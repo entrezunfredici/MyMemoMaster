@@ -1,0 +1,19 @@
+name: tests se lance sur les pokémons de type dev 
+
+on:
+  push:
+    branches:
+      - 'dev_*'
+      - 'dev'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: API - Install dependencies
+        working-directory: my_memo_master_api
+        run: npm install
+      - name: API - Test
+        working-directory: my_memo_master_api
+        run: npm run test
