@@ -1,4 +1,4 @@
-name: Build
+name: Build normalement ça paaaaaaassse
 on:
   push:
     branches:
@@ -21,6 +21,8 @@ jobs:
         run: ng test
   notify:
     runs-on: ubuntu-latest
+    needs: test
+    if: success()
     steps:
       - name: Send message to Discord
         run: |
@@ -28,7 +30,7 @@ jobs:
             "https://media1.tenor.com/m/SYbQQkWKTJUAAAAd/vilebrequin-vilebrequin-winamax.gif"
             "https://media1.tenor.com/m/2C6IrDSSZ4EAAAAd/vilebrequin-vilebrequin-winamax.gif"
             "https://media1.tenor.com/m/Fl1OdPlcQ20AAAAC/vilebrequin-vilebrequin-dos-d-ane.gif"
-            "https://media1.tenor.com/m/eMOeGcx_o54AAAAd/crash-bus.gif"
+            "https://media1.tenor.com/m/LbNXxiA2KlgAAAAC/vilebrequin-sylvain.gif"
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           curl -X POST -H "Content-Type: application/json" \
@@ -37,7 +39,6 @@ jobs:
   build:
     name: Build and analyze
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
         with:
