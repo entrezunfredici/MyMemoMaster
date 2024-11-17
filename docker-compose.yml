@@ -1,0 +1,36 @@
+version: "3"
+
+services:
+  api:
+    image: node:18
+    working_dir: /app
+    volumes:
+      - ./my_memo_master_api:/app
+    ports:
+      - "9000:9000"
+    environment:
+      - NODE_ENV=development
+    command: sh -c "npm install && npm rebuild sqlite3 && npm start"
+
+  front:
+    image: node:18
+    working_dir: /app
+    volumes:
+      - ./my_memo_master_front:/app
+    ports:
+      - "4200:4200"
+    environment:
+      - NODE_ENV=development
+    command: sh -c "npm install && npm run start -- --host 0.0.0.0"
+
+#   db:
+#     image: postgres:13
+#     environment:
+#       POSTGRES_USER: user
+#       POSTGRES_PASSWORD: password
+#       POSTGRES_DB: mydatabase
+#     volumes:
+#       - db-data:/var/lib/postgresql/data
+
+# volumes:
+#   db-data:

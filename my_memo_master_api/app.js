@@ -33,6 +33,11 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 // Middleware pour servir la documentation Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// Route pour la racine
+app.get('/', (req, res) => {
+    res.send('Hello World');
+});
+
 // ... Autres middlewares
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
