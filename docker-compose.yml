@@ -6,6 +6,7 @@ services:
     working_dir: /app
     volumes:
       - ./my_memo_master_api:/app
+      - api-data:/app/data  # Ajout d'un volume nommé pour persister les données
     ports:
       - "9000:9000"
     environment:
@@ -17,11 +18,16 @@ services:
     working_dir: /app
     volumes:
       - ./my_memo_master_front:/app
+      - front-data:/app/data  # Ajout d'un volume nommé pour persister les données
     ports:
       - "4200:4200"
     environment:
       - NODE_ENV=development
     command: sh -c "npm install && npm run start -- --host 0.0.0.0"
+
+volumes:
+  api-data:
+  front-data:
 
 #   db:
 #     image: postgres:13
