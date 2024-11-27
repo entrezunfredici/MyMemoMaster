@@ -1,5 +1,30 @@
 const subjectService = require("../services/Subject.service.js");
 
+/**
+ * @swagger
+ * /subjects/all:
+ *   get:
+ *     summary: Récupérer tous les sujets
+ *     tags: [Subjects]
+ *     responses:
+ *       200:
+ *         description: Liste de tous les sujets récupérée avec succès.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                     example: 1
+ *                   name:
+ *                     type: string
+ *                     example: "Math"
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
 exports.findAll = async (req, res) => {
   try {
     const data = await subjectService.findAll();
@@ -13,6 +38,38 @@ exports.findAll = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /subjects/{id}:
+ *   get:
+ *     summary: Récupérer un sujet par ID
+ *     tags: [Subjects]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Identifiant du sujet
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Sujet récupéré avec succès.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 1
+ *                 name:
+ *                   type: string
+ *                   example: "Math"
+ *       404:
+ *         description: Sujet non trouvé.
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
 exports.findOne = async (req, res) => {
   try {
     const data = await subjectService.findOne(req.params.id);
@@ -30,6 +87,39 @@ exports.findOne = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /subjects/add:
+ *   post:
+ *     summary: Ajouter un nouveau sujet
+ *     tags: [Subjects]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Math"
+ *     responses:
+ *       201:
+ *         description: Sujet créé avec succès.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 1
+ *                 name:
+ *                   type: string
+ *                   example: "Math"
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
 exports.create = async (req, res) => {
   try {
     const { name } = req.body;
