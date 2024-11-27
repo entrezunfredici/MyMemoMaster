@@ -1,15 +1,11 @@
 const express = require("express");
-const {
-  validateSubject,
-  validateId,
-} = require("../validators/subject.validator");
-const subject = require("../controllers/subject.controller.js");
+const subject = require("../controllers/Subject.controller.js");
 
 const router = express.Router();
 
-router.get("/", subject.findAll);
-router.get("/:id", validateId, subject.findOne);
-router.post("/", validateSubject, subject.create);
+router.get("/all", subject.findAll);
+router.get("/:id", subject.findOne);
+router.post("/add", subject.create);
 
 module.exports = (app) => {
   app.use("/subject", router);
