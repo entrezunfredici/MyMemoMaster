@@ -34,7 +34,7 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: 'http://localhost:' + process.env.API_PORT, // URL de ton serveur
+                url: 'http://localhost:' + process.env.API_PORT, 
             },
         ],
     },
@@ -54,8 +54,5 @@ app.use(({ res }) => {
 
 // ... Autres middlewares
 
-app.listen(process.env.API_PORT, () => {
-    console.log(`Server running on port ${process.env.API_PORT}`);
-});
 
 module.exports = app;

@@ -6,11 +6,13 @@ const instance = new Sequelize({
     storage: dbConfig.storage
 });
 
-//définir les moddèles :
+// Models
+const roles = require('./roles')(instance);
 
-// Définir les associations :
-
+// Associations
+// ...
 
 module.exports = {
-    instance
+    instance,
+    roles,
 };
