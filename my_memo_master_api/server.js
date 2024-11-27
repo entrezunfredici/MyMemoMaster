@@ -1,12 +1,16 @@
-const port = 9000;
-const db = require('./models/index');
+require('dotenv').config();
+const { instance } = require('./models');
 const app = require('./app');
-// Start the server on the given port
-db.instance.sync({force: false}).then(async () =>{
-    console.log('Database connected and synchronized');
-    app.listen(port, () => {
-        console.log('Server is running on port', port)
+
+const PORT = process.env.PORT || 9000;
+
+instance.sync({ force: false })
+    .then(() => {
+        console.log('Database connected and synchronized');
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
     })
-}).catch((e) => {
-    console.error(e);
-})
+    .catch((error) => {
+        console.error('Failed to connect to the database:', error);
+    });

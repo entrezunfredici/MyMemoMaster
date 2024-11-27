@@ -23,14 +23,14 @@ services:
       - NODE_ENV=development
     command: sh -c "npm install && npm run start -- --host 0.0.0.0"
 
-#   db:
+#   database:
 #     image: postgres:13
 #     environment:
 #       POSTGRES_USER: user
 #       POSTGRES_PASSWORD: password
 #       POSTGRES_DB: mydatabase
 #     volumes:
-#       - db-data:/var/lib/postgresql/data
+#       - database-database:/var/lib/postgresql/database
 
 # volumes:
-#   db-data:
+#   database-database:
