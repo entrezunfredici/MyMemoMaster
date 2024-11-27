@@ -6,11 +6,10 @@ const instance = new Sequelize({
     storage: dbConfig.storage
 });
 
-//définir les modèles :
-const Unit = require('./unit.model');
+// Charger le modèle Unit en passant l'instance
+const Unit = require('./unit.model')(instance);
 
-// Définir les associations :
-
+// Définir les associations (si nécessaire)
 
 module.exports = {
     instance,
