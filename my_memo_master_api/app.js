@@ -38,8 +38,13 @@ app.get('/', (req, res) => {
     res.send('Hello World');
 });
 
-const rolesrouter = require('./routes/roles')
-app.use('/roles', rolesrouter)
+const rolesroutes = require('./routers/roles')
+app.use('/roles', rolesroutes)
+
+// Si rien n'est trouvé
+app.use(({ res }) => {
+    return res.status(404).json({ message: 'Route not found' });
+})
 
 // ... Autres middlewares
 app.listen(PORT, () => {
