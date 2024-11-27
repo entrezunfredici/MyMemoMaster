@@ -1,14 +1,22 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); // .env is placed in the root directory of the project
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const cors = require('cors');
-const PORT = process.env.PORT || 8000;
+const bodyParser = require('body-parser');
+const PORT = process.env.API_PORT || 8000;
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// CORS
+app.use(cors({
+    origin: process.env.VITE_FRONT_URL,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use(bodyParser.json());
 
 // Options pour SwaggerJsdoc
 const swaggerOptions = {
@@ -33,13 +41,8 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 // Middleware pour servir la documentation Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Route pour la racine
-app.get('/', (req, res) => {
-    res.send('Hello World');
-});
-
-const rolesroutes = require('./routers/roles')
-app.use('/roles', rolesroutes)
+// Routes
+app.use('/roles', require('./routers/roles'))
 
 // Si rien n'est trouvé
 app.use(({ res }) => {
