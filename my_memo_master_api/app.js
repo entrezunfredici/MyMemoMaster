@@ -38,6 +38,9 @@ app.get('/', (req, res) => {
     res.send('Hello World');
 });
 
+const rolesrouter = require('./routes/roles')
+app.use('/roles', rolesrouter)
+
 // ... Autres middlewares
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
