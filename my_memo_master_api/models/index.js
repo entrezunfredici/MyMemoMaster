@@ -7,7 +7,7 @@ const instance = new Sequelize({
 });
 
 // Models
-const roles = require('./roles')(instance);
+const roles = require('./Roles.models')(instance);
 
 // Associations
 // ...

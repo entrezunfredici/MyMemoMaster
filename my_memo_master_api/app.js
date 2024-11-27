@@ -45,7 +45,7 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
-app.use('/roles', require('./routers/roles'))
+app.use('/roles', require('./routes/Role.route'))
 
 // Si rien n'est trouvé
 app.use(({ res }) => {
