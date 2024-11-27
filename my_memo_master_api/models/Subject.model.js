@@ -14,6 +14,18 @@ const Subject = instance.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    mindMapId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    leitnerSystemId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    testId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   },
   {
     tableName: "subjects",
