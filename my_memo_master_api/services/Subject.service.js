@@ -1,4 +1,4 @@
-const Subject = require("../models/Subject.model.js");
+const { Subject } = require("../models/index");
 const { Op } = require("sequelize");
 
 class SubjectService {

@@ -8,5 +8,5 @@ router.get("/:id", subject.findOne);
 router.post("/add", subject.create);
 
 module.exports = (app) => {
-  app.use("/subject", router);
+  app.use("/subjects", router);
 };
