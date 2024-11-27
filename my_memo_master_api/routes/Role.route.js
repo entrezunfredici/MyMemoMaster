@@ -1,9 +1,8 @@
-const roles = require('../models/Roles.models')
-const rolesController = require('../controllers/Roles.controller');
+const roles = require('../models/Role.model')
+const rolesController = require('../controllers/Role.controller');
 
 const router = require('express').Router();
 
-router.get('/all', rolesController.getAllRoles)
+router.get('/all', rolesController.findAll)
 
 module.exports = router;
-    
