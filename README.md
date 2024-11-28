@@ -27,7 +27,8 @@ MyMemoMaster
 
 ## Partie 2: À l'attention des collaborateurs
 
-###bien commencer:
+### Bien commencer:
+
 Logiciels nécéssaires:
 
 - Postman ⇒ https://www.postman.com
@@ -39,25 +40,25 @@ Logiciels nécéssaires:
 récupération du projet:
 http:
 
-```
+```sh
 git clone https://github.com/entrezunfredici/MyMemoMaster.git
 ```
 
 SSH:
 
-```
+```sh
 git clone git@github.com:entrezunfredici/MyMemoMaster.git
 
 ```
 
 lancer votre environnement local:
 
-```
+```sh
 cd MyMemoMaster
 docker-compose up
 ```
 
-###Methode de travail:
+### Methode de travail:
 Etape 1, se caller sur la branche dev:
 
 ```
@@ -195,6 +196,8 @@ un adjectif:
       <td></td>
       <td></td>
       <td></td>
+      <td></td>
+      <td></td>
     </tr>
     <tr>
       <td>Étape 7</td>
@@ -205,9 +208,13 @@ un adjectif:
       <td></td>
       <td></td>
       <td></td>
+      <td></td>
+      <td></td>
     </tr>
     <tr>
       <td>Étape 8</td>
+     <td></td>
+      <td></td>
       <td></td>
       <td></td>
       <td></td>
@@ -218,6 +225,8 @@ un adjectif:
     </tr>
     <tr>
       <td>Étape 9</td>
+      <td></td>
+      <td></td>
       <td></td>
       <td></td>
       <td></td>

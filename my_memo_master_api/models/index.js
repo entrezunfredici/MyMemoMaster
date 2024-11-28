@@ -1,16 +1,21 @@
-const { Sequelize } = require('sequelize');
-const dbConfig = require('../db.config');
+const { Sequelize } = require("sequelize");
+const dbConfig = require("../db.config");
 
+// Création de l'instance Sequelize
 const instance = new Sequelize({
-    dialect: dbConfig.dialect,
-    storage: dbConfig.storage
+  dialect: dbConfig.dialect,
+  storage: dbConfig.storage,
 });
 
-//définir les moddèles :
+// Models
+const Role = require("./Role.model")(instance);
+const Subject = require("./Subject.model")(instance);
 
-// Définir les associations :
-
+// Associations
+// ...
 
 module.exports = {
-    instance
+  instance,
+  Role,
+  Subject,
 };

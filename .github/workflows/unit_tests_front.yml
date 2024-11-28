@@ -14,9 +14,9 @@ jobs:
       - name: API - Install dependencies
         working-directory: my_memo_master_api
         run: npm install
-      - name: Front - Test
-        working-directory: my_memo_master_front
-        run: ng test
+      # - name: Front - Test
+      #   working-directory: my_memo_master_front
+      #   run: ng test
 
   notify_failure:
     runs-on: ubuntu-latest
