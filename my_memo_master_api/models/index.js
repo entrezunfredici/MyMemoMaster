@@ -8,14 +8,14 @@ const instance = new Sequelize({
 });
 
 // Models
-const roles = require("./Role.model")(instance);
-const Subject = require("./Subject.model");
+const Role = require("./Role.model")(instance);
+const Subject = require("./Subject.model")(instance);
 
 // Associations
 // ...
 
 module.exports = {
   instance,
-  roles,
+  Role,
   Subject,
 };
