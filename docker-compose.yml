@@ -3,12 +3,12 @@ version: "3"
 services:
   api:
     image: node:18
-    working_dir: /app
+    working_dir: /server
     volumes:
-      - ./my_memo_master_api:/app
-      - api-data:/app/data  # Ajout d'un volume nommé pour persister les données
+      - ./my_memo_master_api:/server
+      - api-data:/server/data  # Ajout d'un volume nommé pour persister les données
     ports:
-      - "9000:9000"
+      - "${API_PORT}:${API_PORT}"
     environment:
       - NODE_ENV=development
     command: sh -c "npm install && npm rebuild sqlite3 && npm start"
@@ -20,10 +20,10 @@ services:
       - ./my_memo_master_front:/app
       - front-data:/app/data  # Ajout d'un volume nommé pour persister les données
     ports:
-      - "4200:4200"
+      - "${VITE_PORT}:${VITE_PORT}"
     environment:
       - NODE_ENV=development
-    command: sh -c "npm install && npm run start -- --host 0.0.0.0"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
 
 volumes:
   api-data:
