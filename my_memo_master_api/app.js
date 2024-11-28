@@ -22,7 +22,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // Middleware for favicon
-app.use(favicon(__dirname + '/public/favicon.ico'))
+app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
 const swaggerOptions = {
@@ -39,11 +39,17 @@ const swaggerOptions = {
             },
         ],
     },
-    apis: ['./routers/*.js'], // Chemin des fichiers de routes
+    servers: [
+      {
+        url: "http://localhost:" + PORT, // URL de ton serveur
+      },
+    ],
+  },
+  apis: ["./routers/*.js"], // Chemin des fichiers de routes
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use('/roles', require('./routes/Role.route'))
