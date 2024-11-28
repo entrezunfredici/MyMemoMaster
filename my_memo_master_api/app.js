@@ -26,26 +26,20 @@ app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
 const swaggerOptions = {
-    definition: {
-        openapi: '3.0.0',
-        info: {
-            title: 'API Documentation',
-            version: '1.0.0',
-            description: 'Documentation de l\'API avec OpenAPI et Swagger',
-        },
-        servers: [
-            {
-                url: 'http://localhost:' + process.env.API_PORT, 
-            },
-        ],
-    },
-    servers: [
-      {
-        url: "http://localhost:" + PORT, // URL de ton serveur
+  definition: {
+      openapi: '3.0.0',
+      info: {
+          title: 'API Documentation',
+          version: '1.0.0',
+          description: 'Documentation de l\'API avec OpenAPI et Swagger',
       },
-    ],
+      servers: [
+          {
+              url: 'http://localhost:' + process.env.API_PORT, 
+          },
+      ],
   },
-  apis: ["./routers/*.js"], // Chemin des fichiers de routes
+  apis: ['./routers/*.js'], // Chemin des fichiers de routes
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
