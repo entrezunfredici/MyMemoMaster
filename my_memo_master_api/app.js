@@ -5,6 +5,7 @@ const favicon = require('serve-favicon')
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const cors = require('cors');
+const subjectRoutes = require("./routes/Subject.routes");
 const bodyParser = require('body-parser');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') }); // .env is placed in the root directory of the project
@@ -13,7 +14,7 @@ const app = express();
 
 // CORS
 app.use(cors({
-    origin: process.env.FRONT_URL,
+    origin: process.env.VITE_FRONT_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -34,7 +35,7 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: 'http://localhost:' + process.env.API_PORT, // URL de ton serveur
+                url: 'http://localhost:' + process.env.API_PORT, 
             },
         ],
     },
@@ -45,17 +46,14 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
-app.use('/roles', require('./routers/roles'))
-
+app.use('/roles', require('./routes/Role.route'))
 // Si rien n'est trouvé
+
+
+// ... Autres middlewares
+subjectRoutes(app);
+
 app.use(({ res }) => {
     return res.status(404).json({ message: 'Route not found' });
 })
-
-// ... Autres middlewares
-
-app.listen(process.env.API_PORT, () => {
-    console.log(`Server running on port ${process.env.API_PORT}`);
-});
-
 module.exports = app;
