@@ -5,6 +5,7 @@ const favicon = require('serve-favicon')
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const cors = require('cors');
+const subjectRoutes = require("./routes/Subject.routes");
 const bodyParser = require('body-parser');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') }); // .env is placed in the root directory of the project
@@ -21,7 +22,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // Middleware for favicon
-app.use(favicon(__dirname + '/public/favicon.ico'))
+app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
 const swaggerOptions = {
@@ -38,21 +39,27 @@ const swaggerOptions = {
             },
         ],
     },
-    apis: ['./routers/*.js'], // Chemin des fichiers de routes
+    servers: [
+      {
+        url: "http://localhost:" + PORT, // URL de ton serveur
+      },
+    ],
+  },
+  apis: ["./routers/*.js"], // Chemin des fichiers de routes
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use('/roles', require('./routes/Role.route'))
-
 // Si rien n'est trouvé
+
+
+// ... Autres middlewares
+subjectRoutes(app);
+
 app.use(({ res }) => {
     return res.status(404).json({ message: 'Route not found' });
 })
-
-// ... Autres middlewares
-
-
 module.exports = app;
