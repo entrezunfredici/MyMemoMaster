@@ -1,18 +1,18 @@
 const express = require("express");
-const subject = require("../controllers/Subject.controller.js");
+const role = require("../controllers/Role.controller.js");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /subjects/all:
+ * /roles/all:
  *   get:
- *     summary: Récupère tous les sujets
+ *     summary: Récupère tous les rôles
  *     tags:
- *       - Subjects
+ *       - Roles
  *     responses:
  *       200:
- *         description: Liste de tous les sujets
+ *         description: Liste de tous les rôles
  *         content:
  *           application/json:
  *             schema:
@@ -26,37 +26,28 @@ const router = express.Router();
  *                   name:
  *                     type: string
  *                     example: "Math"
- *                   mindMapId:
- *                     type: integer
- *                     example: 42
- *                   leitnerSystemId:
- *                     type: integer
- *                     example: 13
- *                   testId:
- *                     type: integer
- *                     example: 7
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", subject.findAll);
+router.get("/all", role.findAll);
 
 /**
  * @swagger
- * /subjects/{id}:
+ * /roles/{id}:
  *   get:
- *     summary: Récupère un sujet par son ID
+ *     summary: Récupère un rôle par son ID
  *     tags:
- *       - Subjects
+ *       - Roles
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du sujet
+ *         description: ID du rôle
  *         schema:
  *           type: integer
  *     responses:
  *       200:
- *         description: Sujet correspondant à l'ID
+ *         description: Rôle correspondant à l'ID
  *         content:
  *           application/json:
  *             schema:
@@ -68,29 +59,20 @@ router.get("/all", subject.findAll);
  *                 name:
  *                   type: string
  *                   example: "Math"
- *                 mindMapId:
- *                   type: integer
- *                   example: 42
- *                 leitnerSystemId:
- *                   type: integer
- *                   example: 13
- *                 testId:
- *                   type: integer
- *                   example: 7
  *       404:
- *         description: Sujet non trouvé
+ *         description: Rôle non trouvé
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", subject.findOne);
+router.get("/:id", role.findOne);
 
 /**
  * @swagger
- * /subjects/add:
+ * /roles/add:
  *   post:
- *     summary: Ajoute un nouveau sujet
+ *     summary: Ajoute un nouveau rôle
  *     tags:
- *       - Subjects
+ *       - Roles
  *     requestBody:
  *       required: true
  *       content:
@@ -101,31 +83,22 @@ router.get("/:id", subject.findOne);
  *               name:
  *                 type: string
  *                 example: "Math"
- *               mindMapId:
- *                 type: integer
- *                 example: 42
- *               leitnerSystemId:
- *                 type: integer
- *                 example: 13
- *               testId:
- *                 type: integer
- *                 example: 7
  *     responses:
  *       201:
- *         description: Sujet créé avec succès
+ *         description: Rôle créé avec succès
  *       400:
  *         description: Requête invalide
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", subject.create);
+router.post("/add", role.create);
 
 module.exports = (app) => {
     /**
      * @swagger
      * tags:
-     *   - name: Subjects
-     *     description: Gestion des sujets
+     *   - name: Roles
+     *     description: Gestion des rôles
      */
-    app.use("/subjects", router);
+    app.use("/roles", router);
 };

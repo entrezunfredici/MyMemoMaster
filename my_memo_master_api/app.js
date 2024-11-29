@@ -6,6 +6,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const cors = require('cors');
 const subjectRoutes = require("./routes/Subject.routes");
+const roleRoutes = require("./routes/Role.routes");
 const bodyParser = require('body-parser');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') }); // .env is placed in the root directory of the project
@@ -26,28 +27,29 @@ app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
 const swaggerOptions = {
-  definition: {
-      openapi: '3.0.0',
-      info: {
-          title: 'API Documentation',
-          version: '1.0.0',
-          description: 'Documentation de l\'API avec OpenAPI et Swagger',
-      },
-      servers: [
-          {
-              url: 'http://localhost:' + process.env.API_PORT, 
-          },
-      ],
-  },
-  apis: ['./routers/*.js'], // Chemin des fichiers de routes
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'API Documentation',
+            version: '1.0.0',
+            description: 'Documentation de l\'API avec OpenAPI et Swagger',
+        },
+        servers: [
+            {
+                url: 'http://localhost:' + process.env.API_PORT,
+            },
+        ],
+    },
+    apis: ['./routers/*.js'], // Chemin des fichiers de routes
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
-app.use('/roles', require('./routes/Role.route'))
 subjectRoutes(app);
+roleRoutes(app);
+
 // ... Autres middlewares
 
 // Si rien n'est trouvé
