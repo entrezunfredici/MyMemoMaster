@@ -53,7 +53,7 @@ git clone git@github.com:entrezunfredici/MyMemoMaster.git
 
 ```
 
-1. Lancer votre environnement local:
+3. Lancer votre environnement local:
 
 Avec docker-compose:
 ```sh
@@ -71,6 +71,13 @@ npm run start
 cd MyMemoMaster/my_memo_master_front
 npm install
 npm run dev
+```
+
+4. Lancer le seed de la base de données:
+
+```sh
+cd MyMemoMaster/my_memo_master_api
+npm run seed
 ```
 
 ### Methode de travail:

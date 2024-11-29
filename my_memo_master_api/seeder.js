@@ -18,32 +18,29 @@ const listTables = async () => {
 const seedDatabase = async () => {
     // * This function will drop all existing tables, recreate them, and insert sample data
     try {
-        db.instance.authenticate().then(async () => {
-            console.log('Database connected successfully');
-            db.instance.sync({ force: true }).then(() => {
-                console.log('Database synchronized successfully');
+        await db.instance.authenticate();
+        console.log('Database connected successfully');
 
-                // await db.instance.query('PRAGMA foreign_keys = OFF');
+        await db.instance.sync({ force: true });
+        console.log('Database synchronized successfully');
 
-                db.Role.drop().then(() => {
-                    db.Role.bulkCreate(require('./seeds/Role.seed.json'));
-                });
-                db.Subject.drop().then(() => {
-                    db.Subject.bulkCreate(require('./seeds/Subject.seed.json'));
-                });
-                // ... Add more tables here
+        await db.instance.query('PRAGMA foreign_keys = OFF');
 
-                // await db.instance.query('PRAGMA foreign_keys = ON');
+        await db.Role.bulkCreate(require('./seeds/Role.seed.json'));
+        console.log('Roles table seeded successfully');
+        await db.Subject.bulkCreate(require('./seeds/Subject.seed.json'));
+        console.log('Subjects table seeded successfully');
 
-                console.log('Sample data inserted');
-            })
-        })
+        await db.instance.query('PRAGMA foreign_keys = ON');
+
+        console.log('Sample data inserted');
     } catch (error) {
         console.error('Error inserting sample data');
         console.error(error);
         throw error;
     }
 };
+
 
 const checkSeed = async () => {
     // * This function will verify that the sample data has been inserted. We assume that if ONE record is found, then all records have been inserted.

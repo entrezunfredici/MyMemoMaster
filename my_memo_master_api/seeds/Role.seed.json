@@ -4,7 +4,7 @@
         "name": "Admin"
     },
     {
-        "roleId": 1,
+        "roleId": 2,
         "name": "Utilisateur"
     }
 ]
