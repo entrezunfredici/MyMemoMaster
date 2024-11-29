@@ -1,6 +1,6 @@
 # MyMemoMaster
 
-Présentation:
+## Partie 1: Présentation
 MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leur révisions. En centralisant diverses fonctionnalités visant à optimiser l’apprentissage. La ou MyMEmoMaster pourra se démarquer de ces concurrents c’est sur le fait de proposer un large éventail de fonctionnalités :
 
 Les fonctionnalitées principales sont :
@@ -10,7 +10,11 @@ Les fonctionnalitées principales sont :
 
 L'applications disposera de fonctionnalitées interactives.
 
-arborescence du projet:
+## Partie 2: À l'attention des collaborateurs
+
+### Détails du projet
+
+Arborescence du projet:
 
 MyMemoMaster
 │   README.md
@@ -25,50 +29,61 @@ MyMemoMaster
 |       ./package.json //package de l'api
 |   ./my_memo_master_front
 
-## Partie 2: À l'attention des collaborateurs
-
 ### Bien commencer:
 
-Logiciels nécéssaires:
+1. Logiciels nécéssaires:
 
 - Postman ⇒ https://www.postman.com
-- Visual Studio Code ⇒ https://code.visualstudio.com
+- VS Code ⇒ https://code.visualstudio.com
 - Git ⇒ https://git-scm.com
 - Docker/Docker-compose ⇒ https://www.docker.com
-- un navigateur web
+- Un navigateur web
 
-récupération du projet:
-http:
-
+2. Récupération du projet:
+3. 
+HTTP:
 ```sh
 git clone https://github.com/entrezunfredici/MyMemoMaster.git
 ```
 
 SSH:
-
 ```sh
 git clone git@github.com:entrezunfredici/MyMemoMaster.git
 
 ```
 
-lancer votre environnement local:
+3. Lancer votre environnement local:
 
+Avec docker-compose:
 ```sh
 cd MyMemoMaster
 docker-compose up
 ```
 
+A l'ancienne (comme la moutarde):
+```sh
+cd MyMemoMaster/my_memo_master_api
+npm install
+npm run start
+```
+```sh
+cd MyMemoMaster/my_memo_master_front
+npm install
+npm run dev
+```
+
 ### Methode de travail:
+
 Etape 1, se caller sur la branche dev:
 
-```
+```sh
 git checkout dev
 git pull
 ```
 
 Etape 2, créer une branche pour la feature que vous souhaitez ajouter:
 
-```
+```sh
 git checkout -b dev_front/back_ma-feature
 ```
 
@@ -81,7 +96,7 @@ Etape 3, travailler sur votre feature:
 Etape 4, pusher sur votre branche (chaques fin de séance et quand votre feature est finie):
 quand votre branche n'est pas encore sur git
 
-```
+```sh
 git add .
 git commmit -m "`<message>`"
 git push origin dev_front/back_ma-feature
@@ -89,7 +104,7 @@ git push origin dev_front/back_ma-feature
 
 quand votre bra&nche est déja sur git
 
-```
+```sh
 git add .
 git commmit -m "`<message>`"
 git push
@@ -104,9 +119,9 @@ un adjectif:
 - [FIX] pour les corrections de bugs
   suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
 
-## Organisation du travail
+<!-- ## Organisation du travail -->
 
-<table>
+<!-- <table>
   <thead>
     <tr>
       <th>Étapes</th>
@@ -244,6 +259,8 @@ un adjectif:
       <td></td>
       <td></td>
       <td></td>
+      <td></td>
+      <td></td>
     </tr>
   </tbody>
-</table>
+</table> -->
