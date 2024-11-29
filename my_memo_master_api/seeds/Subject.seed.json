@@ -1,0 +1,16 @@
+[
+    {
+        "subjectId": 1,
+        "name": "Maths",
+        "mindMapId": 1,
+        "leitnerSystemId": 1,
+        "testId": 1
+    },
+    {
+        "subjectId": 2,
+        "name": "Science",
+        "mindMapId": 2,
+        "leitnerSystemId": 2,
+        "testId": 2
+    }
+]

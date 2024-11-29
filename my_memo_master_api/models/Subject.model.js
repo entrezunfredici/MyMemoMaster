@@ -4,7 +4,7 @@ module.exports = (instance) => {
   return instance.define(
     "Subject",
     {
-      id: {
+      subjectId: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
@@ -38,7 +38,7 @@ module.exports = (instance) => {
       },
     },
     {
-      tableName: "subject",
+      tableName: "Subject",
       updatedAt: 'updatedAt',
       createdAt: 'createdAt',
       timestamps: false,

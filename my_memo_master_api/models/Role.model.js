@@ -23,9 +23,9 @@ module.exports = (instance) => {
             defaultValue: DataTypes.NOW,
         },
     }, {
-        timestamps: true,
+        tableName: 'Role',
         updatedAt: 'updatedAt',
         createdAt: 'createdAt',
-        tableName: 'role',
+        timestamps: true,
     })
 }
