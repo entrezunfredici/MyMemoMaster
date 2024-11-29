@@ -3,7 +3,7 @@ name: tests front se lance sur les pokémons de type dev front
 on:
   push:
     branches:
-      - 'dev_front_'
+      - 'dev_front_*'
 
 jobs:
   test:
