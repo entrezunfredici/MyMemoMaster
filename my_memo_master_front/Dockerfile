@@ -16,8 +16,8 @@ RUN npm ci
 # Copie tout le reste des fichiers de l'application
 COPY . .
 
-# Expose le port sur lequel l'application va tourner
-EXPOSE ${API_PORT}
+# Expose le port sur lequel Vite va tourner
+EXPOSE ${VITE_PORT}
 
-# Commande pour démarrer l'application
-CMD ["npm", "start"]
+# Commande pour démarrer l'application avec Vite
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

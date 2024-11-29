@@ -47,12 +47,10 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use('/roles', require('./routes/Role.route'))
-// Si rien n'est trouvé
-
-
-// ... Autres middlewares
 subjectRoutes(app);
+// ... Autres middlewares
 
+// Si rien n'est trouvé
 app.use(({ res }) => {
     return res.status(404).json({ message: 'Route not found' });
 })

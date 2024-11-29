@@ -2,28 +2,42 @@ version: "3"
 
 services:
   api:
-    image: node:18
-    working_dir: /server
-    volumes:
-      - ./my_memo_master_api:/server
-      - api-data:/server/data  # Ajout d'un volume nommé pour persister les données
+    build:
+      context: ./my_memo_master_api
+      dockerfile: Dockerfile
+      args:
+        - API_PORT=${API_PORT}
     ports:
       - "${API_PORT}:${API_PORT}"
+    volumes:
+      - ./my_memo_master_api:/app
+      - api-data:/app/data  # Ajout d'un volume nommé pour persister les données
     environment:
       - NODE_ENV=development
+      - API_PORT=${API_PORT}
     command: sh -c "npm install && npm rebuild sqlite3 && npm start"
 
   front:
-    image: node:18
-    working_dir: /app
+    build:
+      context: ./my_memo_master_front
+      dockerfile: Dockerfile
+      args:
+        - VITE_PORT=${VITE_PORT}
+    ports:
+      - "${VITE_PORT}:${VITE_PORT}"
     volumes:
       - ./my_memo_master_front:/app
       - front-data:/app/data  # Ajout d'un volume nommé pour persister les données
-    ports:
-      - "${VITE_PORT}:${VITE_PORT}"
-    environment:
-      - NODE_ENV=development
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    # build:
+    #   args:
+    #     - VITE_PORT=${VITE_PORT}
+    # working_dir: /app
+    # environment:
+    #   - NODE_ENV=development
+    #   - VITE_PORT=${VITE_PORT}
+    #   - VITE_FRONT_URL=${VITE_FRONT_URL}
+    #   - VITE_BACK_API_URL=${VITE_BACK_API_URL}
+    # command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
 
 volumes:
   api-data:
