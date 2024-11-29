@@ -9,6 +9,7 @@ const listTables = async () => {
         const tables = await db.instance.query("SELECT name FROM sqlite_master WHERE type='table';");
         console.log(tables[0].map(table => table.name));
     } catch (error) {
+        console.error('Error listing tables');
         console.error(error);
         throw error;
     }
@@ -17,23 +18,28 @@ const listTables = async () => {
 const seedDatabase = async () => {
     // * This function will drop all existing tables, recreate them, and insert sample data
     try {
-        await db.instance.authenticate();
-        
-        await db.instance.sync({ force: true });
-        
-        await db.instance.query('PRAGMA foreign_keys = OFF');
-        
-        await db.Role.drop();
-        await db.Role.bulkCreate(require('./seeds/Role.seed.json'));
-        await db.Subject.drop();
-        await db.Subject.bulkCreate(require('./seeds/Subject.seed.json'));
-        // ... Add more tables here
+        db.instance.authenticate().then(async () => {
+            console.log('Database connected successfully');
+            db.instance.sync({ force: true }).then(() => {
+                console.log('Database synchronized successfully');
 
-        await db.instance.query('PRAGMA foreign_keys = ON');
-        
-        console.log('Sample data inserted');
+                // await db.instance.query('PRAGMA foreign_keys = OFF');
+
+                db.Role.drop().then(() => {
+                    db.Role.bulkCreate(require('./seeds/Role.seed.json'));
+                });
+                db.Subject.drop().then(() => {
+                    db.Subject.bulkCreate(require('./seeds/Subject.seed.json'));
+                });
+                // ... Add more tables here
+
+                // await db.instance.query('PRAGMA foreign_keys = ON');
+
+                console.log('Sample data inserted');
+            })
+        })
     } catch (error) {
-        console.log('Error seeding data');
+        console.error('Error inserting sample data');
         console.error(error);
         throw error;
     }
@@ -44,11 +50,12 @@ const checkSeed = async () => {
     try {
         const roles = await db.Role.findAll();
         if (roles.length === 0) {
-            console.log('No roles found in the database');
+            console.warn('No data found in the database');
         } else {
             console.log('Sample data verified');
         }
     } catch (error) {
+        console.error('Error verifying sample data');
         console.error(error);
         throw error;
     }
@@ -60,12 +67,12 @@ const checkSeed = async () => {
         await seedDatabase();
         await checkSeed();
         console.log('Data seeding completed');
-        process.exit(0); 
+        process.exit(0);
     } catch (error) {
-        console.log('Error running the script');
+        console.error('Error running the script');
         console.error(error);
-        process.exit(1); 
+        process.exit(1);
     } finally {
-        await db.instance.close(); 
+        await db.instance.close();
     }
 })();
