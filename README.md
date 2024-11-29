@@ -16,6 +16,7 @@ L'applications disposera de fonctionnalitées interactives.
 
 Arborescence du projet:
 
+```txt
 MyMemoMaster
 │   README.md
 |   .gitignore
@@ -28,6 +29,7 @@ MyMemoMaster
 |       ./app.js //fichier principal de l'api
 |       ./package.json //package de l'api
 |   ./my_memo_master_front
+```
 
 ### Bien commencer:
 
@@ -40,7 +42,6 @@ MyMemoMaster
 - Un navigateur web
 
 2. Récupération du projet:
-3. 
 HTTP:
 ```sh
 git clone https://github.com/entrezunfredici/MyMemoMaster.git
@@ -52,7 +53,7 @@ git clone git@github.com:entrezunfredici/MyMemoMaster.git
 
 ```
 
-3. Lancer votre environnement local:
+1. Lancer votre environnement local:
 
 Avec docker-compose:
 ```sh
