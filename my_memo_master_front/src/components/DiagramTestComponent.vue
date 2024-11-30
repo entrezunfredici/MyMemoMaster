@@ -69,6 +69,9 @@ export default {
     // Lifecycle hook
     onMounted(() => {
       initializeDiagram(); // Call the function to set up GoJS
+
+      const canva = document.querySelector("canvas")
+      console.dir(canva)
     });
 
     return {
