@@ -10,28 +10,15 @@ const instance = new Sequelize({
 // Models
 const Role = require("./Role.model")(instance);
 const Subject = require("./Subject.model")(instance);
-const LeitnerSystem = require("./LeitnerSystem.model")(sequelize);
-const LeitnerSystemsUsers = require("./leitnerSystemsUsers.model")(sequelize);
+const LeitnerSystem = require("./LeitnerSystem.model")(instance);
+const LeitnerSystemsUsers = require("./leitnerSystemsUsers.model")(instance);
 
-// Associations
-
-// Association Many-to-Many entre User et LeitnerSystem
-User.belongsToMany(LeitnerSystem, {
-  through: LeitnerSystemsUsers,
-  foreignKey: "idUser",
-  otherKey: "idSystem",
-  as: "sharedLeitnerSystems",
-});
-
-LeitnerSystem.belongsToMany(User, {
-  through: LeitnerSystemsUsers,
-  foreignKey: "idSystem",
-  otherKey: "idUser",
-  as: "usersWithAccess",
-});
+// // Associations
 
 module.exports = {
   instance,
   Role,
   Subject,
+  LeitnerSystem,
+  LeitnerSystemsUsers,
 };
