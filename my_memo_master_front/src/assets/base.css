@@ -1,0 +1,66 @@
+:root {
+    --primary: #76a9fa;
+    --light: #ffffff;
+    --dark: #111827;
+
+    --success-light: #34d399;
+    --success: #10b981;
+    --success-dark: #047857;
+    --warning-light: #fbbf24;
+    --warning: #f59e0b;
+    --warning-dark: #d97706;
+    --danger-light: #ef4444;
+    --danger: #dc2626;
+    --danger-dark: #991b1b;
+}
+
+/* Overload vue-toastification stuff */
+.Vue-Toastification__toast {
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2) !important;
+    font-family: "Poppins", "Roboto", sans-serif !important;
+    border: solid 2px transparent !important;
+    border-radius: 1rem !important;
+}
+
+.Vue-Toastification__toast--info {
+    background-color: var(--gray) !important;
+    color: var(--light) !important;
+}
+
+.Vue-Toastification__toast--success {
+    background-color: var(--success) !important;
+    color: var(--light) !important;
+}
+
+.Vue-Toastification__toast--warning {
+    background-color: var(--warning) !important;
+    color: var(--light) !important;
+}
+
+.Vue-Toastification__toast--error {
+    background-color: var(--danger) !important;
+    color: var(--light) !important;
+}
+
+*,
+*::before,
+*::after {
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+    box-sizing: border-box;
+    font-weight: normal;
+}
+
+body {
+    min-height: 100vh;
+    transition: color 0.5s, background-color 0.5s;
+    line-height: 1.6;
+    font-family: "Poppins", "Roboto", sans-serif;
+    font-size: 15px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--light);
+    background: var(--dark);
+}

@@ -14,7 +14,7 @@ import platform
 # commands and folders
 commands = [
     ("lancement de l'api", "npm run start", "my_memo_master_api"),
-    ("lancement du front", "ng serve", "my_memo_master_front")
+    # ("lancement du front", "ng serve", "my_memo_master_front")
 ]
 
 # Exécution des commandes

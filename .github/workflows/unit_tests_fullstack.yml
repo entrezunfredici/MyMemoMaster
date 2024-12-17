@@ -13,12 +13,15 @@ jobs:
       - name: API - Install dependencies
         working-directory: my_memo_master_api
         run: npm install
+      - name: Front - Install dependencies
+        working-directory: my_memo_master_front
+        run: npm install
       - name: API - Test
         working-directory: my_memo_master_api
         run: npm run test
       - name: Front - Test
         working-directory: my_memo_master_front
-        run: ng test
+        run: npm run test
 
   notify_failure:
     runs-on: ubuntu-latest
@@ -37,7 +40,8 @@ jobs:
             "https://media1.tenor.com/m/hoRt31ZDmPEAAAAC/vilebrequin-sylvain.gif"
             "https://media1.tenor.com/m/gD2lZPrYVW4AAAAC/vilebrequin-vilebrequin-sylvain-levy.gif"
             "https://media1.tenor.com/m/sBEng5B5vbwAAAAC/cat-cats.gif"
-            "https://media1.tenor.com/m/1c70Jy7WZI8AAAAd/cat.gif"
+            "https://media1.tenor.com/m/1c70Jy7WZI8AAAAd/cat.gif",
+            "https://media1.tenor.com/m/GElyvue_13cAAAAd/april-fools-joke.gif"
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           BRANCH_NAME=${GITHUB_REF##*/}

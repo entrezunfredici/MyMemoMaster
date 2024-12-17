@@ -1,0 +1,22 @@
+# Ignorer les répertoires de dépendances
+node_modules
+npm-debug.log
+
+# Ignorer les fichiers de configuration de l'éditeur
+.vscode
+.idea
+
+# Ignorer les fichiers de contrôle de version
+.git
+.gitignore
+
+# Ignorer les fichiers de configuration de l'environnement
+#.env
+
+# Ignorer les fichiers de logs
+logs
+*.log
+
+# Ignorer les fichiers temporaires
+tmp
+*.tmp

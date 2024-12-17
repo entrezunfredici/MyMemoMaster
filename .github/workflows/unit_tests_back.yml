@@ -3,7 +3,7 @@ name: tests back se lance sur les pokémons de type dev back
 on:
   push:
     branches:
-      - 'dev_back_'
+      - 'dev_back_*'
 jobs:
   test:
     runs-on: ubuntu-latest
