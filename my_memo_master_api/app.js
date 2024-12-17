@@ -7,6 +7,8 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const cors = require('cors');
 const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
+const userRoutes = require("./routes/User.routes");
+const authMiddleware = require('./middlewares/Auth.middleware');
 const bodyParser = require('body-parser');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') }); // .env is placed in the root directory of the project
@@ -29,11 +31,13 @@ app.use(favicon(__dirname + "/public/favicon.ico"));
 const swaggerSpec = swaggerJsdoc(require('./swagger.config.js'));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// Middleware
+app.use(authMiddleware);
+
 // Routes
 subjectRoutes(app);
 roleRoutes(app);
-
-// ... Autres middlewares
+userRoutes(app);
 
 // Si rien n'est trouvé
 app.use(({ res }) => {

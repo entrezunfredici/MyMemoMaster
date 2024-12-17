@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-module.exports = async (req, res, next) => {
-    if (process.env.BACK_BYPASS_AUTH == 'true') {
+module.exports = (req, res, next) => {
+    if (process.env.BYPASS_AUTH == 'true') {
         next();
         return;
     }
