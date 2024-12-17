@@ -10,6 +10,7 @@ const instance = new Sequelize({
 // Models
 const Role = require("./Role.model")(instance);
 const Subject = require("./Subject.model")(instance);
+const LeitnerCard = require("./LeitnerCard.model")(instance);
 
 // Associations
 // ...
@@ -18,4 +19,5 @@ module.exports = {
   instance,
   Role,
   Subject,
+  LeitnerCard,
 };
