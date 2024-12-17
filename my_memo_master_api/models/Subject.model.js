@@ -4,43 +4,21 @@ module.exports = (instance) => {
   return instance.define(
     "Subject",
     {
-      subjectId: {
+      idSubject: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
       },
       name: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(50),
         allowNull: false,
-      },
-      mindMapId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      leitnerSystemId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      testId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      updatedAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
-      },
-      createdAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
       },
     },
     {
       tableName: "Subject",
-      updatedAt: 'updatedAt',
-      createdAt: 'createdAt',
+      updatedAt: "updatedAt",
+      createdAt: "createdAt",
       timestamps: false,
     }
   );

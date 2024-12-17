@@ -48,4 +48,51 @@ describe("SubjectService", () => {
     expect(Subject.create).toHaveBeenCalledWith({ name: "History" });
     expect(subject).toEqual(mockSubject);
   });
+
+  test("should update an existing subject", async () => {
+    const mockSubject = {
+      id: 1,
+      name: "Old Subject",
+      update: jest.fn().mockImplementation(function (newData) {
+        Object.assign(this, newData);
+        return this;
+      }),
+    };
+    const updatedData = { name: "Updated Subject" };
+    Subject.findByPk.mockResolvedValue(mockSubject);
+    const updatedSubject = await SubjectService.update(1, updatedData);
+    expect(Subject.findByPk).toHaveBeenCalledWith(1);
+    expect(mockSubject.update).toHaveBeenCalledWith(updatedData);
+    expect(updatedSubject).toMatchObject({ id: 1, name: "Updated Subject" });
+  });
+
+  test("should return null when updating a non-existing subject", async () => {
+    Subject.findByPk.mockResolvedValue(null);
+
+    const updatedSubject = await SubjectService.update(999, { name: "Fail" });
+
+    expect(Subject.findByPk).toHaveBeenCalledWith(999);
+    expect(updatedSubject).toBeNull();
+  });
+
+  test("should delete a subject by ID", async () => {
+    const mockSubject = { destroy: jest.fn() };
+
+    Subject.findByPk.mockResolvedValue(mockSubject);
+
+    const result = await SubjectService.delete(1);
+
+    expect(Subject.findByPk).toHaveBeenCalledWith(1);
+    expect(mockSubject.destroy).toHaveBeenCalledTimes(1);
+    expect(result).toBe(true);
+  });
+
+  test("should return false when deleting a non-existing subject", async () => {
+    Subject.findByPk.mockResolvedValue(null);
+
+    const result = await SubjectService.delete(999);
+
+    expect(Subject.findByPk).toHaveBeenCalledWith(999);
+    expect(result).toBe(false);
+  });
 });
