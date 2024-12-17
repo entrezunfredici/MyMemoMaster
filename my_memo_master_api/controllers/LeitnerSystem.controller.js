@@ -1,17 +1,5 @@
 const leitnerSystemService = require("../services/LeitnerSystem.service.js");
 
-/**
- * @swagger
- * /leitnersystems/all:
- *   get:
- *     summary: Récupérer tous les systèmes de Leitner
- *     tags: [LeitnerSystems]
- *     responses:
- *       200:
- *         description: Liste de tous les systèmes de Leitner récupérée avec succès.
- *       500:
- *         description: Erreur interne du serveur.
- */
 exports.findAll = async (req, res) => {
   try {
     const data = await leitnerSystemService.findAll();
@@ -24,27 +12,6 @@ exports.findAll = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /leitnersystems/bySubjects/{subjectid}:
- *   get:
- *     summary: Récupérer les systèmes de Leitner liés à un sujet
- *     tags: [LeitnerSystems]
- *     parameters:
- *       - name: subjectid
- *         in: path
- *         required: true
- *         description: Identifiant du sujet
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Liste des systèmes récupérée avec succès.
- *       404:
- *         description: Aucun système trouvé.
- *       500:
- *         description: Erreur interne du serveur.
- */
 exports.findBySubject = async (req, res) => {
   try {
     const { subjectid } = req.params;
@@ -61,27 +28,6 @@ exports.findBySubject = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /leitnersystems/{id}:
- *   get:
- *     summary: Récupérer un système de Leitner par ID
- *     tags: [LeitnerSystems]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: Identifiant du système de Leitner
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Système récupéré avec succès.
- *       404:
- *         description: Système non trouvé.
- *       500:
- *         description: Erreur interne du serveur.
- */
 exports.findOne = async (req, res) => {
   try {
     const { id } = req.params;
@@ -96,36 +42,6 @@ exports.findOne = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /leitnersystem/add:
- *   post:
- *     summary: Ajouter un système de Leitner
- *     tags: [LeitnerSystems]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               idUser:
- *                 type: integer
- *               idMindMap:
- *                 type: integer
- *                 nullable: true
- *               sujet:
- *                 type: array
- *                 items:
- *                   type: string
- *     responses:
- *       201:
- *         description: Système ajouté avec succès.
- *       500:
- *         description: Erreur interne du serveur.
- */
 exports.create = async (req, res) => {
   try {
     const { name, idUser, idMindMap, sujet } = req.body;
@@ -141,36 +57,6 @@ exports.create = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /leitnesystem/edit:
- *   post:
- *     summary: Modifier un système de Leitner
- *     tags: [LeitnerSystems]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               idSystem:
- *                 type: integer
- *               idUser:
- *                 type: integer
- *               name:
- *                 type: string
- *               idMindMap:
- *                 type: integer
- *                 nullable: true
- *     responses:
- *       200:
- *         description: Système modifié avec succès.
- *       403:
- *         description: Accès refusé.
- *       500:
- *         description: Erreur serveur.
- */
 exports.update = async (req, res) => {
   try {
     const { idSystem, idUser, name, idMindMap } = req.body;
@@ -191,27 +77,15 @@ exports.update = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /leitnersystem/{id}:
- *   delete:
- *     summary: Supprimer un système de Leitner
- *     tags: [LeitnerSystems]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID du système de Leitner
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Système supprimé avec succès.
- *       403:
- *         description: Accès refusé.
- *       500:
- *         description: Erreur serveur.
- */
+exports.share = async (req, res) => {
+  try {
+    const result = await leitnerSystemService.shareSystem(req.body);
+    res.status(200).send(result);
+  } catch (error) {
+    res.status(403).send({ message: error.message || "Erreur de partage." });
+  }
+};
+
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;

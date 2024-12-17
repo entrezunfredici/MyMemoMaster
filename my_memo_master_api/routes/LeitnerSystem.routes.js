@@ -155,6 +155,74 @@ router.post("/edit", leitnerSystem.update);
 
 /**
  * @swagger
+ * /leitnersystems/share:
+ *   post:
+ *     summary: Partager un système de Leitner avec un utilisateur
+ *     tags: [LeitnerSystems]
+ *     description: Permet à un utilisateur propriétaire d'un système de Leitner de le partager avec un autre utilisateur en attribuant des droits spécifiques.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idUserOwner:
+ *                 type: integer
+ *                 description: ID de l'utilisateur propriétaire qui partage le système.
+ *                 example: 1
+ *               idUserShared:
+ *                 type: integer
+ *                 description: ID de l'utilisateur à qui le système est partagé.
+ *                 example: 2
+ *               idSystem:
+ *                 type: integer
+ *                 description: ID du système de Leitner à partager.
+ *                 example: 10
+ *               writeRight:
+ *                 type: boolean
+ *                 description: Droit d'écriture (true ou false).
+ *                 example: true
+ *               shareRight:
+ *                 type: boolean
+ *                 description: Droit de partage (true ou false).
+ *                 example: true
+ *               shareWithWriteRightRight:
+ *                 type: boolean
+ *                 description: Droit de partager avec écriture (true ou false).
+ *                 example: false
+ *               shareWithAllRights:
+ *                 type: boolean
+ *                 description: Droit de partager avec tous les droits (true ou false).
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Système partagé avec succès.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Système partagé avec succès."
+ *       403:
+ *         description: Permission refusée.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Vous n'avez pas les droits pour partager ce système."
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
+router.post("/share", leitnerSystem.share);
+
+/**
+ * @swagger
  * /leitnersystem/{id}:
  *   delete:
  *     summary: Supprime un système de Leitner
