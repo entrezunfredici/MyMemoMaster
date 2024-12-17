@@ -1,5 +1,6 @@
 const { Sequelize } = require('sequelize');
 const dbConfig = require('../db.config');
+const ResponseType = require('./Response.model')
 
 const instance = new Sequelize({
     dialect: dbConfig.dialect,
@@ -12,5 +13,6 @@ const instance = new Sequelize({
 
 
 module.exports = {
-    instance
+    instance,
+    ResponseType
 };
