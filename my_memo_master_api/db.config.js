@@ -1,5 +1,5 @@
 module.exports = {
-    dialect : "sqlite",
+    dialect: "sqlite",
     storage: "./my-db.sqlite",
-    logging: console.log('Database connection established!')
+    logging: console.log('\x1b[32m%s\x1b[0m', 'Database connection established!')
 }

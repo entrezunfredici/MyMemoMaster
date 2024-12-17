@@ -6,9 +6,7 @@ exports.findAll = async (req, res) => {
         res.status(200).send(data);
     } catch (error) {
         res.status(500).send({
-            message:
-                error.message ||
-                "Une erreur s'est produite lors de la récupération des rôles.",
+            message: error || "Une erreur s'est produite lors de la récupération des rôles.",
         });
     }
 };
@@ -25,7 +23,7 @@ exports.findOne = async (req, res) => {
         }
     } catch (error) {
         res.status(500).send({
-            message: `Erreur lors de la récupération du rôle avec l'identifiant ${req.params.id}.`,
+            message: error || `Erreur lors de la récupération du rôle avec l'identifiant ${req.params.id}.`,
         });
     }
 };
@@ -37,7 +35,7 @@ exports.create = async (req, res) => {
         res.status(201).send(data);
     } catch (error) {
         res.status(500).send({
-            message: "Une erreur s'est produite lors de la création du rôle.",
+            message: error || "Une erreur s'est produite lors de la création du rôle.",
         });
     }
 };

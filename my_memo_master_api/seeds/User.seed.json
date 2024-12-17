@@ -1,8 +1,8 @@
 [
     {
         "userId": 1,
+        "roleId": 1,
         "email": "j.doe@test.com",
-        "roleId": "j.doe@test.com",
         "name": "John Doe",
         "password": "password"
     }

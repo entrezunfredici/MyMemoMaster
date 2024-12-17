@@ -1,5 +1,5 @@
 const { User } = require("../models/index");
-const { Op } = require("sequelize");
+const bcrypt = require('bcrypt');
 
 class UserService {
 
@@ -11,6 +11,16 @@ class UserService {
     return users;
   }
 
+  async findByEmail(email) {
+    const user = await User.findOne({
+      where: { email: email }
+    });
+    if (user) {
+      delete user.dataValues.password;
+    }
+    return user;
+  }
+
   async findOne(userId) {
     const user = await User.findByPk(userId);
     if (user) {
@@ -19,13 +29,14 @@ class UserService {
     return user;
   }
 
-  async create(data) {
-    await User.create(data);
+  async create(user) {
+    user.password = await bcrypt.hash(user.password, 10);
+    await User.create(user);
     return this.findOne(userId);
   }
 
-  async update(userId, data) {
-    await User.update(data, {
+  async update(userId, user) {
+    await User.update(user, {
       where: { userId: userId }
     });
     return this.findOne(userId);
@@ -49,6 +60,24 @@ class UserService {
       where: { userId: userId }
     });
     return this.findOne(userId);
+  }
+
+  async updateLoginDate(userId) {
+    await User.update({ lastLogin: new Date() }, {
+      where: { userId: userId }
+    });
+  }
+
+  async verifyPassword(userId, password) {
+    const user = await User.findByPk(userId);
+    return await bcrypt.compare(password, user.password);
+  }
+
+  async setPassword(userId, password) {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await User.update({ password: hashedPassword }, {
+      where: { userId: userId }
+    });
   }
 }
 

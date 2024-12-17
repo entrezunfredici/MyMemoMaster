@@ -1,15 +1,5 @@
 const userService = require('../services/User.service');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
-exports.findAll = async (req, res) => {
-  try {
-    const users = await userService.findAll();
-    res.status(200).send(users);
-  } catch (error) {
-    res.status(500).send({ message: "Erreur lors de la récupération des utilisateurs." });
-  }
-};
 
 exports.findOne = async (req, res) => {
   try {
@@ -23,33 +13,47 @@ exports.findOne = async (req, res) => {
 
 exports.register = async (req, res) => {
   try {
-    const { username, password, email } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await userService.create({ username, email, password: hashedPassword });
-    res.status(201).send(newUser);
+    const { name, password, email } = req.body;
+    const user = await userService.create({ name, email, password });
+    res.status(201).send(user);
   } catch (error) {
+    console.error(error);
     res.status(500).send({ message: "Erreur lors de l'inscription." });
+  }
+};
+
+exports.update = async (req, res) => {
+  try {
+    const { id } = req.body;
+    const updatedUser = await userService.update(id, req.body);
+    res.status(200).send(updatedUser);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Erreur lors de la mise à jour de l'utilisateur." });
   }
 };
 
 exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const user = await userService.findByUsername(username);
+    const { email, password } = req.body;
+    const user = await userService.findByEmail(email);
 
     if (!user) return res.status(404).send({ message: "Utilisateur introuvable." });
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await userService.verifyPassword(user.userId, password);
     if (!isPasswordValid) return res.status(401).send({ message: "Mot de passe incorrect." });
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, email: user.email, role: user.role },
+      { id: user.userId, name: user.name, email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: process.env.JWT_EXPIRES_IN }
     );
+
+    await userService.updateLoginDate(user.userId);
 
     res.status(200).send({ token });
   } catch (error) {
+    console.error(error);
     res.status(500).send({ message: "Erreur lors de la connexion." });
   }
 };
@@ -57,12 +61,13 @@ exports.login = async (req, res) => {
 exports.changePassword = async (req, res) => {
   try {
     const { id } = req.body;
-    const newPassword = await bcrypt.hash(req.body.newPassword, 10);
-    const success = await userService.updatePassword(id, newPassword);
+
+    await userService.setPassword(id, req.body.newPassword);
 
     if (!success) return res.status(404).send({ message: "Utilisateur non trouvé." });
     res.status(200).send({ message: "Mot de passe modifié avec succès." });
   } catch (error) {
+    console.error(error);
     res.status(500).send({ message: "Erreur lors de la modification du mot de passe." });
   }
 };
@@ -73,6 +78,7 @@ exports.addRole = async (req, res) => {
     const success = await userService.addRole(userId, roleId);
     res.status(200).send({ message: "Rôle ajouté avec succès." });
   } catch (error) {
+    console.error(error);
     res.status(500).send({ message: "Erreur lors de l'ajout du rôle." });
   }
 };
@@ -83,6 +89,7 @@ exports.removeRole = async (req, res) => {
     const success = await userService.removeRole(userId, roleId);
     res.status(200).send({ message: "Rôle supprimé avec succès." });
   } catch (error) {
+    console.error(error);
     res.status(500).send({ message: "Erreur lors de la suppression du rôle." });
   }
 };
@@ -94,6 +101,7 @@ exports.delete = async (req, res) => {
     if (!success) return res.status(403).send({ message: "Opération non autorisée." });
     res.status(200).send({ message: "Utilisateur supprimé avec succès." });
   } catch (error) {
+    console.error(error);
     res.status(500).send({ message: "Erreur lors de la suppression de l'utilisateur." });
   }
 };

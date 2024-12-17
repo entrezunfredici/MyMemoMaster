@@ -2,10 +2,7 @@ const { Sequelize } = require("sequelize");
 const dbConfig = require("../db.config");
 
 // Création de l'instance Sequelize
-const instance = new Sequelize({
-  dialect: dbConfig.dialect,
-  storage: dbConfig.storage,
-});
+const instance = new Sequelize(dbConfig);
 
 // Models
 const Role = require("./Role.model")(instance);

@@ -1,5 +1,6 @@
 const express = require("express");
 const user = require("../controllers/User.controller.js");
+const authMiddleware = require("../middlewares/Auth.middleware.js");
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               username:
+ *               name:
  *                 type: string
  *                 example: "mathieu"
  *               password:
@@ -46,7 +47,7 @@ router.post("/register", user.register);
  *           schema:
  *             type: object
  *             properties:
- *               username:
+ *               name:
  *                 type: string
  *                 example: "mathieu"
  *               password:
@@ -92,21 +93,15 @@ router.post("/login", user.login);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", user.findOne);
+router.get("/:id", authMiddleware, user.findOne);
 
 /**
  * @swagger
- * /users/{id}/change-password:
- *   put:
- *     summary: Modifier le mot de passe d'un utilisateur
- *     tags: [Users]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID de l'utilisateur
- *         schema:
- *           type: integer
+ * /users/update:
+ *   post:
+ *     summary: Mettre à jour un utilisateur
+ *     tags: 
+ *       - Users
  *     requestBody:
  *       required: true
  *       content:
@@ -114,80 +109,24 @@ router.get("/:id", user.findOne);
  *           schema:
  *             type: object
  *             properties:
- *               newPassword:
+ *               id:
+ *                 type: integer
+ *                 example: 1
+ *               name:
  *                 type: string
- *                 example: "newpassword123"
+ *                 example: "updated_name"
+ *               email:
+ *                 type: string
+ *                 example: "updated_email@example.com"
  *     responses:
  *       200:
- *         description: Mot de passe modifié avec succès.
+ *         description: Utilisateur mis à jour avec succès.
  *       404:
  *         description: Utilisateur non trouvé.
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id/change-password", user.changePassword);
-
-/**
- * @swagger
- * /users/{id}/role:
- *   post:
- *     summary: Ajouter un rôle à un utilisateur
- *     tags: [Users]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID de l'utilisateur
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               roleId:
- *                 type: integer
- *                 example: 2
- *     responses:
- *       200:
- *         description: Rôle ajouté avec succès.
- *       500:
- *         description: Erreur lors de l'ajout du rôle.
- */
-router.post("/:id/role", user.addRole);
-
-/**
- * @swagger
- * /users/{id}/role:
- *   delete:
- *     summary: Supprimer un rôle d'un utilisateur
- *     tags: [Users]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID de l'utilisateur
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               roleId:
- *                 type: integer
- *                 example: 2
- *     responses:
- *       200:
- *         description: Rôle supprimé avec succès.
- *       500:
- *         description: Erreur lors de la suppression du rôle.
- */
-router.delete("/:id/role", user.removeRole);
+router.put("/:id", authMiddleware, user.update);
 
 /**
  * @swagger
@@ -220,7 +159,102 @@ router.delete("/:id/role", user.removeRole);
  *       500:
  *         description: Erreur lors de la suppression.
  */
-router.delete("/:id", user.delete);
+router.delete("/:id", authMiddleware, user.delete);
+
+/**
+ * @swagger
+ * /users/{id}/change-password:
+ *   put:
+ *     summary: Modifier le mot de passe d'un utilisateur
+ *     tags: [Users]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID de l'utilisateur
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               newPassword:
+ *                 type: string
+ *                 example: "newpassword123"
+ *     responses:
+ *       200:
+ *         description: Mot de passe modifié avec succès.
+ *       404:
+ *         description: Utilisateur non trouvé.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.put("/:id/change-password", authMiddleware, user.changePassword);
+
+/**
+ * @swagger
+ * /users/{id}/role:
+ *   post:
+ *     summary: Ajouter un rôle à un utilisateur
+ *     tags: [Users]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID de l'utilisateur
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               roleId:
+ *                 type: integer
+ *                 example: 2
+ *     responses:
+ *       200:
+ *         description: Rôle ajouté avec succès.
+ *       500:
+ *         description: Erreur lors de l'ajout du rôle.
+ */
+router.post("/:id/role", authMiddleware, user.addRole);
+
+/**
+ * @swagger
+ * /users/{id}/role:
+ *   delete:
+ *     summary: Supprimer un rôle d'un utilisateur
+ *     tags: [Users]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID de l'utilisateur
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               roleId:
+ *                 type: integer
+ *                 example: 2
+ *     responses:
+ *       200:
+ *         description: Rôle supprimé avec succès.
+ *       500:
+ *         description: Erreur lors de la suppression du rôle.
+ */
+router.delete("/:id/role", authMiddleware, user.removeRole);
 
 module.exports = (app) => {
     /**
