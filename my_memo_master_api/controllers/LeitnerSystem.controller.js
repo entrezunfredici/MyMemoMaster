@@ -1,5 +1,5 @@
+const e = require("express");
 const leitnerSystemService = require("../services/LeitnerSystem.service.js");
-
 exports.findAll = async (req, res) => {
   try {
     const data = await leitnerSystemService.findAll();
@@ -45,35 +45,58 @@ exports.findOne = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { name, idUser, idMindMap, sujet } = req.body;
-    const data = await leitnerSystemService.create({
+
+    // Validation des données reçues
+    if (!name || !idUser) {
+      return res
+        .status(400)
+        .json({ message: "Les champs name et idUser sont obligatoires." });
+    }
+
+    // Création du système dans la base de données
+    const newSystem = await leitnerSystemService.create({
       name,
       idUser,
       idMindMap,
-      sujet,
+      sujet, // Sequelize gère JSON directement si la colonne est déclarée comme JSON
     });
-    res.status(201).send(data);
+
+    // Réponse avec le nouveau système créé
+    return res.status(201).json(newSystem);
   } catch (error) {
-    res.status(500).send({ message: "Erreur lors de la création du système." });
+    console.error("Erreur Sequelize :", error.message, error);
+    return res.status(500).json({
+      message: "Erreur lors de la création du système.",
+      error: error.message,
+    });
   }
 };
 
 exports.update = async (req, res) => {
   try {
-    const { idSystem, idUser, name, idMindMap } = req.body;
+    const { id } = req.params;
+    const { idUser, name, idMindMap } = req.body;
+
     const updated = await leitnerSystemService.update({
-      idSystem,
+      idSystem: id,
       idUser,
       name,
       idMindMap,
     });
+
     if (!updated) {
       return res
-        .status(403)
-        .send({ message: "Accès refusé ou système non modifié." });
+        .status(404)
+        .send({ message: `Système introuvable pour l'ID ${id}.` });
     }
+
     res.status(200).send({ message: "Système modifié avec succès." });
   } catch (error) {
-    res.status(500).send({ message: "Erreur lors de la modification." });
+    console.error("Erreur lors de la modification :", error.message);
+    res.status(500).send({
+      message: "Erreur lors de la modification.",
+      error: error.message,
+    });
   }
 };
 

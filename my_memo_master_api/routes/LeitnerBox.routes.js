@@ -113,7 +113,7 @@ router.post("/add", leitnerBox.create);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/edit", leitnerBox.update);
+router.put("/:id", leitnerBox.update);
 
 /**
  * @swagger

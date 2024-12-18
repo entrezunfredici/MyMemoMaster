@@ -5,11 +5,9 @@ exports.findAll = async (req, res) => {
     const boxes = await LeitnerBoxService.findAll();
     res.status(200).send(boxes);
   } catch (error) {
-    res
-      .status(500)
-      .send({
-        message: "Erreur lors de la récupération des boîtes de Leitner.",
-      });
+    res.status(500).send({
+      message: "Erreur lors de la récupération des boîtes de Leitner.",
+    });
   }
 };
 
@@ -49,18 +47,23 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const updatedBox = await LeitnerBoxService.update(req.body.idBox, req.body);
+    const { id } = req.params;
+    const newData = req.body;
+
+    const updatedBox = await LeitnerBoxService.update(id, newData);
+
     if (!updatedBox) {
-      res
+      return res
         .status(404)
-        .send({ message: `Boîte introuvable pour l'ID ${req.body.idBox}.` });
-    } else {
-      res.status(200).send(updatedBox);
+        .json({ message: `Boîte introuvable pour l'ID ${id}.` });
     }
+
+    return res.status(200).json(updatedBox);
   } catch (error) {
-    res
+    console.error("Erreur lors de la mise à jour de la boîte :", error.message);
+    return res
       .status(500)
-      .send({ message: "Erreur lors de la mise à jour de la boîte." });
+      .json({ message: "Erreur serveur.", error: error.message });
   }
 };
 

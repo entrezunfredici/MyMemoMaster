@@ -151,7 +151,7 @@ router.post("/add", leitnerSystem.create);
  *       500:
  *         description: Erreur serveur
  */
-router.post("/edit", leitnerSystem.update);
+router.put("/:id", leitnerSystem.update);
 
 /**
  * @swagger

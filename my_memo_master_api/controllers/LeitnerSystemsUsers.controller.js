@@ -40,15 +40,35 @@ module.exports = {
     try {
       const { idUser, idSystem } = req.params;
       const data = req.body;
+
+      if (!idUser || !idSystem) {
+        return res.status(400).json({
+          message: "Les paramètres idUser et idSystem sont requis.",
+        });
+      }
+
       const result = await LeitnerSystemsUsersService.update(
         idUser,
         idSystem,
         data
       );
-      return res.status(200).json({ message: "Mise à jour réussie" });
+
+      if (!result) {
+        return res.status(404).json({
+          message: `Aucun enregistrement trouvé pour idUser ${idUser} et idSystem ${idSystem}.`,
+        });
+      }
+
+      return res.status(200).json({
+        message: "Mise à jour réussie",
+        updatedData: result,
+      });
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: "Erreur serveur" });
+      console.error("Erreur lors de la mise à jour :", error.message);
+      return res.status(500).json({
+        message: "Erreur serveur lors de la mise à jour.",
+        error: error.message,
+      });
     }
   },
 
