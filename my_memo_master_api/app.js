@@ -29,7 +29,7 @@ app.use(bodyParser.json());
 app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
-const swaggerSpec = swaggerJsdoc(require('./config/swagger.config.js'));
+const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
@@ -42,4 +42,5 @@ unitRoutes(app);
 app.use(({ res }) => {
   return res.status(404).json({ message: "Route not found" });
 });
+
 module.exports = app;

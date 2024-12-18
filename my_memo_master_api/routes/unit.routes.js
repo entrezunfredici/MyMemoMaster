@@ -1,7 +1,7 @@
 const express = require("express");
-const router = express.Router();
 const unitController = require("../controllers/unit.controller");
 
+const router = express.Router();
 /**
  * @swagger
  * tags:
@@ -121,4 +121,12 @@ router.put("/unit/:id", unitController.updateUnit);
  */
 router.delete("/unit/:id", unitController.deleteUnit);
 
-module.exports = router;
+module.exports = (app) => {
+    /**
+     * @swagger
+     * tags:
+     *   - name: Subjects
+     *     description: Gestion des sujets
+     */
+    app.use("/units", router);
+};

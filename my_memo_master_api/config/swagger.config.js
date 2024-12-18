@@ -10,13 +10,10 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: `http://localhost:${process.env.PORT || 8000}`,
+                url: `http://localhost:${process.env.PORT}`,
             },
         ],
     },
     apis: ['./routes/*.js'],
 };
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
-module.exports = swaggerSpec;
+module.exports = swaggerOptions;
