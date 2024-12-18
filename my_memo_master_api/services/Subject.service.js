@@ -1,35 +1,34 @@
 const { Subject } = require("../models/index");
 
-class SubjectService {
+const SubjectService = {
+  // Récupérer tous les sujets
+  async findAll() {
+    return await Subject.findAll();
+  },
 
-    async findAll() {
-        const subjects = await Subject.findAll();
-        return subjects;
-    }
+  async findOne(subjectId) {
+    return await Subject.findByPk(subjectId);
+  },
 
-    async findOne(subjectId) {
-        const subject = await Subject.findByPk(subjectId);
-        return subject;
-    }
+  async create(data) {
+    return await Subject.create(data);
+  },
 
-    async create(data) {
-        await Subject.create(data);
-        return this.findOne(subjectId);
-    }
+  async update(subjectId, data) {
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) return null;
 
-    async update(subjectId, data) {
-        await Subject.update(data, {
-            where: { subjectId: subjectId }
-        });
-        return this.findOne(subjectId);
-    }
+    await subject.update(data);
+    return subject;
+  },
 
-    async delete(subjectId) {
-        await Subject.destroy({
-            where: { subjectId: subjectId }
-        });
-    }
+  async delete(subjectId) {
+    const subject = await Subject.findByPk(subjectId);
+    if (!subject) return false;
 
-}
+    await subject.destroy();
+    return true;
+  },
+};
 
-module.exports = new SubjectService();
+module.exports = SubjectService;

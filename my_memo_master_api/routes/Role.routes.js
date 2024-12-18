@@ -1,6 +1,6 @@
 const express = require("express");
 const role = require("../controllers/Role.controller.js");
-const authMiddleware = require('../middlewares/Auth.middleware');
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 const router = express.Router();
 
@@ -94,7 +94,6 @@ router.get("/:id", role.findOne);
  */
 router.post("/add", role.create);
 
-
 /**
  * @swagger
  * /roles/{id}:
@@ -152,11 +151,11 @@ router.put("/:id", role.update);
 router.delete("/:id", role.delete);
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Roles
-     *     description: Gestion des rôles
-     */
-    app.use("/roles", authMiddleware, router);
+  /**
+   * @swagger
+   * tags:
+   *   - name: Roles
+   *     description: Gestion des rôles
+   */
+  app.use("/roles", authMiddleware, router);
 };

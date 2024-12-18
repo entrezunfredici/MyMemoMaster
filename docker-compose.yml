@@ -9,7 +9,7 @@ services:
       - "${API_PORT}:${API_PORT}"
     volumes:
       - ./my_memo_master_api:/app
-      - api-data:/app/data  # Ajout d'un volume nommé pour persister les données
+      - api-data:/app/data # Ajout d'un volume nommé pour persister les données
     environment:
       - NODE_ENV=development
       - API_PORT=${API_PORT}
@@ -25,7 +25,7 @@ services:
       - "${VITE_PORT}:${VITE_PORT}"
     volumes:
       - ./my_memo_master_front:/app
-      - front-data:/app/data  # Ajout d'un volume nommé pour persister les données
+      - front-data:/app/data # Ajout d'un volume nommé pour persister les données
     # build:
     #   args:
     #     - VITE_PORT=${VITE_PORT}
@@ -40,7 +40,6 @@ services:
 volumes:
   api-data:
   front-data:
-
 #   database:
 #     image: postgres:13
 #     environment:
