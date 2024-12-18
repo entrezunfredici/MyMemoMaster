@@ -1,37 +1,47 @@
-const ResponseService = require("../services/Response.service");
+const ResponseService = require("../services/Response.service.js");
 
-const ResponseController = {
-  async getAll(req, res, next) {
+  exports.findAll = async (req, res) => {
     try {
-      const responses = await ResponseService.getAll();
+      const responses = await ResponseService.findAll();
       res.status(200).json(responses);
     } catch (error) {
-      next(error);
+      res.status(500).send({
+        message:
+          error.message || "Une erreur s'est produite lors de la récupération des réponses",
+      });
     }
-  },
+  };
 
-  async getById(req, res, next) {
+  exports.findOne = async (req, res) => {
     try {
-      const response = await ResponseService.getById(req.params.id);
+      const response = await ResponseService.findOne(req.params.id);
       if (!response) {
-        return res.status(404).json({ message: "Response not found" });
+        res.status(404).send({
+          message: `Réponse introuvable pour l'identifiant ${req.params.id}.`,
+        });
+      }else{
+        res.status(200).send(response);
       }
-      res.status(200).json(response);
     } catch (error) {
-      next(error);
+      res.status(500).send({
+        message: `Erreur lors de la récupération de la reponse avec l'identifiant ${req.params.id}.`,
+      });
     }
-  },
+  };
 
-  async create(req, res, next) {
+  exports.create = async (req, res) => {
     try {
-      const newResponse = await ResponseService.create(req.body);
-      res.status(201).json(newResponse);
+      const { name } = req.body
+      const data = await ResponseService.create({name});
+      res.status(201).send(data);
     } catch (error) {
-      next(error);
+      res.status(500).send({
+        message: "Une erreur s'est produite lors de la création de la reponse.",
+      });
     }
   },
 
-  async update(req, res, next) {
+  exports.update = async (req, res) => {
     try {
       const updatedResponse = await ResponseService.update(
         req.params.id,
@@ -39,18 +49,20 @@ const ResponseController = {
       );
       res.status(200).json(updatedResponse);
     } catch (error) {
-      next(error);
+      res.status(500).send({
+        message: "Une erreur s'est produite lors de la modification de la reponse",
+      });
     }
   },
 
-  async delete(req, res, next) {
+  exports.delete = async (req, res) => {
     try {
       await ResponseService.delete(req.params.id);
       res.status(204).send();
     } catch (error) {
-      next(error);
+      res.status(500).send({
+        message: "Une erreur s'est produite lors de la suppression de la reponse",
+      });
     }
-  },
-};
+  };
 
-module.exports = ResponseController;
