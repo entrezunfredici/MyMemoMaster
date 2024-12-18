@@ -1,11 +1,8 @@
 const { Sequelize } = require("sequelize");
-const dbConfig = require("../db.config");
+const dbConfig = require("../config/db.config");
 
 // Création de l'instance Sequelize
-const instance = new Sequelize({
-  dialect: dbConfig.dialect,
-  storage: dbConfig.storage,
-});
+const instance = new Sequelize(dbConfig);
 
 // Models
 const Role = require("./Role.model")(instance);
@@ -14,6 +11,8 @@ const LeitnerSystem = require("./LeitnerSystem.model")(instance);
 const LeitnerSystemsUsers = require("./leitnerSystemsUsers.model")(instance);
 const LeitnerCard = require("./LeitnerCard.model")(instance);
 const LeitnerBox = require("./LeitnerBox.model")(instance);
+const Unit = require("./unit.model")(instance);
+const User = require("./User.model")(instance);
 
 // // Associations
 LeitnerSystem.associate({ LeitnerBox, LeitnerCard, Subject });
@@ -29,4 +28,6 @@ module.exports = {
   LeitnerSystemsUsers,
   LeitnerCard,
   LeitnerBox,
+  Unit,
+  User,
 };

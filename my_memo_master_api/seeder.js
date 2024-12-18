@@ -1,4 +1,5 @@
 const db = require("./models/index");
+const bcrypt = require("bcrypt");
 
 // ? This script is meant to be run only once, to seed the database with sample data just for test purposes. It will drop all existing tables and recreate them, then insert the sample data.
 
@@ -27,10 +28,21 @@ const seedDatabase = async () => {
 
     await db.instance.query("PRAGMA foreign_keys = OFF");
 
-    await db.Role.bulkCreate(require("./seeds/Role.seed.json"));
+    const users = require("./seeds/User.seed.json");
+    users.forEach((user) => {
+      user.password = bcrypt.hashSync(user.password, 10);
+    });
+    await db.User.bulkCreate(users);
+    console.log("Users table seeded successfully");
+
+    const roles = require("./seeds/Role.seed.json");
+    await db.Role.bulkCreate(roles);
     console.log("Roles table seeded successfully");
-    await db.Subject.bulkCreate(require("./seeds/Subject.seed.json"));
+
+    const subjects = require("./seeds/Subject.seed.json");
+    await db.Subject.bulkCreate(subjects);
     console.log("Subjects table seeded successfully");
+
     await db.LeitnerSystem.bulkCreate(
       require("./seeds/LeitnerSystem.seed.json")
     );
@@ -39,7 +51,6 @@ const seedDatabase = async () => {
     console.log("LeitnerBoxes table seeded successfully");
     await db.LeitnerCard.bulkCreate(require("./seeds/LeitnerCard.seed.json"));
     console.log("LeitnerCards table seeded successfully");
-
     await db.instance.query("PRAGMA foreign_keys = ON");
 
     console.log("Sample data inserted");

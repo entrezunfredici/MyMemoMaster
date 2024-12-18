@@ -1,9 +1,9 @@
 import axios from 'axios'
-import { VITE_BACK_API_URL } from '@/config';
+import { VITE_API_URL } from '@/config';
 import { useAuthStore } from '@/stores/auth'
 
 const axiosApi = axios.create({
-  baseURL: VITE_BACK_API_URL,
+  baseURL: VITE_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },

@@ -13,12 +13,16 @@ const roleRoutes = require("./routes/Role.routes");
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
 const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
 const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
+const subjectRoutes = require("./routes/Subject.routes");
+const roleRoutes = require("./routes/Role.routes");
+const userRoutes = require("./routes/User.routes");
+const unitRoutes = require("./routes/Unit.routes");
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
 const app = express();
 
-// CORS configuration
+// CORS
 app.use(
   cors({
     origin: process.env.VITE_FRONT_URL,
@@ -43,6 +47,7 @@ app.use("/roles", roleRoutes);
 app.use("/leitnersystems", leitnerSystemRoutes);
 app.use("/leitnercards", leitnerCardRoutes);
 app.use("/leitnerboxes", leitnerBoxRoutes);
+app.use("users/", userRoutes);
 
 // Gestion des routes inexistantes
 app.use((req, res, next) => {
