@@ -220,10 +220,10 @@ const userInput = ref(`
 textarea {
   width: 100%;
   margin-bottom: 20px;
-  background-color: #f0f0f0; /* Couleur de fond */
-  color: #333333; /* Couleur du texte */
-  border: 1px solid #ccc; /* Bordure grise */
-  padding: 10px; /* Espacement intérieur */
-  font-size: 14px; /* Taille de police */
+  background-color: #f0f0f0;
+  color: #333333;
+  border: 1px solid #ccc;
+  padding: 10px;
+  font-size: 14px;
 }
 </style>

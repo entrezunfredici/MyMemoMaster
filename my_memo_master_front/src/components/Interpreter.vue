@@ -26,9 +26,19 @@ export default {
     async parseContent() {
       let html = this.content
 
-      // Convertir les balises <formula> en code compatible MathJax
       html = html.replace(/<formula>(.*?)<\/formula>/gs, (match, formula) => {
-        return `\\(${formula}\\)` // MathJax LaTeX syntaxe
+        return `\\(${formula}\\)`
+      })
+
+      html = html.replace(/<text(.*?)>(.*?)<\/text>/gs, (match, attributes, text) => {
+        const bold = attributes.includes('bold') ? 'font-weight: bold;' : ''
+        const italic = attributes.includes('italic') ? 'font-style: italic;' : ''
+        const colorMatch = attributes.match(/color:([a-zA-Z0-9#]+)/)
+        const color = colorMatch ? `color: ${colorMatch[1]};` : ''
+
+        // Générer le style final
+        const style = `${bold} ${italic} ${color}`
+        return `<span style="${style.trim()}">${text}</span>`
       })
 
       this.renderedContent = html
@@ -46,7 +56,7 @@ export default {
 
 <style scoped>
 .interpreter-output {
-  color: #333333; /* Texte noir par défaut */
-  font-size: 16px; /* Taille de police */
+  color: #333333;
+  font-size: 16px;
 }
 </style>
