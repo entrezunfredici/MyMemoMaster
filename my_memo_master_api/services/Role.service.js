@@ -14,8 +14,7 @@ class RoleService {
     }
 
     async create(data) {
-        await Role.create(data);
-        return this.findOne(roleId);
+        return await Role.create(data);
     }
 
     async update(roleId, data) {
@@ -26,7 +25,7 @@ class RoleService {
     }
 
     async delete(roleId) {
-        await Role.destroy({
+        return await Role.destroy({
             where: { roleId: roleId }
         });
     }

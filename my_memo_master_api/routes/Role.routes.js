@@ -94,6 +94,63 @@ router.get("/:id", role.findOne);
  */
 router.post("/add", role.create);
 
+
+/**
+ * @swagger
+ * /roles/{id}:
+ *   put:
+ *     summary: Met à jour un rôle existant
+ *     tags: [Roles]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID du rôle à mettre à jour
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Updated Role Name"
+ *     responses:
+ *       200:
+ *         description: Rôle mis à jour avec succès.
+ *       404:
+ *         description: Rôle non trouvé.
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
+router.put("/:id", role.update);
+
+/**
+ * @swagger
+ * /roles/{id}:
+ *   delete:
+ *     summary: Supprime un rôle par son ID
+ *     tags: [Roles]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID du rôle à supprimer
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Rôle supprimé avec succès.
+ *       404:
+ *         description: Rôle non trouvé.
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
+router.delete("/:id", role.delete);
+
 module.exports = (app) => {
     /**
      * @swagger
