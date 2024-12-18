@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-  return instance.define(
+  const LeitnerSystem = instance.define(
     "LeitnerSystem",
     {
       idSystem: {
@@ -32,4 +32,13 @@ module.exports = (instance) => {
       timestamps: false,
     }
   );
+
+  LeitnerSystem.associate = (models) => {
+    LeitnerSystem.hasMany(models.LeitnerBox, {
+      foreignKey: "idSystem",
+      as: "leitnerBoxes",
+    });
+  };
+
+  return LeitnerSystem;
 };

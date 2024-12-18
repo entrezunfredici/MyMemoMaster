@@ -1,7 +1,5 @@
-const { DataTypes } = require("sequelize");
-
 module.exports = (instance) => {
-  return instance.define(
+  const LeitnerBox = instance.define(
     "LeitnerBox",
     {
       idBox: {
@@ -32,4 +30,13 @@ module.exports = (instance) => {
       timestamps: false,
     }
   );
+
+  LeitnerBox.associate = (models) => {
+    LeitnerBox.belongsTo(models.LeitnerSystem, {
+      foreignKey: "idSystem",
+      as: "leitnerSystem",
+    });
+  };
+
+  return LeitnerBox;
 };

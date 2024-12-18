@@ -16,7 +16,7 @@ module.exports = (instance) => {
       },
     },
     {
-      tableName: "subjects",
+      tableName: "Subject",
       updatedAt: "updatedAt",
       createdAt: "createdAt",
       timestamps: false,
