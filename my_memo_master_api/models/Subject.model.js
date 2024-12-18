@@ -23,12 +23,14 @@ module.exports = (instance) => {
     }
   );
 
-  Subject.belongsToMany(instance.models.LeitnerSystem, {
-    through: "systemSubject",
-    foreignKey: "idSubject",
-    otherKey: "idSystem",
-    as: "leitnerSystems",
-  });
+  Subject.associate = (models) => {
+    Subject.belongsToMany(models.LeitnerSystem, {
+      through: "systemSubject",
+      foreignKey: "idSubject",
+      otherKey: "idSystem",
+      as: "leitnerSystems",
+    });
+  };
 
   return Subject;
 };

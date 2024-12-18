@@ -16,7 +16,7 @@ const LeitnerCard = require("./LeitnerCard.model")(instance);
 const LeitnerBox = require("./LeitnerBox.model")(instance);
 
 // // Associations
-LeitnerSystem.associate({ LeitnerBox, LeitnerCard });
+LeitnerSystem.associate({ LeitnerBox, LeitnerCard, Subject });
 LeitnerCard.associate({ LeitnerBox, LeitnerSystem });
 LeitnerBox.associate({ LeitnerSystem, LeitnerCard });
 Subject.associate({ LeitnerSystem });

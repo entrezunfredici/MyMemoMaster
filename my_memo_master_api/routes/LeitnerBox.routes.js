@@ -138,6 +138,4 @@ router.post("/edit", leitnerBox.update);
  */
 router.delete("/:id", leitnerBox.delete);
 
-module.exports = (app) => {
-  app.use("/leitnerboxes", router);
-};
+module.exports = router;

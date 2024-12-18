@@ -155,12 +155,4 @@ router.put("/:id", subject.update);
  */
 router.delete("/:id", subject.delete);
 
-module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Subjects
-     *     description: Gestion des sujets
-     */
-    app.use("/subjects", router);
-};
+module.exports = router;

@@ -93,12 +93,4 @@ router.get("/:id", role.findOne);
  */
 router.post("/add", role.create);
 
-module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Roles
-     *     description: Gestion des rôles
-     */
-    app.use("/roles", router);
-};
+module.exports = router;
