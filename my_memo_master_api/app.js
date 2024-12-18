@@ -10,6 +10,7 @@ const roleRoutes = require("./routes/Role.routes");
 const bodyParser = require("body-parser");
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
 const LeitnernerCardRoutes = require("./routes/LeitnerCard.routes");
+const LeitnerBoxRoutes = require("./routes/LeitnerBox.routes");
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
@@ -38,7 +39,7 @@ subjectRoutes(app);
 roleRoutes(app);
 leitnerSystemRoutes(app);
 LeitnernerCardRoutes(app);
-
+LeitnerBoxRoutes(app);
 // ... Autres middlewares
 
 // Si rien n'est trouvé

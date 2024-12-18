@@ -31,6 +31,14 @@ const seedDatabase = async () => {
     console.log("Roles table seeded successfully");
     await db.Subject.bulkCreate(require("./seeds/Subject.seed.json"));
     console.log("Subjects table seeded successfully");
+    await db.LeitnerSystem.bulkCreate(
+      require("./seeds/LeitnerSystem.seed.json")
+    );
+    console.log("LeitnerSystems table seeded successfully");
+    await db.LeitnerBox.bulkCreate(require("./seeds/LeitnerBox.seed.json"));
+    console.log("LeitnerBoxes table seeded successfully");
+    await db.LeitnerCard.bulkCreate(require("./seeds/LeitnerCard.seed.json"));
+    console.log("LeitnerCards table seeded successfully");
 
     await db.instance.query("PRAGMA foreign_keys = ON");
 
