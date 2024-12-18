@@ -5,9 +5,7 @@ exports.findAll = async (req, res) => {
     const data = await subjectService.findAll();
     res.status(200).send(data);
   } catch (error) {
-    res
-      .status(500)
-      .send({ message: "Erreur lors de la récupération des sujets." });
+    res.status(500).send({ message: error.message || "Une erreur s'est produite lors de la récupération des sujets.", });
   }
 };
 
@@ -22,7 +20,9 @@ exports.findOne = async (req, res) => {
       res.status(200).send(data);
     }
   } catch (error) {
-    res.status(500).send({ message: "Erreur interne du serveur." });
+    res.status(500).send({
+      message: error.message || `Erreur lors de la récupération du sujet avec l'identifiant ${req.params.id}.`,
+    });
   }
 };
 

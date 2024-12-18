@@ -1,5 +1,6 @@
 const express = require("express");
 const subject = require("../controllers/Subject.controller.js");
+const authMiddleware = require('../middlewares/Auth.middleware');
 
 const router = express.Router();
 
@@ -162,5 +163,5 @@ module.exports = (app) => {
      *   - name: Subjects
      *     description: Gestion des sujets
      */
-    app.use("/subjects", router);
+    app.use("/subjects", authMiddleware, router);
 };

@@ -6,9 +6,10 @@ const swaggerUi = require("swagger-ui-express");
 const cors = require("cors");
 const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
-const bodyParser = require("body-parser");
-const unitRoutes = require("./routes/unit.routes");
-const swaggerJsdoc = require("swagger-jsdoc"); // Add this line
+const userRoutes = require("./routes/User.routes");
+const unitRoutes = require("./routes/Unit.routes");
+const bodyParser = require('body-parser');
+const swaggerJsdoc = require('swagger-jsdoc');
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
@@ -36,7 +37,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 subjectRoutes(app);
 roleRoutes(app);
 unitRoutes(app);
-// ... Autres middlewares
+userRoutes(app);
 
 // Si rien n'est trouvé
 app.use(({ res }) => {
