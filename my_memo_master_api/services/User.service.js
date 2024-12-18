@@ -1,5 +1,6 @@
 const { User } = require("../models/index");
 const bcrypt = require('bcrypt');
+const generateCode = require('../helpers/generateCode')
 
 class UserService {
 
@@ -15,24 +16,29 @@ class UserService {
     const user = await User.findOne({
       where: { email: email }
     });
-    if (user) {
-      delete user.dataValues.password;
-    }
+    if (!user) return null;
+    delete user.dataValues.password;
     return user;
   }
 
   async findOne(userId) {
     const user = await User.findByPk(userId);
-    if (user) {
-      delete user.dataValues.password;
-    }
+    if (!user) return null;
+    delete user.dataValues.password;
     return user;
   }
 
   async create(user) {
+    if (await this.findByEmail(user.email)) throw new Error('Email déjà utilisé');
+    if (!user.name || !user.password || !user.email) throw new Error('Champs manquants');
+
     user.password = await bcrypt.hash(user.password, 10);
-    await User.create(user);
-    return this.findOne(userId);
+
+    const newUser = await User.create(user);
+    if (!newUser) throw new Error('Erreur lors de la création de l\'utilisateur');
+
+    delete newUser.dataValues.password;
+    return newUser
   }
 
   async update(userId, user) {
@@ -48,7 +54,9 @@ class UserService {
     });
   }
 
-  async updateRole(userId, roleId) {
+  async setRole(userId, roleId) {
+    if (!await Role.findByPk(roleId)) throw new Error('Le rôle n\'existe pas');
+
     await User.update({ roleId: roleId }, {
       where: { userId: userId }
     });
@@ -74,10 +82,45 @@ class UserService {
   }
 
   async setPassword(userId, password) {
+    if (!password) throw new Error('Mot de passe manquant');
+    if (password.length < 10) throw new Error('Le mot de passe doit contenir au moins 10 caractères');
+
     const hashedPassword = await bcrypt.hash(password, 10);
+    if (bcrypt.compare(password, hashedPassword)) throw new Error('Le mot de passe doit être différent de l\'ancien');
+    
     await User.update({ password: hashedPassword }, {
       where: { userId: userId }
     });
+  }
+
+  async setValidEmailCode(userId, code = '') {
+    if (!code) code = generateCode();
+    await User.update({ validEmailCode: code }, {
+      where: { userId: userId }
+    });
+  }
+
+  async verifyValidEmailCode(userId, code) {
+    const user = await User.findByPk(userId);
+    const isValid = user.validEmailCode === code;
+    user.validEmailCode = null;
+    await user.save();
+    return isValid;
+  }
+
+  async setResetPasswordCode(userId, code = '') {
+    if (!code) code = generateCode();
+    await User.update({ resetPasswordCode: code }, {
+      where: { userId: userId }
+    });
+  }
+
+  async verifyResetPasswordCode(userId, code) {
+    const user = await User.findByPk(userId);
+    const isValid = user.resetPasswordCode === code;
+    user.resetPasswordCode = null;
+    await user.save();
+    return isValid;
   }
 }
 
