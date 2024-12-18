@@ -15,17 +15,17 @@ services:
       - API_PORT=${API_PORT}
     command: sh -c "npm install && npm rebuild sqlite3 && npm start"
 
-  front:
-    build:
-      context: ./my_memo_master_front
-      dockerfile: Dockerfile
-      args:
-        - VITE_PORT=${VITE_PORT}
-    ports:
-      - "${VITE_PORT}:${VITE_PORT}"
-    volumes:
-      - ./my_memo_master_front:/app
-      - front-data:/app/data  # Ajout d'un volume nommé pour persister les données
+  # front:
+  #   build:
+  #     context: ./my_memo_master_front
+  #     dockerfile: Dockerfile
+  #     args:
+  #       - VITE_PORT=${VITE_PORT}
+  #   ports:
+  #     - "${VITE_PORT}:${VITE_PORT}"
+  #   volumes:
+  #     - ./my_memo_master_front:/app
+  #     - front-data:/app/data  # Ajout d'un volume nommé pour persister les données
     # build:
     #   args:
     #     - VITE_PORT=${VITE_PORT}

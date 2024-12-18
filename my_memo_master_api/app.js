@@ -9,6 +9,7 @@ const roleRoutes = require("./routes/Role.routes");
 const responseRoutes = require("./routes/Response.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
+const diagrammeRoutes = require("./routes/Diagramme.routes.js");
 const bodyParser = require('body-parser');
 const swaggerJsdoc = require('swagger-jsdoc');
 
@@ -40,6 +41,8 @@ roleRoutes(app);
 responseRoutes(app);
 unitRoutes(app);
 userRoutes(app);
+diagrammeRoutes(app);
+
 
 // ... Autres middlewares
 
