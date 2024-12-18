@@ -26,6 +26,7 @@
     "serve-favicon": "^2.5.0",
     "sqlite3": "^5.1.7",
     "statuses": "^2.0.1",
+    "swagger": "^0.0.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },

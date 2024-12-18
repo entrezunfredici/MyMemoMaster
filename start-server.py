@@ -14,7 +14,7 @@ import platform
 # commands and folders
 commands = [
     ("lancement de l'api", "npm run start", "my_memo_master_api"),
-    # ("lancement du front", "ng serve", "my_memo_master_front")
+    ("lancement du front", "npm run dev", "my_memo_master_front")
 ]
 
 # Exécution des commandes
@@ -23,4 +23,4 @@ for instance, command, directory in commands:
     if platform.system() == "Windows":
         subprocess.Popen(["start", "cmd", "/c", command], cwd=directory, shell=True)
     else:
-        subprocess.Popen(["open", "-a", "Terminal"], cwd=directory)
+        subprocess.Popen(["open", "-a", "Terminal"], cwd=directory, shell=True)

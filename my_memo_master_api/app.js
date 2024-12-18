@@ -8,6 +8,7 @@ const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
 const bodyParser = require("body-parser");
 const unitRoutes = require("./routes/unit.routes");
+const swaggerJsdoc = require("swagger-jsdoc"); // Add this line
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
@@ -28,7 +29,7 @@ app.use(bodyParser.json());
 app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
-const swaggerSpec = swaggerJsdoc(require("./swagger.config.js"));
+const swaggerSpec = swaggerJsdoc(require('./config/swagger.config.js'));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes

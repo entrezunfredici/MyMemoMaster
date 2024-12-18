@@ -1,6 +1,7 @@
-# MyMemoMaster
+# eMyMemoMaster
 
 ## Partie 1: Présentation
+
 MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leur révisions. En centralisant diverses fonctionnalités visant à optimiser l’apprentissage. La ou MyMEmoMaster pourra se démarquer de ces concurrents c’est sur le fait de proposer un large éventail de fonctionnalités :
 
 Les fonctionnalitées principales sont :
@@ -42,12 +43,14 @@ MyMemoMaster
 - Un navigateur web
 
 2. Récupération du projet:
-HTTP:
+   HTTP:
+
 ```sh
 git clone https://github.com/entrezunfredici/MyMemoMaster.git
 ```
 
 SSH:
+
 ```sh
 git clone git@github.com:entrezunfredici/MyMemoMaster.git
 
@@ -56,17 +59,20 @@ git clone git@github.com:entrezunfredici/MyMemoMaster.git
 3. Lancer votre environnement local:
 
 Avec docker-compose:
+
 ```sh
 cd MyMemoMaster
 docker-compose up
 ```
 
 A l'ancienne (comme la moutarde):
+
 ```sh
 cd MyMemoMaster/my_memo_master_api
 npm install
 npm run start
 ```
+
 ```sh
 cd MyMemoMaster/my_memo_master_front
 npm install
