@@ -1,4 +1,4 @@
-const { User } = require("../models/index");
+const { User, Role } = require("../models/index");
 const bcrypt = require('bcrypt');
 const generateCode = require('../helpers/generateCode')
 
@@ -108,6 +108,12 @@ class UserService {
     return isValid;
   }
 
+  async clearValidEmailCode(userId) {
+    await User.update({ validEmailCode: null }, {
+      where: { userId: userId }
+    });
+  }
+
   async setResetPasswordCode(userId, code = '') {
     if (!code) code = generateCode();
     await User.update({ resetPasswordCode: code }, {
@@ -121,6 +127,17 @@ class UserService {
     user.resetPasswordCode = null;
     await user.save();
     return isValid;
+  }
+
+  async clearResetPasswordCode(userId) {
+    await User.update({ resetPasswordCode: null }, {
+      where: { userId: userId }
+    });
+  }
+
+  async clearAllCodes(userId) {
+    await this.clearValidEmailCode(userId);
+    await this.clearResetPasswordCode(userId);
   }
 }
 

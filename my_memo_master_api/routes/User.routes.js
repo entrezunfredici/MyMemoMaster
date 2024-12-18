@@ -47,9 +47,9 @@ router.post("/register", user.register);
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               email:
  *                 type: string
- *                 example: "mathieu"
+ *                 example: "mathieu@example.com"
  *               password:
  *                 type: string
  *                 example: "mypassword123"
@@ -97,8 +97,8 @@ router.get("/:id", authMiddleware, user.findOne);
 
 /**
  * @swagger
- * /users/update:
- *   post:
+ * /users/{id}:
+ *   put:
  *     summary: Mettre à jour un utilisateur
  *     tags: 
  *       - Users
@@ -255,6 +255,129 @@ router.post("/:id/role", authMiddleware, user.addRole);
  *         description: Erreur lors de la suppression du rôle.
  */
 router.delete("/:id/role", authMiddleware, user.removeRole);
+
+/**
+ * @swagger
+ * /users/verify-email:
+ *   post:
+ *     summary: Vérifier l'email d'un utilisateur
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "mathieu@example.com"
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       201:
+ *         description: Email vérifié avec succès.
+ *       401:
+ *         description: Code invalide.
+ *       404:
+ *         description: Utilisateur introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post("/verify-email", user.verifyEmail);
+
+/**
+ * @swagger
+ * /users/forgot-password:
+ *   post:
+ *     summary: Envoyer un code de réinitialisation de mot de passe
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "mathieu@example.com"
+ *     responses:
+ *       201:
+ *         description: Code de réinitialisation envoyé avec succès.
+ *       404:
+ *         description: Utilisateur introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post("/forgot-password", user.forgotPassword);
+
+/**
+ * @swagger
+ * /users/reset-password:
+ *   post:
+ *     summary: Réinitialiser le mot de passe
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "mathieu@example.com"
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 example: "newpassword123"
+ *     responses:
+ *       201:
+ *         description: Mot de passe réinitialisé avec succès.
+ *       401:
+ *         description: Code invalide.
+ *       404:
+ *         description: Utilisateur introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post("/reset-password", user.resetPassword);
+
+/**
+ * @swagger
+ * /users/{id}/role:
+ *   put:
+ *     summary: Mettre à jour le rôle d'un utilisateur
+ *     tags: [Users]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID de l'utilisateur
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               roleId:
+ *                 type: integer
+ *                 example: 2
+ *     responses:
+ *       200:
+ *         description: Rôle mis à jour avec succès.
+ *       500:
+ *         description: Erreur lors de la mise à jour du rôle.
+ */
+router.put("/:id/role", authMiddleware, user.updateRole);
+
 
 module.exports = (app) => {
     /**

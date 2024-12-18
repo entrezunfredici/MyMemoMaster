@@ -42,7 +42,7 @@ exports.verifyEmail = async (req, res) => {
     const user = await userService.findByEmail(email);
 
     if (!user) return res.status(404).send({ message: "Utilisateur introuvable." });
-    if (!userService.verifyEmail(user.userId, code)) return res.status(401).send({ message: "Code invalide." });
+    if (!userService.verifyValidEmailCode(user.userId, code)) return res.status(401).send({ message: "Code invalide." });
 
     userService.update(user.userId, { hasValidatedEmail: true });
 
@@ -98,10 +98,9 @@ exports.findOne = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
-  const { userId } = req.body;
   try {
-    await userService.update(userId, req.body);
-    const updatedUser = await userService.findOne(userId);
+    await userService.update(req.params.id, req.body);
+    const updatedUser = await userService.findOne(req.params.id);
     res.status(200).send(updatedUser);
   } catch (error) {
     res.status(500).send({ message: error.message || "Erreur lors de la mise à jour de l'utilisateur." });
@@ -109,10 +108,15 @@ exports.update = async (req, res) => {
 };
 
 exports.changePassword = async (req, res) => {
-  const { id } = req.body;
+  const { id, oldPassword, newPassword } = req.body;
   try {
+    const user = await userService.findOne(id);
+    if (!user) return res.status(404).send({ message: "Utilisateur introuvable." });
 
-    await userService.setPassword(id, req.body.newPassword);
+    const isPasswordValid = await userService.verifyPassword(user.userId, oldPassword);
+    if (!isPasswordValid) return res.status(401).send({ message: "Mot de passe incorrect." });
+
+    await userService.setPassword(user.userId, newPassword);
 
     res.status(200).send({ message: "Mot de passe modifié avec succès." });
   } catch (error) {
@@ -121,9 +125,9 @@ exports.changePassword = async (req, res) => {
 };
 
 exports.addRole = async (req, res) => {
-  const { userId, roleId } = req.body;
+  const { roleId } = req.body;
   try {
-    await userService.setRole(userId, roleId);
+    await userService.setRole(req.params.id, roleId);
     res.status(200).send({ message: "Rôle ajouté avec succès." });
   } catch (error) {
     res.status(500).send({ message: error.message || "Erreur lors de l'ajout du rôle." });
@@ -132,8 +136,8 @@ exports.addRole = async (req, res) => {
 
 exports.updateRole = async (req, res) => {
   try {
-    const { userId, roleId } = req.body;
-    await userService.setRole(userId, roleId);
+    const { roleId } = req.body;
+    await userService.setRole(req.params.id, roleId);
     res.status(200).send({ message: "Rôle mis à jour avec succès." });
   } catch (error) {
     res.status(500).send({ message: error.message || "Erreur lors de la mise à jour du rôle." });
@@ -142,8 +146,8 @@ exports.updateRole = async (req, res) => {
 
 exports.removeRole = async (req, res) => {
   try {
-    const { userId, roleId } = req.body;
-    await userService.removeRole(userId, roleId);
+    const { roleId } = req.body;
+    await userService.deleteRole(req.params.id, roleId);
     res.status(200).send({ message: "Rôle supprimé avec succès." });
   } catch (error) {
     res.status(500).send({ message: error.message || "Erreur lors de la suppression du rôle." });
