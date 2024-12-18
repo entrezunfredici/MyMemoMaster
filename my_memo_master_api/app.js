@@ -6,6 +6,7 @@ const swaggerUi = require("swagger-ui-express");
 const cors = require("cors");
 const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
+const responseRoutes = require("./routes/Response.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
 const bodyParser = require('body-parser');
@@ -36,8 +37,11 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Routes
 subjectRoutes(app);
 roleRoutes(app);
+responseRoutes(app);
 unitRoutes(app);
 userRoutes(app);
+
+// ... Autres middlewares
 
 // Si rien n'est trouvé
 app.use(({ res }) => {
