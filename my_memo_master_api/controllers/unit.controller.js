@@ -1,4 +1,4 @@
-const unitService = require("../services/unit.service");
+const unitService = require("../services/Unit.service");
 
 async function getAllUnits(req, res) {
   try {

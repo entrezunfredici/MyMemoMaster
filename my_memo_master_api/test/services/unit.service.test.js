@@ -1,5 +1,5 @@
 const { Unit } = require("../../models");
-const UnitService = require("../../services/unit.service");
+const UnitService = require("../../services/Unit.service");
 
 jest.mock("../../models", () => ({
   Unit: {

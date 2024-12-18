@@ -11,7 +11,7 @@ RUN apk add --no-cache bash git
 COPY package*.json ./
 
 # Installe les dépendances
-RUN npm ci
+RUN npm install
 
 # Copie tout le reste des fichiers de l'application
 COPY . .
