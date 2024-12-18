@@ -6,6 +6,7 @@ const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
 
 // Importation des routes
 const subjectRoutes = require("./routes/Subject.routes");
@@ -13,8 +14,6 @@ const roleRoutes = require("./routes/Role.routes");
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
 const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
 const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
-const subjectRoutes = require("./routes/Subject.routes");
-const roleRoutes = require("./routes/Role.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
 
@@ -38,7 +37,6 @@ app.use(bodyParser.json());
 app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
-const swaggerSpec = swaggerJsdoc(require("./swagger.config.js"));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
@@ -48,6 +46,7 @@ app.use("/leitnersystems", leitnerSystemRoutes);
 app.use("/leitnercards", leitnerCardRoutes);
 app.use("/leitnerboxes", leitnerBoxRoutes);
 app.use("users/", userRoutes);
+app.use("/units", unitRoutes);
 
 // Gestion des routes inexistantes
 app.use((req, res, next) => {

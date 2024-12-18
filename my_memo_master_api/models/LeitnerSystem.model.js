@@ -21,6 +21,12 @@ module.exports = (instance) => {
       idUser: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        references: {
+          model: "User",
+          key: "userId",
+        },
+        onDelete: "SET NULL",
+        onUpdate: "CASCADE",
       },
       idMindMap: {
         type: DataTypes.INTEGER,
@@ -33,7 +39,13 @@ module.exports = (instance) => {
     }
   );
 
+  // Associations
   LeitnerSystem.associate = (models) => {
+    LeitnerSystem.belongsTo(models.User, {
+      foreignKey: "idUser",
+      as: "user",
+    });
+
     LeitnerSystem.hasMany(models.LeitnerBox, {
       foreignKey: "idSystem",
       as: "leitnerBoxes",
