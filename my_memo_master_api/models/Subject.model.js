@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-  return instance.define(
+  const Subject = instance.define(
     "Subject",
     {
       idSubject: {
@@ -22,4 +22,13 @@ module.exports = (instance) => {
       timestamps: false,
     }
   );
+
+  Subject.belongsToMany(instance.models.LeitnerSystem, {
+    through: "systemSubject",
+    foreignKey: "idSubject",
+    otherKey: "idSystem",
+    as: "leitnerSystems",
+  });
+
+  return Subject;
 };
