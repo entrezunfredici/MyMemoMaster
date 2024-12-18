@@ -1,3 +1,5 @@
+const { DataTypes } = require("sequelize");
+
 module.exports = (instance) => {
   const LeitnerBox = instance.define(
     "LeitnerBox",
@@ -35,6 +37,11 @@ module.exports = (instance) => {
     LeitnerBox.belongsTo(models.LeitnerSystem, {
       foreignKey: "idSystem",
       as: "leitnerSystem",
+    });
+
+    LeitnerBox.hasMany(models.LeitnerCard, {
+      foreignKey: "idBox",
+      as: "leitnerCards",
     });
   };
 
