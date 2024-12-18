@@ -138,4 +138,12 @@ router.post("/edit", leitnerBox.update);
  */
 router.delete("/:id", leitnerBox.delete);
 
-module.exports = router;
+module.exports = (app) => {
+  /**
+   * @swagger
+   * tags:
+   *   - name: Leitner Boxes
+   *     description: Gestion des boîtes de Leitner
+   */
+  app.use("/leitnerboxes", router);
+};

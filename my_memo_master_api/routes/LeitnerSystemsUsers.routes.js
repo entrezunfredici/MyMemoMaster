@@ -165,4 +165,12 @@ router.put("/:idUser/:idSystem", controller.update);
  */
 router.delete("/:idUser/:idSystem", controller.delete);
 
-module.exports = router;
+module.exports = (app) => {
+  /**
+   * @swagger
+   * tags:
+   *   - name: Leitner Systems Users
+   *     description: Gestion des Systèmes de Leitner partagés avec les utilisateurs
+   */
+  app.use("/leitnersystemsusers", router);
+};

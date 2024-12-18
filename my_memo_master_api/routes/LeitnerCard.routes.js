@@ -59,4 +59,12 @@ router.post("/leitnercards/response", leitnerCardController.correctResponse);
  */
 router.delete("/leitnercards/:id", leitnerCardController.deleteCard);
 
-module.exports = router;
+module.exports = (app) => {
+  /**
+   * @swagger
+   * tags:
+   *   - name: Leitner Cards
+   *     description: Gestion des cartes de Leitner
+   */
+  app.use("/leitnercards", router);
+};

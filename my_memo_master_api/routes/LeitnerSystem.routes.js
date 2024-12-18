@@ -251,4 +251,12 @@ router.post("/share", leitnerSystem.share);
  */
 router.delete("/:id", leitnerSystem.delete);
 
-module.exports = router;
+module.exports = (app) => {
+  /**
+   * @swagger
+   * tags:
+   *   - name: Leitner Systems
+   *     description: Gestion des Systèmes de Leitner
+   */
+  app.use("/leitnersystems", router);
+};
