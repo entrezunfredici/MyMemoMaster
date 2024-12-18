@@ -9,6 +9,7 @@ const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
 const bodyParser = require("body-parser");
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
+const LeitnernerCardRoutes = require("./routes/LeitnerCard.routes");
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
@@ -36,6 +37,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 subjectRoutes(app);
 roleRoutes(app);
 leitnerSystemRoutes(app);
+LeitnernerCardRoutes(app);
 
 // ... Autres middlewares
 

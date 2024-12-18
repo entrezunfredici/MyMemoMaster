@@ -12,6 +12,7 @@ const Role = require("./Role.model")(instance);
 const Subject = require("./Subject.model")(instance);
 const LeitnerSystem = require("./LeitnerSystem.model")(instance);
 const LeitnerSystemsUsers = require("./leitnerSystemsUsers.model")(instance);
+const LeitnerCard = require("./LeitnerCard.model")(instance);
 
 // // Associations
 
@@ -21,4 +22,5 @@ module.exports = {
   Subject,
   LeitnerSystem,
   LeitnerSystemsUsers,
+  LeitnerCard,
 };
