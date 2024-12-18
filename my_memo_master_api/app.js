@@ -14,6 +14,7 @@ const roleRoutes = require("./routes/Role.routes");
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
 const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
 const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
+const responseRoutes = require("./routes/Response.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
 const leitnerSystemsUsersRoutes = require("./routes/LeitnerSystemsUsers.routes");
@@ -41,18 +42,21 @@ app.use(favicon(__dirname + "/public/favicon.ico"));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
-app.use("/subjects", subjectRoutes);
-app.use("/roles", roleRoutes);
-app.use("/leitnersystems", leitnerSystemRoutes);
-app.use("/leitnercards", leitnerCardRoutes);
-app.use("/leitnerboxes", leitnerBoxRoutes);
-app.use("users/", userRoutes);
-app.use("/units", unitRoutes);
-app.use("/leitnersystemsusers", leitnerSystemsUsersRoutes);
+subjectRoutes(app);
+roleRoutes(app);
+responseRoutes(app);
+unitRoutes(app);
+userRoutes(app);
+leitnerSystemRoutes(app);
+leitnerCardRoutes(app);
+leitnerBoxRoutes(app);
+leitnerSystemsUsersRoutes(app);
 
-// Gestion des routes inexistantes
-app.use((req, res, next) => {
-  res.status(404).json({ message: "Route not found" });
+// ... Autres middlewares
+
+// Si rien n'est trouvé
+app.use(({ res }) => {
+  return res.status(404).json({ message: "Route not found" });
 });
 
 module.exports = app;

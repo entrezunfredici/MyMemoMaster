@@ -14,6 +14,7 @@ models.LeitnerCard = require("./LeitnerCard.model")(instance);
 models.LeitnerBox = require("./LeitnerBox.model")(instance);
 models.Unit = require("./unit.model")(instance);
 models.User = require("./User.model")(instance);
+models.Response = require("./Response.model")(instance);
 
 // // Associations
 Object.keys(models).forEach((modelName) => {
