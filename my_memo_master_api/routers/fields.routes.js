@@ -81,9 +81,31 @@ router.get('/:id', FieldController.getFieldById);
  *               name:
  *                 type: string
  *                 example: "Nom du champ"
- *               type:
+ *               fieldChar:
+ *                 type: string
+ *                 example: "Caractère"
+ *               fieldLetter:
+ *                 type: string
+ *                 example: "Lettre"
+ *               valueSaved:
+ *                 type: boolean
+ *                 example: true
+ *               numericValue:
+ *                 type: number
+ *                 format: float
+ *                 example: 10.5
+ *               textValue:
  *                 type: string
  *                 example: "Texte"
+ *               idType:
+ *                 type: integer
+ *                 example: 1
+ *               idUnit:
+ *                 type: integer
+ *                 example: 2
+ *               idUser:
+ *                 type: integer
+ *                 example: 3
  *     responses:
  *       201:
  *         description: Champ créé avec succès
@@ -117,9 +139,31 @@ router.post('/add', FieldController.createField);
  *               name:
  *                 type: string
  *                 example: "Nom du champ"
- *               type:
+ *               fieldChar:
  *                 type: string
- *                 example: "Numérique"
+ *                 example: "Caractère"
+ *               fieldLetter:
+ *                 type: string
+ *                 example: "Lettre"
+ *               valueSaved:
+ *                 type: boolean
+ *                 example: true
+ *               numericValue:
+ *                 type: number
+ *                 format: float
+ *                 example: 10.5
+ *               textValue:
+ *                 type: string
+ *                 example: "Texte"
+ *               idType:
+ *                 type: integer
+ *                 example: 1
+ *               idUnit:
+ *                 type: integer
+ *                 example: 2
+ *               idUser:
+ *                 type: integer
+ *                 example: 3
  *     responses:
  *       200:
  *         description: Champ mis à jour avec succès

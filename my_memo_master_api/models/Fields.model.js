@@ -1,14 +1,14 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-    return sequelize.define('Field', {
+    const Field = sequelize.define('Field', {
         id: {
             type: DataTypes.INTEGER,
             primaryKey: true,
             autoIncrement: true,
             allowNull: false,
         },
-        fieldValue: {
+        name: {
             type: DataTypes.STRING,
             allowNull: false,
         },
@@ -24,28 +24,54 @@ module.exports = (sequelize) => {
             type: DataTypes.BOOLEAN,
             allowNull: true,
         },
-        idType: {
+        numericValue: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: true,
+        },
+        textValue: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        idType: { // Clé secondaire vers FieldTypes
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: 'fieldTypes', // Correspond au nom de la table associée
+                model: 'FieldTypes', // Nom de la table associée
                 key: 'id',
             },
         },
-        updatedAt: {
-            type: DataTypes.DATE,
+        idUnit: { // Clé secondaire vers Units
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'Units',
+                key: 'id',
+            },
+        },
+        idUser: { // Clé secondaire vers Users
+            type: DataTypes.INTEGER,
             allowNull: false,
-            defaultValue: DataTypes.NOW,
+            references: {
+                model: 'Users',
+                key: 'id',
+            },
         },
         createdAt: {
             type: DataTypes.DATE,
             allowNull: false,
             defaultValue: DataTypes.NOW,
         },
+        updatedAt: {
+            type: DataTypes.DATE,
+            allowNull: false,
+            defaultValue: DataTypes.NOW,
+        },
     }, {
-        tableName: 'fields', // Le nom exact de ta table
-        timestamps: true, // Active automatiquement createdAt et updatedAt
+        tableName: 'fields', // Nom exact de la table
+        timestamps: true, // Active createdAt et updatedAt automatiquement
         updatedAt: 'updatedAt', // Associe la colonne updatedAt
         createdAt: 'createdAt', // Associe la colonne createdAt
     });
+
+    return Field;
 };

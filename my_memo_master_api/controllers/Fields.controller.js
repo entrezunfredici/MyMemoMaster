@@ -1,50 +1,37 @@
-const fieldService = require('../services/Field.service');  // Importation du service FieldService
+const FieldService = require('../services/Field.service');
 
 /**
  * @swagger
- * /fields/all:
- *   get:
- *     summary: Récupérer tous les champs
+ * /fields/add:
+ *   post:
+ *     summary: Ajouter un champ
+ *     description: Ajoute un nouveau champ dans la base de données.
  *     tags: [Fields]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Field'
  *     responses:
- *       200:
- *         description: Liste de tous les champs récupérée avec succès.
+ *       201:
+ *         description: Champ ajouté avec succès
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                     example: 1
- *                   fieldValue:
- *                     type: string
- *                     example: "Valeur"
- *                   fieldChar:
- *                     type: string
- *                     example: "A"
- *                   fieldLetter:
- *                     type: string
- *                     example: "B"
- *                   valueSaved:
- *                     type: boolean
- *                     example: true
- *                   idType:
- *                     type: integer
- *                     example: 2
+ *               $ref: '#/components/schemas/Field'
  *       500:
- *         description: Erreur interne du serveur.
+ *         description: Erreur serveur
  */
-exports.getAllFields = async (req, res) => {
-  try {
-    const fields = await fieldService.getAllFields();
-    res.status(200).json(fields);
-  } catch (error) {
-    console.error('Erreur lors de la récupération des champs :', error.message);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
-  }
+
+exports.addField = async (req, res) => {
+    try {
+        const field = await FieldService.addField(req.body);
+        res.status(201).json(field);
+    } catch (error) {
+        console.error('Erreur lors de l\'ajout du champ :', error.message);
+        res.status(500).json({ message: error.message });
+    }
 };
 
 /**
@@ -52,225 +39,142 @@ exports.getAllFields = async (req, res) => {
  * /fields/{id}:
  *   get:
  *     summary: Récupérer un champ par ID
+ *     description: Récupère un champ spécifique en utilisant son ID.
  *     tags: [Fields]
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: Identifiant du champ
  *         schema:
  *           type: integer
+ *         description: L'identifiant du champ
  *     responses:
  *       200:
- *         description: Champ récupéré avec succès.
+ *         description: Champ trouvé
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 1
- *                 fieldValue:
- *                   type: string
- *                   example: "Valeur"
- *                 fieldChar:
- *                   type: string
- *                   example: "A"
- *                 fieldLetter:
- *                   type: string
- *                   example: "B"
- *                 valueSaved:
- *                   type: boolean
- *                   example: true
- *                 idType:
- *                   type: integer
- *                   example: 2
+ *               $ref: '#/components/schemas/Field'
  *       404:
- *         description: Champ non trouvé.
+ *         description: Champ non trouvé
  *       500:
- *         description: Erreur interne du serveur.
+ *         description: Erreur serveur
  */
-exports.getFieldById = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const field = await fieldService.getFieldById(id);
-    if (!field) {
-      res.status(404).json({ message: 'Champ non trouvé' });
-    } else {
-      res.status(200).json(field);
-    }
-  } catch (error) {
-    console.error('Erreur lors de la récupération du champ :', error.message);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
-  }
-};
 
-/**
- * @swagger
- * /fields/add:
- *   post:
- *     summary: Ajouter un nouveau champ
- *     tags: [Fields]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               fieldValue:
- *                 type: string
- *                 example: "Valeur"
- *               fieldChar:
- *                 type: string
- *                 example: "A"
- *               fieldLetter:
- *                 type: string
- *                 example: "B"
- *               valueSaved:
- *                 type: boolean
- *                 example: true
- *               idType:
- *                 type: integer
- *                 example: 2
- *     responses:
- *       201:
- *         description: Champ créé avec succès.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 1
- *                 fieldValue:
- *                   type: string
- *                   example: "Valeur"
- *                 fieldChar:
- *                   type: string
- *                   example: "A"
- *                 fieldLetter:
- *                   type: string
- *                   example: "B"
- *                 valueSaved:
- *                   type: boolean
- *                   example: true
- *                 idType:
- *                   type: integer
- *                   example: 2
- *       500:
- *         description: Erreur interne du serveur.
- */
-exports.createField = async (req, res) => {
-  const { fieldValue, fieldChar, fieldLetter, valueSaved, idType } = req.body;
-  try {
-    const newField = await fieldService.createField({
-      fieldValue,
-      fieldChar,
-      fieldLetter,
-      valueSaved,
-      idType,
-    });
-    res.status(201).json(newField);
-  } catch (error) {
-    console.error('Erreur lors de la création du champ :', error.message);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
-  }
+exports.getFieldById = async (req, res) => {
+    try {
+        const field = await FieldService.getFieldById(req.params.id);
+        if (!field) return res.status(404).json({ message: 'Champ non trouvé' });
+
+        res.status(200).json(field);
+    } catch (error) {
+        console.error('Erreur lors de la récupération du champ :', error.message);
+        res.status(500).json({ message: error.message });
+    }
 };
 
 /**
  * @swagger
  * /fields/{id}:
  *   put:
- *     summary: Mettre à jour un champ par ID
+ *     summary: Mettre à jour un champ
+ *     description: Met à jour un champ existant dans la base de données.
  *     tags: [Fields]
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: Identifiant du champ
  *         schema:
  *           type: integer
+ *         description: L'identifiant du champ à mettre à jour
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               fieldValue:
- *                 type: string
- *                 example: "Valeur Modifiée"
- *               fieldChar:
- *                 type: string
- *                 example: "B"
- *               fieldLetter:
- *                 type: string
- *                 example: "C"
- *               valueSaved:
- *                 type: boolean
- *                 example: false
- *               idType:
- *                 type: integer
- *                 example: 3
+ *             $ref: '#/components/schemas/Field'
  *     responses:
  *       200:
- *         description: Champ mis à jour avec succès.
+ *         description: Champ mis à jour avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Field'
  *       404:
- *         description: Champ non trouvé.
+ *         description: Champ non trouvé
  *       500:
- *         description: Erreur interne du serveur.
+ *         description: Erreur serveur
  */
+
 exports.updateField = async (req, res) => {
-  const { id } = req.params;
-  const updates = req.body;
-  try {
-    const updatedField = await fieldService.updateField(id, updates);
-    if (!updatedField) {
-      res.status(404).json({ message: 'Champ non trouvé' });
-    } else {
-      res.status(200).json(updatedField);
+    try {
+        const field = await FieldService.updateField(req.params.id, req.body);
+        res.status(200).json(field);
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour du champ :', error.message);
+        res.status(500).json({ message: error.message });
     }
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour du champ :', error.message);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
-  }
 };
 
 /**
  * @swagger
  * /fields/{id}:
  *   delete:
- *     summary: Supprimer un champ par ID
+ *     summary: Supprimer un champ
+ *     description: Supprime un champ spécifique de la base de données.
  *     tags: [Fields]
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: Identifiant du champ
  *         schema:
  *           type: integer
+ *         description: L'identifiant du champ à supprimer
+ *     responses:
+ *       204:
+ *         description: Champ supprimé avec succès
+ *       404:
+ *         description: Champ non trouvé
+ *       500:
+ *         description: Erreur serveur
+ */
+
+exports.deleteField = async (req, res) => {
+    try {
+        await FieldService.deleteField(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        console.error('Erreur lors de la suppression du champ :', error.message);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+/**
+ * @swagger
+ * /fields:
+ *   get:
+ *     summary: Récupérer tous les champs
+ *     description: Récupère tous les champs enregistrés dans la base de données.
+ *     tags: [Fields]
  *     responses:
  *       200:
- *         description: Champ supprimé avec succès.
- *       404:
- *         description: Champ non trouvé.
+ *         description: Liste des champs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Field'
  *       500:
- *         description: Erreur interne du serveur.
+ *         description: Erreur serveur
  */
-exports.deleteField = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const isDeleted = await fieldService.deleteField(id);
-    if (!isDeleted) {
-      res.status(404).json({ message: 'Champ non trouvé' });
-    } else {
-      res.status(200).json({ message: 'Champ supprimé avec succès' });
+
+exports.getAllFields = async (req, res) => {
+    try {
+        const fields = await FieldService.getAllFields();
+        res.status(200).json(fields);
+    } catch (error) {
+        console.error('Erreur lors de la récupération des champs :', error.message);
+        res.status(500).json({ message: error.message });
     }
-  } catch (error) {
-    console.error('Erreur lors de la suppression du champ :', error.message);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
-  }
 };

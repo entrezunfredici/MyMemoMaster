@@ -1,4 +1,4 @@
-const { Field } = require('../models/Fields.model');
+const { Field } = require('../models/index'); // Importation du modèle Field
 
 /**
  * @swagger
@@ -26,21 +26,21 @@ class FieldService {
      *                   id:
      *                     type: integer
      *                     example: 1
-     *                   fieldValue:
+     *                   name:
      *                     type: string
-     *                     example: "Exemple"
-     *                   fieldChar:
+     *                     example: "Nom du champ"
+     *                   numericValue:
+     *                     type: number
+     *                     example: 42.5
+     *                   textValue:
      *                     type: string
-     *                     example: "A"
+     *                     example: "Texte du champ"
      *                   fieldLetter:
      *                     type: string
      *                     example: "A"
      *                   valueSaved:
      *                     type: boolean
      *                     example: true
-     *                   idType:
-     *                     type: integer
-     *                     example: 1
      */
     async findAll() {
         try {
@@ -75,21 +75,21 @@ class FieldService {
      *                 id:
      *                   type: integer
      *                   example: 1
-     *                 fieldValue:
+     *                 name:
      *                   type: string
-     *                   example: "Exemple"
-     *                 fieldChar:
+     *                   example: "Nom du champ"
+     *                 numericValue:
+     *                   type: number
+     *                   example: 42.5
+     *                 textValue:
      *                   type: string
-     *                   example: "A"
+     *                   example: "Texte du champ"
      *                 fieldLetter:
      *                   type: string
      *                   example: "A"
      *                 valueSaved:
      *                   type: boolean
      *                   example: true
-     *                 idType:
-     *                   type: integer
-     *                   example: 1
      *       404:
      *         description: Champ introuvable.
      */
@@ -109,7 +109,7 @@ class FieldService {
      * @swagger
      * /service/fields/add:
      *   post:
-     *     summary: Créer un nouveau champ
+     *     summary: Ajouter un nouveau champ
      *     tags: [FieldService]
      *     requestBody:
      *       required: true
@@ -118,12 +118,15 @@ class FieldService {
      *           schema:
      *             type: object
      *             properties:
-     *               fieldValue:
+     *               name:
      *                 type: string
-     *                 example: "Exemple Value"
-     *               fieldChar:
+     *                 example: "Nom du champ"
+     *               numericValue:
+     *                 type: number
+     *                 example: 42.5
+     *               textValue:
      *                 type: string
-     *                 example: "A"
+     *                 example: "Texte du champ"
      *               fieldLetter:
      *                 type: string
      *                 example: "A"
@@ -132,10 +135,16 @@ class FieldService {
      *                 example: true
      *               idType:
      *                 type: integer
-     *                 example: 1
+     *                 example: 2
+     *               idUnit:
+     *                 type: integer
+     *                 example: 3
+     *               idUser:
+     *                 type: integer
+     *                 example: 5
      *     responses:
      *       201:
-     *         description: Champ créé avec succès.
+     *         description: Champ ajouté avec succès.
      *       400:
      *         description: Requête invalide.
      */
@@ -151,7 +160,7 @@ class FieldService {
      * @swagger
      * /service/fields/{id}:
      *   put:
-     *     summary: Mettre à jour un champ par ID
+     *     summary: Modifier un champ existant par ID
      *     tags: [FieldService]
      *     parameters:
      *       - name: id
@@ -168,21 +177,15 @@ class FieldService {
      *           schema:
      *             type: object
      *             properties:
-     *               fieldValue:
+     *               name:
      *                 type: string
-     *                 example: "Updated Value"
-     *               fieldChar:
+     *                 example: "Nom modifié"
+     *               numericValue:
+     *                 type: number
+     *                 example: 55.2
+     *               textValue:
      *                 type: string
-     *                 example: "B"
-     *               fieldLetter:
-     *                 type: string
-     *                 example: "B"
-     *               valueSaved:
-     *                 type: boolean
-     *                 example: false
-     *               idType:
-     *                 type: integer
-     *                 example: 2
+     *                 example: "Texte modifié"
      *     responses:
      *       200:
      *         description: Champ mis à jour avec succès.

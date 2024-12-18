@@ -1,4 +1,4 @@
-const { FieldType } = require('../models/FieldType.model');  // Importation du modèle FieldType
+const { FieldType } = require('../models/index');  // Importation du modèle FieldType
 
 /**
  * @swagger
@@ -103,6 +103,85 @@ class FieldTypeService {
         } catch (error) {
             throw new Error('Erreur lors de la récupération du type de champ');
         }
+    }
+
+    /**
+     * Méthode pour appliquer les règles du champ
+     * @param {Object} field Le champ à traiter
+     * @returns {Object} Valeur traitée du champ
+     */
+    async processField(field) {
+        try {
+            const fieldType = await this.findOne(field.idType); // On récupère le type du champ
+            
+            // Si le type de champ permet les valeurs numériques
+            let result = {};
+            if (fieldType.allowFloat) {
+                result.numericValue = field.numericValue; // Retourne la valeur numérique
+            }
+
+            // Si le type de champ permet les valeurs textuelles
+            if (fieldType.allowCharacters) {
+                result.textValue = field.textValue; // Retourne la valeur textuelle
+            }
+
+            // Si le type de champ permet les unités
+            if (fieldType.allowUnit) {
+                result.unit = field.unit; // Retourne l'unité du champ
+            }
+
+            // Appliquer la règle de séparation si elle est définie
+            if (fieldType.separation) {
+                result = this.applySeparationRule(result, fieldType.separation);
+            }
+
+            return result;
+
+        } catch (error) {
+            throw new Error('Erreur lors du traitement du champ');
+        }
+    }
+
+    /**
+     * Appliquer la règle de séparation sur les valeurs du champ
+     * @param {Object} fieldData Données du champ
+     * @param {string} separation La règle de séparation
+     * @returns {Object} Valeurs formatées avec séparation
+     */
+    applySeparationRule(fieldData, separation) {
+        const separationRegex = /([A-Z])(\d+)/g; // Regex pour extraire la règle de séparation (ex : T3, N2)
+        let result = {};
+
+        // Appliquer la règle de séparation pour chaque champ
+        for (const [key, value] of Object.entries(fieldData)) {
+            if (separationRegex.test(separation)) {
+                const matches = [...separation.matchAll(separationRegex)];
+                matches.forEach(([_, type, length]) => {
+                    if (key.startsWith(type)) {
+                        result[key] = this.applySeparation(value, parseInt(length, 10));
+                    }
+                });
+            } else {
+                result[key] = value;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Appliquer la séparation à une valeur
+     * @param {string|number} value La valeur à séparer
+     * @param {number} length Le nombre de caractères/digits pour chaque segment
+     * @returns {Object} Valeur séparée sous forme d'objet
+     */
+    applySeparation(value, length) {
+        const valueStr = value.toString();
+        let segments = [];
+        for (let i = 0; i < valueStr.length; i += length) {
+            segments.push(valueStr.slice(i, i + length));
+        }
+        return segments;
     }
 
     /**
