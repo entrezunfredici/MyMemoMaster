@@ -55,7 +55,6 @@ section {
   margin: 1rem 0rem;
 }
 
-/* Code for Firefox */
 *::-moz-selection,
 *::selection {
   color: var(--ivory);

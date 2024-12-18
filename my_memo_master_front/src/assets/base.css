@@ -1,6 +1,7 @@
 /* ! THIS FILE IS MEANT TO SET THE BASE STYLES FOR THE WHOLE APPLICATION */
 /* ! DONT WRITE ANY STYLES OR COMPONENT SPECIFIC STYLES HERE */
 
+/* App theme */
 :root {
     /* Theme colors */
     --orange: #FF4438;
@@ -9,23 +10,15 @@
     --light-blue: #D5DAEC;
     --blue: #1D3BA0;
     /* Other colors */
-    --success-light: #34d399;
     --success: #10b981;
-    --success-dark: #047857;
-    --warning-light: #fbbf24;
     --warning: #f59e0b;
-    --warning-dark: #d97706;
-    --danger-light: #ef4444;
     --danger: #dc2626;
-    --danger-dark: #991b1b;
 }
 
-/* Overload vue-toastification stuff */
+/* Vue-toastification overrides */
 .Vue-Toastification__toast {
-    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2) !important;
     font-family: "Roboto", sans-serif !important;
-    border: solid 2px transparent !important;
-    border-radius: 1rem !important;
+    border-radius: 0.75rem !important;
 }
 
 .Vue-Toastification__toast--info {
@@ -47,6 +40,8 @@
     background-color: var(--danger) !important;
     color: var(--ivory) !important;
 }
+
+/* Bases styles */
 
 *,
 *::before,

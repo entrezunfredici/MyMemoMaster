@@ -4,7 +4,10 @@ import { isMobile } from '@/helpers/functions.js'
 const toast = useToast();
 
 function notify(message, type = 'info') {
-    if (['info', 'success', 'error', 'warning'].includes(type) === false) type = 'info';
+    if (['info', 'success', 'error', 'warning'].includes(type) === false) {
+        type = 'info';
+        console.error('Invalid type for notification. Defaulting to info.');
+    }
 
     toast[type](message, {
         position: isMobile() ? 'top-right' : 'bottom-right',
