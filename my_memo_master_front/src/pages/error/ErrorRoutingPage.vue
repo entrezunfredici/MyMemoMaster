@@ -5,7 +5,3 @@
     <router-link to="/" class="text-light text-lg font-bold underline">Home page</router-link>
   </div>
 </template>
-
-<script setup>
-
-</script>

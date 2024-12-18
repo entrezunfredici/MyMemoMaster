@@ -1,21 +1,52 @@
 <template>
   <div>
-      <!-- Desktop header -->
-    <header class="flex justify-between items-center bg-dark-light border-b border-gray p-4 gap-3">
-      <Bars3Icon class="size-10 text-gray-light rounded-lg p-1 cursor-pointer"/>
-      <router-link :to="route.path">
-        <h1 class="text-2xl font-bold text-light">
-          {{ route.meta.title }}
-        </h1>
-      </router-link>
-      <MagnifyingGlassIcon class="size-10 text-gray-light rounded-full p-1.5 cursor-pointer"/>
-    </header>
+    {{ route.meta.title }}
+    <nav class="flex flex-col items-center justify-between rounded-lg border-2 border-light-blue h-96">
+      <div class="flex flex-col items-center gap-2 justify-center">
+        <router-link to="/mindmaps"
+          :class="[route?.name && route.name.includes('mindmaps') ? 'bg-light-blue' : '', 'text-orange p-2 rounded-lg']">
+          <MindmapIcon />
+        </router-link>
+        <router-link to="/flashcards"
+          :class="[route?.name && route.name.includes('flashcards') ? 'bg-light-blue' : '', 'text-orange p-2 rounded-lg']">
+          <FlashardIcon />
+        </router-link>
+        <router-link to="/exercises"
+          :class="[route?.name && route.name.includes('exercises') ? 'bg-light-blue' : '', 'text-orange p-2 rounded-lg']">
+          <ExercisesIcon />
+        </router-link>
+        <router-link to="/classroom"
+          :class="[route?.name && route.name.includes('classroom') ? 'bg-light-blue' : '', 'text-orange p-2 rounded-lg']">
+          <ClassroomIcon />
+        </router-link>
+        <router-link to="/community"
+          :class="[route?.name && route.name.includes('community') ? 'bg-light-blue' : '', 'text-orange p-2 rounded-lg']">
+          <CommunityIcon />
+        </router-link>
+      </div>
+      <div class="flex flex-col items-center gap-2 justify-center">
+        <router-link to="/profile"
+          :class="[route?.name && route.name.includes('profile') ? 'bg-light-blue' : '', 'text-orange p-2 rounded-lg']">
+          <ProfileIcon />
+        </router-link>
+        <router-link to="/settings"
+          :class="[route?.name && route.name.includes('settings') ? 'bg-light-blue' : '', 'text-orange p-2 rounded-lg']">
+          <SettingsIcon />
+        </router-link>
+      </div>
+
+    </nav>
   </div>
 </template>
 
 <script setup>
-import { MagnifyingGlassIcon } from '@heroicons/vue/24/solid'
-import { Bars3Icon } from '@heroicons/vue/24/solid'
+import ClassroomIcon from '@/icons/ClassroomIcon.vue'
+import CommunityIcon from '@/icons/CommunityIcon.vue'
+import ExercisesIcon from '@/icons/ExercisesIcon.vue'
+import FlashardIcon from '@/icons/FlashardIcon.vue'
+import MindmapIcon from '@/icons/MindmapIcon.vue'
+import ProfileIcon from '@/icons/ProfileIcon.vue'
+import SettingsIcon from '@/icons/SettingsIcon.vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()

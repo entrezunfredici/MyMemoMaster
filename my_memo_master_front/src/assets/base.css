@@ -1,8 +1,14 @@
-:root {
-    --primary: #a6fa76;
-    --light: #ffffff;
-    --dark: #000000;
+/* ! THIS FILE IS MEANT TO SET THE BASE STYLES FOR THE WHOLE APPLICATION */
+/* ! DONT WRITE ANY STYLES OR COMPONENT SPECIFIC STYLES HERE */
 
+:root {
+    /* Theme colors */
+    --orange: #FF4438;
+    --peach: #F8CBAD;
+    --ivory: #FAF6E8;
+    --light-blue: #D5DAEC;
+    --blue: #1D3BA0;
+    /* Other colors */
     --success-light: #34d399;
     --success: #10b981;
     --success-dark: #047857;
@@ -17,29 +23,29 @@
 /* Overload vue-toastification stuff */
 .Vue-Toastification__toast {
     box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2) !important;
-    font-family: "Poppins", "Roboto", sans-serif !important;
+    font-family: "Roboto", sans-serif !important;
     border: solid 2px transparent !important;
     border-radius: 1rem !important;
 }
 
 .Vue-Toastification__toast--info {
-    background-color: var(--gray) !important;
-    color: var(--light) !important;
+    background-color: var(--blue) !important;
+    color: var(--ivory) !important;
 }
 
 .Vue-Toastification__toast--success {
     background-color: var(--success) !important;
-    color: var(--light) !important;
+    color: var(--ivory) !important;
 }
 
 .Vue-Toastification__toast--warning {
     background-color: var(--warning) !important;
-    color: var(--light) !important;
+    color: var(--ivory) !important;
 }
 
 .Vue-Toastification__toast--error {
     background-color: var(--danger) !important;
-    color: var(--light) !important;
+    color: var(--ivory) !important;
 }
 
 *,
@@ -56,11 +62,11 @@ body {
     min-height: 100vh;
     transition: color 0.5s, background-color 0.5s;
     line-height: 1.6;
-    font-family: "Poppins", "Roboto", sans-serif;
+    font-family: "Roboto", sans-serif;
     font-size: 15px;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    color: var(--light);
-    background: var(--dark);
+    color: var(--blue);
+    background: var(--ivory);
 }

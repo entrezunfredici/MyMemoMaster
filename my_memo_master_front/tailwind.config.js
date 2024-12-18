@@ -7,9 +7,13 @@ export default {
   theme: {
     extend: {},
     colors: {
-      primary: '#a6fa76',
-      light: '#ffffff',
-      dark: '#000000',
+      /* Theme colors */
+      orange: '#FF4438',
+      peach: '#F8CBAD',
+      ivory: '#FAF6E8',
+      'light-blue': '#D5DAEC',
+      blue: '#1D3BA0',
+      /* Other colors */
       'success-light': '#34d399',
       success: '#10b981',
       'success-dark': '#047857',

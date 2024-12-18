@@ -56,10 +56,10 @@ section {
 }
 
 /* Code for Firefox */
-::-moz-selection,
-::selection {
-  color: var(--light);
-  background: var(--primary);
+*::-moz-selection,
+*::selection {
+  color: var(--ivory);
+  background: var(--orange);
 }
 
 ul,
@@ -74,11 +74,6 @@ a {
 input:focus,
 textarea:focus {
   outline: none;
-}
-
-textarea:disabled,
-input:disabled {
-  color: var(--gray-light);
 }
 
 textarea {
