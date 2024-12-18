@@ -64,6 +64,11 @@ module.exports = (instance) => {
       otherKey: "idSubject",
       as: "subjects",
     });
+
+    LeitnerSystem.hasMany(models.LeitnerSystemsUsers, {
+      foreignKey: "idSystem",
+      as: "leitnerSystemsUsers",
+    });
   };
 
   return LeitnerSystem;

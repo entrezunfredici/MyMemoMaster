@@ -5,29 +5,24 @@ const dbConfig = require("../config/db.config");
 const instance = new Sequelize(dbConfig);
 
 // Models
-const Role = require("./Role.model")(instance);
-const Subject = require("./Subject.model")(instance);
-const LeitnerSystem = require("./LeitnerSystem.model")(instance);
-const LeitnerSystemsUsers = require("./LeitnerSystemsUsers.model")(instance);
-const LeitnerCard = require("./LeitnerCard.model")(instance);
-const LeitnerBox = require("./LeitnerBox.model")(instance);
-const Unit = require("./unit.model")(instance);
-const User = require("./User.model")(instance);
+const models = {};
+models.Role = require("./Role.model")(instance);
+models.Subject = require("./Subject.model")(instance);
+models.LeitnerSystem = require("./LeitnerSystem.model")(instance);
+models.LeitnerSystemsUsers = require("./LeitnerSystemsUsers.model")(instance);
+models.LeitnerCard = require("./LeitnerCard.model")(instance);
+models.LeitnerBox = require("./LeitnerBox.model")(instance);
+models.Unit = require("./unit.model")(instance);
+models.User = require("./User.model")(instance);
 
 // // Associations
-LeitnerSystem.associate({ LeitnerBox, LeitnerCard, Subject, User });
-LeitnerCard.associate({ LeitnerBox, LeitnerSystem });
-LeitnerBox.associate({ LeitnerSystem, LeitnerCard });
-Subject.associate({ LeitnerSystem });
-User.associate({ Role, LeitnerSystem });
+Object.keys(models).forEach((modelName) => {
+  if (models[modelName].associate) {
+    models[modelName].associate(models);
+  }
+});
+
 module.exports = {
   instance,
-  Role,
-  Subject,
-  LeitnerSystem,
-  LeitnerSystemsUsers,
-  LeitnerCard,
-  LeitnerBox,
-  Unit,
-  User,
+  ...models,
 };

@@ -16,6 +16,7 @@ const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
 const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
+const leitnerSystemsUsersRoutes = require("./routes/LeitnerSystemsUsers.routes");
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
@@ -47,6 +48,7 @@ app.use("/leitnercards", leitnerCardRoutes);
 app.use("/leitnerboxes", leitnerBoxRoutes);
 app.use("users/", userRoutes);
 app.use("/units", unitRoutes);
+app.use("/leitnersystemsusers", leitnerSystemsUsersRoutes);
 
 // Gestion des routes inexistantes
 app.use((req, res, next) => {

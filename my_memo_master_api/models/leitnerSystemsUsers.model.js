@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-  return sequelize.define(
+  const LeitnerSystemsUsers = sequelize.define(
     "LeitnerSystemsUsers",
     {
       idUser: {
@@ -40,4 +40,19 @@ module.exports = (sequelize) => {
       timestamps: false,
     }
   );
+
+  // Associations
+  LeitnerSystemsUsers.associate = (models) => {
+    LeitnerSystemsUsers.belongsTo(models.User, {
+      foreignKey: "idUser",
+      as: "user",
+    });
+
+    LeitnerSystemsUsers.belongsTo(models.LeitnerSystem, {
+      foreignKey: "idSystem",
+      as: "leitnerSystem",
+    });
+  };
+
+  return LeitnerSystemsUsers;
 };
