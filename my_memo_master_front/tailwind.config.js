@@ -7,18 +7,18 @@ export default {
   theme: {
     extend: {},
     colors: {
-      primary: '#a6fa76',
-      light: '#ffffff',
-      dark: '#000000',
-      'success-light': '#34d399',
+      /* Theme colors */
+      primary: '#1E3BA1',
+      'light-primary': '#D5DAED',
+      secondary: '#FA4238',
+      'light-secondary': '#FDC7C4',
+      light: '#FDF7FF',
+      gray: '#d5daed',
+      dark: '#101f56',
+      /* Other colors */
       success: '#10b981',
-      'success-dark': '#047857',
-      'warning-light': '#fbbf24',
       warning: '#f59e0b',
-      'warning-dark': '#d97706',
-      'danger-light': '#ef4444',
       danger: '#dc2626',
-      'danger-dark': '#991b1b',
     },
     screens: {
       'xsm': '460px',
