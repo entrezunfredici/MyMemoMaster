@@ -12,7 +12,7 @@ models.LeitnerSystem = require("./LeitnerSystem.model")(instance);
 models.LeitnerSystemsUsers = require("./leitnerSystemsUsers.model")(instance);
 models.LeitnerCard = require("./LeitnerCard.model")(instance);
 models.LeitnerBox = require("./LeitnerBox.model")(instance);
-models.Unit = require("./unit.model")(instance);
+models.Unit = require("./Unit.model")(instance);
 models.User = require("./User.model")(instance);
 models.Response = require("./Response.model")(instance);
 
