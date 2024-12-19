@@ -6,26 +6,26 @@ class UserService {
 
   async findAll() {
     const users = await User.findAll();
-    users.forEach(user => {
-      delete user.dataValues.password;
+    return users.map(user => {
+      const { password, ...userWithoutPassword } = user?.dataValues || user;
+      return userWithoutPassword;
     });
-    return users;
   }
 
   async findByEmail(email) {
     const user = await User.findOne({
-      where: { email: email }
+      where: { email },
     });
     if (!user) return null;
-    delete user.dataValues.password;
-    return user;
+    const { password, ...userWithoutPassword } = user?.dataValues || user;
+    return userWithoutPassword;
   }
 
   async findOne(userId) {
     const user = await User.findByPk(userId);
     if (!user) return null;
-    delete user.dataValues.password;
-    return user;
+    const { password, ...userWithoutPassword } = user?.dataValues || user;
+    return userWithoutPassword;
   }
 
   async create(user) {
@@ -37,9 +37,10 @@ class UserService {
     const newUser = await User.create(user);
     if (!newUser) throw new Error('Erreur lors de la création de l\'utilisateur');
 
-    delete newUser.dataValues.password;
-    return newUser
+    const { password, ...userWithoutPassword } = newUser?.dataValues || newUser;
+    return userWithoutPassword;
   }
+
 
   async update(userId, user) {
     await User.update(user, {
@@ -87,7 +88,7 @@ class UserService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     if (bcrypt.compare(password, hashedPassword)) throw new Error('Le mot de passe doit être différent de l\'ancien');
-    
+
     await User.update({ password: hashedPassword }, {
       where: { userId: userId }
     });
