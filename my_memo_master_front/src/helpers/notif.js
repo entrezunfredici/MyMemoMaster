@@ -11,7 +11,7 @@ function notify(message, type = 'info') {
 
     toast[type](message, {
         position: isMobile() ? 'top-right' : 'bottom-right',
-        timeout: 40000,
+        timeout: 4000,
         closeOnClick: true,
         pauseOnHover: true,
         draggable: true,

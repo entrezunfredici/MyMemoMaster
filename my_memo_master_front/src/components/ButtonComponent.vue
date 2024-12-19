@@ -1,6 +1,9 @@
 <template>
-  <button :class="['button', 'py-2.5 px-3 rounded-lg inline-flex items-center justify-center text-md font-medium', types[props.type]]" :disabled="disabled || false"
-    @click="callback"><slot></slot></button>
+  <button
+    :class="['button', 'py-2.5 px-3 rounded-lg inline-flex items-center justify-center text-md font-medium', types[props.type]]"
+    :disabled="disabled || false" @click="callback">
+    <slot></slot>
+  </button>
 </template>
 
 <script setup>
@@ -28,8 +31,8 @@ const props = defineProps({
 })
 
 const types = ref({
-  normal: 'bg-blue text-ivory',
-  outline: 'bg-ivory text-blue border-2 border-blue',
+  normal: 'bg-primary text-light',
+  outline: 'bg-light text-primary border-2 border-primary',
 })
 
 </script>

@@ -4,25 +4,7 @@ const routes = [
     name: 'home',
     component: () => import('../pages/HomePage.vue'),
     meta: {
-      title: 'Home',
-      private: true,
-    },
-  },
-  {
-    path: '/classroom',
-    name: 'classroom',
-    component: () => import('../pages/ClassroomPage.vue'),
-    meta: {
-      title: 'Classroom',
-      private: true,
-    },
-  },
-  {
-    path: '/community',
-    name: 'community',
-    component: () => import('../pages/CommunityPage.vue'),
-    meta: {
-      title: 'Community',
+      title: 'Acceuil',
       private: true,
     },
   },

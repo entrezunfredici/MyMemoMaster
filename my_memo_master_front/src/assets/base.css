@@ -4,11 +4,13 @@
 /* App theme */
 :root {
     /* Theme colors */
-    --orange: #FF4438;
-    --peach: #F8CBAD;
-    --ivory: #FAF6E8;
-    --light-blue: #D5DAEC;
-    --blue: #1D3BA0;
+    --primary: #1E3BA1;
+    --light-primary: #D5DAED;
+    --secondary: #FA4238;
+    --light-secondary: #FDC7C4;
+    --light: #FDF7FF;
+    --gray: #d5daed;
+    --dark: #101f56;
     /* Other colors */
     --success: #10b981;
     --warning: #f59e0b;
@@ -41,6 +43,26 @@
     color: var(--ivory) !important;
 }
 
+/* Fonts */
+
+@font-face {
+    font-family: 'neue-haas-grotesk';
+    src: url('/fonts/neue-haas-grotesk/NHaasGroteskDSPro-75Bd.otf') format('opentype');
+}
+
+.neue-haas-grotesk-font {
+    font-family: 'neue-haas-grotesk';
+}
+
+@font-face {
+    font-family: 'compita-medium';
+    src: url('/fonts/compita/Fontspring-DEMO-compita-medium.otf') format('opentype');
+}
+
+.compita-medium-font {
+    font-family: 'compita-medium';
+}
+
 /* Bases styles */
 
 *,
@@ -57,11 +79,11 @@ body {
     min-height: 100vh;
     transition: color 0.5s, background-color 0.5s;
     line-height: 1.6;
-    font-family: "Roboto", sans-serif;
+    font-family: "compita-medium-font", "Roboto", sans-serif;
     font-size: 15px;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    color: var(--blue);
-    background: var(--ivory);
+    color: var(--dark);
+    background: var(--light);
 }

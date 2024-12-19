@@ -8,11 +8,13 @@ export default {
     extend: {},
     colors: {
       /* Theme colors */
-      orange: '#FF4438',
-      peach: '#F8CBAD',
-      ivory: '#FAF6E8',
-      'light-blue': '#D5DAEC',
-      blue: '#1D3BA0',
+      primary: '#1E3BA1',
+      'light-primary': '#D5DAED',
+      secondary: '#FA4238',
+      'light-secondary': '#FDC7C4',
+      light: '#FDF7FF',
+      gray: '#d5daed',
+      dark: '#101f56',
       /* Other colors */
       success: '#10b981',
       warning: '#f59e0b',
