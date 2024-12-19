@@ -84,11 +84,6 @@ body {
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-<<<<<<< HEAD
-    color: var(--light);
-    background: lightslategrey;
-=======
     color: var(--dark);
     background: var(--light);
->>>>>>> 69ebf20e338ed7268a3719a33f7f194750a81668
 }
