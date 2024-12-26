@@ -1,5 +1,5 @@
 const { User, Role } = require("../models/index");
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const generateCode = require('../helpers/generateCode')
 
 class UserService {
