@@ -5,13 +5,6 @@ const router = express.Router();
 
 /**
  * @swagger
- * tags:
- *   name: LeitnerSystemsUsers
- *   description: Gestion des droits utilisateurs sur les systèmes Leitner
- */
-
-/**
- * @swagger
  * /leitnerSystemsUsers/add:
  *   post:
  *     summary: Créer une relation entre un utilisateur et un système Leitner
@@ -166,11 +159,11 @@ router.put("/:idUser/:idSystem", controller.update);
 router.delete("/:idUser/:idSystem", controller.delete);
 
 module.exports = (app) => {
-  /**
+    /**
    * @swagger
    * tags:
-   *   - name: Leitner Systems Users
-   *     description: Gestion des Systèmes de Leitner partagés avec les utilisateurs
+   *   name: LeitnerSystemsUsers
+   *   description: Gestion des droits utilisateurs sur les systèmes Leitner
    */
   app.use("/leitnersystemsusers", router);
 };

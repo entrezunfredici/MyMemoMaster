@@ -10,7 +10,7 @@ const leitnerCardController = require("../controllers/LeitnerCard.controller");
  *     tags: [LeitnerCards]
  */
 router.get(
-  "/leitnercards/leitnerboxes/:leitnerboxid",
+  "/leitnerboxes/:leitnerboxid",
   leitnerCardController.getCardsByBoxId
 );
 
@@ -21,7 +21,7 @@ router.get(
  *     summary: Obtenir une carte de Leitner par ID
  *     tags: [LeitnerCards]
  */
-router.get("/leitnercards/:id", leitnerCardController.getCardById);
+router.get("/:id", leitnerCardController.getCardById);
 
 /**
  * @swagger
@@ -30,7 +30,7 @@ router.get("/leitnercards/:id", leitnerCardController.getCardById);
  *     summary: Ajouter une carte de Leitner
  *     tags: [LeitnerCards]
  */
-router.post("/leitnercards/add", leitnerCardController.addCard);
+router.post("/add", leitnerCardController.addCard);
 
 /**
  * @swagger
@@ -48,7 +48,7 @@ router.put("/:id", leitnerCardController.updateCard);
  *     summary: Corriger une réponse
  *     tags: [LeitnerCards]
  */
-router.post("/leitnercards/response", leitnerCardController.correctResponse);
+router.post("/response", leitnerCardController.correctResponse);
 
 /**
  * @swagger
@@ -57,14 +57,14 @@ router.post("/leitnercards/response", leitnerCardController.correctResponse);
  *     summary: Supprimer une carte de Leitner
  *     tags: [LeitnerCards]
  */
-router.delete("/leitnercards/:id", leitnerCardController.deleteCard);
+router.delete("/:id", leitnerCardController.deleteCard);
 
 module.exports = (app) => {
   /**
    * @swagger
    * tags:
-   *   - name: Leitner Cards
-   *     description: Gestion des cartes de Leitner
+   *   name: LeitnerCards
+   *   description: Gestion des cartes de Leitner
    */
   app.use("/leitnercards", router);
 };

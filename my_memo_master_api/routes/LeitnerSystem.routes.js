@@ -255,8 +255,8 @@ module.exports = (app) => {
   /**
    * @swagger
    * tags:
-   *   - name: Leitner Systems
-   *     description: Gestion des Systèmes de Leitner
+   *   name: LeitnerSystems
+   *   description: Gestion des Systèmes de Leitner
    */
   app.use("/leitnersystems", router);
 };
