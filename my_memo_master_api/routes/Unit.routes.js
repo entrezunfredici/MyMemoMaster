@@ -4,13 +4,6 @@ const unitController = require("../controllers/Unit.controller");
 const router = express.Router();
 /**
  * @swagger
- * tags:
- *   name: Units
- *   description: Gestion des unités
- */
-
-/**
- * @swagger
  * /unit/all:
  *   get:
  *     summary: Obtenir toutes les unités
@@ -21,7 +14,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/unit/all", unitController.getAllUnits);
+router.get("/all", unitController.getAllUnits);
 
 /**
  * @swagger
@@ -42,7 +35,7 @@ router.get("/unit/all", unitController.getAllUnits);
  *       404:
  *         description: Unité non trouvée.
  */
-router.get("/unit/:id", unitController.getUnitById);
+router.get("/:id", unitController.getUnitById);
 
 /**
  * @swagger
@@ -70,7 +63,7 @@ router.get("/unit/:id", unitController.getUnitById);
  *       201:
  *         description: Unité ajoutée avec succès.
  */
-router.post("/unit/add", unitController.addUnit);
+router.post("/add", unitController.addUnit);
 
 /**
  * @swagger
@@ -100,7 +93,7 @@ router.post("/unit/add", unitController.addUnit);
  *       200:
  *         description: Unité mise à jour avec succès.
  */
-router.put("/unit/:id", unitController.updateUnit);
+router.put("/:id", unitController.updateUnit);
 
 /**
  * @swagger
@@ -119,14 +112,14 @@ router.put("/unit/:id", unitController.updateUnit);
  *       200:
  *         description: Unité supprimée avec succès.
  */
-router.delete("/unit/:id", unitController.deleteUnit);
+router.delete("/:id", unitController.deleteUnit);
 
 module.exports = (app) => {
     /**
      * @swagger
      * tags:
-     *   - name: Subjects
-     *     description: Gestion des sujets
+     *   name: Units
+     *   description: Gestion des unités
      */
     app.use("/units", router);
 };

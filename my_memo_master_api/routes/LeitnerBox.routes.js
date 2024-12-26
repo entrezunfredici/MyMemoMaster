@@ -5,13 +5,6 @@ const router = express.Router();
 
 /**
  * @swagger
- * tags:
- *   name: LeitnerBoxes
- *   description: Gestion des boîtes de Leitner
- */
-
-/**
- * @swagger
  * /leitnerboxes/all:
  *   get:
  *     summary: Obtenir toutes les boîtes de Leitner
@@ -142,8 +135,8 @@ module.exports = (app) => {
   /**
    * @swagger
    * tags:
-   *   - name: Leitner Boxes
-   *     description: Gestion des boîtes de Leitner
+   *   name: LeitnerBoxes
+   *   description: Gestion des boîtes de Leitner
    */
   app.use("/leitnerboxes", router);
 };
