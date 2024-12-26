@@ -1,5 +1,5 @@
 const db = require("./models/index");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 // ? This script is meant to be run only once, to seed the database with sample data just for test purposes. It will drop all existing tables and recreate them, then insert the sample data.
 
