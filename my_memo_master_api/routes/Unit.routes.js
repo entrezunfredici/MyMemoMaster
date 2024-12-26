@@ -2,9 +2,10 @@ const express = require("express");
 const unitController = require("../controllers/Unit.controller");
 
 const router = express.Router();
+
 /**
  * @swagger
- * /unit/all:
+ * /units/all:
  *   get:
  *     summary: Obtenir toutes les unités
  *     tags: [Units]
@@ -15,10 +16,11 @@ const router = express.Router();
  *         description: Erreur serveur.
  */
 router.get("/all", unitController.getAllUnits);
+//router.get("/all", subject.findAll);
 
 /**
  * @swagger
- * /unit/{id}:
+ * /units/{id}:
  *   get:
  *     summary: Obtenir une unité par ID
  *     tags: [Units]
@@ -39,7 +41,7 @@ router.get("/:id", unitController.getUnitById);
 
 /**
  * @swagger
- * /unit/add:
+ * /units/add:
  *   post:
  *     summary: Ajouter une nouvelle unité
  *     tags: [Units]
@@ -67,7 +69,7 @@ router.post("/add", unitController.addUnit);
 
 /**
  * @swagger
- * /unit/{id}:
+ * /units/{id}:
  *   put:
  *     summary: Mettre à jour une unité
  *     tags: [Units]
@@ -97,7 +99,7 @@ router.put("/:id", unitController.updateUnit);
 
 /**
  * @swagger
- * /unit/{id}:
+ * /units/{id}:
  *   delete:
  *     summary: Supprimer une unité par ID
  *     tags: [Units]
