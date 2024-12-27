@@ -1,0 +1,14 @@
+[
+    {
+        "id": 1,
+        "name": "Meter",
+        "denomination": "m",
+        "physicalQuantityId": 1
+    },
+    {
+        "id": 1,
+        "name": "Seconds",
+        "denomination": "s",
+        "physicalQuantityId": 2
+    }
+]
