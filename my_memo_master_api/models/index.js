@@ -1,8 +1,10 @@
 const { Sequelize } = require("sequelize");
-const dbConfig = require("../config/db.config");
+//const dbConfig = require("../config/db.config");
+const dbmsConfig = require("../config/dbms.config");
 
 // Création de l'instance Sequelize
-const instance = new Sequelize(dbConfig);
+//const instance = new Sequelize(dbConfig);
+const instance = new Sequelize(dbmsConfig);
 
 // Models
 const models = {};
