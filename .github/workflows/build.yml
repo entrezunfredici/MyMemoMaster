@@ -84,7 +84,7 @@ jobs:
       - name: Déployer avec Docker Compose
         run: |
           ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
-            cd /path/to/project && \
+            cd /var/www/html/mymemomaster && \
             docker-compose down && \
             docker-compose up --build -d
           EOF
