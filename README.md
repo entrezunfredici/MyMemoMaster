@@ -1,4 +1,4 @@
-# eMyMemoMaster
+# MyMemoMaster
 
 ## Partie 1: Présentation
 
@@ -57,7 +57,6 @@ git clone git@github.com:entrezunfredici/MyMemoMaster.git
 ```
 
 3. Copez `.env.example` en `.env` et remplissez les variables d'environnement.
-
 4. Lancer votre environnement local:
 
 Avec docker-compose:
