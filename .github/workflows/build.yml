@@ -81,7 +81,20 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/id_rsa
           chmod 600 /tmp/id_rsa
 
-      - name: Déployer avec Docker Compose
+      - name: Check folder on VPS
+        run: |
+          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            if [ ! -d /var/www/html/mymemomaster ]; then
+              mkdir -p /var/www/html/mymemomaster
+            fi
+          EOF
+        
+      - name: push files to VPS
+        run: |
+          scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r ./* root@${{ secrets.VPS_IP }}:/var/www/html/mymemomaster
+
+      - name: Déploy with Docker Compose
         run: |
           ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
             cd /var/www/html/mymemomaster && \
