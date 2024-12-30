@@ -18,7 +18,7 @@ models.Unit = require("./Unit.model")(instance);
 models.User = require("./User.model")(instance);
 models.Response = require("./Response.model")(instance);
 
-// // Associations
+// Associations
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {
     models[modelName].associate(models);

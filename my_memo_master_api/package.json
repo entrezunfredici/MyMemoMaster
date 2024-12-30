@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "start": "nodemon server.js",
     "build": "next build",
-    "seed": "node seeder.js"
+    "seed": "node msbd_seeder.js"
   },
   "author": "",
   "license": "ISC",
