@@ -99,5 +99,6 @@ jobs:
           ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
             cd /var/www/html/mymemomaster && \
             docker-compose down && \
-            docker-compose up --build -d
+            docker-compose build && \
+            docker-compose up
           EOF
