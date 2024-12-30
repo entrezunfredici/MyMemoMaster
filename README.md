@@ -87,6 +87,25 @@ cd MyMemoMaster/my_memo_master_api
 npm run seed
 ```
 
+6. Configurer PGAdmin:
+6.1. PgAdmin Docker:
+Ouvrez votre navigateur et allez à l'adresse suivante: http://localhost:5050
+entrer les identifiants définis dans le .env
+une fois connecté, faire un clic droit sur "Servers" passer sa souris sur "nouveau" puis cliquer sur "Server"
+remplir les champs comme suit:
+dans l'ongle général:
+- Name: my memo master (ou le nom que vous voulez)
+dans l'oglet Connexion
+- Nom d'hôte/Adresse: la valeur de PG_HOST dans le .env
+- Port: la valeur de PG_PORT dans le .env
+- identifiant de connexion: la valeur de PG_USER dans le .env
+- Mot de passe: la valeur de PG_PASS dans le .env
+Pour finir cliquer sur "Enregistrer"
+6.2. PgAdmin local:
+Télerchargez Postgres SQL et PG admin sur votre machine
+Ouvrez PGAdmin et connectez vous avec les identifiants définis dans le .env
+creer la base de donnée "PG_DB"
+
 ### Methode de travail:
 
 Etape 1, se caller sur la branche dev:
@@ -134,148 +153,4 @@ un adjectif:
 - [FIX] pour les corrections de bugs
   suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
 
-<!-- ## Organisation du travail -->
 
-<!-- <table>
-  <thead>
-    <tr>
-      <th>Étapes</th>
-      <th colspan="8">Tâches de dev</th>
-      <th>Tâches de design</th>
-    </tr>
-    <tr>
-      <th>Étapes</th>
-      <th>Dev 1</th>
-      <th>Dev 2</th>
-      <th>Dev 3</th>
-      <th>Dev 4</th>
-      <th>Dev 5</th>
-      <th>Dev 6</th>
-      <th>Dev 7</th>
-      <th>Dev 8</th>
-      <th>Crea 1</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Étape 1</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 2</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 3</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 4</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 5</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 6</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 7</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 8</td>
-     <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 9</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Étape 10</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-  </tbody>
-</table> -->
