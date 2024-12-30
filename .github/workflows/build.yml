@@ -97,14 +97,23 @@ jobs:
       - name: Déploy with Docker Compose
         run: |
           ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
-            cd /var/www/html/mymemomaster && \
-            docker-compose down && \
-            docker-compose build && \
-            cd my_memo_master_api && \
-            npm i && \
-            cd ../ && \
-            cd my_memo_master_front && \
-            npm i && \
-            cd ../ && \
-            docker-compose up -d
+            set -e  # Arrêter le script si une commande échoue
+
+            if [ -d "/var/www/html/mymemomaster/my_memo_master_api" ]; then
+              cd /var/www/html/mymemomaster/my_memo_master_api && npm install
+            else
+              echo "404 my_memo_master_api not found"
+              exit 1
+            fi
+
+            if [ -d "/var/www/html/mymemomaster/my_memo_master_front" ]; then
+              cd /var/www/html/mymemomaster/my_memo_master_front && npm install
+            else
+              echo "404 my_memo_master_front not found"
+              exit 1
+            fi
+
+            cd /var/www/html/mymemomaster
+            docker-compose down
+            docker-compose up --build -d
           EOF
