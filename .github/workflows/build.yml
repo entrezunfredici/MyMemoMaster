@@ -115,5 +115,6 @@ jobs:
 
             cd /var/www/html/mymemomaster
             docker-compose down
-            docker-compose up --build -d
+            docker-compose build
+            docker-compose up -d
           EOF
