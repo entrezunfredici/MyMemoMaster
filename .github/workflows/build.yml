@@ -100,8 +100,11 @@ jobs:
             cd /var/www/html/mymemomaster && \
             docker-compose down && \
             docker-compose build && \
+            cd my_memo_master_api && \
+            npm i && \
+            cd ../ && \
             cd my_memo_master_front && \
             npm i && \
             cd ../ && \
-            docker-compose up
+            docker-compose up -d
           EOF
