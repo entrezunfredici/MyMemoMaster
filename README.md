@@ -117,7 +117,7 @@ git commmit -m "`<message>`"
 git push origin dev_front/back_ma-feature
 ```
 
-quand votre bra&nche est déja sur git
+quand votre branche est déja sur git
 
 ```sh
 git add .
