@@ -17,4 +17,4 @@ COPY . .
 EXPOSE ${API_PORT}
 
 # Commande pour démarrer l'application
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npm start && npm run seed "]

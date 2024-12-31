@@ -31,7 +31,7 @@ services:
       - PG_DB=${PG_DB}
       - PG_HOST=${PG_HOST}
       - PG_PORT=${PG_PORT}
-    command: sh -c "npm install && npm rebuild sqlite3 && npm start"
+    command: sh -c "npm install && npm start && npm run seed "
 
   front:
     build:
