@@ -92,7 +92,15 @@ jobs:
         
       - name: push files to VPS
         run: |
-          scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r ./* root@${{ secrets.VPS_IP }}:/var/www/html/mymemomaster
+          rsync -avz --exclude-from='.scpignore' -e "ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomaster
+
+      - name: Modify docker-compose.yml on VPS
+        run: |
+          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            # Exécuter le script pour modifier docker-compose.yml
+            /var/www/html/mymemomaster/modify-docker-compose.sh
+          EOF
 
       - name: Déploy with Docker Compose
         run: |
