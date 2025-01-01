@@ -9,21 +9,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, front]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: API - Install dependencies
-        working-directory: my_memo_master_api
-        run: npm install
-      - name: API - Test
-        working-directory: my_memo_master_api
-        run: npm run test
-      - name: Front - Install dependencies
-        working-directory: my_memo_master_front
-        run: npm install
-      - name: Front - Test
-        working-directory: my_memo_master_front
-        run: npm run test
+      - name: Install dependencies and test
+        working-directory: my_memo_master_${{ matrix.service }}
+        run: |
+          npm install
+          npm run test
 
   notify_failure:
     runs-on: ubuntu-latest
@@ -72,15 +68,15 @@ jobs:
           -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
           ${{ secrets.DISCORD_LOG }}
 
-  build:
-    name: Build and Analyze with SonarQube
+  sonar_analysis:
+    name: SonarQube Analysis
     runs-on: ubuntu-latest
-    needs: notify_success
+    needs: test
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
         with:
-          fetch-depth: 0  # Important pour une analyse précise par SonarQube
+          fetch-depth: 0  # Nécessaire pour SonarQube
 
       - name: Run SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@v3
@@ -88,7 +84,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # Si tu veux arrêter le workflow si la qualité est insuffisante :
+      # Optionnel : Vérifier la passerelle qualité
       # - name: Quality Gate Check
       #   uses: sonarsource/sonarqube-quality-gate-action@master
       #   timeout-minutes: 5
@@ -98,7 +94,7 @@ jobs:
   notify:
     name: Notify on Success
     runs-on: ubuntu-latest
-    needs: build
+    needs: sonar_analysis
     if: success()
     steps:
       - name: Send message to Discord
@@ -111,71 +107,36 @@ jobs:
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Project is ready to deploy! on test env* $RANDOM_URL\"}" \
+          -d "{\"content\": \"Project is ready to build and deploy! on test env* $RANDOM_URL\"}" \
           ${{ secrets.DISCORD_LOG }}
 
-  deploy:
-    name: Deploying on VPS with Docker Compose
+  build_and_deploy:
+    name: Build and Deploy
     runs-on: ubuntu-latest
-    needs: build
+    needs: [test, sonar_analysis]
+    if: success()
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
-      - name: Copy SSH key to VPS
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to VPS
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/id_rsa
-          chmod 600 /tmp/id_rsa
-
-      - name: Check folder on VPS
-        run: |
-          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            if [ ! -d /var/www/html/mymemomastertest ]; then
-              mkdir -p /var/www/html/mymemomastertest
-            fi
-          EOF
-        
-      - name: Push files to VPS
-        run: |
-          rsync -avz --exclude-from='.scpignore' -e "ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
-
-      - name: Set execute permissions for modify-docker-compose.sh
-        run: |
-          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            chmod +x /var/www/html/mymemomastertest/modify-docker-compose.sh
-          EOF
-
-      - name: Modify docker-compose.yml on VPS
-        run: |
-          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            # Exécuter le script pour modifier docker-compose.yml
-            /var/www/html/mymemomastertest/modify-docker-compose.sh
-          EOF
-
-      - name: Deploy with Docker Compose
-        run: |
-          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
-            set -e  # Arrêter le script si une commande échoue
-
-            if [ -d "/var/www/html/mymemomastertest/my_memo_master_api" ]; then
-              cd /var/www/html/mymemomastertest/my_memo_master_api && npm install
-            else
-              echo "404 my_memo_master_api not found"
-              exit 1
-            fi
-
-            if [ -d "/var/www/html/mymemomastertest/my_memo_master_front" ]; then
-              cd /var/www/html/mymemomastertest/my_memo_master_front && npm install
-            else
-              echo "404 my_memo_master_front not found"
-              exit 1
-            fi
-
+          rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
+          ssh root@${{ secrets.VPS_IP }} << 'EOF'
             cd /var/www/html/mymemomastertest
+            ./modify-docker-compose.sh
             docker-compose down
             docker-compose build
             docker-compose up -d
+          EOF
+
+      - name: Clean Docker resources
+        run: |
+          ssh root@${{ secrets.VPS_IP }} << 'EOF'
+            docker system prune -af
           EOF
