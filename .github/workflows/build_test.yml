@@ -1,0 +1,128 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - dev_cicd
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: API - Install dependencies
+        working-directory: my_memo_master_api
+        run: npm install
+
+      - name: API - Test
+        working-directory: my_memo_master_api
+        run: npm run test
+
+      # Décommenter si nécessaire pour les tests frontaux
+      # - name: Front - Test
+      #   working-directory: my_memo_master_front
+      #   run: ng test
+
+  notify:
+    name: Notify on Success
+    runs-on: ubuntu-latest
+    needs: test
+    if: success()
+    steps:
+      - name: Send message to Discord
+        run: |
+          URLS=(
+            "https://media1.tenor.com/m/SYbQQkWKTJUAAAAd/vilebrequin-vilebrequin-winamax.gif"
+            "https://media1.tenor.com/m/2C6IrDSSZ4EAAAAd/vilebrequin-vilebrequin-winamax.gif"
+            "https://media1.tenor.com/m/Fl1OdPlcQ20AAAAC/vilebrequin-vilebrequin-dos-d-ane.gif"
+            "https://media1.tenor.com/m/LbNXxiA2KlgAAAAC/vilebrequin-sylvain.gif"
+          )
+          RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{\"content\": \"Project is ready to build! $RANDOM_URL\"}" \
+          ${{ secrets.DISCORD_LOG }}
+
+  build:
+    name: Build and Analyze with SonarQube
+    runs-on: ubuntu-latest
+    needs: notify
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Important pour une analyse précise par SonarQube
+
+      - name: Run SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      # Si tu veux arrêter le workflow si la qualité est insuffisante :
+      # - name: Quality Gate Check
+      #   uses: sonarsource/sonarqube-quality-gate-action@master
+      #   timeout-minutes: 5
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  deploy:
+    name: Deploying on VPS with Docker Compose
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Copy SSH key to VPS
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/id_rsa
+          chmod 600 /tmp/id_rsa
+
+      - name: Check folder on VPS
+        run: |
+          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            if [ ! -d /var/www/html/mymemomastertest ]; then
+              mkdir -p /var/www/html/mymemomastertest
+            fi
+          EOF
+        
+      - name: push files to VPS
+        run: |
+          rsync -avz --exclude-from='.scpignore' -e "ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
+
+      - name: Modify docker-compose.yml on VPS
+        run: |
+          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            # Exécuter le script pour modifier docker-compose.yml
+            /var/www/html/mymemomastertest/modify-docker-compose.sh
+          EOF
+
+      - name: Déploy with Docker Compose
+        run: |
+          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+            set -e  # Arrêter le script si une commande échoue
+
+            if [ -d "/var/www/html/mymemomastertest/my_memo_master_api" ]; then
+              cd /var/www/html/mymemomastertest/my_memo_master_api && npm install
+            else
+              echo "404 my_memo_master_api not found"
+              exit 1
+            fi
+
+            if [ -d "/var/www/html/mymemomastertest/my_memo_master_front" ]; then
+              cd /var/www/html/mymemomastertest/my_memo_master_front && npm install
+            else
+              echo "404 my_memo_master_front not found"
+              exit 1
+            fi
+
+            cd /var/www/html/mymemomastertest
+            docker-compose down
+            docker-compose build
+            docker-compose up -d
+          EOF
