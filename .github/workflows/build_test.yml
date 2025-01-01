@@ -97,7 +97,7 @@ jobs:
 
       - name: Modify docker-compose.yml on VPS
         run: |
-          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+          ssh sudo -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             # Exécuter le script pour modifier docker-compose.yml
             /var/www/html/mymemomastertest/modify-docker-compose.sh
