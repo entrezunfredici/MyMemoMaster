@@ -111,7 +111,10 @@ jobs:
           ${{ secrets.DISCORD_LOG }}
 
   build_and_deploy:
+    name: Build and Deploy
     runs-on: ubuntu-latest
+    needs: [test, sonar_analysis]
+    if: success()
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
