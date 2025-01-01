@@ -43,7 +43,7 @@ jobs:
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Project is ready to build! $RANDOM_URL\"}" \
+          -d "{\"content\": \"Project is ready to build! on test env* $RANDOM_URL\"}" \
           ${{ secrets.DISCORD_LOG }}
 
   build:
@@ -95,9 +95,16 @@ jobs:
         run: |
           rsync -avz --exclude-from='.scpignore' -e "ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
 
+      - name: Set execute permissions for modify-docker-compose.sh
+        run: |
+          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            chmod +x /var/www/html/mymemomastertest/modify-docker-compose.sh
+          EOF
+
       - name: Modify docker-compose.yml on VPS
         run: |
-          ssh sudo -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
+          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             # Exécuter le script pour modifier docker-compose.yml
             /var/www/html/mymemomastertest/modify-docker-compose.sh
