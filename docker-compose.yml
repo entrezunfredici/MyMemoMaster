@@ -1,6 +1,7 @@
 version: "3.8"
 
 services:
+#start sgbd
   postgres:
     build:
       context: ./localPostgres
@@ -22,7 +23,7 @@ services:
       - "${PG_ADMIN_PORT}:80"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
-
+#end sgbd
   api:
     build:
       context: ./my_memo_master_api

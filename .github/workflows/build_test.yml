@@ -126,7 +126,7 @@ jobs:
 
       - name: Modify docker-compose.yml
         run: |
-          sed -i '/postgres:/,/api:/d' docker-compose.yml
+          sed -i '/#start sgbd/,/#end sgbd/d' docker-compose.yml
 
       - name: Deploy to VPS
         run: |
