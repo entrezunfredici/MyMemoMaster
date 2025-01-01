@@ -111,10 +111,7 @@ jobs:
           ${{ secrets.DISCORD_LOG }}
 
   build_and_deploy:
-    name: Build and Deploy
     runs-on: ubuntu-latest
-    needs: [test, sonar_analysis]
-    if: success()
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
@@ -127,9 +124,27 @@ jobs:
       - name: Deploy to VPS
         run: |
           rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
+
           ssh root@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            # Donner les permissions au script
+            chmod +x /var/www/html/mymemomastertest/modify-docker-compose.sh
+            # Exécuter le script pour modifier docker-compose.yml
+            /var/www/html/mymemomastertest/modify-docker-compose.sh
+
+            # Vérifier les dépendances Node.js
+            if [ -d "/var/www/html/mymemomastertest/my_memo_master_api" ]; then
+              cd /var/www/html/mymemomastertest/my_memo_master_api
+              npm install
+            fi
+
+            if [ -d "/var/www/html/mymemomastertest/my_memo_master_front" ]; then
+              cd /var/www/html/mymemomastertest/my_memo_master_front
+              npm install
+            fi
+
+            # Déployer avec Docker Compose
             cd /var/www/html/mymemomastertest
-            ./modify-docker-compose.sh
             docker-compose down
             docker-compose build
             docker-compose up -d
