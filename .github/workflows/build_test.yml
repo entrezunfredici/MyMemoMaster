@@ -124,8 +124,8 @@ jobs:
       - name: Modify docker-compose.yml
         run: |
           sed -i '/#start sgbd/,/#end sgbd/d' docker-compose.yml
-          sed -i '/command: sh -c "npm install && npm start && npm run seed"/a \ \ networks:\n\ \ \ \ - mynetwork' docker-compose.yml
-          sed -i '/front-data:\/app\/data/a \n\networks:\n  mynetwork:\n    external: true' docker-compose.yml
+          sed -i '/- PG_PORT=${PG_PORT}/a \ \ networks:\n\ \ \ \ - mynetwork' docker-compose.yml
+          sed -i '/front-data:\/app\/data/a \n/networks:\n  mynetwork:\n    external: true' docker-compose.yml
       - name: Deploy to VPS
         run: |
           rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
