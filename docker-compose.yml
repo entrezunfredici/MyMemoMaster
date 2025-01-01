@@ -44,8 +44,6 @@ services:
       - PG_HOST=${PG_HOST}
       - PG_PORT=${PG_PORT}
     command: sh -c "npm install && npm start && npm run seed "
-    networks:
-      - mynetwork
 
   front:
     build:
@@ -60,10 +58,6 @@ services:
     volumes:
       - ./my_memo_master_front:/app
       - front-data:/app/data
-
-networks:
-  mynetwork:
-    external: true
 
 volumes:
   api-data:

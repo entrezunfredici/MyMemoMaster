@@ -76,8 +76,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0  # Nécessaire pour SonarQube
-
+          fetch-depth: 0
       - name: Run SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@v3
         env:
@@ -118,34 +117,29 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
-
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - name: Modify docker-compose.yml
         run: |
           sed -i '/#start sgbd/,/#end sgbd/d' docker-compose.yml
-
+          sed -i '/front-data:\/app\/data/a \nnetworks:\n  mynetwork:\n    external: true' docker-compose.yml
+          sed -i '/command: sh -c "npm install && npm start && npm run seed"/a \ \ networks:\n\ \ \ \ - mynetwork' docker-compose.yml
       - name: Deploy to VPS
         run: |
           rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
-
           ssh root@${{ secrets.VPS_IP }} << 'EOF'
             set -e
-
             # Vérifier les dépendances Node.js
             if [ -d "/var/www/html/mymemomastertest/my_memo_master_api" ]; then
               cd /var/www/html/mymemomastertest/my_memo_master_api
               npm install
             fi
-
             if [ -d "/var/www/html/mymemomastertest/my_memo_master_front" ]; then
               cd /var/www/html/mymemomastertest/my_memo_master_front
               npm install
             fi
-
             # Déployer avec Docker Compose
             cd /var/www/html/mymemomastertest
             docker-compose down
