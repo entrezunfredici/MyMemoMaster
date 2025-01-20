@@ -1,20 +1,24 @@
-# Utilise l'image de base node:18-alpine
-FROM node:18-alpine
+# Step 1: Build the Vue.js application
+FROM node:18 AS build-stage
 
-# Définit le répertoire de travail à /app
 WORKDIR /app
-
-# Copie les fichiers package.json et package-lock.json (ou yarn.lock) pour installer les dépendances
 COPY package*.json ./
-
-# Installe les dépendances avec npm
-RUN npm ci
-
-# Copie le reste des fichiers de l'application dans le conteneur
+RUN npm install
 COPY . .
+RUN npm run build
 
-# Expose le port sur lequel Vite va tourner (par défaut 5173)
-EXPOSE ${VITE_PORT}
+# Step 2: Use a lightweight Debian image with Apache
+FROM debian:bullseye
 
-# Lancer le serveur de développement Vite
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Install Apache
+RUN apt-get update && apt-get install -y apache2 && rm -rf /var/lib/apt/lists/*
+
+# Copy the built files to the Apache web directory
+COPY --from=build-stage /app/dist /var/www/html/mymemomaster/my_memo_master_front
+
+# Expose port 80 et 443
+EXPOSE 80
+EXPOSE 443
+
+# Start Apache server
+CMD ["apachectl", "-D", "FOREGROUND"]

@@ -20,7 +20,7 @@ services:
       context: ./localPostgres
       dockerfile: Dockerfile-pgadmin
     ports:
-      - "${PG_ADMIN_PORT}:80"
+      - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
 #end sgbd
@@ -49,8 +49,6 @@ services:
     build:
       context: ./my_memo_master_front
       dockerfile: Dockerfile
-      args:
-        - VITE_PORT=${VITE_PORT}
     ports:
       - "${VITE_PORT}:${VITE_PORT}"
     environment:
