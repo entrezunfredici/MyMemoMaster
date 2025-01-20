@@ -1,25 +1,25 @@
 services:
-  postgres:
-    build:
-      context: ./localPostgres
-      dockerfile: Dockerfile-postgres
-    environment:
-      POSTGRES_USER: ${PG_USER}
-      POSTGRES_PASSWORD: ${PG_PASS}
-      POSTGRES_DB: ${PG_DB}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "${PG_PORT}:${PG_PORT}"
+  # postgres:
+  #   build:
+  #     context: ./localPostgres
+  #     dockerfile: Dockerfile-postgres
+  #   environment:
+  #     POSTGRES_USER: ${PG_USER}
+  #     POSTGRES_PASSWORD: ${PG_PASS}
+  #     POSTGRES_DB: ${PG_DB}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   ports:
+  #     - "${PG_PORT}:${PG_PORT}"
 
-  pgadmin:
-    build:
-      context: ./localPostgres
-      dockerfile: Dockerfile-pgadmin
-    ports:
-      - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
+  # pgadmin:
+  #   build:
+  #     context: ./localPostgres
+  #     dockerfile: Dockerfile-pgadmin
+  #   ports:
+  #     - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
+  #   volumes:
+  #     - pgadmin-data:/var/lib/pgadmin
   api:
     build:
       context: ./my_memo_master_api
