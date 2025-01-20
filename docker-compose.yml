@@ -1,7 +1,4 @@
-version: "3.8"
-
 services:
-  # Start SGBD
   postgres:
     build:
       context: ./localPostgres
@@ -23,7 +20,6 @@ services:
       - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
-  # End SGBD
   api:
     build:
       context: ./my_memo_master_api
@@ -37,12 +33,6 @@ services:
       - api-data:/app/data
     environment:
       - NODE_ENV=development
-      - API_PORT=${API_PORT}
-      - PG_USER=${PG_USER}
-      - PG_PASS=${PG_PASS}
-      - PG_DB=${PG_DB}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
   front:
     build:
       context: ./my_memo_master_front
