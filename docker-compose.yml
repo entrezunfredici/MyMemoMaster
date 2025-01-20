@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-#start sgbd
+  # Start SGBD
   postgres:
     build:
       context: ./localPostgres
@@ -23,7 +23,7 @@ services:
       - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
-#end sgbd
+  # End SGBD
   api:
     build:
       context: ./my_memo_master_api
@@ -37,25 +37,20 @@ services:
       - api-data:/app/data
     environment:
       - NODE_ENV=development
-      - API_PORT=${API_PORT}
-      - PG_USER=${PG_USER}
-      - PG_PASS=${PG_PASS}
-      - PG_DB=${PG_DB}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-    command: sh -c "npm install && npm start && npm run seed "
-
   front:
     build:
       context: ./my_memo_master_front
       dockerfile: Dockerfile
-    ports:
-      - "${VITE_PORT}:${VITE_PORT}"
-    environment:
-      - VITE_PORT=${VITE_PORT}
     volumes:
       - ./my_memo_master_front:/app
       - front-data:/app/data
+  apache:
+    image: httpd:2.4
+    container_name: my_memo_master_apache
+    ports:
+      - "80:80"
+    volumes:
+      - ./apache-config.conf:/usr/local/apache2/conf/httpd.conf:ro
 
 volumes:
   api-data:
