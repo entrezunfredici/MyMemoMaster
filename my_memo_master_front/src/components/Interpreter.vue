@@ -27,7 +27,7 @@ export default {
       let html = this.content
 
       html = html.replace(/<formula>(.*?)<\/formula>/gs, (match, formula) => {
-        return `\\(${formula}\\)`
+        return `<span class="mathjax-formula">\\(${formula}\\)</span>`
       })
 
       html = html.replace(/<text(.*?)>(.*?)<\/text>/gs, (match, attributes, text) => {
@@ -46,17 +46,14 @@ export default {
       // Attendre que Vue mette à jour le DOM
       this.$nextTick(() => {
         if (window.MathJax) {
-          window.MathJax.typesetPromise().catch((err) => console.error('MathJax error:', err))
+          window.MathJax.typesetPromise()
+            .then(() => console.log('MathJax rendu terminé'))
+            .catch((err) => console.error('Erreur MathJax :', err))
+        } else {
+          console.error('MathJax n’est pas chargé.')
         }
       })
     }
   }
 }
 </script>
-
-<style scoped>
-.interpreter-output {
-  color: #333333;
-  font-size: 16px;
-}
-</style>
