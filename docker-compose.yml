@@ -20,6 +20,9 @@ services:
     build:
       context: ./localPostgres
       dockerfile: Dockerfile-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD : ${PGADMIN_DEFAULT_PASSWORD}
     ports:
       - "${PG_ADMIN_PORT}:80"
     volumes:
