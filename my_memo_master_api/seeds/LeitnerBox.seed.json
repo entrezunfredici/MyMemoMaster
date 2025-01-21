@@ -1,0 +1,37 @@
+[
+  {
+    "idBox": 1,
+    "level": 1,
+    "intervall": 5,
+    "color": 123456,
+    "idSystem": null
+  },
+  {
+    "idBox": 2,
+    "level": 2,
+    "intervall": 10,
+    "color": 654321,
+    "idSystem": null
+  },
+  {
+    "idBox": 3,
+    "level": 3,
+    "intervall": 15,
+    "color": 111111,
+    "idSystem": null
+  },
+  {
+    "idBox": 4,
+    "level": 4,
+    "intervall": 20,
+    "color": 222222,
+    "idSystem": null
+  },
+  {
+    "idBox": 5,
+    "level": 5,
+    "intervall": 30,
+    "color": 333333,
+    "idSystem": null
+  }
+]

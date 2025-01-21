@@ -1,0 +1,9 @@
+# Utiliser l'image officielle de PgAdmin
+FROM dpage/pgadmin4
+
+# Définir les variables d'environnement pour PgAdmin
+ENV PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+ENV PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+
+# Volume pour la persistance des données PgAdmin
+VOLUME /var/lib/pgadmin

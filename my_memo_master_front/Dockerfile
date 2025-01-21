@@ -1,23 +1,20 @@
-# Utilise une image de base node:18-alpine
+# Utilise l'image de base node:18-alpine
 FROM node:18-alpine
 
-# Définit le répertoire de travail
+# Définit le répertoire de travail à /app
 WORKDIR /app
 
-# Installe les dépendances nécessaires pour Alpine
-RUN apk add --no-cache bash git
-
-# Copie les fichiers package.json et package-lock.json
+# Copie les fichiers package.json et package-lock.json (ou yarn.lock) pour installer les dépendances
 COPY package*.json ./
 
-# Installe les dépendances
+# Installe les dépendances avec npm
 RUN npm ci
 
-# Copie tout le reste des fichiers de l'application
+# Copie le reste des fichiers de l'application dans le conteneur
 COPY . .
 
-# Expose le port sur lequel Vite va tourner
+# Expose le port sur lequel Vite va tourner (par défaut 5173)
 EXPOSE ${VITE_PORT}
 
-# Commande pour démarrer l'application avec Vite
+# Lancer le serveur de développement Vite
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

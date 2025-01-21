@@ -11,12 +11,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: API - Install dependencies
-        working-directory: my_memo_master_api
+      - name: Front - Install dependencies
+        working-directory: my_memo_master_front
         run: npm install
-      # - name: Front - Test
-      #   working-directory: my_memo_master_front
-      #   run: ng test
+      - name: Front - Test
+        working-directory: my_memo_master_front
+        run: npm run test
 
   notify_failure:
     runs-on: ubuntu-latest
