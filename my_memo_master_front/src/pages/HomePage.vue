@@ -1,7 +1,6 @@
 <template>
   <div>
     <section>Salut salut</section>
-<<<<<<< HEAD
 
     <section>
       <DiagramTest />
@@ -186,11 +185,9 @@
     <section>
       <DiagramTest />
     </section>
-=======
     <section>
       <DiagramTest />
     </section>
->>>>>>> e5dc8d8183efd26c648f52aa21e8bdd163a91628
     <section>
       <h2>Test de l'Interpréteur</h2>
       <!-- Zone de saisie pour tester -->
@@ -210,18 +207,15 @@
 
 <script setup>
 import DiagramTest from '@/components/DiagramTestComponent.vue'
-<<<<<<< HEAD
 import Button from '@/components/ButtonComponent.vue'
 import Dropdown from '@/components/DropdownComponent.vue'
-=======
->>>>>>> e5dc8d8183efd26c648f52aa21e8bdd163a91628
 import Interpreter from '@/components/Interpreter.vue'
 import { ref } from 'vue'
 
 // Texte saisi par l'utilisateur
 const userInput = ref(`
 <text bold color:red>Texte de test</text>
-<formula>\\frac{a}{b} + \\sqrt{x^2 + y^2}</formula>
+<formula>sqrt(a^2 + b^2) + frac{1}{2} + nsqrt(3,x)</formula>
 `)
 </script>
 
