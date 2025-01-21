@@ -26,11 +26,6 @@ Object.keys(models).forEach((modelName) => {
 });
 
 module.exports = {
-    instance,
-    Response,
-    Role,
-    Subject,
-    Unit,
-    User,
-    Diagramme,
+  instance,
+  ...models,
 };
