@@ -1,10 +1,10 @@
 require('dotenv').config();
 module.exports = {
+  username: process.env.PG_USER || "postgres",
+  password: process.env.PG_PASS || "admin",
+  database: process.env.PG_DB || "mymemomasterdb",
+  host: process.env.PG_HOST || "localhost",
+  port: process.env.PG_PORT || 5432,
   dialect: "postgres",
-  host: process.env.PG_HOST,
-  username: process.env.PG_USER,
-  password: process.env.PG_PASS,
-  database: process.env.PG_DB,
-  port: process.env.PG_PORT,
   logging: console.log,
 };
