@@ -1,4 +1,35 @@
+version: "3.8"
+
 services:
+  postgres:
+    build:
+      context: ./localPostgres
+      dockerfile: Dockerfile-postgres
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASS}
+      POSTGRES_DB: ${PG_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${PG_PORT}:5432"
+    networks:
+      - my_network
+
+  pgadmin:
+    build:
+      context: ./localPostgres
+      dockerfile: Dockerfile-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD : ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "${PG_ADMIN_PORT}:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - my_network
+
   api:
     build:
       context: ./my_memo_master_api
@@ -9,11 +40,18 @@ services:
       - "${API_PORT}:${API_PORT}"
     volumes:
       - ./my_memo_master_api:/app
-      - api-data:/app/data  # Ajout d'un volume nommé pour persister les données
+      - api-data:/app/data
     environment:
       - NODE_ENV=development
       - API_PORT=${API_PORT}
-    command: sh -c "npm install && npm rebuild sqlite3 && npm start"
+      - PG_USER=${PG_USER}
+      - PG_PASS=${PG_PASS}
+      - PG_DB=${PG_DB}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+    command: sh -c "npm install && npm start && npm run seed"
+    networks:
+      - my_network
 
   front:
     build:
@@ -23,32 +61,20 @@ services:
         - VITE_PORT=${VITE_PORT}
     ports:
       - "${VITE_PORT}:${VITE_PORT}"
+    environment:
+      - VITE_PORT=${VITE_PORT}
     volumes:
       - ./my_memo_master_front:/app
-      - front-data:/app/data  # Ajout d'un volume nommé pour persister les données
-    # build:
-    #   args:
-    #     - VITE_PORT=${VITE_PORT}
-    # working_dir: /app
-    # environment:
-    #   - NODE_ENV=development
-    #   - VITE_PORT=${VITE_PORT}
-    #   - VITE_FRONT_URL=${VITE_FRONT_URL}
-    #   - VITE_API_URL=${VITE_API_URL}
-    # command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+      - front-data:/app/data
+    networks:
+      - my_network
 
 volumes:
   api-data:
   front-data:
+  postgres-data:
+  pgadmin-data:
 
-#   database:
-#     image: postgres:13
-#     environment:
-#       POSTGRES_USER: user
-#       POSTGRES_PASSWORD: password
-#       POSTGRES_DB: mydatabase
-#     volumes:
-#       - database-database:/var/lib/postgresql/database
-
-# volumes:
-#   database-database:
+networks:
+  my_network:
+    driver: bridge

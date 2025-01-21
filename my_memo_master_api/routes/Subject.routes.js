@@ -1,6 +1,6 @@
 const express = require("express");
 const subject = require("../controllers/Subject.controller.js");
-const authMiddleware = require('../middlewares/Auth.middleware');
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 const router = express.Router();
 
@@ -157,11 +157,11 @@ router.put("/:id", subject.update);
 router.delete("/:id", subject.delete);
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Subjects
-     *     description: Gestion des sujets
-     */
-    app.use("/subjects", authMiddleware, router);
+  /**
+   * @swagger
+   * tags:
+   *   - name: Subjects
+   *     description: Gestion des sujets
+   */
+  app.use("/subjects", router);
 };

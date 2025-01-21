@@ -1,0 +1,10 @@
+# Utiliser l'image officielle de PostgreSQL
+FROM postgres:13
+
+# Définir les variables d'environnement
+ENV POSTGRES_USER=${PG_USER}
+ENV POSTGRES_PASSWORD=${PG_PASS}
+ENV POSTGRES_DB=${PG_DB}
+
+# Volume pour les données persistantes
+VOLUME /var/lib/postgresql/data

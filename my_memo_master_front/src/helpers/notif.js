@@ -4,7 +4,11 @@ import { isMobile } from '@/helpers/functions.js'
 const toast = useToast();
 
 function notify(message, type = 'info') {
-    // ? type can either be 'info', 'success', 'error' or 'warning'
+    if (['info', 'success', 'error', 'warning'].includes(type) === false) {
+        type = 'info';
+        console.error('Invalid type for notification. Defaulting to info.');
+    }
+
     toast[type](message, {
         position: isMobile() ? 'top-right' : 'bottom-right',
         timeout: 4000,
@@ -15,7 +19,7 @@ function notify(message, type = 'info') {
         showCloseButtonOnHover: false,
         hideProgressBar: true,
         closeButton: 'button',
-        icon: true,
+        icon: false,
         rtl: false
     });
 }

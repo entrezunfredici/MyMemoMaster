@@ -3,14 +3,21 @@ const dotenv = require("dotenv");
 const express = require("express");
 const favicon = require("serve-favicon");
 const swaggerUi = require("swagger-ui-express");
+const swaggerJsdoc = require("swagger-jsdoc");
 const cors = require("cors");
+const bodyParser = require("body-parser");
+const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
+
+// Importation des routes
 const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
+const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
+const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
+const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
 const responseRoutes = require("./routes/Response.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
-const bodyParser = require('body-parser');
-const swaggerJsdoc = require('swagger-jsdoc');
+const leitnerSystemsUsersRoutes = require("./routes/LeitnerSystemsUsers.routes");
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
@@ -25,13 +32,13 @@ app.use(
   })
 );
 
+// Body parser
 app.use(bodyParser.json());
 
 // Middleware for favicon
 app.use(favicon(__dirname + "/public/favicon.ico"));
 
 // Middleware pour servir la documentation Swagger
-const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
@@ -40,6 +47,10 @@ roleRoutes(app);
 responseRoutes(app);
 unitRoutes(app);
 userRoutes(app);
+leitnerSystemRoutes(app);
+leitnerCardRoutes(app);
+leitnerBoxRoutes(app);
+leitnerSystemsUsersRoutes(app);
 
 // ... Autres middlewares
 

@@ -28,7 +28,6 @@ export const useAuthStore = defineStore('auth', {
 
         return true
       }).catch(error => {
-        this.logout()
         notif.notify(`An error occured: ${error}`, 'error')
         return false
       })
@@ -72,13 +71,26 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async deleteAccount() {
-      // TODO: WIP
-      console.log('deleteAccount')
+
+      await api.del(`user-delete/${this.user.userId}`).then(resp => {
+
+        if (resp.status !== 200) {
+          notif.notify(resp.data.message, 'error')
+          return false
+        }
+
+        this.logout()
+
+        return true
+      }).catch(error => {
+        notif.notify(`An error occured: ${error}`, 'error')
+        return false
+      })
     },
 
     async register(user, redirect = '/auth') {
 
-      this.logout()
+      this.logout(false)
 
       await api.post('register', user).then(resp => {
 
@@ -126,7 +138,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    logout(redirect = '/auth') {
+    logout(notify = true, redirect = '/auth') {
 
       this.authenticated = false
       this.user = {}
@@ -135,8 +147,11 @@ export const useAuthStore = defineStore('auth', {
       if (redirect) {
         router.push(redirect)
       }
-      notif.clear()
-      notif.notify('You have been logged out', 'info')
+
+      if (notify) {
+        notif.clear()
+        notif.notify('You have been logged out', 'info')
+      }
     },
   },
 },

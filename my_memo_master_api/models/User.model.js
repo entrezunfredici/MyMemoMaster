@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-  return instance.define(
+  const User = instance.define(
     "User",
     {
       userId: {
@@ -23,11 +23,11 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: 'Role',
-          key: 'roleId'
+          model: "Role",
+          key: "roleId",
         },
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE'
+        onDelete: "CASCADE",
+        onUpdate: "CASCADE",
       },
       password: {
         type: DataTypes.STRING,
@@ -63,9 +63,24 @@ module.exports = (instance) => {
     },
     {
       tableName: "User",
-      updatedAt: 'updatedAt',
-      createdAt: 'createdAt',
+      updatedAt: "updatedAt",
+      createdAt: "createdAt",
       timestamps: false,
     }
   );
+
+  // Associations
+  User.associate = (models) => {
+    User.hasMany(models.LeitnerSystem, {
+      foreignKey: "idUser",
+      as: "leitnerSystems",
+    });
+
+    User.hasMany(models.LeitnerSystemsUsers, {
+      foreignKey: "idUser",
+      as: "leitnerSystemsUsers",
+    });
+  };
+
+  return User;
 };

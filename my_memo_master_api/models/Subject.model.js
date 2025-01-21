@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-  return instance.define(
+  const Subject = instance.define(
     "Subject",
     {
       idSubject: {
@@ -16,10 +16,21 @@ module.exports = (instance) => {
       },
     },
     {
-      tableName: "subjects",
+      tableName: "Subject",
       updatedAt: "updatedAt",
       createdAt: "createdAt",
       timestamps: false,
     }
   );
+
+  Subject.associate = (models) => {
+    Subject.belongsToMany(models.LeitnerSystem, {
+      through: "systemSubject",
+      foreignKey: "idSubject",
+      otherKey: "idSystem",
+      as: "leitnerSystems",
+    });
+  };
+
+  return Subject;
 };
