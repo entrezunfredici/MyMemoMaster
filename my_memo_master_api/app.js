@@ -18,9 +18,6 @@ const responseRoutes = require("./routes/Response.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
 const leitnerSystemsUsersRoutes = require("./routes/LeitnerSystemsUsers.routes");
-const diagrammeRoutes = require("./routes/Diagramme.routes.js");
-const bodyParser = require('body-parser');
-const swaggerJsdoc = require('swagger-jsdoc');
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
