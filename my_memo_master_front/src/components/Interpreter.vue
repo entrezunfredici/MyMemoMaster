@@ -35,10 +35,13 @@ export default {
           return (
             `<table style="border-collapse: collapse; text-align: center;">` +
             matrix
-              .split('],[')
+              .split(/\],\s*\[/)
               .map((row) => {
-                const cells = row.replace(/[\[\]]/g, '').split(',')
-                return `<tr>${cells.map((cell) => `<td style="padding: 4px;">${cell.trim()}</td>`).join('')}</tr>`
+                const cells = row
+                  .replace(/[\[\]]/g, '')
+                  .split(',')
+                  .map((cell) => cell.trim())
+                return `<tr>${cells.map((cell) => `<td style="padding: 4px;">${cell}</td>`).join('')}</tr>`
               })
               .join('') +
             `</table>`
