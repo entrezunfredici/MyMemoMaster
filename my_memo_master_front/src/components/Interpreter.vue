@@ -30,7 +30,10 @@ export default {
 
       // Transformer tout le contenu directement
       html = html
-        .replace(/sqrt\((.*?)\)/g, '√($1)') // Racine carrée
+        // Racine carrée : √( ┤ )
+        .replace(/sqrt\((.*?)\)/g, '√($1)')
+
+        // Matrice : mattrix([ ┤ , ┤ , ┤ ], [ ┤ , ┤ , ┤ ])
         .replace(/mattrix\((.*?)\)/g, (_, matrix) => {
           return (
             `<table style="border-collapse: collapse; text-align: center;">` +
@@ -46,33 +49,87 @@ export default {
               .join('') +
             `</table>`
           )
-        }) // Matrice simple (approximatif)
+        })
+
+        // Fraction : ┤over┤
         .replace(
           /(.*?)over(.*?)/g,
           '<span style="display: inline-block; vertical-align: middle;">$1</span>/<span style="display: inline-block; vertical-align: middle;">$2</span>'
-        ) // Fraction
-        .replace(/\^(\S+)/g, '<i style="vertical-align: super; font-size: 0.75em;">$1</i>')
-        .replace(/([a-zA-Z0-9]+)_([a-zA-Z0-9]+)/g, '$1<sub>$2</sub>') //Indices
-        .replace(/ln\((.*?)\)/g, 'ln($1)') // Logarithme
+        )
+
+        // Exposant : ┤^┤
+        .replace(/(\S+)\^(\S+)/g, '$1<i style="vertical-align: super; font-size: 0.75em;">$2</i>')
+
+        // Indice : ┤_┤
+        .replace(/([a-zA-Z0-9]+)_([a-zA-Z0-9]+)/g, '$1<sub>$2</sub>')
+
+        // Intégrale : ∫_┤^┤(┤)
         .replace(
           /∫_(.*?)\^(.*?)\((.*?)\)/g,
-          '<span style="font-style: italic;">∫<sub>$1</sub><sup>$2</sup>($3)</span>'
-        ) // Intégrale
-        .replace(/\|\|(.*?)\|\|/g, '‖$1‖') // Norme
-        .replace(/\|(.*?)\|/g, '|$1|') // Valeur absolue
-        .replace(/⌊(.*?)⌋/g, '⌊$1⌋') // Partie entière inférieure
-        .replace(/nsqrt\((.*?),(.*?)\)/g, '<sup>$1</sup>√($2)') // Racine n-ième
-        .replace(/ℕ/g, '&#8469;') // Ensembles
-        .replace(/∞/g, '&#8734;') // Infini
-        .replace(/²/g, '<sup>2</sup>') // Exposant 2
+          '<span style="font-style: italic;">∫<sub>$1</sub><sup>$2</sup> $3</span>'
+        )
+
+        // Variantes d'intégrales : ∮_┤^┤(┤), ∯_┤^┤(┤)
         .replace(
-          /frac\{(.*?)\}\{(.*?)\}/g,
-          '<span style="display: inline-flex; flex-direction: column; align-items: center; font-size: 0.9em;"><span>$1</span><span style="border-top: 1px solid; width: 100%;">$2</span></span>'
-        ) // Fraction
+          /∮_(.*?)\^(.*?)\((.*?)\)/g,
+          '<span style="font-style: italic;">∮<sub>$1</sub><sup>$2</sup> $3</span>'
+        )
+        .replace(
+          /∯_(.*?)\^(.*?)\((.*?)\)/g,
+          '<span style="font-style: italic;">∯<sub>$1</sub><sup>$2</sup> $3</span>'
+        )
+
+        // Exponentielle : e^┤
+        .replace(/e\^(\S+)/g, 'e<i style="vertical-align: super; font-size: 0.75em;">$1</i>')
+
+        // Logarithme : ln( ┤ )
+        .replace(/ln\((.*?)\)/g, 'ln($1)')
+
+        // Dérivée simple : ̇ ┤
+        .replace(
+          /̇(\S+)/g,
+          '<span style="position: relative;"><span>$1</span><span style="position: absolute; top: -0.75em;">˙</span></span>'
+        )
+
+        // Double dérivée : ̈ ┤
+        .replace(
+          /̈(\S+)/g,
+          '<span style="position: relative;"><span>$1</span><span style="position: absolute; top: -0.75em;">¨</span></span>'
+        )
+
+        // Inverse : ̅ ┤
+        .replace(/̅(\S+)/g, '<span style="text-decoration: overline;">$1</span>')
+
+        // Vecteur : widevec( ┤ )
         .replace(
           /widevec\((.*?)\)/g,
           '<span style="display: inline-block; position: relative;"><span>$1</span><span style="position: absolute; top: -1em; left: 0; right: 0; font-size: 0.8em; font-weight: bold;">→</span></span>'
         )
+
+        // Racine n-ième : nsqrt( ┤ )
+        .replace(/nsqrt\((.*?),(.*?)\)/g, '<sup>$1</sup>√($2)')
+
+        // Norme : ‖┤‖
+        .replace(/\|\|(.*?)\|\|/g, '‖$1‖')
+
+        // Valeur absolue : |┤|
+        .replace(/\|(.*?)\|/g, '|$1|')
+
+        // Partie entière inférieure : ⌊┤⌋
+        .replace(/⌊(.*?)⌋/g, '⌊$1⌋')
+
+        // Ensembles : tels quels (∅, ℕ, ℤ, ℚ, ℝ, ℂ, ∞)
+        .replace(/ℕ/g, '&#8469;')
+        .replace(/ℤ/g, '&#8484;')
+        .replace(/ℚ/g, '&#8474;')
+        .replace(/ℝ/g, '&#8477;')
+        .replace(/ℂ/g, '&#8450;')
+        .replace(/∞/g, '&#8734;')
+
+        // Exposant 2 : ²
+        .replace(/²/g, '<sup>2</sup>')
+
+      // Parenthèses, crochets, accolades, etc. (|┤| ⌊┤⌋ ‖┤‖ (┤) {┤}) : tels quels
 
       // Optionnel : Encapsuler dans un conteneur pour distinguer les formules transformées
       // Ne pas encapsuler inutilement le contenu
