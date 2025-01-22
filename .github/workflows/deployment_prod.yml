@@ -120,7 +120,7 @@ jobs:
               exit 1
             fi
 
-            # Pull new images and restart services
+            # Stop, rebuild, and start services
             docker-compose down
             docker-compose build
             docker-compose up -d

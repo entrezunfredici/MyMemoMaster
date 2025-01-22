@@ -6,5 +6,5 @@ module.exports = {
   host: process.env.PG_HOST || "localhost",
   port: process.env.PG_PORT || 5432,
   dialect: "postgres",
-  logging: console.log,
+  logging: false,
 };

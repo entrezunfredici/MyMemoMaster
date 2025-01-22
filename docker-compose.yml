@@ -1,46 +1,56 @@
+# File docker-compose.yml
+
 services:
-  postgres:
-    build:
-      context: ./localPostgres
-      dockerfile: Dockerfile-postgres
-    environment:
-      POSTGRES_USER: ${PG_USER}
-      POSTGRES_PASSWORD: ${PG_PASS}
-      POSTGRES_DB: ${PG_DB}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "${PG_PORT}:${PG_PORT}"
+  # postgres:
+  #   build:
+  #     context: ./localPostgres
+  #     dockerfile: Dockerfile-postgres
+  #   environment:
+  #     POSTGRES_USER: ${PG_USER}
+  #     POSTGRES_PASSWORD: ${PG_PASS}
+  #     POSTGRES_DB: ${PG_DB}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   ports:
+  #     - "${PG_PORT}:${PG_PORT}"
 
-  pgadmin:
-    build:
-      context: ./localPostgres
-      dockerfile: Dockerfile-pgadmin
-    ports:
-      - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+  # pgadmin:
+  #   build:
+  #     context: ./localPostgres
+  #     dockerfile: Dockerfile-pgadmin
+  #   ports:
+  #     - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
+  #   volumes:
+  #     - pgadmin-data:/var/lib/pgadmin
+  #   environment:
+  #     - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+  #     - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
 
-  api:
-    build:
-      context: ./my_memo_master_api
-      dockerfile: Dockerfile
-      args:
-        - API_PORT=${API_PORT}
-    env_file:
-      - .env
+  # api:
+  #   build:
+  #     context: ./my_memo_master_api
+  #     dockerfile: Dockerfile
+  #     args:
+  #       - API_PORT=${API_PORT}
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "${API_PORT}:${API_PORT}"
+  #   volumes:
+  #     - ./my_memo_master_api:/app
+  #     - api-data:/app/data
+  #   environment:
+  #     - NODE_ENV=production
+  #   depends_on:
+  #     - postgres
+  apache:
+    image: httpd:2.4
+    container_name: my_memo_master_apache
     ports:
-      - "${API_PORT}:${API_PORT}"
+      - "${FRONT_PORT}:80"
     volumes:
-      - ./my_memo_master_api:/app
-      - api-data:/app/data
-    environment:
-      - NODE_ENV=production
-    depends_on:
-      - postgres
+      - ./apache-config-front.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./my_memo_master_front/dist:/var/www/html:ro
 
   front:
     build:
@@ -49,18 +59,8 @@ services:
     volumes:
       - ./my_memo_master_front:/app
       - front-data:/app/data
-    depends_on:
-      - api
-
-  apache:
-    image: httpd:2.4
-    container_name: my_memo_master_apache
-    ports:
-      - "80:80"
-    volumes:
-      - ./apache-config.conf:/usr/local/apache2/conf/httpd.conf:ro
-      - ./my_memo_master_front/dist:/var/www/html/mymemomaster/my_memo_master_front:ro
-      - ./my_memo_master_api:/var/www/html/mymemomaster/my_memo_master_api:ro
+    # depends_on:
+    # - api
 
 volumes:
   api-data:

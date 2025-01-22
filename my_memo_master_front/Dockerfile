@@ -1,16 +1,26 @@
-FROM node:18-alpine
+# File my_memo_master_front/Dockerfile
 
-# Set working directory
+FROM node:18
+
 WORKDIR /app
 
-# Copy package.json and install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy the app code and build it
-COPY . .
+COPY . ./
 RUN npm run build
 
-# Use a simple server to serve the static files
-RUN npm install -g serve
-CMD ["serve", "-s", "dist", "-l", "80"]
+FROM debian:bullseye
+
+RUN apt-get update && apt-get install -y apache2 && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /var/log/apache2 && chown -R www-data:www-data /var/log/apache2
+
+RUN rm -rf /var/www/html/*
+
+COPY --from=0 /app/dist /var/www/html
+
+EXPOSE 80
+EXPOSE 443
+
+CMD ["apachectl", "-D", "FOREGROUND"]
