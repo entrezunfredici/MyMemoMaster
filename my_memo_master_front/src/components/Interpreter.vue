@@ -31,7 +31,20 @@ export default {
       // Transformer tout le contenu directement
       html = html
         .replace(/sqrt\((.*?)\)/g, '√($1)') // Racine carrée
-        .replace(/mattrix\((.*?)\)/g, '[$1]') // Matrice simple (approximatif)
+        .replace(/mattrix\((.*?)\)/g, (_, matrix) => {
+          return (
+            `<table style="border-collapse: collapse; text-align: center;">` +
+            matrix
+              .split('],[')
+              .map((row) => {
+                const cells = row.replace(/[\[\]]/g, '').split(',')
+                return `<tr>${cells.map((cell) => `<td style="padding: 4px;">${cell.trim()}</td>`).join('')}</tr>`
+              })
+              .join('') +
+            `</table>`
+          )
+        })
+        // Matrice simple (approximatif)
         .replace(
           /(.*?)over(.*?)/g,
           '<span style="display: inline-block; vertical-align: middle;">$1</span>/<span style="display: inline-block; vertical-align: middle;">$2</span>'
@@ -48,10 +61,6 @@ export default {
         .replace(/⌊(.*?)⌋/g, '⌊$1⌋') // Partie entière inférieure
         .replace(/nsqrt\((.*?),(.*?)\)/g, '<sup>$1</sup>√($2)') // Racine n-ième
         .replace(/ℕ/g, '&#8469;') // Ensembles
-        .replace(/ℤ/g, '&#8484;')
-        .replace(/ℚ/g, '&#8474;')
-        .replace(/ℝ/g, '&#8477;')
-        .replace(/ℂ/g, '&#8450;')
         .replace(/∞/g, '&#8734;') // Infini
         .replace(/²/g, '<sup>2</sup>') // Exposant 2
         .replace(
