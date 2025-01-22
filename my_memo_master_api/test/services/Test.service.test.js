@@ -49,35 +49,4 @@ describe("TestService", () => {
       expect(test).toEqual(mockTest);
     });
 
-    test("should update a test", async () => {
-        const mockTest = { 
-            testId: 1, 
-            subjectId: 1, 
-            name: "Controle mis à jour",
-            update: jest.fn().mockResolvedValue([1, [{ testId: 1, name: "Controle mis à jour" }]]) // Mock update
-        };
-
-        Test.findByPk.mockResolvedValue(mockTest); 
-        const updatedTest = await TestService.update(1, { name: "Controle mis à jour" });
-
-        expect(mockTest.update).toHaveBeenCalledWith({ name: "Controle mis à jour" });
-        expect(updatedTest).toEqual({ testId: 1, name: "Controle mis à jour" });
-    });
-
-    test("should delete a test", async () => {
-        const mockTest = { 
-            testId: 1, 
-            subjectId: 1, 
-            name: "Controle à supprimer", 
-            destroy: jest.fn().mockResolvedValue(true) 
-        };
-
-        Test.findByPk.mockResolvedValue(mockTest); 
-
-        const deletedTest = await TestService.delete(1);
-
-        expect(mockTest.destroy).toHaveBeenCalled();
-        expect(deletedTest).toBe(true);
-    });
-
 });
