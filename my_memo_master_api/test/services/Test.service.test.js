@@ -50,22 +50,34 @@ describe("TestService", () => {
     });
 
     test("should update a test", async () => {
-        const mockTest = { subjectId: 1, name: "Controle mis à jour" };
-        Test.update.mockResolvedValue([1, [mockTest]]); // Update renvoie généralement un tableau [nombre de lignes modifiées, les objets mis à jour]
+        const mockTest = { 
+            testId: 1, 
+            subjectId: 1, 
+            name: "Controle mis à jour", 
+            update: jest.fn().mockResolvedValue([1, [mockTest]]) // Mock update
+        };
+
+        Test.findByPk.mockResolvedValue(mockTest); // Le mock doit retourner une instance du modèle avec la méthode update
 
         const updatedTest = await TestService.update(1, { name: "Controle mis à jour" });
 
-        expect(Test.update).toHaveBeenCalledWith({ name: "Controle mis à jour" }, { where: { testId: 1 } });
+        expect(mockTest.update).toHaveBeenCalledWith({ name: "Controle mis à jour" });
         expect(updatedTest).toEqual(mockTest);
     });
 
     test("should delete a test", async () => {
-        const mockTest = { id: 1, subjectId: 1, name: "Controle à supprimer" };
-        Test.destroy.mockResolvedValue(1); 
+        const mockTest = { 
+            testId: 1, 
+            subjectId: 1, 
+            name: "Controle à supprimer", 
+            destroy: jest.fn().mockResolvedValue(true) // Mock destroy
+        };
+
+        Test.findByPk.mockResolvedValue(mockTest); // Le mock doit retourner une instance du modèle avec la méthode destroy
 
         const deletedTest = await TestService.delete(1);
 
-        expect(Test.destroy).toHaveBeenCalledWith({ where: { testId: 1 } });
+        expect(mockTest.destroy).toHaveBeenCalled();
         expect(deletedTest).toBe(true);
     });
 
