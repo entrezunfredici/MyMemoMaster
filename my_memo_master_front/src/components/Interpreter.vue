@@ -52,7 +52,7 @@ export default {
           '<span style="display: inline-block; vertical-align: middle;">$1</span>/<span style="display: inline-block; vertical-align: middle;">$2</span>'
         ) // Fraction
         .replace(/\^(\S+)/g, '<i style="vertical-align: super; font-size: 0.75em;">$1</i>')
-        .replace(/(.*?)_(.*?)/g, '$1<sub>$2</sub>') // Indices
+        .replace(/([a-zA-Z0-9]+)_([a-zA-Z0-9]+)/g, '$1<sub>$2</sub>') //Indices
         .replace(/ln\((.*?)\)/g, 'ln($1)') // Logarithme
         .replace(
           /∫_(.*?)\^(.*?)\((.*?)\)/g,
