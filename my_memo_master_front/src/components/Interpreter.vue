@@ -132,6 +132,9 @@ export default {
         // Exposant 2 : ²
         .replace(/²/g, '<sup>2</sup>')
 
+        //Retour à la ligne
+        .replace(/\n/g, '<br>')
+
       // Parenthèses, crochets, accolades, etc. (|┤| ⌊┤⌋ ‖┤‖ (┤) {┤}) : tels quels
 
       // Optionnel : Encapsuler dans un conteneur pour distinguer les formules transformées
