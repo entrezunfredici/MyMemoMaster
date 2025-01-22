@@ -215,13 +215,36 @@ import { ref } from 'vue'
 // Texte saisi par l'utilisateur
 const userInput = ref(`
 <text bold color:red>Texte de test</text>
-<formula>
-  sqrt(a^2 + b^2) + frac{1}{2} + nsqrt(3,x) + mattrix([1,2,3],[4,5,6],[7,8,9]) + 
-  (a+b)^2 + a_1 + e^x + ln(a+b) + widevec(v) + 
-  ∫_0^1(f(x))dx + ∮_C(f(x))dx + ∯_S(f(x))dx +
-  ||a+b|| + |c-d| + ⌊e⌋ + ℕ ∪ ℝ + ² + ∞ + 
-  α + β + γ + δ + ∃x∈ℝ + ∄y∉ℤ + ⊂A⊃B + ± ⊥ ⋋ ⋌ ∝ %.
-</formula>`)
+sqrt(a^2 + b^2)
+
+nsqrt(3,x)
+
+mattrix([1,2,3],[4,5,6],[7,8,9])
+
+frac{1}{2}
+
+(a+b)^2
+
+a_1
+
+e^x
+
+ln(a+b)
+
+widevec(v)
+
+∫_0^1(f(x))dx
+
+∮_C(f(x))dx
+
+∯_S(f(x))dx
+
+||a+b||
+
+|c-d|
+
+⌊e⌋
+`)
 </script>
 
 <style scoped>

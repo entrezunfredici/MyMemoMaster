@@ -26,43 +26,42 @@ export default {
     async parseContent() {
       let html = this.content
 
-      html = html.replace(/<formula>(.*?)<\/formula>/gs, (match, formula) => {
-        // Transformer les formules spéciales en équivalents HTML/CSS
-        let parsedFormula = formula
-          .replace(/sqrt\((.*?)\)/g, '√($1)') // Racine carrée
-          .replace(/mattrix\((.*?)\)/g, '[$1]') // Matrice simple (approximatif)
-          .replace(
-            /(.*?)over(.*?)/g,
-            '<span style="display: inline-block; vertical-align: middle;">$1</span>/<span style="display: inline-block; vertical-align: middle;">$2</span>'
-          ) // Fraction
-          .replace(/(.*?)\^(.*?)/g, '$1<sup>$2</sup>') // Exposants
-          .replace(/(.*?)_(.*?)/g, '$1<sub>$2</sub>') // Indices
-          .replace(/ln\((.*?)\)/g, 'ln($1)') // Logarithme
-          .replace(/e\^(.*?)/g, 'e<sup>$1</sup>') // Exponentielle
-          .replace(
-            /∫_(.*?)\^(.*?)\((.*?)\)/g,
-            '<span style="font-style: italic;">∫<sub>$1</sub><sup>$2</sup>($3)</span>'
-          ) // Intégrale
-          .replace(/\|\|(.*?)\|\|/g, '‖$1‖') // Norme
-          .replace(/\|(.*?)\|/g, '|$1|') // Valeur absolue
-          .replace(/⌊(.*?)⌋/g, '⌊$1⌋') // Partie entière inférieure
-          .replace(/nsqrt\((.*?),(.*?)\)/g, '<sup>$1</sup>√($2)') // Racine n-ième
-          .replace(/([+\-*/!=≠≃≈≤≥⨁⊛±∀∃∄∋∈∉∪∩⊂⊃∝⋌⋋∠∡⊥%])/g, '$1') // Opérateurs affichés tels quels
-          .replace(/ℕ/g, '&#8469;') // Ensembles
-          .replace(/ℤ/g, '&#8484;')
-          .replace(/ℚ/g, '&#8474;')
-          .replace(/ℝ/g, '&#8477;')
-          .replace(/ℂ/g, '&#8450;')
-          .replace(/∞/g, '&#8734;') // Infini
-          .replace(/²/g, '<sup>2</sup>') // Exposant 2
-          .replace(
-            /frac\{(.*?)\}\{(.*?)\}/g,
-            '<span style="display: inline-flex; flex-direction: column; align-items: center; font-size: 0.9em;"><span>$1</span><span style="border-top: 1px solid; width: 100%;">$2</span></span>'
-          ) // Fraction
+      html = html.replace(/<formula>(.*?)<\/formula>/gs, (match, formula) => formula) // Supprime le traitement des balises <formula>
 
-        // Retourner la formule transformée dans un conteneur <span> ou autre balise
-        return `<span class="formula">${parsedFormula}</span>`
-      })
+      // Transformer tout le contenu directement
+      html = html
+        .replace(/sqrt\((.*?)\)/g, '√($1)') // Racine carrée
+        .replace(/mattrix\((.*?)\)/g, '[$1]') // Matrice simple (approximatif)
+        .replace(
+          /(.*?)over(.*?)/g,
+          '<span style="display: inline-block; vertical-align: middle;">$1</span>/<span style="display: inline-block; vertical-align: middle;">$2</span>'
+        ) // Fraction
+        .replace(/\^(\S+)/g, '<i style="vertical-align: super; font-size: 0.75em;">$1</i>')
+        .replace(/(.*?)_(.*?)/g, '$1<sub>$2</sub>') // Indices
+        .replace(/ln\((.*?)\)/g, 'ln($1)') // Logarithme
+        .replace(
+          /∫_(.*?)\^(.*?)\((.*?)\)/g,
+          '<span style="font-style: italic;">∫<sub>$1</sub><sup>$2</sup>($3)</span>'
+        ) // Intégrale
+        .replace(/\|\|(.*?)\|\|/g, '‖$1‖') // Norme
+        .replace(/\|(.*?)\|/g, '|$1|') // Valeur absolue
+        .replace(/⌊(.*?)⌋/g, '⌊$1⌋') // Partie entière inférieure
+        .replace(/nsqrt\((.*?),(.*?)\)/g, '<sup>$1</sup>√($2)') // Racine n-ième
+        .replace(/ℕ/g, '&#8469;') // Ensembles
+        .replace(/ℤ/g, '&#8484;')
+        .replace(/ℚ/g, '&#8474;')
+        .replace(/ℝ/g, '&#8477;')
+        .replace(/ℂ/g, '&#8450;')
+        .replace(/∞/g, '&#8734;') // Infini
+        .replace(/²/g, '<sup>2</sup>') // Exposant 2
+        .replace(
+          /frac\{(.*?)\}\{(.*?)\}/g,
+          '<span style="display: inline-flex; flex-direction: column; align-items: center; font-size: 0.9em;"><span>$1</span><span style="border-top: 1px solid; width: 100%;">$2</span></span>'
+        ) // Fraction
+
+      // Optionnel : Encapsuler dans un conteneur pour distinguer les formules transformées
+      // Ne pas encapsuler inutilement le contenu
+      html = html
 
       html = html.replace(/<text(.*?)>(.*?)<\/text>/gs, (match, attributes, text) => {
         const bold = attributes.includes('bold') ? 'font-weight: bold;' : ''
@@ -91,3 +90,13 @@ export default {
   }
 }
 </script>
+<style>
+sup {
+  vertical-align: super;
+  font-size: smaller;
+}
+sub {
+  vertical-align: sub;
+  font-size: smaller;
+}
+</style>
