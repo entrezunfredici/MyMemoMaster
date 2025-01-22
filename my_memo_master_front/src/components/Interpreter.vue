@@ -46,8 +46,7 @@ export default {
               .join('') +
             `</table>`
           )
-        })
-        // Matrice simple (approximatif)
+        }) // Matrice simple (approximatif)
         .replace(
           /(.*?)over(.*?)/g,
           '<span style="display: inline-block; vertical-align: middle;">$1</span>/<span style="display: inline-block; vertical-align: middle;">$2</span>'
@@ -70,6 +69,10 @@ export default {
           /frac\{(.*?)\}\{(.*?)\}/g,
           '<span style="display: inline-flex; flex-direction: column; align-items: center; font-size: 0.9em;"><span>$1</span><span style="border-top: 1px solid; width: 100%;">$2</span></span>'
         ) // Fraction
+        .replace(
+          /widevec\((.*?)\)/g,
+          '<span style="display: inline-block; position: relative;"><span>$1</span><span style="position: absolute; top: -1em; left: 0; right: 0; font-size: 0.8em; font-weight: bold;">→</span></span>'
+        )
 
       // Optionnel : Encapsuler dans un conteneur pour distinguer les formules transformées
       // Ne pas encapsuler inutilement le contenu
