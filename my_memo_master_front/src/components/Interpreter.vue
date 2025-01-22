@@ -88,17 +88,20 @@ export default {
         // Dérivée simple : ̇ ┤
         .replace(
           /̇(\S+)/g,
-          '<span style="position: relative;"><span>$1</span><span style="position: absolute; top: -0.75em;">˙</span></span>'
+          '<span style="position: relative; display: inline-block; text-align: center;"><span>$1</span><span style="position: absolute; top: -0.7em; left: 50%; transform: translateX(-50%); font-size: 0.75em;">˙</span></span>'
         )
 
         // Double dérivée : ̈ ┤
         .replace(
           /̈(\S+)/g,
-          '<span style="position: relative;"><span>$1</span><span style="position: absolute; top: -0.75em;">¨</span></span>'
+          '<span style="position: relative; display: inline-block; text-align: center;"><span>$1</span><span style="position: absolute; top: -0.7em; left: 50%; transform: translateX(-50%); font-size: 0.75em; letter-spacing: -0.1em;">¨</span></span>'
         )
 
         // Inverse : ̅ ┤
-        .replace(/̅(\S+)/g, '<span style="text-decoration: overline;">$1</span>')
+        .replace(
+          /̅(\S+)/g,
+          '<span style="text-decoration: overline; display: inline-block;">$1</span>'
+        )
 
         // Vecteur : widevec( ┤ )
         .replace(
