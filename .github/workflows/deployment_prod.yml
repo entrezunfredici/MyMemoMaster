@@ -112,14 +112,6 @@ jobs:
             # Navigate to project directory
             cd /var/www/html/mymemomaster
 
-            # Ensure Docker Compose is properly configured
-            if [ -f "docker-compose.yml" ]; then
-              echo "Docker Compose file exists. Proceeding with deployment."
-            else
-              echo "ERROR: docker-compose.yml not found!"
-              exit 1
-            fi
-
             # Stop, rebuild, and start services
             docker-compose down
             docker-compose build

@@ -12,4 +12,4 @@ COPY . ./
 
 EXPOSE ${API_PORT}
 
-CMD ["sh", "-c", "npm start"]
+CMD ["sh", "-c", "npm run start && npm run seed"]

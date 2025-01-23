@@ -1,56 +1,62 @@
 # File docker-compose.yml
 
 services:
-  # postgres:
-  #   build:
-  #     context: ./localPostgres
-  #     dockerfile: Dockerfile-postgres
-  #   environment:
-  #     POSTGRES_USER: ${PG_USER}
-  #     POSTGRES_PASSWORD: ${PG_PASS}
-  #     POSTGRES_DB: ${PG_DB}
-  #   volumes:
-  #     - postgres-data:/var/lib/postgresql/data
-  #   ports:
-  #     - "${PG_PORT}:${PG_PORT}"
-
-  # pgadmin:
-  #   build:
-  #     context: ./localPostgres
-  #     dockerfile: Dockerfile-pgadmin
-  #   ports:
-  #     - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
-  #   volumes:
-  #     - pgadmin-data:/var/lib/pgadmin
-  #   environment:
-  #     - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
-  #     - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
-
-  # api:
-  #   build:
-  #     context: ./my_memo_master_api
-  #     dockerfile: Dockerfile
-  #     args:
-  #       - API_PORT=${API_PORT}
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "${API_PORT}:${API_PORT}"
-  #   volumes:
-  #     - ./my_memo_master_api:/app
-  #     - api-data:/app/data
-  #   environment:
-  #     - NODE_ENV=production
-  #   depends_on:
-  #     - postgres
-  apache:
-    image: httpd:2.4
-    container_name: my_memo_master_apache
-    ports:
-      - "${FRONT_PORT}:80"
+  postgres:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile-postgres
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASS}
+      POSTGRES_DB: ${PG_DB}
     volumes:
-      - ./apache-config-front.conf:/usr/local/apache2/conf/httpd.conf:ro
-      - ./my_memo_master_front/dist:/var/www/html:ro
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${PG_PORT}:5432"
+    networks:
+      - my_memo_master_network
+
+  pgadmin:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile-pgadmin
+    ports:
+      - "${PGADMIN_PORT}:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
+    networks:
+      - my_memo_master_network
+
+  api:
+    build:
+      context: ./my_memo_master_api
+      dockerfile: Dockerfile
+      args:
+        - API_PORT=${API_PORT}
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    volumes:
+      - ./my_memo_master_api:/app
+      - api-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - API_PORT=${API_PORT}
+      - PG_USER=${PG_USER}
+      - PG_PASS=${PG_PASS}
+      - PG_DB=${PG_DB}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+    depends_on:
+      - postgres
+    networks:
+      - my_memo_master_network
 
   front:
     build:
@@ -59,11 +65,18 @@ services:
     volumes:
       - ./my_memo_master_front:/app
       - front-data:/app/data
-    # depends_on:
-    # - api
+    ports:
+      - "5173:80"
+    restart: always
+    networks:
+      - my_memo_master_network
 
 volumes:
   api-data:
   front-data:
   postgres-data:
   pgadmin-data:
+
+networks:
+  my_memo_master_network:
+    driver: bridge

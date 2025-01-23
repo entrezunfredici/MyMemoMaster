@@ -1,26 +1,17 @@
-# File my_memo_master_front/Dockerfile
-
-FROM node:18
-
+# Step 1: Build the Vue.js app
+FROM node:18 AS builder
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm install
-
-COPY . ./
+COPY . .
 RUN npm run build
 
-FROM debian:bullseye
+# Step 2: Use nginx to serve the built app
+FROM nginx:stable-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-RUN apt-get update && apt-get install -y apache2 && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /var/log/apache2 && chown -R www-data:www-data /var/log/apache2
-
-RUN rm -rf /var/www/html/*
-
-COPY --from=0 /app/dist /var/www/html
-
+# Expose port 80
 EXPOSE 80
-EXPOSE 443
 
-CMD ["apachectl", "-D", "FOREGROUND"]
+# Start nginx server
+CMD ["nginx", "-g", "daemon off;"]
