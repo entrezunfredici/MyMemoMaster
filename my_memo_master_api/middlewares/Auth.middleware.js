@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 module.exports = (req, res, next) => {
-    if (process.env.BYPASS_AUTH == 'true') {
+    if (process.env.API_BYPASS_AUTH == 'true') {
         next();
         return;
     }
@@ -21,7 +21,7 @@ module.exports = (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.AUTH_JWT_SECRET);
         req.user = decoded;
         next();
     } catch (err) {

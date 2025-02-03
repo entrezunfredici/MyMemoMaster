@@ -24,8 +24,8 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign(
       { id: user.userId, name: user.name, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      process.env.AUTH_JWT_SECRET,
+      { expiresIn: process.env.AUTH_JWT_EXPIRES_IN }
     );
 
     await userService.updateLoginDate(user.userId);
