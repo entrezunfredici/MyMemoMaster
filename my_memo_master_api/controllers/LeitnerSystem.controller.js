@@ -1,10 +1,11 @@
-const e = require("express");
+const express = require("express");
 const leitnerSystemService = require("../services/LeitnerSystem.service.js");
 exports.findAll = async (req, res) => {
   try {
     const data = await leitnerSystemService.findAll();
     res.status(200).send(data);
   } catch (error) {
+    console.error(error.message);
     res.status(500).send({
       message:
         "Une erreur s'est produite lors de la récupération des systèmes de Leitner.",

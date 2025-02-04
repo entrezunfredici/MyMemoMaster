@@ -24,8 +24,9 @@ module.exports = (req, res, next) => {
         const decoded = jwt.verify(token, process.env.AUTH_JWT_SECRET);
         req.user = decoded;
         next();
-    } catch (err) {
-        res.status(401).send({ message: err });
+    } catch (error) {
+        console.error(error.message);
+        res.status(401).send({ message: 'Unauthorized!' });
         return;
     }
 };
