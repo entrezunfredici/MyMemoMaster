@@ -1,4 +1,4 @@
-module.exports = swaggerOptions = {
+const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
@@ -8,6 +8,7 @@ module.exports = swaggerOptions = {
         },
         servers: [
             {
+                // eslint-disable-next-line no-undef
                 url: 'http://localhost:' + process.env.API_PORT,
             },
         ],
