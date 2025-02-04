@@ -1,5 +1,4 @@
 # *Ce fichier* https://media1.tenor.com/m/69J_vOZhULQAAAAd/oss117-bordel.gif
-# git pull ; git add . ; git commit -m "[UP] Maj pipeline" ; git push origin main --force
 
 name: Build and Deploy
 
