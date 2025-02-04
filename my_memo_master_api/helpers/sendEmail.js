@@ -12,10 +12,10 @@ module.exports = (subject = '', text = '', to = '', from = process.env.EMAIL_FRO
 
     transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
-            logConsole(`An error occurred: ${error}`, 'error');
+            console.error(`An error occurred: ${error}`);
             return false;
         } else {
-            logFile('Email sent: ' + info.response, 'info');
+            console.log('Email sent: ' + info.response, 'info');
             return true;
         }
     });
