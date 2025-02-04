@@ -12,7 +12,7 @@ const listTables = async () => {
     console.log(tables[0].map((table) => table.tablename));
   } catch (error) {
     console.error("Error listing tables");
-    console.error(error);
+    console.error(error?.message || error);
     throw error;
   }
 };
@@ -26,38 +26,35 @@ const seedDatabase = async () => {
     await db.instance.sync({ force: true });
     console.log("Database synchronized successfully");
 
+    await db.instance.query("PRAGMA foreign_keys = OFF");
+
     // Désactiver les déclencheurs de clés étrangères pour les insertions
     await db.instance.query('ALTER TABLE "User" DISABLE TRIGGER ALL');
     await db.instance.query('ALTER TABLE "Role" DISABLE TRIGGER ALL');
     await db.instance.query('ALTER TABLE "LeitnerSystem" DISABLE TRIGGER ALL');
-    // Répétez pour d'autres tables si nécessaire
 
     const users = require("./seeds/User.seed.json");
     users.forEach((user) => {
       user.password = bcrypt.hashSync(user.password, 10);
     });
-
-    const roles = require("./seeds/Role.seed.json");
-    await db.Role.bulkCreate(roles);
-    console.log("Roles table seeded successfully");
-
     await db.User.bulkCreate(users);
     console.log("Users table seeded successfully");
 
-    const subjects = require("./seeds/Subject.seed.json");
-    await db.Subject.bulkCreate(subjects);
+    await db.Role.bulkCreate(require("./seeds/Role.seed.json"));
+    console.log("Roles table seeded successfully");
+
+    await db.Subject.bulkCreate(require("./seeds/Subject.seed.json"));
     console.log("Subjects table seeded successfully");
 
-    const units = require("./seeds/Units.seed.json");
-    await db.Subject.bulkCreate(units);
+    await db.Subject.bulkCreate(require("./seeds/Units.seed.json"));
     console.log("Units table seeded successfully");
 
-    await db.LeitnerSystem.bulkCreate(
-      require("./seeds/LeitnerSystem.seed.json")
-    );
+    await db.LeitnerSystem.bulkCreate(require("./seeds/LeitnerSystem.seed.json"));
     console.log("LeitnerSystems table seeded successfully");
+
     await db.LeitnerBox.bulkCreate(require("./seeds/LeitnerBox.seed.json"));
     console.log("LeitnerBoxes table seeded successfully");
+
     await db.LeitnerCard.bulkCreate(require("./seeds/LeitnerCard.seed.json"));
     console.log("LeitnerCards table seeded successfully");
 
@@ -65,12 +62,11 @@ const seedDatabase = async () => {
     await db.instance.query('ALTER TABLE "User" ENABLE TRIGGER ALL');
     await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');
     await db.instance.query('ALTER TABLE "LeitnerSystem" ENABLE TRIGGER ALL');
-    // Répétez pour d'autres tables si nécessaire
 
     console.log("Sample data inserted successfully");
   } catch (error) {
     console.error("Error inserting sample data");
-    console.error(error);
+    console.error(error?.message || error);
     throw error;
   }
 };
@@ -86,7 +82,7 @@ const checkSeed = async () => {
     }
   } catch (error) {
     console.error("Error verifying sample data");
-    console.error(error);
+    console.error(error?.message || error);
     throw error;
   }
 };
@@ -100,7 +96,7 @@ const checkSeed = async () => {
     process.exit(0);
   } catch (error) {
     console.error("Error running the script");
-    console.error(error);
+    console.error(error?.message || error);
     process.exit(1);
   } finally {
     await db.instance.close();

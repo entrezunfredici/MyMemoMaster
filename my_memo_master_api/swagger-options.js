@@ -8,7 +8,6 @@ const swaggerOptions = {
         },
         servers: [
             {
-                // eslint-disable-next-line no-undef
                 url: 'http://localhost:' + process.env.API_PORT,
             },
         ],

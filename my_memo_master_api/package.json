@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "build": "next build",
-    "seed": "node msbd_seeder.js",
+    "seed": "node seeder.js",
     "lint": "eslint ."
   },
   "author": "",

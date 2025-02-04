@@ -5,7 +5,7 @@ exports.findAll = async (req, res) => {
     const boxes = await LeitnerBoxService.findAll();
     res.status(200).send(boxes);
   } catch (error) {
-    console.error(error.message);
+    console.error(error?.message || error);
     res.status(500).send({
       message: "Erreur lors de la récupération des boîtes de Leitner.",
     });
@@ -23,7 +23,7 @@ exports.findOne = async (req, res) => {
       res.status(200).send(box);
     }
   } catch (error) {
-    console.error(error.message);
+    console.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la récupération de la boîte: " });
@@ -41,7 +41,7 @@ exports.create = async (req, res) => {
     });
     res.status(201).send(box);
   } catch (error) {
-    console.error(error.message);
+    console.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la création de la boîte." });
@@ -81,7 +81,7 @@ exports.delete = async (req, res) => {
       res.status(200).send({ message: "Boîte supprimée avec succès." });
     }
   } catch (error) {
-    console.error(error.message);
+    console.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la suppression de la boîte." });

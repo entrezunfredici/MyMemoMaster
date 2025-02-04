@@ -23,7 +23,7 @@ const ResponseService = require("../services/Response.service.js");
         res.status(200).send(response);
       }
     } catch (error) {
-      console.error(error.message);
+      console.error(error?.message || error);
       res.status(500).send({
         message: `Erreur lors de la récupération de la reponse avec l'identifiant ${req.params.id}.`,
       });
@@ -36,7 +36,7 @@ const ResponseService = require("../services/Response.service.js");
       const data = await ResponseService.create({name});
       res.status(201).send(data);
     } catch (error) {
-      console.error(error.message);
+      console.error(error?.message || error);
       res.status(500).send({
         message: "Une erreur s'est produite lors de la création de la reponse.",
       });
@@ -51,6 +51,7 @@ const ResponseService = require("../services/Response.service.js");
       );
       res.status(200).json(updatedResponse);
     } catch (error) {
+      console.error(error?.message || error);
       res.status(500).send({
         message: "Une erreur s'est produite lors de la modification de la reponse",
       });
@@ -62,7 +63,7 @@ const ResponseService = require("../services/Response.service.js");
       await ResponseService.delete(req.params.id);
       res.status(204).send();
     } catch (error) {
-      console.error(error.message);
+      console.error(error?.message || error);
       res.status(500).send({
         message: "Une erreur s'est produite lors de la suppression de la reponse",
       });
