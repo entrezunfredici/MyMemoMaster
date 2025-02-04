@@ -22,9 +22,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Front - Install dependencies
-        working-directory: my_memo_master_api
+        working-directory: my_memo_master_front
         run: npm install
       - name: Front - Lint
+        working-directory: my_memo_master_front
         run: npm run lint
   notify_failure:
     runs-on: ubuntu-latest

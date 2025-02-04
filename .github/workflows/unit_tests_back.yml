@@ -25,6 +25,7 @@ jobs:
         working-directory: my_memo_master_api
         run: npm install
       - name: API - Lint
+        working-directory: my_memo_master_api
         run: npm run lint
   notify_failure:
     runs-on: ubuntu-latest
