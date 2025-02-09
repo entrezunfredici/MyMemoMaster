@@ -1,10 +1,12 @@
+import { VITE_APP_NAME } from '@/config';
+
 const routes = [
   {
     path: '/',
     name: 'home',
     component: () => import('../pages/HomePage.vue'),
     meta: {
-      title: 'Acceuil',
+      title: VITE_APP_NAME,
       private: true,
     },
   },
