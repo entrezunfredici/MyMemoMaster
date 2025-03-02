@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - 'dev_back_*'
-      - '*devops*' # Add a branch to test the workflow
+      # - '*devops*' # Add a branch to test the workflow
 
 jobs:
   test:
