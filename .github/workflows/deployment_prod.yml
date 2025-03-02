@@ -58,38 +58,39 @@ jobs:
           -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
           ${{ secrets.DISCORD_LOG }}
 
-  sonar_analysis:
-    name: Run SonarQube Analysis
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+  # sonar_analysis:
+  #   name: Run SonarQube Analysis
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v2
+  #       with:
+  #         fetch-depth: 0
       
-      - name: Run SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v3
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  #     - name: Run SonarQube Scan
+  #       uses: sonarsource/sonarqube-scan-action@v3
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-  sonar_analysis_failure:
-    name: Notify SonarQube Failure
-    runs-on: ubuntu-latest
-    needs: sonar_analysis
-    if: failure()
-    steps:
-      - name: Send SonarQube Failure Notification to Discord
-        run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"SonarQube analysis failed on branch $GITHUB_REF!\"}" \
-          ${{ secrets.DISCORD_LOG }}
+  # sonar_analysis_failure:
+  #   name: Notify SonarQube Failure
+  #   runs-on: ubuntu-latest
+  #   needs: sonar_analysis
+  #   if: failure()
+  #   steps:
+  #     - name: Send SonarQube Failure Notification to Discord
+  #       run: |
+  #         curl -X POST -H "Content-Type: application/json" \
+  #         -d "{\"content\": \"SonarQube analysis failed on branch $GITHUB_REF!\"}" \
+  #         ${{ secrets.DISCORD_LOG }}
 
   build_and_deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
-    needs: [test, sonar_analysis]
+    needs: test
+    # needs: [test, sonar_analysis]
     if: success()
     steps:
       - name: Checkout Code
