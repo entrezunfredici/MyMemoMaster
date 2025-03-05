@@ -15,15 +15,15 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
       mindMapJson: {
-        type: DataTypes.TEXT, // `TEXT` est plus approprié pour du JSON volumineux.
+        type: DataTypes.JSON, // `TEXT` est plus approprié pour du JSON volumineux.
         allowNull: false,
       },
-      idUser: {
+      userId: {
         type: DataTypes.INTEGER,
         allowNull: false, // Assurez-vous que cette clé étrangère ne peut pas être nulle.
         references: {
           model: "User", // Nom de la table cible.
-          key: "idUser", // Clé primaire dans la table cible.
+          key: "userId", // Clé primaire dans la table cible.
         },
       },
     },
@@ -36,7 +36,7 @@ module.exports = (sequelize) => {
   // Définir les associations
   MindMap.associate = (models) => {
     MindMap.belongsTo(models.User, {
-      foreignKey: "idUser",
+      foreignKey: "userId",
       as: "user", // Alias pour la relation.
     });
   };

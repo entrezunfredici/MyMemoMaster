@@ -4,11 +4,11 @@ const router = express.Router();
 
 /**
  * @swagger
- * /diagrammes/all:
+ * /diagramme/all:
  *   get:
  *     summary: Récupère tous les diagrammes
  *     tags:
- *       - diagrammes
+ *       - diagramme
  *     responses:
  *       200:
  *         description: Liste de tous les diagrammes
@@ -25,9 +25,9 @@ const router = express.Router();
  *                   name:
  *                     type: string
  *                     example: "Math"
- *                  mindMapsJson:
- *                      type: string
- *                      example: "json"
+ *                   mindMapsJson:
+ *                     type: string
+ *                     example: "json"
  *       500:
  *         description: Erreur interne du serveur
  */
@@ -35,21 +35,21 @@ router.get("/all", diagramme.findAll);
 
 /**
  * @swagger
- * /diagrammes/{id}:
+ * /diagramme/{id}:
  *   get:
- *     summary: Récupère un rôle par son ID
+ *     summary: Récupère un diagramme par son ID
  *     tags:
- *       - diagrammes
+ *       - diagramme
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du rôle
+ *         description: ID du diagramme
  *         schema:
  *           type: integer
  *     responses:
  *       200:
- *         description: Rôle correspondant à l'ID
+ *         description: Diagramme correspondant à l'ID
  *         content:
  *           application/json:
  *             schema:
@@ -62,10 +62,10 @@ router.get("/all", diagramme.findAll);
  *                   type: string
  *                   example: "Math"
  *                 mindMapsJson:
- *                    type: string
- *                    example: "json"
+ *                   type: string
+ *                   example: "json"
  *       404:
- *         description: Rôle non trouvé
+ *         description: Diagramme non trouvé
  *       500:
  *         description: Erreur interne du serveur
  */
@@ -73,11 +73,11 @@ router.get("/:id", diagramme.findOne);
 
 /**
  * @swagger
- * /diagrammes/add:
+ * /diagramme/add:
  *   post:
  *     summary: Ajoute un nouveau diagramme
  *     tags:
- *       - diagrammes
+ *       - diagramme
  *     requestBody:
  *       required: true
  *       content:
@@ -89,11 +89,11 @@ router.get("/:id", diagramme.findOne);
  *                 type: string
  *                 example: "Math"
  *               mindMapsJson:
- *                  type: string
- *                  example: "json"
- *     responses
+ *                 type: string
+ *                 example: "json"
+ *     responses:
  *       201:
- *         description: Rôle créé avec succès
+ *         description: Diagramme créé avec succès
  *       400:
  *         description: Requête invalide
  *       500:
@@ -103,15 +103,16 @@ router.post("/add", diagramme.create);
 
 /**
  * @swagger
- * /diagrammes/{id}:
+ * /diagramme/{id}:
  *   put:
- *     summary: Met à jour un rôle existant
- *     tags: [diagrammes]
+ *     summary: Met à jour un diagramme existant
+ *     tags:
+ *       - diagramme
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du rôle à mettre à jour
+ *         description: ID du diagramme à mettre à jour
  *         schema:
  *           type: integer
  *     requestBody:
@@ -123,46 +124,50 @@ router.post("/add", diagramme.create);
  *             properties:
  *               name:
  *                 type: string
- *                 example: "Updated Role Name"
+ *                 example: "Updated Diagram Name"
+ *               mindMapsJson:
+ *                 type: string
+ *                 example: "Updated JSON"
  *     responses:
  *       200:
- *         description: Rôle mis à jour avec succès.
+ *         description: Diagramme mis à jour avec succès
  *       404:
- *         description: Rôle non trouvé.
+ *         description: Diagramme non trouvé
  *       500:
- *         description: Erreur interne du serveur.
+ *         description: Erreur interne du serveur
  */
 router.put("/:id", diagramme.update);
 
 /**
  * @swagger
- * /diagrammes/{id}:
+ * /diagramme/{id}:
  *   delete:
- *     summary: Supprime un rôle par son ID
- *     tags: [diagrammes]
-*     parameters:
+ *     summary: Supprime un diagramme par son ID
+ *     tags:
+ *       - diagramme
+ *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du rôle à supprimer
+ *         description: ID du diagramme à supprimer
  *         schema:
  *           type: integer
  *     responses:
  *       200:
- *         description: Rôle supprimé avec succès.
+ *         description: Diagramme supprimé avec succès
  *       404:
- *         description: Rôle non trouvé.
+ *         description: Diagramme non trouvé
  *       500:
- *         description: Erreur interne du serveur.
+ *         description: Erreur interne du serveur
  */
 router.delete("/:id", diagramme.delete);
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: diagrammes
-     *     description: Gestion des diagrammes
-     */
-    app.use("/diagramme", router);
+  /**
+   * @swagger
+   * tags:
+   *   - name: diagramme
+   *     description: Gestion des diagrammes
+   */
+  app.use("/diagramme", router);
 };

@@ -31,6 +31,7 @@
 import * as go from "gojs";
 import { ref, onMounted } from "vue";
 import { useToast } from 'vue-toastification';
+import { api } from '@/helpers/api'
 
 export default {
 setup() {
@@ -175,12 +176,24 @@ const onNodeDoubleClick = (node) => {
 };
 
 // Exporter le diagramme en JSON
-const exportDiagram = () => {
+const exportDiagram = async () => {
   const json = diagram.model.toJson();
-  console.log("Diagramme exporté en JSON :", json);
-  alert("Le diagramme a été exporté. Vérifiez la console.");
-};
+  try {
+    const response = await api.post('/diagramme/add', { diagram: json });
 
+    if (response.status !== 200) {
+      console.log('Erreur lors de la sauvegarde du diagramme dans l\'API.', 'error');
+      return false;
+    }
+
+    console.log('Diagramme sauvegardé avec succès dans l\'API !', 'success');
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la requête API :', error);
+    console.log(`Erreur lors de la requête API : ${error}`, 'error');
+    return false;
+  }
+};
 // Importer un diagramme à partir d'un JSON
 const importDiagram = (json) => {
   try {
