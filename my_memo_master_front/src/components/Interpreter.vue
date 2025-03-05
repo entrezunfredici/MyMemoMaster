@@ -65,7 +65,9 @@ export default {
         .replace(/(\S+)\^(\S+)/g, '$1<i style="vertical-align: super; font-size: 0.75em;">$2</i>')
 
         // Indice : ┤_┤
-        .replace(/([a-zA-Z0-9]+)_([a-zA-Z0-9]+)/g, '$1<sub>$2</sub>')
+        .replace(/([a-zA-Z0-9]+)_\((.*?)\)/g, (_, base, sub) => {
+          return `${base}<sub>${sub.replace(/,/g, '')}</sub>`
+        })
 
         // Intégrale : ∫_┤^┤(┤)
         .replace(
@@ -92,13 +94,19 @@ export default {
         // Dérivée simple : ̇ ┤
         .replace(
           /̇(\S+)/g,
-          '<span style="position: relative; display: inline-block; text-align: center;"><span>$1</span><span style="position: absolute; top: -0.7em; left: 50%; transform: translateX(-50%); font-size: 0.75em;">˙</span></span>'
+          '<span style="position: relative; display: inline-block; text-align: center;">' +
+            '<span>$1</span>' +
+            '<span style="position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%); font-size: 0.75em;">˙</span>' +
+            '</span>'
         )
 
         // Double dérivée : ̈ ┤
         .replace(
           /̈(\S+)/g,
-          '<span style="position: relative; display: inline-block; text-align: center;"><span>$1</span><span style="position: absolute; top: -0.7em; left: 50%; transform: translateX(-50%); font-size: 0.75em; letter-spacing: -0.1em;">¨</span></span>'
+          '<span style="position: relative; display: inline-block; text-align: center;">' +
+            '<span>$1</span>' +
+            '<span style="position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%); font-size: 0.75em; letter-spacing: -0.1em;">¨</span>' +
+            '</span>'
         )
 
         // Inverse : ̅ ┤
@@ -110,7 +118,10 @@ export default {
         // Vecteur : widevec( ┤ )
         .replace(
           /widevec\((.*?)\)/g,
-          '<span style="display: inline-block; position: relative;"><span>$1</span><span style="position: absolute; top: -1em; left: 0; right: 0; font-size: 0.8em; font-weight: bold;">→</span></span>'
+          '<span style="display: inline-block; position: relative; text-align: center;">' +
+            '<span style="text-decoration: none;">$1</span>' +
+            '<span style="position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%); font-size: 0.8em; font-weight: bold;">→</span>' +
+            '</span>'
         )
 
         // Racine n-ième : nsqrt( ┤ )
