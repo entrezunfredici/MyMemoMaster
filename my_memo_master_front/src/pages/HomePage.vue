@@ -200,7 +200,7 @@
 
       <!-- Affichage du résultat interprété -->
       <h3>Résultat :</h3>
-      <Interpreter :content="userInput" />
+      <Interpreter :content="interpretedContent" />
     </section>
   </div>
 </template>
@@ -210,41 +210,14 @@ import DiagramTest from '@/components/DiagramTestComponent.vue'
 import Button from '@/components/ButtonComponent.vue'
 import Dropdown from '@/components/DropdownComponent.vue'
 import Interpreter from '@/components/Interpreter.vue'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 // Texte saisi par l'utilisateur
-const userInput = ref(`
-<text bold color:red>Texte de test</text>
-sqrt(a^2 + b^2)
+const userInput = ref('')
 
-nsqrt(3,x)
-
-mattrix([1,2,3],[4,5,6],[7,8,9])
-
-3over5
-
-(a+b)^2
-
-a_1
-
-e^x
-
-ln(a+b)
-
-widevec(v)
-
-∫_0^1(f(x))dx
-
-∮_C(f(x))dx
-
-∯_S(f(x))dx
-
-||a+b||
-
-|c-d|
-
-⌊e⌋
-`)
+const interpretedContent = computed(() => {
+  return userInput.value
+})
 </script>
 
 <style scoped>
