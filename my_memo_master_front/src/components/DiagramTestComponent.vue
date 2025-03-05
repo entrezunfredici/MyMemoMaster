@@ -14,6 +14,7 @@
     </div>
 
 <button @click="exportDiagram">Exporter en JSON</button>
+<button @click="exportDiagramBD">Exporter en Base de donnée</button>
 
 <!-- Importer un fichier JSON -->
 <input type="file" @change="loadJsonFile" />
@@ -194,6 +195,29 @@ const exportDiagram = async () => {
     return false;
   }
 };
+
+const exportDiagramBD = async() =>{
+  const json = diagram.model.toJson();
+
+  const dataToSend = {
+    mmName: json.mmName || 'Nom par défaut', // Ajouter un nom pour le diagramme
+    mindMapJson: json, // L'objet JSON du diagramme
+    userId: 1, // Assurez-vous que vous avez un `userId` pour l'utilisateur connecté
+    idSubject: 1, // Assurez-vous que vous avez un `idSubject` pour le sujet concerné
+  };
+  try {
+    await api.post('diagramme/add', dataToSend);
+    console.log('Diagramme sauvegardé avec succès dans l\'API !', 'success');
+    return true;
+  } catch (error) {
+    console.log(api)
+    console.log(dataToSend);
+    // console.error('Erreur lors de la requête API :', error);
+    // console.log(`Erreur lors de la requête API : ${error}`, 'error');
+    return false;
+  }
+};
+
 // Importer un diagramme à partir d'un JSON
 const importDiagram = (json) => {
   try {
@@ -245,7 +269,7 @@ onMounted(() => {
   initializePalette();
 });
 
-return { diagramDiv,paletteDiv, inputRef,colorRef, addNode, exportDiagram, loadJsonFile ,addLinksChecked};
+return { diagramDiv,paletteDiv, inputRef,colorRef, addNode, exportDiagram, exportDiagramBD, loadJsonFile ,addLinksChecked};
 },
 };
 </script>
