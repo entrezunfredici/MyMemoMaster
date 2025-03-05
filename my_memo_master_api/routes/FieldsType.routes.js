@@ -2,14 +2,6 @@ const express = require("express");
 const fieldTypeController = require("../controllers/FieldsType.controller.js");
 
 const router = express.Router();
-
-/**
- * @swagger
- * tags:
- *   name: FieldsType
- *   description: Gestion des types de champs
- */
-
 /**
  * @swagger
  * /fieldstypes/all:
@@ -96,5 +88,11 @@ router.get("/:id", fieldTypeController.findOne);
 router.post("/add", fieldTypeController.create);
 
 module.exports = (app) => {
+  /**
+   * @swagger
+   * tags:
+   *   name: FieldsType
+   *   description: Gestion des types de champs
+   */
   app.use("/fieldstypes", router);
 };
