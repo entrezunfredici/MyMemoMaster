@@ -53,8 +53,12 @@ export default {
 
         // Fraction : ┤over┤
         .replace(
-          /(.*?)over(.*?)/g,
-          '<span style="display: inline-block; vertical-align: middle;">$1</span>/<span style="display: inline-block; vertical-align: middle;">$2</span>'
+          /(\d+)over(\d+)/g,
+          '<span style="display: inline-flex; flex-direction: column; align-items: center;">' +
+            '<span>$1</span>' +
+            '<span style="width: 100%; height: 1px; background-color: black; margin: 1px 0; display: block;"></span>' +
+            '<span>$2</span>' +
+            '</span>'
         )
 
         // Exposant : ┤^┤
