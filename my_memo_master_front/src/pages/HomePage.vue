@@ -189,13 +189,16 @@
       <DiagramTest />
     </section>
     <section>
-      <h2>Test de l'Interpréteur</h2>
-      <textarea
-        v-model="userInput"
-        placeholder="Écrivez votre contenu ici..."
-        rows="5"
-        cols="50"
-      ></textarea>
+      <h2>Symboles Disponibles</h2>
+      <!-- Utilisation du composant de la palette -->
+      <SymbolPalette @symbolDropped="addToInput" />
+    </section>
+    <section>
+      <h2>Interpréteur de Formules</h2>
+      <p>Déplacez un bloc dans la zone ci-dessous pour voir sa conversion.</p>
+
+      <!-- Zone d'interprétation -->
+      <textarea v-model="userInput" rows="5" cols="50"></textarea>
 
       <h3>Résultat :</h3>
       <Interpreter :content="interpretedContent" />
@@ -208,10 +211,13 @@ import DiagramTest from '@/components/DiagramTestComponent.vue'
 import Button from '@/components/ButtonComponent.vue'
 import Dropdown from '@/components/DropdownComponent.vue'
 import Interpreter from '@/components/Interpreter.vue'
+import SymbolPalette from '@/components/SymbolPalette.vue'
 import { ref, computed } from 'vue'
 
 const userInput = ref('')
-
+const addToInput = (formulaText) => {
+  userInput.value += ' ' + formulaText + '()'
+}
 const interpretedContent = computed(() => {
   return userInput.value
 })
