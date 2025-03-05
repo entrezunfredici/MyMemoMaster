@@ -1,20 +1,15 @@
-# Utilise l'image de base node:18-alpine
-FROM node:18-alpine
+# File my_memo_master_api/Dockerfile
 
-# Définit le répertoire de travail à /app
+FROM node:18
+
 WORKDIR /app
 
-# Copie les fichiers package.json et package-lock.json (ou yarn.lock)
 COPY package*.json ./
 
-# Installe les dépendances
-RUN npm ci
+RUN npm install
 
-# Copie tout le reste des fichiers de l'application dans le conteneur
-COPY . .
+COPY . ./
 
-# Expose le port sur lequel l'API va tourner (par défaut 3000)
 EXPOSE ${API_PORT}
 
-# Commande pour démarrer l'application
-CMD ["sh", "-c", "npm start && npm run seed "]
+CMD ["sh", "-c", "npm run start && npm run seed"]

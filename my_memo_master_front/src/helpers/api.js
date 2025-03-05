@@ -1,11 +1,11 @@
 import axios from 'axios'
-import { VITE_BACK_API_URL } from '@/config';
+import { VITE_API_URL } from '@/config';
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
 
 const axiosApi = axios.create({
-  baseURL: VITE_BACK_API_URL,
+  baseURL: VITE_API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

@@ -1,5 +1,5 @@
 const { LeitnerSystem } = require("../models/index");
-const { Op } = require("sequelize");
+const { LeitnerSystemsUsers } = require("../models/index");
 
 class LeitnerSystemService {
   async findAll() {

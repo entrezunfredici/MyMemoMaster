@@ -5,7 +5,8 @@ exports.findAll = async (req, res) => {
     const data = await subjectService.findAll();
     res.status(200).send(data);
   } catch (error) {
-    res.status(500).send({ message: error.message || "Une erreur s'est produite lors de la récupération des sujets.", });
+    console.error(error?.message || error);
+    res.status(500).send({ message: "Une erreur s'est produite lors de la récupération des sujets.", });
   }
 };
 
@@ -32,6 +33,7 @@ exports.create = async (req, res) => {
     const data = await subjectService.create({ name });
     res.status(201).send(data);
   } catch (error) {
+    console.error(error?.message || error);
     res.status(500).send({ message: "Erreur lors de la création du sujet." });
   }
 };
@@ -47,6 +49,7 @@ exports.update = async (req, res) => {
       res.status(200).send(updatedSubject);
     }
   } catch (error) {
+    console.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la mise à jour du sujet." });
@@ -64,6 +67,7 @@ exports.delete = async (req, res) => {
       res.status(200).send({ message: "Sujet supprimé avec succès." });
     }
   } catch (error) {
+    console.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la suppression du sujet." });

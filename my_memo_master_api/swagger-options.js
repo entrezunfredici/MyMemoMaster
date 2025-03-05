@@ -1,4 +1,4 @@
-module.exports = swaggerOptions = {
+const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
