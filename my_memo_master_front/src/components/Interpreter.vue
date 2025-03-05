@@ -23,8 +23,34 @@ export default {
     }
   },
   methods: {
+    checkUnitHomogeneity(expression) {
+      const units = ['m', 's', 'kg', 'J', 'N', 'Pa', 'W', 'V', 'A', 'Ω', 'Hz']
+      const unitPattern = /(\d+)\s*([a-zA-Z]+)/g
+
+      let lines = expression.split(/\n+/)
+
+      for (let line of lines) {
+        let matches = [...line.matchAll(unitPattern)]
+        let foundUnits = matches.map((match) => match[2])
+
+        if (foundUnits.length > 1) {
+          let uniqueUnits = [...new Set(foundUnits)]
+          if (uniqueUnits.length > 1) {
+            return `⚠️ Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
+          }
+        }
+      }
+
+      return null
+    },
     async parseContent() {
       let html = this.content
+
+      let unitError = this.checkUnitHomogeneity(html)
+      if (unitError) {
+        this.renderedContent = `<span style="color: red; font-weight: bold;">${unitError}</span>`
+        return
+      }
 
       html = html.replace(/<formula>(.*?)<\/formula>/gs, (match, formula) => formula) // Supprime le traitement des balises <formula>
 
