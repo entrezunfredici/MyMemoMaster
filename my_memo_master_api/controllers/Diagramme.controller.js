@@ -29,40 +29,92 @@ const DiagrammeService = require("../services/Diagramme.service.js");
     }
   };
 
-  exports.create = async (req, res) => {
-    try {
-      const { name } = req.body
-      const data = await DiagrammeService.create({name});
-      res.status(201).send(data);
-    } catch (error) {
-      res.status(500).send({
-        message: "Une erreur s'est produite lors de la création du diagramme.",
-      });
-    }
-  },
+exports.create = async (req, res) => {
+  try {
+    // Extraire les bonnes données du corps de la requête
+    const { mmName, mindMapJson, userId } = req.body;
 
-  exports.update = async (req, res) => {
-    try {
-      const updatedDiagramme = await DiagrammeService.update(
-        req.params.id,
-        req.body
-      );
-      res.status(200).json(updatedDiagramme);
-    } catch (error) {
-      res.status(500).send({
-        message: "Une erreur s'est produite lors de la modification du diagramme",
-      });
+    // Vérifier que tous les champs requis sont présents
+    if (!mmName || !mindMapJson || !userId) {
+      return res.status(400).json({ message: "Tous les champs (mmName, mindMapJson, userId) sont requis." });
     }
-  },
 
-  exports.delete = async (req, res) => {
-    try {
-      await DiagrammeService.delete(req.params.id);
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).send({
-        message: "Une erreur s'est produite lors de la suppression du diagramme",
+    // Insérer les données dans la base de données
+    const data = await DiagrammeService.create({ mmName, mindMapJson, userId });
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Erreur lors de la création du diagramme :", error);
+    res.status(500).json({
+      message: "Une erreur s'est produite lors de la création du diagramme.",
+      error: error.message
+    });
+  }
+};
+
+exports.update = async (req, res) => {
+  try {
+    // Vérifier que l'ID de la requête est valide
+    const { id } = req.params;
+    const { mmName, mindMapJson, userId } = req.body;
+
+    // Vérification des champs nécessaires
+    if (!mmName || !mindMapJson || !userId) {
+      return res.status(400).json({ message: "Tous les champs (mmName, mindMapJson, userId) sont requis." });
+    }
+
+    // Appeler le service pour mettre à jour les données
+    const updatedDiagramme = await DiagrammeService.update(id, {
+      mmName,
+      mindMapJson,
+      userId
+    });
+
+    // Si le diagramme n'a pas été trouvé et mis à jour, retourner une erreur
+    if (!updatedDiagramme) {
+      return res.status(404).json({
+        message: `Diagramme avec l'ID ${id} non trouvé ou déjà mis à jour.`
       });
     }
-  };
+
+    // Retourner le diagramme mis à jour
+    res.status(200).json(updatedDiagramme);
+  } catch (error) {
+    console.error("Erreur lors de la modification du diagramme :", error);
+    res.status(500).json({
+      message: "Une erreur s'est produite lors de la modification du diagramme.",
+      error: error.message
+    });
+  }
+};
+
+
+exports.delete = async (req, res) => {
+  try {
+    // Extraire l'ID du diagramme à supprimer
+    const { id } = req.params;
+
+    // Vérifier si le diagramme existe avant de tenter de le supprimer
+    const diagramme = await DiagrammeService.findById(id);
+
+    // Si le diagramme n'existe pas, renvoyer une erreur 404
+    if (!diagramme) {
+      return res.status(404).json({
+        message: `Diagramme avec l'ID ${id} non trouvé.`
+      });
+    }
+
+    // Appeler la méthode delete du service pour supprimer le diagramme
+    await DiagrammeService.delete(id);
+
+    // Répondre avec un code 204 pour indiquer que la suppression a réussi
+    res.status(204).send();
+  } catch (error) {
+    console.error("Erreur lors de la suppression du diagramme :", error);
+    res.status(500).json({
+      message: "Une erreur s'est produite lors de la suppression du diagramme.",
+      error: error.message
+    });
+  }
+};
 
