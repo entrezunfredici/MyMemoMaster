@@ -28,7 +28,7 @@ describe("TestService", () => {
       expect(Test.findAll).toHaveBeenCalledTimes(1);
       expect(tests).toEqual(mockTests);
     });
-  
+
     test("should retrieve a test by ID", async () => {
       const mockTest = { testId: 1, subjectId: 1, name: "Controle finale" };
       Test.findByPk.mockResolvedValue(mockTest);
@@ -38,7 +38,7 @@ describe("TestService", () => {
       expect(Test.findByPk).toHaveBeenCalledWith(1);
       expect(test).toEqual(mockTest);
     });
-  
+
     test("should create a new test", async () => {
       const mockTest = { testId: 3, subjectId: 1, name: "Controle m1" };
       Test.create.mockResolvedValue(mockTest);
@@ -46,6 +46,30 @@ describe("TestService", () => {
       const test = await TestService.create({ subjectId: 1, name: "Controle m1" });
   
       expect(Test.create).toHaveBeenCalledWith({ subjectId: 1, name: "Controle m1" });
+      expect(test).toEqual(mockTest);
+    });
+
+    test("should update a test", async () => {
+      const mockTest = { testId: 1, subjectId: 1, name: "Controle finale" };
+      Test.findByPk.mockResolvedValue(mockTest);
+      Test.update.mockResolvedValue([1]);
+  
+      const test = await TestService.update(1, { name: "Controle m1" });
+  
+      expect(Test.findByPk).toHaveBeenCalledWith(1);
+      expect(Test.update).toHaveBeenCalledWith({ name: "Controle m1" }, { where: { testId: 1 } });
+      expect(test).toEqual(mockTest);
+    });
+
+    test("should delete a test", async () => {
+      const mockTest = { testId: 1, subjectId: 1, name: "Controle finale" };
+      Test.findByPk.mockResolvedValue(mockTest);
+      Test.destroy.mockResolvedValue(1);
+  
+      const test = await TestService.delete(1);
+  
+      expect(Test.findByPk).toHaveBeenCalledWith(1);
+      expect(Test.destroy).toHaveBeenCalledWith({ where: { testId: 1 } });
       expect(test).toEqual(mockTest);
     });
 

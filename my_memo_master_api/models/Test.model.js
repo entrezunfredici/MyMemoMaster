@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-    return instance.define('Test', {
+    const Test = instance.define('Test', {
         testId: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
@@ -36,4 +36,13 @@ module.exports = (instance) => {
         createdAt: 'createdAt',
         timestamps: true,
     });
+
+    Test.associate = (models) => {
+        Test.belongsTo(models.Subject, {
+            foreignKey: 'subjectId',
+            as: 'subject',
+        });
+    };
+
+    return Test;
 };
