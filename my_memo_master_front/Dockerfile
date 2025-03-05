@@ -1,16 +1,17 @@
-FROM node:18-alpine
-
-# Set working directory
+# Step 1: Build the Vue.js app
+FROM node:18 AS builder
 WORKDIR /app
-
-# Copy package.json and install dependencies
 COPY package*.json ./
 RUN npm install
-
-# Copy the app code and build it
 COPY . .
 RUN npm run build
 
-# Use a simple server to serve the static files
-RUN npm install -g serve
-CMD ["serve", "-s", "dist", "-l", "80"]
+# Step 2: Use nginx to serve the built app
+FROM nginx:stable-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx server
+CMD ["nginx", "-g", "daemon off;"]

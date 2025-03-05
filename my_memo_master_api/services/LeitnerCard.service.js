@@ -32,7 +32,7 @@ class LeitnerCardService {
     return null;
   }
 
-  async correctResponse(cardId, responseId, responseTime) {
+  async correctResponse(cardId, responseId) {
     const card = await LeitnerCard.findByPk(cardId);
     const response = await Response.findByPk(responseId);
 

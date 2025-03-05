@@ -2,7 +2,7 @@
   <div class="flex min-h-screen">
     <aside class="flex flex-col items-center justify-center sticky top-0 h-screen mx-2 sm:mx-4 md:mx-6 lg:mx-8">
       <router-link to="/" class="my-6">
-        <img src="/logo/logo-full.svg" alt="Logo">
+        <img src="/logo/logo-full.svg" :alt="VITE_APP_NAME">
       </router-link>
       <nav class="flex flex-col items-center justify-between rounded-xl border-2 border-gray mb-4 p-2 w-20"
         style="height: calc(100% - 9rem);">
@@ -53,6 +53,7 @@ import MindmapIcon from '@/icons/MindmapIcon.vue'
 import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
 import { useRoute } from 'vue-router'
+import { VITE_APP_NAME } from '@/config';
 
 const route = useRoute()
 

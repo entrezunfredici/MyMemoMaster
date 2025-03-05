@@ -4,7 +4,7 @@ const routes = [
     name: 'home',
     component: () => import('../pages/HomePage.vue'),
     meta: {
-      title: 'Acceuil',
+      title: 'Accueil',
       private: true,
     },
   },

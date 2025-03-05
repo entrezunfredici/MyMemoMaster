@@ -1,3 +1,5 @@
+# File my_memo_master_api/Dockerfile
+
 FROM node:18
 
 WORKDIR /app
@@ -10,4 +12,4 @@ COPY . ./
 
 EXPOSE ${API_PORT}
 
-CMD ["sh", "-c", "npm start && npm run seed "]
+CMD ["sh", "-c", "npm run start && npm run seed"]
