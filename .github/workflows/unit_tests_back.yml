@@ -1,9 +1,9 @@
-name: tests back se lance sur les pokémons de type dev back
-
 on:
   push:
     branches:
       - 'dev_back_*'
+      # - '*devops*' # Add a branch to test the workflow
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -16,9 +16,20 @@ jobs:
       - name: API - Test
         working-directory: my_memo_master_api
         run: npm run test
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: API - Install dependencies
+        working-directory: my_memo_master_api
+        run: npm install
+      - name: API - Lint
+        working-directory: my_memo_master_api
+        run: npm run lint
   notify_failure:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, lint]
     if: failure()
     steps:
       - name: Send message to Discord
@@ -43,7 +54,7 @@ jobs:
 
   notify_success:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, lint]
     if: success()
     steps:
       - name: Send success message to Discord
