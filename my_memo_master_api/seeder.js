@@ -29,9 +29,9 @@ const seedDatabase = async () => {
     await db.instance.query("PRAGMA foreign_keys = OFF");
 
     // Désactiver les déclencheurs de clés étrangères pour les insertions
-    await db.instance.query('ALTER TABLE "User" DISABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "Role" DISABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "LeitnerSystem" DISABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "User" DISABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "Role" DISABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "LeitnerSystem" DISABLE TRIGGER ALL');
 
     const users = require("./seeds/User.seed.json");
     users.forEach((user) => {
@@ -59,9 +59,11 @@ const seedDatabase = async () => {
     console.log("LeitnerCards table seeded successfully");
 
     // Réactiver les déclencheurs de clés étrangères
-    await db.instance.query('ALTER TABLE "User" ENABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "LeitnerSystem" ENABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "User" ENABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "LeitnerSystem" ENABLE TRIGGER ALL');
+
+    await db.instance.query("PRAGMA foreign_keys = ON");
 
     console.log("Sample data inserted successfully");
   } catch (error) {
@@ -89,7 +91,7 @@ const checkSeed = async () => {
 
 (async () => {
   try {
-    await listTables();
+    // await listTables();
     await seedDatabase();
     await checkSeed();
     console.log("Data seeding completed");

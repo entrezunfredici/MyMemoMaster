@@ -18,6 +18,15 @@ const routes = [
     },
   },
   {
+    path: '/tutorials',
+    name: 'tutorials',
+    component: () => import('../pages/TutorialsPage.vue'),
+    meta: {
+      title: 'Tutoriels',
+      private: true,
+    },
+  },
+  {
     path: '/flashcards',
     name: 'flashcards',
     component: () => import('../pages/FlashcardsPage.vue'),

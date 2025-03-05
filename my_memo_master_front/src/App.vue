@@ -7,6 +7,10 @@
       <nav class="flex flex-col items-center justify-between rounded-xl border-2 border-gray mb-4 p-2 w-20"
         style="height: calc(100% - 9rem);">
         <div class="flex flex-col items-center gap-3 justify-center">
+          <router-link to="/tutorials"
+            :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+            <TutorialIcon class="size-8" />
+          </router-link>
           <router-link to="/mindmaps"
             :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <MindmapIcon class="size-8" />
@@ -50,6 +54,7 @@ import { RouterView } from 'vue-router'
 import ExercisesIcon from '@/icons/ExercisesIcon.vue'
 import FlashardIcon from '@/icons/FlashardIcon.vue'
 import MindmapIcon from '@/icons/MindmapIcon.vue'
+import TutorialIcon from '@/icons/TutorialIcon.vue'
 import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
 import { useRoute } from 'vue-router'
