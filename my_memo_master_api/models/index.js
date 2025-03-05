@@ -17,7 +17,9 @@ models.LeitnerBox = require("./LeitnerBox.model")(instance);
 models.Unit = require("./Unit.model")(instance);
 models.User = require("./User.model")(instance);
 models.Response = require("./Response.model")(instance);
-models.Question = requiere("./Question.model")(instance);
+models.Question = require("./Question.model")(instance);
+models.Test = require("./Test.model")(instance);
+
 
 // Associations
 Object.keys(models).forEach((modelName) => {

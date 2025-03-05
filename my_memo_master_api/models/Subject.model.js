@@ -30,6 +30,13 @@ module.exports = (instance) => {
       otherKey: "idSystem",
       as: "leitnerSystems",
     });
+
+    Subject.belongsToMany(models.Question, {
+      through: "questionSubject",
+      foreignKey: "idSubject",
+      otherKey: "idQuestion",
+      as: "question",
+    });
   };
 
   return Subject;

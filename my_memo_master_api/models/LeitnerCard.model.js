@@ -39,6 +39,11 @@ module.exports = (instance) => {
       as: "leitnerBox",
     });
 
+    LeitnerCard.belongsTo(models.Question, {
+      foreignKey: "idQuestion",
+      as: "question",
+    });
+
     LeitnerCard.belongsToMany(instance.models.LeitnerSystem, {
       through: "cardSystems",
       foreignKey: "idCard",
