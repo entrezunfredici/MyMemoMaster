@@ -7,6 +7,7 @@ class UserService {
   async findAll() {
     const users = await User.findAll();
     return users.map(user => {
+      // eslint-disable-next-line no-unused-vars
       const { password, ...userWithoutPassword } = user?.dataValues || user;
       return userWithoutPassword;
     });
@@ -17,6 +18,7 @@ class UserService {
       where: { email },
     });
     if (!user) return null;
+    // eslint-disable-next-line no-unused-vars
     const { password, ...userWithoutPassword } = user?.dataValues || user;
     return userWithoutPassword;
   }
@@ -24,6 +26,7 @@ class UserService {
   async findOne(userId) {
     const user = await User.findByPk(userId);
     if (!user) return null;
+    // eslint-disable-next-line no-unused-vars
     const { password, ...userWithoutPassword } = user?.dataValues || user;
     return userWithoutPassword;
   }
@@ -37,6 +40,7 @@ class UserService {
     const newUser = await User.create(user);
     if (!newUser) throw new Error('Erreur lors de la création de l\'utilisateur');
 
+    // eslint-disable-next-line no-unused-vars
     const { password, ...userWithoutPassword } = newUser?.dataValues || newUser;
     return userWithoutPassword;
   }

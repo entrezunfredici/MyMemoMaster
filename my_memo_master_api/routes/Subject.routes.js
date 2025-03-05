@@ -163,5 +163,5 @@ module.exports = (app) => {
    *   - name: Subjects
    *     description: Gestion des sujets
    */
-  app.use("/subjects", router);
+  app.use("/roles", authMiddleware, router);
 };

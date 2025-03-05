@@ -1,9 +1,9 @@
-version: "3.8"
+# File docker-compose.yml
 
 services:
   postgres:
     build:
-      context: ./localPostgres
+      context: ./postgres
       dockerfile: Dockerfile-postgres
     environment:
       POSTGRES_USER: ${PG_USER}
@@ -14,21 +14,23 @@ services:
     ports:
       - "${PG_PORT}:5432"
     networks:
-      - my_network
+      - my_memo_master_network
 
   pgadmin:
     build:
-      context: ./localPostgres
+      context: ./postgres
       dockerfile: Dockerfile-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD : ${PGADMIN_DEFAULT_PASSWORD}
     ports:
-      - "${PG_ADMIN_PORT}:80"
+      - "${PGADMIN_PORT}:80"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
     networks:
-      - my_network
+      - my_memo_master_network
 
   api:
     build:
@@ -36,38 +38,38 @@ services:
       dockerfile: Dockerfile
       args:
         - API_PORT=${API_PORT}
+    env_file:
+      - .env
     ports:
       - "${API_PORT}:${API_PORT}"
     volumes:
       - ./my_memo_master_api:/app
       - api-data:/app/data
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - API_PORT=${API_PORT}
       - PG_USER=${PG_USER}
       - PG_PASS=${PG_PASS}
       - PG_DB=${PG_DB}
       - PG_HOST=${PG_HOST}
       - PG_PORT=${PG_PORT}
-    command: sh -c "npm install && npm start && npm run seed"
+    depends_on:
+      - postgres
     networks:
-      - my_network
+      - my_memo_master_network
 
   front:
     build:
       context: ./my_memo_master_front
       dockerfile: Dockerfile
-      args:
-        - VITE_PORT=${VITE_PORT}
-    ports:
-      - "${VITE_PORT}:${VITE_PORT}"
-    environment:
-      - VITE_PORT=${VITE_PORT}
     volumes:
       - ./my_memo_master_front:/app
       - front-data:/app/data
+    ports:
+      - "5173:80"
+    restart: always
     networks:
-      - my_network
+      - my_memo_master_network
 
 volumes:
   api-data:
@@ -76,5 +78,5 @@ volumes:
   pgadmin-data:
 
 networks:
-  my_network:
+  my_memo_master_network:
     driver: bridge

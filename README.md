@@ -63,7 +63,7 @@ Avec docker-compose:
 
 ```sh
 cd MyMemoMaster
-docker-compose up
+docker-compose down ; docker-compose up --build
 ```
 
 A l'ancienne (comme la moutarde):

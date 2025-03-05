@@ -7,7 +7,7 @@ module.exports = {
       const result = await LeitnerSystemsUsersService.create(data);
       return res.status(201).json(result);
     } catch (error) {
-      console.error(error);
+      console.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },
@@ -17,7 +17,7 @@ module.exports = {
       const result = await LeitnerSystemsUsersService.findAll();
       return res.status(200).json(result);
     } catch (error) {
-      console.error(error);
+      console.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },
@@ -31,7 +31,7 @@ module.exports = {
       }
       return res.status(200).json(result);
     } catch (error) {
-      console.error(error);
+      console.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },
@@ -80,7 +80,7 @@ module.exports = {
         .status(200)
         .json({ message: "Relation supprimée avec succès" });
     } catch (error) {
-      console.error(error);
+      console.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },
