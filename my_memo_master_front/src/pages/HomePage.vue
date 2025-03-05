@@ -221,9 +221,9 @@ const interpretedContent = computed(() => {
 textarea {
   width: 100%;
   margin-bottom: 20px;
-  background-color: #f0f0f0;
+  background-color: white;
   color: #333333;
-  border: 1px solid #ccc;
+  border: 1px solid black;
   padding: 10px;
   font-size: 14px;
 }
