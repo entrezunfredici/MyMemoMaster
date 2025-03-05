@@ -1,0 +1,14 @@
+[
+    {
+        "idResponse": 1,
+        "content": "contenu",
+        "correction": false,
+        "idQuestion": 10
+    },
+    {
+        "idResponse": 2,
+        "content": "thecontent",
+        "correction": true,
+        "idQuestion": 5
+    }
+]

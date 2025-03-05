@@ -1,9 +1,8 @@
-name: tests front se lance sur les pokémons de type dev front
-
 on:
   push:
     branches:
       - 'dev_front_*'
+      # - '*devops*' # Add a branch to test the workflow
 
 jobs:
   test:
@@ -11,16 +10,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: API - Install dependencies
-        working-directory: my_memo_master_api
+      - name: Front - Install dependencies
+        working-directory: my_memo_master_front
         run: npm install
-      # - name: Front - Test
-      #   working-directory: my_memo_master_front
-      #   run: ng test
-
+      - name: Front - Test
+        working-directory: my_memo_master_front
+        run: npm run test
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Front - Install dependencies
+        working-directory: my_memo_master_front
+        run: npm install
+      - name: Front - Lint
+        working-directory: my_memo_master_front
+        run: npm run lint
   notify_failure:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, lint]
     if: failure()
     steps:
       - name: Send message to Discord
@@ -45,7 +54,7 @@ jobs:
 
   notify_success:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, lint]
     if: success()
     steps:
       - name: Send success message to Discord

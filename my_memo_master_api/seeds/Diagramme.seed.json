@@ -1,0 +1,30 @@
+{
+    "mmName": "Ma première MindMap",
+    "mindMapJson": {
+      "class": "GraphLinksModel",
+      "nodeDataArray": [
+        { "key": "Géographie", "color": "red", "location": "21.79998779296875 -182.89999389648438" },
+        { "key": "1939", "color": "green", "location": "17.79998779296875 -85.69999694824219" },
+        { "key": "Musique", "color": "blue", "location": "-216.20001220703125 -46.69999694824219" },
+        { "key": "Mondialisation", "color": "yellow", "location": "211.79998779296875 -240.49998474121094" },
+        { "key": "Livres", "color": "#ff0080", "location": "213.26142374915398 -5.088576250846032" },
+        { "key": "Francais", "color": "blue", "location": "-213.20001220703125 -212.87714944993422" },
+        { "key": "Histoire", "color": "blue", "location": "-213.20001220703125 -320.8771494499342" },
+        { "key": "1789", "color": "yellow", "location": "106.79998779296875 -439.8771494499342" }
+      ],
+      "linkDataArray": [
+        { "from": "Musique", "to": "1939" },
+        { "from": "Géographie", "to": "Mondialisation" },
+        { "from": "1939", "to": "Livres" },
+        { "from": "Mondialisation", "to": "Livres" },
+        { "from": "Francais", "to": "1939" },
+        { "from": "Histoire", "to": "1789" },
+        { "from": "1789", "to": "Géographie" },
+        { "from": -7, "to": "Francais" },
+        { "from": "Géographie", "to": "1789" }
+      ]
+    },
+    "userId": 1,
+    "idSubject": 0
+  }
+  

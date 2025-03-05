@@ -1,5 +1,6 @@
 const express = require("express");
 const subject = require("../controllers/Subject.controller.js");
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 const router = express.Router();
 
@@ -8,11 +9,10 @@ const router = express.Router();
  * /subjects/all:
  *   get:
  *     summary: Récupère tous les sujets
- *     tags:
- *       - Subjects
+ *     tags: [Subjects]
  *     responses:
  *       200:
- *         description: Liste de tous les sujets
+ *         description: Liste de tous les sujets récupérée avec succès.
  *         content:
  *           application/json:
  *             schema:
@@ -26,17 +26,8 @@ const router = express.Router();
  *                   name:
  *                     type: string
  *                     example: "Math"
- *                   mindMapId:
- *                     type: integer
- *                     example: 42
- *                   leitnerSystemId:
- *                     type: integer
- *                     example: 13
- *                   testId:
- *                     type: integer
- *                     example: 7
  *       500:
- *         description: Erreur interne du serveur
+ *         description: Erreur interne du serveur.
  */
 router.get("/all", subject.findAll);
 
@@ -45,18 +36,17 @@ router.get("/all", subject.findAll);
  * /subjects/{id}:
  *   get:
  *     summary: Récupère un sujet par son ID
- *     tags:
- *       - Subjects
+ *     tags: [Subjects]
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du sujet
+ *         description: ID du sujet à récupérer
  *         schema:
  *           type: integer
  *     responses:
  *       200:
- *         description: Sujet correspondant à l'ID
+ *         description: Sujet récupéré avec succès.
  *         content:
  *           application/json:
  *             schema:
@@ -68,19 +58,10 @@ router.get("/all", subject.findAll);
  *                 name:
  *                   type: string
  *                   example: "Math"
- *                 mindMapId:
- *                   type: integer
- *                   example: 42
- *                 leitnerSystemId:
- *                   type: integer
- *                   example: 13
- *                 testId:
- *                   type: integer
- *                   example: 7
  *       404:
- *         description: Sujet non trouvé
+ *         description: Sujet non trouvé.
  *       500:
- *         description: Erreur interne du serveur
+ *         description: Erreur interne du serveur.
  */
 router.get("/:id", subject.findOne);
 
@@ -89,8 +70,7 @@ router.get("/:id", subject.findOne);
  * /subjects/add:
  *   post:
  *     summary: Ajoute un nouveau sujet
- *     tags:
- *       - Subjects
+ *     tags: [Subjects]
  *     requestBody:
  *       required: true
  *       content:
@@ -101,31 +81,87 @@ router.get("/:id", subject.findOne);
  *               name:
  *                 type: string
  *                 example: "Math"
- *               mindMapId:
- *                 type: integer
- *                 example: 42
- *               leitnerSystemId:
- *                 type: integer
- *                 example: 13
- *               testId:
- *                 type: integer
- *                 example: 7
  *     responses:
  *       201:
- *         description: Sujet créé avec succès
- *       400:
- *         description: Requête invalide
+ *         description: Sujet créé avec succès.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 1
+ *                 name:
+ *                   type: string
+ *                   example: "Math"
  *       500:
- *         description: Erreur interne du serveur
+ *         description: Erreur interne du serveur.
  */
 router.post("/add", subject.create);
 
+/**
+ * @swagger
+ * /subjects/{id}:
+ *   put:
+ *     summary: Met à jour un sujet existant
+ *     tags: [Subjects]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID du sujet à mettre à jour
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Updated Subject Name"
+ *     responses:
+ *       200:
+ *         description: Sujet mis à jour avec succès.
+ *       404:
+ *         description: Sujet non trouvé.
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
+router.put("/:id", subject.update);
+
+/**
+ * @swagger
+ * /subjects/{id}:
+ *   delete:
+ *     summary: Supprime un sujet par son ID
+ *     tags: [Subjects]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID du sujet à supprimer
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Sujet supprimé avec succès.
+ *       404:
+ *         description: Sujet non trouvé.
+ *       500:
+ *         description: Erreur interne du serveur.
+ */
+router.delete("/:id", subject.delete);
+
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Subjects
-     *     description: Gestion des sujets
-     */
-    app.use("/subjects", router);
+  /**
+   * @swagger
+   * tags:
+   *   - name: Subjects
+   *     description: Gestion des sujets
+   */
+  app.use("/roles", authMiddleware, router);
 };

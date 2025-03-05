@@ -1,24 +1,35 @@
 const { Sequelize } = require("sequelize");
-const dbConfig = require("../db.config");
+const dbmsConfig = require("../config/dbms.config");
+const dbConfig = require("../config/db.config");
 
 // Création de l'instance Sequelize
-const instance = new Sequelize({
-  dialect: dbConfig.dialect,
-  storage: dbConfig.storage,
-});
+const instance = new Sequelize(process.env.ENVIRONMENT === "prod" ? dbmsConfig : dbConfig);
 
 // Models
-const Role = require("./Role.model")(instance);
-const Subject = require("./Subject.model")(instance);
-const Test = require("./Test.model")(instance);
+const models = {};
+models.Role = require("./Role.model")(instance);
+models.Subject = require("./Subject.model")(instance);
+models.LeitnerSystem = require("./LeitnerSystem.model")(instance);
+models.LeitnerSystemsUsers = require("./leitnerSystemsUsers.model")(instance);
+models.LeitnerCard = require("./LeitnerCard.model")(instance);
+models.LeitnerBox = require("./LeitnerBox.model")(instance);
+models.Unit = require("./Unit.model")(instance);
+models.User = require("./User.model")(instance);
+models.Response = require("./Response.model")(instance);
+models.Fields = require("./Fields.model")(instance);
+models.FieldsType = require("./FieldsType.model")(instance);
+models.Diagramme = require("./diagramme.model")(instance);
+models.Subject = require("./Subject.model")(instance);
+models.Test = require("./Test.model")(instance);
 
 // Associations
-Subject.hasMany(Test, { foreignKey: 'subjectId' });
-Test.belongsTo(Subject, { foreignKey: 'subjectId' });
+Object.keys(models).forEach((modelName) => {
+  if (models[modelName].associate) {
+    models[modelName].associate(models);
+  }
+});
 
 module.exports = {
   instance,
-  Role,
-  Subject,
-  Test,
+  ...models,
 };

@@ -1,23 +1,17 @@
-# Utilise une image de base node:18-alpine
-FROM node:18-alpine
-
-# Définit le répertoire de travail
+# Step 1: Build the Vue.js app
+FROM node:18 AS builder
 WORKDIR /app
-
-# Installe les dépendances nécessaires pour Alpine
-RUN apk add --no-cache bash git
-
-# Copie les fichiers package.json et package-lock.json
 COPY package*.json ./
-
-# Installe les dépendances
-RUN npm ci
-
-# Copie tout le reste des fichiers de l'application
+RUN npm install
 COPY . .
+RUN npm run build
 
-# Expose le port sur lequel Vite va tourner
-EXPOSE ${VITE_PORT}
+# Step 2: Use nginx to serve the built app
+FROM nginx:stable-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Commande pour démarrer l'application avec Vite
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Expose port 80
+EXPOSE 80
+
+# Start nginx server
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,46 +1,69 @@
-:root {
-    --primary: #a6fa76;
-    --light: #ffffff;
-    --dark: #000000;
+/* ! THIS FILE IS MEANT TO SET THE BASE STYLES FOR THE WHOLE APPLICATION */
+/* ! DONT WRITE ANY STYLES OR COMPONENT SPECIFIC STYLES HERE */
 
-    --success-light: #34d399;
+/* App theme */
+:root {
+    /* Theme colors */
+    --primary: #1E3BA1;
+    --light-primary: #D5DAED;
+    --secondary: #FA4238;
+    --light-secondary: #FDC7C4;
+    --light: #FDF7FF;
+    --gray: #d5daed;
+    --dark: #101f56;
+    /* Other colors */
     --success: #10b981;
-    --success-dark: #047857;
-    --warning-light: #fbbf24;
     --warning: #f59e0b;
-    --warning-dark: #d97706;
-    --danger-light: #ef4444;
     --danger: #dc2626;
-    --danger-dark: #991b1b;
 }
 
-/* Overload vue-toastification stuff */
+/* Vue-toastification overrides */
 .Vue-Toastification__toast {
-    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2) !important;
-    font-family: "Poppins", "Roboto", sans-serif !important;
-    border: solid 2px transparent !important;
-    border-radius: 1rem !important;
+    font-family: "Roboto", sans-serif !important;
+    border-radius: 0.75rem !important;
 }
 
 .Vue-Toastification__toast--info {
-    background-color: var(--gray) !important;
-    color: var(--light) !important;
+    background-color: var(--blue) !important;
+    color: var(--ivory) !important;
 }
 
 .Vue-Toastification__toast--success {
     background-color: var(--success) !important;
-    color: var(--light) !important;
+    color: var(--ivory) !important;
 }
 
 .Vue-Toastification__toast--warning {
     background-color: var(--warning) !important;
-    color: var(--light) !important;
+    color: var(--ivory) !important;
 }
 
 .Vue-Toastification__toast--error {
     background-color: var(--danger) !important;
-    color: var(--light) !important;
+    color: var(--ivory) !important;
 }
+
+/* Fonts */
+
+@font-face {
+    font-family: 'neue-haas-grotesk';
+    src: url('/fonts/neue-haas-grotesk/NHaasGroteskDSPro-75Bd.otf') format('opentype');
+}
+
+.neue-haas-grotesk-font {
+    font-family: 'neue-haas-grotesk';
+}
+
+@font-face {
+    font-family: 'compita-medium';
+    src: url('/fonts/compita/Fontspring-DEMO-compita-medium.otf') format('opentype');
+}
+
+.compita-medium-font {
+    font-family: 'compita-medium';
+}
+
+/* Bases styles */
 
 *,
 *::before,
@@ -56,11 +79,11 @@ body {
     min-height: 100vh;
     transition: color 0.5s, background-color 0.5s;
     line-height: 1.6;
-    font-family: "Poppins", "Roboto", sans-serif;
+    font-family: "compita-medium-font", "Roboto", sans-serif;
     font-size: 15px;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    color: var(--light);
-    background: var(--dark);
+    color: var(--dark);
+    background: var(--light);
 }

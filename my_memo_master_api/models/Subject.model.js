@@ -1,47 +1,36 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-  return instance.define(
+  const Subject = instance.define(
     "Subject",
     {
-      subjectId: {
+      idSubject: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
       },
       name: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(50),
         allowNull: false,
-      },
-      mindMapId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      leitnerSystemId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      testId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      updatedAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
-      },
-      createdAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
       },
     },
     {
       tableName: "Subject",
-      updatedAt: 'updatedAt',
-      createdAt: 'createdAt',
+      updatedAt: "updatedAt",
+      createdAt: "createdAt",
       timestamps: false,
     }
   );
+
+  Subject.associate = (models) => {
+    Subject.belongsToMany(models.LeitnerSystem, {
+      through: "systemSubject",
+      foreignKey: "idSubject",
+      otherKey: "idSystem",
+      as: "leitnerSystems",
+    });
+  };
+
+  return Subject;
 };

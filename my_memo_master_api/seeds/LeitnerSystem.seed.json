@@ -1,0 +1,23 @@
+[
+  {
+    "idSystem": 1,
+    "sujet": ["Chapitre 1", "Chapitre 2"],
+    "name": "Système Leitner Mathématiques",
+    "idUser": 1,
+    "idMindMap": 10
+  },
+  {
+    "idSystem": 2,
+    "sujet": ["Section A", "Section B"],
+    "name": "Système Leitner Physique",
+    "idUser": 2,
+    "idMindMap": 11
+  },
+  {
+    "idSystem": 3,
+    "sujet": ["Module 1", "Module 2"],
+    "name": "Système Leitner Chimie",
+    "idUser": 3,
+    "idMindMap": null
+  }
+]
