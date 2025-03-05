@@ -1,5 +1,5 @@
 const { Fields } = require("../../models/index");
-const FieldsService = require("../../services/fields.service");
+const FieldsService = require("../../services/Fields.service");
 
 jest.mock("../../models/index", () => ({
   Fields: {

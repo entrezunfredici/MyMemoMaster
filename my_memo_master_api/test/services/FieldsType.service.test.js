@@ -1,5 +1,5 @@
 const { FieldType } = require("../../models/index");
-const FieldTypeService = require("../../services/fieldsType.service");
+const FieldTypeService = require("../../services/FieldsType.service");
 
 jest.mock("../../models/index", () => ({
   FieldType: {
