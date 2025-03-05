@@ -150,10 +150,6 @@ export default {
         //Retour à la ligne
         .replace(/\n/g, '<br>')
 
-      // Parenthèses, crochets, accolades, etc. (|┤| ⌊┤⌋ ‖┤‖ (┤) {┤}) : tels quels
-
-      // Optionnel : Encapsuler dans un conteneur pour distinguer les formules transformées
-      // Ne pas encapsuler inutilement le contenu
       html = html
 
       html = html.replace(/<text(.*?)>(.*?)<\/text>/gs, (match, attributes, text) => {

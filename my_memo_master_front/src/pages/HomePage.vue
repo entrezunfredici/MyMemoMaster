@@ -190,7 +190,6 @@
     </section>
     <section>
       <h2>Test de l'Interpréteur</h2>
-      <!-- Zone de saisie pour tester -->
       <textarea
         v-model="userInput"
         placeholder="Écrivez votre contenu ici..."
@@ -198,7 +197,6 @@
         cols="50"
       ></textarea>
 
-      <!-- Affichage du résultat interprété -->
       <h3>Résultat :</h3>
       <Interpreter :content="interpretedContent" />
     </section>
@@ -212,7 +210,6 @@ import Dropdown from '@/components/DropdownComponent.vue'
 import Interpreter from '@/components/Interpreter.vue'
 import { ref, computed } from 'vue'
 
-// Texte saisi par l'utilisateur
 const userInput = ref('')
 
 const interpretedContent = computed(() => {
