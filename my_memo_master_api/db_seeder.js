@@ -43,6 +43,10 @@ const seedDatabase = async () => {
     await db.Subject.bulkCreate(subjects);
     console.log("Subjects table seeded successfully");
 
+    const diagrammes = require("./seeds/Diagramme.seed.json");
+    await db.Subject.bulkCreate(diagrammes);
+    console.log("diagrammes table seeded successfully");
+    
     await db.LeitnerSystem.bulkCreate(
       require("./seeds/LeitnerSystem.seed.json")
     );

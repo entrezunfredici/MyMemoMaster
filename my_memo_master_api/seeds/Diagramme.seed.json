@@ -1,0 +1,82 @@
+[
+    {
+        "idMindMap": 1,
+        "mmName": "MindMap 1",
+        "mindMapJson": {
+            "class": "GraphLinksModel",
+            "nodeDataArray": [
+                {
+                    "key": 1,
+                    "color": "green",
+                    "location": "-147.51236572265623 13.014752197265636"
+                }
+            ],
+            "linkDataArray": []
+        },
+        "idUser": 1
+    },
+    {
+        "idMindMap": 2,
+        "mmName": "MindMap 2",
+        "mindMapJson": {
+            "class": "GraphLinksModel",
+            "nodeDataArray": [
+                {
+                    "key": 2,
+                    "color": "red",
+                    "location": "-147.51236572265623 13.014752197265636"
+                }
+            ],
+            "linkDataArray": []
+        },
+        "idUser": 1
+    },
+    {
+        "idMindMap": 3,
+        "mmName": "MindMap 3",
+        "mindMapJson": {
+            "class": "GraphLinksModel",
+            "nodeDataArray": [
+                {
+                    "key": 3,
+                    "color": "blue",
+                    "location": "-147.51236572265623 13.014752197265636"
+                }
+            ],
+            "linkDataArray": []
+        },
+        "idUser": 1
+    },
+    {
+        "idMindMap": 4,
+        "mmName": "MindMap 4",
+        "mindMapJson": {
+            "class": "GraphLinksModel",
+            "nodeDataArray": [
+                {
+                    "key": 4,
+                    "color": "black",
+                    "location": "-147.51236572265623 13.014752197265636"
+                }
+            ],
+            "linkDataArray": []
+        },
+        "idUser": 1
+    },
+    {
+        "idMindMap": 5,
+        "mmName": "MindMap 5",
+        "mindMapJson": {
+            "class": "GraphLinksModel",
+            "nodeDataArray": [
+                {
+                    "key": 5,
+                    "color": "white",
+                    "location": "-147.51236572265623 13.014752197265636"
+                }
+            ],
+            "linkDataArray": []
+        },
+        "idUser": 1
+    }
+]
