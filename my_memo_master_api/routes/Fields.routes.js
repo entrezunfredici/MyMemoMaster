@@ -1,5 +1,5 @@
 const express = require("express");
-const fieldController = require("../controllers/Field.controller.js");
+const fieldController = require("../controllers/Fields.controller.js");
 
 const router = express.Router();
 

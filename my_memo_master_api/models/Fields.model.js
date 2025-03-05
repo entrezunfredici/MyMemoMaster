@@ -22,7 +22,7 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: "units",
+          model: "Units",
           key: "idUnit",
         },
         onDelete: "SET NULL",
@@ -32,7 +32,7 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: "fieldsType",
+          model: "FieldsType",
           key: "idType",
         },
         onDelete: "SET NULL",
@@ -44,12 +44,12 @@ module.exports = (instance) => {
 
   //Associations
   Fields.associate = (models) => {
-    Fields.belongsTo(models.fieldsType, {
+    Fields.belongsTo(models.FieldsType, {
       foreignKey: "idType",
       as: "fieldType",
     });
-    Fields.belongsTo(models.units, {
-      foreignKey: "idUnit",
+    Fields.belongsTo(models.Unit, {
+      foreignKey: "idUnits",
       as: "units",
     });
   };
