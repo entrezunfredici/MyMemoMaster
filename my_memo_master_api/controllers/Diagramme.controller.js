@@ -32,15 +32,15 @@ const DiagrammeService = require("../services/Diagramme.service.js");
 exports.create = async (req, res) => {
   try {
     // Extraire les bonnes données du corps de la requête
-    const { mmName, mindMapJson, userId } = req.body;
+    const { mmName, mindMapJson, userId, idSubject } = req.body;
 
     // Vérifier que tous les champs requis sont présents
-    if (!mmName || !mindMapJson || !userId) {
-      return res.status(400).json({ message: "Tous les champs (mmName, mindMapJson, userId) sont requis." });
+    if (!mmName || !mindMapJson || !userId || !idSubject) {
+      return res.status(400).json({ message: "Tous les champs (mmName, mindMapJson, userId, idSubject) sont requis."+mmName+ mindMapJson+ userId+ idSubject });
     }
 
     // Insérer les données dans la base de données
-    const data = await DiagrammeService.create({ mmName, mindMapJson, userId });
+    const data = await DiagrammeService.create({ mmName, mindMapJson, userId, idSubject });
 
     res.status(201).json(data);
   } catch (error) {
