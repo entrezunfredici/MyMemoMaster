@@ -31,7 +31,7 @@
           </router-link>
           <router-link to="/settings"
             :class="[route?.name && route.name.includes('settings') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-            <SettingsIcon class="size-8" />
+              <SettingsIcon class="size-8" />
           </router-link>
         </div>
       </nav>
