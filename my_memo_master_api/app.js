@@ -12,7 +12,6 @@ const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
 const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
 const testRoutes = require("./routes/Test.routes");
-const bodyParser = require('body-parser');
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
 const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
 const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");

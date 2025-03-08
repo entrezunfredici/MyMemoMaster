@@ -19,7 +19,6 @@ models.Response = require("./Response.model")(instance);
 models.Fields = require("./Fields.model")(instance);
 models.FieldsType = require("./FieldsType.model")(instance);
 models.Diagramme = require("./diagramme.model")(instance);
-models.Subject = require("./Subject.model")(instance);
 models.Test = require("./Test.model")(instance);
 
 // Associations
