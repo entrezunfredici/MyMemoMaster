@@ -26,6 +26,7 @@ exports.findOne = async (req, res) => {
     } catch (error) {
         res.status(500).send({
             message: `Erreur lors de la récupération du test avec l'identifiant ${req.params.id}.`,
+            error: error.message,
         });
     }
 };
@@ -38,6 +39,7 @@ exports.create = async (req, res) => {
     } catch (error) {
         res.status(500).send({
             message: "Une erreur s'est produite lors de la création du test.",
+            error: error.message,
         });
     }
 };
@@ -52,6 +54,7 @@ exports.update = async (req, res) => {
     } catch (error) {
       res.status(500).send({
         message: "Une erreur s'est produite lors de la modification du test",
+        error: error.message,
       });
     }
   },
@@ -63,6 +66,7 @@ exports.update = async (req, res) => {
     } catch (error) {
       res.status(500).send({
         message: "Une erreur s'est produite lors de la suppression du test",
+        error: error.message,
       });
     }
   };
