@@ -11,6 +11,8 @@ const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
 // Importation des routes
 const subjectRoutes = require("./routes/Subject.routes");
 const roleRoutes = require("./routes/Role.routes");
+const testRoutes = require("./routes/Test.routes");
+const bodyParser = require('body-parser');
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
 const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
 const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
@@ -47,6 +49,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Routes
 subjectRoutes(app);
 roleRoutes(app);
+testRoutes(app);
 responseRoutes(app);
 unitRoutes(app);
 userRoutes(app);

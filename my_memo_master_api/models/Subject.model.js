@@ -30,7 +30,10 @@ module.exports = (instance) => {
       otherKey: "idSystem",
       as: "leitnerSystems",
     });
-  };
 
-  return Subject;
+    Subject.hasMany(models.Test, {
+      foreignKey: "subjectId",
+      as: "tests",
+    });
+  };
 };
