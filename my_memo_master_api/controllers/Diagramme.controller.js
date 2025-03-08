@@ -25,6 +25,7 @@ const DiagrammeService = require("../services/Diagramme.service.js");
     } catch (error) {
       res.status(500).send({
         message: `Erreur lors de la récupération du diagramme avec l'identifiant ${req.params.id}.`,
+        error: error.message
       });
     }
   };
