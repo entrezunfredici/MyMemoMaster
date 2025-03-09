@@ -119,24 +119,6 @@ jobs:
             docker-compose build
             docker-compose up -d
           EOF
-      - name: Deploy to VPS in prod 
-        if: github.ref == 'refs/heads/main'
-        run: |
-          # Sync files to VPS
-          rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomaster
-          
-          # Execute remote commands to build and run Docker Compose
-          ssh root@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-
-            # Navigate to project directory
-            cd /var/www/html/mymemomaster
-
-            # Stop, rebuild, and start services
-            docker-compose down
-            docker-compose build
-            docker-compose up -d
-          EOF
 
       - name: Deploy to VPS in preprod 
         if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/dev_cicd')
