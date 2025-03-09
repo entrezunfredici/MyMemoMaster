@@ -138,8 +138,8 @@ jobs:
             docker-compose up -d
           EOF
 
-      - name: Deploy to VPS in test env 
-        if: ((github.ref == 'refs/heads/dev') || (github.ref == 'refs/heads/dev_cicd_*'))
+      - name: Deploy to VPS in preprod 
+        if: ((github.ref == 'refs/heads/dev') || (github.ref == 'refs/heads/dev_cicd*'))
         run: |
           # Sync files to VPS
           rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
