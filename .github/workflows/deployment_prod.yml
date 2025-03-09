@@ -139,7 +139,7 @@ jobs:
           EOF
 
       - name: Deploy to VPS in preprod 
-        if: ((github.ref == 'refs/heads/dev') || (github.ref == 'refs/heads/dev_cicd*'))
+        if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/dev_cicd')
         run: |
           # Sync files to VPS
           rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
