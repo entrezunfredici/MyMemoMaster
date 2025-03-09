@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     # needs: [test, sonar_analysis]
-    if: success()
+    if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev_cicd') || startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/dev_back_*'))
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
