@@ -7,7 +7,6 @@ const bcrypt = require('bcrypt'); // Assurez-vous d'importer bcrypt pour hacher 
 
 let authToken;
 
-// Hook pour créer un utilisateur avant les tests
 Before(async function () {
   try {
     const user = await db.User.findOne({ where: { email: 'test@example.com' } });
@@ -61,7 +60,7 @@ When('I send a GET request to {string}', function (endpoint) {
     });
 });
 
-When('I send a POST request to {string} with body:', function (endpoint, body) {
+When('I send a POST request to {string} with the following body:', function (endpoint, body) {
   console.log('Sending POST request to:', endpoint); // Ajoutez ce log
   console.log('Request body:', body); // Ajoutez ce log
   return request(app)
@@ -72,9 +71,44 @@ When('I send a POST request to {string} with body:', function (endpoint, body) {
       this.response = response;
     })
     .catch(error => {
-      console.error('Error sending POST request:', error); // Ajoutez ce log
+      console.error('Error sending POST request:', error);
       throw error;
     });
+});
+
+When('I send a PUT request to {string} with the following body:', function (endpoint, body) {
+  console.log('Sending PUT request to:', endpoint); // Ajoutez ce log
+  console.log('Request body:', body); // Ajoutez ce log
+  return request(app)
+    .put(endpoint)
+    .set('Authorization', `Bearer ${authToken}`)
+    .send(JSON.parse(body))
+    .then(response => {
+      this.response = response;
+    })
+    .catch(error => {
+      console.error('Error sending PUT request:', error);
+      throw error;
+    });
+});
+
+When('I send a DELETE request to {string}', async function (url) {
+  try {
+    // Send the DELETE request
+    const response = await request(app)
+      .delete(url)
+      .set('Authorization', `Bearer ${authToken}`);
+
+    // Optionally, you can store the response for later use in other steps
+    this.response = response;
+
+    // Return the response status for assertions
+    return response.status;
+  } catch (error) {
+    // Handle the error
+    console.error('Error sending DELETE request:', error);
+    throw error;
+  }
 });
 
 Then('the response status should be {int}', function (statusCode) {
@@ -89,14 +123,19 @@ Then('the response status should start with {int}', function (beginStatusCode) {
   assert.strictEqual(this.response.status.toString().startsWith(beginStatusCode.toString()), true);
 });
 
-Then('the response should be a list of rights', function () {
+Then('the response should be a list of {string}', function (type) {
   console.log('Response body:', this.response.body); // Ajoutez ce log
-  assert.ok(Array.isArray(this.response.body.data));
+  assert.ok(Array.isArray(this.response.body), `The response should be a list of ${type}`);
+  this.response.body.forEach(item => {
+    assert.property(item, 'id', `Each ${type} item should have an 'id' property`);
+    // Ajoutez d'autres assertions selon les propriétés attendues des éléments de la liste
+  });
 });
 
-Then('the response should be a list of roles', function () {
+Then('the response should be a message indicating that the {string} was successfully deleted', function (type) {
+  // Assuming the response body contains a message field
   console.log('Response body:', this.response.body); // Ajoutez ce log
-  assert.ok(Array.isArray(this.response.body.data));
+  assert.strictEqual(this.response.body.message, `${type} successfully deleted`);
 });
 
 Then('the response should indicate success', function () {
