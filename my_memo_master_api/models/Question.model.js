@@ -27,6 +27,7 @@ module.exports = (instance) => {
       tableName: "Question",
       timestamps: false,
     },
+  );
 
     Question.associate = (models) => {
     
@@ -58,7 +59,7 @@ module.exports = (instance) => {
           as: "leitnerCard",
         });
       }
-  );
+ 
 
   return Question;
 
