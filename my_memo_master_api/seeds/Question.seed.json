@@ -1,0 +1,32 @@
+[
+    {
+        "idQuestion": 1,
+        "questionPosition": 1,
+        "statement": "Quelle est la capitale de la France ?",
+        "type": "géographie"
+    },
+    {
+        "idQuestion": 2,
+        "questionPosition": 2,
+        "statement": "Quelle est la capitale de l'Allemagne ?",
+        "type": "géographie"
+    },
+    {
+        "idQuestion": 3,
+        "questionPosition": 3,
+        "statement": "Quelle est la capitale de l'Espagne ?",
+        "type": "géographie"
+    },
+    {
+        "idQuestion": 4,
+        "questionPosition": 4,
+        "statement": "Quelle est la capitale de l'Italie ?",
+        "type": "géographie"
+    },
+    {
+        "idQuestion": 5,
+        "questionPosition": 5,
+        "statement": "Quelle est la capitale du Portugal ?",
+        "type": "géographie"
+    }
+]
