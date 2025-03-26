@@ -9,7 +9,7 @@ export default {
     colors: {
       /* Theme colors */
       primary: '#1E3BA1',
-      'light-primary': '#D5DAED',
+      'light-primary': '#828FBC',
       secondary: '#FA4238',
       'light-secondary': '#FDC7C4',
       light: '#FDF7FF',

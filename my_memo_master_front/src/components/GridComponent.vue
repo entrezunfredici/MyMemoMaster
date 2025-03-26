@@ -1,7 +1,7 @@
 <template>
   <div v-if="props?.items && props?.items.length > 0"
     :class="['grid my-2', props.maxHeight > 1 ? 'overflow-y-scroll' : '']"
-    :style="{ maxHeight: props.maxHeight > 1 ? `${props.maxHeight}px` : 'auto' }">
+    :style="[props.maxHeight > 1 ? ` max-height: ${props.maxHeight}px;` : 'max-height: auto;' ]">
     <div v-for="(item, index) in props.items" :key="index"
       :class="[props.clickables && !isMobile() ? 'hover:scale-105 transition-transform ease-in-out transform duration-200 cursor-pointer' : '']">
       <slot name="item" :item="item"></slot>
@@ -46,7 +46,7 @@ const props = defineProps({
 
 @media (min-width: 1536px) {
   .grid {
-    grid-gap: 3rem;
+    grid-gap: 1.5rem;
   }
 }
 
@@ -76,7 +76,7 @@ const props = defineProps({
 
 @media (max-width: 639px) {
   .grid {
-    grid-gap: 2.5rem;
+    grid-gap: 1.5rem;
   }
 }
 </style>
