@@ -12,4 +12,6 @@ COPY . ./
 
 EXPOSE ${API_PORT}
 
-CMD ["sh", "-c", "npm run start && npm run seed"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+CMD ["/entrypoint.sh"]
