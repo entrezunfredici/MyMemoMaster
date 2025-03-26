@@ -50,7 +50,7 @@ const seedDatabase = async () => {
     console.log("Units table seeded successfully");
 
     const diagrammes = require("./seeds/Diagramme.seed.json");
-    await db.Subject.bulkCreate(diagrammes);
+    await db.Diagramme.bulkCreate(diagrammes);
     console.log("diagrammes table seeded successfully");
 
     await db.LeitnerSystem.bulkCreate(
