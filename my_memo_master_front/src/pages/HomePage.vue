@@ -189,25 +189,7 @@
       <DiagramTest />
     </section>
     <section>
-      <h2>Symboles Disponibles</h2>
-      <!-- Utilisation du composant de la palette -->
-      <SymbolPalette @symbolClicked="addToInput" />
-    </section>
-    <section>
-      <h2>Interpréteur de Formules</h2>
-      <p>Déplacez un bloc dans la zone ci-dessous pour voir sa conversion.</p>
-
-      <!-- Zone d'interprétation -->
-      <textarea
-        v-model="userInput"
-        rows="5"
-        cols="50"
-        @keydown.delete="handleDelete"
-        @keydown.backspace="handleDelete"
-      ></textarea>
-
-      <h3>Résultat :</h3>
-      <Interpreter :content="interpretedContent" />
+      <Interpreter />
     </section>
   </div>
 </template>
@@ -217,7 +199,6 @@ import DiagramTest from '@/components/DiagramTestComponent.vue'
 import Button from '@/components/ButtonComponent.vue'
 import Dropdown from '@/components/DropdownComponent.vue'
 import Interpreter from '@/components/Interpreter.vue'
-import SymbolPalette from '@/components/SymbolPalette.vue'
 import { ref, computed } from 'vue'
 
 const userInput = ref('')
