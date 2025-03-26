@@ -2,7 +2,7 @@
   <Menu as="div" class="relative inline-block text-left py-2 w-full">
     <div>
       <button
-        class="flex justify-between w-full items-center justify-center border-2 border-gray rounded-md px-2 py-1 text-lg font-medium text-dark"
+        class="flex justify-between w-full items-center justify-center bg-[#FFF] border-2 border-gray rounded-lg px-2 py-1 text-lg font-medium text-dark"
         @click.stop="show = !show">
         {{ props.title }}
         <ChevronDownIcon
@@ -15,7 +15,7 @@
         enter-from="opacity-0 scale-95" enter-to="opacity-100 scale-100"
         leave="transition ease-in duration-75 transform" leave-from="opacity-100 scale-100"
         leave-to="opacity-0 scale-95"
-        class="origin-top-right absolute mt-2 w-full shadow-xl rounded-lg bg-light p-4 z-10">
+        class="bg-[#FFF] origin-top-right absolute mt-2 w-full shadow-xl rounded-lg bg-light p-4 z-10">
         <slot></slot>
       </TransitionChild>
     </TransitionRoot>
