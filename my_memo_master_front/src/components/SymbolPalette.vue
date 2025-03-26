@@ -58,8 +58,8 @@ const initializeDiagram = () => {
     go.Node,
     'Auto',
     {
-      movable: true,
-      dragComputation: (node) => onNodeDrop(node)
+      movable: false,
+      click: (e, node) => onNodeClick(node)
     },
     $(go.Shape, 'RoundedRectangle', { stroke: 'black', strokeWidth: 2, fill: 'white' }),
     $(go.TextBlock, { margin: 8 }, new go.Binding('text', 'key'))
@@ -67,20 +67,15 @@ const initializeDiagram = () => {
 
   // Création des blocs de symboles
   const nodeDataArray = Object.keys(formulaMapping).map((symbol) => ({
-    key: symbol
+    key: symbol,
+    formula: formulaMapping[symbol]
   }))
 
   diagram.model = new go.GraphLinksModel(nodeDataArray)
 }
 
-// Fonction déclenchée lorsqu'un bloc est déplacé
-const onNodeDrop = (node) => {
-  const symbol = node.data.key
-  const formulaText = formulaMapping[symbol]
-
-  if (formulaText) {
-    emit('symbolDropped', formulaText)
-  }
+const onNodeClick = (node) => {
+  emit('symbolClicked', node.data.formula)
 }
 
 // Exécuter l'initialisation après le montage du composant
