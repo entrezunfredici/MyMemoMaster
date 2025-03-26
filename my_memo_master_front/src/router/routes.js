@@ -38,7 +38,9 @@ const routes = [
   {
     path: '/profile',
     name: 'profile',
-    component: () => import('../pages/ProfilePage.vue'),
+    //component: () => import('../pages/ProfilePage.vue'),
+    component: () => import('../pages/InscriptionPage.vue'),
+    //component: () => import('../pages/ConnexionPage.vue'),
     meta: {
       title: 'Profile',
       private: true,
@@ -53,6 +55,7 @@ const routes = [
       private: true,
     },
   },
+
   // ==================== CATCH ====================
   {
     path: '/error-server',
@@ -70,6 +73,7 @@ const routes = [
       title: 'Error',
     },
   }
+  
 ]
 
 export default routes
