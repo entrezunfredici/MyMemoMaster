@@ -198,7 +198,13 @@
       <p>Déplacez un bloc dans la zone ci-dessous pour voir sa conversion.</p>
 
       <!-- Zone d'interprétation -->
-      <textarea v-model="userInput" rows="5" cols="50" @keydown.delete="handleDelete"></textarea>
+      <textarea
+        v-model="userInput"
+        rows="5"
+        cols="50"
+        @keydown.delete="handleDelete"
+        @keydown.backspace="handleDelete"
+      ></textarea>
 
       <h3>Résultat :</h3>
       <Interpreter :content="interpretedContent" />
@@ -225,7 +231,7 @@ const handleDelete = (event) => {
   const input = userInput.value
   const cursorPos = event.target.selectionStart
 
-  // Formules complexes littérales (exactes)
+  // 1. Formules complexes exactes (à adapter si tu en as d'autres)
   const complexFormulas = [
     '∫_┤^┤(┤)()',
     '∮_┤^┤(┤)()',
@@ -240,13 +246,19 @@ const handleDelete = (event) => {
     const start = cursorPos - formula.length
     const fragment = input.slice(start, cursorPos)
     if (fragment === formula) {
-      userInput.value = input.slice(0, start) + input.slice(cursorPos)
+      let startCut = start
+      let endCut = cursorPos
+
+      if (input[startCut - 1] === ' ') startCut -= 1
+      else if (input[endCut] === ' ') endCut += 1
+
+      userInput.value = input.slice(0, startCut) + input.slice(endCut)
       event.preventDefault()
       return
     }
   }
 
-  // Cas encadrants dynamiques : |x|, ‖x‖, ⌊x⌋, etc.
+  // 2. Délimiteurs (|x|, ‖x‖, ⌊x⌋) avec ()
   const delimiters = [
     { open: '⌊', close: '⌋' },
     { open: '|', close: '|' },
@@ -254,32 +266,42 @@ const handleDelete = (event) => {
   ]
 
   for (let { open, close } of delimiters) {
-    // On cherche les 2 symboles + ()
     const pattern = new RegExp(`\\${open}[^\\${open}\\${close}]*\\${close}\\(\\)`, 'g')
-
     const matches = [...input.matchAll(pattern)]
 
     for (let match of matches) {
       const matchStart = match.index
       const matchEnd = matchStart + match[0].length
-
       if (cursorPos === matchEnd) {
-        userInput.value = input.slice(0, matchStart) + input.slice(matchEnd)
+        let startCut = matchStart
+        let endCut = matchEnd
+
+        if (input[startCut - 1] === ' ') startCut -= 1
+        else if (input[endCut] === ' ') endCut += 1
+
+        userInput.value = input.slice(0, startCut) + input.slice(endCut)
         event.preventDefault()
         return
       }
     }
   }
 
-  // Formules simples type xyz()
+  // 3. Formules simples type abc()
   const simpleFormulaPattern = /[\ẇ̈^_+=\-*/→‖⌊⌋|∞∅ℕℤℚℝℂ≈≠≤≥]+\(.*?\)/g
-  let match
   const startToCursor = input.slice(0, cursorPos)
+  let match
+
   while ((match = simpleFormulaPattern.exec(startToCursor)) !== null) {
     const matchStart = match.index
-    const matchEnd = match.index + match[0].length
+    const matchEnd = matchStart + match[0].length
     if (cursorPos === matchEnd) {
-      userInput.value = input.slice(0, matchStart) + input.slice(matchEnd)
+      let startCut = matchStart
+      let endCut = matchEnd
+
+      if (input[startCut - 1] === ' ') startCut -= 1
+      else if (input[endCut] === ' ') endCut += 1
+
+      userInput.value = input.slice(0, startCut) + input.slice(endCut)
       event.preventDefault()
       return
     }
