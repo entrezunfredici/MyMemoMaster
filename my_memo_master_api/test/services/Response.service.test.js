@@ -1,4 +1,4 @@
-const { Response } = require("../../models/index");
+const { Question, Response } = require("../../models/index");
 const ResponseService = require("../../services/Response.service");
 
 jest.mock("../../models/index", () => ({
@@ -9,6 +9,9 @@ jest.mock("../../models/index", () => ({
     create: jest.fn(),
     update: jest.fn(),
     destroy: jest.fn(),
+  },
+  Question: {
+    findByPk: jest.fn(),
   },
 }));
 
@@ -91,10 +94,12 @@ describe("ResponseService", () => {
       idQuestion: 42,
     };
     const mockResponse = { idResponse: 3, ...newResponse };
+    Question.findByPk.mockResolvedValue({ idQuestion: 1, statement: "Sample question" });
     Response.create.mockResolvedValue(mockResponse);
 
     const response = await ResponseService.create(newResponse);
 
+    expect(Question.findByPk).toHaveBeenCalledWith(42);
     expect(Response.create).toHaveBeenCalledWith(newResponse);
     expect(response).toEqual(mockResponse);
   });
