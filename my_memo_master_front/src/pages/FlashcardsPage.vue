@@ -7,6 +7,10 @@
         </h4>
         Lorem ipsum dolor sit amet consectetur adipisicing elit. Dolor tenetur ex nulla cum, nisi dolorem, esse quam
         fuga atque facilis dicta maiores. Corrupti repudiandae ipsam debitis autem tempore quisquam veniam.
+        <Dropdown title="Sort">
+          test
+        </Dropdown>
+        <!-- <Select /> -->
       </div>
     </section>
     <section class="p-4 bg-light rounded-[7px]">
@@ -22,5 +26,7 @@
 
 <script setup>
 import Mindmap from '@/components/MindmapComponent.vue'
+import Dropdown from '@/components/DropdownComponent.vue'
+// import Select from '@/components/SelectComponent.vue'
 
 </script>
