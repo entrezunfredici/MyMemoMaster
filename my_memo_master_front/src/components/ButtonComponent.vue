@@ -1,6 +1,6 @@
 <template>
   <button
-    :class="['button', 'py-2.5 px-3 rounded-lg inline-flex items-center justify-center text-md font-medium', types[props.type]]"
+    :class="['button', 'py-2 px-3 rounded-lg text-lg inline-flex items-center justify-center text-md font-medium', types[props.type]]"
     :disabled="disabled || false" @click="callback">
     <slot></slot>
   </button>

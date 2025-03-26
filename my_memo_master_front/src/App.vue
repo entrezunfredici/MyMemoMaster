@@ -47,7 +47,7 @@
         <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
           route.meta.title }}</h1>
       </header>
-      <main class="mr-4">
+      <main class="mb-8 mr-4">
         <RouterView />
       </main>
     </div>
