@@ -1,6 +1,6 @@
 <template>
     <div class="flex flex-row items-center gap-2" @click="openLink()">
-        <div class="border-2 border-light-primary rounded-lg bg-gray flex items-center justify-center cursor-pointer aspect-video h-24 w-24">
+        <div class="border-2 border-light-primary rounded-lg bg-gray flex items-center justify-center cursor-pointer aspect-video h-28 w-28">
             <PlayIcon class="h-5 w-5 text-light-primary" />
         </div>
         <div class="p-4">

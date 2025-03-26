@@ -1,5 +1,5 @@
 <template>
-    <div :class="['flex items-center gap-2 rounded-full px-3 py-1 bg-primary', props.clickable ? 'cursor-pointer' : '']">
+    <div :class="['flex items-center gap-2 rounded-full px-2.5  bg-primary', props.clickable ? 'cursor-pointer' : '']">
         <span class="text-sm text-light">{{ props.text }}</span>
     </div>
 </template>
