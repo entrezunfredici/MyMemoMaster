@@ -1,7 +1,9 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-    const Test = instance.define('Test', {
+    const Test =  instance.define(
+        'Test',
+        {
         testId: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
@@ -35,12 +37,21 @@ module.exports = (instance) => {
         updatedAt: 'updatedAt',
         createdAt: 'createdAt',
         timestamps: true,
-    });
+    }
+    );
 
     Test.associate = (models) => {
+
+        Test.belongsToMany(models.Question, {
+            through: "testQuestions",
+            foreignKey: "idTest",
+            otherKey: "idQuestion",
+            as: "question",
+        });
+
         Test.belongsTo(models.Subject, {
-            foreignKey: 'subjectId',
-            as: 'subject',
+            foreignKey: "subjectId",
+            as: "subject",
         });
     };
 

@@ -5,14 +5,21 @@ const router = express.Router();
 
 /**
  * @swagger
- * /responses:
+ * /responses/all/{questionId}:
  *   get:
- *     summary: Récupère toutes les réponses
+ *     summary: Récupère toutes les réponses d'une question
  *     tags:
  *       - Responses
+ *     parameters:
+ *       - name: questionId
+ *         in: path
+ *         required: true
+ *         description: ID de la question
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
- *         description: Liste de toutes les réponses
+ *         description: Liste de toutes les réponses liées à la question
  *         content:
  *           application/json:
  *             schema:
@@ -32,10 +39,53 @@ const router = express.Router();
  *                   idQuestion:
  *                     type: integer
  *                     example: 42
+ *       404:
+ *         description: Question introuvable
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/", ResponseController.findAll);
+router.get("/all/:questionId", ResponseController.findAllByQuestion);
+
+/**
+ * @swagger
+ * /responses/correction/{questionId}:
+ *   get:
+ *     summary: Récupère la correction d'une question
+ *     tags:
+ *       - Responses
+ *     parameters:
+ *       - name: questionId
+ *         in: path
+ *         required: true
+ *         description: ID de la question
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: La correction de la question
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 idResponse:
+ *                   type: integer
+ *                   example: 1
+ *                 content:
+ *                   type: string
+ *                   example: "Correction exemple"
+ *                 correction:
+ *                   type: boolean
+ *                   example: true
+ *                 idQuestion:
+ *                   type: integer
+ *                   example: 42
+ *       404:
+ *         description: Aucune correction trouvée
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.get("/correction/:questionId", ResponseController.findCorrectionByQuestion);
 
 /**
  * @swagger
@@ -98,7 +148,7 @@ router.get("/:id", ResponseController.findOne);
  *               correction:
  *                 type: boolean
  *                 example: false
- *               idQuestion:
+ *               questionId:
  *                 type: integer
  *                 example: 42
  *     responses:
@@ -113,7 +163,7 @@ router.post("/add", ResponseController.create);
 
 /**
  * @swagger
- * /responses/{id}:
+ * /responses/edit/{id}:
  *   put:
  *     summary: Met à jour une réponse existante
  *     tags:
@@ -138,7 +188,7 @@ router.post("/add", ResponseController.create);
  *               correction:
  *                 type: boolean
  *                 example: true
- *               idQuestion:
+ *               questionId:
  *                 type: integer
  *                 example: 42
  *     responses:
@@ -151,7 +201,7 @@ router.post("/add", ResponseController.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", ResponseController.update);
+router.put("/edit/:id", ResponseController.update);
 
 /**
  * @swagger
@@ -168,7 +218,7 @@ router.put("/:id", ResponseController.update);
  *         schema:
  *           type: integer
  *     responses:
- *       200:
+ *       204:
  *         description: Réponse supprimée avec succès
  *       404:
  *         description: Réponse non trouvée
@@ -178,11 +228,11 @@ router.put("/:id", ResponseController.update);
 router.delete("/:id", ResponseController.delete);
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Responses
-     *     description: Gestion des réponses
-     */
-    app.use("/responses", router);
+  /**
+   * @swagger
+   * tags:
+   *   - name: Responses
+   *     description: Gestion des réponses
+   */
+  app.use("/responses", router);
 };

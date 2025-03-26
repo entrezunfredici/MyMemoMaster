@@ -3,11 +3,11 @@ const TestService = require("../../services/Test.service");
 
 jest.mock("../../models/index", () => ({
     Test: {
-        findAll: jest.fn(),
-        findByPk: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        destroy: jest.fn(),
+      findAll: jest.fn(),
+      findByPk: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      destroy: jest.fn(),
     },
 }));
 

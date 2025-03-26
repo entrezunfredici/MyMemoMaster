@@ -20,6 +20,7 @@ models.Fields = require("./Fields.model")(instance);
 models.FieldsType = require("./FieldsType.model")(instance);
 models.Diagramme = require("./diagramme.model")(instance);
 models.Test = require("./Test.model")(instance);
+models.Question = require("./Question.model")(instance);
 
 // Associations
 Object.keys(models).forEach((modelName) => {
