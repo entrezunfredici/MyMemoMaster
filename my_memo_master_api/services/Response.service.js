@@ -1,4 +1,4 @@
-const { Response } = require("../models/index");
+const {  Question, Response } = require("../models/index");
 
 class ResponseService  {
 

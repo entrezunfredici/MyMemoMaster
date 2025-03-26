@@ -62,5 +62,4 @@ module.exports = (instance) => {
 
   return Question;
 
-
 };

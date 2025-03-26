@@ -1,4 +1,4 @@
-const { Question, Test } = require("../models/index");
+const { Question, Test, Response, LeitnerCard } = require("../models/index");
 
 class QuestionService {
 
