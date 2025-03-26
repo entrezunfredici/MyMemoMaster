@@ -1,12 +1,20 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-    const Subject = instance.define('Subject', {
-        subjectId: {
+    const Test = instance.define('Test', {
+        testId: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
             allowNull: false,
             primaryKey: true,
+        },
+        subjectId: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'Subject', // nom du modèle référencé
+                key: 'subjectId'
+            },
         },
         name: {
             type: DataTypes.STRING(50),
@@ -22,26 +30,19 @@ module.exports = (instance) => {
             allowNull: false,
             defaultValue: DataTypes.NOW,
         },
-    }, {
-        tableName: 'Subject',
+    },{
+        tableName: 'Test',
         updatedAt: 'updatedAt',
         createdAt: 'createdAt',
         timestamps: true,
     });
 
-  Subject.associate = (models) => {
-    Subject.belongsToMany(models.LeitnerSystem, {
-      through: "systemSubject",
-      foreignKey: "idSubject",
-      otherKey: "idSystem",
-      as: "leitnerSystems",
-    });
+    Test.associate = (models) => {
+        Test.belongsTo(models.Subject, {
+            foreignKey: 'subjectId',
+            as: 'subject',
+        });
+    };
 
-    Subject.hasMany(models.Test, {
-      foreignKey: "subjectId",
-      as: "tests",
-    });
-  };
-
-  return Subject;
+    return Test;
 };

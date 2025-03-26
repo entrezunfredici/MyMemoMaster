@@ -1,8 +1,8 @@
-const { MindMap } = require("../../models/index");
-const MindMapService = require("../../services/MindMap.service");
+const { Diagramme } = require("../../models/index");
+const DiagrammeService = require("../../services/Diagramme.service");
 
 jest.mock("../../models/index", () => ({
-    MindMap: {
+    Diagramme: {
         findAll: jest.fn(),
         findByPk: jest.fn(),
         create: jest.fn(),
@@ -11,94 +11,94 @@ jest.mock("../../models/index", () => ({
     },
 }));
 
-describe("MindMapService", () => {
+describe("DiagrammeService", () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
     test("should retrieve all mind maps", async () => {
-        const mockMindMaps = [
-            { idMindMap: 1, mmName: "MindMap 1", mindMapJson: "{}", idUser: 1 },
-            { idMindMap: 2, mmName: "MindMap 2", mindMapJson: "{}", idUser: 2 },
+        const mockDiagrammes = [
+            { idDiagramme: 1, mmName: "Diagramme 1", DiagrammeJson: "{}", idUser: 1 },
+            { idDiagramme: 2, mmName: "Diagramme 2", DiagrammeJson: "{}", idUser: 2 },
         ];
-        MindMap.findAll.mockResolvedValue(mockMindMaps);
+        Diagramme.findAll.mockResolvedValue(mockDiagrammes);
 
-        const mindMaps = await MindMapService.findAll();
+        const diagrammes = await DiagrammeService.findAll();
 
-        expect(MindMap.findAll).toHaveBeenCalledTimes(1);
-        expect(mindMaps).toEqual(mockMindMaps);
+        expect(Diagramme.findAll).toHaveBeenCalledTimes(1);
+        expect(diagrammes).toEqual(mockDiagrammes);
     });
 
     test("should retrieve a mind map by ID", async () => {
-        const mockMindMap = { idMindMap: 1, mmName: "MindMap 1", mindMapJson: "{}", idUser: 1 };
-        MindMap.findByPk.mockResolvedValue(mockMindMap);
+        const mockDiagramme = { idDiagramme: 1, mmName: "Diagramme 1", DiagrammeJson: "{}", idUser: 1 };
+        Diagramme.findByPk.mockResolvedValue(mockDiagramme);
 
-        const mindMap = await MindMapService.findOne(1);
+        const diagramme = await DiagrammeService.findOne(1);
 
-        expect(MindMap.findByPk).toHaveBeenCalledWith(1);
-        expect(mindMap).toEqual(mockMindMap);
+        expect(Diagramme.findByPk).toHaveBeenCalledWith(1);
+        expect(diagramme).toEqual(mockDiagramme);
     });
 
     test("should create a new mind map", async () => {
-        const newMindMap = { mmName: "New MindMap", mindMapJson: "{}", idUser: 1 };
-        const mockMindMap = { idMindMap: 1, ...newMindMap };
-        MindMap.create.mockResolvedValue(mockMindMap);
+        const newDiagramme = { mmName: "New Diagramme", DiagrammeJson: "{}", idUser: 1 };
+        const mockDiagramme = { idDiagramme: 1, ...newDiagramme };
+        Diagramme.create.mockResolvedValue(mockDiagramme);
 
-        const mindMap = await MindMapService.create(newMindMap);
+        const createdDiagramme = await DiagrammeService.create(newDiagramme);
 
-        expect(MindMap.create).toHaveBeenCalledWith(newMindMap);
-        expect(mindMap).toEqual(mockMindMap);
+        expect(Diagramme.create).toHaveBeenCalledWith(newDiagramme);
+        expect(createdDiagramme).toEqual(mockDiagramme);
     });
 
     test("should update an existing mind map", async () => {
-        const mockMindMap = {
-            idMindMap: 1,
-            mmName: "Old MindMap",
-            mindMapJson: "{}",
+        const mockDiagramme = {
+            idDiagramme: 1,
+            mmName: "Old Diagramme",
+            DiagrammeJson: "{}",
             idUser: 1,
             update: jest.fn().mockImplementation(function (newData) {
                 Object.assign(this, newData);
                 return this;
             }),
         };
-        const updatedData = { mmName: "Updated MindMap", mindMapJson: "{}", idUser: 1 };
+        const updatedData = { mmName: "Updated Diagramme", DiagrammeJson: "{}", idUser: 1 };
 
-        MindMap.findByPk.mockResolvedValue(mockMindMap);
+        Diagramme.findByPk.mockResolvedValue(mockDiagramme);
 
-        const updatedMindMap = await MindMapService.update(1, updatedData);
+        const updatedDiagramme = await DiagrammeService.update(1, updatedData);
 
-        expect(MindMap.findByPk).toHaveBeenCalledWith(1);
-        expect(mockMindMap.update).toHaveBeenCalledWith(updatedData);
-        expect(updatedMindMap).toMatchObject({
-            idMindMap: 1,
-            mmName: "Updated MindMap",
-            mindMapJson: "{}",
+        expect(Diagramme.findByPk).toHaveBeenCalledWith(1);
+        expect(mockDiagramme.update).toHaveBeenCalledWith(updatedData);
+        expect(updatedDiagramme).toMatchObject({
+            idDiagramme: 1,
+            mmName: "Updated Diagramme",
+            DiagrammeJson: "{}",
             idUser: 1,
         });
     });
 
     test("should throw an error when updating a non-existing mind map", async () => {
-        MindMap.findByPk.mockResolvedValue(null);
+        Diagramme.findByPk.mockResolvedValue(null);
 
-        await expect(MindMapService.update(999, { mmName: "Non-existing MindMap" })).rejects.toThrow("MindMap not found");
-        expect(MindMap.findByPk).toHaveBeenCalledWith(999);
+        await expect(DiagrammeService.update(999, { mmName: "Non-existing Diagramme" })).rejects.toThrow("Diagramme not found");
+        expect(Diagramme.findByPk).toHaveBeenCalledWith(999);
     });
 
     test("should delete a mind map by ID", async () => {
-        MindMap.findByPk.mockResolvedValue({
+        Diagramme.findByPk.mockResolvedValue({
             destroy: jest.fn().mockResolvedValue(true),
         });
 
-        const result = await MindMapService.delete(1);
+        const result = await DiagrammeService.delete(1);
 
-        expect(MindMap.findByPk).toHaveBeenCalledWith(1);
+        expect(Diagramme.findByPk).toHaveBeenCalledWith(1);
         expect(result).toBe(true);
     });
 
     test("should throw an error when deleting a non-existing mind map", async () => {
-        MindMap.findByPk.mockResolvedValue(null);
+        Diagramme.findByPk.mockResolvedValue(null);
 
-        await expect(MindMapService.delete(999)).rejects.toThrow("MindMap not found");
-        expect(MindMap.findByPk).toHaveBeenCalledWith(999);
+        await expect(DiagrammeService.delete(999)).rejects.toThrow("Diagramme not found");
+        expect(Diagramme.findByPk).toHaveBeenCalledWith(999);
     });
 });
