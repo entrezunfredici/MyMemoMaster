@@ -62,6 +62,25 @@ const routes = [
       private: true,
     },
   },
+  // ==================== AUTH & ACCOUNT ====================
+  {
+    path: '/auth',
+    name: 'auth',
+    component: () => import('../pages/AuthPage.vue'),
+    meta: {
+      title: 'Authentification',
+      private: false,
+    },
+  },
+  {
+    path: '/account',
+    name: 'account',
+    component: () => import('../pages/AccountPage.vue'),
+    meta: {
+      title: 'Mon compte',
+      private: true,
+    },
+  },
   // ==================== CATCH ====================
   {
     path: '/error-server',
