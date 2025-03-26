@@ -2,7 +2,11 @@
 FROM node:18 AS builder
 WORKDIR /app
 COPY package*.json ./
+
+# Installe les dépendances
 RUN npm install
+
+# Copie tout le reste des fichiers de l'application
 COPY . .
 RUN npm run build
 
