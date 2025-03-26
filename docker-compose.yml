@@ -9,7 +9,6 @@ services:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASS}
       POSTGRES_DB: ${PG_DB}
-      PG_PORT: ${PG_PORT} 
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
@@ -37,23 +36,18 @@ services:
     build:
       context: ./my_memo_master_api
       dockerfile: Dockerfile
-      args:
-        - API_PORT=${API_PORT}
     env_file:
       - .env
     ports:
       - "${API_PORT}:${API_PORT}"
-    volumes:
-      - ./my_memo_master_api:/app
-      - api-data:/app/data
     environment:
       - NODE_ENV=production
       - API_PORT=${API_PORT}
       - PG_USER=${PG_USER}
       - PG_PASS=${PG_PASS}
       - PG_DB=${PG_DB}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
+      - PG_HOST=postgres  # Utilisation de 'postgres' comme hostname, pas une adresse IP
+      - PG_PORT=5432      # Toujours 5432 en interne dans le conteneur PostgreSQL
     depends_on:
       - postgres
     networks:
