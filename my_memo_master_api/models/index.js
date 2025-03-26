@@ -19,6 +19,8 @@ models.User = require("./User.model")(instance);
 models.Response = require("./Response.model")(instance);
 models.Fields = require("./Fields.model")(instance);
 models.FieldsType = require("./FieldsType.model")(instance);
+models.Tutorials = require("./Tutorials.model")(instance);
+
 
 // Associations
 Object.keys(models).forEach((modelName) => {
