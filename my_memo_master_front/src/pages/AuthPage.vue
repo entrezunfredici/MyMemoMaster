@@ -18,19 +18,19 @@ const authStore = useAuthStore()
 
 const tabs = ref({
   login: {
-    title: 'Login',
+    title: 'Se connecter',
     component: shallowRef(AuthLogin),
   },
   register: {
-    title: 'Register',
+    title: 'S\'inscrire',
     component: shallowRef(AuthRegister),
   },
   forgotPassword: {
-    title: 'Forgot Password ?',
+    title: 'Mot de passe oublié ?',
     component: shallowRef(AuthForgotPassword),
   },
   resetPassword: {
-    title: 'Reset your Password',
+    title: 'Réinitialiser votre mot de passe',
     component: shallowRef(AuthResetPassword),
   }
 })

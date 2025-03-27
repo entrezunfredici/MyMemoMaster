@@ -4,7 +4,7 @@
       enter-to="opacity-100 scale-100" leave="transition ease-in-out duration-300 transform"
       leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
       <span class="text-light text-sm">Password strength</span>
-      <div class="overflow-hidden h-4 my-2 flex rounded-full bg-gray-dark">
+      <div class="overflow-hidden h-4 my-2 flex rounded-full bg-gray">
         <div :style="`width: ${percentage}%`" :class="color"></div>
       </div>
     </TransitionChild>

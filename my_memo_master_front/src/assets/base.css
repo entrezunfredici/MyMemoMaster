@@ -15,6 +15,12 @@
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #dc2626;
+    /* Password colors */
+    --password-step-1: #dc2626;
+    --password-step-2: #dc7e26;
+    --password-step-3: #dcd926;
+    --password-step-4: #78dc26;
+    --password-step-5: #29af00;
 }
 
 /* Vue-toastification overrides */

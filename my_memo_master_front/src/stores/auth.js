@@ -77,7 +77,7 @@ export const useAuthStore = defineStore('auth', {
 
     async fetchUserInfos() {
 
-      await api.get(`user-infos/${this.user.userId}`).then(resp => {
+      await api.get(`uusers/ser-infos/${this.user.userId}`).then(resp => {
 
         if (resp.status !== 200) {
           notif.notify(resp.data.message, 'error')
@@ -99,7 +99,7 @@ export const useAuthStore = defineStore('auth', {
       delete userPayload.connectionToken
       delete userPayload.password
 
-      await api.put(`user-update/${this.user.userId}`, userPayload).then(resp => {
+      await api.put(`uusers/ser-update/${this.user.userId}`, userPayload).then(resp => {
 
         if (resp.status === 'error') {
           notif.notify(resp.data.message, 'error')
@@ -165,7 +165,7 @@ export const useAuthStore = defineStore('auth', {
 
     async deleteAccount() {
 
-      await api.del(`user-delete/${this.user.userId}`).then(resp => {
+      await api.del(`uusers/ser-delete/${this.user.userId}`).then(resp => {
 
         if (resp.status !== 200) {
           notif.notify(resp.data.message, 'error')
@@ -214,7 +214,7 @@ export const useAuthStore = defineStore('auth', {
         password,
       }
 
-      await api.post('register', user).then(resp => {
+      await api.post('users/register', user).then(resp => {
 
         if (resp.status !== 201) {
           notif.notify(resp.data.message, 'error')
@@ -250,7 +250,7 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
 
-      await api.post('login', { email, password }).then(resp => {
+      await api.post('users/login', { email, password }).then(resp => {
 
         if (resp.status !== 200) {
           notif.notify(resp.data.message, 'error')
