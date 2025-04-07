@@ -1,8 +1,13 @@
 <template>
-  <div class="rounded-lg border border-gray p-4 max-w-md mx-auto mt-8">
-    <h2 class="text-center text-light text-2xl font-semibold mt-4 mb-8">{{ tabs[authStore.authentication.tab].title }}
-    </h2>
-    <component :is="tabs[authStore.authentication.tab].component" />
+  <div class="grid place-items-center h-screen bg-light">
+    <section>
+      <img src="/personne-heureuse-et-faussement-epanoui.webp" alt="Image d'illustration" class="mx-auto mb-4" />
+    </section>  
+    <section>
+      <h2 class="text-center text-light text-2xl font-semibold mt-4 mb-8">{{ tabs[authStore.authentication.tab].title }}
+      </h2>
+      <component :is="tabs[authStore.authentication.tab].component" />
+    </section>  
   </div>
 </template>
 

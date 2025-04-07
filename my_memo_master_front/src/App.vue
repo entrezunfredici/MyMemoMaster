@@ -1,7 +1,7 @@
 <template>
   <!-- NO LAYOUT -->
-  <div v-if="route.name.includes('auth')" class="flex flex-1 min-h-screen">
-    <main class="mb-8 mr-4">
+  <div v-if="route.name.includes('auth')" >
+    <main>
       <RouterView />
     </main>
   </div>
