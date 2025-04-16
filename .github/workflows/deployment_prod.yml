@@ -33,8 +33,16 @@ jobs:
       - name: Send Test Failure Notification to Discord
         run: |
           URLS=( 
-            "https://media1.tenor.com/m/4CtiBiTdmioAAAAC/vilebrequin-sylvain.gif" 
-            "https://media1.tenor.com/m/GgnOYuwPdAIAAAAC/vilebrequin-sylvain.gif" 
+            "https://media1.tenor.com/m/4CtiBiTdmioAAAAC/vilebrequin-sylvain.gif"
+            "https://media1.tenor.com/m/GgnOYuwPdAIAAAAC/vilebrequin-sylvain.gif"
+            "https://media1.tenor.com/m/OlLPEZbtPEYAAAAd/vilebrequin-vilebrequin-telemerding.gif"
+            "https://media1.tenor.com/m/-o0dTiU5Ow4AAAAd/vilebrequin-vilebrequin-cpt.gif"
+            "https://media1.tenor.com/m/eMOeGcx_o54AAAAd/crash-bus.gif"
+            "https://media1.tenor.com/m/0y5lOt_Y450AAAAd/vilebrequin-vilebrequin-cpt.gif"
+            "https://media1.tenor.com/m/hoRt31ZDmPEAAAAC/vilebrequin-sylvain.gif"
+            "https://media1.tenor.com/m/gD2lZPrYVW4AAAAC/vilebrequin-vilebrequin-sylvain-levy.gif"
+            "https://media1.tenor.com/m/sBEng5B5vbwAAAAC/cat-cats.gif"
+            "https://media1.tenor.com/m/1c70Jy7WZI8AAAAd/cat.gif" 
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           BRANCH_NAME=${GITHUB_REF##*/}
@@ -50,8 +58,12 @@ jobs:
       - name: Send Test Success Notification to Discord
         run: |
           URLS=( 
-            "https://media1.tenor.com/m/BhPivX5RaGgAAAAd/vilebrequin-vilbrequin.gif" 
-            "https://media1.tenor.com/m/uPogt0rnqKoAAAAd/rosycheeks-approved.gif" 
+            "https://media1.tenor.com/m/BhPivX5RaGgAAAAd/vilebrequin-vilbrequin.gif"
+            "https://media1.tenor.com/m/-c-taOTKNN8AAAAd/vilebrequin-sylvain.gif"
+            "https://media1.tenor.com/m/4Nxe3sCkjVcAAAAd/vilebrequin-vilbrequin.gif"
+            "https://media1.tenor.com/m/uPogt0rnqKoAAAAd/rosycheeks-approved.gif"
+            "https://media1.tenor.com/m/eAwDugg8aBgAAAAd/kitty-meow.gif"
+            "https://media1.tenor.com/m/wjS2sXen8iMAAAAd/stonks-up-stongs.gif" 
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           BRANCH_NAME=${GITHUB_REF##*/}

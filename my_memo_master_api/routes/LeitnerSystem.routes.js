@@ -118,8 +118,8 @@ router.post("/add", leitnerSystem.create);
 
 /**
  * @swagger
- * /leitnesystem/edit:
- *   post:
+ * /leitnesystem/{id}:
+ *   put:
  *     summary: Modifie un système de Leitner existant
  *     tags:
  *       - LeitnerSystems

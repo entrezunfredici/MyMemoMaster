@@ -22,8 +22,8 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: "Units",
-          key: "idUnit",
+          model: "units",
+          key: "id",
         },
         onDelete: "SET NULL",
         onUpdate: "CASCADE",
@@ -49,7 +49,7 @@ module.exports = (instance) => {
       as: "fieldType",
     });
     Fields.belongsTo(models.Unit, {
-      foreignKey: "idUnits",
+      foreignKey: "idUnit",
       as: "units",
     });
   };

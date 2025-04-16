@@ -6,7 +6,7 @@ const router = express.Router();
 /**
  * @swagger
  * /tests/all:
- *   post:
+ *   get:
  *     summary: Récupère la liste complète des tests.
  *     tags:
  *       - Tests

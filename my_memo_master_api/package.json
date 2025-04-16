@@ -27,7 +27,7 @@
     "mysql2": "^3.11.3",
     "nodemailer": "^6.9.16",
     "pg": "^8.13.1",
-    "sequelize": "^6.37.4",
+    "sequelize": "^6.37.6",
     "serve-favicon": "^2.5.0",
     "sqlite3": "^5.1.7",
     "statuses": "^2.0.1",

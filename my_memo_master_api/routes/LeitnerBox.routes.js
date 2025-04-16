@@ -75,8 +75,8 @@ router.post("/add", leitnerBox.create);
 
 /**
  * @swagger
- * /leitnerboxes/edit:
- *   post:
+ * /leitnerboxes/{id}:
+ *   put:
  *     summary: Modifier une boîte de Leitner existante
  *     tags: [LeitnerBoxes]
  *     requestBody:
