@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 module.exports = (instance) => {
-    const fieldsType = instance.define(
-      "fieldsType",
+    const FieldsType = instance.define(
+      "FieldsType",
       {
         idType: {
           type: DataTypes.INTEGER,
@@ -19,19 +19,19 @@ module.exports = (instance) => {
         },
       },
       {
-        tableName: "fieldsType",
+        tableName: "FieldsType",
         timestamps: false,
       }
     );
   
     // Associations
-    fieldsType.associate = (models) => {
-      fieldsType.hasMany(models.Fields, {
+    FieldsType.associate = (models) => {
+      FieldsType.hasMany(models.Fields, {
         foreignKey: "idType",
         as: "fields",
       });
     };
   
-    return fieldsType;
+    return FieldsType;
   };
   
