@@ -1,6 +1,12 @@
 <template>
+  <!-- NO LAYOUT -->
+  <div v-if="route.name.includes('auth')" >
+    <main>
+      <RouterView />
+    </main>
+  </div>
   <!-- DESKTOP LAYOUT -->
-  <div v-if="!isMobile()" class="flex flex-1 min-h-screen">
+  <div v-else-if="!isMobile()" class="flex flex-1 min-h-screen">
     <aside class="flex flex-col items-center justify-center sticky top-0 h-screen mx-2 sm:mx-4 md:mx-6 lg:mx-8">
       <router-link to="/" class="my-6">
         <img src="/logo/logo-full.svg" :alt="VITE_APP_NAME">
@@ -52,7 +58,8 @@
       </main>
     </div>
   </div>
-  <div v-else class="min-h-screen">
+  <!-- MOBIL LAYOUT -->
+  <div v-else-if="isMobile()" class="min-h-screen">
     <header class="m-4">
       <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
         route.meta.title }}</h1>

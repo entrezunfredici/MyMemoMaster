@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {},
     colors: {
-      /* Theme colors */
+      // Theme
       primary: '#1E3BA1',
       'light-primary': '#828FBC',
       secondary: '#FA4238',
@@ -15,10 +15,16 @@ export default {
       light: '#FDF7FF',
       gray: '#d5daed',
       dark: '#101f56',
-      /* Other colors */
+      // Other colors
       success: '#10b981',
       warning: '#f59e0b',
       danger: '#dc2626',
+      // Password
+      'password-step-1': '#dc2626',
+      'password-step-2': '#dc7e26',
+      'password-step-3': '#dcd926',
+      'password-step-4': '#78dc26',
+      'password-step-5': '#29af00',
     },
     screens: {
       'xsm': '460px',

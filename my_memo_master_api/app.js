@@ -31,11 +31,18 @@ const app = express();
 // CORS
 app.use(
   cors({
-    origin: process.env.VITE_FRONT_URL,
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+// app.use(
+//   cors({
+//     origin: process.env.VITE_FRONT_URL,
+//     methods: ["GET", "POST", "PUT", "DELETE"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//   })
+// );
 
 // Body parser
 app.use(bodyParser.json());
