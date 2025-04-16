@@ -41,7 +41,7 @@ export const useAuthStore = defineStore('auth', {
 
       await api.put(`user-update/${this.user.userId}`, userPayload).then(resp => {
 
-        if (resp.status === 'error') {
+        if (resp.status === 200) {
           notif.notify(resp.data.message, 'error')
           return false
         }
