@@ -1,4 +1,4 @@
-const { FieldsType } = require("../models/index");  // Au lieu de FieldType
+const { FieldsType } = require("../models/index");
 
 const FieldTypeService = {
   async findAll() {
