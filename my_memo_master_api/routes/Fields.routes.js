@@ -82,8 +82,8 @@ router.get("/:id", fieldController.findOne);
  *                 type: integer
  *                 example: 3
  *               data:
- *                 type: string
- *                 example: "Données du champ"
+ *                 type: object
+ *                 example: {"value"="Données du champ"}
  *     responses:
  *       201:
  *         description: Champ créé avec succès
