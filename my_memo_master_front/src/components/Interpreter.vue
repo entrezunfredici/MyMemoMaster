@@ -129,15 +129,12 @@ export default {
     },
 
     handleDelete(event) {
-      console.log('🟡 handleDelete called')
       setTimeout(() => {
         const input = this.userInput
         const inputElement = this.$refs.inputRef
         if (!inputElement) return
 
         const cursorPos = inputElement.selectionStart
-        console.log('🔹 userInput:', input)
-        console.log('🔹 cursorPos:', cursorPos)
 
         const complexFormulas = [
           '∫_┤^┤(┤)()',
@@ -145,54 +142,31 @@ export default {
           '∯_┤^┤(┤)()',
           '̅()',
           '|┤|()',
-          '⌊┤|┤|()',
+          '⌊┤⌋()',
           '‖┤‖()'
         ]
 
         for (let formula of complexFormulas) {
-          const start = cursorPos - formula.length
-          const fragment = input.slice(start, cursorPos)
-          if (fragment === formula) {
-            let startCut = start
-            let endCut = cursorPos
+          const start = cursorPos - formula.length - 1 // -1 pour inclure éventuel espace
+          const end = cursorPos
+          const fragment = input.slice(start, end)
 
-            if (input[startCut - 1] === ' ') startCut -= 1
-            else if (input[endCut] === ' ') endCut += 1
+          const cleanedFragment = fragment.replace(/\s/g, '')
+          const cleanedFormula = formula.replace(/\s/g, '')
 
-            this.userInput = input.slice(0, startCut) + input.slice(endCut)
+          console.log('✏️ Testing fragment:', JSON.stringify(fragment))
+          console.log('↔︎ Against formula:', JSON.stringify(formula))
+
+          if (cleanedFragment === cleanedFormula) {
+            console.log('✅ Match! Removing:', fragment)
+            this.userInput = input.slice(0, start) + input.slice(end)
+            event.preventDefault()
             return
           }
         }
 
-        const delimiters = [
-          { open: '⌊', close: '⌋' },
-          { open: '|', close: '|' },
-          { open: '‖', close: '‖' }
-        ]
-
-        for (let { open, close } of delimiters) {
-          const pattern = new RegExp(`\\${open}[^\\${open}\\${close}]*\\${close}\\(\\)`, 'g')
-          const matches = [...input.matchAll(pattern)]
-
-          for (let match of matches) {
-            const matchStart = match.index
-            const matchEnd = matchStart + match[0].length
-            console.log('🔸 Match trouvé:', match[0], '| Start:', matchStart, '| End:', matchEnd)
-            console.log('🔸 cursorPos === matchEnd ?', cursorPos === matchEnd)
-            if (cursorPos === matchEnd) {
-              let startCut = matchStart
-              let endCut = matchEnd
-
-              if (input[startCut - 1] === ' ') startCut -= 1
-              else if (input[endCut] === ' ') endCut += 1
-              console.log('🟥 Suppression de:', input.slice(startCut, endCut))
-              this.userInput = input.slice(0, startCut) + input.slice(endCut)
-              return
-            }
-          }
-        }
-
-        const simpleFormulaPattern = /\s?\b[a-zA-Z]+\(\)?\s?/g
+        // Suppression pour formules simples comme sqrt(), ln(), etc.
+        const simpleFormulaPattern = /[\ẇ̈^_+=\-*/→‖⌊⌋|∞∅ℕℤℚℝℂ≈≠≤≥]+\(\)?/g
         const matches = [...input.matchAll(simpleFormulaPattern)]
 
         for (let match of matches) {
@@ -200,7 +174,9 @@ export default {
           const matchEnd = matchStart + match[0].length
 
           if (cursorPos === matchEnd) {
+            console.log('✅ Match simple formula:', match[0])
             this.userInput = input.slice(0, matchStart) + input.slice(matchEnd)
+            event.preventDefault()
             return
           }
         }
