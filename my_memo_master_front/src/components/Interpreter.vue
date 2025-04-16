@@ -39,7 +39,8 @@ export default {
       userInput: '',
       renderedContent: '',
       showPalette: false,
-      diagramInitialized: false
+      diagramInitialized: false,
+      selectedFormulas: []
     }
   },
   watch: {
@@ -106,7 +107,46 @@ export default {
         'Auto',
         {
           movable: false,
-          click: (e, node) => this.addToInput(node.data.formula)
+          click: (e, node) => {
+            const diagram = node.diagram
+            const formula = node.data.formula
+            const isMetaKey = e.control || e.meta
+
+            if (isMetaKey) {
+              this.selectedFormulas.push(formula)
+              this.userInput += ' ' + formula + '()'
+              node.isSelected = true
+            } else {
+              const index = this.selectedFormulas.lastIndexOf(formula)
+
+              if (index !== -1) {
+                this.selectedFormulas.splice(index, 1)
+
+                const pattern = ` ${formula}()`
+                const lastIndex = this.userInput.lastIndexOf(pattern)
+
+                if (lastIndex !== -1) {
+                  this.userInput =
+                    this.userInput.slice(0, lastIndex) +
+                    this.userInput.slice(lastIndex + pattern.length)
+                }
+
+                if (!this.selectedFormulas.includes(formula)) {
+                  node.isSelected = false
+                }
+              } else {
+                for (let f of this.selectedFormulas) {
+                  const regex = new RegExp(`\\s?${f}\\(\\)`, 'g')
+                  this.userInput = this.userInput.replace(regex, '')
+                }
+
+                diagram.clearSelection()
+                this.selectedFormulas = [formula]
+                this.userInput += ' ' + formula + '()'
+                node.isSelected = true
+              }
+            }
+          }
         },
         $(go.Shape, 'RoundedRectangle', {
           stroke: 'black',
@@ -125,9 +165,19 @@ export default {
     },
 
     addToInput(formulaText) {
-      this.userInput += ' ' + formulaText + '()'
+      if (this.selectedFormula === formulaText) {
+        const regex = new RegExp(`\\s?${formulaText}\\(\\)`, 'g')
+        this.userInput = this.userInput.replace(regex, '')
+        this.selectedFormula = null
+      } else {
+        if (this.selectedFormula) {
+          const oldRegex = new RegExp(`\\s?${this.selectedFormula}\\(\\)`, 'g')
+          this.userInput = this.userInput.replace(oldRegex, '')
+        }
+        this.userInput += ' ' + formulaText + '()'
+        this.selectedFormula = formulaText
+      }
     },
-
     handleDelete(event) {
       setTimeout(() => {
         const input = this.userInput
