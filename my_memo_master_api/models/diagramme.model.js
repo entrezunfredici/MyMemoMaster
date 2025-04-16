@@ -48,7 +48,7 @@ module.exports = (sequelize) => {
       as: "user", // Alias pour la relation.
     });
     MindMap.belongsTo(models.Subject, {
-      foreignKey: "idSubject",
+      foreignKey: "subjectId",
       as: "subject", // Alias pour la relation.
     });
   };
