@@ -13,12 +13,12 @@
     </label>
     </div>
 
-<button @click="exportDiagram">Exporter en JSON</button>
-<button @click="exportDiagramBD">Exporter en Base de donnée</button>
+    <button @click="saveDiagram">Save</button>
+    <button @click="exportDiagramBD">Exporter en Base de donnée</button>
 
-<!-- Importer un fichier JSON -->
-<input type="file" @change="loadJsonFile" />
-<div style="display: flex;">
+  <!-- Importer un fichier JSON -->
+  <input type="file" @change="loadJsonFile" />
+  <div style="display: flex;">  
       <!-- Palette -->
       <div ref="paletteDiv" style="width: 20%; height: 600px; border: 1px solid lightgray; margin-right: 10px;"></div>
 
@@ -33,6 +33,7 @@ import * as go from "gojs";
 import { ref, onMounted } from "vue";
 import { useToast } from 'vue-toastification';
 import { api } from '@/helpers/api'
+
 
 export default {
 setup() {
@@ -176,32 +177,37 @@ const onNodeDoubleClick = (node) => {
   }
 };
 
-// Exporter le diagramme en JSON
-const exportDiagram = async () => {
-  const json = diagram.model.toJson();
+const saveDiagram = async () => {
   try {
-    const response = await api.post('/diagramme/add', { diagram: json });
+    const json = diagram.model.toJson();
+    const idDiagramme = json.idMindMap; // Assurez-vous que `idMindMap` existe bien
 
-    if (response.status !== 200) {
-      console.log('Erreur lors de la sauvegarde du diagramme dans l\'API.', 'error');
+    if (!idDiagramme) {
+      console.error("ID du diagramme manquant !");
       return false;
     }
 
-    console.log('Diagramme sauvegardé avec succès dans l\'API !', 'success');
+    // Envoi de la requête PUT avec l'ID dans l'URL
+    const response = await api.put(`/diagramme/${idDiagramme}`, { diagram: json });
+
+    if (response.status !== 200) {
+      console.error('Erreur lors de la sauvegarde du diagramme dans l\'API.');
+      return false;
+    }
+
+    console.log('Diagramme sauvegardé avec succès dans l\'API !');
     return true;
   } catch (error) {
     console.error('Erreur lors de la requête API :', error);
-    console.log(`Erreur lors de la requête API : ${error}`, 'error');
     return false;
   }
 };
 
 const exportDiagramBD = async() =>{
   const json = diagram.model.toJson();
-
   const dataToSend = {
     mmName: json.mmName || 'Nom par défaut', // Ajouter un nom pour le diagramme
-    mindMapJson: json, // L'objet JSON du diagramme
+    mindMapJson: JSON.parse(json), // L'objet JSON du diagramme
     userId: 1, // Assurez-vous que vous avez un `userId` pour l'utilisateur connecté
     idSubject: 1, // Assurez-vous que vous avez un `idSubject` pour le sujet concerné
   };
@@ -220,13 +226,8 @@ const exportDiagramBD = async() =>{
 
 // Importer un diagramme à partir d'un JSON
 const importDiagram = (json) => {
-  try {
-    diagram.model = go.Model.fromJson(json);
-    alert("Diagramme importé avec succès !");
-  } catch (error) {
-    console.error("Erreur lors de l'importation du diagramme :", error);
-    alert("Le fichier JSON est invalide.");
-  }
+  diagram.model = go.Model.fromJson(json); // Remplacez par votre logique d'importation
+  console.log('Diagramme importé avec succès !');
 };
 
 // Charger un fichier JSON
@@ -269,7 +270,7 @@ onMounted(() => {
   initializePalette();
 });
 
-return { diagramDiv,paletteDiv, inputRef,colorRef, addNode, exportDiagram, exportDiagramBD, loadJsonFile ,addLinksChecked};
+return { diagramDiv,paletteDiv, inputRef,colorRef, addNode, saveDiagram, exportDiagramBD,importDiagram,  loadJsonFile ,addLinksChecked};
 },
 };
 </script>

@@ -23,6 +23,7 @@ const diagrammeRoutes = require("./routes/Diagramme.routes");
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
 const app = express();
+console.log("CORS autorise les requêtes depuis :", process.env.VITE_FRONT_URL);
 
 // CORS
 app.use(
@@ -32,6 +33,8 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+// app.use(cors()); // Autorise toutes les requêtes (à ne pas laisser en prod)
+
 
 // Body parser
 app.use(bodyParser.json());

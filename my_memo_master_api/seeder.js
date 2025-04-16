@@ -7,7 +7,7 @@ const listTables = async () => {
   // * Function to list all tables in the database
   try {
     const tables = await db.instance.query(
-      "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema';"
+      "SELECT tablename FROM catalog.tables WHERE schemaname != 'catalog' AND schemaname != 'information_schema';"
     );
     console.log(tables[0].map((table) => table.tablename));
   } catch (error) {
@@ -29,9 +29,9 @@ const seedDatabase = async () => {
     await db.instance.query("PRAGMA foreign_keys = OFF");
 
     // Désactiver les déclencheurs de clés étrangères pour les insertions
-    await db.instance.query('ALTER TABLE "User" DISABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "Role" DISABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "LeitnerSystem" DISABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "User" DISABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "Role" DISABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "LeitnerSystem" DISABLE TRIGGER ALL');
 
     const users = require("./seeds/User.seed.json");
     users.forEach((user) => {
@@ -49,8 +49,7 @@ const seedDatabase = async () => {
     await db.Subject.bulkCreate(require("./seeds/Units.seed.json"));
     console.log("Units table seeded successfully");
 
-    const diagrammes = require("./seeds/Diagramme.seed.json");
-    await db.Diagramme.bulkCreate(diagrammes);
+    await db.Diagramme.bulkCreate(require("./seeds/Diagramme.seed.json"));
     console.log("diagrammes table seeded successfully");
 
     await db.LeitnerSystem.bulkCreate(
@@ -65,9 +64,9 @@ const seedDatabase = async () => {
     console.log("LeitnerCards table seeded successfully");
 
     // Réactiver les déclencheurs de clés étrangères
-    await db.instance.query('ALTER TABLE "User" ENABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');
-    await db.instance.query('ALTER TABLE "LeitnerSystem" ENABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "User" ENABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');
+    // await db.instance.query('ALTER TABLE "LeitnerSystem" ENABLE TRIGGER ALL');
 
     console.log("Sample data inserted successfully");
   } catch (error) {
@@ -95,7 +94,7 @@ const checkSeed = async () => {
 
 (async () => {
   try {
-    await listTables();
+    // await listTables();
     await seedDatabase();
     await checkSeed();
     console.log("Data seeding completed");
