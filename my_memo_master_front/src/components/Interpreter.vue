@@ -122,7 +122,7 @@ export default {
               if (index !== -1) {
                 this.selectedFormulas.splice(index, 1)
 
-                const pattern = ` ${formula}()`
+                const pattern = ` ${formula}`
                 const lastIndex = this.userInput.lastIndexOf(pattern)
 
                 if (lastIndex !== -1) {
@@ -177,7 +177,7 @@ export default {
           const oldRegex = new RegExp(`\\s?${this.selectedFormula}`, 'g')
           this.userInput = this.userInput.replace(oldRegex, '')
         }
-        this.userInput += ' ' + formulaText + '()'
+        this.userInput += ' ' + formulaText
         this.selectedFormula = formulaText
       }
     },
@@ -189,18 +189,10 @@ export default {
 
         const cursorPos = inputElement.selectionStart
 
-        const complexFormulas = [
-          '∫_┤^┤(┤)()',
-          '∮_┤^┤(┤)()',
-          '∯_┤^┤(┤)()',
-          '̅()',
-          '|┤|()',
-          '⌊┤⌋()',
-          '‖┤‖()'
-        ]
+        const complexFormulas = ['∫_┤^┤(┤)', '∮_┤^┤(┤)', '∯_┤^┤(┤)', '̅', '|┤|', '⌊┤⌋', '‖┤‖']
 
         for (let formula of complexFormulas) {
-          const start = cursorPos - formula.length - 1 // -1 pour inclure éventuel espace
+          const start = cursorPos - formula.length - 1
           const end = cursorPos
           const fragment = input.slice(start, end)
 
@@ -211,15 +203,13 @@ export default {
           console.log('↔︎ Against formula:', JSON.stringify(formula))
 
           if (cleanedFragment === cleanedFormula) {
-            console.log('✅ Match! Removing:', fragment)
             this.userInput = input.slice(0, start) + input.slice(end)
             event.preventDefault()
             return
           }
         }
 
-        // Suppression pour formules simples comme sqrt(), ln(), etc.
-        const simpleFormulaPattern = /[\ẇ̈^_+=\-*/→‖⌊⌋|∞∅ℕℤℚℝℂ≈≠≤≥]+\(\)?/g
+        const simpleFormulaPattern = /[\ẇ̈^_+=\-*/→‖⌊⌋|∞∅ℕℤℚℝℂ≈≠≤≥]+/g
         const matches = [...input.matchAll(simpleFormulaPattern)]
 
         for (let match of matches) {
@@ -227,7 +217,6 @@ export default {
           const matchEnd = matchStart + match[0].length
 
           if (cursorPos === matchEnd) {
-            console.log('✅ Match simple formula:', match[0])
             this.userInput = input.slice(0, matchStart) + input.slice(matchEnd)
             event.preventDefault()
             return
