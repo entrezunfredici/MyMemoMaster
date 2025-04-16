@@ -15,6 +15,7 @@ export default {
       light: '#FDF7FF',
       gray: '#d5daed',
       dark: '#101f56',
+      greyCustom: '#F5F5F5',
       /* Other colors */
       success: '#10b981',
       warning: '#f59e0b',
