@@ -48,6 +48,12 @@ const seedDatabase = async () => {
 
     await db.Subject.bulkCreate(require("./seeds/Units.seed.json"));
     console.log("Units table seeded successfully");
+    
+    await db.Question.bulkCreate(require("./seeds/Question.seed.json"));
+    console.log("Question table seeded successfully");
+
+    await db.Response.bulkCreate(require("./seeds/Response.seed.json"));
+    console.log("Response table seeded successfully");
 
     const diagrammes = require("./seeds/Diagramme.seed.json");
     await db.Subject.bulkCreate(diagrammes);
