@@ -22,8 +22,7 @@ services:
       context: ./postgres
       dockerfile: Dockerfile-pgadmin
     ports:
-      #- "${PGADMIN_PORT}:${INTERNAL_PG_PORT}"
-      - "${PGADMIN_PORT}:80"
+      - "${PGADMIN_PORT}:${INTERNAL_PG_PORT}"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
     environment:
