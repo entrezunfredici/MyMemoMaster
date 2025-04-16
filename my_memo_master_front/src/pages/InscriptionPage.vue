@@ -2,7 +2,7 @@
   <div class="flex h-screen w-full bg-blue-500 contenue">
     <!-- Colonne de l'image (70%) - Cachée en mode mobile -->
     <div class="hidden md:block w-[70%] h-full bg-blue-500 custom-border ">
-      <img src="../../public/incription.jpg" alt="Connexion" class="w-full h-full object-cover border-radius-9px imageConnexion">
+      <img src="../../public/inscription.png" alt="Connexion" class="w-full h-full object-cover no-underline border-radius-9px imageConnexion">
     </div>
 
     <!-- Colonne du formulaire (100% en mobile, 30% en desktop) -->
@@ -13,7 +13,7 @@
       <form @submit.prevent="submitForm" class="w-full max-w-md mt-6">
         <div class="mb-4">
           <label class="block text-gray-700">Email</label>
-          <input type="email" v-model="email" required class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <input type="email" v-model="email" required class="w-full mt-1 p-3 no-underline border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
         </div>
 
         <div class="mb-4">
@@ -65,6 +65,3 @@ export default {
   },
 };
 </script>
-
-        
-  
