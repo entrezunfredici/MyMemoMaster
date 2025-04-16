@@ -31,7 +31,7 @@ module.exports = (sequelize) => {
         allowNull: false, // Assurez-vous que cette clé étrangère ne peut pas être nulle.
         references: {
           model: "Subject", // Nom de la table cible.
-          key: "idSubject", // Clé primaire dans la table cible.
+          key: "subjectId", // Clé primaire dans la table cible.
         },
       },
     },
@@ -48,7 +48,7 @@ module.exports = (sequelize) => {
       as: "user", // Alias pour la relation.
     });
     MindMap.belongsTo(models.Subject, {
-      foreignKey: "subjectId",
+      foreignKey: "idSubject",
       as: "subject", // Alias pour la relation.
     });
   };
