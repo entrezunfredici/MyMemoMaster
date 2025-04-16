@@ -34,8 +34,8 @@ router.post("/add", leitnerCardController.addCard);
 
 /**
  * @swagger
- * /leitnercards/edit/{id}:
- *   post:
+ * /leitnercards/{id}:
+ *   put:
  *     summary: Modifier une carte de Leitner
  *     tags: [LeitnerCards]
  */

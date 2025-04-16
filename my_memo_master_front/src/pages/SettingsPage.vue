@@ -8,7 +8,7 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import { useRoleStore } from '@/stores/role'
+import { useRoleStore } from '@/stores/roles'
 
 const roleStore = useRoleStore()
 
