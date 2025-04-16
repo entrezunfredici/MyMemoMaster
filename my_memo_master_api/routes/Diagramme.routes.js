@@ -88,9 +88,12 @@ router.get("/:id", diagramme.findOne);
  *               name:
  *                 type: string
  *                 example: "Math"
- *               mindMapsJson:
- *                 type: string
- *                 example: "json"
+ *               mindMapJson:
+ *                 type: object
+ *                 example: {"nodes": [5, 6, 7],"edges": [8, 9, 10]}
+ *               userId:
+ *                type: integer 
+ *                example: 1
  *     responses:
  *       201:
  *         description: Diagramme créé avec succès
