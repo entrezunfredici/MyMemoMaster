@@ -14,8 +14,7 @@ module.exports = (instance) => {
           allowNull: false,
         },
         allowUnit: {
-          type: DataTypes.BOOLEAN,
-          allowNull: false,
+          type: DataTypes.BOOLEAN
         },
       },
       {
@@ -34,4 +33,3 @@ module.exports = (instance) => {
   
     return FieldsType;
   };
-  
