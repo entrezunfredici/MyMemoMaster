@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { notif } from '@/helpers/notif.js'
-import router from '@/router'
 import { api } from '@/helpers/api'
 
 export const useRoleStore = defineStore('role', {
@@ -11,13 +10,12 @@ export const useRoleStore = defineStore('role', {
     actions: {
         async fetchRoles() {
             await api.get(`roles/all`).then(resp => {
-
                 if (resp.status !== 200) {
-                  notif.notify(resp.data.message, 'error')
-                  return false
+                    notif.notify(resp.data.message, 'error')
+                    return false
                 }
-        
-                this.roles = resp.data.data
+
+                this.roles = resp.data
                 return true
             }).catch(error => {
                 notif.notify(`An error occured: ${error}`, 'error')
@@ -30,7 +28,7 @@ export const useRoleStore = defineStore('role', {
                     notif.notify(resp.data.message, 'error');
                     return false;
                 }
-                this.role = resp.data.data;
+                this.role = resp.data;
                 return true;
             }).catch(error => {
                 notif.notify(`An error occured: ${error}`, 'error')

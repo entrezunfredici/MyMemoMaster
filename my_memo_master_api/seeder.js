@@ -89,6 +89,7 @@ const checkSeed = async () => {
   // * Function to verify that the sample data has been inserted
   try {
     const roles = await db.Role.findAll();
+    console.log(roles)
     if (roles.length === 0) {
       console.warn("No data found in the database");
     } else {
