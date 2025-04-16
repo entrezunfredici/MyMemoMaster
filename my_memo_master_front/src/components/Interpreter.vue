@@ -135,10 +135,13 @@ export default {
                   node.isSelected = false
                 }
               } else {
-                for (let f of this.selectedFormulas) {
-                  const regex = new RegExp(`\\s?${f}\\(\\)`, 'g')
-                  this.userInput = this.userInput.replace(regex, '')
-                }
+                const formulasSet = new Set(this.selectedFormulas)
+                this.userInput = this.userInput
+                  .split(/\s+/)
+                  .filter((token) => {
+                    return !Array.from(formulasSet).includes(token.replace(/\(\)/g, ''))
+                  })
+                  .join(' ')
 
                 diagram.clearSelection()
                 this.selectedFormulas = [formula]
