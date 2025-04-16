@@ -114,7 +114,7 @@ export default {
 
             if (isMetaKey) {
               this.selectedFormulas.push(formula)
-              this.userInput += ' ' + formula + '()'
+              this.userInput += ' ' + formula
               node.isSelected = true
             } else {
               const index = this.selectedFormulas.lastIndexOf(formula)
@@ -145,7 +145,7 @@ export default {
 
                 diagram.clearSelection()
                 this.selectedFormulas = [formula]
-                this.userInput += ' ' + formula + '()'
+                this.userInput += ' ' + formula
                 node.isSelected = true
               }
             }
@@ -169,12 +169,12 @@ export default {
 
     addToInput(formulaText) {
       if (this.selectedFormula === formulaText) {
-        const regex = new RegExp(`\\s?${formulaText}\\(\\)`, 'g')
+        const regex = new RegExp(`\\s?${formula}`, 'g')
         this.userInput = this.userInput.replace(regex, '')
         this.selectedFormula = null
       } else {
         if (this.selectedFormula) {
-          const oldRegex = new RegExp(`\\s?${this.selectedFormula}\\(\\)`, 'g')
+          const oldRegex = new RegExp(`\\s?${this.selectedFormula}`, 'g')
           this.userInput = this.userInput.replace(oldRegex, '')
         }
         this.userInput += ' ' + formulaText + '()'
