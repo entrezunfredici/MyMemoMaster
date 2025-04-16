@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { notif } from '@/composables/notif.js'
+import { notif } from '@/helpers/notif.js'
 import router from '@/router'
-import { api } from '@/composables/api'
-import { isValidEmail } from '@/composables/helpers.js'
-import { isValidDate } from '@/composables/helpers.js'
-import { missingsElementsPassword } from '@/composables/helpers.js'
+import { api } from '@/helpers/api'
+import { isValidEmail } from '@/helpers/functions.js'
+import { isValidDate } from '@/helpers/functions.js'
+import { missingsElementsPassword } from '@/helpers/functions.js'
 
 export const useAuthStore = defineStore('auth', {
   persist: true,
@@ -24,19 +24,15 @@ export const useAuthStore = defineStore('auth', {
         },
         register: {
           fields: {
-            username: '',
-            birthdate: '2000-01-01T00:00:00.000Z',
+            name: '',
             email: '',
-            language: 'en-US',
             password: '',
             confirmPassword: '',
             acceptTerms: false,
           },
           default: {
-            username: '',
-            birthdate: '2000-01-01T00:00:00.000Z',
+            name: '',
             email: '',
-            language: 'en-US',
             password: '',
             confirmPassword: '',
             acceptTerms: false,
@@ -99,9 +95,7 @@ export const useAuthStore = defineStore('auth', {
 
     async updateUser(notify = false) {
 
-      const username = this.user.username.trim() || null
-      const birthdate = this.user.birthdate || null
-      const language = this.user.language || null
+      const name = this.user.name.trim() || null
       const homePageEnableSpents = this.user.homePageEnableSpents || false
       const homePageEnableStats = this.user.homePageEnableStats || false
       const homePageEnableQuote = this.user.homePageEnableQuote || false
@@ -109,10 +103,7 @@ export const useAuthStore = defineStore('auth', {
 
       let error = null
 
-      if (!error && (!username || username.length === 0)) error = "Please enter your username"
-      if (!error && (!birthdate || birthdate.length === 0)) error = "Please enter your birthdate"
-      if (!error && !isValidDate(birthdate)) error = "Please enter a valid birthdate"
-      if (!error && (!language || language.length === 0)) error = "Please select your language"
+      if (!error && (!name || name.length === 0)) error = "Please enter your name"
 
       if (error) {
         notif.notify(error, 'error')
@@ -120,9 +111,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       const user = {
-        username,
-        birthdate,
-        language,
+        name,
         homePageEnableSpents,
         homePageEnableStats,
         homePageEnableQuote,
@@ -264,20 +253,15 @@ export const useAuthStore = defineStore('auth', {
 
       this.logout(false)
 
-      const username = this.authentication.tabs.register.fields.username.trim() || null
-      const birthdate = this.authentication.tabs.register.fields.birthdate || null
+      const name = this.authentication.tabs.register.fields.name.trim() || null
       const email = this.authentication.tabs.register.fields.email.trim() || null
-      const language = this.authentication.tabs.register.fields.language || null
       const password = this.authentication.tabs.register.fields.password.trim() || null
       const confirmPassword = this.authentication.tabs.register.fields.confirmPassword.trim() || null
       const acceptTerms = this.authentication.tabs.register.fields.acceptTerms || null
 
       let error = null
 
-      if (!error && (!username || username.length === 0)) error = "Please enter your username"
-      if (!error && (!birthdate || birthdate.length === 0)) error = "Please enter your birthdate"
-      if (!error && !isValidDate(birthdate)) error = "Please enter a valid birthdate"
-      if (!error && (!language || language.length === 0)) error = "Please select your language"
+      if (!error && (!name || name.length === 0)) error = "Please enter your name"
       if (!error && (!email || email.length === 0)) error = "Please enter your email"
       if (!error && !isValidEmail(email)) error = "Please enter a valid email"
       if (!error && (!password || password.length === 0)) error = "Please enter your password"
@@ -292,10 +276,8 @@ export const useAuthStore = defineStore('auth', {
       }
 
       const user = {
-        username,
+        name,
         email,
-        birthdate,
-        language,
         password,
       }
 
