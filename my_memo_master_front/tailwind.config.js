@@ -3,7 +3,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   purge: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-  darkMode: true, // or 'media' or 'class'
+  darkMode: true,
+  safelist: ['text-white'], // or 'media' or 'class'
   theme: {
     extend: {},
     colors: {
