@@ -3,12 +3,12 @@
         "id": 1,
         "name": "Meter",
         "denomination": "m",
-        "physicalQuantityId": 1
+        "physicalQuantityName": "Lenght"
     },
     {
         "id": 2,
         "name": "Seconds",
         "denomination": "s",
-        "physicalQuantityId": 2
+        "physicalQuantityName": "Time"
     }
 ]

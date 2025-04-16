@@ -26,11 +26,11 @@ async function getUnitById(req, res) {
 
 async function addUnit(req, res) {
   try {
-    const { name, denomination, physicalQuantityId } = req.body;
+    const { name, denomination, physicalQuantityName } = req.body;
     const newUnit = await unitService.addUnit({
       name,
       denomination,
-      physicalQuantityId,
+      physicalQuantityName,
     });
     res.status(201).json(newUnit);
   } catch (error) {

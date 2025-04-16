@@ -58,9 +58,9 @@ router.get("/:id", unitController.getUnitById);
  *               denomination:
  *                 type: string
  *                 example: "m"
- *               physicalQuantityId:
- *                 type: integer
- *                 example: 1
+ *               physicalQuantityName:
+ *                 type: string
+ *                 example: "Lenght"
  *     responses:
  *       201:
  *         description: Unité ajoutée avec succès.
