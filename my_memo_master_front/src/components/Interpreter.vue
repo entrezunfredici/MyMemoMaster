@@ -271,9 +271,10 @@ export default {
       html = html
         .replace(/sqrt\((.*?)\)/g, '√($1)')
         .replace(
-          /(\d+)over(\d+)/g,
-          '<span style="display: inline-flex; flex-direction: column; align-items: center;"><span>$1</span><span style="width: 100%; height: 1px; background-color: black; margin: 1px 0; display: block;"></span><span>$2</span></span>'
+          /over\((.*?),(.*?)\)/g,
+          '<span style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.2em;"><span>$1</span><span style="width: 100%; height: 1px; background-color: black; margin: 1px 0;"></span><span>$2</span></span>'
         )
+        .replace(/\^\((.*?)\)/g, '<i style="vertical-align: super; font-size: 0.75em;">$1</i>')
         .replace(/(\S+)\^(\S+)/g, '$1<i style="vertical-align: super; font-size: 0.75em;">$2</i>')
         .replace(
           /([a-zA-Z0-9]+)_\((.*?)\)/g,
@@ -291,7 +292,22 @@ export default {
           /∯_(.*?)\^(.*?)\((.*?)\)/g,
           '<span style="font-style: italic;">∯<sub>$1</sub><sup>$2</sup> $3</span>'
         )
-        .replace(/e\^(\S+)/g, 'e<i style="vertical-align: super; font-size: 0.75em;">$1</i>')
+        .replace(
+          /e\^([^\s^]+)\^([^\s^]+)/g,
+          'e<span style="vertical-align: super; font-size: 0.75em;">$1<span style="vertical-align: super; font-size: 0.65em;">$2</span></span>'
+        )
+        .replace(
+          /\^\((.*?)\)/g,
+          '<span style="vertical-align: super; font-size: 0.75em;">$1</span>'
+        )
+        .replace(/([a-zA-Z0-9]+)((?:\^\d+)+)/g, (_, base, exps) => {
+          const expParts = exps.slice(1).split('^')
+          let result = base
+          for (const exp of expParts) {
+            result += `<sup>${exp}</sup>`
+          }
+          return result
+        })
         .replace(/ln\((.*?)\)/g, 'ln($1)')
         .replace(
           /̇(\S+)/g,
