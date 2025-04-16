@@ -21,12 +21,17 @@
     ></textarea>
 
     <h3>Résultat :</h3>
-    <textarea
-      v-model="userInput"
-      rows="5"
-      cols="50"
-      style="width: 100%; margin-top: 10px"
-    ></textarea>
+    <div
+      v-html="renderedContent"
+      style="
+        width: 100%;
+        min-height: 100px;
+        border: 1px solid black;
+        padding: 10px;
+        background-color: white;
+        margin-top: 10px;
+      "
+    ></div>
   </div>
 </template>
 
@@ -247,6 +252,15 @@ export default {
 
     async parseContent() {
       let html = this.userInput
+      const reverseMapping = this.getReverseMapping()
+
+      let words = html.trim().split(/\s+/)
+
+      html = words
+        .map((w) => {
+          return reverseMapping[w] || w
+        })
+        .join(' ')
 
       let unitError = this.checkUnitHomogeneity(html)
       if (unitError) {
@@ -315,6 +329,49 @@ export default {
           window.MathJax.typesetPromise().catch((err) => console.error('Erreur MathJax :', err))
         }
       })
+    },
+    getReverseMapping() {
+      const formulaMapping = {
+        '√x': 'sqrt',
+        'x²': '^',
+        'x/y': 'over',
+        xₙ: '_',
+        '∫_a^b f(x)': '∫_┤^┤(┤)',
+        '∮_a^b f(x)': '∮_┤^┤(┤)',
+        '∯_a^b f(x)': '∯_┤^┤(┤)',
+        'e^x': 'e^',
+        'ln(x)': 'ln',
+        ẋ: '̇',
+        ẍ: '̈',
+        x̅: '̅',
+        '→x': 'widevec',
+        'ⁿ√x': 'nsqrt',
+        '|x|': '|┤|',
+        '⌊x⌋': '⌊┤⌋',
+        '‖x‖': '‖┤‖',
+        '∅': '∅',
+        ℕ: 'ℕ',
+        ℤ: 'ℤ',
+        ℚ: 'ℚ',
+        ℝ: 'ℝ',
+        ℂ: 'ℂ',
+        '∞': '∞',
+        '+': '+',
+        '-': '-',
+        '*': '*',
+        '/': '/',
+        '=': '=',
+        '≠': '≠',
+        '≈': '≈',
+        '≤': '≤',
+        '≥': '≥'
+      }
+
+      const reversed = {}
+      for (let key in formulaMapping) {
+        reversed[formulaMapping[key]] = key
+      }
+      return reversed
     }
   }
 }
