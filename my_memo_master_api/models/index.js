@@ -30,13 +30,13 @@ Object.keys(models).forEach((modelName) => {
 });
 
 //reset database
-instance.sync({ force: true }).then(() => {
-  console.log("reset database success"); 
-});
-
-// instance.sync({ alter: true }).then(() => {
-//   console.log("Update database success"); 
+// instance.sync({ force: true }).then(() => {
+//   console.log("reset database success"); 
 // });
+
+instance.sync({ alter: true }).then(() => {
+  console.log("Update database success"); 
+});
 
 module.exports = {
   instance,
