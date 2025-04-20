@@ -20,10 +20,7 @@ const FieldsService = {
 
   // 4. Modifier un champ par son ID
   async update(id, data) {
-    const field = await Fields.findByPk(id);
-    if (!field) return null;
-    await field.update(data);
-    return field;
+    return await Fields.update(data, { where: { id: id } });
   },
 
   // 5. Supprimer un champ par son ID

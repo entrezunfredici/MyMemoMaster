@@ -51,7 +51,7 @@ exports.update = async (req, res) => {
       res.status(200).json(updatedTest);
     } catch (error) {
       res.status(500).send({
-        message: "Une erreur s'est produite lors de la modification du test",
+        message: "Une erreur inattendue s'est produite lors de la modification du test. Veuillez réessayer plus tard." ? error.message : error.message,
       });
     }
   },
