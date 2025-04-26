@@ -142,13 +142,13 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: webfactory/ssh-agent@v0.5.3
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
 
       - name: Set up SSH preprod for Deployment
         if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*')
         uses: webfactory/ssh-agent@v0.5.3
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PREPROD_PRIVATE_KEY }}
 
       - name: Upload docker-compose.yml prod to server
         if: github.ref == 'refs/heads/main'
