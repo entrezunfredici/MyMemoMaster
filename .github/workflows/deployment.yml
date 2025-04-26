@@ -106,11 +106,10 @@ jobs:
   #         -d "{\"content\": \"SonarQube analysis failed on branch $GITHUB_REF!\"}" \
   #         ${{ secrets.DISCORD_LOG }}
 
-  build_and_deploy:
-    name: Build and Deploy
+  push_on_docker_hub:
+    name: Push on docker hub
     runs-on: ubuntu-latest
     needs: test
-    # needs: [test, sonar_analysis]
     if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*'))
     steps:
       - name: Checkout Code
@@ -137,6 +136,16 @@ jobs:
           docker build -t mymemomaster_test_front:latest -f my_memo_master_front/Dockerfile .
           docker push mymemomaster_test_api:latest
           docker push mymemomaster_test_front:latest
+
+  build_and_deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    needs: push_on_docker_hub
+    # needs: [push_on_docker_hub, sonar_analysis]
+    if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*'))
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
 
       - name: Set up SSH prod for Deployment
         if: github.ref == 'refs/heads/main'
