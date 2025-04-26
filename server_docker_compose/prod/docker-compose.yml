@@ -1,0 +1,75 @@
+# File docker-compose.yml
+
+services:
+  postgres:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile-postgres
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASS}
+      POSTGRES_DB: ${PG_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${PG_PORT}:5432"
+      #- "${PG_PORT}:5432"
+    networks:
+      - my_memo_master_network
+
+  pgadmin:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile-pgadmin
+    ports:
+      - "${PGADMIN_PORT}:${INTERNAL_PG_PORT}"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
+    networks:
+      - my_memo_master_network
+
+  api:
+    image: ton_dockerhub_username/my_memo_master_api:latest
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    volumes:
+      - api-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - API_PORT=${API_PORT}
+      - PG_USER=${PG_USER}
+      - PG_PASS=${PG_PASS}
+      - PG_DB=${PG_DB}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=5432
+    depends_on:
+      - postgres
+    networks:
+      - my_memo_master_network
+
+  front:
+    image: ton_dockerhub_username/my_memo_master_front:latest
+    volumes:
+      - front-data:/app/data
+    ports:
+      - "${VITE_PORT}:80"
+    restart: always
+    networks:
+      - my_memo_master_network
+
+volumes:
+  api-data:
+  front-data:
+  postgres-data:
+  pgadmin-data:
+
+networks:
+  my_memo_master_network:
+    driver: bridge

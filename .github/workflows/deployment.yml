@@ -71,20 +71,28 @@ jobs:
           -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
           ${{ secrets.DISCORD_LOG }}
 
-  # sonar_analysis:
-  #   name: Run SonarQube Analysis
-  #   runs-on: ubuntu-latest
-  #   needs: test
-  #   steps:
-  #     - name: Checkout Code
-  #       uses: actions/checkout@v2
-  #       with:
-  #         fetch-depth: 0
-  #     - name: Run SonarQube Scan
-  #       uses: sonarsource/sonarqube-scan-action@v3
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  sonar_analysis:
+    name: Run SonarQube Analysis
+    runs-on: ubuntu-latest
+    needs: test
+    if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*'))
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Run SonarQube Prod Scan
+        if: github.ref == 'refs/heads/main'
+        uses: sonarsource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_PROD_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - name: Run SonarQube PreProd Scan
+        if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*')
+        uses: sonarsource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_PREPROD_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   # sonar_analysis_failure:
   #   name: Notify SonarQube Failure
@@ -103,51 +111,72 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     # needs: [test, sonar_analysis]
-    if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev_cicd') || startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/dev_back_*'))
+    if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*'))
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      - name: Set up SSH for Deployment
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and Push Docker Prod Images
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker build -t mymemomaster_api:latest -f my_memo_master_api/Dockerfile .
+          docker build -t mymemomaster_front:latest -f my_memo_master_front/Dockerfile .
+          docker push mymemomaster_api:latest
+          docker push mymemomaster_front:latest
+
+      - name: Build and Push Docker PreProd Images
+        if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*')
+        run: |
+          docker build -t mymemomaster_test_api:latest -f my_memo_master_api/Dockerfile .
+          docker build -t mymemomaster_test_front:latest -f my_memo_master_front/Dockerfile .
+          docker push mymemomaster_test_api:latest
+          docker push mymemomaster_test_front:latest
+
+      - name: Set up SSH prod for Deployment
+        if: github.ref == 'refs/heads/main'
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Set up SSH preprod for Deployment
+        if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*')
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Upload docker-compose.yml prod to server
+        if: github.ref == 'refs/heads/main'
+        run: |
+          scp server_docker_compose/prod/docker-compose.yml ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.SSH_HOST }}:var/www/html/mymemomasterdocker-compose.yml
+
       - name: Deploy to VPS in prod 
         if: github.ref == 'refs/heads/main'
         run: |
-          # Sync files to VPS
-          rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomaster
-          
-          # Execute remote commands to build and run Docker Compose
-          ssh root@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-
-            # Navigate to project directory
-            cd /var/www/html/mymemomaster
-
-            # Stop, rebuild, and start services
-            docker-compose down
-            docker-compose build
+          ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+          ssh ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            cd var/www/html/mymemomaster
+            docker-compose pull
             docker-compose up -d
           EOF
 
-      - name: Deploy to VPS in preprod 
-        if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/dev_cicd')
+      - name: Upload docker-compose.yml preprod to server
+        if: github.ref == 'refs/heads/main'
         run: |
-          # Sync files to VPS
-          rsync -avz --exclude-from='.scpignore' -e "ssh -o StrictHostKeyChecking=no" . root@${{ secrets.VPS_IP }}:/var/www/html/mymemomastertest
-          
-          # Execute remote commands to build and run Docker Compose
-          ssh root@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
+          scp server_docker_compose/preprod/docker-compose.yml ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.SSH_HOST }}:var/www/html/mymemomasterdocker-compose.yml
 
-            # Navigate to project directory
-            cd /var/www/html/mymemomastertest
-
-            # Stop, rebuild, and start services
-            docker-compose down
-            docker-compose build
+      - name: Deploy to VPS in preprod 
+        if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*')
+        run: |
+          ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+          ssh ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            cd var/www/html/mymemomaster
+            docker-compose pull
             docker-compose up -d
           EOF
 
