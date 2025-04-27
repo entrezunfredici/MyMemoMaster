@@ -7,7 +7,7 @@ on:
     branches:
       - main
       - dev
-      - '*devops*' # Add a branch to test the workflow
+      - '*devops*'
 
 jobs:
   test:
