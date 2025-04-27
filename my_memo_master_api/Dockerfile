@@ -12,11 +12,6 @@ COPY . ./
 
 EXPOSE ${API_PORT}
 
-RUN if [ -f entrypoint.sh ]; then \
-        cp entrypoint.sh /entrypoint.sh; \
-    else \
-        cp my_memo_master_api/entrypoint.sh /entrypoint.sh; \
-    fi
-
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
