@@ -162,14 +162,14 @@ jobs:
       - name: Upload docker-compose.yml prod to server
         if: github.ref == 'refs/heads/main'
         run: |
-          scp server_docker_compose/prod/docker-compose.yml ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master/docker-compose.yml
+          scp  -P ${{ secrets.VPS_PORT }} server_docker_compose/prod/docker-compose.yml ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master/docker-compose.yml
 
       - name: Deploy to VPS in prod 
         if: github.ref == 'refs/heads/main'
         run: |
-          ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
-          ssh ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd /var/www/html/mymemomaster
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            cd var/www/html/my_memo_master
             docker-compose pull
             docker-compose up -d
           EOF
@@ -177,14 +177,14 @@ jobs:
       - name: Upload docker-compose.yml preprod to server
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
-          scp server_docker_compose/preprod/docker-compose.yml ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:var/www/html/my_memo_master/docker-compose.yml
+          scp  -P ${{ secrets.VPS_PORT }} server_docker_compose/preprod/docker-compose.yml ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:var/www/html/my_memo_master/docker-compose.yml
 
       - name: Deploy to VPS in preprod 
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
-          ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
-          ssh ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd var/www/html/mymemomaster
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            cd var/www/html/my_memo_master
             docker-compose pull
             docker-compose up -d
           EOF
