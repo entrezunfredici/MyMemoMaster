@@ -162,7 +162,7 @@ jobs:
       - name: Upload docker-compose.yml prod to server
         if: github.ref == 'refs/heads/main'
         run: |
-          scp server_docker_compose/prod/docker-compose.yml ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/mymemomaster/docker-compose.yml
+          scp server_docker_compose/prod/docker-compose.yml ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master/docker-compose.yml
 
       - name: Deploy to VPS in prod 
         if: github.ref == 'refs/heads/main'
@@ -177,7 +177,7 @@ jobs:
       - name: Upload docker-compose.yml preprod to server
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
-          scp server_docker_compose/preprod/docker-compose.yml ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:var/www/html/mymemomaster/docker-compose.yml
+          scp server_docker_compose/preprod/docker-compose.yml ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:var/www/html/my_memo_master/docker-compose.yml
 
       - name: Deploy to VPS in preprod 
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
