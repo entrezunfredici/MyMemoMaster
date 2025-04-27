@@ -107,7 +107,7 @@ jobs:
   #         ${{ secrets.DISCORD_LOG }}
 
   push_on_docker_hub:
-    name: Build and Push on docker hub
+    name: Build and Deploy on docker hub
     runs-on: ubuntu-latest
     needs: test
     if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops'))
@@ -121,7 +121,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build and Push Docker Prod Images
+      - name: Build and Deploy Docker Prod Images
         if: github.ref == 'refs/heads/main'
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest -f my_memo_master_api/Dockerfile my_memo_master_api/
@@ -129,7 +129,7 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest -f my_memo_master_front/Dockerfile my_memo_master_front/
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest
 
-      - name: Build and Push Docker PreProd Images
+      - name: Build and Deploy Docker PreProd Images
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest -f my_memo_master_api/Dockerfile my_memo_master_api/
