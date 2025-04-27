@@ -124,7 +124,6 @@ jobs:
       - name: Build and Push Docker Prod Images
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "DockerHub Username: ${{ secrets.DOCKERHUB_USERNAME }}"
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest -f my_memo_master_api/Dockerfile .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest -f my_memo_master_front/Dockerfile .
@@ -133,7 +132,6 @@ jobs:
       - name: Build and Push Docker PreProd Images
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
-          echo "DockerHub Username: ${{ secrets.DOCKERHUB_USERNAME }}"
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest -f my_memo_master_api/Dockerfile .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest -f my_memo_master_front/Dockerfile .
