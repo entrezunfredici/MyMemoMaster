@@ -107,7 +107,7 @@ jobs:
   #         ${{ secrets.DISCORD_LOG }}
 
   push_on_docker_hub:
-    name: Push on docker hub
+    name: Build and Push on docker hub
     runs-on: ubuntu-latest
     needs: test
     if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/*devops*'))
