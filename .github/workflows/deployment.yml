@@ -124,18 +124,18 @@ jobs:
       - name: Build and Push Docker Prod Images
         if: github.ref == 'refs/heads/main'
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest -f my_memo_master_api/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest -f my_memo_master_front/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest -f my_memo_master_api/Dockerfile .
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest -f my_memo_master_front/Dockerfile .
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest
 
       - name: Build and Push Docker PreProd Images
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest -f my_memo_master_api/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest -f my_memo_master_front/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest -f my_memo_master_api/Dockerfile .
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest -f my_memo_master_front/Dockerfile .
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest
 
   build_and_deploy:
     name: Build and Deploy
