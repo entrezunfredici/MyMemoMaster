@@ -184,21 +184,21 @@ jobs:
         run: |
           scp -v -P ${{ secrets.VPS_PORT }} \
             server_docker_compose/prod/docker-compose.yml \
-            ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master/docker-compose.yml
+            ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:~/var/www/html/my_memo_master/docker-compose.yml
 
       - name: Upload docker-compose.yml to preprod server
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           scp -v -P ${{ secrets.VPS_PORT }} \
             server_docker_compose/preprod/docker-compose.yml \
-            ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:var/www/html/my_memo_master/docker-compose.yml
+            ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:~/var/www/html/my_memo_master/docker-compose.yml
 
       # ─────── 4. SSH Déployment ───────
       - name: Deploy to VPS in prod
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd /var/www/html/my_memo_master
+            cd ~/var/www/html/my_memo_master
             docker-compose pull
             docker-compose up -d
           EOF
@@ -207,7 +207,7 @@ jobs:
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd var/www/html/my_memo_master
+            cd ~/var/www/html/my_memo_master
             docker-compose pull
             docker-compose up -d
           EOF
