@@ -164,12 +164,12 @@ jobs:
       - name: Prepare SSH known_hosts for prod
         if: github.ref == 'refs/heads/main'
         run: |
-          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> /home/websites_prod/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> /home/websites_prod/.ssh/authorized_keys
 
       - name: Prepare SSH known_hosts for preprod
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
-          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> /home/websites_preprod/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> /home/websites_preprod/.ssh/authorized_keys
 
       # ─────── 3. SCP Upload ───────
       - name: Upload docker-compose.yml to prod server
