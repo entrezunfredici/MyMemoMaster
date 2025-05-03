@@ -160,6 +160,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PREPROD_PRIVATE_KEY }}
 
+      - name: Add SSH key to agent
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PREPROD_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-add ~/.ssh/id_rsa
+
       # ─────── 2. known_hosts ───────
       - name: Prepare SSH known_hosts for prod
         if: github.ref == 'refs/heads/main'
