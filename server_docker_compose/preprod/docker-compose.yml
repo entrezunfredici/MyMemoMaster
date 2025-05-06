@@ -1,5 +1,5 @@
 # File docker-compose.yml
-
+version: '3.8'
 services:
   postgres:
     build:
@@ -15,7 +15,7 @@ services:
       - "${PG_PORT}:5432"
       #- "${PG_PORT}:5432"
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
 
   pgadmin:
     build:
@@ -31,7 +31,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
 
   api:
     image: ton_dockerhub_username/my_memo_master_test_api:latest
@@ -52,7 +52,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
 
   front:
     image: ton_dockerhub_username/my_memo_master_test_front:latest
@@ -62,7 +62,7 @@ services:
       - "${VITE_PORT}:80"
     restart: always
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
 
 volumes:
   api-data:
