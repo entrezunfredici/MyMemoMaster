@@ -2,9 +2,10 @@
 version: '3'
 services:
   postgres:
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile-postgres
+    #build:
+    #  context: ./postgres
+    #  dockerfile: Dockerfile-postgres
+    image: postgres:15
     environment:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASS}
@@ -18,9 +19,10 @@ services:
       - my_memo_master_preprod_network
 
   pgadmin:
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile-pgadmin
+    #build:
+    #  context: ./postgres
+    #  dockerfile: Dockerfile-pgadmin
+    image: dpage/pgadmin4:latest
     ports:
       - "${PGADMIN_PORT}:${INTERNAL_PG_PORT}"
     volumes:
