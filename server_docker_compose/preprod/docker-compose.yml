@@ -36,7 +36,7 @@ services:
       - my_memo_master_preprod_network
 
   api:
-    image: ton_dockerhub_username/my_memo_master_test_api:latest
+    image: ${DOCKERHUB_USERNAME}/my_memo_master_test_api:latest
     env_file:
       - .env
     ports:
@@ -57,7 +57,7 @@ services:
       - my_memo_master_preprod_network
 
   front:
-    image: ton_dockerhub_username/my_memo_master_test_front:latest
+    image: ${DOCKERHUB_USERNAME}/my_memo_master_test_front:latest
     volumes:
       - front-data:/app/data
     ports:
