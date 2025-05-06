@@ -191,7 +191,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd /home/websites_prod/var/www/html/my_memo_master
+            cd ~/var/www/html/my_memo_master
             docker-compose pull
             docker-compose up -d
           EOF
@@ -200,7 +200,7 @@ jobs:
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd /home/websites_preprod/var/www/html/my_memo_master
+            cd ~/var/www/html/my_memo_master
             docker-compose pull
             docker-compose up -d
           EOF
