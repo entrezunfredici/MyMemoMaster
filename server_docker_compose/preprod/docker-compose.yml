@@ -36,7 +36,7 @@ services:
       - my_memo_master_preprod_network
 
   api:
-    image: ${DOCKERHUB_USERNAME}/my_memo_master_test_api:latest
+    image: fredissimo/my_memo_master_test_api:latest
     env_file:
       - .env
     ports:
@@ -57,7 +57,7 @@ services:
       - my_memo_master_preprod_network
 
   front:
-    image: ${DOCKERHUB_USERNAME}/my_memo_master_test_front:latest
+    image: fredissimo/my_memo_master_test_front:latest
     volumes:
       - front-data:/app/data
     ports:
