@@ -166,6 +166,9 @@ jobs:
       - name: Prepare SSH known_hosts for preprod
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
       # ─────── 3. SCP Upload ───────
