@@ -242,26 +242,58 @@ export default {
       }, 0)
     },
     checkUnitHomogeneity(expression) {
-      const units = ['m', 's', 'kg', 'J', 'N', 'Pa', 'W', 'V', 'A', 'Ω', 'Hz']
-      const unitPattern = /(\d+)\s*([a-zA-Z]+)/g
+      const operatorPattern = /=|<|>|≤|≥|≠|≈|\+|-|\*/
 
-      let lines = expression.split(/\n+/)
+      const lines = expression.split(/\n+/)
 
       for (let line of lines) {
-        let matches = [...line.matchAll(unitPattern)]
-        let foundUnits = matches.map((match) => match[2])
+        if (!operatorPattern.test(line)) continue
+        if (!/[=+\-*]/.test(line)) continue
 
-        if (foundUnits.length > 1) {
-          let uniqueUnits = [...new Set(foundUnits)]
-          if (uniqueUnits.length > 1) {
-            return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
+        const terms = line
+          .split(operatorPattern)
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0)
+        if (terms.length < 2) continue
+
+        const normalizedUnits = terms.map((term) => {
+          const unitCounts = {}
+          const matches = [...term.matchAll(/(\d+)?\s*([a-zA-Z]+(?:\/[a-zA-Z]+)*)/g)]
+          for (let match of matches) {
+            const fullUnit = match[2]
+            const parts = fullUnit.split('/')
+            for (let i = 0; i < parts.length; i++) {
+              const part = parts[i]
+              const exponent = i === 0 ? 1 : -1
+              unitCounts[part] = (unitCounts[part] || 0) + exponent
+            }
+          }
+
+          return unitCounts
+        })
+
+        const base = JSON.stringify(normalizedUnits[0])
+        for (let i = 1; i < normalizedUnits.length; i++) {
+          if (JSON.stringify(normalizedUnits[i]) !== base) {
+            const unitsA = normalizedUnits[0]
+            const unitsB = normalizedUnits[i]
+            const allKeys = new Set([...Object.keys(unitsA), ...Object.keys(unitsB)])
+            let same = true
+            for (let key of allKeys) {
+              if ((unitsA[key] || 0) !== (unitsB[key] || 0)) {
+                same = false
+                break
+              }
+            }
+            if (same) continue
+            const unique = [...allKeys]
+            return `Erreur : Unités incompatibles dans "${line}" (${unique.join(' et ')}).`
           }
         }
       }
 
       return null
     },
-
     async parseContent() {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
