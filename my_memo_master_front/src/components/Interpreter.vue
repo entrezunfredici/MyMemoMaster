@@ -254,7 +254,7 @@ export default {
         if (foundUnits.length > 1) {
           let uniqueUnits = [...new Set(foundUnits)]
           if (uniqueUnits.length > 1) {
-            return `⚠️ Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
+            return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
           }
         }
       }
