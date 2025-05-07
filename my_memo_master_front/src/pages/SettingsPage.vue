@@ -67,7 +67,7 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import { useRoleStore } from '@/stores/role'
+import { useRoleStore } from '@/stores/roles'
 import Button from '@/components/ButtonComponent.vue'
 import { ref } from 'vue'
 import ToggleButton from '@/components/ToggleButton.vue'
