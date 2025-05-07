@@ -166,9 +166,7 @@ jobs:
       - name: Prepare SSH known_hosts for preprod
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
-          mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
 
       # ─────── 3. SCP Upload ───────
       - name: Upload docker-compose.yml to vps in prod
