@@ -45,7 +45,17 @@ export default {
       renderedContent: '',
       showPalette: false,
       diagramInitialized: false,
-      selectedFormulas: []
+      selectedFormulas: [],
+      colorFields: {
+        1: '#007bff',
+        2: '#e83e8c',
+        3: '#28a745',
+        4: '#fd7e14',
+        5: '#6f42c1',
+        6: '#dc3545',
+        7: '#17a2b8',
+        8: '#343a40'
+      }
     }
   },
   watch: {
@@ -171,7 +181,9 @@ export default {
 
       diagram.model = new go.GraphLinksModel(nodeDataArray)
     },
-
+    getColorById(id) {
+      return this.colorFields[id] || 'black'
+    },
     addToInput(formulaText) {
       if (this.selectedFormula === formulaText) {
         const regex = new RegExp(`\\s?${formula}`, 'g')
@@ -254,13 +266,7 @@ export default {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
 
-      let words = html.trim().split(/\s+/)
-
-      html = words
-        .map((w) => {
-          return reverseMapping[w] || w
-        })
-        .join(' ')
+      html = html.replace(/\b\w+\b/g, (w) => reverseMapping[w] || w)
 
       let unitError = this.checkUnitHomogeneity(html)
       if (unitError) {
@@ -336,7 +342,29 @@ export default {
         .replace(/ℂ/g, '&#8450;')
         .replace(/∞/g, '&#8734;')
         .replace(/²/g, '<sup>2</sup>')
-        .replace(/\n/g, '<br>')
+
+      // Interprétation des balises <text>
+      html = html.replace(/<text([^>]*)>([\s\S]*?)<\/text>/gi, (match, attributes, content) => {
+        let openTags = ''
+        let closeTags = ''
+
+        let styles = ''
+        if (attributes.includes('bold')) styles += 'font-weight: bold;'
+        if (attributes.includes('italic')) styles += 'font-style: italic;'
+
+        const colorMatch = attributes.match(/color:([a-zA-Z]+)/)
+        if (colorMatch) styles += `color: ${colorMatch[1]};`
+
+        if (styles) {
+          openTags += `<span style="${styles}">`
+          closeTags = '</span>' + closeTags
+        }
+
+        const contentWithBreaks = content.replace(/\n/g, '<br>')
+
+        return `${openTags}${contentWithBreaks}${closeTags}`
+      })
+      html = html.replace(/\n/g, '<br>')
 
       this.renderedContent = html
 
