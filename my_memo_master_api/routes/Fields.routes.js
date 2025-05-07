@@ -83,7 +83,7 @@ router.get("/:id", fieldController.findOne);
  *                 example: 3
  *               data:
  *                 type: object
- *                 example: {"value"="Données du champ"}
+ *                 example: {"value":"Données du champ"}
  *     responses:
  *       201:
  *         description: Champ créé avec succès
@@ -120,10 +120,10 @@ router.post("/add", fieldController.create);
  *                 example: "C"
  *               idType:
  *                 type: integer
- *                 example: 4
+ *                 example: 3
  *               data:
- *                 type: string
- *                 example: "Données mises à jour"
+ *                 type: object
+ *                 example: {"value":"Données mises à jour"}
  *     responses:
  *       200:
  *         description: Champ mis à jour avec succès
