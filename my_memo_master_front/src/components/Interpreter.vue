@@ -258,7 +258,10 @@ export default {
     async parseContent() {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
-      const cleanForUnits = html.replace(/<text[^>]*>[\s\S]*?<\/text>/gi, '')
+      const cleanForUnits = html
+        .replace(/<text[^>]*>[\s\S]*?<\/text>/gi, '')
+        .replace(/(sqrt|nsqrt|over|ln|widevec|∫_|∮_|∯_)\(.*?\)/g, '')
+        .replace(/[ẋẍx̅]/g, '')
       let unitError = this.checkUnitHomogeneity(cleanForUnits)
 
       if (unitError) {
