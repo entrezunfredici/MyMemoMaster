@@ -11,14 +11,7 @@
     </div>
 
     <h2>Zone de texte</h2>
-    <textarea
-      v-model="userInput"
-      ref="inputRef"
-      rows="5"
-      cols="50"
-      @keydown.delete="handleDelete"
-      @keydown.backspace="handleDelete"
-    ></textarea>
+    <textarea v-model="userInput" ref="inputRef" rows="5" cols="50"></textarea>
 
     <h3>Résultat :</h3>
     <div
@@ -198,49 +191,6 @@ export default {
         this.selectedFormula = formulaText
       }
     },
-    handleDelete(event) {
-      setTimeout(() => {
-        const input = this.userInput
-        const inputElement = this.$refs.inputRef
-        if (!inputElement) return
-
-        const cursorPos = inputElement.selectionStart
-
-        const complexFormulas = ['∫_┤^┤(┤)', '∮_┤^┤(┤)', '∯_┤^┤(┤)', '̅', '|┤|', '⌊┤⌋', '‖┤‖']
-
-        for (let formula of complexFormulas) {
-          const start = cursorPos - formula.length - 1
-          const end = cursorPos
-          const fragment = input.slice(start, end)
-
-          const cleanedFragment = fragment.replace(/\s/g, '')
-          const cleanedFormula = formula.replace(/\s/g, '')
-
-          console.log('✏️ Testing fragment:', JSON.stringify(fragment))
-          console.log('↔︎ Against formula:', JSON.stringify(formula))
-
-          if (cleanedFragment === cleanedFormula) {
-            this.userInput = input.slice(0, start) + input.slice(end)
-            event.preventDefault()
-            return
-          }
-        }
-
-        const simpleFormulaPattern = /[\ẇ̈^_+=\-*/→‖⌊⌋|∞∅ℕℤℚℝℂ≈≠≤≥]+/g
-        const matches = [...input.matchAll(simpleFormulaPattern)]
-
-        for (let match of matches) {
-          const matchStart = match.index
-          const matchEnd = matchStart + match[0].length
-
-          if (cursorPos === matchEnd) {
-            this.userInput = input.slice(0, matchStart) + input.slice(matchEnd)
-            event.preventDefault()
-            return
-          }
-        }
-      }, 0)
-    },
     checkUnitHomogeneity(expression) {
       const operatorPattern = /=|<|>|≤|≥|≠|≈|\+|-|\*/
 
@@ -248,7 +198,6 @@ export default {
 
       for (let line of lines) {
         if (!operatorPattern.test(line)) continue
-        if (!/[=+\-*]/.test(line)) continue
 
         const terms = line
           .split(operatorPattern)
@@ -272,22 +221,21 @@ export default {
           return unitCounts
         })
 
-        const base = JSON.stringify(normalizedUnits[0])
+        function unitsAreEqual(u1, u2) {
+          const allKeys = new Set([...Object.keys(u1), ...Object.keys(u2)])
+          for (let key of allKeys) {
+            if ((u1[key] || 0) !== (u2[key] || 0)) return false
+          }
+          return true
+        }
+
         for (let i = 1; i < normalizedUnits.length; i++) {
-          if (JSON.stringify(normalizedUnits[i]) !== base) {
-            const unitsA = normalizedUnits[0]
-            const unitsB = normalizedUnits[i]
-            const allKeys = new Set([...Object.keys(unitsA), ...Object.keys(unitsB)])
-            let same = true
-            for (let key of allKeys) {
-              if ((unitsA[key] || 0) !== (unitsB[key] || 0)) {
-                same = false
-                break
-              }
-            }
-            if (same) continue
-            const unique = [...allKeys]
-            return `Erreur : Unités incompatibles dans "${line}" (${unique.join(' et ')}).`
+          if (!unitsAreEqual(normalizedUnits[0], normalizedUnits[i])) {
+            const allUnits = new Set([
+              ...Object.keys(normalizedUnits[0]),
+              ...Object.keys(normalizedUnits[i])
+            ])
+            return `Erreur : Unités incompatibles dans "${line}" (${[...allUnits].join(' et ')}).`
           }
         }
       }
