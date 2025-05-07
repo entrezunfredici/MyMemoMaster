@@ -29,6 +29,10 @@ Object.keys(models).forEach((modelName) => {
   }
 });
 
+instance.sync({ alter: true }).then(() => {
+  console.log("Update database success"); 
+});
+
 module.exports = {
   instance,
   ...models,
