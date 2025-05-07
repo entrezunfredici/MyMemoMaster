@@ -23,6 +23,7 @@ const fieldsRoutes = require("./routes/Fields.routes.js");
 const fieldsTypeRoutes = require("./routes/FieldsType.routes.js");
 const diagrammeRoutes = require("./routes/Diagramme.routes");
 const questionRoutes = require("./routes/Question.routes");
+const tutorialRoutes = require("./routes/Tutorials.routes");
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
@@ -61,7 +62,7 @@ fieldsRoutes(app);
 fieldsTypeRoutes(app);
 diagrammeRoutes(app);
 questionRoutes(app);
-
+tutorialRoutes(app);
 
 // ... Autres middlewares
 
