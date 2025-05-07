@@ -184,7 +184,7 @@ class TestService {
     async update(id, data) {
         const test = await Test.findByPk(id);
         if (!test) {
-            throw new Error("Test not found");
+            throw new Error(" Test not found");
         }
         return await test.update(data);
     }
