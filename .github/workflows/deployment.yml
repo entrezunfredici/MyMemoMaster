@@ -81,13 +81,13 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Run SonarQube Prod Scan
+      - name: SonarQube Prod Scan
         if: github.ref == 'refs/heads/main'
         uses: sonarsource/sonarqube-scan-action@v3
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_PROD_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      - name: Run SonarQube PreProd Scan
+      - name: SonarQube PreProd Scan
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         uses: sonarsource/sonarqube-scan-action@v3
         env:
