@@ -260,8 +260,13 @@ export default {
       const reverseMapping = this.getReverseMapping()
       const cleanForUnits = html
         .replace(/<text[^>]*>[\s\S]*?<\/text>/gi, '')
-        .replace(/(sqrt|nsqrt|over|ln|widevec|∫_|∮_|∯_)\(.*?\)/g, '')
-        .replace(/[ẋẍx̅]/g, '')
+        .replace(/nsqrt\([^)]*\)/gi, '')
+        .replace(/sqrt\([^)]*\)/gi, '')
+        .replace(/ln\([^)]*\)/gi, '')
+        .replace(/over\([^)]*\)/gi, '')
+        .replace(/e\^([^\s^]+)/gi, '')
+        .replace(/[a-zA-Z]+\^\d+/gi, '')
+        .replace(/[ẋẍx̅→∫∮∯]/g, '')
       let unitError = this.checkUnitHomogeneity(cleanForUnits)
 
       if (unitError) {
