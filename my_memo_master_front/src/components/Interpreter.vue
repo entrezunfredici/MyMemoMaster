@@ -266,8 +266,6 @@ export default {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
 
-      html = html.replace(/\b\w+\b/g, (w) => reverseMapping[w] || w)
-
       let unitError = this.checkUnitHomogeneity(html)
       if (unitError) {
         this.renderedContent = `<span style="color: red; font-weight: bold;">${unitError}</span>`
@@ -275,6 +273,10 @@ export default {
       }
 
       html = html
+        .replace(
+          /nsqrt\((.*?),(.*?)\)/g,
+          '<span style="font-size: 0.75em; vertical-align: super;">$1</span>√($2)'
+        )
         .replace(/sqrt\((.*?)\)/g, '√($1)')
         .replace(
           /over\((.*?),(.*?)\)/g,
@@ -331,7 +333,7 @@ export default {
           /widevec\((.*?)\)/g,
           '<span style="display: inline-block; position: relative; text-align: center;"><span style="text-decoration: none;">$1</span><span style="position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%); font-size: 0.8em; font-weight: bold;">→</span></span>'
         )
-        .replace(/nsqrt\((.*?),(.*?)\)/g, '<sup>$1</sup>√($2)')
+
         .replace(/\|\|(.*?)\|\|/g, '‖$1‖')
         .replace(/\|(.*?)\|/g, '|$1|')
         .replace(/⌊(.*?)⌋/g, '⌊$1⌋')
