@@ -195,6 +195,11 @@ export default {
       const operatorPattern = /=|<|>|≤|≥|≠|≈|\+|-|\*/
 
       const lines = expression.split(/\n+/)
+      const unitConversions = {
+        km: { base: 'm', factor: 1000 },
+        h: { base: 's', factor: 3600 },
+        min: { base: 's', factor: 60 }
+      }
 
       for (let line of lines) {
         if (!operatorPattern.test(line)) continue
@@ -207,14 +212,22 @@ export default {
 
         const normalizedUnits = terms.map((term) => {
           const unitCounts = {}
-          const matches = [...term.matchAll(/(\d+)?\s*([a-zA-Z]+(?:\/[a-zA-Z]+)*)/g)]
+          const matches = [...term.matchAll(/(\d+)?\s*([a-zA-Z\/]+)/g)]
           for (let match of matches) {
             const fullUnit = match[2]
             const parts = fullUnit.split('/')
-            for (let i = 0; i < parts.length; i++) {
-              const part = parts[i]
-              const exponent = i === 0 ? 1 : -1
-              unitCounts[part] = (unitCounts[part] || 0) + exponent
+            const processPart = (part, exponent) => {
+              const conversion = unitConversions[part]
+              const base = conversion ? conversion.base : part
+              unitCounts[base] = (unitCounts[base] || 0) + exponent
+            }
+            if (parts.length === 1) {
+              processPart(parts[0], 1)
+            } else {
+              processPart(parts[0], 1)
+              for (let i = 1; i < parts.length; i++) {
+                processPart(parts[i], -1)
+              }
             }
           }
 
@@ -245,8 +258,9 @@ export default {
     async parseContent() {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
+      const cleanForUnits = html.replace(/<text[^>]*>[\s\S]*?<\/text>/gi, '')
+      let unitError = this.checkUnitHomogeneity(cleanForUnits)
 
-      let unitError = this.checkUnitHomogeneity(html)
       if (unitError) {
         this.renderedContent = `<span style="color: red; font-weight: bold;">${unitError}</span>`
         return
