@@ -45,7 +45,17 @@ export default {
       renderedContent: '',
       showPalette: false,
       diagramInitialized: false,
-      selectedFormulas: []
+      selectedFormulas: [],
+      colorFields: {
+        1: '#007bff',
+        2: '#e83e8c',
+        3: '#28a745',
+        4: '#fd7e14',
+        5: '#6f42c1',
+        6: '#dc3545',
+        7: '#17a2b8',
+        8: '#343a40'
+      }
     }
   },
   watch: {
@@ -171,7 +181,9 @@ export default {
 
       diagram.model = new go.GraphLinksModel(nodeDataArray)
     },
-
+    getColorById(id) {
+      return this.colorFields[id] || 'black'
+    },
     addToInput(formulaText) {
       if (this.selectedFormula === formulaText) {
         const regex = new RegExp(`\\s?${formula}`, 'g')
@@ -242,7 +254,7 @@ export default {
         if (foundUnits.length > 1) {
           let uniqueUnits = [...new Set(foundUnits)]
           if (uniqueUnits.length > 1) {
-            return `⚠️ Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
+            return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
           }
         }
       }
@@ -254,14 +266,6 @@ export default {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
 
-      let words = html.trim().split(/\s+/)
-
-      html = words
-        .map((w) => {
-          return reverseMapping[w] || w
-        })
-        .join(' ')
-
       let unitError = this.checkUnitHomogeneity(html)
       if (unitError) {
         this.renderedContent = `<span style="color: red; font-weight: bold;">${unitError}</span>`
@@ -269,6 +273,10 @@ export default {
       }
 
       html = html
+        .replace(
+          /nsqrt\((.*?),(.*?)\)/g,
+          '<span style="font-size: 0.75em; vertical-align: super;">$1</span>√($2)'
+        )
         .replace(/sqrt\((.*?)\)/g, '√($1)')
         .replace(
           /over\((.*?),(.*?)\)/g,
@@ -325,7 +333,7 @@ export default {
           /widevec\((.*?)\)/g,
           '<span style="display: inline-block; position: relative; text-align: center;"><span style="text-decoration: none;">$1</span><span style="position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%); font-size: 0.8em; font-weight: bold;">→</span></span>'
         )
-        .replace(/nsqrt\((.*?),(.*?)\)/g, '<sup>$1</sup>√($2)')
+
         .replace(/\|\|(.*?)\|\|/g, '‖$1‖')
         .replace(/\|(.*?)\|/g, '|$1|')
         .replace(/⌊(.*?)⌋/g, '⌊$1⌋')
@@ -336,7 +344,29 @@ export default {
         .replace(/ℂ/g, '&#8450;')
         .replace(/∞/g, '&#8734;')
         .replace(/²/g, '<sup>2</sup>')
-        .replace(/\n/g, '<br>')
+
+      // Interprétation des balises <text>
+      html = html.replace(/<text([^>]*)>([\s\S]*?)<\/text>/gi, (match, attributes, content) => {
+        let openTags = ''
+        let closeTags = ''
+
+        let styles = ''
+        if (attributes.includes('bold')) styles += 'font-weight: bold;'
+        if (attributes.includes('italic')) styles += 'font-style: italic;'
+
+        const colorMatch = attributes.match(/color:([a-zA-Z]+)/)
+        if (colorMatch) styles += `color: ${colorMatch[1]};`
+
+        if (styles) {
+          openTags += `<span style="${styles}">`
+          closeTags = '</span>' + closeTags
+        }
+
+        const contentWithBreaks = content.replace(/\n/g, '<br>')
+
+        return `${openTags}${contentWithBreaks}${closeTags}`
+      })
+      html = html.replace(/\n/g, '<br>')
 
       this.renderedContent = html
 
