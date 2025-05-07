@@ -36,7 +36,7 @@ services:
       - my_memo_master_preprod_network
 
   api:
-    image: fredissimo/my_memo_master_test_api:latest
+    image: fredissimo/mymemomaster_test_api:latest
     env_file:
       - .env
     ports:
@@ -57,7 +57,7 @@ services:
       - my_memo_master_preprod_network
 
   front:
-    image: fredissimo/my_memo_master_test_front:latest
+    image: fredissimo/mymemomaster_test_api:latest
     volumes:
       - front-data:/app/data
     ports:
