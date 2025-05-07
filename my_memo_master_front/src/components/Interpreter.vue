@@ -198,7 +198,9 @@ export default {
       const unitConversions = {
         km: { base: 'm', factor: 1000 },
         h: { base: 's', factor: 3600 },
-        min: { base: 's', factor: 60 }
+        min: { base: 's', factor: 60 },
+        cm: { base: 'm', factor: 0.01 },
+        mm: { base: 'm', factor: 0.001 }
       }
 
       for (let line of lines) {
@@ -212,23 +214,20 @@ export default {
 
         const normalizedUnits = terms.map((term) => {
           const unitCounts = {}
-          const matches = [...term.matchAll(/(\d+)?\s*([a-zA-Z\/]+)/g)]
+          const matches = [
+            ...term.matchAll(/([0-9]*\.?[0-9]+)?([a-zA-Z]+)(?:\/([0-9]*\.?[0-9]+)?([a-zA-Z]+))?/g)
+          ]
           for (let match of matches) {
-            const fullUnit = match[2]
-            const parts = fullUnit.split('/')
+            const [, , unit1, , unit2] = match
             const processPart = (part, exponent) => {
+              if (!part) return
               const conversion = unitConversions[part]
               const base = conversion ? conversion.base : part
               unitCounts[base] = (unitCounts[base] || 0) + exponent
             }
-            if (parts.length === 1) {
-              processPart(parts[0], 1)
-            } else {
-              processPart(parts[0], 1)
-              for (let i = 1; i < parts.length; i++) {
-                processPart(parts[i], -1)
-              }
-            }
+
+            processPart(unit1, 1)
+            processPart(unit2, -1)
           }
 
           return unitCounts
@@ -236,6 +235,7 @@ export default {
 
         function unitsAreEqual(u1, u2) {
           const allKeys = new Set([...Object.keys(u1), ...Object.keys(u2)])
+          if ([...allKeys].filter(Boolean).length === 0) return true // éviter erreur vide
           for (let key of allKeys) {
             if ((u1[key] || 0) !== (u2[key] || 0)) return false
           }
