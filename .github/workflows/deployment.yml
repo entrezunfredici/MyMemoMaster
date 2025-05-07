@@ -147,6 +147,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PROD_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
       # ─────── 1. SSH agent ───────
       - name: Set up SSH prod for Deployment
         if: github.ref == 'refs/heads/main'
