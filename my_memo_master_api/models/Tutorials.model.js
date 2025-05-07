@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 
-models.exports = (instance) => {
+module.exports = (instance) => {
   return instance.define(
     "Tutorials",
     {
