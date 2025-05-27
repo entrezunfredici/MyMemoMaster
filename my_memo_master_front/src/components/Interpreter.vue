@@ -192,64 +192,15 @@ export default {
       }
     },
     checkUnitHomogeneity(expression) {
-      const operatorPattern = /=|<|>|≤|≥|≠|≈|\+|-|\*/
-
       const lines = expression.split(/\n+/)
-      const unitConversions = {
-        km: { base: 'm', factor: 1000 },
-        h: { base: 's', factor: 3600 },
-        min: { base: 's', factor: 60 },
-        cm: { base: 'm', factor: 0.01 },
-        mm: { base: 'm', factor: 0.001 }
-      }
 
       for (let line of lines) {
-        if (!operatorPattern.test(line)) continue
+        const matches = [...line.matchAll(/\b\d+(?:\.\d+)?\s*([a-zA-ZµΩ°]+)\b/g)]
+        const unitsFound = matches.map((match) => match[1])
+        const uniqueUnits = [...new Set(unitsFound)]
 
-        const terms = line
-          .split(operatorPattern)
-          .map((t) => t.trim())
-          .filter((t) => t.length > 0)
-        if (terms.length < 2) continue
-
-        const normalizedUnits = terms.map((term) => {
-          const unitCounts = {}
-          const matches = [
-            ...term.matchAll(/([0-9]*\.?[0-9]+)?([a-zA-Z]+)(?:\/([0-9]*\.?[0-9]+)?([a-zA-Z]+))?/g)
-          ]
-          for (let match of matches) {
-            const [, , unit1, , unit2] = match
-            const processPart = (part, exponent) => {
-              if (!part) return
-              const conversion = unitConversions[part]
-              const base = conversion ? conversion.base : part
-              unitCounts[base] = (unitCounts[base] || 0) + exponent
-            }
-
-            processPart(unit1, 1)
-            processPart(unit2, -1)
-          }
-
-          return unitCounts
-        })
-
-        function unitsAreEqual(u1, u2) {
-          const allKeys = new Set([...Object.keys(u1), ...Object.keys(u2)])
-          if ([...allKeys].filter(Boolean).length === 0) return true // éviter erreur vide
-          for (let key of allKeys) {
-            if ((u1[key] || 0) !== (u2[key] || 0)) return false
-          }
-          return true
-        }
-
-        for (let i = 1; i < normalizedUnits.length; i++) {
-          if (!unitsAreEqual(normalizedUnits[0], normalizedUnits[i])) {
-            const allUnits = new Set([
-              ...Object.keys(normalizedUnits[0]),
-              ...Object.keys(normalizedUnits[i])
-            ])
-            return `Erreur : Unités incompatibles dans "${line}" (${[...allUnits].join(' et ')}).`
-          }
+        if (uniqueUnits.length > 1) {
+          return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
         }
       }
 
