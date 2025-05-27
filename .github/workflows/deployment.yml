@@ -168,6 +168,11 @@ jobs:
         run: |
           ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
+      # ─────── DEBUG ANTHONTEST ───────
+      - name: DEBUG ANTHONTEST
+        run: |
+          sftp -vvv -P ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}
+
       # ─────── 3. SCP Upload ───────
       - name: Upload docker-compose.yml to vps in prod
         if: github.ref == 'refs/heads/main'
