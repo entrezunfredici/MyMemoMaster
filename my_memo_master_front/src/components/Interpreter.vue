@@ -344,7 +344,23 @@ export default {
         .replace(/ℂ/g, '&#8450;')
         .replace(/∞/g, '&#8734;')
         .replace(/²/g, '<sup>2</sup>')
-
+        .replace(
+          /mattrix\(\[([^\]]+)\],\s*\[([^\]]+)\],\s*\[([^\]]+)\]\)/g,
+          (_, row1, row2, row3) => {
+            const toRow = (r) =>
+              '<tr>' +
+              r
+                .split(',')
+                .map(
+                  (val) => `<td style="border: 1px solid #ccc; padding: 4px;">${val.trim()}</td>`
+                )
+                .join('') +
+              '</tr>'
+            return `<table style="border-collapse: collapse; margin: 5px 0;">${toRow(row1)}${toRow(
+              row2
+            )}${toRow(row3)}</table>`
+          }
+        )
       // Interprétation des balises <text>
       html = html.replace(/<text([^>]*)>([\s\S]*?)<\/text>/gi, (match, attributes, content) => {
         let openTags = ''
