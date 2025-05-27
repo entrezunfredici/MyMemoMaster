@@ -25,7 +25,7 @@ const selectedSubject = ref('');
 // Récupère les diagrammes
 const fetchDiagrams = async () => {
   try {
-    const response = await api.get('diagramme/all');
+    const response = await api.get('diagrammes/all');
     diagrams.value = response.data;
   } catch (error) {
     console.error('Erreur API :', error);
@@ -67,7 +67,7 @@ const deleteDiagram = async (id) => {
   if (!confirmDelete) return;
 
   try {
-    const response = await api.delete(`/diagramme/${id}`);
+    const response = await api.delete(`/diagrammes/${id}`);
     if (response.status === 204 || response.status === 200) {
       toast.success('Diagramme supprimé');
       fetchDiagrams();
@@ -83,7 +83,7 @@ const confirmDelete = async (diagram) => {
   if (!confirmed) return;
 
   try {
-    const response = await api.del(`diagramme/${diagram.idMindMap}`);
+    const response = await api.del(`diagrammes/${diagram.idMindMap}`);
     if (response && [200, 204].includes(response.status)) {
       toast.success('Diagramme supprimé avec succès');
       diagrams.value = diagrams.value.filter(d => d.idMindMap !== diagram.idMindMap);
@@ -110,7 +110,7 @@ const confirmEdit = async () => {
     const diagram = diagrams.value.find(d => d.idMindMap === currentEditId.value);
     if (!diagram) return;
 
-    await api.put(`/diagramme/${currentEditId.value}`, {
+    await api.put(`/diagrammes/${currentEditId.value}`, {
       mmName: editedName.value,
       mindMapJson: diagram.mindMapJson,
       userId: diagram.userId,

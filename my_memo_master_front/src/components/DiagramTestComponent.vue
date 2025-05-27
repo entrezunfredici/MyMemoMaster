@@ -220,7 +220,7 @@ const saveDiagram = async () => {
       return;
     }
 
-    await api.put(`/diagramme/${diagramId.value}`, { diagram: json });
+    await api.put(`/diagrammes/${diagramId.value}`, { diagram: json });
     toast.success("Diagramme sauvegardé !");
   } catch (error) {
     console.error('Erreur de sauvegarde :', error);
@@ -237,7 +237,7 @@ const confirmExport = async () => {
       idSubject: 1,
     };
 
-    const response = await api.post('diagramme/add', dataToSend);
+    const response = await api.post('diagrammes/add', dataToSend);
     diagramId.value = response.data.id; // stocke l'ID retourné
     toast.success('Diagramme exporté en BDD');
     showExportModal.value = false;
