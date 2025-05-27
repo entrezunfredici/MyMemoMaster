@@ -192,12 +192,97 @@ export default {
       }
     },
     checkUnitHomogeneity(expression) {
-      const lines = expression.split(/\n+/)
+      const equivalentUnits = {
+        mm: 'm',
+        cm: 'm',
+        dm: 'm',
+        m: 'm',
+        dam: 'm',
+        hm: 'm',
+        km: 'm',
+        ms: 's',
+        s: 's',
+        min: 's',
+        h: 's',
+        hr: 's',
+        day: 's',
+        mg: 'kg',
+        g: 'kg',
+        kg: 'kg',
+        tonne: 'kg',
+        t: 'kg',
+        'm/s': 'm/s',
+        'km/h': 'm/s',
+        'mm²': 'm²',
+        'cm²': 'm²',
+        'dm²': 'm²',
+        'm²': 'm²',
+        a: 'm²',
+        ha: 'm²',
+        'km²': 'm²',
+        'mm³': 'm³',
+        'cm³': 'm³',
+        'dm³': 'm³',
+        'm³': 'm³',
+        L: 'm³',
+        dL: 'm³',
+        cL: 'm³',
+        mL: 'm³',
+        J: 'J',
+        kJ: 'J',
+        MJ: 'J',
+        cal: 'J',
+        kcal: 'J',
+        Wh: 'J',
+        kWh: 'J',
+        N: 'N',
+        kN: 'N',
+        Pa: 'Pa',
+        kPa: 'Pa',
+        bar: 'Pa',
+        atm: 'Pa',
+        mmHg: 'Pa',
+        W: 'W',
+        kW: 'W',
+        MW: 'W',
+        V: 'V',
+        mV: 'V',
+        A: 'A',
+        mA: 'A',
+        Ω: 'Ω',
+        ohm: 'Ω',
+        Hz: 'Hz',
+        kHz: 'Hz',
+        MHz: 'Hz',
+        K: 'K',
+        '°C': 'K',
+        '°F': 'K'
+      }
+
+      const normalizeUnit = (unit) => equivalentUnits[unit] || unit
+
+      const preprocess = (text) =>
+        text
+          // Cas 1 : 10m/1s → 10m/s
+          .replace(/\b(\d+(?:\.\d+)?)\s*([a-zA-ZµΩ°]+)\/1([a-zA-ZµΩ°]+)\b/g, '$1$2/$3')
+          // Cas 2 : 100000m/3600s → 100000m/s
+          .replace(/\b(\d+(?:\.\d+)?)\s*([a-zA-ZµΩ°]+)\/\d+(?:\.\d+)?([a-zA-ZµΩ°]+)\b/g, '$1$2/$3')
+
+      const lines = preprocess(expression).split(/\n+/)
 
       for (let line of lines) {
-        const matches = [...line.matchAll(/\b\d+(?:\.\d+)?\s*([a-zA-ZµΩ°]+)\b/g)]
-        const unitsFound = matches.map((match) => match[1])
-        const uniqueUnits = [...new Set(unitsFound)]
+        const matches = [...line.matchAll(/\b\d+(?:\.\d+)?\s*([a-zA-ZµΩ°\/]+)\b/g)]
+        const normalizedUnits = matches.map((m) => {
+          const full = m[1]
+          if (full.includes('/')) {
+            const [num, denom] = full.split('/')
+            return normalizeUnit(num) + '/' + normalizeUnit(denom)
+          } else {
+            return normalizeUnit(full)
+          }
+        })
+
+        const uniqueUnits = [...new Set(normalizedUnits)].sort()
 
         if (uniqueUnits.length > 1) {
           return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
