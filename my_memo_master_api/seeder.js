@@ -7,7 +7,7 @@ const listTables = async () => {
   // * Function to list all tables in the database
   try {
     const tables = await db.instance.query(
-      "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema';"
+      "SELECT tablename FROM catalog.tables WHERE schemaname != 'catalog' AND schemaname != 'information_schema';"
     );
     console.log(tables[0].map((table) => table.tablename));
   } catch (error) {
@@ -55,8 +55,7 @@ const seedDatabase = async () => {
     await db.Response.bulkCreate(require("./seeds/Response.seed.json"));
     console.log("Response table seeded successfully");
 
-    const diagrammes = require("./seeds/Diagramme.seed.json");
-    await db.Subject.bulkCreate(diagrammes);
+    await db.Diagramme.bulkCreate(require("./seeds/Diagramme.seed.json"));
     console.log("diagrammes table seeded successfully");
 
     await db.LeitnerSystem.bulkCreate(
@@ -75,7 +74,7 @@ const seedDatabase = async () => {
     // await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');
     // await db.instance.query('ALTER TABLE "LeitnerSystem" ENABLE TRIGGER ALL');
 
-    await db.instance.query("PRAGMA foreign_keys = ON");
+   // await db.instance.query("PRAGMA foreign_keys = ON");
 
     console.log("Sample data inserted successfully");
   } catch (error) {
