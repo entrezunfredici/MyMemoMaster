@@ -11,14 +11,7 @@
     </div>
 
     <h2>Zone de texte</h2>
-    <textarea
-      v-model="userInput"
-      ref="inputRef"
-      rows="5"
-      cols="50"
-      @keydown.delete="handleDelete"
-      @keydown.backspace="handleDelete"
-    ></textarea>
+    <textarea v-model="userInput" ref="inputRef" rows="5" cols="50"></textarea>
 
     <h3>Résultat :</h3>
     <div
@@ -198,75 +191,84 @@ export default {
         this.selectedFormula = formulaText
       }
     },
-    handleDelete(event) {
-      setTimeout(() => {
-        const input = this.userInput
-        const inputElement = this.$refs.inputRef
-        if (!inputElement) return
-
-        const cursorPos = inputElement.selectionStart
-
-        const complexFormulas = ['∫_┤^┤(┤)', '∮_┤^┤(┤)', '∯_┤^┤(┤)', '̅', '|┤|', '⌊┤⌋', '‖┤‖']
-
-        for (let formula of complexFormulas) {
-          const start = cursorPos - formula.length - 1
-          const end = cursorPos
-          const fragment = input.slice(start, end)
-
-          const cleanedFragment = fragment.replace(/\s/g, '')
-          const cleanedFormula = formula.replace(/\s/g, '')
-
-          console.log('✏️ Testing fragment:', JSON.stringify(fragment))
-          console.log('↔︎ Against formula:', JSON.stringify(formula))
-
-          if (cleanedFragment === cleanedFormula) {
-            this.userInput = input.slice(0, start) + input.slice(end)
-            event.preventDefault()
-            return
-          }
-        }
-
-        const simpleFormulaPattern = /[\ẇ̈^_+=\-*/→‖⌊⌋|∞∅ℕℤℚℝℂ≈≠≤≥]+/g
-        const matches = [...input.matchAll(simpleFormulaPattern)]
-
-        for (let match of matches) {
-          const matchStart = match.index
-          const matchEnd = matchStart + match[0].length
-
-          if (cursorPos === matchEnd) {
-            this.userInput = input.slice(0, matchStart) + input.slice(matchEnd)
-            event.preventDefault()
-            return
-          }
-        }
-      }, 0)
-    },
     checkUnitHomogeneity(expression) {
-      const units = ['m', 's', 'kg', 'J', 'N', 'Pa', 'W', 'V', 'A', 'Ω', 'Hz']
-      const unitPattern = /(\d+)\s*([a-zA-Z]+)/g
+      const operatorPattern = /=|<|>|≤|≥|≠|≈|\+|-|\*/
 
-      let lines = expression.split(/\n+/)
+      const lines = expression.split(/\n+/)
+      const unitConversions = {
+        km: { base: 'm', factor: 1000 },
+        h: { base: 's', factor: 3600 },
+        min: { base: 's', factor: 60 },
+        cm: { base: 'm', factor: 0.01 },
+        mm: { base: 'm', factor: 0.001 }
+      }
 
       for (let line of lines) {
-        let matches = [...line.matchAll(unitPattern)]
-        let foundUnits = matches.map((match) => match[2])
+        if (!operatorPattern.test(line)) continue
 
-        if (foundUnits.length > 1) {
-          let uniqueUnits = [...new Set(foundUnits)]
-          if (uniqueUnits.length > 1) {
-            return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
+        const terms = line
+          .split(operatorPattern)
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0)
+        if (terms.length < 2) continue
+
+        const normalizedUnits = terms.map((term) => {
+          const unitCounts = {}
+          const matches = [
+            ...term.matchAll(/([0-9]*\.?[0-9]+)?([a-zA-Z]+)(?:\/([0-9]*\.?[0-9]+)?([a-zA-Z]+))?/g)
+          ]
+          for (let match of matches) {
+            const [, , unit1, , unit2] = match
+            const processPart = (part, exponent) => {
+              if (!part) return
+              const conversion = unitConversions[part]
+              const base = conversion ? conversion.base : part
+              unitCounts[base] = (unitCounts[base] || 0) + exponent
+            }
+
+            processPart(unit1, 1)
+            processPart(unit2, -1)
+          }
+
+          return unitCounts
+        })
+
+        function unitsAreEqual(u1, u2) {
+          const allKeys = new Set([...Object.keys(u1), ...Object.keys(u2)])
+          if ([...allKeys].filter(Boolean).length === 0) return true // éviter erreur vide
+          for (let key of allKeys) {
+            if ((u1[key] || 0) !== (u2[key] || 0)) return false
+          }
+          return true
+        }
+
+        for (let i = 1; i < normalizedUnits.length; i++) {
+          if (!unitsAreEqual(normalizedUnits[0], normalizedUnits[i])) {
+            const allUnits = new Set([
+              ...Object.keys(normalizedUnits[0]),
+              ...Object.keys(normalizedUnits[i])
+            ])
+            return `Erreur : Unités incompatibles dans "${line}" (${[...allUnits].join(' et ')}).`
           }
         }
       }
 
       return null
     },
-
     async parseContent() {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
+      const cleanForUnits = html
+        .replace(/<text[^>]*>[\s\S]*?<\/text>/gi, '')
+        .replace(/nsqrt\([^)]*\)/gi, '')
+        .replace(/sqrt\([^)]*\)/gi, '')
+        .replace(/ln\([^)]*\)/gi, '')
+        .replace(/over\([^)]*\)/gi, '')
+        .replace(/e\^([^\s^]+)/gi, '')
+        .replace(/[a-zA-Z]+\^\d+/gi, '')
+        .replace(/[ẋẍx̅→∫∮∯]/g, '')
+      let unitError = this.checkUnitHomogeneity(cleanForUnits)
 
-      let unitError = this.checkUnitHomogeneity(html)
       if (unitError) {
         this.renderedContent = `<span style="color: red; font-weight: bold;">${unitError}</span>`
         return

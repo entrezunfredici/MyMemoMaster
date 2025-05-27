@@ -147,6 +147,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
+      
+
       # ─────── 1. SSH agent ───────
       - name: Set up SSH prod for Deployment
         if: github.ref == 'refs/heads/main'
@@ -161,13 +163,8 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PREPROD_PRIVATE_KEY }}
 
       # ─────── 2. known_hosts ───────
-      - name: Prepare SSH known_hosts for prod
-        if: github.ref == 'refs/heads/main'
-        run: |
-          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
-
       - name: Prepare SSH known_hosts for preprod
-        if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
