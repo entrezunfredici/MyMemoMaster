@@ -83,7 +83,7 @@ router.get("/:id", role.findOne);
  *             properties:
  *               name:
  *                 type: string
- *                 example: "Math"
+ *                 example: "Student"
  *     responses:
  *       201:
  *         description: Rôle créé avec succès

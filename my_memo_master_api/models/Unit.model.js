@@ -15,8 +15,8 @@ module.exports = (instance) => {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        physicalQuantityId: {
-            type: DataTypes.INTEGER,
+        physicalQuantityName: {
+            type: DataTypes.STRING,
             allowNull: false,
         },
     }, {

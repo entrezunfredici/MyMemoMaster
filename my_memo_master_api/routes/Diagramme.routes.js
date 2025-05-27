@@ -4,11 +4,11 @@ const router = express.Router();
 
 /**
  * @swagger
- * /diagramme/all:
+ * /diagrammes/all:
  *   get:
  *     summary: Récupère tous les diagrammes
  *     tags:
- *       - diagramme
+ *       - diagrammes
  *     responses:
  *       200:
  *         description: Liste de tous les diagrammes
@@ -35,11 +35,11 @@ router.get("/all", diagramme.findAll);
 
 /**
  * @swagger
- * /diagramme/{id}:
+ * /diagrammes/{id}:
  *   get:
  *     summary: Récupère un diagramme par son ID
  *     tags:
- *       - diagramme
+ *       - diagrammes
  *     parameters:
  *       - name: id
  *         in: path
@@ -73,11 +73,11 @@ router.get("/:id", diagramme.findOne);
 
 /**
  * @swagger
- * /diagramme/add:
+ * /diagrammes/add:
  *   post:
  *     summary: Ajoute un nouveau diagramme
  *     tags:
- *       - diagramme
+ *       - diagrammes
  *     requestBody:
  *       required: true
  *       content:
@@ -88,9 +88,12 @@ router.get("/:id", diagramme.findOne);
  *               name:
  *                 type: string
  *                 example: "Math"
- *               mindMapsJson:
- *                 type: string
- *                 example: "json"
+ *               mindMapJson:
+ *                 type: object
+ *                 example: {"nodes": [5, 6, 7],"edges": [8, 9, 10]}
+ *               userId:
+ *                type: integer 
+ *                example: 1
  *     responses:
  *       201:
  *         description: Diagramme créé avec succès
@@ -103,11 +106,11 @@ router.post("/add", diagramme.create);
 
 /**
  * @swagger
- * /diagramme/{id}:
+ * /diagrammes/{id}:
  *   put:
  *     summary: Met à jour un diagramme existant
  *     tags:
- *       - diagramme
+ *       - diagrammes
  *     parameters:
  *       - name: id
  *         in: path
@@ -140,11 +143,11 @@ router.put("/:id", diagramme.update);
 
 /**
  * @swagger
- * /diagramme/{id}:
+ * /diagrammes/{id}:
  *   delete:
  *     summary: Supprime un diagramme par son ID
  *     tags:
- *       - diagramme
+ *       - diagrammes
  *     parameters:
  *       - name: id
  *         in: path
@@ -166,8 +169,8 @@ module.exports = (app) => {
   /**
    * @swagger
    * tags:
-   *   - name: diagramme
+   *   - name: diagrammes
    *     description: Gestion des diagrammes
    */
-  app.use("/diagramme", router);
+  app.use("/diagrammes", router);
 };

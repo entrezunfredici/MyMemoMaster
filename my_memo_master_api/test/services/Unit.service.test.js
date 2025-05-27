@@ -18,8 +18,8 @@ describe("UnitService", () => {
 
   test("should retrieve all units", async () => {
     const mockUnits = [
-      { id: 1, name: "Meter", denomination: "m", physicalQuantityId: 1 },
-      { id: 2, name: "Kilogram", denomination: "kg", physicalQuantityId: 2 },
+      { id: 1, name: "Meter", denomination: "m", physicalQuantityName: "Lenght" },
+      { id: 2, name: "Kilogram", denomination: "kg", physicalQuantityName: "Weight" },
     ];
     Unit.findAll.mockResolvedValue(mockUnits);
 
@@ -34,7 +34,7 @@ describe("UnitService", () => {
       id: 1,
       name: "Meter",
       denomination: "m",
-      physicalQuantityId: 1,
+      physicalQuantityName: "Lenght",
     };
     Unit.findByPk.mockResolvedValue(mockUnit);
 
@@ -57,7 +57,7 @@ describe("UnitService", () => {
     const newUnit = {
       name: "Second",
       denomination: "s",
-      physicalQuantityId: 3,
+      physicalQuantityName: "Time",
     };
     const mockCreatedUnit = { id: 3, ...newUnit };
 
@@ -74,7 +74,7 @@ describe("UnitService", () => {
       id: 1,
       name: "Meter",
       denomination: "m",
-      physicalQuantityId: 1,
+      physicalQuantityName: "Lenght",
       update: jest.fn().mockImplementation((newData) => {
         Object.assign(mockUnit, newData);
         return mockUnit;
@@ -93,7 +93,7 @@ describe("UnitService", () => {
       id: 1,
       name: "Kilometer",
       denomination: "km",
-      physicalQuantityId: 1,
+      physicalQuantityName: "Lenght",
     });
   });
 

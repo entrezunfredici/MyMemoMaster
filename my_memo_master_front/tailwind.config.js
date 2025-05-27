@@ -2,14 +2,15 @@
 
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-  darkMode: true, // or 'media' or 'class'
+  purge: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
+  darkMode: true,
+  safelist: ['text-white'], // or 'media' or 'class'
   theme: {
     extend: {},
     colors: {
       /* Theme colors */
       primary: '#1E3BA1',
-      'light-primary': '#D5DAED',
+      'light-primary': '#828FBC',
       secondary: '#FA4238',
       'light-secondary': '#FDC7C4',
       light: '#FDF7FF',

@@ -1,5 +1,6 @@
 .env
 .idea
+*lock.json
 my_memo_master_api/node_modules
 my_memo_master_api/database/db.sqlite
 my_memo_master_api/.envs

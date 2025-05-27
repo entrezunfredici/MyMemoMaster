@@ -48,6 +48,12 @@ const seedDatabase = async () => {
 
     await db.Subject.bulkCreate(require("./seeds/Units.seed.json"));
     console.log("Units table seeded successfully");
+    
+    await db.Question.bulkCreate(require("./seeds/Question.seed.json"));
+    console.log("Question table seeded successfully");
+
+    await db.Response.bulkCreate(require("./seeds/Response.seed.json"));
+    console.log("Response table seeded successfully");
 
     await db.Diagramme.bulkCreate(require("./seeds/Diagramme.seed.json"));
     console.log("diagrammes table seeded successfully");
@@ -68,6 +74,8 @@ const seedDatabase = async () => {
     // await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');
     // await db.instance.query('ALTER TABLE "LeitnerSystem" ENABLE TRIGGER ALL');
 
+   // await db.instance.query("PRAGMA foreign_keys = ON");
+
     console.log("Sample data inserted successfully");
   } catch (error) {
     console.error("Error inserting sample data");
@@ -80,6 +88,7 @@ const checkSeed = async () => {
   // * Function to verify that the sample data has been inserted
   try {
     const roles = await db.Role.findAll();
+    console.log(roles)
     if (roles.length === 0) {
       console.warn("No data found in the database");
     } else {
