@@ -70,6 +70,9 @@ const seedDatabase = async () => {
     await db.LeitnerCard.bulkCreate(require("./seeds/LeitnerCard.seed.json"));
     console.log("LeitnerCards table seeded successfully");
 
+    await db.Test.bulkCreate(require("./seeds/Test.seed.json"));
+    console.log("Test table seeded successfully");
+
     // Réactiver les déclencheurs de clés étrangères
     // await db.instance.query('ALTER TABLE "User" ENABLE TRIGGER ALL');
     // await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');

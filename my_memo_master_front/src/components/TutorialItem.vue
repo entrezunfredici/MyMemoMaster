@@ -4,7 +4,7 @@
             <PlayIcon class="h-5 w-5 text-light-primary" />
         </div>
         <div class="p-4">
-            <h4 class="text-xl font-bold">{{ props.tutorial.title }}</h4>
+            <h4 class="text-xl font-bold">{{ props.tutorial.name }}</h4>
             <p class="text-md">{{ props.tutorial.description }}</p>
             <div class="flex flex-row gap-2 mt-2">
                 <Pill v-if="props?.tutorial?.subject?.name" :text="props.tutorial.subject.name" />
