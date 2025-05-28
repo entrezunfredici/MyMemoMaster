@@ -24,6 +24,10 @@
           <textarea placeholder="Quelle est la loi de bernouilli ?" class="w-full p-2 rounded-lg text-dark" />
         </div>
 
+        <div class="pb-4 w-full flex justify-center">
+          <Button :callback="() => { console.log('Valider') }">Valider</Button>
+        </div>
+
         <div class="border-4 border-primary rounded-lg px-8 py-4">
           <h4 class="text-primary text-xl neue-haas-grotesk-r font-semibold pb-4">
             Questions récap

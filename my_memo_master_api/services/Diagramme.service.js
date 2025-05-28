@@ -2,6 +2,10 @@ const { Diagramme } = require("../models/index");
 
 class DiagrammeService  {
 
+  async findById(id) {
+    return await Diagramme.findByPk(id); // ou findOne({ where: { idMindMap: id } });
+  };
+
   async findAll() {
     return await Diagramme.findAll();
   }

@@ -9,3 +9,4 @@ db.instance.sync().then(async () => {
 }).catch((e) => {
     console.error(e);
 })
+

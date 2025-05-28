@@ -47,7 +47,9 @@ const routes = [
   {
     path: '/profile',
     name: 'profile',
-    component: () => import('../pages/ProfilePage.vue'),
+    //component: () => import('../pages/ProfilePage.vue'),
+    //component: () => import('../pages/ConnexionPage.vue'),
+    component: () => import('../pages/InscriptionPage.vue'),
     meta: {
       title: 'Profile',
       private: true,
@@ -88,6 +90,7 @@ const routes = [
       title: 'Error',
     },
   }
+  
 ]
 
 export default routes

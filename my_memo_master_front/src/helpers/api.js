@@ -27,19 +27,7 @@ axiosApi.interceptors.request.use((config) => {
 });
 
 function isStatusOk(status) {
-
-  // 401: Unauthorized
-  if (status === 401) {
-    useAuthStore().logout()
-    return false
-  }
-  
-  // 204: No Content (ex: user not found)
-  if (status === 204) {
-    return false
-  }
-
-  return true
+  return [200, 201, 202, 204].includes(status);
 }
 
 async function get(endpoint, params = {}) {
