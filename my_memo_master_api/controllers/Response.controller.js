@@ -3,8 +3,8 @@ const ResponseService = require("../services/Response.service.js");
 // Obtenir toutes les réponses d'une question
 exports.findAllByQuestion = async (req, res) => {
   try {
-    const { idQuestion } = req.params;
-    const responses = await ResponseService.getAllResponsesByQuestion(idQuestion);
+    const { questionId } = req.params;
+    const responses = await ResponseService.getAllResponsesByQuestion(questionId);
     res.status(200).json(responses);
   } catch (error) {
     res.status(500).send({
@@ -16,18 +16,18 @@ exports.findAllByQuestion = async (req, res) => {
 // Obtenir la correction d'une question
 exports.findCorrectionByQuestion = async (req, res) => {
   try {
-    const { idQuestion } = req.params;
-    const correction = await ResponseService.getCorrectionByQuestion(idQuestion);
+    const { questionId } = req.params;
+    const correction = await ResponseService.getCorrectionByQuestion(questionId);
     if (!correction) {
       res.status(404).send({
-        message: `Aucune correction trouvée pour la question ${idQuestion}.`,
+        message: `Aucune correction trouvée pour la question ${questionId}.`,
       });
     } else {
       res.status(200).json(correction);
     }
   } catch (error) {
     res.status(500).send({
-      message: `Erreur lors de la récupération de la correction pour la question ${req.params.idQuestion}.`,
+      message: `Erreur lors de la récupération de la correction pour la question ${req.params.questionId}.`,
     });
   }
 };

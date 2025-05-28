@@ -64,7 +64,15 @@ const routes = [
       private: true,
     },
   },
-
+    {
+    path: '/create-test',
+    name: 'create.test',
+    component: () => import('../pages/CreateTestPage.vue'),
+    meta: {
+      title: 'Create Test',
+      private: true,
+    },
+  },
   // ==================== CATCH ====================
   {
     path: '/error-server',
