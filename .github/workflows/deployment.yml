@@ -71,7 +71,6 @@ jobs:
           -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
           ${{ secrets.DISCORD_LOG }}
 
-  # sonar broken
   sonar_analysis:
     name: Run SonarQube Analysis
     runs-on: ubuntu-latest
