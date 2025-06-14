@@ -47,7 +47,9 @@ const routes = [
   {
     path: '/profile',
     name: 'profile',
-    component: () => import('../pages/ProfilePage.vue'),
+    //component: () => import('../pages/ProfilePage.vue'),
+    //component: () => import('../pages/ConnexionPage.vue'),
+    component: () => import('../pages/InscriptionPage.vue'),
     meta: {
       title: 'Profile',
       private: true,
@@ -59,6 +61,15 @@ const routes = [
     component: () => import('../pages/SettingsPage.vue'),
     meta: {
       title: 'Settings',
+      private: true,
+    },
+  },
+    {
+    path: '/create-test',
+    name: 'create.test',
+    component: () => import('../pages/CreateTestPage.vue'),
+    meta: {
+      title: 'Create Test',
       private: true,
     },
   },
@@ -79,6 +90,7 @@ const routes = [
       title: 'Error',
     },
   }
+  
 ]
 
 export default routes

@@ -23,7 +23,7 @@ module.exports = (instance) => {
             defaultValue: DataTypes.NOW,
         },
     }, {
-        tableName: 'Role',
+        tableName: 'roles',
         updatedAt: 'updatedAt',
         createdAt: 'createdAt',
         timestamps: true,

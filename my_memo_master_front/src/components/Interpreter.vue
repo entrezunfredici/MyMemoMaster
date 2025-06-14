@@ -11,14 +11,7 @@
     </div>
 
     <h2>Zone de texte</h2>
-    <textarea
-      v-model="userInput"
-      ref="inputRef"
-      rows="5"
-      cols="50"
-      @keydown.delete="handleDelete"
-      @keydown.backspace="handleDelete"
-    ></textarea>
+    <textarea v-model="userInput" ref="inputRef" rows="5" cols="50"></textarea>
 
     <h3>Résultat :</h3>
     <div
@@ -198,75 +191,120 @@ export default {
         this.selectedFormula = formulaText
       }
     },
-    handleDelete(event) {
-      setTimeout(() => {
-        const input = this.userInput
-        const inputElement = this.$refs.inputRef
-        if (!inputElement) return
-
-        const cursorPos = inputElement.selectionStart
-
-        const complexFormulas = ['∫_┤^┤(┤)', '∮_┤^┤(┤)', '∯_┤^┤(┤)', '̅', '|┤|', '⌊┤⌋', '‖┤‖']
-
-        for (let formula of complexFormulas) {
-          const start = cursorPos - formula.length - 1
-          const end = cursorPos
-          const fragment = input.slice(start, end)
-
-          const cleanedFragment = fragment.replace(/\s/g, '')
-          const cleanedFormula = formula.replace(/\s/g, '')
-
-          console.log('✏️ Testing fragment:', JSON.stringify(fragment))
-          console.log('↔︎ Against formula:', JSON.stringify(formula))
-
-          if (cleanedFragment === cleanedFormula) {
-            this.userInput = input.slice(0, start) + input.slice(end)
-            event.preventDefault()
-            return
-          }
-        }
-
-        const simpleFormulaPattern = /[\ẇ̈^_+=\-*/→‖⌊⌋|∞∅ℕℤℚℝℂ≈≠≤≥]+/g
-        const matches = [...input.matchAll(simpleFormulaPattern)]
-
-        for (let match of matches) {
-          const matchStart = match.index
-          const matchEnd = matchStart + match[0].length
-
-          if (cursorPos === matchEnd) {
-            this.userInput = input.slice(0, matchStart) + input.slice(matchEnd)
-            event.preventDefault()
-            return
-          }
-        }
-      }, 0)
-    },
     checkUnitHomogeneity(expression) {
-      const units = ['m', 's', 'kg', 'J', 'N', 'Pa', 'W', 'V', 'A', 'Ω', 'Hz']
-      const unitPattern = /(\d+)\s*([a-zA-Z]+)/g
+      const equivalentUnits = {
+        mm: 'm',
+        cm: 'm',
+        dm: 'm',
+        m: 'm',
+        dam: 'm',
+        hm: 'm',
+        km: 'm',
+        ms: 's',
+        s: 's',
+        min: 's',
+        h: 's',
+        hr: 's',
+        day: 's',
+        mg: 'kg',
+        g: 'kg',
+        kg: 'kg',
+        tonne: 'kg',
+        t: 'kg',
+        'm/s': 'm/s',
+        'km/h': 'm/s',
+        'mm²': 'm²',
+        'cm²': 'm²',
+        'dm²': 'm²',
+        'm²': 'm²',
+        a: 'm²',
+        ha: 'm²',
+        'km²': 'm²',
+        'mm³': 'm³',
+        'cm³': 'm³',
+        'dm³': 'm³',
+        'm³': 'm³',
+        L: 'm³',
+        dL: 'm³',
+        cL: 'm³',
+        mL: 'm³',
+        J: 'J',
+        kJ: 'J',
+        MJ: 'J',
+        cal: 'J',
+        kcal: 'J',
+        Wh: 'J',
+        kWh: 'J',
+        N: 'N',
+        kN: 'N',
+        Pa: 'Pa',
+        kPa: 'Pa',
+        bar: 'Pa',
+        atm: 'Pa',
+        mmHg: 'Pa',
+        W: 'W',
+        kW: 'W',
+        MW: 'W',
+        V: 'V',
+        mV: 'V',
+        A: 'A',
+        mA: 'A',
+        Ω: 'Ω',
+        ohm: 'Ω',
+        Hz: 'Hz',
+        kHz: 'Hz',
+        MHz: 'Hz',
+        K: 'K',
+        '°C': 'K',
+        '°F': 'K'
+      }
 
-      let lines = expression.split(/\n+/)
+      const normalizeUnit = (unit) => equivalentUnits[unit] || unit
+
+      const preprocess = (text) =>
+        text
+          // Cas 1 : 10m/1s → 10m/s
+          .replace(/\b(\d+(?:\.\d+)?)\s*([a-zA-ZµΩ°]+)\/1([a-zA-ZµΩ°]+)\b/g, '$1$2/$3')
+          // Cas 2 : 100000m/3600s → 100000m/s
+          .replace(/\b(\d+(?:\.\d+)?)\s*([a-zA-ZµΩ°]+)\/\d+(?:\.\d+)?([a-zA-ZµΩ°]+)\b/g, '$1$2/$3')
+
+      const lines = preprocess(expression).split(/\n+/)
 
       for (let line of lines) {
-        let matches = [...line.matchAll(unitPattern)]
-        let foundUnits = matches.map((match) => match[2])
-
-        if (foundUnits.length > 1) {
-          let uniqueUnits = [...new Set(foundUnits)]
-          if (uniqueUnits.length > 1) {
-            return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
+        const matches = [...line.matchAll(/\b\d+(?:\.\d+)?\s*([a-zA-ZµΩ°\/]+)\b/g)]
+        const normalizedUnits = matches.map((m) => {
+          const full = m[1]
+          if (full.includes('/')) {
+            const [num, denom] = full.split('/')
+            return normalizeUnit(num) + '/' + normalizeUnit(denom)
+          } else {
+            return normalizeUnit(full)
           }
+        })
+
+        const uniqueUnits = [...new Set(normalizedUnits)].sort()
+
+        if (uniqueUnits.length > 1) {
+          return `Erreur : Unités incompatibles dans "${line}" (${uniqueUnits.join(' et ')}).`
         }
       }
 
       return null
     },
-
     async parseContent() {
       let html = this.userInput
       const reverseMapping = this.getReverseMapping()
+      const cleanForUnits = html
+        .replace(/<text[^>]*>[\s\S]*?<\/text>/gi, '')
+        .replace(/nsqrt\([^)]*\)/gi, '')
+        .replace(/sqrt\([^)]*\)/gi, '')
+        .replace(/ln\([^)]*\)/gi, '')
+        .replace(/over\([^)]*\)/gi, '')
+        .replace(/e\^([^\s^]+)/gi, '')
+        .replace(/[a-zA-Z]+\^\d+/gi, '')
+        .replace(/[ẋẍx̅→∫∮∯]/g, '')
+      let unitError = this.checkUnitHomogeneity(cleanForUnits)
 
-      let unitError = this.checkUnitHomogeneity(html)
       if (unitError) {
         this.renderedContent = `<span style="color: red; font-weight: bold;">${unitError}</span>`
         return
@@ -344,7 +382,23 @@ export default {
         .replace(/ℂ/g, '&#8450;')
         .replace(/∞/g, '&#8734;')
         .replace(/²/g, '<sup>2</sup>')
-
+        .replace(
+          /mattrix\(\[([^\]]+)\],\s*\[([^\]]+)\],\s*\[([^\]]+)\]\)/g,
+          (_, row1, row2, row3) => {
+            const toRow = (r) =>
+              '<tr>' +
+              r
+                .split(',')
+                .map(
+                  (val) => `<td style="border: 1px solid #ccc; padding: 4px;">${val.trim()}</td>`
+                )
+                .join('') +
+              '</tr>'
+            return `<table style="border-collapse: collapse; margin: 5px 0;">${toRow(row1)}${toRow(
+              row2
+            )}${toRow(row3)}</table>`
+          }
+        )
       // Interprétation des balises <text>
       html = html.replace(/<text([^>]*)>([\s\S]*?)<\/text>/gi, (match, attributes, content) => {
         let openTags = ''

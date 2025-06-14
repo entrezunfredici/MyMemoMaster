@@ -223,5 +223,3 @@ jobs:
           curl -X POST -H "Content-Type: application/json" \
           -d "{\"content\": \"Deployment succeeded on branch $GITHUB_REF!\"}" \
           ${{ secrets.DISCORD_LOG }}
-
-#230
