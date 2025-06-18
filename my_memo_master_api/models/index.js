@@ -35,7 +35,7 @@ Object.keys(models).forEach((modelName) => {
 //   console.log("reset database success"); 
 // });
 
-instance.sync({ force: true }).then(() => {
+instance.sync({ alter: true }).then(() => {
   console.log("Base de données synchronisée (force true)");
   // Ici tu peux démarrer ton serveur ou ta seed
 }).catch((err) => {
