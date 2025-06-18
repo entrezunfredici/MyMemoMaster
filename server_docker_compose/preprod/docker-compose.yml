@@ -2,9 +2,6 @@
 version: '3'
 services:
   postgres:
-    #build:
-    #  context: ./postgres
-    #  dockerfile: Dockerfile-postgres
     image: postgres:15
     environment:
       POSTGRES_USER: ${PG_USER}
@@ -14,14 +11,10 @@ services:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - "${PG_PORT}:5432"
-      #- "${PG_PORT}:5432"
     networks:
       - my_memo_master_preprod_network
 
   pgadmin:
-    #build:
-    #  context: ./postgres
-    #  dockerfile: Dockerfile-pgadmin
     image: dpage/pgadmin4:latest
     ports:
       - "${PGADMIN_PORT}:${INTERNAL_PG_PORT}"
