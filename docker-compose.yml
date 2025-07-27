@@ -16,7 +16,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - my_memo_master_preprod_network
+      - my_memo_master_network
   postgres:
     build:
       context: ./postgres
