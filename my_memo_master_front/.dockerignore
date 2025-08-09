@@ -1,4 +1,10 @@
-node_modules/
+node_modules
+dist
 .git
-.idea
+.gitignore
+Dockerfile
 Dockerfile*
+nginx.conf
+.vscode
+.env
+.env.local
