@@ -53,7 +53,6 @@ services:
       - traefik.http.routers.mmm-preprod-api.rule=Host(`api.tests.my-memo-master.com`)
       - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
-      # Port INTERNE où l'API écoute dans le container
       - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
     networks:
       - my_memo_master_preprod_network
@@ -69,7 +68,6 @@ services:
       - traefik.http.routers.mmm-preprod-front.rule=Host(`tests.my-memo-master.com`)
       - traefik.http.routers.mmm-preprod-front.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-front.tls.certresolver=letsencrypt
-      - traefik.http.services.mmm-preprod-front.loadbalancer.server.port=80
     networks:
       - my_memo_master_preprod_network
       - traefik_proxy

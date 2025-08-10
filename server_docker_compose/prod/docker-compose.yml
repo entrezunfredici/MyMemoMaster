@@ -70,7 +70,6 @@ services:
       - traefik.http.routers.mmm-prod-front.rule=Host(`my-memo-master.com`,`www.my-memo-master.com`)
       - traefik.http.routers.mmm-prod-front.entrypoints=websecure
       - traefik.http.routers.mmm-prod-front.tls.certresolver=letsencrypt
-      - traefik.http.services.mmm-prod-front.loadbalancer.server.port=80
     networks:
       - my_memo_master_network
       - traefik_proxy
