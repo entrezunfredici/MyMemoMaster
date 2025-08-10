@@ -1,21 +1,7 @@
 # File docker-compose.yml
-version: '3'
-services:
-  traefik:
-    image: traefik:v2.10
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-    ports:
-      - "80:80"
-      - "8080:8081"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - my_memo_master_preprod_network
+version: "3.3"
 
+services:
   postgres:
     image: postgres:15
     environment:
@@ -37,12 +23,14 @@ services:
     depends_on:
       - postgres
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin-preprod.mymemomaster.com`)"
-      - "traefik.http.routers.pgadmin.entrypoints=web"
-      - "traefik.http.services.pgadmin.loadbalancer.server.port=${INTERNAL_PG_PORT}"
+      - traefik.enable=true
+      - traefik.http.routers.mmm-preprod-pgadmin.rule=Host(`pgadmin.tests.my-memo-master.com`)
+      - traefik.http.routers.mmm-preprod-pgadmin.entrypoints=websecure
+      - traefik.http.routers.mmm-preprod-pgadmin.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-preprod-pgadmin.loadbalancer.server.port=80
     networks:
       - my_memo_master_preprod_network
+      - traefik_proxy
 
   api:
     image: fredissimo/mymemomaster_test_api:latest
@@ -61,25 +49,31 @@ services:
     depends_on:
       - postgres
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api-preprod.mymemomaster.com`)"
-      - "traefik.http.routers.api.entrypoints=web"
-      - "traefik.http.services.api.loadbalancer.server.port=${API_PORT}"
+      - traefik.enable=true
+      - traefik.http.routers.mmm-preprod-api.rule=Host(`api.tests.my-memo-master.com`)
+      - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
+      - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
+      # Port INTERNE où l'API écoute dans le container
+      - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
     networks:
       - my_memo_master_preprod_network
+      - traefik_proxy
+    restart: unless-stopped
 
   front:
     image: fredissimo/mymemomaster_test_front:latest
     volumes:
       - front-data:/app/data
-    restart: always
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.front.rule=Host(`preprod.mymemomaster.com`)"
-      - "traefik.http.routers.front.entrypoints=web"
-      - "traefik.http.services.front.loadbalancer.server.port=80"
+      - traefik.enable=true
+      - traefik.http.routers.mmm-preprod-front.rule=Host(`tests.my-memo-master.com`)
+      - traefik.http.routers.mmm-preprod-front.entrypoints=websecure
+      - traefik.http.routers.mmm-preprod-front.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-preprod-front.loadbalancer.server.port=80
     networks:
       - my_memo_master_preprod_network
+      - traefik_proxy
+    restart: unless-stopped
 
 volumes:
   api-data:
@@ -90,3 +84,6 @@ volumes:
 networks:
   my_memo_master_preprod_network:
     driver: bridge
+  traefik_proxy:
+    external: true
+

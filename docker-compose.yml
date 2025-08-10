@@ -50,6 +50,7 @@ services:
   front:
     image: node:18-alpine
     working_dir: /app
+    env_file: .env
     volumes:
       - ./my_memo_master_front:/app
     environment:

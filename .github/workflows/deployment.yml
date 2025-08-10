@@ -22,7 +22,7 @@ jobs:
       - name: Install Dependencies and Run Tests
         working-directory: my_memo_master_${{ matrix.service }}
         run: |
-          npm install
+          npm ci
           npm run test
 
   test_failure:
