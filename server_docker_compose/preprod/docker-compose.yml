@@ -28,6 +28,7 @@ services:
       - traefik.http.routers.mmm-preprod-pgadmin.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-pgadmin.tls.certresolver=letsencrypt
       - traefik.http.services.mmm-preprod-pgadmin.loadbalancer.server.port=80
+      - traefik.docker.network=traefik_proxy
     networks:
       - my_memo_master_preprod_network
       - traefik_proxy
@@ -54,6 +55,7 @@ services:
       - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
       - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
+      - traefik.docker.network=traefik_proxy
     networks:
       - my_memo_master_preprod_network
       - traefik_proxy
@@ -68,6 +70,8 @@ services:
       - traefik.http.routers.mmm-preprod-front.rule=Host(`tests.my-memo-master.com`)
       - traefik.http.routers.mmm-preprod-front.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-front.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-preprod-front.loadbalancer.server.port=80
+      - traefik.docker.network=traefik_proxy
     networks:
       - my_memo_master_preprod_network
       - traefik_proxy
@@ -84,4 +88,3 @@ networks:
     driver: bridge
   traefik_proxy:
     external: true
-
