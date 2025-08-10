@@ -4,6 +4,8 @@ services:
 
   postgres:
     image: postgres:16
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASS}
@@ -16,11 +18,10 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4
+    env_file:
+      - .env
     volumes:
       - pgadmin-data:/var/lib/pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     depends_on:
       - postgres
     labels:
@@ -29,6 +30,7 @@ services:
       - traefik.http.routers.mmm-prod-pgadmin.entrypoints=websecure
       - traefik.http.routers.mmm-prod-pgadmin.tls.certresolver=letsencrypt
       - traefik.http.services.mmm-prod-pgadmin.loadbalancer.server.port=80
+      - traefik.docker.network=traefik_proxy
     networks:
       - my_memo_master_network
       - traefik_proxy
@@ -46,7 +48,7 @@ services:
       PG_USER: ${PG_USER}
       PG_PASS: ${PG_PASS}
       PG_DB: ${PG_DB}
-      PG_HOST: ${PG_HOST:-postgres}  # par défaut, le service postgres
+      PG_HOST: ${PG_HOST:-postgres}
       PG_PORT: 5432
     depends_on:
       - postgres
@@ -56,6 +58,7 @@ services:
       - traefik.http.routers.mmm-prod-api.entrypoints=websecure
       - traefik.http.routers.mmm-prod-api.tls.certresolver=letsencrypt
       - traefik.http.services.mmm-prod-api.loadbalancer.server.port=${API_PORT}
+      - traefik.docker.network=traefik_proxy
     networks:
       - my_memo_master_network
       - traefik_proxy
@@ -70,6 +73,8 @@ services:
       - traefik.http.routers.mmm-prod-front.rule=Host(`my-memo-master.com`,`www.my-memo-master.com`)
       - traefik.http.routers.mmm-prod-front.entrypoints=websecure
       - traefik.http.routers.mmm-prod-front.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-prod-front.loadbalancer.server.port=80
+      - traefik.docker.network=traefik_proxy
     networks:
       - my_memo_master_network
       - traefik_proxy
