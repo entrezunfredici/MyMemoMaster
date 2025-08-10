@@ -1,5 +1,6 @@
 # MyMemoMaster
 
+
 ## Partie 1: Présentation
 
 MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leur révisions. En centralisant diverses fonctionnalités visant à optimiser l’apprentissage. La ou MyMEmoMaster pourra se démarquer de ces concurrents c’est sur le fait de proposer un large éventail de fonctionnalités :
@@ -88,23 +89,24 @@ npm run seed
 ```
 
 6. Configurer PGAdmin:
-6.1. PgAdmin Docker:
-Ouvrez votre navigateur et allez à l'adresse suivante: http://localhost:5050
-entrer les identifiants définis dans le .env
-une fois connecté, faire un clic droit sur "Servers" passer sa souris sur "nouveau" puis cliquer sur "Server"
-remplir les champs comme suit:
-dans l'ongle général:
+   6.1. PgAdmin Docker:
+   Ouvrez votre navigateur et allez à l'adresse suivante: http://localhost:5050
+   entrer les identifiants définis dans le .env
+   une fois connecté, faire un clic droit sur "Servers" passer sa souris sur "nouveau" puis cliquer sur "Server"
+   remplir les champs comme suit:
+   dans l'ongle général:
+
 - Name: my memo master (ou le nom que vous voulez)
-dans l'oglet Connexion
+  dans l'oglet Connexion
 - Nom d'hôte/Adresse: la valeur de PG_HOST dans le .env
 - Port: la valeur de PG_PORT dans le .env
 - identifiant de connexion: la valeur de PG_USER dans le .env
 - Mot de passe: la valeur de PG_PASS dans le .env
-Pour finir cliquer sur "Enregistrer"
-6.2. PgAdmin local:
-Télerchargez Postgres SQL et PG admin sur votre machine
-Ouvrez PGAdmin et connectez vous avec les identifiants définis dans le .env
-creer la base de donnée "PG_DB"
+  Pour finir cliquer sur "Enregistrer"
+  6.2. PgAdmin local:
+  Télerchargez Postgres SQL et PG admin sur votre machine
+  Ouvrez PGAdmin et connectez vous avec les identifiants définis dans le .env
+  creer la base de donnée "PG_DB"
 
 ### Methode de travail:
 
@@ -152,5 +154,3 @@ un adjectif:
 - [REF] pour les refactorisations
 - [FIX] pour les corrections de bugs
   suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
-
-
