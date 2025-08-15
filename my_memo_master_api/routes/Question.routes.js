@@ -232,6 +232,12 @@ router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
  *               idCard:
  *                 type: integer
  *                 example: 1
+ *               idSystem:
+ *                 type: integer
+ *                 example: 1
+ *               name:
+ *                 type: string
+ *                 example: "Question 1"
  *     responses:
  *       201:
  *         description: Question créée avec succès
