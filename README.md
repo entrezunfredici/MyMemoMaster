@@ -56,7 +56,7 @@ git clone git@github.com:entrezunfredici/MyMemoMaster.git
 
 ```
 
-3. Copez `.env.example` en `.env` et remplissez les variables d'environnement.
+3. Copiez `.env.example` en `.env` et remplissez les variables d'environnement.
 4. Lancer votre environnement local:
 
 Avec docker-compose:
@@ -64,6 +64,20 @@ Avec docker-compose:
 ```sh
 cd MyMemoMaster
 docker-compose down ; docker-compose up --build
+```
+
+A noter, le docker compose dispose d'un reverseproxy (traefik), lorsque vous demmarez le projet avec docker, le font est accéssible à l'adresse :
+```
+ http://localhost/
+```
+L'api a l'adresse :
+```
+  http://localhost/api
+```
+
+et le traefik a l'adresse:
+```
+ http://localhost:8080/dashboard/#/
 ```
 
 A l'ancienne (comme la moutarde):
@@ -88,23 +102,24 @@ npm run seed
 ```
 
 6. Configurer PGAdmin:
-6.1. PgAdmin Docker:
-Ouvrez votre navigateur et allez à l'adresse suivante: http://localhost:5050
-entrer les identifiants définis dans le .env
-une fois connecté, faire un clic droit sur "Servers" passer sa souris sur "nouveau" puis cliquer sur "Server"
-remplir les champs comme suit:
-dans l'ongle général:
+   6.1. PgAdmin Docker:
+   Ouvrez votre navigateur et allez à l'adresse suivante: http://localhost:5050
+   entrer les identifiants définis dans le .env
+   une fois connecté, faire un clic droit sur "Servers" passer sa souris sur "nouveau" puis cliquer sur "Server"
+   remplir les champs comme suit:
+   dans l'ongle général:
+
 - Name: my memo master (ou le nom que vous voulez)
-dans l'oglet Connexion
+  dans l'oglet Connexion
 - Nom d'hôte/Adresse: la valeur de PG_HOST dans le .env
 - Port: la valeur de PG_PORT dans le .env
 - identifiant de connexion: la valeur de PG_USER dans le .env
 - Mot de passe: la valeur de PG_PASS dans le .env
-Pour finir cliquer sur "Enregistrer"
-6.2. PgAdmin local:
-Télerchargez Postgres SQL et PG admin sur votre machine
-Ouvrez PGAdmin et connectez vous avec les identifiants définis dans le .env
-creer la base de donnée "PG_DB"
+  Pour finir cliquer sur "Enregistrer"
+  6.2. PgAdmin local:
+  Télerchargez Postgres SQL et PG admin sur votre machine
+  Ouvrez PGAdmin et connectez vous avec les identifiants définis dans le .env
+  creer la base de donnée "PG_DB"
 
 ### Methode de travail:
 
@@ -152,5 +167,3 @@ un adjectif:
 - [REF] pour les refactorisations
 - [FIX] pour les corrections de bugs
   suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
-
-

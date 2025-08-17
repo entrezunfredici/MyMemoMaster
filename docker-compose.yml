@@ -10,7 +10,7 @@ services:
       - "--entrypoints.web.address=:80"
     ports:
       - "80:80"
-      - "8080:8080"  # dashboard Traefik
+      - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -27,7 +27,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - "${PG_PORT}:5432"   # optionnel en local, pas nécessaire si seul l'API s'y connecte via le réseau docker
+      - "${PG_PORT}:5432"
     networks:
       - my_memo_master_network
 
