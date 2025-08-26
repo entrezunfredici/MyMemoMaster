@@ -69,6 +69,11 @@ classDiagram
     MindMapItem "*" -- "*" MindMapBranch : links >
 
     %% --- Leitner ---
+    class LeitnerSystem {
+      +UUID idSystem
+      +string name
+    }
+
     class LeitnerBox {
       +UUID idBox
       +int level
@@ -84,8 +89,10 @@ classDiagram
       +UUID ownerId
     }
 
+    LeitnerSystem "1" -- "*" LeitnerBox
     LeitnerBox "1" -- "*" LeitnerCard
     User "1" -- "*" LeitnerCard : owns >
+    User "1" -- "*" LeitnerSystem : owns >
 
     %% --- Exercices ---
     class Exercise {
