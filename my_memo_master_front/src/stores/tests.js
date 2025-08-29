@@ -40,7 +40,7 @@ export const useTestStore = defineStore('tests', {
       }
     },
 
-   async createTest() {
+  async createTest() {
     try {
         const resp = await api.post('tests/add', this.test)
         if (resp.status !== 201) {
