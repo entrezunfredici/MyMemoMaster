@@ -1,6 +1,6 @@
 # File my_memo_master_api/Dockerfile
 
-FROM node:22
+FROM node:22alpine
 
 WORKDIR /app
 

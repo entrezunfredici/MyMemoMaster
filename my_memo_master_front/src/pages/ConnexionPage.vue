@@ -29,19 +29,16 @@
           </div> -->
 
         <!-- <a href="#" class="text-sm text-blue-600">Mot de passe oublié ?</a> -->
-<div class="flex flex-col items-center">
-       
-   <button type="submit" class="w-[116px] bg-[#1E3BA1] text-white !text-white hover:bg-[#162c7a] focus:outline-none py-2 px-4 rounded valider">
-          Valider
-        </button>
-       
-        <a href="" class="underline m-3">Vous n'avez pas un compte? Créez une!
-        </a>
-        <p v-if="errorMessage" class="text-red-500 text-sm text-center mt-2">
-          {{ errorMessage }}
-        </p>
-</div>
-       
+        <div class="flex flex-col items-center">
+          <button type="submit" class="w-[116px] bg-[#1E3BA1] text-white !text-white hover:bg-[#162c7a] focus:outline-none py-2 px-4 rounded valider">
+            Valider
+          </button>
+          <a href="" class="underline m-3">Vous n'avez pas un compte? Créez une!
+          </a>
+          <p v-if="errorMessage" class="text-red-500 text-sm text-center mt-2">
+            {{ errorMessage }}
+          </p>
+        </div>
       </form>
     </div>
   </div>

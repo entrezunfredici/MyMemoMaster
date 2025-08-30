@@ -56,6 +56,15 @@ const routes = [
     },
   },
   {
+    path: '/auth',
+    name: 'auth',
+    component: () => import('../pages/ConnexionPage.vue'),
+    meta: {
+      title: 'Profile',
+      private: true,
+    },
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: () => import('../pages/SettingsPage.vue'),
