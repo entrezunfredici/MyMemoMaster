@@ -16,7 +16,7 @@ export const useAuthStore = defineStore('auth',
     actions: {
       async fetchUserInfos() {
 
-        await api.get(`user-infos/${this.user.userId}`).then(resp => {
+        await api.get(`users/${this.user.userId}`).then(resp => {
 
           if (resp.status !== 200) {
             notif.notify(resp.data.message, 'error')
@@ -93,7 +93,7 @@ export const useAuthStore = defineStore('auth',
 
         this.logout(false)
 
-        await api.post('register', user).then(resp => {
+        await api.post('users/register', user).then(resp => {
 
           if (resp.status !== 201) {
             notif.notify(resp.data.message, 'error')
@@ -115,7 +115,7 @@ export const useAuthStore = defineStore('auth',
 
       async login(email, password, redirect = '/') {
 
-        await api.post('login', { email, password }).then(resp => {
+        await api.post('users/login', { email, password }).then(resp => {
 
           if (resp.status !== 200) {
             notif.notify(resp.data.message, 'error')
