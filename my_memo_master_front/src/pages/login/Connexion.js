@@ -13,8 +13,7 @@ export default {
         async submitForm() {
             this.errorMessage = ''
             try {
-                await this.login({ email: this.email, password: this.password })
-                this.$router.push('/auth')
+                await this.login(this.email, this.password, '/auth')
             } catch (e) {
                 this.errorMessage = e?.response?.data?.message || e?.message || "Erreur lors de l'inscription."
             }

@@ -113,16 +113,16 @@ export const useAuthStore = defineStore('auth',
         }
       },
 
-      async login(email, password) {
+      async login(email, password, redirect) {
 
-        await api.post('users/login', { email, password }).then(resp => {
+        await api.post('users/login', { email: email, password: password }).then(resp => {
 
           if (resp.status !== 200) {
             notif.notify(resp.data.message, 'error')
             return false
           }
 
-          this.token = resp.data.data.token
+          this.token = resp.data.token
           this.authenticated = true
 
           notif.notify('You have been logged in', 'success')
@@ -132,6 +132,9 @@ export const useAuthStore = defineStore('auth',
           notif.notify(`An error occured: ${error}`, 'error')
           return false
         })
+        if (redirect) {
+          router.push(redirect)
+        }
       },
 
       logout(notify = true, redirect = '/auth') {
