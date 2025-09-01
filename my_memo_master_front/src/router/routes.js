@@ -49,7 +49,7 @@ const routes = [
     name: 'profile',
     //component: () => import('../pages/ProfilePage.vue'),
     //component: () => import('../pages/ConnexionPage.vue'),
-    component: () => import('../pages/InscriptionPage.vue'),
+    component: () => import('../pages/register/InscriptionPage.vue'),
     meta: {
       title: 'Profile',
       private: true,
@@ -58,7 +58,7 @@ const routes = [
   {
     path: '/auth',
     name: 'auth',
-    component: () => import('../pages/ConnexionPage.vue'),
+    component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
       title: 'Profile',
       private: true,

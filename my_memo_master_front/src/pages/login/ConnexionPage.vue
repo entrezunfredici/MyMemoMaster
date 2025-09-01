@@ -2,12 +2,12 @@
   <div class="flex h-screen w-full contenue border-radius-9px ">
     <!-- Colonne de l'image (70%) - Cachée en mode mobile -->
     <div class="hidden md:block w-[70%] h-full bg-blue-500 custom-border border-radius-9px">
-      <img src="../../public/connexion.jpg" alt="Connexion" class="w-full h-full object-cover no-underline border-radius-9px imageConnexion">
+      <img src="../../../public/connexion.jpg" alt="Connexion" class="w-full h-full object-cover no-underline border-radius-9px imageConnexion">
     </div>
 
     <!-- Colonne du formulaire (100% en mobile, 30% en desktop) -->
     <div class="w-full md:w-[30%] flex flex-col justify-center items-center bg-white px-8 md:px-16 border border-[#1E3BA1]  custom-border formulaire">
-    <img src="../../public/logo/logo-full.svg" alt="logo" class="w-auto h-auto object-cover">
+    <img src="../../../public/logo/logo-full.svg" alt="logo" class="w-auto h-auto object-cover">
       <h2 class="text-primary text-[2rem] md:text-[3rem] neue-haas-grotesk-font font-bold">Connexion</h2>
 
       <form @submit.prevent="submitForm" class="w-full max-w-md mt-6">
@@ -43,39 +43,5 @@
     </div>
   </div>
 </template>
-<style scoped>
-.custom-border {
-  border: thick solid #1E3BA1;
-  border-radius: 18px;
-}
-.imageConnexion {
-  border-radius: 9px;
-}
-.valider{
-  color: white
-}
-.contenue{
-background-color: #1E3BA1;
-border-radius: 50px;
-}
-.formulaire{
-  background-color: white;
-}
-
-</style>
-<script>
-export default {
-  data() {
-    return {
-      email: "",
-      password: "",
-      errorMessage: "",
-    };
-  },
-  methods: {
-    submitForm() {
-      alert("Connexion réussie !");
-    },
-  },
-};
-</script>
+<style scoped src="./Connexion.css"></style>
+<script src="./Connexion.js"></script>
