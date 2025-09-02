@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import routes from './routes'
-import { useAuthStore } from '@/stores/auth'
+//import { useAuthStore } from '@/stores/auth'
 import { VITE_APP_NAME } from '@/config';
 
 const router = createRouter({
