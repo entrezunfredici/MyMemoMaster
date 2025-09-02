@@ -13,7 +13,7 @@ export default {
         async submitForm() {
             this.errorMessage = ''
             try {
-                await this.login(this.email, this.password, '/auth')
+                await this.login(this.email, this.password, '/')
             } catch (e) {
                 this.errorMessage = e?.response?.data?.message || e?.message || "Erreur lors de l'inscription."
             }

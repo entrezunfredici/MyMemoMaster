@@ -9,18 +9,18 @@ export default {
     extend: {},
     colors: {
       /* Theme colors */
-      primary: '#1E3BA1',
-      'light-primary': '#828FBC',
-      secondary: '#FA4238',
-      'light-secondary': '#FDC7C4',
-      light: '#FDF7FF',
-      gray: '#d5daed',
-      dark: '#101f56',
+      primary: 'var(--primary)',
+      'light-primary': 'var(--light-primary)',
+      secondary: 'var(--secondary)',
+      'light-secondary': 'var(--light-secondary)',
+      light: 'var(--light)',
+      gray: 'var(--gray)',
+      dark: 'var(--dark)',
       greyCustom: '#F5F5F5',
       /* Other colors */
-      success: '#10b981',
-      warning: '#f59e0b',
-      danger: '#dc2626',
+      success: 'var(--success)',
+      warning: 'var(--warning)',
+      danger: 'var(--danger)',
     },
     screens: {
       'xsm': '460px',

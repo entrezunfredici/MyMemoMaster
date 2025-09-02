@@ -1,7 +1,7 @@
 <template>
-  <div class="flex h-screen w-full contenue border-radius-9px ">
+  <div class="flex h-screen w-full bg-primary rounded-[50px]">
     <!-- Colonne de l'image (70%) - Cachée en mode mobile -->
-    <div class="hidden md:block w-[70%] h-full bg-blue-500 custom-border border-radius-9px">
+    <div class="hidden md:block w-[70%] h-full bg-primary border-[5px] border-primary rounded-[18px]">
       <img src="../../../public/connexion.jpg" alt="Connexion" class="w-full h-full object-cover no-underline border-radius-9px imageConnexion">
     </div>
 
@@ -28,12 +28,11 @@
               class="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
           </div> -->
 
-        <!-- <a href="#" class="text-sm text-blue-600">Mot de passe oublié ?</a> -->
         <div class="flex flex-col items-center">
           <button type="submit" class="w-[116px] bg-[#1E3BA1] text-white !text-white hover:bg-[#162c7a] focus:outline-none py-2 px-4 rounded valider">
             Valider
           </button>
-          <a href="" class="underline m-3">Vous n'avez pas un compte? Créez une!
+          <a href="/profile" class="underline m-3">Vous n'avez pas un compte? Créez en un!
           </a>
           <p v-if="errorMessage" class="text-red-500 text-sm text-center mt-2">
             {{ errorMessage }}
