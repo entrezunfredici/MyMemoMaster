@@ -47,11 +47,18 @@ const routes = [
   {
     path: '/profile',
     name: 'profile',
-    //component: () => import('../pages/ProfilePage.vue'),
-    //component: () => import('../pages/ConnexionPage.vue'),
-    component: () => import('../pages/register/InscriptionPage.vue'),
+    component: () => import('../pages/ProfilePage.vue'),
     meta: {
       title: 'Profile',
+      private: true,
+    },
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('../pages/register/InscriptionPage.vue'),
+    meta: {
+      title: 'register',
       private: true,
     },
   },
@@ -60,7 +67,7 @@ const routes = [
     name: 'auth',
     component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
-      title: 'Profile',
+      title: 'login',
       private: true,
     },
   },
