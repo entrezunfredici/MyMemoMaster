@@ -65,6 +65,11 @@ services:
     image: fredissimo/mymemomaster_test_front:latest
     volumes:
       - front-data:/app/data
+    environment:
+      - API_URL=${VITE_API_URL}
+      - FRONT_URL=${VITE_FRONT_URL}
+      - CHOKIDAR_USEPOLLING=1
+      - VITE_PORT=${VITE_PORT:-5173}
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-preprod-front.rule=Host(`tests.my-memo-master.com`)
