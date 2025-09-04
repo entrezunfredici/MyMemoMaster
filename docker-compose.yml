@@ -54,8 +54,8 @@ services:
     volumes:
       - ./my_memo_master_front:/app
     environment:
-      - API_URL=${VITE_API_URL}
-      - FRONT_URL=${VITE_FRONT_URL}
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_FRONT_URL=${VITE_FRONT_URL}
       - CHOKIDAR_USEPOLLING=1
       - VITE_PORT=${VITE_PORT:-5173}
     command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}"

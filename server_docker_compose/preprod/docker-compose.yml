@@ -1,27 +1,35 @@
-# File docker-compose.yml
-version: "3.3"
+version: "3.8"
 
+# Astuce: épingle tes images (évite :latest) ex. fredissimo/mymemomaster_test_front:preprod-2025-09-04
 services:
   postgres:
     image: postgres:15
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASS}
       POSTGRES_DB: ${PG_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
     networks:
       - my_memo_master_preprod_network
 
   pgadmin:
     image: dpage/pgadmin4:latest
+    restart: unless-stopped
     volumes:
       - pgadmin-data:/var/lib/pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-preprod-pgadmin.rule=Host(`pgadmin.tests.my-memo-master.com`)
@@ -34,42 +42,46 @@ services:
       - traefik_proxy
 
   api:
-    image: fredissimo/mymemomaster_test_api:latest
+    image: ${IMAGE_API}
+    restart: unless-stopped
     env_file:
       - .env
-    volumes:
-      - api-data:/app/data
     environment:
-      - NODE_ENV=production
-      - API_PORT=${API_PORT}
-      - PG_USER=${PG_USER}
-      - PG_PASS=${PG_PASS}
-      - PG_DB=${PG_DB}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=5432
+      NODE_ENV: production
+      PORT: ${API_PORT}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_USER: ${PG_USER}
+      PG_PASS: ${PG_PASS}
+      PG_DB: ${PG_DB}
+      # CORS : autorise ton front préprod (adapte si besoin)
+      CORS_ORIGIN: https://tests.my-memo-master.com
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-preprod-api.rule=Host(`api.tests.my-memo-master.com`)
       - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
+      # Traefik envoie vers le PORT **interne** de l'API (celui ci-dessus)
       - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
       - traefik.docker.network=traefik_proxy
     networks:
       - my_memo_master_preprod_network
       - traefik_proxy
-    restart: unless-stopped
+    volumes:
+      - api-data:/app/data
 
   front:
-    image: fredissimo/mymemomaster_test_front:latest
-    volumes:
-      - front-data:/app/data
+    image: ${IMAGE_Front}
+    restart: unless-stopped
+    # ⚠️ Si ton image front est un build statique (Nginx),
+    # les VITE_* ne servent plus ici. On ne passe PAS VITE_PORT / CHOKIDAR (dev only).
+    # L'image doit exposer port 80 (Nginx).
     environment:
-      - API_URL=${VITE_API_URL}
-      - FRONT_URL=${VITE_FRONT_URL}
-      - CHOKIDAR_USEPOLLING=1
-      - VITE_PORT=${VITE_PORT:-5173}
+      APP_PUBLIC_URL: https://${FRONT_DOMAIN}
+      APP_API_URL:    https://${API_DOMAIN}
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-preprod-front.rule=Host(`tests.my-memo-master.com`)
@@ -80,7 +92,12 @@ services:
     networks:
       - my_memo_master_preprod_network
       - traefik_proxy
-    restart: unless-stopped
+    volumes:
+      - front-data:/app/data
+    # Si (et seulement si) ton image front génère un config runtime (config.js), tu peux passer :
+    # environment:
+    #   APP_PUBLIC_URL: https://tests.my-memo-master.com
+    #   APP_API_URL: https://api.tests.my-memo-master.com
 
 volumes:
   api-data:
