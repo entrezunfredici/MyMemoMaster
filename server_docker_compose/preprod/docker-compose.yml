@@ -27,8 +27,7 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    depends_on:
-      - postgres
+    depends_on: [postgres]
     labels:
       - traefik.enable=true
       - "traefik.http.routers.mmm-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)"
@@ -56,8 +55,7 @@ services:
       PGPASSWORD: ${PG_PASS}
       PGDATABASE: ${PG_DB}
       CORS_ORIGIN: https://${FRONT_DOMAIN}
-    depends_on:
-      - postgres
+    depends_on: [postgres]
     labels:
       - traefik.enable=true
       - "traefik.http.routers.mmm-api.rule=Host(`${API_DOMAIN}`)"
@@ -77,8 +75,7 @@ services:
     environment:
       APP_PUBLIC_URL: https://${FRONT_DOMAIN}
       APP_API_URL:    https://${API_DOMAIN}
-    depends_on:
-      - api
+    depends_on: [postgres]
     labels:
       - traefik.enable=true
       - "traefik.http.routers.mmm-front.rule=Host(`${FRONT_DOMAIN}`)"
