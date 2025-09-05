@@ -22,8 +22,7 @@ services:
       - .env
     volumes:
       - pgadmin-data:/var/lib/pgadmin
-    depends_on:
-      - postgres
+    depends_on: [postgres]
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-prod-pgadmin.rule=Host(`pgadmin.my-memo-master.com`)
@@ -50,8 +49,7 @@ services:
       PG_DB: ${PG_DB}
       PG_HOST: ${PG_HOST:-postgres}
       PG_PORT: 5432
-    depends_on:
-      - postgres
+    depends_on: [postgres] 
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-prod-api.rule=Host(`api.my-memo-master.com`)
