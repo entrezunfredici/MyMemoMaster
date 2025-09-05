@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.3"
 
 # Ce fichier attend dans .env (préprod):
 # IMAGE_API=fredissimo/mymemomaster_test_api:preprod-YYYYMMDD
