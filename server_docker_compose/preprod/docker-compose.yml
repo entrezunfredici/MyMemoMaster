@@ -20,6 +20,8 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     restart: unless-stopped
+    env_file:
+      - .env
     volumes:
       - pgadmin-data:/var/lib/pgadmin
     environment:
@@ -70,6 +72,8 @@ services:
   front:
     image: ${IMAGE_FRONT}
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       APP_PUBLIC_URL: https://${FRONT_DOMAIN}
       APP_API_URL:    https://${API_DOMAIN}
