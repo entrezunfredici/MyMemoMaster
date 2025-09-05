@@ -1,5 +1,3 @@
-# *this file* https://media1.tenor.com/m/69J_vOZhULQAAAAd/oss117-bordel.gif
-
 name: Build and Deploy
 
 on:
@@ -9,16 +7,17 @@ on:
       - dev
       - '*devops*'
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        service: [api, front]
+      matrix: { service: [api, front] }
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
-      
+      - uses: actions/checkout@v4
       - name: Install Dependencies and Run Tests
         working-directory: my_memo_master_${{ matrix.service }}
         run: |
@@ -30,7 +29,7 @@ jobs:
     needs: test
     if: failure()
     steps:
-      - name: Send Test Failure Notification to Discord
+      - name: Notify test failure (Discord)
         run: |
           URLS=( 
             "https://media1.tenor.com/m/4CtiBiTdmioAAAAC/vilebrequin-sylvain.gif"
@@ -47,15 +46,15 @@ jobs:
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           BRANCH_NAME=${GITHUB_REF##*/}
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Tests failed on branch $BRANCH_NAME! $RANDOM_URL\"}" \
-          ${{ secrets.DISCORD_LOG }}
+            -d "{\"content\": \"Tests failed on branch $BRANCH_NAME! $RANDOM_URL\"}" \
+            ${{ secrets.DISCORD_LOG }}
 
   test_success:
     runs-on: ubuntu-latest
     needs: test
     if: success()
     steps:
-      - name: Send Test Success Notification to Discord
+      - name: Notify test success (Discord)
         run: |
           URLS=( 
             "https://media1.tenor.com/m/BhPivX5RaGgAAAAd/vilebrequin-vilbrequin.gif"
@@ -68,8 +67,8 @@ jobs:
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
           BRANCH_NAME=${GITHUB_REF##*/}
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
-          ${{ secrets.DISCORD_LOG }}
+            -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
+            ${{ secrets.DISCORD_LOG }}
 
   sonar_analysis:
     name: Run SonarQube Analysis
@@ -77,10 +76,8 @@ jobs:
     needs: test
     if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops'))
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - name: Run SonarQube Prod Scan
         if: github.ref == 'refs/heads/main'
         uses: sonarsource/sonarqube-scan-action@v3
@@ -94,42 +91,26 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_PREPROD_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-  # sonar_analysis_failure:
-  #   name: Notify SonarQube Failure
-  #   runs-on: ubuntu-latest
-  #   needs: sonar_analysis
-  #   if: failure()
-  #   steps:
-  #     - name: Send SonarQube Failure Notification to Discord
-  #       run: |
-  #         curl -X POST -H "Content-Type: application/json" \
-  #         -d "{\"content\": \"SonarQube analysis failed on branch $GITHUB_REF!\"}" \
-  #         ${{ secrets.DISCORD_LOG }}
-
   push_on_docker_hub:
-    name: Build and Deploy on docker hub
+    name: Build and push images
     runs-on: ubuntu-latest
     needs: test
     if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops'))
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
-
+      - uses: actions/checkout@v4
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Build and Deploy Docker Prod Images
+      - name: Build & push PROD
         if: github.ref == 'refs/heads/main'
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest -f my_memo_master_api/Dockerfile my_memo_master_api/
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest -f my_memo_master_front/Dockerfile my_memo_master_front/
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest
-
-      - name: Build and Deploy Docker PreProd Images
+      - name: Build & push PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest -f my_memo_master_api/Dockerfile my_memo_master_api/
@@ -141,100 +122,109 @@ jobs:
     name: Deploy on server
     runs-on: ubuntu-latest
     needs: push_on_docker_hub
-    # needs: [push_on_docker_hub, sonar_analysis]
     if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops'))
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      # ─────── 1. SSH agent ───────
-      - name: Set up SSH prod for Deployment
+      # ───── SSH agent ─────
+      - name: Set up SSH PROD
         if: github.ref == 'refs/heads/main'
-        uses: webfactory/ssh-agent@v0.5.3
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
 
-      - name: Set up SSH preprod for Deployment
+      - name: Set up SSH PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
-        uses: webfactory/ssh-agent@v0.5.3
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PREPROD_PRIVATE_KEY }}
 
-      # ─────── 2. known_hosts ───────
-      - name: Prepare SSH known_hosts for preprod
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
+      # ───── known_hosts ─────
+      - name: Prepare known_hosts
         run: |
           ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
-      # ─────── 3. SSH Stop contziner ───────
-      - name: Deploy to VPS in prod
+      # ───── Stop containers ─────
+      - name: Stop PROD
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            mkdir -p /var/www/html/my_memo_master_prod
             cd /var/www/html/my_memo_master_prod
-            docker-compose down
+            docker-compose down || true
           EOF
 
-      - name: Deploy to VPS in preprod
+      - name: Stop PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            mkdir -p /var/www/html/my_memo_master_preprod
             cd /var/www/html/my_memo_master_preprod
-            docker-compose down
+            docker-compose down || true
           EOF
 
-      # ─────── 4. SCP Upload ───────
-      - name: Upload docker-compose.yml to vps in prod
+      # ───── Upload compose ─────
+      - name: Upload compose PROD
         if: github.ref == 'refs/heads/main'
         run: |
           scp -v -P ${{ secrets.VPS_PORT }} \
             server_docker_compose/prod/docker-compose.yml \
             ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_prod/docker-compose.yml
 
-      - name: Upload docker-compose.yml to vps in preprod
+      - name: Upload compose PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           scp -v -P ${{ secrets.VPS_PORT }} \
             server_docker_compose/preprod/docker-compose.yml \
             ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_preprod/docker-compose.yml
 
-      # ─────── 5. SSH Déployment ───────
-      - name: Deploy to VPS in prod
+      # ───── Deploy with v1 compatibility ─────
+      - name: Deploy PROD (docker-compose v1 safe)
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -euo pipefail
             cd /var/www/html/my_memo_master_prod
+
+            # 0) Traefik network if missing
+            docker network create traefik_proxy || true
+
+            # 1) Patch compose if "condition:" present (v1 doesn't support it)
+            if grep -q "condition:" docker-compose.yml; then
+              sed -i -E 's/depends_on:\s*\n\s*postgres:\s*\n\s*condition:\s*service_healthy/depends_on:\n      - postgres/g' docker-compose.yml || true
+              sed -i -E 's/depends_on:\s*\n\s*api:\s*\n\s*condition:\s*service_started/depends_on:\n      - api/g' docker-compose.yml || true
+            fi
+
+            # 2) Export .env for v1
+            set -a; [ -f .env ] && . ./.env; set +a
+
+            # 3) Validate and deploy
+            docker-compose config
             docker-compose pull
             docker-compose up -d
+            docker-compose ps
           EOF
 
-      - name: Deploy to VPS in preprod
+      - name: Deploy PREPROD (docker-compose v1 safe)
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -euo pipefail
             cd /var/www/html/my_memo_master_preprod
+
+            docker network create traefik_proxy || true
+
+            if grep -q "condition:" docker-compose.yml; then
+              sed -i -E 's/depends_on:\s*\n\s*postgres:\s*\n\s*condition:\s*service_healthy/depends_on:\n      - postgres/g' docker-compose.yml || true
+              sed -i -E 's/depends_on:\s*\n\s*api:\s*\n\s*condition:\s*service_started/depends_on:\n      - api/g' docker-compose.yml || true
+            fi
+
+            set -a; [ -f .env ] && . ./.env; set +a
+
+            docker-compose config
             docker-compose pull
             docker-compose up -d
+            docker-compose ps
           EOF
-
-  build_failure:
-    runs-on: ubuntu-latest
-    needs: build_and_deploy
-    if: failure()
-    steps:
-      - name: Notify Deployment Failure
-        run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Deployment failed on branch $GITHUB_REF!\"}" \
-          ${{ secrets.DISCORD_LOG }}
-
-  build_success:
-    runs-on: ubuntu-latest
-    needs: build_and_deploy
-    if: success()
-    steps:
-      - name: Notify Deployment Success
-        run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Deployment succeeded on branch $GITHUB_REF!\"}" \
-          ${{ secrets.DISCORD_LOG }}
