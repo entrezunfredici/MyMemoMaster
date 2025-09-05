@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.3"
 
 # Ce fichier attend dans .env (préprod):
 # IMAGE_API=fredissimo/mymemomaster_test_api:preprod-YYYYMMDD
@@ -36,8 +36,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     labels:
       - traefik.enable=true
       - "traefik.http.routers.mmm-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)"
@@ -72,8 +71,7 @@ services:
       # CORS : autorise le domaine du front de préprod
       CORS_ORIGIN: https://${FRONT_DOMAIN}
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${API_PORT}/health"]
       interval: 20s
