@@ -147,8 +147,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      
-
       # ─────── 1. SSH agent ───────
       - name: Set up SSH prod for Deployment
         if: github.ref == 'refs/heads/main'
@@ -168,7 +166,24 @@ jobs:
         run: |
           ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
-      # ─────── 3. SCP Upload ───────
+      # ─────── 3. SSH Stop contziner ───────
+      - name: Deploy to VPS in prod
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            cd /var/www/html/my_memo_master_prod
+            docker-compose down
+          EOF
+
+      - name: Deploy to VPS in preprod
+        if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
+        run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            cd /var/www/html/my_memo_master_preprod
+            docker-compose down
+          EOF
+
+      # ─────── 4. SCP Upload ───────
       - name: Upload docker-compose.yml to vps in prod
         if: github.ref == 'refs/heads/main'
         run: |
@@ -183,7 +198,7 @@ jobs:
             server_docker_compose/preprod/docker-compose.yml \
             ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_preprod/docker-compose.yml
 
-      # ─────── 4. SSH Déployment ───────
+      # ─────── 5. SSH Déployment ───────
       - name: Deploy to VPS in prod
         if: github.ref == 'refs/heads/main'
         run: |
