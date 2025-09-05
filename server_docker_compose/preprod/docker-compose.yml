@@ -39,19 +39,19 @@ services:
     volumes:
       - api-data:/app/data
     environment:
-      - NODE_ENV = production
-      - PORT = ${API_PORT}
-      - PG_HOST = postgres
-      - PG_PORT = 5432
-      - PG_USER = ${PG_USER}
-      - PG_PASS = ${PG_PASS}
-      - PG_DB = ${PG_DB}
-      - PGHOST = postgres
-      - PGPORT = 5432
-      - PGUSER = ${PG_USER}
-      - PGPASSWORD = ${PG_PASS}
-      - PGDATABASE = ${PG_DB}
-      - CORS_ORIGIN = https://${FRONT_DOMAIN}
+      - NODE_ENV=production
+      - PORT=${API_PORT}
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=${PG_USER}
+      - PG_PASS=${PG_PASS}
+      - PG_DB=${PG_DB}
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=${PG_USER}
+      - PGPASSWORD=${PG_PASS}
+      - PGDATABASE=${PG_DB}
+      - CORS_ORIGIN=https://${FRONT_DOMAIN}
     depends_on:
       - postgres
     labels:
