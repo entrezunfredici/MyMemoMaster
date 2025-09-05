@@ -23,7 +23,7 @@ services:
       - postgres
     labels:
       - traefik.enable=true
-      - traefik.http.routers.mmm-preprod-pgadmin.rule=Host(`pgadmin.tests.my-memo-master.com`)
+      - traefik.http.routers.mmm-preprod-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)
       - traefik.http.routers.mmm-preprod-pgadmin.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-pgadmin.tls.certresolver=letsencrypt
       - traefik.http.services.mmm-preprod-pgadmin.loadbalancer.server.port=80
@@ -33,19 +33,25 @@ services:
       - traefik_proxy
 
   api:
-    image: fredissimo/mymemomaster_test_api:latest
+    image: ${IMAGE_API}
     env_file:
       - .env
     volumes:
       - api-data:/app/data
     environment:
-      - NODE_ENV=production
-      - API_PORT=${API_PORT}
-      - PG_USER=${PG_USER}
-      - PG_PASS=${PG_PASS}
-      - PG_DB=${PG_DB}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=5432
+      - NODE_ENV = production
+      - PORT = ${API_PORT}
+      - PG_HOST = postgres
+      - PG_PORT = 5432
+      - PG_USER = ${PG_USER}
+      - PG_PASS = ${PG_PASS}
+      - PG_DB = ${PG_DB}
+      - PGHOST = postgres
+      - PGPORT = 5432
+      - PGUSER = ${PG_USER}
+      - PGPASSWORD = ${PG_PASS}
+      - PGDATABASE = ${PG_DB}
+      - CORS_ORIGIN = https://${FRONT_DOMAIN}
     depends_on:
       - postgres
     labels:
@@ -61,17 +67,17 @@ services:
     restart: unless-stopped
 
   front:
-    image: fredissimo/mymemomaster_test_front:latest
+    image: ${IMAGE_FRONT}
     volumes:
       - front-data:/app/data
+    env_file:
+      - .env
     environment:
-      - API_URL=${VITE_API_URL}
-      - FRONT_URL=${VITE_FRONT_URL}
-      - CHOKIDAR_USEPOLLING=1
-      - VITE_PORT=${VITE_PORT:-5173}
+      - APP_PUBLIC_URL=https://${FRONT_DOMAIN}
+      - APP_API_URL=https://${API_DOMAIN}
     labels:
       - traefik.enable=true
-      - traefik.http.routers.mmm-preprod-front.rule=Host(`tests.my-memo-master.com`)
+      - traefik.http.routers.mmm-preprod-front.rule=Host(`${FRONT_DOMAIN}`)
       - traefik.http.routers.mmm-preprod-front.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-front.tls.certresolver=letsencrypt
       - traefik.http.services.mmm-preprod-front.loadbalancer.server.port=80
@@ -92,128 +98,3 @@ networks:
     driver: bridge
   traefik_proxy:
     external: true
-
-# version: "3.3"
-
-# services:
-#   postgres:
-#     image: postgres:15
-#     environment:
-#       POSTGRES_USER: ${PG_USER}
-#       POSTGRES_PASSWORD: ${PG_PASS}
-#       POSTGRES_DB: ${PG_DB}
-#     volumes:
-#       - postgres-data:/var/lib/postgresql/data
-#     networks:
-#       - my_memo_master_preprod_network
-
-#   pgadmin:
-#     image: dpage/pgadmin4:latest
-#     volumes:
-#       - pgadmin-data:/var/lib/pgadmin
-#     environment:
-#       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-#       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-#     depends_on:
-#       - postgres
-#     labels:
-#       - traefik.enable=true
-#       - traefik.http.routers.mmm-preprod-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)
-#       - traefik.http.routers.mmm-preprod-pgadmin.entrypoints=websecure
-#       - traefik.http.routers.mmm-preprod-pgadmin.tls.certresolver=letsencrypt
-#       - traefik.http.services.mmm-preprod-pgadmin.loadbalancer.server.port=80
-#       - traefik.docker.network=traefik_proxy
-#     networks:
-#       - my_memo_master_preprod_network
-#       - traefik_proxy
-
-#   api:
-#     image: ${IMAGE_API}
-#     env_file:
-#       - .env
-#     volumes:
-#       - api-data:/app/data
-#     environment:
-#       - NODE_ENV=production
-#       - API_PORT=${API_PORT}
-#       - PG_USER=${PG_USER}
-#       - PG_PASS=${PG_PASS}
-#       - PG_DB=${PG_DB}
-#       - PG_HOST=${PG_HOST}
-#       - PG_PORT=5432
-#     depends_on:
-#       - postgres
-#     labels:
-#       - traefik.enable=true
-#       - traefik.http.routers.mmm-preprod-api.rule=Host(`api.tests.my-memo-master.com`)
-#       - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
-#       - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
-#       - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
-#       - traefik.docker.network=traefik_proxy
-#     networks:
-#       - my_memo_master_preprod_network
-#       - traefik_proxy
-#     restart: unless-stopped
-
-#   front:
-#     image: ${IMAGE_FRONT}
-#     volumes:
-#       - front-data:/app/data
-#     env_file:
-#       - .env
-#     environment:
-#       - APP_PUBLIC_URL = https://${FRONT_DOMAIN}
-#       - APP_API_URL = https://${API_DOMAIN}
-#     labels:
-#       - traefik.enable=true
-#       - traefik.http.routers.mmm-preprod-front.rule=Host(`${FRONT_DOMAIN}`)
-#       - traefik.http.routers.mmm-preprod-front.entrypoints=websecure
-#       - traefik.http.routers.mmm-preprod-front.tls.certresolver=letsencrypt
-#       - traefik.http.services.mmm-preprod-front.loadbalancer.server.port=80
-#       - traefik.docker.network=traefik_proxy
-#     networks:
-#       - my_memo_master_preprod_network
-#       - traefik_proxy
-#     restart: unless-stopped
-
-# volumes:
-#   api-data:
-#   front-data:
-#   postgres-data:
-#   pgadmin-data:
-
-# networks:
-#   my_memo_master_preprod_network:
-#     driver: bridge
-#   traefik_proxy:
-#     external: true
-
-  # api:
-  #   image: ${IMAGE_API}
-  #   restart: unless-stopped
-  #   env_file: [.env]
-  #   environment:
-  #     - NODE_ENV = production
-  #     - PORT = ${API_PORT}
-  #     - PG_HOST = postgres
-  #     - PG_PORT = 5432
-  #     - PG_USER = ${PG_USER}
-  #     - PG_PASS = ${PG_PASS}
-  #     - PG_DB = ${PG_DB}
-  #     - PGHOST = postgres
-  #     - PGPORT = 5432
-  #     - PGUSER = ${PG_USER}
-  #     - PGPASSWORD = ${PG_PASS}
-  #     - PGDATABASE = ${PG_DB}
-  #     - CORS_ORIGIN = https://${FRONT_DOMAIN}
-  #   depends_on: [postgres]
-  #   labels:
-  #     - traefik.enable=true
-  #     - "traefik.http.routers.mmm-api.rule=Host(`${API_DOMAIN}`)"
-  #     - traefik.http.routers.mmm-api.entrypoints=websecure
-  #     - traefik.http.routers.mmm-api.tls.certresolver=letsencrypt
-  #     - "traefik.http.services.mmm-api.loadbalancer.server.port=${API_PORT}"
-  #     - traefik.docker.network=traefik_proxy
-  #   networks: [mmm_preprod, traefik_proxy]
-  #   volumes:
-  #     - api-data:/app/data
