@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
     // Ce bloc "define" garde la compat avec un code qui lirait encore process.env.*
     define: {
       'process.env': {
-        VITE_APP_NAME: "my memo master",
+        VITE_APP_NAME: env.VITE_APP_NAME,
         VITE_APP_COMPANY_NAME: env.VITE_APP_COMPANY_NAME,
         VITE_APP_AUTHOR_NAME: env.VITE_APP_AUTHOR_NAME,
         VITE_FRONT_URL: env.VITE_FRONT_URL,
