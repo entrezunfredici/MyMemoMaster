@@ -68,13 +68,35 @@ services:
 
   front:
     image: ${IMAGE_FRONT}
-    volumes:
-      - front-data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - api
     env_file:
       - .env
     environment:
       - APP_PUBLIC_URL=https://${FRONT_DOMAIN}
       - APP_API_URL=https://${API_DOMAIN}
+    command: >
+      sh -lc '
+        # 1) Génère la config runtime
+        cat >/usr/share/nginx/html/config.js <<EOF
+        window.__APP_CONFIG__ = {
+          PUBLIC_URL: "${APP_PUBLIC_URL}",
+          API_URL: "${APP_API_URL}"
+        };
+        EOF
+
+        # 2) S’assure que /config.js est servi en statique (pas réécrit)
+        if ! grep -q "location = /config.js" /etc/nginx/conf.d/default.conf 2>/dev/null; then
+          sed -i "/server {/a \  location = /config.js { try_files /config.js =404; add_header Cache-Control \"no-cache\"; }" /etc/nginx/conf.d/default.conf
+        fi
+
+        # 3) (sécurité) injecte le <script src="/config.js"> avant le bundle s’il manque
+        grep -q "/config.js" /usr/share/nginx/html/index.html \
+          || sed -i "/type=\\"module\\"/i \  <script src=\\"/config.js\\"></script>" /usr/share/nginx/html/index.html
+
+        exec nginx -g "daemon off;";
+      '
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-preprod-front.rule=Host(`${FRONT_DOMAIN}`)
@@ -85,7 +107,13 @@ services:
     networks:
       - my_memo_master_preprod_network
       - traefik_proxy
-    restart: unless-stopped
+    volumes:
+      - front-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 
 volumes:
   api-data:
