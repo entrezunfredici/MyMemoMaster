@@ -40,7 +40,8 @@ services:
       - api-data:/app/data
     environment:
       - NODE_ENV=production
-      - PORT=${API_PORT}
+      - ENVIRONMENT=prod
+      - API_PORT=${API_PORT}
       - PG_HOST=postgres
       - PG_PORT=5432
       - PG_USER=${PG_USER}
@@ -52,6 +53,16 @@ services:
       - PGPASSWORD=${PG_PASS}
       - PGDATABASE=${PG_DB}
       - CORS_ORIGIN=https://${FRONT_DOMAIN}
+      # Auth / Security
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+      - AUTH_JWT_EXPIRES_IN=${AUTH_JWT_EXPIRES_IN}
+      - API_BYPASS_AUTH=${API_BYPASS_AUTH}
+      # CORS / Front URL (used by API code)
+      - VITE_FRONT_URL=${VITE_FRONT_URL}
+      # Email
+      - EMAIL_FROM=${EMAIL_FROM}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
     depends_on:
       - postgres
     labels:
@@ -76,6 +87,12 @@ services:
     environment:
       - APP_PUBLIC_URL=https://${FRONT_DOMAIN}
       - APP_API_URL=https://${API_DOMAIN}
+      # Optional: expose Vite variables for builds that might use them
+      - VITE_APP_NAME=${VITE_APP_NAME}
+      - VITE_APP_COMPANY_NAME=${VITE_APP_COMPANY_NAME}
+      - VITE_APP_AUTHOR_NAME=${VITE_APP_AUTHOR_NAME}
+      - VITE_FRONT_URL=${VITE_FRONT_URL}
+      - VITE_API_URL=${VITE_API_URL}
     command: >
       sh -lc '
         # 1) Génère la config runtime
