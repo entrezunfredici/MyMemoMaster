@@ -38,7 +38,7 @@ services:
   api:
     image: fredissimo/mymemomaster_api:latest
     env_file:
-      - ../../.env
+      - .env
     volumes:
       - api-data:/app/data
     environment:
