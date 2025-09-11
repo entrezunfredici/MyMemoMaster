@@ -59,7 +59,6 @@ const routes = [
     component: () => import('../pages/register/InscriptionPage.vue'),
     meta: {
       title: 'register',
-      private: true,
     },
   },
   {
@@ -68,7 +67,6 @@ const routes = [
     component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
       title: 'login',
-      private: true,
     },
   },
   {

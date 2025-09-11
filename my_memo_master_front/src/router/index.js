@@ -16,8 +16,8 @@ router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   if (to.meta.private === true) {
     if (!authStore.authenticated || !(authStore.user.connectionToken || authStore.token)) {
-      authStore.logout()
-      return false
+      authStore.logout(false, null)
+      return next({ path: '/auth' })
     }
   }
   if (to.name === 'profile') {
