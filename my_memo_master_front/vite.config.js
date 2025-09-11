@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    base: process.env.BASE || '/', // ← important si tu sers à la racine (Traefik/Nginx)
+    base: process.env.BASE || '/',
     plugins: [
       vue(),
       VitePWA({
