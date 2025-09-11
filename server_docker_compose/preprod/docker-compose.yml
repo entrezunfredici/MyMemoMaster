@@ -83,7 +83,7 @@ services:
     depends_on:
       - api
     env_file:
-      - ../../.env
+      - .env
     environment:
       - APP_PUBLIC_URL=https://${FRONT_DOMAIN}
       - APP_API_URL=https://${API_DOMAIN}

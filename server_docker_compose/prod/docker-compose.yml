@@ -5,7 +5,7 @@ services:
   postgres:
     image: postgres:16
     env_file:
-      - ../../.env
+      - .env
     environment:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASS}
@@ -19,7 +19,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     env_file:
-      - ../../.env
+      - .env
     volumes:
       - pgadmin-data:/var/lib/pgadmin
     depends_on: [postgres]
@@ -76,7 +76,7 @@ services:
   front:
     image: fredissimo/mymemomaster_front:latest
     env_file:
-      - ../../.env
+      - .env
     environment:
       # Vite/frontend runtime variables (used at build time)
       VITE_APP_NAME: ${VITE_APP_NAME}
