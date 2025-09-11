@@ -14,17 +14,17 @@ router.beforeEach((to, from, next) => {
 
   //Check if the route is private and validate the token
   const authStore = useAuthStore()
-  if (to.meta.private === true) {
-    if (!authStore.authenticated || !(authStore.user.connectionToken || authStore.token)) {
-      authStore.logout(false, null)
-      return next({ path: '/auth' })
-    }
-  }
-  if (to.name === 'profile') {
-    if (authStore.authenticated) {
-      next({ path: '/register' })
-    }
-  }
+  // if (to.meta.private === true) {
+  //   if (!authStore.authenticated || !(authStore.user.connectionToken || authStore.token)) {
+  //     authStore.logout(false, null)
+  //     return next({ path: '/auth' })
+  //   }
+  // }
+  // if (to.name === 'profile') {
+  //   if (authStore.authenticated) {
+  //     next({ path: '/register' })
+  //   }
+  // }
 
   next();
 });
