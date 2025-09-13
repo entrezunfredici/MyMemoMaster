@@ -67,7 +67,7 @@ services:
       - postgres
     labels:
       - traefik.enable=true
-      - traefik.http.routers.mmm-preprod-api.rule=Host(`api.tests.my-memo-master.com`)
+      - traefik.http.routers.mmm-preprod-api.rule=Host(`${API_DOMAIN}`)
       - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
       - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
       - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
