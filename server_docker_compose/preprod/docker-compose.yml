@@ -33,7 +33,7 @@ services:
       - traefik_proxy
 
   api:
-    image: ${IMAGE_FRONT}
+    image: ${IMAGE_API}
     # image: fredissimo/mymemomaster_test_api:latest
     env_file:
       - .env
