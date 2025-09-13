@@ -33,8 +33,8 @@ services:
       - traefik_proxy
 
   api:
-    #image: ${IMAGE_FRONT}
-    image: fredissimo/mymemomaster_test_api:latest
+    image: ${IMAGE_FRONT}
+    # image: fredissimo/mymemomaster_test_api:latest
     env_file:
       - .env
     volumes:
@@ -79,8 +79,8 @@ services:
     restart: unless-stopped
 
   front:
-    #image: ${IMAGE_FRONT}
-    image: fredissimo/mymemomaster_test_front:latest
+    image: ${IMAGE_FRONT}
+    # image: fredissimo/mymemomaster_test_front:latest
     restart: unless-stopped
     depends_on:
       - api
