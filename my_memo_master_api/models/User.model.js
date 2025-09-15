@@ -23,7 +23,7 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: "Role",
+          model: "roles",
           key: "roleId",
         },
         onDelete: "CASCADE",
