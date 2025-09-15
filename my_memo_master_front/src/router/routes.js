@@ -4,8 +4,7 @@ const routes = [
     name: 'home',
     component: () => import('../pages/HomePage.vue'),
     meta: {
-      title: 'Accueil',
-      private: true,
+      title: 'Accueil'
     },
   },
   {
@@ -23,7 +22,6 @@ const routes = [
     component: () => import('../pages/TutorialsPage.vue'),
     meta: {
       title: 'Tutoriels',
-      private: true,
     },
   },
   {
@@ -59,7 +57,6 @@ const routes = [
     component: () => import('../pages/register/InscriptionPage.vue'),
     meta: {
       title: 'register',
-      private: true,
     },
   },
   {
@@ -68,7 +65,6 @@ const routes = [
     component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
       title: 'login',
-      private: true,
     },
   },
   {
