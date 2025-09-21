@@ -91,25 +91,27 @@ export const useAuthStore = defineStore('auth',
 
       async register(user, redirect = '/auth') {
 
-        this.logout(false)
+        this.logout(false, null)
 
-        await api.post('users/register', user).then(resp => {
+        try {
+          const resp = await api.post('users/register', user)
 
-          if (resp.status !== 201) {
-            notif.notify(resp.data.message, 'error')
-            return false
+          if (!resp || resp.status !== 201) {
+            const message = resp?.data?.message || 'Registration failed.'
+            throw new Error(message)
           }
 
-          notif.notify(`You have been registered`, 'success')
+          notif.notify('You have been registered', 'success')
+
+          if (redirect) {
+            router.push(redirect)
+          }
 
           return true
-        }).catch(error => {
-          notif.notify(`An error occured: ${error}`, 'error')
-          return false
-        })
-
-        if (redirect) {
-          router.push(redirect)
+        } catch (error) {
+          const message = error?.response?.data?.message || error?.message || "Erreur lors de l'inscription."
+          notif.notify(message, 'error')
+          throw new Error(message)
         }
       },
 
@@ -155,3 +157,4 @@ export const useAuthStore = defineStore('auth',
     },
   },
 )
+

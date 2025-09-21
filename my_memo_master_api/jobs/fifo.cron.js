@@ -1,7 +1,7 @@
 // jobs/fifo.cron.js
 const cron = require('node-cron');
 const { Op } = require('sequelize');
-const { LeitnerCard, sequelize } = require('../models');
+const { LeitnerCard, instance: sequelize } = require('../models');
 
 let isRunning = false;
 
