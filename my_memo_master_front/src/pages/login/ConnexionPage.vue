@@ -12,13 +12,13 @@
 
       <form @submit.prevent="submitForm" class="w-full max-w-md mt-6">
         <div class="mb-4">
-          <label class="block text-gray-700">Email</label>
-          <input type="email" v-model="email" required class="w-full mt-1 p-3 no-underline border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label for="login-email" class="block text-gray-700">Email</label>
+          <input id="login-email" name="email" type="email" v-model="email" required class="w-full mt-1 p-3 no-underline border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
         </div>
 
         <div class="mb-4">
-          <label class="block text-gray-700">Mot de passe</label>
-          <input type="password" v-model="password" required class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label for="login-password" class="block text-gray-700">Mot de passe</label>
+          <input id="login-password" name="password" type="password" v-model="password" required class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
           <a href="#" class="text-sm text-blue-600">Mot de passe oublié ?</a>
         </div>
         
@@ -44,3 +44,4 @@
 </template>
 <style scoped src="./Connexion.css"></style>
 <script src="./Connexion.js"></script>
+

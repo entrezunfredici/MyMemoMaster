@@ -12,23 +12,56 @@
 
       <form @submit.prevent="submitForm" class="w-full max-w-md mt-6">
         <div class="mb-4">
-          <label class="block text-gray-700 no-underline">Name</label>
-          <input v-model="name" required class="w-full mt-1 p-3 no-underline border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label for="register-name" class="block text-gray-700 no-underline">Name</label>
+          <input
+            id="register-name"
+            name="name"
+            v-model="name"
+            required
+            :class="['w-full mt-1 p-3 no-underline border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
+          >
+          <p v-if="fieldErrors.name" class="text-red-500 text-xs mt-1">{{ fieldErrors.name }}</p>
         </div>
 
         <div class="mb-4">
-          <label class="block text-gray-700 no-underline">Email</label>
-          <input type="email" v-model.trim="email" required class="w-full mt-1 p-3 no-underline border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label for="register-email" class="block text-gray-700 no-underline">Email</label>
+          <input
+            id="register-email"
+            name="email"
+            type="email"
+            v-model.trim="email"
+            required
+            :class="['w-full mt-1 p-3 no-underline border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.email ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
+          >
+          <p v-if="fieldErrors.email" class="text-red-500 text-xs mt-1">{{ fieldErrors.email }}</p>
         </div>
 
         <div class="mb-4">
-          <label class="block text-gray-700 no-underline">Mot de passe</label>
-          <input type="password" v-model="password" minlength="6" required class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label for="register-password" class="block text-gray-700 no-underline">Mot de passe</label>
+          <input
+            id="register-password"
+            name="password"
+            type="password"
+            v-model="password"
+            minlength="6"
+            required
+            :class="['w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.password ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
+          >
+          <p v-if="fieldErrors.password" class="text-red-500 text-xs mt-1">{{ fieldErrors.password }}</p>
         </div>
 
         <div class="mb-4">
-          <label class="block text-gray-700 no-underline">Confirmer le mot de passe</label>
-          <input type="password" v-model="confirmPassword" minlength="6" required class="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label for="register-confirm-password" class="block text-gray-700 no-underline">Confirmer le mot de passe</label>
+          <input
+            id="register-confirm-password"
+            name="confirmPassword"
+            type="password"
+            v-model="confirmPassword"
+            minlength="6"
+            required
+            :class="['w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
+          >
+          <p v-if="fieldErrors.confirmPassword" class="text-red-500 text-xs mt-1">{{ fieldErrors.confirmPassword }}</p>
         </div>
 
         <div class="flex flex-col items-center m-2">

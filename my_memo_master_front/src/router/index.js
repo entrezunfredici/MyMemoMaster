@@ -20,13 +20,12 @@ router.beforeEach((to, from, next) => {
       return next({ path: '/auth' })
     }
   }
-  if (to.name === 'profile') {
-    if (authStore.authenticated) {
-      next({ path: '/register' })
-    }
+  if (['register', 'auth'].includes(to.name) && authStore.authenticated) {
+    return next({ path: '/profile' })
   }
 
   next();
 });
 
 export default router
+
