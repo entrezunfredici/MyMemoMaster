@@ -2,9 +2,10 @@ const { Sequelize } = require("sequelize");
 const dbmsConfig = require("../config/dbms.config");
 const dbConfig = require("../config/db.config");
 
-// Création de l'instance Sequelize
+// Instantiate Sequelize using the right configuration for the current environment
 const instance = new Sequelize(process.env.ENVIRONMENT === "prod" ? dbmsConfig : dbConfig);
-// Models
+
+// Register models
 const models = {};
 models.Role = require("./Role.model")(instance);
 models.Subject = require("./Subject.model")(instance);
@@ -22,27 +23,19 @@ models.Test = require("./Test.model")(instance);
 models.Question = require("./Question.model")(instance);
 models.Tutorials = require("./Tutorials.model")(instance);
 
-
-// Associations
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {
     models[modelName].associate(models);
   }
 });
 
-//reset database
-// instance.sync({ force: true }).then(() => {
-//   console.log("reset database success"); 
-// });
-
-instance.sync({ alter: true }).then(() => {
-  console.log("Base de données synchronisée (force true)");
-  // Ici tu peux démarrer ton serveur ou ta seed
-}).catch((err) => {
-  console.error("Erreur lors de la synchronisation de la base :", err);
-});
+const syncModels = async (options = {}) => {
+  const syncOptions = { alter: true, ...options };
+  await instance.sync(syncOptions);
+};
 
 module.exports = {
   instance,
+  syncModels,
   ...models,
 };
