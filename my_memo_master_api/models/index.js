@@ -29,8 +29,63 @@ Object.keys(models).forEach((modelName) => {
   }
 });
 
+const getPhysicalTableName = (model) => {
+  const tableName = model.getTableName();
+
+  if (typeof tableName === "string") {
+    return tableName;
+  }
+
+  if (tableName && typeof tableName.tableName === "string") {
+    return tableName.tableName;
+  }
+
+  return String(tableName);
+};
+
+const cleanupSQLiteBackupTables = async () => {
+  if (instance.getDialect() !== "sqlite") {
+    return;
+  }
+
+  const queryInterface = instance.getQueryInterface();
+  const existingTables = await queryInterface.showAllTables();
+  const normalizedTables = new Set(
+    existingTables.map((table) => {
+      if (typeof table === "string") {
+        return table;
+      }
+
+      if (table && typeof table.tableName === "string") {
+        return table.tableName;
+      }
+
+      return String(table);
+    })
+  );
+
+  for (const model of Object.values(models)) {
+    const backupTableName = `${getPhysicalTableName(model)}_backup`;
+
+    if (normalizedTables.has(backupTableName)) {
+      await queryInterface.dropTable(backupTableName);
+    }
+  }
+};
+
 const syncModels = async (options = {}) => {
-  const syncOptions = { alter: true, ...options };
+  await cleanupSQLiteBackupTables();
+
+  const syncOptions = { ...options };
+  const shouldAlter =
+    instance.getDialect() === "postgres" &&
+    options.force !== true &&
+    Object.prototype.hasOwnProperty.call(options, "alter") === false;
+
+  if (shouldAlter) {
+    syncOptions.alter = true;
+  }
+
   await instance.sync(syncOptions);
 };
 
