@@ -39,7 +39,7 @@
             Questions récap
           </h4>
           <div class="flex flex-col gap-4">
-            <div v-for="(q, index) in questions" :key="q.idQuestion"
+            <div v-for="(q) in questions" :key="q.idQuestion"
               class="flex justify-between border-2 bg-[#FFF] border-gray rounded-lg px-4 py-2">
               <span class="text-lg text-dark">{{ q.statement }}</span>
               <XMarkIcon class="size-6 text-dark cursor-pointer hover:brightness-50" @click="deleteQuestion(q.idQuestion)" />
