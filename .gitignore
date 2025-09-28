@@ -4,3 +4,5 @@
 my_memo_master_api/node_modules
 my_memo_master_api/database/db.sqlite
 my_memo_master_api/.envs
+
+server_docker_compose/preprod/server_proxy/
