@@ -156,7 +156,7 @@ const escapeHtml = (value) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\]/g, '\$&');
+const escapeRegex = (value) => value.replace(/[[\]{}()*+?.\\^$|]/g, '\$&');
 
 const normalizeTokens = (raw) => {
   let output = raw;
@@ -423,8 +423,7 @@ const checkUnitHomogeneity = (expression) => {
       .replace(/(\d+(?:\.\d+)?)\s*([a-zA-ZµΩ°]+)\/1([a-zA-ZµΩ°]+)/g, '$1$2/$3')
       .replace(/(\d+(?:\.\d+)?)\s*([a-zA-ZµΩ°]+)\/\d+(?:\.\d+)?([a-zA-ZµΩ°]+)/g, '$1$2/$3');
 
-  const lines = preprocess(expression).split(/
-+/);
+  const lines = preprocess(expression).split(/\r?\n+/);
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
