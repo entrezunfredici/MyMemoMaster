@@ -543,9 +543,7 @@ const formatContent = (rawValue) => {
       closeTags = '</span>' + closeTags;
     }
 
-    const contentWithBreaks = content.replace(/
-/g, '<br>');
-    return `${openTags}${contentWithBreaks}${closeTags}`;
+    const contentWithBreaks = String(content ?? '').replace(/\r?\n/g, '<br/>');
   });
 
   return html;
