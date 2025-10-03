@@ -514,12 +514,9 @@ const formatContent = (rawValue) => {
     .replace(/∫_(.*?)\^(.*?)\((.*?)\)/g, '<span style="font-style: italic;">∫<sub>$1</sub><sup>$2</sup> $3</span>')
     .replace(/∮_(.*?)\^(.*?)\((.*?)\)/g, '<span style="font-style: italic;">∮<sub>$1</sub><sup>$2</sup> $3</span>')
     .replace(/∯_(.*?)\^(.*?)\((.*?)\)/g, '<span style="font-style: italic;">∯<sub>$1</sub><sup>$2</sup> $3</span>')
-    .replace(/∫([^\s^]+)\^([^\s^]+)\s*([^
-]+)/g, '<span style="font-style: italic;">∫<sub>$1</sub><sup>$2</sup> $3</span>')
-    .replace(/∮([^\s^]+)\^([^\s^]+)\s*([^
-]+)/g, '<span style="font-style: italic;">∮<sub>$1</sub><sup>$2</sup> $3</span>')
-    .replace(/∯([^\s^]+)\^([^\s^]+)\s*([^
-]+)/g, '<span style="font-style: italic;">∯<sub>$1</sub><sup>$2</sup> $3</span>')
+    .replace(/∫([^\s^]+)\^([^\s^]+)\s*([^\r\n]+)/g, '<span style="font-style: italic;">∫<sub>$1</sub><sup>$2</sup> $3</span>')
+    .replace(/∮([^\s^]+)\^([^\s^]+)\s*([^\r\n]+)/g, '<span style="font-style: italic;">∮<sub>$1</sub><sup>$2</sup> $3</span>')
+    .replace(/∯([^\s^]+)\^([^\s^]+)\s*([^\r\n]+)/g, '<span style="font-style: italic;">∯<sub>$1</sub><sup>$2</sup> $3</span>')
     .replace(/([A-Za-z])̅/g, '<span style="text-decoration: overline;">$1</span>')
     .replace(/ẋ/g, '<span>x<sup style="font-size: 0.7em;">·</sup></span>')
     .replace(/ẍ/g, '<span>x<sup style="font-size: 0.7em;">..</sup></span>')
@@ -529,11 +526,7 @@ const formatContent = (rawValue) => {
     .replace(/ℝ/g, '&#8477;')
     .replace(/ℂ/g, '&#8450;')
     .replace(/∞/g, '&#8734;')
-    .replace(/
-/g, '<br />');
-
-  html = renderMatrix(html);
-
+    .replace(/\r?\n/g, '<br />');
   html = html.replace(/<text([^>]*)>([\s\S]*?)<\/text>/gi, (_match, attributes, content) => {
     let openTags = '';
     let closeTags = '';
