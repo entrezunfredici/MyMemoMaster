@@ -60,12 +60,16 @@
 
     <h3>Résultat</h3>
     <div class="interpreter__preview" v-html="renderedContent"></div>
+    <div v-if="unitsError" style="margin-bottom:8px; padding:8px 12px; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:8px; font-weight:600;">
+      {{ unitsError }}
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
 import { renderMathMultiline } from './interpreter.js' // KaTeX bridge
+import { checkUnitHomogeneity } from './units.js'
 
 /* --- Palette & boutons (inchangés / légères retouches utiles) --- */
 const formulaMapping = {
@@ -147,6 +151,7 @@ const userInput = ref('')
 const textareaRef = ref(null)
 
 // KaTeX: rendu HTML (computed -> auto-refresh)
+const unitsError = computed(() => checkUnitHomogeneity(userInput.value)) 
 const renderedContent = computed(() => renderMathMultiline(userInput.value))
 
 /* --- Insertion depuis la palette/toolbar --- */
