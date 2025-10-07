@@ -1,4 +1,4 @@
-// src/components/interpreter.js
+// src/components/interpreter/interpreter.js
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 

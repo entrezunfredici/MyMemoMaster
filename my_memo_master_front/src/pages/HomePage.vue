@@ -7,7 +7,7 @@
 </template>
 
 <script setup>
-import Interpreter from '@/components/Interpreter.vue';
+import Interpreter from '@/components/interpreter/Interpreter.vue';
 </script>
 
 <style scoped>
