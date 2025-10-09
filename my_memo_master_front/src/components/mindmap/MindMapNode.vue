@@ -51,11 +51,31 @@
         {{ node.collapsed ? '+' : '-' }}
       </text>
     </g>
+
+    <g
+      class="mindmap-node__add"
+      :class="{ 'mindmap-node__add--active': selected }"
+      :transform="`translate(${width / 2 + 36}, 0)`"
+      @pointerdown.stop.prevent="createChildNode"
+    >
+      <circle r="12" stroke="#111827" stroke-width="1" />
+      <text
+        text-anchor="middle"
+        dominant-baseline="central"
+        fill="#0f172a"
+        font-size="16"
+        font-weight="600"
+      >
+        +
+      </text>
+    </g>
   </g>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
+import { normalizeCreationType, getNodeLabel } from '@/helpers/mindmapCreation';
 
 const props = defineProps({
   node: {
@@ -73,6 +93,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['node-pointerdown', 'toggle-collapse']);
+const store = useMindMapBuilderStore();
+const creationType = computed(() => normalizeCreationType(store.tool));
 
 const width = computed(() => props.node.style?.width || 220);
 const height = computed(() => props.node.style?.height || 120);
@@ -96,6 +118,21 @@ const handlePointerDown = (event) => {
 
 const toggleCollapse = () => {
   emit('toggle-collapse', props.node.id);
+};
+
+const createChildNode = () => {
+  if (!props.node?.id) return;
+  const type = creationType.value;
+  const label = getNodeLabel(type);
+  const payload = {
+    label,
+    type,
+    parentId: props.node.id,
+  };
+  if (type !== 'text') {
+    payload.content = '';
+  }
+  store.addNode(payload);
 };
 </script>
 
@@ -134,5 +171,24 @@ const toggleCollapse = () => {
 
 .mindmap-node__collapse {
   cursor: pointer;
+}
+
+.mindmap-node__add {
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mindmap-node:hover .mindmap-node__add,
+.mindmap-node__add--active {
+  opacity: 1;
+}
+
+.mindmap-node__add circle {
+  fill: #38bdf8;
+}
+
+.mindmap-node__add:hover circle {
+  fill: #0ea5e9;
 }
 </style>

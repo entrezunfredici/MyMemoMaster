@@ -73,6 +73,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
+import { creationTools, getNodeLabel, normalizeCreationType } from '@/helpers/mindmapCreation';
 import MindMapNode from './MindMapNode.vue';
 import MindMapLink from './MindMapLink.vue';
 import MindMapZone from './MindMapZone.vue';
@@ -198,7 +199,26 @@ const onLinkPointerDown = ({ link }) => {
 };
 
 const onBackgroundPointerDown = (event) => {
-  if (event.target === svgRef.value && event.button === 0) {
+  const isCreationTool = creationTools.includes(store.tool);
+  const isPrimaryButton = event.button === 0;
+  const clickedSvgBackground = event.target === svgRef.value;
+
+  if (isCreationTool && isPrimaryButton && clickedSvgBackground) {
+    if (!store.map.subjectNodeId) return;
+    const coords = toBoardCoords(event);
+    const type = normalizeCreationType(store.tool);
+    const label = getNodeLabel(type);
+    store.addNode({
+      label,
+      type,
+      parentId: store.map.subjectNodeId,
+      content: type === 'text' ? undefined : '',
+      position: coords,
+    });
+    return;
+  }
+
+  if (clickedSvgBackground && isPrimaryButton) {
     store.resetSelection();
   }
 

@@ -19,6 +19,15 @@
       </div>
     </div>
 
+    <div class="mindmap-palette__section">
+      <h4>Creer des items</h4>
+      <div class="mindmap-palette__actions">
+        <button @click="createSubjectItem">{{ subjectCreationLabel }}</button>
+        <button @click="addChild" :disabled="!selectedNode">{{ childCreationLabel }}</button>
+      </div>
+      <p class="mindmap-palette__hint">{{ creationHint }}</p>
+    </div>
+
     <div class="mindmap-palette__section" v-if="selectedNode">
       <h4>Item selectionne</h4>
       <div class="mindmap-palette__field">
@@ -40,7 +49,6 @@
         <input type="color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
       </div>
       <div class="mindmap-palette__actions">
-        <button @click="addChild">Ajouter un item enfant</button>
         <button @click="toggleCollapse">{{ selectedNode.collapsed ? 'Reafficher' : 'Masquer' }}</button>
         <button class="danger" @click="removeNode">Supprimer</button>
       </div>
@@ -85,6 +93,12 @@
 import { computed, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { masteryList } from '@/helpers/mindmap';
+import {
+  normalizeCreationType,
+  getNodeLabel,
+  getSubjectActionLabel,
+  getChildActionLabel,
+} from '@/helpers/mindmapCreation';
 
 const store = useMindMapBuilderStore();
 
@@ -102,6 +116,15 @@ const masteryLevels = masteryList;
 const selectedNode = computed(() => store.selectedNode);
 const selectedNodeZone = computed(() => selectedNode.value?.zoneId || null);
 const zones = computed(() => store.map.zones || []);
+const creationType = computed(() => normalizeCreationType(store.tool));
+const subjectCreationLabel = computed(() => getSubjectActionLabel(creationType.value));
+const childCreationLabel = computed(() => getChildActionLabel(creationType.value));
+const creationHint = computed(() => {
+  if (selectedNode.value) {
+    return `Le prochain element sera relie a \"${selectedNode.value.label}\".`;
+  }
+  return 'Selectionne un item pour lui ajouter un enfant, sinon un item sera relie au sujet principal.';
+});
 
 const editableLabel = ref('');
 const editableContent = ref('');
@@ -142,9 +165,34 @@ const updateColor = (value) => {
   store.updateNodeStyle(selectedNode.value.id, { primaryColor: value });
 };
 
+const createSubjectItem = () => {
+  if (!store.map.subjectNodeId) return;
+  const type = creationType.value;
+  const nodeLabel = getNodeLabel(type);
+  const payload = {
+    label: nodeLabel,
+    type,
+    parentId: store.map.subjectNodeId,
+  };
+  if (type !== 'text') {
+    payload.content = '';
+  }
+  store.addNode(payload);
+};
+
 const addChild = () => {
   if (!selectedNode.value) return;
-  store.addNode({ label: 'Nouvel item', parentId: selectedNode.value.id });
+  const type = creationType.value;
+  const nodeLabel = getNodeLabel(type);
+  const payload = {
+    label: nodeLabel,
+    type,
+    parentId: selectedNode.value.id,
+  };
+  if (type !== 'text') {
+    payload.content = '';
+  }
+  store.addNode(payload);
 };
 
 const toggleCollapse = () => {
@@ -298,6 +346,13 @@ const assignZone = (zoneId) => {
   background: #0ea5e9;
 }
 
+.mindmap-palette__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+  color: #f1f5f9;
+}
+
 .mindmap-palette__actions .danger {
   background: #f87171;
   color: #fff;
@@ -332,6 +387,13 @@ const assignZone = (zoneId) => {
 .mindmap-palette__zone-chip.active {
   background: #2563eb;
   color: #ffffff;
+}
+
+.mindmap-palette__hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>
 

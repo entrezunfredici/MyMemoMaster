@@ -84,21 +84,39 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       node.layout.y = y;
       this.touch();
     },
-    addNode({ label = 'Nouvel item', type = 'text', content = '', parentId = null }) {
+    addNode({
+      label = 'Nouvel item',
+      type = 'text',
+      content = undefined,
+      parentId = null,
+      position = null,
+    }) {
       const id = createId();
-      const parent = parentId ? this.map.nodes[parentId] : null;
-      const angle = parent?.layout?.angle ?? 0;
-      const radius = parent ? (parent.layout.radius || 180) + 160 : 260;
       const subject = this.map.nodes[this.map.subjectNodeId];
-      const baseX = subject?.layout?.x ?? 0;
-      const baseY = subject?.layout?.y ?? 0;
-      const x = parent ? parent.layout.x + radius * Math.cos(angle || 0) : baseX + 240;
-      const y = parent ? parent.layout.y + radius * Math.sin(angle || 0) : baseY;
-      this.map.nodes[id] = ensureSecondaryColor({
+      let resolvedParentId = parentId || this.map.subjectNodeId || null;
+      let parent = resolvedParentId ? this.map.nodes[resolvedParentId] : null;
+      if (resolvedParentId && !parent) {
+        resolvedParentId = this.map.subjectNodeId || null;
+        parent = resolvedParentId ? this.map.nodes[resolvedParentId] : null;
+      }
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      const existingChildren = resolvedParentId
+        ? this.map.links.filter((link) => link.from === resolvedParentId)
+        : [];
+      const childCount = existingChildren.length;
+      const baseX = parent?.layout?.x ?? subject?.layout?.x ?? 0;
+      const baseY = parent?.layout?.y ?? subject?.layout?.y ?? 0;
+      const parentSize = Math.max(parent?.style?.width || 220, parent?.style?.height || 120);
+      const radius = parent ? parentSize / 2 + 160 + childCount * 40 : 260 + childCount * 60;
+      const angle = parent ? childCount * goldenAngle : childCount * goldenAngle;
+      let x = baseX + radius * Math.cos(angle);
+      let y = baseY + radius * Math.sin(angle);
+      const nodeContent = content !== undefined ? content : label;
+      const newNode = ensureSecondaryColor({
         id,
         label,
         type,
-        content: content || label,
+        content: nodeContent,
         mastery: 'undefined',
         zoneId: null,
         style: {
@@ -108,16 +126,31 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
           width: 220,
           height: 120,
         },
-        layout: { x, y },
+        layout: { x, y, radius, angle },
         collapsed: false,
         meta: {
           isSubject: false,
-          parentId: parentId || this.map.subjectNodeId,
+          parentId: resolvedParentId || null,
         },
       });
-      if (parentId || this.map.subjectNodeId) {
-        const from = parentId || this.map.subjectNodeId;
-        this.addLink({ from, to: id, type: 'appartenance' });
+      if (position && typeof position.x === 'number' && typeof position.y === 'number') {
+        newNode.layout.x = position.x;
+        newNode.layout.y = position.y;
+        if (parent) {
+          const dx = position.x - baseX;
+          const dy = position.y - baseY;
+          newNode.layout.radius = Math.hypot(dx, dy);
+          newNode.layout.angle = Math.atan2(dy, dx);
+        }
+      }
+      if (parent?.collapsed) {
+        parent.collapsed = false;
+      }
+      this.map.nodes[id] = newNode;
+      if (resolvedParentId) {
+        this.addLink({ from: resolvedParentId, to: id, type: 'appartenance' });
+      } else if (this.map.subjectNodeId) {
+        this.addLink({ from: this.map.subjectNodeId, to: id, type: 'appartenance' });
       }
       this.selectNode(id);
       this.touch();
