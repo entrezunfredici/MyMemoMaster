@@ -39,6 +39,50 @@ services:
       - my_memo_master_preprod_network
       - traefik_proxy
 
+  db-sync:
+    image: ${IMAGE_API}
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - ENVIRONMENT=prod
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=${PG_USER}
+      - PG_PASS=${PG_PASS}
+      - PG_DB=${PG_DB}
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=${PG_USER}
+      - PGPASSWORD=${PG_PASS}
+      - PGDATABASE=${PG_DB}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo ">>> Running database synchronization before API startup..."
+        node <<'NODE'
+        const { syncModels } = require('./models');
+        (async () => {
+          try {
+            await syncModels();
+            console.log('Database schema synchronized successfully.');
+            process.exit(0);
+          } catch (error) {
+            console.error('Database synchronization failed.');
+            console.error(error);
+            process.exit(1);
+          }
+        })();
+        NODE
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - my_memo_master_preprod_network
+    restart: "no"
+
   api:
     image: ${IMAGE_API}
     # image: fredissimo/mymemomaster_test_api:latest
@@ -76,6 +120,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-sync:
+        condition: service_completed_successfully
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-preprod-api.rule=Host(`${API_DOMAIN}`)
