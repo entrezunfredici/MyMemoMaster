@@ -1,0 +1,147 @@
+version: "3.2"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASS}
+      POSTGRES_DB: ${PG_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - my_memo_master_preprod_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mmm-preprod-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)
+      - traefik.http.routers.mmm-preprod-pgadmin.entrypoints=websecure
+      - traefik.http.routers.mmm-preprod-pgadmin.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-preprod-pgadmin.loadbalancer.server.port=80
+      - traefik.docker.network=traefik_proxy
+    networks:
+      - my_memo_master_preprod_network
+      - traefik_proxy
+
+  api:
+    image: ${IMAGE_API}
+    # image: fredissimo/mymemomaster_test_api:latest
+    env_file:
+      - .env
+    volumes:
+      - api-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - ENVIRONMENT=prod
+      - API_PORT=${API_PORT}
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=${PG_USER}
+      - PG_PASS=${PG_PASS}
+      - PG_DB=${PG_DB}
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=${PG_USER}
+      - PGPASSWORD=${PG_PASS}
+      - PGDATABASE=${PG_DB}
+      - CORS_ORIGIN=https://${FRONT_DOMAIN}
+      # Auth / Security
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+      - AUTH_JWT_EXPIRES_IN=${AUTH_JWT_EXPIRES_IN}
+      - API_BYPASS_AUTH=${API_BYPASS_AUTH}
+      # CORS / Front URL (used by API code)
+      - VITE_FRONT_URL=${VITE_FRONT_URL}
+      # Email
+      - EMAIL_FROM=${EMAIL_FROM}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+    depends_on:
+      - postgres
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mmm-preprod-api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
+      - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
+      - traefik.docker.network=traefik_proxy
+    networks:
+      - my_memo_master_preprod_network
+      - traefik_proxy
+    restart: unless-stopped
+
+  front:
+    image: ${IMAGE_FRONT}
+    # image: fredissimo/mymemomaster_test_front:latest
+    restart: unless-stopped
+    depends_on:
+      - api
+    env_file:
+      - .env
+    environment:
+      - APP_PUBLIC_URL=https://${FRONT_DOMAIN}
+      - APP_API_URL=https://${API_DOMAIN}
+      # Optional: expose Vite variables for builds that might use them
+      - VITE_APP_NAME=${VITE_APP_NAME}
+      - VITE_APP_COMPANY_NAME=${VITE_APP_COMPANY_NAME}
+      - VITE_APP_AUTHOR_NAME=${VITE_APP_AUTHOR_NAME}
+      - VITE_FRONT_URL=${VITE_FRONT_URL}
+      - VITE_API_URL=${VITE_API_URL}
+    command: >
+      sh -lc '
+        # 1) Génère la config runtime
+        cat >/usr/share/nginx/html/config.js <<EOF
+        window.__APP_CONFIG__ = {
+          PUBLIC_URL: "${APP_PUBLIC_URL}",
+          API_URL: "${APP_API_URL}"
+        };
+        EOF
+
+        # 2) S’assure que /config.js est servi en statique (pas réécrit)
+        if ! grep -q "location = /config.js" /etc/nginx/conf.d/default.conf 2>/dev/null; then
+          sed -i "/server {/a \  location = /config.js { try_files /config.js =404; add_header Cache-Control \"no-cache\"; }" /etc/nginx/conf.d/default.conf
+        fi
+
+        # 3) (sécurité) injecte le <script src="/config.js"> avant le bundle s’il manque
+        grep -q "/config.js" /usr/share/nginx/html/index.html \
+          || sed -i "/type=\\"module\\"/i \  <script src=\\"/config.js\\"></script>" /usr/share/nginx/html/index.html
+
+        exec nginx -g "daemon off;";
+      '
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mmm-preprod-front.rule=Host(`${FRONT_DOMAIN}`)
+      - traefik.http.routers.mmm-preprod-front.entrypoints=websecure
+      - traefik.http.routers.mmm-preprod-front.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-preprod-front.loadbalancer.server.port=80
+      - traefik.docker.network=traefik_proxy
+    networks:
+      - my_memo_master_preprod_network
+      - traefik_proxy
+    volumes:
+      - front-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  api-data:
+  front-data:
+  postgres-data:
+  pgadmin-data:
+
+networks:
+  my_memo_master_preprod_network:
+    driver: bridge
+  traefik_proxy:
+    external: true
