@@ -185,14 +185,14 @@ jobs:
           EOF
 
       # ───── Upload compose ─────
-      - name: Upload compose PROD
+      - name: Upload docker-compose in PROD
         if: github.ref == 'refs/heads/main'
         run: |
           scp -v -P ${{ secrets.VPS_PORT }} \
             server_docker_compose/docker-compose.yml \
             ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_prod/docker-compose.yml
 
-      - name: Upload compose PREPROD
+      - name: Upload docker-compose in PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
         run: |
           scp -v -P ${{ secrets.VPS_PORT }} \
