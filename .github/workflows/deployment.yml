@@ -171,7 +171,7 @@ jobs:
             set -e
             mkdir -p /var/www/html/my_memo_master_prod
             cd /var/www/html/my_memo_master_prod
-            docker-compose down || true
+            docker compose down || true
           EOF
 
       - name: Stop PREPROD
@@ -181,7 +181,7 @@ jobs:
             set -e
             mkdir -p /var/www/html/my_memo_master_preprod
             cd /var/www/html/my_memo_master_preprod
-            docker-compose down || true
+            docker compose down || true
           EOF
 
       # ───── Upload compose ─────
@@ -206,7 +206,8 @@ jobs:
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             cd /var/www/html/my_memo_master_prod
-            docker-compose up -d
+            docker compose pull
+            docker compose up -d
           EOF
 
       - name: Deploy to VPS in preprod (simple up)
@@ -215,7 +216,8 @@ jobs:
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             cd /var/www/html/my_memo_master_preprod
-            docker-compose up -d
+            docker compose pull
+            docker compose up -d
           EOF
 
   build_failure:
