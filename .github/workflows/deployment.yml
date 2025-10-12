@@ -206,8 +206,7 @@ jobs:
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             cd /var/www/html/my_memo_master_prod
-            docker compose pull
-            docker compose up -d
+            docker compose up -d --pull always
           EOF
 
       - name: Deploy to VPS in preprod (simple up)
@@ -216,8 +215,7 @@ jobs:
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             cd /var/www/html/my_memo_master_preprod
-            docker compose pull
-            docker compose up -d
+            docker compose up -d --pull always
           EOF
 
   build_failure:
