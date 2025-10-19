@@ -16,7 +16,7 @@ services:
       retries: 10
       start_period: 5s
     networks:
-      - my_memo_master_preprod_network
+      - my_memo_master_${ENVIRONMENT}_network
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -30,13 +30,13 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.mmm-preprod-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)
-      - traefik.http.routers.mmm-preprod-pgadmin.entrypoints=websecure
-      - traefik.http.routers.mmm-preprod-pgadmin.tls.certresolver=letsencrypt
-      - traefik.http.services.mmm-preprod-pgadmin.loadbalancer.server.port=80
+      - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)
+      - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin.entrypoints=websecure
+      - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-${ENVIRONMENT}-pgadmin.loadbalancer.server.port=80
       - traefik.docker.network=traefik_proxy
     networks:
-      - my_memo_master_preprod_network
+      - my_memo_master_${ENVIRONMENT}_network
       - traefik_proxy
 
   db-sync:
@@ -80,7 +80,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - my_memo_master_preprod_network
+      - my_memo_master_${ENVIRONMENT}_network
     restart: "no"
 
   api:
@@ -124,13 +124,13 @@ services:
         condition: service_completed_successfully
     labels:
       - traefik.enable=true
-      - traefik.http.routers.mmm-preprod-api.rule=Host(`${API_DOMAIN}`)
-      - traefik.http.routers.mmm-preprod-api.entrypoints=websecure
-      - traefik.http.routers.mmm-preprod-api.tls.certresolver=letsencrypt
-      - traefik.http.services.mmm-preprod-api.loadbalancer.server.port=${API_PORT}
+      - traefik.http.routers.mmm-${ENVIRONMENT}-api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.mmm-${ENVIRONMENT}-api.entrypoints=websecure
+      - traefik.http.routers.mmm-${ENVIRONMENT}-api.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-${ENVIRONMENT}-api.loadbalancer.server.port=${API_PORT}
       - traefik.docker.network=traefik_proxy
     networks:
-      - my_memo_master_preprod_network
+      - my_memo_master_${ENVIRONMENT}_network
       - traefik_proxy
     restart: unless-stopped
 
@@ -175,13 +175,13 @@ services:
         exec nginx -g 'daemon off;'
     labels:
       - traefik.enable=true
-      - traefik.http.routers.mmm-preprod-front.rule=Host(`${FRONT_DOMAIN}`)
-      - traefik.http.routers.mmm-preprod-front.entrypoints=websecure
-      - traefik.http.routers.mmm-preprod-front.tls.certresolver=letsencrypt
-      - traefik.http.services.mmm-preprod-front.loadbalancer.server.port=80
+      - traefik.http.routers.mmm-${ENVIRONMENT}-front.rule=Host(`${FRONT_DOMAIN}`)
+      - traefik.http.routers.mmm-${ENVIRONMENT}-front.entrypoints=websecure
+      - traefik.http.routers.mmm-${ENVIRONMENT}-front.tls.certresolver=letsencrypt
+      - traefik.http.services.mmm-${ENVIRONMENT}-front.loadbalancer.server.port=80
       - traefik.docker.network=traefik_proxy
     networks:
-      - my_memo_master_preprod_network
+      - my_memo_master_${ENVIRONMENT}_network
       - traefik_proxy
     volumes:
       - front-data:/app/data
@@ -198,7 +198,7 @@ volumes:
   pgadmin-data:
 
 networks:
-  my_memo_master_preprod_network:
+  my_memo_master_${ENVIRONMENT}_network:
     driver: bridge
   traefik_proxy:
     external: true
