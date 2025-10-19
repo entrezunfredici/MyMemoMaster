@@ -198,7 +198,7 @@ volumes:
   pgadmin-data:
 
 networks:
-  my_memo_master_network:
+  my_memo_master_preprod_network:
     name: my_memo_master_${ENVIRONMENT}_network
     driver: bridge
   traefik_proxy:
