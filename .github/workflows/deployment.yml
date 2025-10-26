@@ -146,11 +146,11 @@ jobs:
       - uses: actions/checkout@v4
 
       # ───── SSH agent ─────
-      - name: Set up SSH PROD
-        if: github.ref == 'refs/heads/main'
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
+      # - name: Set up SSH PROD
+      #   if: github.ref == 'refs/heads/main'
+      #   uses: webfactory/ssh-agent@v0.9.0
+      #   with:
+      #     ssh-private-key: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
 
       - name: Set up SSH PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
@@ -164,15 +164,15 @@ jobs:
           ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
       # ───── Stop containers ─────
-      - name: Stop PROD
-        if: github.ref == 'refs/heads/main'
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            mkdir -p /var/www/html/my_memo_master_prod
-            cd /var/www/html/my_memo_master_prod
-            docker compose down || true
-          EOF
+      # - name: Stop PROD
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+      #       set -e
+      #       mkdir -p /var/www/html/my_memo_master_prod
+      #       cd /var/www/html/my_memo_master_prod
+      #       docker compose down || true
+      #     EOF
 
       - name: Stop PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
@@ -185,12 +185,12 @@ jobs:
           EOF
 
       # ───── Upload compose ─────
-      - name: Upload docker-compose in PROD
-        if: github.ref == 'refs/heads/main'
-        run: |
-          scp -v -P ${{ secrets.VPS_PORT }} \
-            server_docker_compose/docker-compose.yml \
-            ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_prod/docker-compose.yml
+      # - name: Upload docker-compose in PROD
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     scp -v -P ${{ secrets.VPS_PORT }} \
+      #       server_docker_compose/docker-compose.yml \
+      #       ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_prod/docker-compose.yml
 
       - name: Upload docker-compose in PREPROD
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
@@ -200,14 +200,14 @@ jobs:
             ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_preprod/docker-compose.yml
 
       # ───── Deploy in server ─────
-      - name: Deploy to VPS in prod (simple up)
-        if: github.ref == 'refs/heads/main'
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            cd /var/www/html/my_memo_master_prod
-            docker compose up -d --pull always
-          EOF
+      # - name: Deploy to VPS in prod (simple up)
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+      #       set -e
+      #       cd /var/www/html/my_memo_master_prod
+      #       docker compose up -d --pull always
+      #     EOF
 
       - name: Deploy to VPS in preprod (simple up)
         if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
