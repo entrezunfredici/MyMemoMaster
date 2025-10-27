@@ -85,7 +85,6 @@ services:
 
   api:
     image: ${IMAGE_API}
-    # image: fredissimo/mymemomaster_test_api:latest
     env_file:
       - .env
     volumes:
