@@ -30,20 +30,16 @@ ENV VITE_APP_NAME=$VITE_APP_NAME \
 # ⚠️ Assure-toi que vite.config.* lit process.env.BASE (voir snippet plus bas)
 RUN npm run build
 
-# ---- Step 2: Node runtime avec serveur Express ----
-FROM node:20-alpine AS runtime
-WORKDIR /app
+# ---- Step 2: Nginx statique ----
+FROM nginx:alpine
 
-ENV NODE_ENV=production \
-    PORT=8080
+# Nginx conf pour SPA (history mode) + cache assets
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-COPY package*.json ./
-RUN npm ci --omit=dev
+# Fichiers du build
+COPY --from=build /app/dist /usr/share/nginx/html
 
-COPY --from=build /app/dist ./dist
-COPY server ./server
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -q -O - http://127.0.0.1/ || exit 1
 
-EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -q -O - http://127.0.0.1:${PORT}/healthz || exit 1
-
-CMD ["node", "server/index.js"]
+CMD ["nginx", "-g", "daemon off;"]
