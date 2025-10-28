@@ -24,6 +24,7 @@
     "express-openapi-validator": "^5.3.9",
     "http-errors": "^2.0.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
     "mysql2": "^3.11.3",
     "node-cron": "^4.2.1",
     "nodemailer": "^6.9.16",
