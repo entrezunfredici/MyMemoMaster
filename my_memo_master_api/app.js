@@ -48,6 +48,9 @@ app.use(bodyParser.json());
 // Middleware for favicon
 app.use(favicon(__dirname + "/public/favicon.ico"));
 
+// Static files for uploaded assets
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
+
 // Middleware pour servir la documentation Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

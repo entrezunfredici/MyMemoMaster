@@ -1,4 +1,4 @@
-const masteryColors = {
+﻿const masteryColors = {
   undefined: '#C0C5D2',
   low: '#E74C3C',
   medium: '#F39C12',
@@ -58,6 +58,11 @@ const createBlankMindMap = (title = 'Nouvelle carte mentale') => {
           shape: 'bubble',
           width: 220,
           height: 120,
+          textColor: '#eef2ff',
+          fontSize: 14,
+          fontWeight: 'normal',
+          fontStyle: 'normal',
+          textDecoration: 'none',
         },
         layout: {
           x: 400,
@@ -122,6 +127,11 @@ const normalizeMindMap = (raw) => {
           shape: cloned?.style?.shape || 'bubble',
           width: cloned?.style?.width || 220,
           height: cloned?.style?.height || 120,
+          textColor: cloned?.style?.textColor || '#eef2ff',
+          fontSize: Number.parseInt(cloned?.style?.fontSize, 10) || 14,
+          fontWeight: cloned?.style?.fontWeight || 'normal',
+          fontStyle: cloned?.style?.fontStyle || 'normal',
+          textDecoration: cloned?.style?.textDecoration || 'none',
         },
         layout: {
           x: cloned?.layout?.x ?? 0,
@@ -166,6 +176,11 @@ const normalizeMindMap = (raw) => {
           shape: 'bubble',
           width: node.width || 220,
           height: node.height || 120,
+          textColor: node.textColor || '#eef2ff',
+          fontSize: Number.parseInt(node.fontSize, 10) || 14,
+          fontWeight: node.fontWeight || 'normal',
+          fontStyle: node.fontStyle || 'normal',
+          textDecoration: node.textDecoration || 'none',
         },
         layout: {
           x: node.loc ? Number(node.loc.split(' ')[0]) : 400 + (index * 40),

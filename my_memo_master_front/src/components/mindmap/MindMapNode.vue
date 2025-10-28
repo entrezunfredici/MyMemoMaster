@@ -30,7 +30,12 @@
     <foreignObject :x="-width / 2 + 8" :y="-height / 2 + 8" :width="width - 16" :height="height - 32">
       <div class="mindmap-node__content">
         <div class="mindmap-node__title">{{ node.label }}</div>
-        <div class="mindmap-node__body" v-html="displayContent"></div>
+        <div v-if="isImageNode" class="mindmap-node__image">
+          <img v-if="imageSrc" :src="imageSrc" :alt="node.label" />
+          <span v-else class="mindmap-node__image-placeholder">Ajoutez une image depuis la palette</span>
+        </div>
+        <div v-else-if="isFormulaNode" class="mindmap-node__formula" v-html="formulaHtml"></div>
+        <div v-else class="mindmap-node__body" :style="bodyStyle" v-html="displayContent"></div>
       </div>
     </foreignObject>
 
@@ -76,6 +81,7 @@
 import { computed } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { normalizeCreationType, getNodeLabel } from '@/helpers/mindmapCreation';
+import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
 
 const props = defineProps({
   node: {
@@ -107,9 +113,30 @@ const borderRadius = computed(() => {
   return Math.min(width.value, height.value) / 2;
 });
 
+const isImageNode = computed(() => props.node.type === 'image');
+const isFormulaNode = computed(() => props.node.type === 'formula');
+const imageSrc = computed(() => {
+  if (!isImageNode.value) return '';
+  return props.node.content || '';
+});
+const formulaHtml = computed(() => {
+  if (!isFormulaNode.value || !props.node.content) return '';
+  return renderMathMultiline(props.node.content);
+});
 const displayContent = computed(() => {
-  if (!props.node.content) return '';
+  if (!props.node.content || isImageNode.value || isFormulaNode.value) return '';
   return props.node.content;
+});
+const bodyStyle = computed(() => {
+  const rawSize = Number.parseInt(props.node.style?.fontSize, 10);
+  const fontSize = Number.isFinite(rawSize) ? rawSize : 14;
+  return {
+    color: props.node.style?.textColor || '#eef2ff',
+    fontSize: `${fontSize}px`,
+    fontWeight: props.node.style?.fontWeight || 'normal',
+    fontStyle: props.node.style?.fontStyle || 'normal',
+    textDecoration: props.node.style?.textDecoration || 'none',
+  };
 });
 
 const handlePointerDown = (event) => {
@@ -147,7 +174,7 @@ const createChildNode = () => {
 }
 
 .mindmap-node__content {
-  font-family: 'Inter', sans-serif;
+  font-family: ''Inter'', sans-serif;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -167,6 +194,48 @@ const createChildNode = () => {
   line-height: 1.35;
   color: #eef2ff;
   word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.mindmap-node__formula {
+  width: 100%;
+  height: calc(100% - 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.mindmap-node__formula :deep(.katex-display) {
+  margin: 0;
+}
+
+.mindmap-node__formula :deep(.katex) {
+  font-size: 1.05rem;
+}
+
+.mindmap-node__image {
+  width: 100%;
+  height: calc(100% - 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.mindmap-node__image img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  object-fit: contain;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.35);
+}
+
+.mindmap-node__image-placeholder {
+  font-size: 12px;
+  color: #dbeafe;
+  text-align: center;
+  padding: 0 8px;
 }
 
 .mindmap-node__collapse {
@@ -192,3 +261,4 @@ const createChildNode = () => {
   fill: #0ea5e9;
 }
 </style>
+

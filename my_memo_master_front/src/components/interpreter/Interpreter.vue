@@ -63,13 +63,33 @@
     <div v-if="unitsError" style="margin-bottom:8px; padding:8px 12px; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:8px; font-weight:600;">
       {{ unitsError }}
     </div>
+    <div v-if="props.showApply" class="interpreter__actions">
+      <button type="button" @click="apply">{{ props.applyLabel }}</button>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { renderMathMultiline } from './interpreter.js' // KaTeX bridge
 import { checkUnitHomogeneity } from './units.js'
+
+const props = defineProps({
+  modelValue: {
+    type: String,
+    default: '',
+  },
+  showApply: {
+    type: Boolean,
+    default: false,
+  },
+  applyLabel: {
+    type: String,
+    default: 'Appliquer',
+  },
+})
+
+const emit = defineEmits(['update:modelValue', 'apply'])
 
 /* --- Palette & boutons (inchangés / légères retouches utiles) --- */
 const formulaMapping = {
@@ -147,8 +167,25 @@ const setButtons = [
 
 /* --- État & rendu --- */
 const showPalette = ref(false)
-const userInput = ref('')
+const userInput = ref(props.modelValue || '')
 const textareaRef = ref(null)
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    const nextValue = value ?? ''
+    if (nextValue !== userInput.value) {
+      userInput.value = nextValue
+    }
+  }
+)
+
+watch(
+  userInput,
+  (value) => {
+    emit('update:modelValue', value)
+  }
+)
 
 // KaTeX: rendu HTML (computed -> auto-refresh)
 const unitsError = computed(() => checkUnitHomogeneity(userInput.value)) 
@@ -183,6 +220,10 @@ const appendToken = (item) => {
     const cursor = caretIndex !== null ? start + caretIndex : start + token.length
     textarea.setSelectionRange(cursor, cursor)
   })
+}
+
+const apply = () => {
+  emit('apply', userInput.value)
 }
 </script>
 
@@ -255,6 +296,28 @@ const appendToken = (item) => {
 .interpreter__preview {
   min-height: 120px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;
   background: #ffffff; font-size: 16px; color: #0f172a;
+}
+
+.interpreter__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.interpreter__actions button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: #2563eb;
+  color: #ffffff;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.interpreter__actions button:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
 }
 
 .fade-enter-active,.fade-leave-active { transition: opacity 0.2s ease; }

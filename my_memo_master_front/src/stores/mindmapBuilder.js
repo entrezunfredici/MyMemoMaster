@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia';
+﻿import { defineStore } from 'pinia';
 import {
   createBlankMindMap,
   normalizeMindMap,
@@ -125,6 +125,11 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
           shape: 'bubble',
           width: 220,
           height: 120,
+          textColor: parent?.style?.textColor || '#eef2ff',
+          fontSize: Number.parseInt(parent?.style?.fontSize, 10) || 14,
+          fontWeight: parent?.style?.fontWeight || 'normal',
+          fontStyle: parent?.style?.fontStyle || 'normal',
+          textDecoration: parent?.style?.textDecoration || 'none',
         },
         layout: { x, y, radius, angle },
         collapsed: false,
