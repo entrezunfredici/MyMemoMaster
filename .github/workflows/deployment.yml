@@ -137,72 +137,105 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest -f my_memo_master_front/Dockerfile my_memo_master_front/
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest
 
-  build_and_deploy:
-    name: Deploy on server
-    runs-on: ubuntu-latest
-    needs: push_on_docker_hub
-    if: success() && ( startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops'))
-    steps:
-      - uses: actions/checkout@v4
+  # build_and_deploy:
+  #   name: Deploy on server
+  #   runs-on: ubuntu-latest
+  #   needs: push_on_docker_hub
+  #   if: success() && (startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops'))
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      # ───── SSH agent ─────
+  #     # ───── SSH agent ─────
+  #     - name: Set up SSH PROD
+  #       if: github.ref == 'refs/heads/main'
+  #       uses: webfactory/ssh-agent@v0.9.0
+  #       with:
+  #         ssh-private-key: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
 
-      - name: Set up SSH PREPROD
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PREPROD_PRIVATE_KEY }}
+  #     - name: Set up SSH PREPROD
+  #       if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
+  #       uses: webfactory/ssh-agent@v0.9.0
+  #       with:
+  #         ssh-private-key: ${{ secrets.SSH_PREPROD_PRIVATE_KEY }}
 
-      # ───── known_hosts ─────
-      - name: Prepare known_hosts
-        run: |
-          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+  #     # ───── known_hosts ─────
+  #     - name: Prepare known_hosts
+  #       run: |
+  #         ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
-      # ───── Stop containers ─────
-      - name: Stop PREPROD
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            mkdir -p /var/www/html/my_memo_master_preprod
-            cd /var/www/html/my_memo_master_preprod
-            docker compose down || true
-          EOF
+  #     # ───── Stop containers ─────
+  #     - name: Stop PROD
+  #       if: github.ref == 'refs/heads/main'
+  #       run: |
+  #         ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+  #           set -e
+  #           mkdir -p /var/www/html/my_memo_master_prod
+  #           cd /var/www/html/my_memo_master_prod
+  #           docker compose down || true
+  #         EOF
 
-      # ───── Upload compose ─────
-      - name: Upload docker-compose in PREPROD
-        if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
-        run: |
-          scp -v -P ${{ secrets.VPS_PORT }} \
-            server_docker_compose/docker-compose.yml \
-            ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_preprod/docker-compose.yml
+  #     - name: Stop PREPROD
+  #       if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
+  #       run: |
+  #         ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+  #           set -e
+  #           mkdir -p /var/www/html/my_memo_master_preprod
+  #           cd /var/www/html/my_memo_master_preprod
+  #           docker compose down || true
+  #         EOF
 
-      # ───── Deploy in server ─────
-      - name: Deploy to VPS in preprod (simple up)
-        if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            cd /var/www/html/my_memo_master_preprod
-            docker compose up -d --pull always
-          EOF
+  #     # ───── Upload compose ─────
+  #     - name: Upload docker-compose in PROD
+  #       if: github.ref == 'refs/heads/main'
+  #       run: |
+  #         scp -v -P ${{ secrets.VPS_PORT }} \
+  #           server_docker_compose/docker-compose.yml \
+  #           ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_prod/docker-compose.yml
 
-  build_failure:
-    runs-on: ubuntu-latest
-    needs: build_and_deploy
-    if: failure()
-    steps:
-      - name: Notify Deployment Failure
-        run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Deployment failed on branch $GITHUB_REF!\"}" \
-          ${{ secrets.DISCORD_LOG }}
+  #     - name: Upload docker-compose in PREPROD
+  #       if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
+  #       run: |
+  #         scp -v -P ${{ secrets.VPS_PORT }} \
+  #           server_docker_compose/docker-compose.yml \
+  #           ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_preprod/docker-compose.yml
 
-  build_success:
-    runs-on: ubuntu-latest
-    needs: build_and_deploy
-    if: success()
-    steps:
-      - name: Notify Deployment Success
-        run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Deployment succeeded on branch $GITHUB_REF!\"}" \
-          ${{ secrets.DISCORD_LOG }}
+  #     # ───── Deploy in server ─────
+  #     - name: Deploy to VPS in prod (simple up)
+  #       if: github.ref == 'refs/heads/main'
+  #       run: |
+  #         ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+  #           set -e
+  #           cd /var/www/html/my_memo_master_prod
+  #           docker compose up -d --pull always
+  #         EOF
+
+  #     - name: Deploy to VPS in preprod (simple up)
+  #       if: startsWith(github.ref, 'refs/heads/dev') || contains(github.ref, 'devops')
+  #       run: |
+  #         ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+  #           set -e
+  #           cd /var/www/html/my_memo_master_preprod
+  #           docker compose up -d --pull always
+  #         EOF
+
+  # build_failure:
+  #   runs-on: ubuntu-latest
+  #   needs: build_and_deploy
+  #   if: failure()
+  #   steps:
+  #     - name: Notify Deployment Failure
+  #       run: |
+  #         curl -X POST -H "Content-Type: application/json" \
+  #         -d "{\"content\": \"Deployment failed on branch $GITHUB_REF!\"}" \
+  #         ${{ secrets.DISCORD_LOG }}
+
+  # build_success:
+  #   runs-on: ubuntu-latest
+  #   needs: build_and_deploy
+  #   if: success()
+  #   steps:
+  #     - name: Notify Deployment Success
+  #       run: |
+  #         curl -X POST -H "Content-Type: application/json" \
+  #         -d "{\"content\": \"Deployment succeeded on branch $GITHUB_REF!\"}" \
+  #         ${{ secrets.DISCORD_LOG }}
