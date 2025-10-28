@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distDir = path.resolve(__dirname, '../dist');
 const indexHtmlPath = path.join(distDir, 'index.html');
+const CONFIG_SCRIPT_SNIPPET = '<script src="/config.js" defer></script>';
 
 const PORT = Number(process.env.PORT || process.env.FRONT_PORT || process.env.APP_PORT || 8080);
 const PUBLIC_URL =
@@ -186,7 +187,29 @@ const cacheControlForFile = (filePath) => {
   return 'public, max-age=300';
 };
 
+const injectConfigScript = (htmlContent) => {
+  if (!htmlContent || typeof htmlContent !== 'string') return htmlContent;
+  if (htmlContent.includes('/config.js')) return htmlContent;
+
+  const closingHeadTag = '</head>';
+  if (htmlContent.includes(closingHeadTag)) {
+    return htmlContent.replace(
+      closingHeadTag,
+      `  ${CONFIG_SCRIPT_SNIPPET}\n${closingHeadTag}`,
+    );
+  }
+
+  return `${CONFIG_SCRIPT_SNIPPET}\n${htmlContent}`;
+};
+
+let cachedIndexHtml = '';
+const refreshIndexHtmlCache = () => {
+  const raw = fs.readFileSync(indexHtmlPath, 'utf8');
+  cachedIndexHtml = injectConfigScript(raw);
+};
+
 ensureDistIsPresent();
+refreshIndexHtmlCache();
 
 const app = express();
 const isTestEnv = process.env.NODE_ENV === 'test';
@@ -237,6 +260,24 @@ app.get(['/healthz', '/readyz'], (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+const sendIndexHtml = (res) => {
+  if (!cachedIndexHtml) {
+    try {
+      refreshIndexHtmlCache();
+    } catch (error) {
+      console.error('[front-server] Failed to refresh index.html cache:', error);
+      res.status(500).send('Internal Server Error');
+      return;
+    }
+  }
+  res.type('html').send(cachedIndexHtml);
+};
+
+app.get('/index.html', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  sendIndexHtml(res);
+});
+
 app.use(
   express.static(distDir, {
     index: false,
@@ -252,7 +293,7 @@ app.use((req, res, next) => {
     return;
   }
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.sendFile(indexHtmlPath);
+  sendIndexHtml(res);
 });
 
 app.use((err, _req, res, _next) => {
