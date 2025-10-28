@@ -6,10 +6,17 @@ module.exports = (req, res, next) => {
         return;
     }
 
-    const authHeader = req.headers['authorization'];
+    const headerCandidates = [
+        req.headers['x-user-authorization'],
+        req.headers['authorization'],
+    ];
+
+    const authHeader = headerCandidates.find(
+        (value) => typeof value === 'string' && value.trim().length > 0
+    );
 
     if (!authHeader) {
-        res.status(401).send({ message: 'No header provided!' });
+        res.status(401).send({ message: 'No authorization header provided!' });
         return;
     }
 
