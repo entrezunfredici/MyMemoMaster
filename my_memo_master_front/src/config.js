@@ -41,10 +41,8 @@ export const VITE_APP_COMPANY_NAME =
   runtimeCfg.APP_COMPANY_NAME || import.meta.env.VITE_APP_COMPANY_NAME || 'MyMemoMaster';
 export const VITE_APP_AUTHOR_NAME =
   runtimeCfg.APP_AUTHOR_NAME || import.meta.env.VITE_APP_AUTHOR_NAME || "MyMemoMaster's team";
-const fallbackFrontUrl =
-  import.meta.env.VITE_FRONT_URL || 'https://my-memo-master.com';
-const fallbackApiUrl =
-  import.meta.env.VITE_API_URL || 'https://mmm-back-891230202219.europe-west9.run.app';
+const fallbackFrontUrl = import.meta.env.VITE_FRONT_URL || 'http://localhost';
+const fallbackApiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api';
 export const VITE_FRONT_URL = normalizeUrl(runtimeCfg.PUBLIC_URL, fallbackFrontUrl);
 export const VITE_API_URL = normalizeUrl(runtimeCfg.API_URL, fallbackApiUrl);
 
