@@ -251,7 +251,20 @@ axiosApi.interceptors.request.use(async (config) => {
 });
 
 function isStatusOk(status) {
-  return [200, 201, 202, 204].includes(status);
+  if (!status) return false
+
+  // 401: Unauthorized
+  if (status === 401) {
+    useAuthStore().logout()
+    return false
+  }
+
+  // 204: No Content (ex: user not found)
+  if (status === 204) {
+    return false
+  }
+
+  return [200].includes(status);
 }
 
 async function get(endpoint, params = {}) {
@@ -263,7 +276,7 @@ async function get(endpoint, params = {}) {
   try {
     const response = await axiosApi.get(endpoint, { params })
 
-    if (!isStatusOk(response.status)) return
+    if (!isStatusOk(response?.status)) return
 
     return {
       data: response.data,
@@ -285,7 +298,7 @@ async function post(endpoint, data = {}, config = {}) {
   try {
     const response = await axiosApi.post(endpoint, data, config)
 
-    if (!isStatusOk(response.status)) return
+    if (!isStatusOk(response?.status)) return
 
     return {
       data: response.data,
@@ -307,7 +320,7 @@ async function put(endpoint, data = {}, config = {}) {
   try {
     const response = await axiosApi.put(endpoint, data, config)
 
-    if (!isStatusOk(response.status)) return
+    if (!isStatusOk(response?.status)) return
 
     return {
       data: response.data,
@@ -328,7 +341,7 @@ async function del(endpoint, data = {}) {
   try {
     const response = await axiosApi.delete(endpoint, { data })
 
-    if (!isStatusOk(response.status)) return
+    if (!isStatusOk(response?.status)) return
 
     return {
       data: response.data,

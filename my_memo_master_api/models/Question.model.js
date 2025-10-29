@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-  const Question =  instance.define(
+  const Question = instance.define(
     "Question",
     {
       idQuestion: {

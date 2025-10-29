@@ -5,7 +5,7 @@ import { VITE_APP_NAME } from '@/config';
 
 const router = createRouter({
   history: createWebHistory(),
-  scrollBehavior: () => ({ left: 0, top: 0, behavior: 'smooth' }),
+  scrollBehavior: () => ({ top: 0, behavior: 'smooth' }),
   routes,
 })
 

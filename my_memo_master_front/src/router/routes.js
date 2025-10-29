@@ -76,12 +76,31 @@ const routes = [
       private: true,
     },
   },
-    {
+  {
     path: '/create-test',
     name: 'create.test',
     component: () => import('../pages/CreateTestPage.vue'),
     meta: {
       title: 'Create Test',
+      private: true,
+    },
+  },
+  // ==================== AUTH & ACCOUNT ====================
+  {
+    path: '/auth',
+    name: 'auth',
+    component: () => import('../pages/AuthPage.vue'),
+    meta: {
+      title: 'Authentification',
+      private: false,
+    },
+  },
+  {
+    path: '/account',
+    name: 'account',
+    component: () => import('../pages/AccountPage.vue'),
+    meta: {
+      title: 'Mon compte',
       private: true,
     },
   },
@@ -102,7 +121,7 @@ const routes = [
       title: 'Error',
     },
   }
-  
+
 ]
 
 export default routes

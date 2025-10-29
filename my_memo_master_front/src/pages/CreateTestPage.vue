@@ -25,7 +25,7 @@
         </div>
 
         <div class="py-4 flex justify-end">
-          <button class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-greyCustom">
+          <button class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-[#F5F5F5]">
             Insert image
           </button>
         </div>
