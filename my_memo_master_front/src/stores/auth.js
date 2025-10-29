@@ -96,10 +96,6 @@ export const useAuthStore = defineStore('auth', {
     async updateUser(notify = false) {
 
       const name = this.user.name.trim() || null
-      const homePageEnableSpents = this.user.homePageEnableSpents || false
-      const homePageEnableStats = this.user.homePageEnableStats || false
-      const homePageEnableQuote = this.user.homePageEnableQuote || false
-      const homePageEnableLasts = this.user.homePageEnableLasts || false
 
       let error = null
 
@@ -112,10 +108,6 @@ export const useAuthStore = defineStore('auth', {
 
       const user = {
         name,
-        homePageEnableSpents,
-        homePageEnableStats,
-        homePageEnableQuote,
-        homePageEnableLasts,
       }
 
       await api.put(`user/${this.user.userId}`, user).then(resp => {
