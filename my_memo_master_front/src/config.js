@@ -3,7 +3,6 @@
 // ! To prevent accidentally leaking env variables to the client, only variables prefixed with VITE_ are exposed to your Vite-processed code
 // ! https://stackoverflow.com/questions/67378099/import-meta-env-undefined-on-production-build-vitejs
 
-
 // Permet d'injecter une config au runtime via server_docker_compose (window.__APP_CONFIG__)
 const runtimeCfg = typeof window !== 'undefined' ? window.__APP_CONFIG__ || {} : {};
 
