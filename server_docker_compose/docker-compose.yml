@@ -14,7 +14,7 @@ services:
       retries: 10
       start_period: 5s
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -34,7 +34,7 @@ services:
       - traefik.http.services.mmm-${ENVIRONMENT}-pgadmin.loadbalancer.server.port=80
       - traefik.docker.network=traefik_proxy
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
       - traefik_proxy
 
   # db-sync:
@@ -83,7 +83,6 @@ services:
 
   api:
     image: ${IMAGE_API}
-    # image: fredissimo/mymemomaster_test_api:latest
     env_file:
       - .env
     volumes:
@@ -123,7 +122,7 @@ services:
       - traefik.http.services.mmm-${ENVIRONMENT}-api.loadbalancer.server.port=${API_PORT}
       - traefik.docker.network=traefik_proxy
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
       - traefik_proxy
     restart: unless-stopped
 
@@ -174,7 +173,7 @@ services:
       - traefik.http.services.mmm-${ENVIRONMENT}-front.loadbalancer.server.port=80
       - traefik.docker.network=traefik_proxy
     networks:
-      - my_memo_master_network
+      - my_memo_master_preprod_network
       - traefik_proxy
     volumes:
       - front-data:/app/data
@@ -191,7 +190,7 @@ volumes:
   pgadmin-data:
 
 networks:
-  my_memo_master_network:
+  my_memo_master_preprod_network:
     name: my_memo_master_${ENVIRONMENT}_network
     driver: bridge
   traefik_proxy:
