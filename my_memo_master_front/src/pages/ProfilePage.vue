@@ -15,7 +15,7 @@ import { useRoleStore } from '@/stores/roles'
 const roleStore = useRoleStore()
 
 onMounted(async () => {
-  const userRoleId = 1 //recuperer l'id dans user
+  const userRoleId = 1
   await roleStore.fetchRoleById(userRoleId)
 })
 
