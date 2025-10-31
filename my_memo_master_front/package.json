@@ -21,7 +21,7 @@
     "katex": "^0.16.23",
     "lodash": "^4.17.21",
     "mathjax": "^3.2.2",
-    "pinia": "^2.1.7",
+    "pinia": "^2.3.1",
     "pinia-plugin-persistedstate": "^3.2.1",
     "serve": "^14.2.4",
     "vue": "^3.4.21",
