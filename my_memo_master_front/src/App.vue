@@ -34,6 +34,14 @@
             :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ExercisesIcon class="size-8" />
           </router-link>
+          <router-link to="/classroom"
+            :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+            <ClassroomIcon class="size-8" />
+          </router-link>
+          <router-link to="/credits"
+            :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+            <CreditsIcon class="size-8" />
+          </router-link>
         </div>
         <div class="flex flex-col items-center gap-3 justify-center">
           <router-link to="/profile"
@@ -89,6 +97,14 @@
         :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
+      <router-link to="/classroom"
+        :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+        <ExercisesIcon class="size-8" />
+      </router-link>
+      <router-link to="/credits"
+        :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+        <ExercisesIcon class="size-8" />
+      </router-link>
       <router-link to="/profile"
         :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ProfileIcon class="size-8" />
@@ -109,6 +125,8 @@ import MindmapIcon from '@/icons/MindmapIcon.vue'
 import TutorialIcon from '@/icons/TutorialIcon.vue'
 import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
+import CreditsIcon from '@/icons/CommunityIcon.vue'
+import ClassroomIcon from '@/icons/ClassroomIcon.vue'
 import { HomeIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
