@@ -4,11 +4,12 @@
       <SubjectFilterComponent />
       <router-link to="/create-test">
         <div class="flex gap-5 mr-10">
-          <button class="flex items-center gap-2 bg-primary rounded-lg py-0 px-5 text-greyCustom">
+          <button class="flex items-center gap-2 bg-primary rounded-lg py-0 px-5 text-[#F5F5F5]">
+            <PenIcon class="size-16" />
             <img class="w-[16px] h-[16px]" :src="editIcon" alt="editIcon" />
             Create test
           </button>
-          <img :src="helpIcon" alt="helpIcon" />
+          <InformationCircleIcon class="text-primary size-8" />
         </div>
       </router-link>
     </section>
@@ -30,8 +31,9 @@ import { useTestStore } from '@/stores/test'
 import SubjectFilterComponent from '@/components/SubjectFilterComponent.vue'
 import Grid from '@/components/GridComponent.vue'
 import Tutorial from '@/components/TutorialItem.vue'
-import helpIcon from '@/assets/test/Help_circle.png'
-import editIcon from '@/assets/test/Edit.png'
+import { PenIcon } from '@heroicons/vue/24/outline'
+import { InformationCircleIcon } from '@heroicons/vue/24/outline'
+
 
 const route = useRoute()
 const testStore = useTestStore()

@@ -1,3 +1,4 @@
+const path = require("path");
 const DiagrammeService = require("../services/Diagramme.service.js");
 
   exports.findAll = async (req, res) => {
@@ -119,3 +120,31 @@ exports.delete = async (req, res) => {
   }
 };
 
+exports.uploadImage = (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        message: "Aucune image n'a été envoyée.",
+      });
+    }
+
+    const relativePath = path.join("uploads", "mindmaps", req.file.filename).replace(/\\/g, "/");
+    const baseUrl = process.env.API_PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+    const url = `${baseUrl}/${relativePath}`;
+
+    return res.status(201).json({
+      message: "Image téléchargée avec succès.",
+      url,
+      path: `/${relativePath}`,
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'upload de l'image de carte mentale :", error);
+    return res.status(500).json({
+      message: "Une erreur s'est produite lors de l'upload de l'image.",
+      error: error.message,
+    });
+  }
+};

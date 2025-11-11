@@ -4,10 +4,7 @@ FROM node:20-bullseye-slim
 
 WORKDIR /app
 
-ENV PYTHON=/usr/bin/python3
-
 COPY package*.json ./
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && npm install \
@@ -17,8 +14,9 @@ RUN apt-get update \
 
 COPY . ./
 
-EXPOSE ${API_PORT}
+ENV NODE_ENV=production
+ENV PORT=8080
+EXPOSE 8080
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-CMD ["/entrypoint.sh"]
+# Démarrage
+CMD ["npm","start"]

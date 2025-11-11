@@ -1,6 +1,12 @@
 <template>
+  <!-- NO LAYOUT -->
+  <div v-if="route.name.includes('auth')" >
+    <main>
+      <RouterView />
+    </main>
+  </div>
   <!-- DESKTOP LAYOUT -->
-  <div v-if="!isMobile()" class="flex flex-1 min-h-screen">
+  <div v-else-if="!isMobile()" class="flex flex-1 min-h-screen">
     <aside class="flex flex-col items-center justify-center sticky top-0 h-screen mx-2 sm:mx-4 md:mx-6 lg:mx-8">
       <router-link to="/" class="my-6">
         <img src="/logo/logo-full.svg" :alt="VITE_APP_NAME">
@@ -28,6 +34,14 @@
             :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ExercisesIcon class="size-8" />
           </router-link>
+          <router-link to="/classroom"
+            :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+            <ClassroomIcon class="size-8" />
+          </router-link>
+          <router-link to="/credits"
+            :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+            <CreditsIcon class="size-8" />
+          </router-link>
         </div>
         <div class="flex flex-col items-center gap-3 justify-center">
           <router-link to="/profile"
@@ -52,7 +66,8 @@
       </main>
     </div>
   </div>
-  <div v-else class="min-h-screen">
+  <!-- MOBIL LAYOUT -->
+  <div v-else-if="isMobile()" class="min-h-screen">
     <header class="m-4">
       <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
         route.meta.title }}</h1>
@@ -82,6 +97,14 @@
         :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
+      <router-link to="/classroom"
+        :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+        <ExercisesIcon class="size-8" />
+      </router-link>
+      <router-link to="/credits"
+        :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+        <ExercisesIcon class="size-8" />
+      </router-link>
       <router-link to="/profile"
         :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ProfileIcon class="size-8" />
@@ -102,6 +125,8 @@ import MindmapIcon from '@/icons/MindmapIcon.vue'
 import TutorialIcon from '@/icons/TutorialIcon.vue'
 import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
+import CreditsIcon from '@/icons/CommunityIcon.vue'
+import ClassroomIcon from '@/icons/ClassroomIcon.vue'
 import { HomeIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';

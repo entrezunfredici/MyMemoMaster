@@ -16,7 +16,6 @@ export default {
       light: 'var(--light)',
       gray: 'var(--gray)',
       dark: 'var(--dark)',
-      greyCustom: '#F5F5F5',
       /* Other colors */
       success: 'var(--success)',
       warning: 'var(--warning)',
