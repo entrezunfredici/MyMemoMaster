@@ -32,7 +32,7 @@
 
 <script setup>
 const teamMembers = [
-    { firstName: 'Cléula', lastName: 'Potorel', role: 'UI/UX designer', period: '17/10/2024 - 01/07/2025' },
+    { firstName: 'Clélia', lastName: 'Potorel', role: 'UI/UX designer', period: '17/10/2024 - 01/07/2025' },
     { firstName: 'Anthony', lastName: 'Lalba', role: 'Lead tech, développeur & associé', period: '17/10/2024 - +∞' },
     { firstName: 'Gaia', lastName: 'Ducourneau', role: 'Développeuse', period: '17/10/2024 - 01/07/2026' },
     { firstName: 'Jorgelina', lastName: 'Ledesma', role: 'Développeuse', period: '17/10/2024 - 01/07/2026' },
