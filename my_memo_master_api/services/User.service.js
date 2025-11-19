@@ -1,4 +1,4 @@
-const { User, Role } = require("../models/index");
+const { User, Role, UserOnboardingState } = require("../models/index");
 const bcrypt = require('bcryptjs');
 const generateCode = require('../helpers/generateCode')
 
@@ -39,6 +39,16 @@ class UserService {
 
     const newUser = await User.create(user);
     if (!newUser) throw new Error('Erreur lors de la création de l\'utilisateur');
+
+    await UserOnboardingState.create({
+      userId: newUser.userId,
+      tourSeen: false,
+      checklist: {
+        todo_created: false,
+        profile_completed: false,
+        first_action: false
+      }
+    });
 
     // eslint-disable-next-line no-unused-vars
     const { password, ...userWithoutPassword } = newUser?.dataValues || newUser;

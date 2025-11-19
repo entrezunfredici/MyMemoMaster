@@ -1,0 +1,12 @@
+{
+  "userId": 1,
+  "tourSeen": false,
+  "checklist": {
+    "todoCreated": true,
+    "eventCreated": true,
+    "mindmapCreated": true,
+    "leitnerSessionStarted": false,
+    "exerciseCreated": false
+  },
+  "updatedAt": "2025-11-19"
+}

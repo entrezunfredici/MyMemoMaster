@@ -80,6 +80,11 @@ module.exports = (instance) => {
       foreignKey: "idUser",
       as: "leitnerSystemsUsers",
     });
+
+    User.hasOne(models.UserOnboardingState, {
+      foreignKey: "userId",
+      as: "onboardingState",
+    });
   };
 
   return User;

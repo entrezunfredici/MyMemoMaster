@@ -27,7 +27,7 @@ const logout = () => {
 }
 
 onMounted(async () => {
-  const userRoleId = 1 //recuperer l'id dans user
+  const userRoleId = 1
   await roleStore.fetchRoleById(userRoleId)
 })
 </script>
