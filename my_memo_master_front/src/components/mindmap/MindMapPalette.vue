@@ -96,7 +96,7 @@
           <textarea
             v-model="editableContent"
             rows="5"
-            placeholder="Utilise la syntaxe de l'interpréteur (ex: frac(a,b))"
+            placeholder="Utilise la syntaxe de l'interprï¿½teur (ex: frac(a,b))"
             @change="updateContent"
           ></textarea>
           <div
@@ -105,7 +105,7 @@
             v-html="formulaPreviewHtml"
           ></div>
           <div class="mindmap-palette__formula-actions">
-            <button type="button" @click="openInterpreter">Ouvrir l'interpréteur</button>
+            <button type="button" @click="openInterpreter">Ouvrir l'interprï¿½teur</button>
             <button
               v-if="editableContent"
               type="button"
@@ -116,7 +116,7 @@
             </button>
           </div>
           <p class="mindmap-palette__hint">
-            Ouvre l'interpréteur pour Insérer des symboles (ex:
+            Ouvre l'interprï¿½teur pour Insï¿½rer des symboles (ex:
             <code>frac(a,b)</code>, <code>sqrt(x)</code>,
             <code>&lt;text bold color:red&gt;Important&lt;/text&gt;</code>).
           </p>
@@ -183,7 +183,7 @@
       <div class="mindmap-interpreter-modal__backdrop" @click="closeInterpreter"></div>
       <div class="mindmap-interpreter-modal__dialog">
         <div class="mindmap-interpreter-modal__header">
-          <h3>interpréteur de formules</h3>
+          <h3>interprï¿½teur de formules</h3>
           <button type="button" class="mindmap-interpreter-modal__close" @click="closeInterpreter">
             &times;
           </button>
@@ -191,7 +191,7 @@
         <Interpreter
           v-model="interpreterValue"
           :show-apply="true"
-          apply-label="Insérer dans l'item"
+          apply-label="Insï¿½rer dans l'item"
           @apply="applyInterpreter"
         />
       </div>
@@ -235,7 +235,7 @@ const subjectCreationLabel = computed(() => getSubjectActionLabel(creationType.v
 const childCreationLabel = computed(() => getChildActionLabel(creationType.value));
 const creationHint = computed(() => {
   if (selectedNode.value) {
-    return `Le prochain element sera relie a \"${selectedNode.value.label}\".`;
+    return `Le prochain element sera relie a "${selectedNode.value.label}".`;
   }
   return 'Selectionne un item pour lui ajouter un enfant, sinon un item sera relie au sujet principal.';
 });

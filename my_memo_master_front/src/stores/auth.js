@@ -3,7 +3,6 @@ import { notif } from '@/helpers/notif.js'
 import router from '@/router'
 import { api } from '@/helpers/api'
 import { isValidEmail } from '@/helpers/functions.js'
-import { isValidDate } from '@/helpers/functions.js'
 import { missingsElementsPassword } from '@/helpers/functions.js'
 
 export const useAuthStore = defineStore('auth', {
@@ -115,21 +114,6 @@ export const useAuthStore = defineStore('auth', {
         notif.notify(`An error occured: ${error}`, 'error')
         return false
       })
-    },
-
-    async verifyEmail(email, token) {
-      // TODO: WIP
-      console.log('verifyEmail', email, token)
-    },
-
-    async forgotPassword(email) {
-      // TODO: WIP
-      console.log('forgotPassword', email)
-    },
-
-    async resetPassword(code, newPassword, email = this.fogotPasswordEmail) {
-      // TODO: WIP
-      console.log('resetPassword', code, newPassword, email)
     },
 
     async deleteAccount() {
@@ -328,118 +312,6 @@ export const useAuthStore = defineStore('auth', {
         notif.notify(`An error occured: ${error}`, 'error')
         return false
       });
-    },
-
-    async deleteAccount() {
-
-      await api.del(`user/${this.user.userId}`).then(resp => {
-
-        if (resp.status !== 200) {
-          notif.notify(resp.data.message, 'error')
-          return false
-        }
-
-        this.logout()
-
-        return true
-      }).catch(error => {
-        notif.notify(`An error occured: ${error}`, 'error')
-        return false
-      })
-    },
-
-    async register() {
-
-      this.logout(false)
-
-      const name = this.authentication.tabs.register.fields.name.trim() || null
-      const email = this.authentication.tabs.register.fields.email.trim() || null
-      const password = this.authentication.tabs.register.fields.password.trim() || null
-      const confirmPassword = this.authentication.tabs.register.fields.confirmPassword.trim() || null
-      const acceptTerms = this.authentication.tabs.register.fields.acceptTerms || null
-
-      let error = null
-
-      if (!error && (!name || name.length === 0)) error = "Please enter your name"
-      if (!error && (!email || email.length === 0)) error = "Please enter your email"
-      if (!error && !isValidEmail(email)) error = "Please enter a valid email"
-      if (!error && (!password || password.length === 0)) error = "Please enter your password"
-      if (!error && (!confirmPassword || confirmPassword.length === 0)) error = "Please enter your password"
-      if (!error && password !== confirmPassword) error = 'Passwords do not match'
-      if (!error && missingsElementsPassword(password).length > 0) error = `Password must at least contain: ${missingsElementsPassword(password).join(', ')}`
-      if (!error && !acceptTerms) error = 'Please accept the terms and conditions'
-
-      if (error) {
-        notif.notify(error, 'error')
-        return false
-      }
-
-      const user = {
-        name,
-        email,
-        password,
-      }
-
-      await api.post('register', user).then(resp => {
-
-        if (resp.status !== 201) {
-          notif.notify(resp.data.message, 'error')
-          return false
-        }
-
-        notif.notify(`You have been registered`, 'success')
-
-        this.clearTabFields('register')
-
-        this.setAuthenticationTab('login')
-
-        return true
-      }).catch(error => {
-        notif.notify(`An error occured: ${error}`, 'error')
-        return false
-      })
-    },
-
-    async login(redirect = '/') {
-
-      const email = this.authentication.tabs.login.fields.email.trim() || null
-      const password = this.authentication.tabs.login.fields.password.trim() || null
-
-      let error = null
-
-      if (!error && (!password || password.length === 0)) error = "Please enter your password"
-      if (!error && email && email.length === 0) error = "Please enter your email"
-      if (!error && !isValidEmail(email)) error = "Please enter a valid email"
-
-      if (error) {
-        notif.notify(error, 'error')
-        return false
-      }
-
-      await api.post('login', { email, password }).then(resp => {
-
-        if (resp.status !== 200) {
-          notif.notify(resp.data.message, 'error')
-          return false
-        }
-
-        this.user = resp.data.data
-        this.token = resp.data.data.connectionToken
-        this.authenticated = true
-
-        notif.notify('You have been logged in', 'success')
-
-        this.clearTabFields('login')
-
-        return true
-      }).catch(error => {
-        notif.notify(`An error occured: ${error}`, 'error')
-        return false
-      })
-
-      if (redirect) {
-        router.push(redirect)
-      }
     },
 
     logout(notify = true, redirect = '/auth') {

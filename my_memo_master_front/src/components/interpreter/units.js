@@ -155,7 +155,7 @@ function tokenizer(source) {
         if (mNum) { push('NUMBER', mNum[0]); i += mNum[0].length; continue; }
 
         // unité/composite (lettres + symboles ^ µ Ω ° etc.)
-        const mUnit = s.slice(i).match(/^[a-zA-ZµΩ°][a-zA-Z0-9µΩ°^⁰¹²³⁴⁵⁶⁷⁸⁹\-]*/);
+        const mUnit = s.slice(i).match(/^[a-zA-ZµΩ°][a-zA-Z0-9µΩ°^⁰¹²³⁴⁵⁶⁷⁸⁹-]*/);
         if (mUnit) { push('UNIT', mUnit[0]); i += mUnit[0].length; continue; }
 
         // séparateur de ligne
@@ -218,7 +218,7 @@ function parseTerm(tokens, idx) {
 function parseExpr(tokens, idx) {
   let { sig, i } = parseTerm(tokens, idx);
   while (i < tokens.length && (tokens[i].type === '+' || tokens[i].type === '-')) {
-    const op = tokens[i].type; i++;
+    // const op = tokens[i].type; i++;
     const right = parseTerm(tokens, i); i = right.i;
 
     // Addition/soustraction uniquement si signatures identiques
