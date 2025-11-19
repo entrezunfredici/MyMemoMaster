@@ -21,6 +21,7 @@ models.Diagramme = require("./diagramme.model")(instance);
 models.Test = require("./Test.model")(instance);
 models.Question = require("./Question.model")(instance);
 models.Tutorials = require("./Tutorials.model")(instance);
+models.UserOnboardingState = require("./OnboardingState.model")(instance);
 
 
 // Associations
