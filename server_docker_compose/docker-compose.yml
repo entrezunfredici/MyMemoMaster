@@ -91,8 +91,8 @@ services:
       - NODE_ENV=production
       - ENVIRONMENT=prod
       - API_PORT=${API_PORT}
-      - PG_HOST=postgres
-      - PG_PORT=5432
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
       - PG_USER=${PG_USER}
       - PG_PASS=${PG_PASS}
       - PG_DB=${PG_DB}
@@ -135,8 +135,6 @@ services:
     env_file:
       - .env
     environment:
-      - APP_PUBLIC_URL=https://${FRONT_DOMAIN}
-      - APP_API_URL=https://${API_DOMAIN}
       # Optional: expose Vite variables for builds that might use them
       - VITE_APP_NAME=${VITE_APP_NAME}
       - VITE_APP_COMPANY_NAME=${VITE_APP_COMPANY_NAME}
@@ -152,7 +150,7 @@ services:
         cat <<EOF >/usr/share/nginx/html/config.js
         window.__APP_CONFIG__ = {
           PUBLIC_URL: "${APP_PUBLIC_URL}",
-          API_URL: "${APP_API_URL}"
+          API_URL: "${VITE_API_URL}"
         };
         EOF
 
