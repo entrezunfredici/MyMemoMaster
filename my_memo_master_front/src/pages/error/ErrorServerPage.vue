@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col items-center justify-center gap-4 h-screen">
-    <p class="text-2xl font-bold text-light">Server is down</p>
-    <p class="text-lg text-gray">Seems like the server isn't responding right now.</p>
-    <router-link to="/" class="text-light text-lg font-bold underline">Try again</router-link>
+  <div class="flex flex-col items-center justify-center gap-4 h-96">
+    <p class="text-2xl font-bold text-primary">Une erreur est survenue</p>
+    <p class="text-lg text-dark">Il semble qu'il y ait un problème avec le serveur. Veuillez réessayer plus tard.</p>
+    <router-link to="/" class="text-primary text-lg font-bold underline">Réessayer</router-link>
   </div>
 </template>

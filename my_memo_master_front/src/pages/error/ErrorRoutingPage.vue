@@ -1,19 +1,7 @@
 <template>
-  <div class="flex flex-col items-center justify-center gap-4">
-    <h1 class="text-[8rem] font-bold text-primary">404</h1>
-    <p class="text-lg text-dark">Aucune page trouvée</p>
-    <Button @click="goHome()">Rentrer à la maison</Button>
+  <div class="flex flex-col items-center justify-center gap-4 h-96">
+    <p class="text-2xl font-bold text-primary">404</p>
+    <p class="text-lg text-dark">Aucune page trouvé</p>
+    <router-link to="/" class="text-primary text-lg font-bold underline">Rentrer à la maison</router-link>
   </div>
 </template>
-
-<script setup>
-import Button from '@/components/ButtonComponent.vue'
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-function goHome() {
-  router.push('/')
-}
-
-</script>
