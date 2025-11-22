@@ -1,6 +1,6 @@
 <template>
   <!-- NO LAYOUT -->
-  <div v-if="route.name.includes('auth')" >
+  <div v-if="route?.name?.includes?.('auth')" >
     <main>
       <RouterView />
     </main>

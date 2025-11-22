@@ -1,5 +1,6 @@
 const path = require("path");
 const DiagrammeService = require("../services/Diagramme.service.js");
+const { Subject } = require("../models");
 
   exports.findAll = async (req, res) => {
     try {
@@ -37,12 +38,36 @@ exports.create = async (req, res) => {
     const { mmName, mindMapJson, userId, idSubject } = req.body;
 
     // Vérifier que tous les champs requis sont présents
-    if (!mmName || !mindMapJson || !userId || !idSubject) {
-      return res.status(400).json({ message: "Tous les champs (mmName, mindMapJson, userId, idSubject) sont requis."+mmName+ mindMapJson+ userId+ idSubject });
+    if (!mmName || !mindMapJson || !userId) {
+      return res
+        .status(400)
+        .json({ message: "Les champs mmName, mindMapJson et userId sont requis." });
+    }
+
+    // Assurer un sujet valide; crée un sujet par défaut si manquant ou invalide
+    let subjectId = idSubject;
+    try {
+      if (subjectId) {
+        const subject = await Subject.findByPk(subjectId);
+        if (!subject) subjectId = null;
+      }
+
+      if (!subjectId) {
+        const [subject] = await Subject.findOrCreate({
+          where: { name: "Sujet par défaut" },
+          defaults: { name: "Sujet par défaut" },
+        });
+        subjectId = subject.subjectId;
+      }
+    } catch (err) {
+      console.error("Erreur lors de la résolution du sujet :", err);
+      return res
+        .status(500)
+        .json({ message: "Impossible de résoudre le sujet associé à la carte mentale." });
     }
 
     // Insérer les données dans la base de données
-    const data = await DiagrammeService.create({ mmName, mindMapJson, userId, idSubject });
+    const data = await DiagrammeService.create({ mmName, mindMapJson, userId, idSubject: subjectId });
 
     res.status(201).json(data);
   } catch (error) {

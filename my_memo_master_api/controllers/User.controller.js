@@ -8,8 +8,13 @@ exports.register = async (req, res) => {
         await userService.create({ name, email, password });
         res.status(201).send({ message: "Utilisateur inscrit avec succès." });
     } catch (error) {
-        console.error(error?.message || error);
-        res.status(500).send({ message: "Erreur lors de l'inscription." });
+        const message = error?.message || "Erreur lors de l'inscription.";
+        const isConflict =
+            typeof message === "string" &&
+            (message.toLowerCase().includes("utilis") || message.toLowerCase().includes("exist"));
+
+        console.error(message);
+        res.status(isConflict ? 400 : 500).send({ message });
     }
 };
 
