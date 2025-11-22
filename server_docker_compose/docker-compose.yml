@@ -44,16 +44,11 @@ services:
   #   environment:
   #     - NODE_ENV=production
   #     - ENVIRONMENT=prod
-  #     - PG_HOST=postgres
-  #     - PG_PORT=5432
+  #     - PG_HOST=${PG_HOST}
+  #     - PG_PORT=${PG_PORT}
   #     - PG_USER=${PG_USER}
   #     - PG_PASS=${PG_PASS}
   #     - PG_DB=${PG_DB}
-  #     - PGHOST=postgres
-  #     - PGPORT=5432
-  #     - PGUSER=${PG_USER}
-  #     - PGPASSWORD=${PG_PASS}
-  #     - PGDATABASE=${PG_DB}
   #   command:
   #     - /bin/sh
   #     - -c
