@@ -33,7 +33,7 @@ module.exports = (instance) => {
     Question.belongsToMany(models.Subject, {
       through: "questionSubject",
       foreignKey: "idQuestion",
-      otherKey: "idSubject",
+      otherKey: "subjectId",
       as: "subject",
     });
 

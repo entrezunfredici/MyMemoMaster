@@ -46,13 +46,13 @@ const fetchDiagrams = async () => {
 
 const fetchFilters = () => {
   users.value = [...new Set(diagrams.value.map((d) => d.userId).filter(Boolean))];
-  subjects.value = [...new Set(diagrams.value.map((d) => d.idSubject).filter(Boolean))];
+  subjects.value = [...new Set(diagrams.value.map((d) => d.subjectId).filter(Boolean))];
 };
 
 const filteredDiagrams = computed(() => {
   return diagrams.value.filter((diagram) => {
     const matchUser = selectedUser.value ? String(diagram.userId) === String(selectedUser.value) : true;
-    const matchSubject = selectedSubject.value ? String(diagram.idSubject) === String(selectedSubject.value) : true;
+    const matchSubject = selectedSubject.value ? String(diagram.subjectId) === String(selectedSubject.value) : true;
     const matchSearch = diagram.mmName?.toLowerCase().includes(searchQuery.value.toLowerCase());
     return matchUser && matchSubject && matchSearch;
   });
@@ -103,7 +103,7 @@ const confirmEdit = async () => {
       mmName: editedName.value,
       mindMapJson: diagram.mindMapJson,
       userId: diagram.userId,
-      idSubject: diagram.idSubject,
+      subjectId: diagram.subjectId,
     };
     const response = await api.put(`/diagrammes/${currentEditId.value}`, payload);
     if (response) {
@@ -137,10 +137,10 @@ const loadDiagram = (diagram) => {
 
 const ensureMeta = (payload) => {
   const fallbackUser = selectedUser.value || currentDiagramMeta.value?.userId || 1;
-  const fallbackSubject = selectedSubject.value || currentDiagramMeta.value?.idSubject || 1;
+  const fallbackSubject = selectedSubject.value || currentDiagramMeta.value?.subjectId || 1;
   return {
     userId: Number(fallbackUser),
-    idSubject: Number(fallbackSubject),
+    subjectId: Number(fallbackSubject),
     mmName: exportName.value || payload.title || 'Carte mentale',
   };
 };
@@ -160,7 +160,7 @@ const handleSave = async (payload) => {
       mmName: meta.mmName,
       mindMapJson: payload,
       userId: meta.userId,
-      idSubject: meta.idSubject,
+      subjectId: meta.subjectId,
     });
     if (response) {
       toast.success('Diagramme sauvegarde');
@@ -189,7 +189,7 @@ const handleNewMap = (payload) => {
   currentDiagramMeta.value = {
     mmName: payload.title,
     userId: selectedUser.value || 1,
-    idSubject: selectedSubject.value || 1,
+    subjectId: selectedSubject.value || 1,
   };
   currentMapPayload.value = payload;
   exportName.value = payload.title;
@@ -205,7 +205,7 @@ const confirmExportModal = async () => {
       mmName: meta.mmName,
       mindMapJson: pendingPayload.value,
       userId: meta.userId,
-      idSubject: meta.idSubject,
+      subjectId: meta.subjectId,
     };
 
     if (!pendingCreate.value && currentDiagramId.value) {
@@ -272,7 +272,7 @@ onMounted(async () => {
           >
             <div class="sidebar__item-main" @click="loadDiagram(diagram)">
               <span class="sidebar__item-title">{{ diagram.mmName }}</span>
-              <small class="sidebar__item-meta">Utilisateur {{ diagram.userId }} - Matiere {{ diagram.idSubject }}</small>
+              <small class="sidebar__item-meta">Utilisateur {{ diagram.userId }} - Matiere {{ diagram.subjectId }}</small>
             </div>
             <div class="sidebar__item-actions">
               <button v-if="editMode" @click.stop="openEditModal(diagram)">Renommer</button>

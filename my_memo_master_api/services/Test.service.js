@@ -31,7 +31,7 @@ class TestService {
      *                     name:
      *                       type: string
      *                       example: "Test de connaissance"
-     *                     idSubject:
+     *                     subjectId:
      *                       type: integer
      *                       example: 1
      *         500:
@@ -70,7 +70,7 @@ class TestService {
      *                   name:
      *                     type: string
      *                     example: "Test de connaissance"
-     *                   idSubject:
+     *                   subjectId:
      *                     type: integer
      *                     example: 1
      *         404:
@@ -100,7 +100,7 @@ class TestService {
      *                 name:
      *                   type: string
      *                   example: "Test de connaissance"
-     *                 idSubject:
+     *                 subjectId:
      *                   type: integer
      *                   example: 1
      *       responses:
@@ -117,7 +117,7 @@ class TestService {
      *                   name:
      *                     type: string
      *                     example: "Test de connaissance"
-     *                   idSubject:
+     *                   subjectId:
      *                     type: integer
      *                     example: 1
      *         400:
@@ -154,7 +154,7 @@ class TestService {
      *                 name:
      *                   type: string
      *                   example: "Test de mise à jour"
-     *                 idSubject:
+     *                 subjectId:
      *                   type: integer
      *                   example: 1
      *       responses:
@@ -171,7 +171,7 @@ class TestService {
      *                   name:
      *                     type: string
      *                     example: "Test de mise à jour"
-     *                   idSubject:
+     *                   subjectId:
      *                     type: integer
      *                     example: 1
      *         400:

@@ -35,7 +35,7 @@ const { Subject } = require("../models");
 exports.create = async (req, res) => {
   try {
     // Extraire les bonnes données du corps de la requête
-    const { mmName, mindMapJson, userId, idSubject } = req.body;
+    let { mmName, mindMapJson, userId, subjectId } = req.body;
 
     // Vérifier que tous les champs requis sont présents
     if (!mmName || !mindMapJson || !userId) {
@@ -45,7 +45,6 @@ exports.create = async (req, res) => {
     }
 
     // Assurer un sujet valide; crée un sujet par défaut si manquant ou invalide
-    let subjectId = idSubject;
     try {
       if (subjectId) {
         const subject = await Subject.findByPk(subjectId);
@@ -67,7 +66,7 @@ exports.create = async (req, res) => {
     }
 
     // Insérer les données dans la base de données
-    const data = await DiagrammeService.create({ mmName, mindMapJson, userId, idSubject: subjectId });
+    const data = await DiagrammeService.create({ mmName, mindMapJson, userId, subjectId });
 
     res.status(201).json(data);
   } catch (error) {
