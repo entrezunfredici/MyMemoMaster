@@ -8,7 +8,7 @@ exports.findAll = async (req, res) => {
         res.status(500).send({
             message:
                 error.message ||
-                "Une erreur s'est produite lors de la récupération des tests.",
+                `Une erreur s'est produite lors de la récupération des tests.`,
         });
     }
 };
@@ -25,7 +25,7 @@ exports.findOne = async (req, res) => {
         }
     } catch (error) {
         res.status(500).send({
-            message: `Erreur lors de la récupération du test avec l'identifiant ${req.params.id}.`,
+            message: `Erreur lors de la récupération du test avec l'identifiant ${req.params.id}. ${error.message}`,
         });
     }
 };
@@ -37,7 +37,7 @@ exports.create = async (req, res) => {
         res.status(201).send(data);
     } catch (error) {
         res.status(500).send({
-            message: "Une erreur s'est produite lors de la création du test.",
+            message: `Une erreur s'est produite lors de la création du test.  ${error.message}`,
         });
     }
 };
@@ -51,7 +51,7 @@ exports.update = async (req, res) => {
       res.status(200).json(updatedTest);
     } catch (error) {
       res.status(500).send({
-        message: "Une erreur inattendue s'est produite lors de la modification du test. Veuillez réessayer plus tard." ? error.message : error.message,
+        message: error.message || `Une erreur inattendue s'est produite lors de la modification du test. Veuillez réessayer plus tard.`,
       });
     }
   },
@@ -62,7 +62,7 @@ exports.update = async (req, res) => {
       res.status(204).send();
     } catch (error) {
       res.status(500).send({
-        message: "Une erreur s'est produite lors de la suppression du test",
+        message: `Une erreur s'est produite lors de la suppression du test ${error.message}`,
       });
     }
   };
