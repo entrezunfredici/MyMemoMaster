@@ -1,4 +1,6 @@
+const path = require("path");
 const DiagrammeService = require("../services/Diagramme.service.js");
+const { Subject } = require("../models");
 
   exports.findAll = async (req, res) => {
     try {
@@ -33,15 +35,38 @@ const DiagrammeService = require("../services/Diagramme.service.js");
 exports.create = async (req, res) => {
   try {
     // Extraire les bonnes données du corps de la requête
-    const { mmName, mindMapJson, userId, idSubject } = req.body;
+    let { mmName, mindMapJson, userId, subjectId } = req.body;
 
     // Vérifier que tous les champs requis sont présents
-    if (!mmName || !mindMapJson || !userId || !idSubject) {
-      return res.status(400).json({ message: "Tous les champs (mmName, mindMapJson, userId, idSubject) sont requis."+mmName+ mindMapJson+ userId+ idSubject });
+    if (!mmName || !mindMapJson || !userId) {
+      return res
+        .status(400)
+        .json({ message: "Les champs mmName, mindMapJson et userId sont requis." });
+    }
+
+    // Assurer un sujet valide; crée un sujet par défaut si manquant ou invalide
+    try {
+      if (subjectId) {
+        const subject = await Subject.findByPk(subjectId);
+        if (!subject) subjectId = null;
+      }
+
+      if (!subjectId) {
+        const [subject] = await Subject.findOrCreate({
+          where: { name: "Sujet par défaut" },
+          defaults: { name: "Sujet par défaut" },
+        });
+        subjectId = subject.subjectId;
+      }
+    } catch (err) {
+      console.error("Erreur lors de la résolution du sujet :", err);
+      return res
+        .status(500)
+        .json({ message: "Impossible de résoudre le sujet associé à la carte mentale." });
     }
 
     // Insérer les données dans la base de données
-    const data = await DiagrammeService.create({ mmName, mindMapJson, userId, idSubject });
+    const data = await DiagrammeService.create({ mmName, mindMapJson, userId, subjectId });
 
     res.status(201).json(data);
   } catch (error) {
@@ -119,3 +144,31 @@ exports.delete = async (req, res) => {
   }
 };
 
+exports.uploadImage = (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        message: "Aucune image n'a été envoyée.",
+      });
+    }
+
+    const relativePath = path.join("uploads", "mindmaps", req.file.filename).replace(/\\/g, "/");
+    const baseUrl = process.env.API_PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+    const url = `${baseUrl}/${relativePath}`;
+
+    return res.status(201).json({
+      message: "Image téléchargée avec succès.",
+      url,
+      path: `/${relativePath}`,
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'upload de l'image de carte mentale :", error);
+    return res.status(500).json({
+      message: "Une erreur s'est produite lors de l'upload de l'image.",
+      error: error.message,
+    });
+  }
+};

@@ -11,10 +11,24 @@
     --light: #FDF7FF;
     --gray: #d5daed;
     --dark: #101f56;
+    --white: #ffffff;
+
     /* Other colors */
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #dc2626;
+
+    /* Border radius */
+    --radius-xs: 9px;
+    --radius-md: 18px;
+    --radius-xl: 50px;
+
+    /* Password colors */
+    --password-step-1: #dc2626;
+    --password-step-2: #dc7e26;
+    --password-step-3: #dcd926;
+    --password-step-4: #78dc26;
+    --password-step-5: #29af00;
 }
 
 /* Vue-toastification overrides */

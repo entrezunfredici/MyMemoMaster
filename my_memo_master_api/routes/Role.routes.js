@@ -124,7 +124,7 @@ router.post("/add", role.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", role.update);
+router.put("/:id", authMiddleware, role.update);
 
 /**
  * @swagger
@@ -147,7 +147,7 @@ router.put("/:id", role.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:id", role.delete);
+router.delete("/:id", authMiddleware, role.delete);
 
 module.exports = (app) => {
   /**

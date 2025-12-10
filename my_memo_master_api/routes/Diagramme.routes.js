@@ -1,5 +1,6 @@
 const express = require("express");
 const diagramme = require("../controllers/Diagramme.controller.js");
+const mindmapImageUpload = require("../middlewares/mindmapImageUpload");
 const router = express.Router();
 
 /**
@@ -164,6 +165,68 @@ router.put("/:id", diagramme.update);
  *         description: Erreur interne du serveur
  */
 router.delete("/:id", diagramme.delete);
+
+/**
+ * @swagger
+ * /diagrammes/upload-image:
+ *   post:
+ *     summary: Télécharge une image pour une carte mentale
+ *     tags:
+ *       - diagrammes
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image à ajouter à la carte mentale
+ *     responses:
+ *       201:
+ *         description: Image uploadée avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 url:
+ *                   type: string
+ *                   example: "http://localhost:8001/uploads/mindmaps/image-123.png"
+ *                 path:
+ *                   type: string
+ *                   example: "/uploads/mindmaps/image-123.png"
+ *       400:
+ *         description: Requête invalide ou fichier manquant
+ *       413:
+ *         description: Fichier trop volumineux
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.post("/upload-image", (req, res) => {
+  mindmapImageUpload.single("image")(req, res, (error) => {
+    if (error && error.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({
+        message: "L'image dépasse la taille maximale autorisée de 5 Mo.",
+      });
+    }
+    if (error && error.code === "INVALID_FILE_TYPE") {
+      return res.status(400).json({
+        message: "Format d'image non supporté. Formats acceptés : JPG, PNG, GIF, WEBP et SVG.",
+      });
+    }
+    if (error) {
+      return res.status(500).json({
+        message: "Une erreur est survenue lors de l'upload de l'image.",
+        error: error.message,
+      });
+    }
+
+    return diagramme.uploadImage(req, res);
+  });
+});
 
 module.exports = (app) => {
   /**

@@ -24,11 +24,11 @@ const fieldsTypeRoutes = require("./routes/FieldsType.routes.js");
 const diagrammeRoutes = require("./routes/Diagramme.routes");
 const questionRoutes = require("./routes/Question.routes");
 const tutorialRoutes = require("./routes/Tutorials.routes");
+const { startFifoCron } = require('./jobs/fifo.cron');
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
 const app = express();
-console.log("CORS autorise les requêtes depuis :", process.env.VITE_FRONT_URL);
 
 // CORS
 app.use(
@@ -38,6 +38,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+console.log("CORS autorise les requêtes depuis :", process.env.VITE_FRONT_URL);
 // app.use(cors()); // Autorise toutes les requêtes (à ne pas laisser en prod)
 
 
@@ -46,6 +47,9 @@ app.use(bodyParser.json());
 
 // Middleware for favicon
 app.use(favicon(__dirname + "/public/favicon.ico"));
+
+// Static files for uploaded assets
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // Middleware pour servir la documentation Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -68,6 +72,7 @@ questionRoutes(app);
 tutorialRoutes(app);
 
 // ... Autres middlewares
+startFifoCron();
 
 // Si rien n'est trouvé
 app.use(({ res }) => {

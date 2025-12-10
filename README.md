@@ -1,6 +1,5 @@
 # MyMemoMaster
 
-
 ## Partie 1: Présentation
 
 MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leur révisions. En centralisant diverses fonctionnalités visant à optimiser l’apprentissage. La ou MyMEmoMaster pourra se démarquer de ces concurrents c’est sur le fait de proposer un large éventail de fonctionnalités :
@@ -57,7 +56,7 @@ git clone git@github.com:entrezunfredici/MyMemoMaster.git
 
 ```
 
-3. Copez `.env.example` en `.env` et remplissez les variables d'environnement.
+3. Copiez `.env.example` en `.env` et remplissez les variables d'environnement.
 4. Lancer votre environnement local:
 
 Avec docker-compose:
@@ -65,6 +64,20 @@ Avec docker-compose:
 ```sh
 cd MyMemoMaster
 docker-compose down ; docker-compose up --build
+```
+
+A noter, le docker compose dispose d'un reverseproxy (traefik), lorsque vous demmarez le projet avec docker, le font est accéssible à l'adresse :
+```
+ http://localhost/
+```
+L'api a l'adresse :
+```
+  http://localhost/api
+```
+
+et le traefik a l'adresse:
+```
+ http://localhost:8080/dashboard/#/
 ```
 
 A l'ancienne (comme la moutarde):

@@ -29,6 +29,21 @@ router.get("/:id", leitnerCardController.getCardById);
  *   post:
  *     summary: Ajouter une carte de Leitner
  *     tags: [LeitnerCards]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idQuestion:
+ *                 type: integer
+ *                 example: 1
+ *     responses:
+ *       201:
+ *         description: Flash card créée avec succès.
+ *       500:
+ *         description: Erreur serveur.
  */
 router.post("/add", leitnerCardController.addCard);
 

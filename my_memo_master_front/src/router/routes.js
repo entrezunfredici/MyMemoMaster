@@ -5,7 +5,7 @@ const routes = [
     component: () => import('../pages/HomePage.vue'),
     meta: {
       title: 'Accueil',
-      private: true,
+      private: false,
     },
   },
   {
@@ -32,7 +32,16 @@ const routes = [
     component: () => import('../pages/TutorialsPage.vue'),
     meta: {
       title: 'Tutoriels',
-      private: true,
+      private: false,
+    },
+  },
+  {
+    path: '/credits',
+    name: 'credits',
+    component: () => import('../pages/CreditsPage.vue'),
+    meta: {
+      title: 'Credits',
+      private: false,
     },
   },
   {
@@ -56,9 +65,7 @@ const routes = [
   {
     path: '/profile',
     name: 'profile',
-    //component: () => import('../pages/ProfilePage.vue'),
-    //component: () => import('../pages/ConnexionPage.vue'),
-    component: () => import('../pages/InscriptionPage.vue'),
+    component: () => import('../pages/ProfilePage.vue'),
     meta: {
       title: 'Profile',
       private: true,
@@ -73,12 +80,49 @@ const routes = [
       private: true,
     },
   },
-    {
+  {
     path: '/create-test',
     name: 'create.test',
     component: () => import('../pages/CreateTestPage.vue'),
     meta: {
       title: 'Create Test',
+      private: true,
+    },
+  },
+  {
+    path: '/classroom',
+    name: 'classroom',
+    component: () => import('../pages/ClassroomPage.vue'),
+    meta: {
+      title: 'Class Gropup',
+      private: true,
+    },
+  },
+  // ==================== AUTH & ACCOUNT ====================
+  {
+    path: '/auth',
+    name: 'auth',
+    component: () => import('../pages/login/ConnexionPage.vue'),
+    meta: {
+      title: 'Authentification',
+      private: false,
+    },
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('../pages/register/InscriptionPage.vue'),
+    meta: {
+      title: 'register',
+      private: false,
+    },
+  },
+  {
+    path: '/account',
+    name: 'account',
+    component: () => import('../pages/AccountPage.vue'),
+    meta: {
+      title: 'Mon compte',
       private: true,
     },
   },
@@ -99,7 +143,7 @@ const routes = [
       title: 'Error',
     },
   }
-  
+
 ]
 
 export default routes

@@ -46,7 +46,7 @@ class LeitnerCardService {
 
     card.update({
       idBox: nextBox ? nextBox.idBox : card.idBox,
-      fifo: true,
+      fifo: false,
       dateTimeFifo: new Date(Date.now() + nextBox.intervall * 1000),
     });
 

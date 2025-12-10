@@ -8,7 +8,7 @@ exports.findAllByQuestion = async (req, res) => {
     res.status(200).json(responses);
   } catch (error) {
     res.status(500).send({
-      message: error.message || "Une erreur s'est produite lors de la récupération des réponses.",
+      message: error.message || `Une erreur s'est produite lors de la récupération des réponses.`,
     });
   }
 };

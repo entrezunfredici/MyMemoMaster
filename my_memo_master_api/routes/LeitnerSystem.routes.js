@@ -81,7 +81,7 @@ router.get("/:id", leitnerSystem.findOne);
 
 /**
  * @swagger
- * /leitnersystem/add:
+ * /leitnersystems/add:
  *   post:
  *     summary: Ajoute un nouveau système de Leitner
  *     tags:
@@ -223,7 +223,7 @@ router.post("/share", leitnerSystem.share);
 
 /**
  * @swagger
- * /leitnersystem/{id}:
+ * /leitnersystems/{id}:
  *   delete:
  *     summary: Supprime un système de Leitner
  *     tags:
