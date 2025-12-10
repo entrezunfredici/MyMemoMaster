@@ -1,6 +1,5 @@
 const { Op } = require('sequelize');
 const TutorialsService = require('../services/Tutorials.service');
-const { Op } = require('sequelize');
 
 exports.findAll = async (req, res) => {
     let { page, perPage, search, subjectId, revisionTips } = req.query;
