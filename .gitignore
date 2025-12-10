@@ -1,4 +1,5 @@
 .env
 .idea
+*.sqlite
 
 server_docker_compose/server_proxy/
