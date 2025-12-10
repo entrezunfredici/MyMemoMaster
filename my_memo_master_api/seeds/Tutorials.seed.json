@@ -1,0 +1,92 @@
+[
+  {
+    "id": 1,
+    "name": "Introduction à JavaScript",
+    "link": "https://developer.mozilla.org/fr/docs/Web/JavaScript/Guide",
+    "revision_tips": true,
+    "idSubject": 1,
+    "createdAt": "2025-01-15T10:00:00.000Z",
+    "updatedAt": "2025-01-15T10:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "name": "Les bases de React",
+    "link": "https://react.dev/learn",
+    "revision_tips": true,
+    "idSubject": 1,
+    "createdAt": "2025-02-10T14:30:00.000Z",
+    "updatedAt": "2025-02-10T14:30:00.000Z"
+  },
+  {
+    "id": 3,
+    "name": "Node.js et Express",
+    "link": "https://expressjs.com/fr/starter/installing.html",
+    "revision_tips": false,
+    "idSubject": 1,
+    "createdAt": "2025-03-05T09:15:00.000Z",
+    "updatedAt": "2025-03-05T09:15:00.000Z"
+  },
+  {
+    "id": 4,
+    "name": "SQL pour débutants",
+    "link": "https://sql.sh/cours",
+    "revision_tips": true,
+    "idSubject": 2,
+    "createdAt": "2025-02-20T16:45:00.000Z",
+    "updatedAt": "2025-02-20T16:45:00.000Z"
+  },
+  {
+    "id": 5,
+    "name": "PostgreSQL avancé",
+    "link": "https://www.postgresql.org/docs/current/tutorial.html",
+    "revision_tips": false,
+    "idSubject": 2,
+    "createdAt": "2025-03-12T11:20:00.000Z",
+    "updatedAt": "2025-03-12T11:20:00.000Z"
+  },
+  {
+    "id": 6,
+    "name": "Sequelize ORM",
+    "link": "https://sequelize.org/docs/v6/getting-started/",
+    "revision_tips": true,
+    "idSubject": 2,
+    "createdAt": "2025-04-01T08:00:00.000Z",
+    "updatedAt": "2025-04-01T08:00:00.000Z"
+  },
+  {
+    "id": 7,
+    "name": "Algorithmique - Tri et recherche",
+    "link": "https://www.youtube.com/watch?v=example",
+    "revision_tips": true,
+    "idSubject": 3,
+    "createdAt": "2025-01-25T13:30:00.000Z",
+    "updatedAt": "2025-01-25T13:30:00.000Z"
+  },
+  {
+    "id": 8,
+    "name": "Structures de données",
+    "link": "https://www.geeksforgeeks.org/data-structures/",
+    "revision_tips": false,
+    "idSubject": 3,
+    "createdAt": "2025-02-28T10:45:00.000Z",
+    "updatedAt": "2025-02-28T10:45:00.000Z"
+  },
+  {
+    "id": 9,
+    "name": "Git et GitHub",
+    "link": "https://git-scm.com/book/fr/v2",
+    "revision_tips": true,
+    "idSubject": 4,
+    "createdAt": "2025-03-18T15:00:00.000Z",
+    "updatedAt": "2025-03-18T15:00:00.000Z"
+  },
+  {
+    "id": 10,
+    "name": "CI/CD avec GitHub Actions",
+    "link": "https://docs.github.com/fr/actions",
+    "revision_tips": false,
+    "idSubject": 4,
+    "createdAt": "2025-04-10T12:15:00.000Z",
+    "updatedAt": "2025-04-10T12:15:00.000Z"
+  }
+]

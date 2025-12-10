@@ -72,6 +72,9 @@ const seedDatabase = async () => {
     await db.Test.bulkCreate(require("./seeds/Test.seed.json"));
     console.log("Test table seeded successfully");
 
+    await db.Tutorials.bulkCreate(require("./seeds/Tutorials.seed.json"));
+    console.log("Tutorials table seeded successfully");
+
     // Réactiver les déclencheurs de clés étrangères
     // await db.instance.query('ALTER TABLE "User" ENABLE TRIGGER ALL');
     // await db.instance.query('ALTER TABLE "Role" ENABLE TRIGGER ALL');

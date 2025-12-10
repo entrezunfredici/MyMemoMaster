@@ -135,6 +135,44 @@ router.put('/:id', tutorials.update);
 
 /**
  * @swagger
+ * /tutorials/edit/{id}:
+ *   post:
+ *     summary: Modifier un tutoriel par ID (alias POST)
+ *     tags: [Tutorials]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du tutoriel
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               link:
+ *                 type: string
+ *               revision_tips:
+ *                 type: boolean
+ *               idSubject:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Tutoriel mis à jour avec succès.
+ *       404:
+ *         description: Tutoriel non trouvé.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post('/edit/:id', tutorials.update);
+
+/**
+ * @swagger
  * /tutorials/{id}:
  *   delete:
  *     summary: Supprimer un tutoriel par ID
