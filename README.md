@@ -96,6 +96,12 @@ npm run dev
 
 5. Lancer le seed de la base de données:
 
+avec docker
+```sh
+docker compose exec api sh -c "npm run seed"
+```
+
+sans docker
 ```sh
 cd MyMemoMaster/my_memo_master_api
 npm run seed
