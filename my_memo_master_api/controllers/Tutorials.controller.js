@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const TutorialsService = require('../services/Tutorials.service');
 
 exports.findAll = async (req, res) => {
@@ -59,7 +60,7 @@ exports.findOne = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             status: 'error',
-            message: `Erreur lors de la récupération du tutoriel avec l'identifiant ${req.params.id}.`,
+            message: `Erreur lors de la récupération du tutoriel avec l'identifiant ${req.params.id}. ${error.message}`,
         });
     }
 };
@@ -75,7 +76,7 @@ exports.create = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             status: 'error',
-            message: "Une erreur s'est produite lors de la création du tutoriel.",
+            message: `Une erreur s'est produite lors de la création du tutoriel. ${error.message}`,
         });
     }
 };
@@ -99,7 +100,7 @@ exports.update = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             status: 'error',
-            message: `Erreur lors de la mise à jour du tutoriel avec l'identifiant ${req.params.id}.`,
+            message: `Erreur lors de la mise à jour du tutoriel avec l'identifiant ${req.params.id}.  ${error.message}`,
         });
     }
 };
@@ -122,7 +123,7 @@ exports.delete = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             status: 'error',
-            message: `Erreur lors de la suppression du tutoriel avec l'identifiant ${req.params.id}.`,
+            message: `Erreur lors de la suppression du tutoriel avec l'identifiant ${req.params.id}. ${error.message}`,
         });
     }
 };

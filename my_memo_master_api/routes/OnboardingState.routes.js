@@ -1,6 +1,5 @@
 const express = require('express')
 const onboardingState = require("../controllers/OnboardingState.controller.js");
-const role = require('../controllers/Role.controller')
 const router = express.Router();
 
 router.get("/byUserId", onboardingState.findByUserId);
