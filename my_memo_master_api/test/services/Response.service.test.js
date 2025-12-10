@@ -37,10 +37,10 @@ describe("ResponseService", () => {
 
   test("should retrieve all responses by question ID", async () => {
     const idQuestion = 42;
-    const mockResponses = [
-      { idResponse: 1, content: "Réponse 1", correction: true, idQuestion: idQuestion },
-      { idResponse: 2, content: "Réponse 2", correction: false, idQuestion: idQuestion },
-    ];
+    // const mockResponses = [
+    //   { idResponse: 1, content: "Réponse 1", correction: true, idQuestion: idQuestion },
+    //   { idResponse: 2, content: "Réponse 2", correction: false, idQuestion: idQuestion },
+    // ];
 
     const expectedResponses = [
       { idResponse: 2, content: "Réponse 2", correction: false, idQuestion: idQuestion },
