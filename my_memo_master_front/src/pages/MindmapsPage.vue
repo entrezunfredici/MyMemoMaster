@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { api } from '@/helpers/api';
 import { useToast } from 'vue-toastification';
 import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue';
+import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 
 const toast = useToast();
+const mindmapStore = useMindMapBuilderStore();
 
 const builderRef = ref(null);
 const diagrams = ref([]);
@@ -27,6 +29,9 @@ const showExportModal = ref(false);
 const exportName = ref('');
 const pendingPayload = ref(null);
 const pendingCreate = ref(false);
+
+const AUTO_SAVE_DELAY = 1500;
+let autoSaveTimer = null;
 
 const fetchDiagrams = async () => {
   try {
@@ -145,7 +150,91 @@ const ensureMeta = (payload) => {
   };
 };
 
+const updateDiagramsList = (entry) => {
+  if (!entry?.idMindMap) return;
+  const existingIndex = diagrams.value.findIndex((diagram) => diagram.idMindMap === entry.idMindMap);
+  if (existingIndex === -1) {
+    diagrams.value = [entry, ...diagrams.value];
+  } else {
+    diagrams.value = diagrams.value.map((diagram, index) =>
+      index === existingIndex ? { ...diagram, ...entry } : diagram
+    );
+  }
+};
+
+const clearAutoSaveTimer = () => {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+};
+
+const scheduleAutoSave = () => {
+  clearAutoSaveTimer();
+  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY);
+};
+
+const performAutoSave = async () => {
+  autoSaveTimer = null;
+  if (!mindmapStore.isDirty) return;
+  if (isSaving.value || isExporting.value || showExportModal.value) {
+    scheduleAutoSave();
+    return;
+  }
+
+  const payload = mindmapStore.exportPayload();
+  if (!payload) return;
+  const saveVersion = payload?.updatedAt;
+  exportName.value = payload.title || exportName.value || 'Carte mentale';
+  const meta = ensureMeta(payload);
+  const body = {
+    mmName: meta.mmName,
+    mindMapJson: payload,
+    userId: meta.userId,
+    subjectId: meta.subjectId,
+  };
+
+  try {
+    isSaving.value = true;
+    if (currentDiagramId.value) {
+      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body);
+      if (response) {
+        const updatedMeta = { ...body, idMindMap: currentDiagramId.value };
+        currentDiagramMeta.value = { ...(currentDiagramMeta.value || {}), ...updatedMeta };
+        updateDiagramsList(updatedMeta);
+        fetchFilters();
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
+        pendingPayload.value = null;
+        pendingCreate.value = false;
+      }
+    } else {
+      const response = await api.post('diagrammes/add', body);
+      const newId = response?.data?.id || response?.data?.idMindMap;
+      if (newId) {
+        const createdMeta = { ...body, idMindMap: newId };
+        currentDiagramId.value = newId;
+        currentDiagramMeta.value = createdMeta;
+        updateDiagramsList(createdMeta);
+        fetchFilters();
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
+        pendingPayload.value = null;
+        pendingCreate.value = false;
+      }
+    }
+  } catch (error) {
+    console.error('Erreur sauvegarde auto', error);
+    toast.error('Erreur sauvegarde automatique');
+  } finally {
+    isSaving.value = false;
+  }
+};
+
 const handleSave = async (payload) => {
+  const saveVersion = payload?.updatedAt;
   exportName.value = payload.title || exportName.value || 'Carte mentale';
   if (!currentDiagramId.value) {
     pendingCreate.value = true;
@@ -169,6 +258,9 @@ const handleSave = async (payload) => {
         currentDiagramMeta.value.mindMapJson = payload;
       }
       await fetchDiagrams();
+      if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+        mindmapStore.markSaved();
+      }
     }
   } catch (error) {
     toast.error('Erreur sauvegarde');
@@ -198,6 +290,7 @@ const handleNewMap = (payload) => {
 
 const confirmExportModal = async () => {
   if (!pendingPayload.value) return;
+  const saveVersion = pendingPayload.value?.updatedAt;
   try {
     isExporting.value = true;
     const meta = ensureMeta(pendingPayload.value);
@@ -216,6 +309,9 @@ const confirmExportModal = async () => {
           currentDiagramMeta.value.mmName = meta.mmName;
           currentDiagramMeta.value.mindMapJson = pendingPayload.value;
         }
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
       }
     } else {
       const response = await api.post('diagrammes/add', body);
@@ -224,6 +320,9 @@ const confirmExportModal = async () => {
         currentDiagramId.value = newId;
         currentDiagramMeta.value = { ...body, idMindMap: newId };
         toast.success('Diagramme cree');
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
       }
     }
     await fetchDiagrams();
@@ -237,8 +336,30 @@ const confirmExportModal = async () => {
   }
 };
 
+watch(
+  () => mindmapStore.map.updatedAt,
+  () => {
+    if (mindmapStore.isDirty) {
+      scheduleAutoSave();
+    }
+  }
+);
+
+watch(
+  () => showExportModal.value,
+  (isOpen) => {
+    if (!isOpen && mindmapStore.isDirty) {
+      scheduleAutoSave();
+    }
+  }
+);
+
 onMounted(async () => {
   await fetchDiagrams();
+});
+
+onBeforeUnmount(() => {
+  clearAutoSaveTimer();
 });
 </script>
 
