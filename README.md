@@ -167,3 +167,21 @@ un adjectif:
 - [REF] pour les refactorisations
 - [FIX] pour les corrections de bugs
   suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
+
+Workflow
+
+```mermaid
+flowchart TD
+    Backlog --> Cadrage
+    Cadrage --> ToDo
+    Cadrage --> Annule[Annulé]
+    ToDo --> Spec[Spécification]
+    ToDo --> En_cours
+    ToDo --> Annule
+    En_cours --> Spec
+    En_cours --> Annule
+    En_cours --> Valide[Validé]
+    Spec --> En_cours
+    Spec --> Annule
+    Valide --> Spec
+```
