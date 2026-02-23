@@ -1,6 +1,6 @@
 const express = require("express");
 const role = require("../controllers/Role.controller.js");
-const authMiddleware = require("../middlewares/Auth.middleware");
+const authMiddleware = require("../middlewares/Auth.middleware.js");
 
 const router = express.Router();
 
@@ -158,5 +158,4 @@ module.exports = (app) => {
    *     description: Gestion des rôles
    */
   app.use("/roles", router);
-  // app.use("/roles", authMiddleware, router);
 };
