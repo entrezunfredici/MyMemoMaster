@@ -95,7 +95,7 @@ const routes = [
     component: () => import('../pages/ClassroomPage.vue'),
     meta: {
       title: 'Class Group',
-      private: true,
+      private: false,
     },
   },
   // ==================== AUTH & ACCOUNT ====================
