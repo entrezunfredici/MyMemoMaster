@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-screen w-full contenue border-radius-9px">
+  <div class="flex h-screen w-full">
     <!-- Colonne de l'image (70%) - Cachée en mode mobile -->
     <div class="hidden md:block w-[70%] h-full bg-blue-500 custom-border border-radius-9px">
       <img src="../../../public/inscription.png" alt="Connexion" class="w-full h-full object-cover no-underline border-radius-9px imageConnexion">

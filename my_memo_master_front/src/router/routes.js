@@ -85,7 +85,7 @@ const routes = [
     name: 'classroom',
     component: () => import('../pages/ClassroomPage.vue'),
     meta: {
-      title: 'Class Gropup',
+      title: 'Class Group',
       private: true,
     },
   },
