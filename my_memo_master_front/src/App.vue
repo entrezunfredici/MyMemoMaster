@@ -99,7 +99,7 @@
       </router-link>
       <router-link to="/classroom"
         :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <ExercisesIcon class="size-8" />
+        <ClassroomIcon class="size-8" />
       </router-link>
       <!-- <router-link to="/credits"
         :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
