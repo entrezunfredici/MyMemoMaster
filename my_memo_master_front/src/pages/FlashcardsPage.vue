@@ -1,7 +1,7 @@
 <template>
   <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
     
-    <section class="order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
+    <section class="col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
       <div class="w-full flex-grow">
         <div class="flex justify-between items-center pb-4">
           <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold">
@@ -92,15 +92,6 @@
         </div>
       </div>
     </section>
-
-    <section class="order-1 lg:order-2 p-5 bg-light rounded-[7px]">
-      <div class="w-full flex justify-between items-center pb-4">
-        <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold">
-          Visualisation
-        </h4>
-      </div>
-      <Mindmap />
-    </section>
   </div>
 </template>
 
@@ -178,7 +169,7 @@ const handleValidation = () => {
   showFeedback.value = true
   if (!isCorrect.value) {
     errors.value.push(currentCard.value)
-    // A refaire le jour meme
+    cards.value.push(currentCard.value) // A refaire le jour meme
   } else {
     groupCounts.value.G2++     // Progression
     groupCounts.value.G1--
