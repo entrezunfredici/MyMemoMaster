@@ -3,21 +3,6 @@
     
     <section class="col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
       <div class="w-full flex-grow">
-        <div class="flex justify-between items-center pb-4">
-          <button
-            @click="confirmExit"
-            class="text-primary font-semibold hover:underline"
-          >
-            ← Retour
-          </button>
-          <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold">
-            Session : {{ sessionName }}
-          </h4>
-          <span class="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-            {{ currentIndex + 1 }} / {{ cards.length }}
-          </span>
-        </div>
-
         <div class="grid grid-cols-5 gap-2 mb-6 text-center">
           <div
             v-for="(count, group) in groupCounts"
@@ -31,6 +16,21 @@
               {{ count }}
             </div>
           </div>
+        </div>
+
+        <div class="flex justify-between items-center pb-4">
+          <button
+            @click="confirmExit"
+            class="text-primary font-semibold hover:underline"
+          >
+            ← Retour
+          </button>
+          <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold">
+            Session : {{ sessionName }}
+          </h4>
+          <span class="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
+            {{ currentIndex + 1 }} / {{ cards.length }}
+          </span>
         </div>
 
         <div v-if="!isFinished" class="space-y-4">
