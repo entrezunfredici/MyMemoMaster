@@ -6,7 +6,8 @@ module.exports = (instance) => {
     {
       userId: {
         type: DataTypes.INTEGER,
-        autoIncrement: true,
+        primaryKey: true,
+        allowNull: false,
         references: {
           model: "User",
           key: "userId",
