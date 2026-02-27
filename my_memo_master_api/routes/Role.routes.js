@@ -1,6 +1,6 @@
 const express = require("express");
 const role = require("../controllers/Role.controller.js");
-const authMiddleware = require("../middlewares/Auth.middleware");
+const authMiddleware = require("../middlewares/Auth.middleware.js");
 
 const router = express.Router();
 
@@ -125,7 +125,7 @@ router.post("/add", role.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", role.update);
+router.put("/:id", authMiddleware, role.update);
 
 /**
  * @swagger
@@ -148,7 +148,7 @@ router.put("/:id", role.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:id", role.delete);
+router.delete("/:id", authMiddleware, role.delete);
 
 module.exports = (app) => {
   /**
@@ -158,5 +158,4 @@ module.exports = (app) => {
    *     description: Gestion des rôles
    */
   app.use("/roles", router);
-  // app.use("/roles", authMiddleware, router);
 };

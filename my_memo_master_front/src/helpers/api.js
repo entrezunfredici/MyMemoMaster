@@ -11,7 +11,7 @@ import {
   VITE_API_GOOGLE_AUTH_HEADER,
 } from '@/config';
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import router from '@/router'
 
 const SECURITY_MODES = {
   PUBLIC: 'public',
@@ -264,7 +264,7 @@ function isStatusOk(status) {
     return false
   }
 
-  return [200].includes(status);
+  return status >= 200 && status < 300;
 }
 
 async function get(endpoint, params = {}) {
@@ -272,7 +272,6 @@ async function get(endpoint, params = {}) {
   if (typeof endpoint !== 'string') throw new Error('Endpoint must be a string')
   if (typeof params !== 'object') throw new Error('Params must be an object')
 
-  const router = useRouter();
   try {
     const response = await axiosApi.get(endpoint, { params })
 
@@ -294,7 +293,6 @@ async function post(endpoint, data = {}, config = {}) {
   if (typeof data !== 'object') throw new Error('Data must be an object')
   if (typeof config !== 'object') throw new Error('Config must be an object')
 
-  const router = useRouter();
   try {
     const response = await axiosApi.post(endpoint, data, config)
 
@@ -316,7 +314,6 @@ async function put(endpoint, data = {}, config = {}) {
   if (typeof data !== 'object') throw new Error('Data must be an object')
   if (typeof config !== 'object') throw new Error('Config must be an object')
 
-  const router = useRouter();
   try {
     const response = await axiosApi.put(endpoint, data, config)
 
@@ -337,7 +334,6 @@ async function del(endpoint, data = {}) {
   if (typeof endpoint !== 'string') throw new Error('Endpoint must be a string')
   if (typeof data !== 'object') throw new Error('Data must be an object')
 
-  const router = useRouter();
   try {
     const response = await axiosApi.delete(endpoint, { data })
 

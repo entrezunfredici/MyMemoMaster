@@ -8,7 +8,7 @@ exports.findAllByQuestion = async (req, res) => {
     res.status(200).json(responses);
   } catch (error) {
     res.status(500).send({
-      message: error.message || "Une erreur s'est produite lors de la récupération des réponses.",
+      message: error.message || `Une erreur s'est produite lors de la récupération des réponses.`,
     });
   }
 };
@@ -27,7 +27,7 @@ exports.findCorrectionByQuestion = async (req, res) => {
     }
   } catch (error) {
     res.status(500).send({
-      message: `Erreur lors de la récupération de la correction pour la question ${req.params.questionId}.`,
+      message: `Erreur lors de la récupération de la correction pour la question ${req.params.questionId}. ${error.message}`,
     });
   }
 };
@@ -45,7 +45,7 @@ exports.findOne = async (req, res) => {
     }
   } catch (error) {
     res.status(500).send({
-      message: `Erreur lors de la récupération de la réponse avec l'identifiant ${req.params.id}.`,
+      message: `Erreur lors de la récupération de la réponse avec l'identifiant ${req.params.id}. ${error.message}`,
     });
   }
 };
@@ -58,7 +58,7 @@ exports.create = async (req, res) => {
     res.status(201).json(response);
   } catch (error) {
     res.status(500).send({
-      message: "Une erreur s'est produite lors de la création de la réponse.",
+      message: `Une erreur s'est produite lors de la création de la réponse. ${error.message}`,
     });
   }
 };
@@ -71,7 +71,7 @@ exports.update = async (req, res) => {
     res.status(200).json(updatedResponse);
   } catch (error) {
     res.status(500).send({
-      message: "Une erreur s'est produite lors de la modification de la réponse.",
+      message: `Une erreur s'est produite lors de la modification de la réponse. ${error.message}`,
     });
   }
 };
@@ -84,7 +84,7 @@ exports.delete = async (req, res) => {
     res.status(204).send();
   } catch (error) {
     res.status(500).send({
-      message: "Une erreur s'est produite lors de la suppression de la réponse.",
+      message: `Une erreur s'est produite lors de la suppression de la réponse. ${error.message}`,
     });
   }
 };
