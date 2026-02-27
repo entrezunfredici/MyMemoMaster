@@ -1,5 +1,10 @@
 const { User, Role, UserOnboardingState } = require("../models/index");
-const bcrypt = require('bcryptjs');
+let bcrypt;
+try {
+  bcrypt = require("bcryptjs");
+} catch (err) {
+  bcrypt = require("bcrypt");
+}
 const generateCode = require('../helpers/generateCode')
 
 class UserService {

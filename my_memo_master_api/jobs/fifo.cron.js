@@ -6,7 +6,7 @@ const { LeitnerCard, instance: sequelize } = require('../models');
 let isRunning = false;
 
 function startFifoCron() {
-    cron.schedule('*/10 * * * *', async () => {
+    cron.schedule('*/1 * * * *', async () => {
         if (isRunning) return;
         isRunning = true;
         const t0 = Date.now();
