@@ -1,0 +1,188 @@
+.mindmaps-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 100vh;
+    background: #f1f5f9;
+    padding: 16px;
+}
+
+.mindmaps-page__header {
+    background: #ffffff;
+    padding: 16px;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.mindmaps-page__header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.mindmaps-page__layout {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 16px;
+    flex: 1;
+}
+
+.mindmaps-page__sidebar {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 16px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sidebar__tools {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sidebar__modes {
+    display: flex;
+    gap: 8px;
+}
+
+.sidebar__modes button {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: none;
+    background: #e5e7eb;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.sidebar__modes button.active {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.sidebar__tools input,
+.sidebar__tools select {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #cbd5f5;
+    font-size: 14px;
+}
+
+.sidebar__list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+}
+
+.sidebar__item {
+    background: #f8fafc;
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: border 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar__item.active {
+    border-color: #2563eb;
+    transform: translateY(-1px);
+}
+
+.sidebar__item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sidebar__item-title {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.sidebar__item-meta {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.sidebar__item-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.sidebar__item-actions button {
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    background: #e0f2fe;
+    color: #0f172a;
+}
+
+.sidebar__item-actions .danger {
+    background: #fecaca;
+    color: #b91c1c;
+}
+
+.mindmaps-page__content {
+    background: transparent;
+    border-radius: 20px;
+    min-height: 0;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal__dialog {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 16px;
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.modal__dialog input {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #cbd5f5;
+}
+
+.modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal__actions button {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.modal__actions .primary {
+    background: #2563eb;
+    color: #ffffff;
+}
