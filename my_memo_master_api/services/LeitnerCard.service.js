@@ -12,7 +12,7 @@ class LeitnerCardService {
   async addCard(data, userRights) {
     // Vérification des droits utilisateur
     if (userRights.canAdd) {
-      // Carte ajoutée dans la boîte de niveau 0 avec fifo à true
+      // Carte ajoutée dans la boite de niveau 0 avec fifo à true
       const leitnerBox = await LeitnerBox.findOne({ where: { level: 0 } });
       return await LeitnerCard.create({
         ...data,
@@ -36,21 +36,47 @@ class LeitnerCardService {
     const card = await LeitnerCard.findByPk(cardId);
     const response = await Response.findByPk(responseId);
 
-    if (!card || !response) return null;
+    if (!card || !response || response.idQuestion !== card.idQuestion) {
+      return null;
+    }
 
-    const isCorrect = response.content === response.correction;
+    const currentBox = await LeitnerBox.findByPk(card.idBox);
+    if (!currentBox) {
+      return null;
+    }
 
-    // Mise à jour de la boîte en fonction de la correction
-    const newLevel = isCorrect ? card.idBox + 1 : Math.max(card.idBox - 1, 0);
-    const nextBox = await LeitnerBox.findOne({ where: { level: newLevel } });
+    const correction = await Response.findOne({
+      where: { idQuestion: card.idQuestion, correction: true },
+    });
+    if (!correction) {
+      return null;
+    }
 
-    card.update({
-      idBox: nextBox ? nextBox.idBox : card.idBox,
-      fifo: false,
-      dateTimeFifo: new Date(Date.now() + nextBox.intervall * 1000),
+    const isCorrect = response.idResponse === correction.idResponse;
+
+    const targetLevel = isCorrect
+      ? currentBox.level + 1
+      : Math.max(currentBox.level - 1, 1);
+
+    const targetBox = await LeitnerBox.findOne({
+      where: {
+        level: targetLevel,
+        idSystem: currentBox.idSystem ?? null,
+      },
     });
 
-    return { success: isCorrect, correction: response.correction };
+    const destinationBox = targetBox || currentBox;
+
+    await card.update({
+      idBox: destinationBox.idBox,
+      fifo: false,
+      dateTimeFifo: new Date(Date.now() + destinationBox.intervall * 1000),
+    });
+
+    return {
+      success: isCorrect,
+      correction: correction ? correction.content : null,
+    };
   }
 
   async deleteCard(id, userRights) {
