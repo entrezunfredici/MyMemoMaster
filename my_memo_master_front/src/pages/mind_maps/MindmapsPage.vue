@@ -75,4 +75,4 @@
 </template>
 
 <style scoped src="./mindMaps.css"></style>
-<script setup src="./mindMaps.js"></script>
+<script src="./mindMaps.js"></script>
