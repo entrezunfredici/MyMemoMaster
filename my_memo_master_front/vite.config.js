@@ -6,26 +6,35 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const lifecycleEvent = process.env.npm_lifecycle_event || ''
+  const isStorybookRun =
+    process.env.STORYBOOK === 'true' ||
+    lifecycleEvent === 'storybook' ||
+    lifecycleEvent === 'build-storybook'
 
   return {
     base: process.env.BASE || '/',
     plugins: [
       vue(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        manifest: {
-          name: env.VITE_APP_NAME,
-          short_name: env.VITE_APP_SHORT_NAME,
-          description: env.VITE_APP_DESCRIPTION,
-          theme_color: env.VITE_APP_THEME_COLOR,
-          background_color: env.VITE_APP_BG_COLOR,
-          icons: [
-            { src: 'android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
-            { src: 'android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
-            { src: 'android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-          ],
-        },
-      }),
+      ...(!isStorybookRun
+        ? [
+            VitePWA({
+              registerType: 'autoUpdate',
+              manifest: {
+                name: env.VITE_APP_NAME,
+                short_name: env.VITE_APP_SHORT_NAME,
+                description: env.VITE_APP_DESCRIPTION,
+                theme_color: env.VITE_APP_THEME_COLOR,
+                background_color: env.VITE_APP_BG_COLOR,
+                icons: [
+                  { src: 'android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+                  { src: 'android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
+                  { src: 'android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+                ],
+              },
+            }),
+          ]
+        : []),
     ],
     resolve: {
       alias: {

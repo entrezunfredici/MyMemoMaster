@@ -1,0 +1,196 @@
+import { Canvas, Meta } from '@storybook/addon-docs/blocks'
+
+import * as Stories from './ProjectViews.stories'
+import { orphanViews, routedViews } from './projectViews.data'
+
+<Meta of={Stories} />
+
+# Vues du projet
+
+Cette page reference les vues declarees dans `src/router/routes.js` et les ecrans presents dans `src/pages`.
+Les apercus Storybook refletent le comportement actuel du routeur, des guards et du layout.
+
+<div className="views-kpis">
+  <div className="views-kpi">
+    <strong>{routedViews.length}</strong>
+    <span>vues routees</span>
+  </div>
+  <div className="views-kpi">
+    <strong>{routedViews.filter((view) => view.access === 'Privee').length}</strong>
+    <span>vues privees</span>
+  </div>
+  <div className="views-kpi">
+    <strong>{routedViews.filter((view) => Boolean(view.story)).length}</strong>
+    <span>apercus Storybook</span>
+  </div>
+  <div className="views-kpi">
+    <strong>{orphanViews.length}</strong>
+    <span>ecrans hors routage</span>
+  </div>
+</div>
+
+## Lecture rapide
+
+- `Apercu interactif` signifie qu'une story charge la vue dans son contexte applicatif.
+- `Documentation seule` signifie que la vue est referencee, mais pas previsualisee pour eviter un rendu trompeur sans backend ou mocks assez solides.
+- Les routes privees sont documentees avec un contexte d'authentification simule dans Storybook.
+
+## Catalogue des routes
+
+<table className="views-table">
+  <thead>
+    <tr>
+      <th>Vue</th>
+      <th>Route</th>
+      <th>Acces</th>
+      <th>Source</th>
+      <th>Couverture Storybook</th>
+      <th>Resume</th>
+      <th>Dependances</th>
+    </tr>
+  </thead>
+  <tbody>
+    {routedViews.map((view) => (
+      <tr key={view.name}>
+        <td>
+          <strong>{view.title}</strong>
+          <div className="views-subline">
+            <code>{view.name}</code>
+          </div>
+          {view.note ? <div className="views-note">{view.note}</div> : null}
+        </td>
+        <td>
+          <code>{view.path}</code>
+        </td>
+        <td>{view.access}</td>
+        <td>
+          <code>{view.source}</code>
+        </td>
+        <td>{view.storybookStatus}</td>
+        <td>{view.summary}</td>
+        <td>{view.dependencies}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+## Ecrans presents mais non routes
+
+<table className="views-table">
+  <thead>
+    <tr>
+      <th>Vue</th>
+      <th>Statut</th>
+      <th>Source</th>
+      <th>Resume</th>
+    </tr>
+  </thead>
+  <tbody>
+    {orphanViews.map((view) => (
+      <tr key={view.title}>
+        <td>{view.title}</td>
+        <td>{view.status}</td>
+        <td>
+          <code>{view.source}</code>
+        </td>
+        <td>{view.summary}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+## Apercus cles
+
+### Accueil
+
+<Canvas of={Stories.Home} />
+
+### Connexion
+
+<Canvas of={Stories.Login} />
+
+### Exercises
+
+<Canvas of={Stories.Exercises} />
+
+### Flashcards
+
+<Canvas of={Stories.Flashcards} />
+
+### Profile
+
+<Canvas of={Stories.Profile} />
+
+### Settings
+
+<Canvas of={Stories.Settings} />
+
+### Erreur 404
+
+<Canvas of={Stories.Error404} />
+
+<style>
+  {`
+    .views-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin: 24px 0 32px;
+    }
+
+    .views-kpi {
+      border: 1px solid #d5daed;
+      border-radius: 12px;
+      background: #f8faff;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .views-kpi strong {
+      font-size: 28px;
+      line-height: 1;
+      color: #1e3ba1;
+    }
+
+    .views-kpi span {
+      font-size: 14px;
+      color: #38508f;
+    }
+
+    .views-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 32px;
+      font-size: 14px;
+    }
+
+    .views-table th,
+    .views-table td {
+      text-align: left;
+      vertical-align: top;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .views-table th {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+
+    .views-subline {
+      margin-top: 6px;
+      color: #64748b;
+    }
+
+    .views-note {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #eef3ff;
+      color: #1e3ba1;
+      font-size: 12px;
+    }
+  `}
+</style>
