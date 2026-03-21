@@ -5,7 +5,7 @@ const routes = [
     component: () => import('../pages/home_page/HomePage.vue'),
     meta: {
       title: 'Accueil',
-      private: false,
+      private: true,
     },
   },
   {
@@ -32,7 +32,7 @@ const routes = [
     component: () => import('../pages/TutorialsPage.vue'),
     meta: {
       title: 'Tutoriels',
-      private: false,
+      private: true,
     },
   },
   {
