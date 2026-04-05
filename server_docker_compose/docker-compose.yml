@@ -43,9 +43,9 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - ENVIRONMENT=prod
+      - ENVIRONMENT=${ENVIRONMENT}
       - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
+      - PG_PORT=${INTERNAL_PG_PORT:-5432}
       - PG_USER=${PG_USER}
       - PG_PASS=${PG_PASS}
       - PG_DB=${PG_DB}
@@ -84,10 +84,10 @@ services:
       - api-data:/app/data
     environment:
       - NODE_ENV=production
-      - ENVIRONMENT=prod
+      - ENVIRONMENT=${ENVIRONMENT}
       - API_PORT=${API_PORT}
       - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
+      - PG_PORT=${INTERNAL_PG_PORT:-5432}
       - PG_USER=${PG_USER}
       - PG_PASS=${PG_PASS}
       - PG_DB=${PG_DB}

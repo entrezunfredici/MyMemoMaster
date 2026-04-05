@@ -173,3 +173,16 @@ un adjectif:
 - [REF] pour les refactorisations
 - [FIX] pour les corrections de bugs
   suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
+
+## Preprod VPS
+
+La stack serveur pour une preprod/VPS est dans `server_docker_compose/`.
+
+- Fichier d'environnement d'exemple: `server_docker_compose/.env.example`
+- Procedure de lancement: `server_docker_compose/README.md`
+
+Points importants:
+
+- lancer d'abord le proxy Traefik dans `server_docker_compose/server_proxy`
+- utiliser `ENVIRONMENT=preprod` pour eviter les collisions avec une prod active
+- la connexion Postgres entre conteneurs doit utiliser le port interne `5432`

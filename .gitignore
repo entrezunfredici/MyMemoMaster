@@ -1,4 +1,5 @@
 .env
+server_docker_compose/.env
 .idea
 *.sqlite
 
