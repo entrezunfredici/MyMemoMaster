@@ -31,6 +31,10 @@ import SubjectFilterComponent from '@/components/SubjectFilterComponent.vue'
 import Grid from '@/components/GridComponent.vue'
 import Tutorial from '@/components/TutorialItem.vue'
 import { InformationCircleIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
+<<<<<<< HEAD
+=======
+
+>>>>>>> home_page
 
 const route = useRoute()
 const testStore = useTestStore()
