@@ -102,6 +102,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Prepare server docker-compose env for validation
+        run: cp server_docker_compose/.env.example server_docker_compose/.env
+
       - name: Validate server docker-compose
         run: docker compose -f server_docker_compose/docker-compose.yml --env-file server_docker_compose/.env config -q
 
