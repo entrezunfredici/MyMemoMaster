@@ -1,15 +1,18 @@
-name: Preprod DevOps Test
+name: Preprod Branch Deploy
 
 on:
   push:
     branches:
-      - devops_test
+      - 'dev*'
+      - 'dev*/**'
+      - '!dev'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: preprod-devops-test
+  group: preprod-branch-deploy
   cancel-in-progress: true
 
 jobs:
