@@ -123,7 +123,11 @@ jobs:
             set -e
             mkdir -p /var/www/html/my_memo_master_preprod
             cd /var/www/html/my_memo_master_preprod
-            docker compose down || true
+            if [ -f .env ]; then
+              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env down || true
+            else
+              echo "No .env found in $(pwd); skipping docker compose down."
+            fi
           EOF
 
       - name: Upload docker-compose in PREPROD
@@ -132,16 +136,41 @@ jobs:
             server_docker_compose/docker-compose.yml \
             ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_preprod/docker-compose.yml
 
+      - name: Validate PREPROD server env
+        run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            cd /var/www/html/my_memo_master_preprod
+
+            if [ ! -f .env ]; then
+              echo "Missing /var/www/html/my_memo_master_preprod/.env on the VPS."
+              exit 1
+            fi
+
+            if ! grep -q '^ENVIRONMENT=preprod$' .env; then
+              echo "Expected ENVIRONMENT=preprod in /var/www/html/my_memo_master_preprod/.env."
+              echo "Current value:"
+              grep '^ENVIRONMENT=' .env || true
+              exit 1
+            fi
+
+            env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env config -q
+          EOF
+
       - name: Deploy to VPS in PREPROD
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             cd /var/www/html/my_memo_master_preprod
-            docker compose pull
-            docker compose up -d postgres
-            docker compose run --rm db-sync
-            docker compose up -d pgadmin api front
-            docker compose ps
+            compose() {
+              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env "$@"
+            }
+
+            compose pull
+            compose up -d postgres
+            compose run --rm db-sync
+            compose up -d pgadmin api front
+            compose ps
 
             attempt=1
             max_attempts=24
@@ -153,7 +182,7 @@ jobs:
               echo "Verification attempt $attempt/$max_attempts"
 
               for service in $services; do
-                container_id=$(docker compose ps -q "$service")
+                container_id=$(compose ps -q "$service")
 
                 if [ -z "$container_id" ]; then
                   echo "Service $service has no container yet"
@@ -183,8 +212,8 @@ jobs:
 
             if [ "$all_ready" -ne 1 ]; then
               echo "Deployment verification failed."
-              docker compose ps
-              docker compose logs --tail=100
+              compose ps
+              compose logs --tail=100
               exit 1
             fi
           EOF
