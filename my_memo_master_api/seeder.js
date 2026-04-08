@@ -3,19 +3,19 @@ const bcrypt = require("bcryptjs");
 
 // ? Script to seed the database with sample data for test purposes
 
-const listTables = async () => {
-  // * Function to list all tables in the database
-  try {
-    const tables = await db.instance.query(
-      "SELECT tablename FROM catalog.tables WHERE schemaname != 'catalog' AND schemaname != 'information_schema';"
-    );
-    console.log(tables[0].map((table) => table.tablename));
-  } catch (error) {
-    console.error("Error listing tables");
-    console.error(error?.message || error);
-    throw error;
-  }
-};
+// const listTables = async () => {
+//   // * Function to list all tables in the database
+//   try {
+//     const tables = await db.instance.query(
+//       "SELECT tablename FROM catalog.tables WHERE schemaname != 'catalog' AND schemaname != 'information_schema';"
+//     );
+//     console.log(tables[0].map((table) => table.tablename));
+//   } catch (error) {
+//     console.error("Error listing tables");
+//     console.error(error?.message || error);
+//     throw error;
+//   }
+// };
 
 const seedDatabase = async () => {
   try {

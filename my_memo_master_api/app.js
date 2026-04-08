@@ -25,6 +25,7 @@ const fieldsTypeRoutes = require("./routes/FieldsType.routes.js");
 const diagrammeRoutes = require("./routes/Diagramme.routes");
 const questionRoutes = require("./routes/Question.routes");
 const tutorialRoutes = require("./routes/Tutorials.routes");
+const gradingRoutes = require("./routes/Grading.routes");
 const { startFifoCron } = require('./jobs/fifo.cron');
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
@@ -72,6 +73,7 @@ fieldsTypeRoutes(app);
 diagrammeRoutes(app);
 questionRoutes(app);
 tutorialRoutes(app);
+gradingRoutes(app);
 
 // ... Autres middlewares
 startFifoCron();

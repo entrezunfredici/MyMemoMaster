@@ -297,6 +297,8 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       this.isDirty = true;
       this.map.updatedAt = new Date().toISOString();
     },
+    markSaved() {
+      this.isDirty = false;
+    },
   },
 });
-

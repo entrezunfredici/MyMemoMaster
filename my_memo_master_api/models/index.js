@@ -22,6 +22,7 @@ models.Diagramme = require("./diagramme.model")(instance);
 models.Test = require("./Test.model")(instance);
 models.Question = require("./Question.model")(instance);
 models.Tutorials = require("./Tutorials.model")(instance);
+models.UserOnboardingState = require("./OnboardingState.model")(instance);
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {
@@ -43,6 +44,18 @@ const getPhysicalTableName = (model) => {
   return String(tableName);
 };
 
+const normalizeTableName = (table) => {
+  if (typeof table === "string") {
+    return table;
+  }
+
+  if (table && typeof table.tableName === "string") {
+    return table.tableName;
+  }
+
+  return String(table);
+};
+
 const cleanupSQLiteBackupTables = async () => {
   if (instance.getDialect() !== "sqlite") {
     return;
@@ -50,19 +63,7 @@ const cleanupSQLiteBackupTables = async () => {
 
   const queryInterface = instance.getQueryInterface();
   const existingTables = await queryInterface.showAllTables();
-  const normalizedTables = new Set(
-    existingTables.map((table) => {
-      if (typeof table === "string") {
-        return table;
-      }
-
-      if (table && typeof table.tableName === "string") {
-        return table.tableName;
-      }
-
-      return String(table);
-    })
-  );
+  const normalizedTables = new Set(existingTables.map(normalizeTableName));
 
   for (const model of Object.values(models)) {
     const backupTableName = `${getPhysicalTableName(model)}_backup`;
@@ -71,6 +72,12 @@ const cleanupSQLiteBackupTables = async () => {
       await queryInterface.dropTable(backupTableName);
     }
   }
+};
+
+const isDatabaseEmpty = async () => {
+  const queryInterface = instance.getQueryInterface();
+  const tables = await queryInterface.showAllTables();
+  return tables.length === 0;
 };
 
 const syncModels = async (options = {}) => {
@@ -92,5 +99,6 @@ const syncModels = async (options = {}) => {
 module.exports = {
   instance,
   syncModels,
+  isDatabaseEmpty,
   ...models,
 };

@@ -18,6 +18,15 @@ const routes = [
     },
   },
   {
+    path: '/onboarding',
+    name: 'onboarding',
+    component: () => import('../pages/OnboardingPage.vue'),
+    meta: {
+      title: 'Onboarding',
+      private: true,
+    },
+  },
+  {
     path: '/tutorials',
     name: 'tutorials',
     component: () => import('../pages/TutorialsPage.vue'),
@@ -41,6 +50,15 @@ const routes = [
     component: () => import('../pages/FlashcardsPage.vue'),
     meta: {
       title: 'Flashcards',
+      private: true,
+    },
+  },
+  {
+    path: '/flashcardssession',
+    name: 'flashcardssession',
+    component: () => import('../pages/FlashcardsSessionPage.vue'),
+    meta: {
+      title: 'Session de Flashcards',
       private: true,
     },
   },
@@ -85,7 +103,7 @@ const routes = [
     name: 'classroom',
     component: () => import('../pages/ClassroomPage.vue'),
     meta: {
-      title: 'Class Gropup',
+      title: 'Class Group',
       private: true,
     },
   },

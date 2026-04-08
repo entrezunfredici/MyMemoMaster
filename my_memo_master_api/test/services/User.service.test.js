@@ -10,9 +10,14 @@ jest.mock('../../models/index', () => ({
   Role: {
     findByPk: jest.fn(),
   },
+  UserOnboardingState: {
+    create: jest.fn(),
+    findOne: jest.fn(),
+    update: jest.fn(),
+  },
 }));
 
-const { User, Role } = require('../../models/index');
+const { User, Role, UserOnboardingState } = require('../../models/index');
 const UserService = require('../../services/User.service');
 
 describe('UserService', () => {
@@ -88,6 +93,12 @@ describe('UserService', () => {
         userId: 1, email: 'test@example.com', name: 'Test User'
       });
 
+      UserOnboardingState.create.mockResolvedValue({
+        userId: 1,
+        tourSeen: false,
+        checklist: {}
+      });
+
       const user = await UserService.create({
         email: 'test@example.com',
         name: 'Test User',
@@ -96,7 +107,25 @@ describe('UserService', () => {
 
       expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
       expect(User.create).toHaveBeenCalled();
+      expect(UserOnboardingState.create).toHaveBeenCalledWith({
+        userId: 1,
+        tourSeen: false,
+        checklist: {
+          todo_created: false,
+          profile_completed: false,
+          first_action: false
+        }
+      });
       expect(user).toEqual({ userId: 1, email: 'test@example.com', name: 'Test User' });
+      expect(UserOnboardingState.create).toHaveBeenCalledWith({
+        userId: 1,
+        tourSeen: false,
+        checklist: {
+          todo_created: false,
+          profile_completed: false,
+          first_action: false
+        }
+      });
     });
 
     it('should throw an error if email is already used', async () => {

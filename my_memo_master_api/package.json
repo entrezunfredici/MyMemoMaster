@@ -9,7 +9,11 @@
     "start": "node server.js",
     "build": "next build",
     "seed": "node seeder.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
   },
   "author": "",
   "license": "ISC",
@@ -19,6 +23,7 @@
     "better-sqlite3": "^11.7.0",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
+    "dayjs": "^1.11.10",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "express-openapi-validator": "^5.3.9",
