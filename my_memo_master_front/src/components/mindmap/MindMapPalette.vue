@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="mindmap-palette">
     <header class="mindmap-palette__header">
       <h3>Outils</h3>
@@ -73,7 +73,7 @@
           />
           <div class="mindmap-palette__image-actions">
             <button type="button" @click="triggerImageSelection" :disabled="isUploadingImage">
-              {{ isUploadingImage ? 'Envoi en cours…' : 'Choisir une image' }}
+              {{ isUploadingImage ? 'Envoi en coursâ€¦' : 'Choisir une image' }}
             </button>
             <button
               v-if="selectedNode && selectedNode.content"
@@ -90,13 +90,13 @@
             <img :src="selectedNode.content" :alt="selectedNode.label" />
             <span class="mindmap-palette__preview-url">{{ selectedNode.content }}</span>
           </div>
-          <p class="mindmap-palette__hint">Formats acceptés: JPG, PNG, GIF, WEBP ou SVG (max. 5 Mo).</p>
+          <p class="mindmap-palette__hint">Formats acceptÃ©s: JPG, PNG, GIF, WEBP ou SVG (max. 5 Mo).</p>
         </template>
         <template v-else-if="isFormulaNodeSelected">
           <textarea
             v-model="editableContent"
             rows="5"
-            placeholder="Utilise la syntaxe de l'interpréteur (ex: frac(a,b))"
+            placeholder="Utilise la syntaxe de l'interprÃ©teur (ex: frac(a,b))"
             @change="updateContent"
           ></textarea>
           <div
@@ -105,7 +105,7 @@
             v-html="formulaPreviewHtml"
           ></div>
           <div class="mindmap-palette__formula-actions">
-            <button type="button" @click="openInterpreter">Ouvrir l'interpréteur</button>
+            <button type="button" @click="openInterpreter">Ouvrir l'interprÃ©teur</button>
             <button
               v-if="editableContent"
               type="button"
@@ -116,7 +116,7 @@
             </button>
           </div>
           <p class="mindmap-palette__hint">
-            Ouvre l'interpréteur pour Insérer des symboles (ex:
+            Ouvre l'interprÃ©teur pour InsÃ©rer des symboles (ex:
             <code>frac(a,b)</code>, <code>sqrt(x)</code>,
             <code><text bold color:red>Important</text></code>).
           </p>
@@ -130,14 +130,14 @@
         </template>
       </div>
       <div class="mindmap-palette__field">
-        <label>Niveau de maîtrise</label>
+        <label>Niveau de maÃ®trise</label>
         <select :value="selectedNode.mastery" @change="updateMastery($event.target.value)">
           <option v-for="level in masteryLevels" :key="level.id" :value="level.id">{{ level.label }}</option>
         </select>
       </div>
       <div class="mindmap-palette__colors">
         <label>Couleur principale</label>
-        <input type="color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
+        <input type="color" :value="selectedNode.style?.primaryColor || MINDMAP_THEME.primary" @input="updateColor($event.target.value)" />
       </div>
       <div class="mindmap-palette__actions">
         <button @click="toggleCollapse">{{ selectedNode.collapsed ? 'Reafficher' : 'Masquer' }}</button>
@@ -183,7 +183,7 @@
       <div class="mindmap-interpreter-modal__backdrop" @click="closeInterpreter"></div>
       <div class="mindmap-interpreter-modal__dialog">
         <div class="mindmap-interpreter-modal__header">
-          <h3>interpréteur de formules</h3>
+          <h3>interprÃ©teur de formules</h3>
           <button type="button" class="mindmap-interpreter-modal__close" @click="closeInterpreter">
             &times;
           </button>
@@ -191,7 +191,7 @@
         <Interpreter
           v-model="interpreterValue"
           :show-apply="true"
-          apply-label="Insérer dans l'item"
+          apply-label="InsÃ©rer dans l'item"
           @apply="applyInterpreter"
         />
       </div>
@@ -205,6 +205,7 @@ import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { masteryList } from '@/helpers/mindmap';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
+import { MINDMAP_THEME } from '@/constants/theme';
 import Interpreter from '@/components/interpreter/Interpreter.vue';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
 import {
@@ -243,7 +244,7 @@ const creationHint = computed(() => {
 const editableLabel = ref('');
 const editableContent = ref('');
 const zoneName = ref('Zone');
-const zoneColor = ref('#BFDBFE');
+const zoneColor = ref(MINDMAP_THEME.zoneFill);
 const imageInputRef = ref(null);
 const isUploadingImage = ref(false);
 const imageUploadError = ref('');
@@ -252,7 +253,7 @@ const isFormulaNodeSelected = computed(() => selectedNode.value?.type === 'formu
 const isTextNodeSelected = computed(() => selectedNode.value?.type === 'text');
 const showInterpreter = ref(false);
 const interpreterValue = ref('');
-const textColor = ref('#eef2ff');
+const textColor = ref(MINDMAP_THEME.text);
 const fontSize = ref(14);
 const isBold = ref(false);
 const isItalic = ref(false);
@@ -285,7 +286,7 @@ watch(
     if (imageInputRef.value) {
       imageInputRef.value.value = '';
     }
-    textColor.value = node?.style?.textColor || '#eef2ff';
+    textColor.value = node?.style?.textColor || MINDMAP_THEME.text;
     fontSize.value = Number.parseInt(node?.style?.fontSize, 10) || 14;
     isBold.value = (node?.style?.fontWeight || 'normal') !== 'normal';
     isItalic.value = (node?.style?.fontStyle || 'normal') !== 'normal';
@@ -390,7 +391,7 @@ const handleImageSelection = async (event) => {
   imageUploadError.value = '';
 
   if (file.size > 5 * 1024 * 1024) {
-    imageUploadError.value = "L'image dépasse la taille maximale de 5 Mo.";
+    imageUploadError.value = "L'image dÃ©passe la taille maximale de 5 Mo.";
     if (event.target) {
       event.target.value = '';
     }
@@ -421,7 +422,7 @@ const handleImageSelection = async (event) => {
   } catch (error) {
     console.error("Erreur lors de l'upload de l'image de carte mentale :", error);
     imageUploadError.value =
-      "L'image n'a pas pu être téléchargée. Vérifie le format et réessaie.";
+      "L'image n'a pas pu Ãªtre tÃ©lÃ©chargÃ©e. VÃ©rifie le format et rÃ©essaie.";
   } finally {
     isUploadingImage.value = false;
     if (event?.target) {
@@ -490,7 +491,7 @@ const removeNode = () => {
 const createZone = () => {
   const id = store.addZone({ name: zoneName.value.trim() || 'Zone', color: zoneColor.value });
   zoneName.value = 'Zone';
-  zoneColor.value = '#BFDBFE';
+  zoneColor.value = MINDMAP_THEME.zoneFill;
   return id;
 };
 
@@ -505,11 +506,11 @@ const assignZone = (zoneId) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: #ffffff;
+  background: rgb(var(--white-rgb));
   padding: 16px;
   border-radius: 16px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgb(var(--surface-neutral-rgb));
+  box-shadow: 0 10px 30px rgb(var(--text-strong-rgb) / 0.08);
   height: 100%;
 }
 
@@ -518,15 +519,15 @@ const assignZone = (zoneId) => {
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
-  color: #0f172a;
+  color: rgb(var(--text-strong-rgb));
 }
 
 .mindmap-palette__tool {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 9999px;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: rgb(var(--surface-info-strong-rgb));
+  color: rgb(var(--info-hover-rgb));
 }
 
 .mindmap-palette__section {
@@ -547,22 +548,22 @@ const assignZone = (zoneId) => {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: #f3f4f6;
+  background: rgb(var(--surface-subtle-rgb));
   border: none;
   cursor: pointer;
   font-weight: 600;
-  color: #1f2937;
+  color: rgb(var(--text-base-rgb));
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .mindmap-palette__button:hover {
-  background: #e0f2fe;
+  background: rgb(var(--surface-info-rgb));
   transform: translateY(-1px);
 }
 
 .mindmap-palette__button--active {
-  background: #1d4ed8;
-  color: #ffffff;
+  background: rgb(var(--info-hover-rgb));
+  color: rgb(var(--white-rgb));
 }
 
 .mindmap-palette__icon {
@@ -580,7 +581,7 @@ const assignZone = (zoneId) => {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #475569;
+  color: rgb(var(--text-muted-rgb));
 }
 
 .mindmap-palette__field input,
@@ -588,10 +589,10 @@ const assignZone = (zoneId) => {
 .mindmap-palette__field select {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid #cbd5f5;
+  border: 1px solid rgb(var(--border-strong-rgb));
   font-size: 14px;
-  color: #0f172a;
-  background: #f8fafc;
+  color: rgb(var(--text-strong-rgb));
+  background: rgb(var(--surface-soft-rgb));
 }
 
 .mindmap-palette__file-input {
@@ -612,22 +613,22 @@ const assignZone = (zoneId) => {
   border: none;
   cursor: pointer;
   font-weight: 600;
-  background: #38bdf8;
-  color: #0f172a;
+  background: rgb(var(--accent-rgb));
+  color: rgb(var(--text-strong-rgb));
   transition: background 0.2s ease;
 }
 
 .mindmap-palette__image-actions button:hover {
-  background: #0ea5e9;
+  background: rgb(var(--accent-hover-rgb));
 }
 
 .mindmap-palette__image-actions button.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: rgb(var(--border-soft-rgb));
+  color: rgb(var(--text-strong-rgb));
 }
 
 .mindmap-palette__image-actions button.secondary:hover {
-  background: #cbd5f5;
+  background: rgb(var(--border-strong-rgb));
 }
 
 .mindmap-palette__image-actions button:disabled {
@@ -637,7 +638,7 @@ const assignZone = (zoneId) => {
 
 .mindmap-palette__error {
   margin: 6px 0 0;
-  color: #b91c1c;
+  color: rgb(var(--danger-rgb));
   font-size: 12px;
 }
 
@@ -651,21 +652,21 @@ const assignZone = (zoneId) => {
 .mindmap-palette__preview img {
   max-width: 100%;
   border-radius: 8px;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 6px 14px rgb(var(--text-strong-rgb) / 0.25);
 }
 
 .mindmap-palette__preview-url {
   font-size: 12px;
   word-break: break-all;
-  color: #1f2937;
+  color: rgb(var(--text-base-rgb));
 }
 
 .mindmap-palette__formula-preview {
   margin-top: 10px;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
+  border: 1px solid rgb(var(--border-strong-rgb));
+  background: rgb(var(--white-rgb));
   max-height: 180px;
   overflow-y: auto;
 }
@@ -683,23 +684,23 @@ const assignZone = (zoneId) => {
   border: none;
   font-weight: 600;
   cursor: pointer;
-  background: #2563eb;
-  color: #ffffff;
+  background: rgb(var(--info-rgb));
+  color: rgb(var(--white-rgb));
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .mindmap-palette__formula-actions button:hover {
-  background: #1d4ed8;
+  background: rgb(var(--info-hover-rgb));
   transform: translateY(-1px);
 }
 
 .mindmap-palette__formula-actions button.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: rgb(var(--border-soft-rgb));
+  color: rgb(var(--text-strong-rgb));
 }
 
 .mindmap-palette__formula-actions button.secondary:hover {
-  background: #cbd5f5;
+  background: rgb(var(--border-strong-rgb));
 }
 
 .mindmap-palette__text-style {
@@ -709,8 +710,8 @@ const assignZone = (zoneId) => {
   margin-top: 12px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border: 1px solid rgb(var(--border-soft-rgb));
+  background: rgb(var(--surface-soft-rgb));
 }
 
 .mindmap-palette__text-toolbar {
@@ -722,8 +723,8 @@ const assignZone = (zoneId) => {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
+  border: 1px solid rgb(var(--border-strong-rgb));
+  background: rgb(var(--white-rgb));
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -732,14 +733,14 @@ const assignZone = (zoneId) => {
 }
 
 .mindmap-palette__text-toolbar button:hover {
-  background: #dbeafe;
+  background: rgb(var(--surface-info-strong-rgb));
   transform: translateY(-1px);
 }
 
 .mindmap-palette__text-toolbar button.active {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #1d4ed8;
+  background: rgb(var(--info-rgb));
+  color: rgb(var(--white-rgb));
+  border-color: rgb(var(--info-hover-rgb));
 }
 
 .mindmap-palette__text-icon {
@@ -779,7 +780,7 @@ const assignZone = (zoneId) => {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #475569;
+  color: rgb(var(--text-muted-rgb));
 }
 
 .mindmap-palette__actions {
@@ -794,29 +795,29 @@ const assignZone = (zoneId) => {
   border: none;
   cursor: pointer;
   font-weight: 600;
-  background: #38bdf8;
-  color: #0f172a;
+  background: rgb(var(--accent-rgb));
+  color: rgb(var(--text-strong-rgb));
   transition: background 0.2s ease;
 }
 
 .mindmap-palette__actions button:hover {
-  background: #0ea5e9;
+  background: rgb(var(--accent-hover-rgb));
 }
 
 .mindmap-palette__actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: #94a3b8;
-  color: #f1f5f9;
+  background: rgb(var(--disabled-rgb));
+  color: rgb(var(--surface-muted-rgb));
 }
 
 .mindmap-palette__actions .danger {
-  background: #f87171;
-  color: #fff;
+  background: rgb(var(--danger-rgb));
+  color: rgb(var(--white-rgb));
 }
 
 .mindmap-palette__actions .danger:hover {
-  background: #ef4444;
+  background: rgb(var(--danger-hover-rgb));
 }
 
 .mindmap-palette__zones {
@@ -835,26 +836,26 @@ const assignZone = (zoneId) => {
   padding: 6px 12px;
   border-radius: 9999px;
   border: none;
-  background: #e2e8f0;
-  color: #1f2937;
+  background: rgb(var(--border-soft-rgb));
+  color: rgb(var(--text-base-rgb));
   cursor: pointer;
   font-weight: 600;
 }
 
 .mindmap-palette__zone-chip.active {
-  background: #2563eb;
-  color: #ffffff;
+  background: rgb(var(--info-rgb));
+  color: rgb(var(--white-rgb));
 }
 
 .mindmap-palette__hint {
   font-size: 12px;
-  color: #64748b;
+  color: rgb(var(--text-soft-rgb));
   margin-top: 4px;
   line-height: 1.4;
 
 .mindmap-palette__hint code {
-  background: #e2e8f0;
-  color: #1f2937;
+  background: rgb(var(--border-soft-rgb));
+  color: rgb(var(--text-base-rgb));
   padding: 2px 6px;
   border-radius: 6px;
   font-family: 'Fira Code', monospace;
@@ -874,7 +875,7 @@ const assignZone = (zoneId) => {
 .mindmap-interpreter-modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgb(var(--text-strong-rgb) / 0.45);
   backdrop-filter: blur(2px);
 }
 
@@ -883,10 +884,10 @@ const assignZone = (zoneId) => {
   width: min(960px, 100%);
   max-height: 80vh;
   overflow-y: auto;
-  background: #ffffff;
+  background: rgb(var(--white-rgb));
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 24px 60px rgb(var(--text-strong-rgb) / 0.35);
   z-index: 1;
 }
 
@@ -895,7 +896,7 @@ const assignZone = (zoneId) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  color: #0f172a;
+  color: rgb(var(--text-strong-rgb));
 }
 
 .mindmap-interpreter-modal__close {
@@ -904,13 +905,14 @@ const assignZone = (zoneId) => {
   font-size: 24px;
   cursor: pointer;
   line-height: 1;
-  color: #0f172a;
+  color: rgb(var(--text-strong-rgb));
   transition: transform 0.2s ease, color 0.2s ease;
 }
 
 .mindmap-interpreter-modal__close:hover {
-  color: #2563eb;
+  color: rgb(var(--info-rgb));
   transform: scale(1.1);
 }
 </style>
+
 

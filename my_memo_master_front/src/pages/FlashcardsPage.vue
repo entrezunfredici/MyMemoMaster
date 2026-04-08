@@ -18,12 +18,12 @@
             {{ session.name }}
           </h3>
 
-          <p class="text-sm text-gray-light">
+          <p class="text-sm text-light-primary">
             {{ session.cards }} cartes
           </p>
         </div>
         <button
-          class="mt-6 w-full bg-primary text-white py-2 rounded-lg font-semibold hover:bg-primary/90 transition"
+          class="mt-6 w-full bg-primary text-white py-2 rounded-lg font-semibold hover:bg-primary-hover transition"
         >
           Ouvrir la session
         </button>

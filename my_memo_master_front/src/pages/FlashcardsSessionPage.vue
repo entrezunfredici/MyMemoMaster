@@ -9,7 +9,7 @@
             :key="group"
             class="bg-white rounded border border-gray p-1"
           >
-            <div class="text-[10px] uppercase text-gray-light font-bold">
+            <div class="text-[10px] uppercase text-light-primary font-bold">
               {{ groupLabels[group] }}
             </div>
             <div class="text-sm font-semibold text-primary">
@@ -35,14 +35,14 @@
 
         <div v-if="!isFinished" class="space-y-4">
           <div class="py-2">
-            <span class="text-sm font-medium text-gray-light uppercase">Question</span>
+            <span class="text-sm font-medium text-light-primary uppercase">Question</span>
             <div class="w-full p-3 bg-white border border-gray rounded-lg text-dark font-medium mt-1">
               {{ currentCard.question }}
             </div>
           </div>
 
           <div class="py-2">
-            <span class="text-sm font-medium text-gray-light uppercase">Ta Réponse</span>
+            <span class="text-sm font-medium text-light-primary uppercase">Ta Réponse</span>
             
             <textarea 
               v-if="currentCard.type === 'text'"
@@ -61,8 +61,8 @@
                 :class="[
                   'w-full p-3 text-left rounded-lg border-2 transition',
                   userAnswer === opt ? 'border-primary bg-primary/5' : 'border-gray bg-white',
-                  showFeedback && opt === currentCard.answer ? 'border-green-500 bg-green-50' : '',
-                  showFeedback && userAnswer === opt && opt !== currentCard.answer ? 'border-red-500 bg-red-50' : ''
+                  showFeedback && opt === currentCard.answer ? 'border-success bg-success/10' : '',
+                  showFeedback && userAnswer === opt && opt !== currentCard.answer ? 'border-danger bg-danger/10' : ''
                 ]"
               >
                 {{ opt }}
@@ -70,7 +70,7 @@
             </div>
           </div>
 
-          <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+          <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="isCorrect ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'">
             <p class="font-bold mb-1">{{ isCorrect ? '✅ Excellent !' : '❌ À revoir' }}</p>
             <p v-if="!isCorrect" class="text-sm italic">Réponse : {{ currentCard.answer }}</p>
             <Button class="mt-4 w-full" :callback="nextStep">Continuer</Button>
@@ -91,9 +91,9 @@
       <div v-if="!isFinished" class="border-t-2 border-primary mt-6 pt-4">
         <h4 class="text-primary text-lg font-semibold pb-2 italic">Dernières erreurs</h4>
         <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
-          <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-white border border-red-200 rounded-lg px-3 py-2 text-sm">
+          <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-white border border-danger/20 rounded-lg px-3 py-2 text-sm">
             <span>{{ err.question }}</span>
-            <XMarkIcon class="size-4 text-red-500" />
+            <XMarkIcon class="size-4 text-danger" />
           </div>
         </div>
       </div>

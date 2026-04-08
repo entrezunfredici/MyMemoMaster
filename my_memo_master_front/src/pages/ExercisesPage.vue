@@ -4,7 +4,7 @@
       <SubjectFilterComponent />
       <router-link to="/create-test">
         <div class="flex gap-5 mr-10">
-          <button class="flex items-center gap-2 bg-primary rounded-lg py-0 px-5 text-[#F5F5F5]">
+          <button class="flex items-center gap-2 bg-primary rounded-lg py-0 px-5 text-white hover:bg-primary-hover transition">
             <PenIcon class="size-16" />
             <img class="w-[16px] h-[16px]" :src="editIcon" alt="editIcon" />
             Create test

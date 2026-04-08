@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { api } from '@/helpers/api';
 import { useToast } from 'vue-toastification';
@@ -445,21 +445,21 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 16px;
   min-height: 100vh;
-  background: #f1f5f9;
+  background: rgb(var(--surface-muted-rgb));
   padding: 16px;
 }
 
 .mindmaps-page__header {
-  background: #ffffff;
+  background: rgb(var(--white-rgb));
   padding: 16px;
   border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 20px rgb(var(--text-strong-rgb) / 0.08);
 }
 
 .mindmaps-page__header h1 {
   font-size: 24px;
   font-weight: 700;
-  color: #1f2937;
+  color: rgb(var(--text-base-rgb));
 }
 
 .mindmaps-page__layout {
@@ -470,10 +470,10 @@ onBeforeUnmount(() => {
 }
 
 .mindmaps-page__sidebar {
-  background: #ffffff;
+  background: rgb(var(--white-rgb));
   border-radius: 20px;
   padding: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 24px rgb(var(--text-strong-rgb) / 0.08);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -495,21 +495,21 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
   border-radius: 12px;
   border: none;
-  background: #e5e7eb;
+  background: rgb(var(--surface-neutral-rgb));
   cursor: pointer;
   font-weight: 600;
 }
 
 .sidebar__modes button.active {
-  background: #2563eb;
-  color: #ffffff;
+  background: rgb(var(--info-rgb));
+  color: rgb(var(--white-rgb));
 }
 
 .sidebar__tools input,
 .sidebar__tools select {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid #cbd5f5;
+  border: 1px solid rgb(var(--border-strong-rgb));
   font-size: 14px;
 }
 
@@ -524,7 +524,7 @@ onBeforeUnmount(() => {
 }
 
 .sidebar__item {
-  background: #f8fafc;
+  background: rgb(var(--surface-soft-rgb));
   border-radius: 14px;
   padding: 12px;
   display: flex;
@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
 }
 
 .sidebar__item.active {
-  border-color: #2563eb;
+  border-color: rgb(var(--info-rgb));
   transform: translateY(-1px);
 }
 
@@ -549,11 +549,11 @@ onBeforeUnmount(() => {
 
 .sidebar__item-title {
   font-weight: 600;
-  color: #1f2937;
+  color: rgb(var(--text-base-rgb));
 }
 
 .sidebar__item-meta {
-  color: #64748b;
+  color: rgb(var(--text-soft-rgb));
   font-size: 12px;
 }
 
@@ -569,13 +569,13 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  background: #e0f2fe;
-  color: #0f172a;
+  background: rgb(var(--surface-info-rgb));
+  color: rgb(var(--text-strong-rgb));
 }
 
 .sidebar__item-actions .danger {
-  background: #fecaca;
-  color: #b91c1c;
+  background: rgb(var(--danger-soft-rgb));
+  color: rgb(var(--danger-rgb));
 }
 
 .mindmaps-page__content {
@@ -587,7 +587,7 @@ onBeforeUnmount(() => {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgb(var(--text-strong-rgb) / 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -595,7 +595,7 @@ onBeforeUnmount(() => {
 }
 
 .modal__dialog {
-  background: #ffffff;
+  background: rgb(var(--white-rgb));
   padding: 20px;
   border-radius: 16px;
   width: 320px;
@@ -607,7 +607,7 @@ onBeforeUnmount(() => {
 .modal__dialog input {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid #cbd5f5;
+  border: 1px solid rgb(var(--border-strong-rgb));
 }
 
 .modal__actions {
@@ -625,7 +625,8 @@ onBeforeUnmount(() => {
 }
 
 .modal__actions .primary {
-  background: #2563eb;
-  color: #ffffff;
+  background: rgb(var(--info-rgb));
+  color: rgb(var(--white-rgb));
 }
 </style>
+

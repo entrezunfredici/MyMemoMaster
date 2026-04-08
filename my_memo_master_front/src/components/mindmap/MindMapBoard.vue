@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     class="mindmap-board"
     ref="containerRef"
@@ -23,7 +23,7 @@
           markerHeight="8"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1E3A8A" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="rgb(var(--primary-rgb))" />
         </marker>
         <marker
           id="arrow-backward"
@@ -34,7 +34,7 @@
           markerHeight="8"
           orient="auto"
         >
-          <path d="M 10 0 L 0 5 L 10 10 z" fill="#1E3A8A" />
+          <path d="M 10 0 L 0 5 L 10 10 z" fill="rgb(var(--primary-rgb))" />
         </marker>
       </defs>
 
@@ -283,7 +283,7 @@ const onWheel = (event) => {
 .mindmap-board {
   width: 100%;
   height: 100%;
-  background: #f1f5f9;
+  background: rgb(var(--surface-muted-rgb));
   border-radius: 16px;
   overflow: hidden;
   position: relative;
@@ -299,3 +299,4 @@ const onWheel = (event) => {
   cursor: grabbing;
 }
 </style>
+

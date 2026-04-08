@@ -1,9 +1,6 @@
-﻿const masteryColors = {
-  undefined: '#C0C5D2',
-  low: '#E74C3C',
-  medium: '#F39C12',
-  high: '#27AE60',
-};
+﻿import { MASTERY_COLORS, MINDMAP_THEME } from '@/constants/theme';
+
+const masteryColors = MASTERY_COLORS;
 
 const defaultBranchTypes = [
   { id: 'appartenance', label: 'Appartenance' },
@@ -53,12 +50,12 @@ const createBlankMindMap = (title = 'Nouvelle carte mentale') => {
         mastery: 'undefined',
         zoneId: null,
         style: {
-          primaryColor: '#1E3A8A',
+          primaryColor: MINDMAP_THEME.primary,
           secondaryColor: masteryColors.undefined,
           shape: 'bubble',
           width: 220,
           height: 120,
-          textColor: '#eef2ff',
+          textColor: MINDMAP_THEME.text,
           fontSize: 14,
           fontWeight: 'normal',
           fontStyle: 'normal',
@@ -122,12 +119,12 @@ const normalizeMindMap = (raw) => {
       map.nodes[cloned.id] = ensureSecondaryColor({
         ...cloned,
         style: {
-          primaryColor: (cloned === null || cloned === void 0 ? void 0 : cloned.style)?.primaryColor || '#1E3A8A',
+          primaryColor: (cloned === null || cloned === void 0 ? void 0 : cloned.style)?.primaryColor || MINDMAP_THEME.primary,
           secondaryColor: cloned?.style?.secondaryColor,
           shape: cloned?.style?.shape || 'bubble',
           width: cloned?.style?.width || 220,
           height: cloned?.style?.height || 120,
-          textColor: cloned?.style?.textColor || '#eef2ff',
+          textColor: cloned?.style?.textColor || MINDMAP_THEME.text,
           fontSize: Number.parseInt(cloned?.style?.fontSize, 10) || 14,
           fontWeight: cloned?.style?.fontWeight || 'normal',
           fontStyle: cloned?.style?.fontStyle || 'normal',
@@ -171,12 +168,12 @@ const normalizeMindMap = (raw) => {
         mastery: 'undefined',
         zoneId: null,
         style: {
-          primaryColor: node.color || '#1E3A8A',
+          primaryColor: node.color || MINDMAP_THEME.primary,
           secondaryColor: masteryColors.undefined,
           shape: 'bubble',
           width: node.width || 220,
           height: node.height || 120,
-          textColor: node.textColor || '#eef2ff',
+          textColor: node.textColor || MINDMAP_THEME.text,
           fontSize: Number.parseInt(node.fontSize, 10) || 14,
           fontWeight: node.fontWeight || 'normal',
           fontStyle: node.fontStyle || 'normal',
@@ -205,8 +202,8 @@ const normalizeMindMap = (raw) => {
       type: link.type || 'appartenance',
       order: link.order ?? index,
       style: {
-        primaryColor: link.color || '#1E3A8A',
-        secondaryColor: link.secondaryColor || '#C0C5D2',
+        primaryColor: link.color || MINDMAP_THEME.primary,
+        secondaryColor: link.secondaryColor || MINDMAP_THEME.secondary,
         bezier: !!link.curve,
       },
       interactions: {
@@ -296,3 +293,4 @@ export {
   serializeMindMap,
   ensureSecondaryColor,
 };
+

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="mindmap-builder">
     <header class="mindmap-builder__header">
       <div class="mindmap-builder__title">
@@ -105,11 +105,11 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #ffffff;
+  background: rgb(var(--white-rgb));
   padding: 16px;
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgb(var(--border-soft-rgb));
+  box-shadow: 0 8px 24px rgb(var(--text-strong-rgb) / 0.08);
 }
 
 .mindmap-builder__title {
@@ -122,14 +122,14 @@ defineExpose({
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: rgb(var(--text-soft-rgb));
   font-weight: 600;
 }
 
 .mindmap-builder__title input {
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid #cbd5f5;
+  border: 1px solid rgb(var(--border-strong-rgb));
   min-width: 280px;
   font-size: 16px;
 }
@@ -154,9 +154,9 @@ defineExpose({
 }
 
 .mindmap-builder__actions .primary {
-  background: #2563eb;
-  color: #ffffff;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+  background: rgb(var(--info-rgb));
+  color: rgb(var(--white-rgb));
+  box-shadow: 0 10px 20px rgb(var(--info-rgb) / 0.25);
 }
 
 .mindmap-builder__actions .primary:hover:not(:disabled) {
@@ -164,8 +164,8 @@ defineExpose({
 }
 
 .mindmap-builder__actions .secondary {
-  background: #e0f2fe;
-  color: #0f172a;
+  background: rgb(var(--surface-info-rgb));
+  color: rgb(var(--text-strong-rgb));
 }
 
 .mindmap-builder__content {
@@ -177,10 +177,10 @@ defineExpose({
 }
 
 .mindmap-builder__board {
-  background: #ffffff;
+  background: rgb(var(--white-rgb));
   border-radius: 20px;
   padding: 16px;
-  box-shadow: inset 0 0 0 1px #e2e8f0;
+  box-shadow: inset 0 0 0 1px rgb(var(--border-soft-rgb));
 }
 
 .mindmap-builder__board :deep(.mindmap-board) {
@@ -191,5 +191,6 @@ defineExpose({
   height: 100%;
 }
 </style>
+
 
 

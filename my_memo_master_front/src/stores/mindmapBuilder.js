@@ -7,6 +7,7 @@ import {
   serializeMindMap,
   ensureSecondaryColor,
 } from '@/helpers/mindmap';
+import { MINDMAP_THEME } from '@/constants/theme';
 
 const defaultTool = 'select';
 
@@ -120,12 +121,12 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
         mastery: 'undefined',
         zoneId: null,
         style: {
-          primaryColor: parent?.style?.primaryColor || '#1E3A8A',
+          primaryColor: parent?.style?.primaryColor || MINDMAP_THEME.primary,
           secondaryColor: undefined,
           shape: 'bubble',
           width: 220,
           height: 120,
-          textColor: parent?.style?.textColor || '#eef2ff',
+          textColor: parent?.style?.textColor || MINDMAP_THEME.text,
           fontSize: Number.parseInt(parent?.style?.fontSize, 10) || 14,
           fontWeight: parent?.style?.fontWeight || 'normal',
           fontStyle: parent?.style?.fontStyle || 'normal',
@@ -161,7 +162,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       this.touch();
       return id;
     },
-    addZone({ name = 'Zone', color = '#BFDBFE', x = 200, y = 200, width = 360, height = 240 }) {
+    addZone({ name = 'Zone', color = MINDMAP_THEME.zoneFill, x = 200, y = 200, width = 360, height = 240 }) {
       const id = createId();
       this.map.zones = Array.isArray(this.map.zones) ? this.map.zones : [];
       this.map.zones.push({
@@ -216,8 +217,8 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
         direction,
         order: this.map.links.length,
         style: {
-          primaryColor: this.map.nodes[from]?.style?.primaryColor || '#1E3A8A',
-          secondaryColor: this.map.nodes[from]?.style?.secondaryColor || '#C0C5D2',
+          primaryColor: this.map.nodes[from]?.style?.primaryColor || MINDMAP_THEME.primary,
+          secondaryColor: this.map.nodes[from]?.style?.secondaryColor || MINDMAP_THEME.secondary,
           bezier: true,
         },
         interactions: {

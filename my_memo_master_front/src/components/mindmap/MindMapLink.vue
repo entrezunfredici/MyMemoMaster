@@ -1,8 +1,8 @@
-<template>
+﻿<template>
   <g class="mindmap-link" @pointerdown.stop="handlePointerDown">
     <path
       :d="pathD"
-      :stroke="link.style?.primaryColor || '#1E3A8A'"
+      :stroke="link.style?.primaryColor || 'rgb(var(--mindmap-primary-rgb))'"
       :stroke-width="selected ? 4 : 2.5"
       fill="none"
       marker-end="url(#arrow-forward)"
@@ -16,10 +16,10 @@
         width="96"
         height="24"
         rx="12"
-        :fill="link.style?.secondaryColor || '#9CA3AF'"
+        :fill="link.style?.secondaryColor || 'rgb(var(--mindmap-secondary-rgb))'"
         opacity="0.9"
       />
-      <text text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="600" fill="#111827">
+      <text text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="600" fill="rgb(var(--text-strong-rgb))">
         {{ linkLabel }}
       </text>
     </g>
@@ -101,3 +101,4 @@ const handlePointerDown = (event) => {
   pointer-events: none;
 }
 </style>
+

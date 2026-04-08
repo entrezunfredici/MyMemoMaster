@@ -7,7 +7,7 @@
     <p v-else>Chargement du role...</p>
     <button
       @click="logout"
-      class="mt-4 rounded bg-[#1E3BA1] px-4 py-2 text-white hover:bg-[#162c7a] focus:outline-none"
+      class="mt-4 rounded bg-primary px-4 py-2 text-white hover:bg-primary-hover focus:outline-none"
     >
       Se deconnecter
     </button>

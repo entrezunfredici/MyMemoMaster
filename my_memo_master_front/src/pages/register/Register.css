@@ -1,19 +1,18 @@
-.custom-border {
-    border: thick solid #1E3BA1;
-  /* border: thick solid --primary; */
+﻿.custom-border {
+    border: thick solid rgb(var(--primary-rgb));
     border-radius: 18px;
 }
 .imageConnexion {
     border-radius: 9px;
 }
 .valider{
-    color: white
+    color: rgb(var(--white-rgb))
 }
 .contenue{
-    background-color: #1E3BA1;
-    /* background-color: --primary; */
+    background-color: rgb(var(--primary-rgb));
     border-radius: 50px;
 }
 .formulaire{
-    background-color: white;
+    background-color: rgb(var(--white-rgb));
 }
+

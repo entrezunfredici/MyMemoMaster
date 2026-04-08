@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <label class="switch">
     <input type="checkbox" :checked="localValue" @change="toggle" />
     <span class="slider round"></span>
@@ -45,7 +45,7 @@ function toggle(event) {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: rgb(var(--surface-neutral-rgb));
   -webkit-transition: .4s;
   transition: .4s;
 }
@@ -57,17 +57,17 @@ function toggle(event) {
   width: 26px;
   left: 4px;
   bottom: 4px;
-  background-color: white;
+  background-color: rgb(var(--white-rgb));
   -webkit-transition: .4s;
   transition: .4s;
 }
 
 input:checked + .slider {
-  background-color:var(--primary);
+  background-color:rgb(var(--primary-rgb));
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px var(--primary);
+  box-shadow: 0 0 1px rgb(var(--primary-rgb));
 }
 
 input:checked + .slider:before {
@@ -83,3 +83,4 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 </style>
+

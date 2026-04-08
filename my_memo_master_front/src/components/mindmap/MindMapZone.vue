@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <g
     class="mindmap-zone"
     :transform="zoneTransform"
@@ -22,7 +22,7 @@
       text-anchor="middle"
       dominant-baseline="hanging"
       :y="-height / 2 + 12"
-      fill="#1f2937"
+      fill="rgb(var(--text-base-rgb))"
       font-weight="600"
     >
       {{ zone.name }}
@@ -47,8 +47,8 @@ const width = computed(() => layout.value.width || 320);
 const height = computed(() => layout.value.height || 240);
 const zoneTransform = computed(() => `translate(${layout.value.x || 0}, ${layout.value.y || 0})`);
 
-const fillColor = computed(() => props.zone.color || '#BFDBFE');
-const borderColor = computed(() => props.zone.color || '#60A5FA');
+const fillColor = computed(() => props.zone.color || 'rgb(var(--zone-fill-rgb))');
+const borderColor = computed(() => props.zone.color || 'rgb(var(--zone-border-rgb))');
 
 const handlePointerDown = (event) => {
   emit('zone-pointerdown', { event, zone: props.zone });
@@ -65,3 +65,4 @@ const handlePointerDown = (event) => {
   pointer-events: none;
 }
 </style>
+
