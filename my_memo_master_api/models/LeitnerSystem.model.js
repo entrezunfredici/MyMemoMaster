@@ -61,7 +61,7 @@ module.exports = (instance) => {
     LeitnerSystem.belongsToMany(models.Subject, {
       through: "systemSubject",
       foreignKey: "idSystem",
-      otherKey: "idSubject",
+      otherKey: "subjectId",
       as: "subjects",
     });
 

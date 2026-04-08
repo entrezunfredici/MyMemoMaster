@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { api } from '@/helpers/api';
 import { useToast } from 'vue-toastification';
 import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue';
+import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 
 const toast = useToast();
+const mindmapStore = useMindMapBuilderStore();
 
 const builderRef = ref(null);
 const diagrams = ref([]);
@@ -28,6 +30,9 @@ const exportName = ref('');
 const pendingPayload = ref(null);
 const pendingCreate = ref(false);
 
+const AUTO_SAVE_DELAY = 1500;
+let autoSaveTimer = null;
+
 const fetchDiagrams = async () => {
   try {
     const response = await api.get('diagrammes/all');
@@ -46,13 +51,13 @@ const fetchDiagrams = async () => {
 
 const fetchFilters = () => {
   users.value = [...new Set(diagrams.value.map((d) => d.userId).filter(Boolean))];
-  subjects.value = [...new Set(diagrams.value.map((d) => d.idSubject).filter(Boolean))];
+  subjects.value = [...new Set(diagrams.value.map((d) => d.subjectId).filter(Boolean))];
 };
 
 const filteredDiagrams = computed(() => {
   return diagrams.value.filter((diagram) => {
     const matchUser = selectedUser.value ? String(diagram.userId) === String(selectedUser.value) : true;
-    const matchSubject = selectedSubject.value ? String(diagram.idSubject) === String(selectedSubject.value) : true;
+    const matchSubject = selectedSubject.value ? String(diagram.subjectId) === String(selectedSubject.value) : true;
     const matchSearch = diagram.mmName?.toLowerCase().includes(searchQuery.value.toLowerCase());
     return matchUser && matchSubject && matchSearch;
   });
@@ -103,7 +108,7 @@ const confirmEdit = async () => {
       mmName: editedName.value,
       mindMapJson: diagram.mindMapJson,
       userId: diagram.userId,
-      idSubject: diagram.idSubject,
+      subjectId: diagram.subjectId,
     };
     const response = await api.put(`/diagrammes/${currentEditId.value}`, payload);
     if (response) {
@@ -137,15 +142,99 @@ const loadDiagram = (diagram) => {
 
 const ensureMeta = (payload) => {
   const fallbackUser = selectedUser.value || currentDiagramMeta.value?.userId || 1;
-  const fallbackSubject = selectedSubject.value || currentDiagramMeta.value?.idSubject || 1;
+  const fallbackSubject = selectedSubject.value || currentDiagramMeta.value?.subjectId || 1;
   return {
     userId: Number(fallbackUser),
-    idSubject: Number(fallbackSubject),
+    subjectId: Number(fallbackSubject),
     mmName: exportName.value || payload.title || 'Carte mentale',
   };
 };
 
+const updateDiagramsList = (entry) => {
+  if (!entry?.idMindMap) return;
+  const existingIndex = diagrams.value.findIndex((diagram) => diagram.idMindMap === entry.idMindMap);
+  if (existingIndex === -1) {
+    diagrams.value = [entry, ...diagrams.value];
+  } else {
+    diagrams.value = diagrams.value.map((diagram, index) =>
+      index === existingIndex ? { ...diagram, ...entry } : diagram
+    );
+  }
+};
+
+const clearAutoSaveTimer = () => {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+};
+
+const scheduleAutoSave = () => {
+  clearAutoSaveTimer();
+  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY);
+};
+
+const performAutoSave = async () => {
+  autoSaveTimer = null;
+  if (!mindmapStore.isDirty) return;
+  if (isSaving.value || isExporting.value || showExportModal.value) {
+    scheduleAutoSave();
+    return;
+  }
+
+  const payload = mindmapStore.exportPayload();
+  if (!payload) return;
+  const saveVersion = payload?.updatedAt;
+  exportName.value = payload.title || exportName.value || 'Carte mentale';
+  const meta = ensureMeta(payload);
+  const body = {
+    mmName: meta.mmName,
+    mindMapJson: payload,
+    userId: meta.userId,
+    subjectId: meta.subjectId,
+  };
+
+  try {
+    isSaving.value = true;
+    if (currentDiagramId.value) {
+      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body);
+      if (response) {
+        const updatedMeta = { ...body, idMindMap: currentDiagramId.value };
+        currentDiagramMeta.value = { ...(currentDiagramMeta.value || {}), ...updatedMeta };
+        updateDiagramsList(updatedMeta);
+        fetchFilters();
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
+        pendingPayload.value = null;
+        pendingCreate.value = false;
+      }
+    } else {
+      const response = await api.post('diagrammes/add', body);
+      const newId = response?.data?.id || response?.data?.idMindMap;
+      if (newId) {
+        const createdMeta = { ...body, idMindMap: newId };
+        currentDiagramId.value = newId;
+        currentDiagramMeta.value = createdMeta;
+        updateDiagramsList(createdMeta);
+        fetchFilters();
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
+        pendingPayload.value = null;
+        pendingCreate.value = false;
+      }
+    }
+  } catch (error) {
+    console.error('Erreur sauvegarde auto', error);
+    toast.error('Erreur sauvegarde automatique');
+  } finally {
+    isSaving.value = false;
+  }
+};
+
 const handleSave = async (payload) => {
+  const saveVersion = payload?.updatedAt;
   exportName.value = payload.title || exportName.value || 'Carte mentale';
   if (!currentDiagramId.value) {
     pendingCreate.value = true;
@@ -160,7 +249,7 @@ const handleSave = async (payload) => {
       mmName: meta.mmName,
       mindMapJson: payload,
       userId: meta.userId,
-      idSubject: meta.idSubject,
+      subjectId: meta.subjectId,
     });
     if (response) {
       toast.success('Diagramme sauvegarde');
@@ -169,6 +258,9 @@ const handleSave = async (payload) => {
         currentDiagramMeta.value.mindMapJson = payload;
       }
       await fetchDiagrams();
+      if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+        mindmapStore.markSaved();
+      }
     }
   } catch (error) {
     toast.error('Erreur sauvegarde');
@@ -189,7 +281,7 @@ const handleNewMap = (payload) => {
   currentDiagramMeta.value = {
     mmName: payload.title,
     userId: selectedUser.value || 1,
-    idSubject: selectedSubject.value || 1,
+    subjectId: selectedSubject.value || 1,
   };
   currentMapPayload.value = payload;
   exportName.value = payload.title;
@@ -198,6 +290,7 @@ const handleNewMap = (payload) => {
 
 const confirmExportModal = async () => {
   if (!pendingPayload.value) return;
+  const saveVersion = pendingPayload.value?.updatedAt;
   try {
     isExporting.value = true;
     const meta = ensureMeta(pendingPayload.value);
@@ -205,7 +298,7 @@ const confirmExportModal = async () => {
       mmName: meta.mmName,
       mindMapJson: pendingPayload.value,
       userId: meta.userId,
-      idSubject: meta.idSubject,
+      subjectId: meta.subjectId,
     };
 
     if (!pendingCreate.value && currentDiagramId.value) {
@@ -216,6 +309,9 @@ const confirmExportModal = async () => {
           currentDiagramMeta.value.mmName = meta.mmName;
           currentDiagramMeta.value.mindMapJson = pendingPayload.value;
         }
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
       }
     } else {
       const response = await api.post('diagrammes/add', body);
@@ -224,6 +320,9 @@ const confirmExportModal = async () => {
         currentDiagramId.value = newId;
         currentDiagramMeta.value = { ...body, idMindMap: newId };
         toast.success('Diagramme cree');
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
+          mindmapStore.markSaved();
+        }
       }
     }
     await fetchDiagrams();
@@ -237,8 +336,30 @@ const confirmExportModal = async () => {
   }
 };
 
+watch(
+  () => mindmapStore.map.updatedAt,
+  () => {
+    if (mindmapStore.isDirty) {
+      scheduleAutoSave();
+    }
+  }
+);
+
+watch(
+  () => showExportModal.value,
+  (isOpen) => {
+    if (!isOpen && mindmapStore.isDirty) {
+      scheduleAutoSave();
+    }
+  }
+);
+
 onMounted(async () => {
   await fetchDiagrams();
+});
+
+onBeforeUnmount(() => {
+  clearAutoSaveTimer();
 });
 </script>
 
@@ -272,7 +393,7 @@ onMounted(async () => {
           >
             <div class="sidebar__item-main" @click="loadDiagram(diagram)">
               <span class="sidebar__item-title">{{ diagram.mmName }}</span>
-              <small class="sidebar__item-meta">Utilisateur {{ diagram.userId }} - Matiere {{ diagram.idSubject }}</small>
+              <small class="sidebar__item-meta">Utilisateur {{ diagram.userId }} - Matiere {{ diagram.subjectId }}</small>
             </div>
             <div class="sidebar__item-actions">
               <button v-if="editMode" @click.stop="openEditModal(diagram)">Renommer</button>

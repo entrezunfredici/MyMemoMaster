@@ -85,7 +85,7 @@ router.get('/:id', tutorials.findOne);
  *                 type: string
  *               revision_tips:
  *                 type: boolean
- *               idSubject:
+ *               subjectId:
  *                 type: integer
  *     responses:
  *       201:
@@ -121,7 +121,7 @@ router.post('/add', tutorials.create);
  *                 type: string
  *               revision_tips:
  *                 type: boolean
- *               idSubject:
+ *               subjectId:
  *                 type: integer
  *     responses:
  *       200:

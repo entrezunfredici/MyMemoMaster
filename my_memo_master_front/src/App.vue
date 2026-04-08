@@ -1,6 +1,6 @@
 <template>
   <!-- NO LAYOUT -->
-  <div v-if="route.name.includes('auth')" >
+  <div v-if="route?.name?.includes?.('auth')">
     <main>
       <RouterView />
     </main>
@@ -131,10 +131,47 @@ import { HomeIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
 import { isMobile } from '@/helpers/functions';
+import { onBeforeUnmount, onMounted } from 'vue'
+import { notif } from '@/helpers/notif.js'
 
 const route = useRoute()
 
-</script>
+const konamiSequence = [
+  'ArrowUp',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowLeft',
+  'ArrowRight',
+  'b',
+  'a'
+]
 
-<script setup>
+let currentIndex = 0
+
+const handleKeydown = (event) => {
+  const key = event.key
+
+  if (key === konamiSequence[currentIndex]) {
+    currentIndex++
+
+    if (currentIndex === konamiSequence.length) {
+      notif.notify('Konami Code Activated!', 'success')
+      currentIndex = 0
+    }
+  } else {
+    currentIndex = 0
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
+
 </script>
