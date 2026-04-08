@@ -119,23 +119,24 @@ jobs:
   #         -d "{\"content\": \"Tests failed on branch $BRANCH_NAME! $RANDOM_URL\"}" \
   #         ${{ secrets.DISCORD_LOG }}
 
-  # notify_success:
-  #   runs-on: ubuntu-latest
-  #   needs: [test, lint, sonar_analysis]
-  #   if: success()
-  #   steps:
-  #     - name: Send Test Success Notification to Discord
-  #       run: |
-  #         URLS=(
-  #           "https://media1.tenor.com/m/BhPivX5RaGgAAAAd/vilebrequin-vilbrequin.gif"
-  #           "https://media1.tenor.com/m/-c-taOTKNN8AAAAd/vilebrequin-sylvain.gif"
-  #           "https://media1.tenor.com/m/4Nxe3sCkjVcAAAAd/vilebrequin-vilbrequin.gif"
-  #           "https://media1.tenor.com/m/uPogt0rnqKoAAAAd/rosycheeks-approved.gif"
-  #           "https://media1.tenor.com/m/eAwDugg8aBgAAAAd/kitty-meow.gif"
-  #           "https://media1.tenor.com/m/wjS2sXen8iMAAAAd/stonks-up-stongs.gif"
-  #         )
-  #         RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
-  #         BRANCH_NAME=${GITHUB_REF##*/}
-  #         curl -X POST -H "Content-Type: application/json" \
-  #         -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
-  #         ${{ secrets.DISCORD_LOG }}
+  notify_success:
+    runs-on: ubuntu-latest
+    #needs: [test, lint, sonar_analysis]
+    needs: [test, lint]
+    if: success()
+    steps:
+      - name: Send Test Success Notification to Discord
+        run: |
+          URLS=(
+            "https://media1.tenor.com/m/BhPivX5RaGgAAAAd/vilebrequin-vilbrequin.gif"
+            "https://media1.tenor.com/m/-c-taOTKNN8AAAAd/vilebrequin-sylvain.gif"
+            "https://media1.tenor.com/m/4Nxe3sCkjVcAAAAd/vilebrequin-vilbrequin.gif"
+            "https://media1.tenor.com/m/uPogt0rnqKoAAAAd/rosycheeks-approved.gif"
+            "https://media1.tenor.com/m/eAwDugg8aBgAAAAd/kitty-meow.gif"
+            "https://media1.tenor.com/m/wjS2sXen8iMAAAAd/stonks-up-stongs.gif"
+          )
+          RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
+          BRANCH_NAME=${GITHUB_REF##*/}
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
+          ${{ secrets.DISCORD_LOG }}
