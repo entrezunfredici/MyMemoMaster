@@ -1,22 +1,8 @@
 <template>
-  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
+  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-grey rounded-[2px] p-1.5">
     
-    <section class="col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
+    <section class="mx-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
       <div class="w-full flex-grow">
-        <div class="grid grid-cols-5 gap-2 mb-6 text-center">
-          <div
-            v-for="(count, group) in groupCounts"
-            :key="group"
-            class="bg-white rounded border border-gray p-1"
-          >
-            <div class="text-[10px] uppercase text-gray-light font-bold">
-              {{ groupLabels[group] }}
-            </div>
-            <div class="text-sm font-semibold text-primary">
-              {{ count }}
-            </div>
-          </div>
-        </div>
 
         <div class="flex justify-between items-center pb-4">
           <button
@@ -34,12 +20,9 @@
         </div>
 
         <div v-if="!isFinished" class="space-y-4">
-          <div class="py-2">
-            <span class="text-sm font-medium text-gray-light uppercase">Question</span>
-            <div class="w-full p-3 bg-white border border-gray rounded-lg text-dark font-medium mt-1">
-              {{ currentCard.question }}
-            </div>
-          </div>
+          <div class="w-full p-3 bg-white text-dark text-xl text-center font-semibold mt-1">
+            {{ currentCard.question }}
+           </div>
 
           <div class="py-2">
             <span class="text-sm font-medium text-gray-light uppercase">Ta Réponse</span>
@@ -87,15 +70,30 @@
           <Button :callback="reset">Recommencer</Button>
         </div>
       </div>
-
-      <div v-if="!isFinished" class="border-t-2 border-primary mt-6 pt-4">
-        <h4 class="text-primary text-lg font-semibold pb-2 italic">Dernières erreurs</h4>
+    </section>
+    <section class="mx-16 mt-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
+      <div v-if="!isFinished" class="mb-4">
+        <h4 class="text-primary text-lg font-semibold pb-2">Dernières erreurs</h4>
         <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
-          <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-white border border-red-200 rounded-lg px-3 py-2 text-sm">
+          <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-primary/10 rounded-lg px-3 py-2 text-sm">
             <span>{{ err.question }}</span>
-            <XMarkIcon class="size-4 text-red-500" />
           </div>
         </div>
+      </div>
+      <h4 class="text-primary text-lg font-semibold pb-2">Prochaines sessions</h4>
+      <div class="grid grid-cols-5 gap-2 mb-6 text-center">
+          <div
+            v-for="(count, group) in groupCounts"
+            :key="group"
+            class="bg-white rounded border border-gray p-1"
+          >
+            <div class="text-[10px] uppercase text-gray-light font-bold">
+              {{ groupLabels[group] }}
+            </div>
+            <div class="text-sm font-semibold text-primary">
+              {{ count }}
+            </div>
+          </div>
       </div>
     </section>
   </div>
