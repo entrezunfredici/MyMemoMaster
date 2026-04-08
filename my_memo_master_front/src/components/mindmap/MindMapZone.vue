@@ -22,7 +22,7 @@
       text-anchor="middle"
       dominant-baseline="hanging"
       :y="-height / 2 + 12"
-      fill="rgb(var(--text-base-rgb))"
+      fill="rgb(var(--text-base))"
       font-weight="600"
     >
       {{ zone.name }}
@@ -47,8 +47,8 @@ const width = computed(() => layout.value.width || 320);
 const height = computed(() => layout.value.height || 240);
 const zoneTransform = computed(() => `translate(${layout.value.x || 0}, ${layout.value.y || 0})`);
 
-const fillColor = computed(() => props.zone.color || 'rgb(var(--zone-fill-rgb))');
-const borderColor = computed(() => props.zone.color || 'rgb(var(--zone-border-rgb))');
+const fillColor = computed(() => props.zone.color || 'rgb(var(--zone-fill))');
+const borderColor = computed(() => props.zone.color || 'rgb(var(--zone-border))');
 
 const handlePointerDown = (event) => {
   emit('zone-pointerdown', { event, zone: props.zone });

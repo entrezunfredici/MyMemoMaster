@@ -445,21 +445,21 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 16px;
   min-height: 100vh;
-  background: rgb(var(--surface-muted-rgb));
+  background: rgb(var(--surface-muted));
   padding: 16px;
 }
 
 .mindmaps-page__header {
-  background: rgb(var(--white-rgb));
+  background: rgb(var(--white));
   padding: 16px;
   border-radius: 16px;
-  box-shadow: 0 8px 20px rgb(var(--text-strong-rgb) / 0.08);
+  box-shadow: 0 8px 20px rgb(var(--text-strong) / 0.08);
 }
 
 .mindmaps-page__header h1 {
   font-size: 24px;
   font-weight: 700;
-  color: rgb(var(--text-base-rgb));
+  color: rgb(var(--text-base));
 }
 
 .mindmaps-page__layout {
@@ -470,10 +470,10 @@ onBeforeUnmount(() => {
 }
 
 .mindmaps-page__sidebar {
-  background: rgb(var(--white-rgb));
+  background: rgb(var(--white));
   border-radius: 20px;
   padding: 16px;
-  box-shadow: 0 12px 24px rgb(var(--text-strong-rgb) / 0.08);
+  box-shadow: 0 12px 24px rgb(var(--text-strong) / 0.08);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -495,21 +495,21 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
   border-radius: 12px;
   border: none;
-  background: rgb(var(--surface-neutral-rgb));
+  background: rgb(var(--surface-neutral));
   cursor: pointer;
   font-weight: 600;
 }
 
 .sidebar__modes button.active {
-  background: rgb(var(--info-rgb));
-  color: rgb(var(--white-rgb));
+  background: rgb(var(--info));
+  color: rgb(var(--white));
 }
 
 .sidebar__tools input,
 .sidebar__tools select {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid rgb(var(--border-strong-rgb));
+  border: 1px solid rgb(var(--border-strong));
   font-size: 14px;
 }
 
@@ -524,7 +524,7 @@ onBeforeUnmount(() => {
 }
 
 .sidebar__item {
-  background: rgb(var(--surface-soft-rgb));
+  background: rgb(var(--surface-soft));
   border-radius: 14px;
   padding: 12px;
   display: flex;
@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
 }
 
 .sidebar__item.active {
-  border-color: rgb(var(--info-rgb));
+  border-color: rgb(var(--info));
   transform: translateY(-1px);
 }
 
@@ -549,11 +549,11 @@ onBeforeUnmount(() => {
 
 .sidebar__item-title {
   font-weight: 600;
-  color: rgb(var(--text-base-rgb));
+  color: rgb(var(--text-base));
 }
 
 .sidebar__item-meta {
-  color: rgb(var(--text-soft-rgb));
+  color: rgb(var(--text-soft));
   font-size: 12px;
 }
 
@@ -569,13 +569,13 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  background: rgb(var(--surface-info-rgb));
-  color: rgb(var(--text-strong-rgb));
+  background: rgb(var(--surface-info));
+  color: rgb(var(--text-strong));
 }
 
 .sidebar__item-actions .danger {
-  background: rgb(var(--danger-soft-rgb));
-  color: rgb(var(--danger-rgb));
+  background: rgb(var(--danger-soft));
+  color: rgb(var(--danger));
 }
 
 .mindmaps-page__content {
@@ -587,7 +587,7 @@ onBeforeUnmount(() => {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgb(var(--text-strong-rgb) / 0.5);
+  background: rgb(var(--text-strong) / 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -595,7 +595,7 @@ onBeforeUnmount(() => {
 }
 
 .modal__dialog {
-  background: rgb(var(--white-rgb));
+  background: rgb(var(--white));
   padding: 20px;
   border-radius: 16px;
   width: 320px;
@@ -607,7 +607,7 @@ onBeforeUnmount(() => {
 .modal__dialog input {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid rgb(var(--border-strong-rgb));
+  border: 1px solid rgb(var(--border-strong));
 }
 
 .modal__actions {
@@ -625,8 +625,8 @@ onBeforeUnmount(() => {
 }
 
 .modal__actions .primary {
-  background: rgb(var(--info-rgb));
-  color: rgb(var(--white-rgb));
+  background: rgb(var(--info));
+  color: rgb(var(--white));
 }
 </style>
 

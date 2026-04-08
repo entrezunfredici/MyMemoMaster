@@ -45,7 +45,7 @@ function toggle(event) {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgb(var(--surface-neutral-rgb));
+  background-color: rgb(var(--surface-neutral));
   -webkit-transition: .4s;
   transition: .4s;
 }
@@ -57,17 +57,17 @@ function toggle(event) {
   width: 26px;
   left: 4px;
   bottom: 4px;
-  background-color: rgb(var(--white-rgb));
+  background-color: rgb(var(--white));
   -webkit-transition: .4s;
   transition: .4s;
 }
 
 input:checked + .slider {
-  background-color:rgb(var(--primary-rgb));
+  background-color:rgb(var(--primary));
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px rgb(var(--primary-rgb));
+  box-shadow: 0 0 1px rgb(var(--primary));
 }
 
 input:checked + .slider:before {

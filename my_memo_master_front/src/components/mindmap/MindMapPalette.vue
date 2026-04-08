@@ -506,11 +506,11 @@ const assignZone = (zoneId) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: rgb(var(--white-rgb));
+  background: rgb(var(--white));
   padding: 16px;
   border-radius: 16px;
-  border: 1px solid rgb(var(--surface-neutral-rgb));
-  box-shadow: 0 10px 30px rgb(var(--text-strong-rgb) / 0.08);
+  border: 1px solid rgb(var(--surface-neutral));
+  box-shadow: 0 10px 30px rgb(var(--text-strong) / 0.08);
   height: 100%;
 }
 
@@ -519,15 +519,15 @@ const assignZone = (zoneId) => {
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
-  color: rgb(var(--text-strong-rgb));
+  color: rgb(var(--text-strong));
 }
 
 .mindmap-palette__tool {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 9999px;
-  background: rgb(var(--surface-info-strong-rgb));
-  color: rgb(var(--info-hover-rgb));
+  background: rgb(var(--surface-info-strong));
+  color: rgb(var(--info-hover));
 }
 
 .mindmap-palette__section {
@@ -548,22 +548,22 @@ const assignZone = (zoneId) => {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgb(var(--surface-subtle-rgb));
+  background: rgb(var(--surface-subtle));
   border: none;
   cursor: pointer;
   font-weight: 600;
-  color: rgb(var(--text-base-rgb));
+  color: rgb(var(--text-base));
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .mindmap-palette__button:hover {
-  background: rgb(var(--surface-info-rgb));
+  background: rgb(var(--surface-info));
   transform: translateY(-1px);
 }
 
 .mindmap-palette__button--active {
-  background: rgb(var(--info-hover-rgb));
-  color: rgb(var(--white-rgb));
+  background: rgb(var(--info-hover));
+  color: rgb(var(--white));
 }
 
 .mindmap-palette__icon {
@@ -581,7 +581,7 @@ const assignZone = (zoneId) => {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgb(var(--text-muted-rgb));
+  color: rgb(var(--text-muted));
 }
 
 .mindmap-palette__field input,
@@ -589,10 +589,10 @@ const assignZone = (zoneId) => {
 .mindmap-palette__field select {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid rgb(var(--border-strong-rgb));
+  border: 1px solid rgb(var(--border-strong));
   font-size: 14px;
-  color: rgb(var(--text-strong-rgb));
-  background: rgb(var(--surface-soft-rgb));
+  color: rgb(var(--text-strong));
+  background: rgb(var(--surface-soft));
 }
 
 .mindmap-palette__file-input {
@@ -613,22 +613,22 @@ const assignZone = (zoneId) => {
   border: none;
   cursor: pointer;
   font-weight: 600;
-  background: rgb(var(--accent-rgb));
-  color: rgb(var(--text-strong-rgb));
+  background: rgb(var(--accent));
+  color: rgb(var(--text-strong));
   transition: background 0.2s ease;
 }
 
 .mindmap-palette__image-actions button:hover {
-  background: rgb(var(--accent-hover-rgb));
+  background: rgb(var(--accent-hover));
 }
 
 .mindmap-palette__image-actions button.secondary {
-  background: rgb(var(--border-soft-rgb));
-  color: rgb(var(--text-strong-rgb));
+  background: rgb(var(--border-soft));
+  color: rgb(var(--text-strong));
 }
 
 .mindmap-palette__image-actions button.secondary:hover {
-  background: rgb(var(--border-strong-rgb));
+  background: rgb(var(--border-strong));
 }
 
 .mindmap-palette__image-actions button:disabled {
@@ -638,7 +638,7 @@ const assignZone = (zoneId) => {
 
 .mindmap-palette__error {
   margin: 6px 0 0;
-  color: rgb(var(--danger-rgb));
+  color: rgb(var(--danger));
   font-size: 12px;
 }
 
@@ -652,21 +652,21 @@ const assignZone = (zoneId) => {
 .mindmap-palette__preview img {
   max-width: 100%;
   border-radius: 8px;
-  box-shadow: 0 6px 14px rgb(var(--text-strong-rgb) / 0.25);
+  box-shadow: 0 6px 14px rgb(var(--text-strong) / 0.25);
 }
 
 .mindmap-palette__preview-url {
   font-size: 12px;
   word-break: break-all;
-  color: rgb(var(--text-base-rgb));
+  color: rgb(var(--text-base));
 }
 
 .mindmap-palette__formula-preview {
   margin-top: 10px;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgb(var(--border-strong-rgb));
-  background: rgb(var(--white-rgb));
+  border: 1px solid rgb(var(--border-strong));
+  background: rgb(var(--white));
   max-height: 180px;
   overflow-y: auto;
 }
@@ -684,23 +684,23 @@ const assignZone = (zoneId) => {
   border: none;
   font-weight: 600;
   cursor: pointer;
-  background: rgb(var(--info-rgb));
-  color: rgb(var(--white-rgb));
+  background: rgb(var(--info));
+  color: rgb(var(--white));
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .mindmap-palette__formula-actions button:hover {
-  background: rgb(var(--info-hover-rgb));
+  background: rgb(var(--info-hover));
   transform: translateY(-1px);
 }
 
 .mindmap-palette__formula-actions button.secondary {
-  background: rgb(var(--border-soft-rgb));
-  color: rgb(var(--text-strong-rgb));
+  background: rgb(var(--border-soft));
+  color: rgb(var(--text-strong));
 }
 
 .mindmap-palette__formula-actions button.secondary:hover {
-  background: rgb(var(--border-strong-rgb));
+  background: rgb(var(--border-strong));
 }
 
 .mindmap-palette__text-style {
@@ -710,8 +710,8 @@ const assignZone = (zoneId) => {
   margin-top: 12px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid rgb(var(--border-soft-rgb));
-  background: rgb(var(--surface-soft-rgb));
+  border: 1px solid rgb(var(--border-soft));
+  background: rgb(var(--surface-soft));
 }
 
 .mindmap-palette__text-toolbar {
@@ -723,8 +723,8 @@ const assignZone = (zoneId) => {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border: 1px solid rgb(var(--border-strong-rgb));
-  background: rgb(var(--white-rgb));
+  border: 1px solid rgb(var(--border-strong));
+  background: rgb(var(--white));
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -733,14 +733,14 @@ const assignZone = (zoneId) => {
 }
 
 .mindmap-palette__text-toolbar button:hover {
-  background: rgb(var(--surface-info-strong-rgb));
+  background: rgb(var(--surface-info-strong));
   transform: translateY(-1px);
 }
 
 .mindmap-palette__text-toolbar button.active {
-  background: rgb(var(--info-rgb));
-  color: rgb(var(--white-rgb));
-  border-color: rgb(var(--info-hover-rgb));
+  background: rgb(var(--info));
+  color: rgb(var(--white));
+  border-color: rgb(var(--info-hover));
 }
 
 .mindmap-palette__text-icon {
@@ -780,7 +780,7 @@ const assignZone = (zoneId) => {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgb(var(--text-muted-rgb));
+  color: rgb(var(--text-muted));
 }
 
 .mindmap-palette__actions {
@@ -795,29 +795,29 @@ const assignZone = (zoneId) => {
   border: none;
   cursor: pointer;
   font-weight: 600;
-  background: rgb(var(--accent-rgb));
-  color: rgb(var(--text-strong-rgb));
+  background: rgb(var(--accent));
+  color: rgb(var(--text-strong));
   transition: background 0.2s ease;
 }
 
 .mindmap-palette__actions button:hover {
-  background: rgb(var(--accent-hover-rgb));
+  background: rgb(var(--accent-hover));
 }
 
 .mindmap-palette__actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: rgb(var(--disabled-rgb));
-  color: rgb(var(--surface-muted-rgb));
+  background: rgb(var(--disabled));
+  color: rgb(var(--surface-muted));
 }
 
 .mindmap-palette__actions .danger {
-  background: rgb(var(--danger-rgb));
-  color: rgb(var(--white-rgb));
+  background: rgb(var(--danger));
+  color: rgb(var(--white));
 }
 
 .mindmap-palette__actions .danger:hover {
-  background: rgb(var(--danger-hover-rgb));
+  background: rgb(var(--danger-hover));
 }
 
 .mindmap-palette__zones {
@@ -836,26 +836,26 @@ const assignZone = (zoneId) => {
   padding: 6px 12px;
   border-radius: 9999px;
   border: none;
-  background: rgb(var(--border-soft-rgb));
-  color: rgb(var(--text-base-rgb));
+  background: rgb(var(--border-soft));
+  color: rgb(var(--text-base));
   cursor: pointer;
   font-weight: 600;
 }
 
 .mindmap-palette__zone-chip.active {
-  background: rgb(var(--info-rgb));
-  color: rgb(var(--white-rgb));
+  background: rgb(var(--info));
+  color: rgb(var(--white));
 }
 
 .mindmap-palette__hint {
   font-size: 12px;
-  color: rgb(var(--text-soft-rgb));
+  color: rgb(var(--text-soft));
   margin-top: 4px;
   line-height: 1.4;
 
 .mindmap-palette__hint code {
-  background: rgb(var(--border-soft-rgb));
-  color: rgb(var(--text-base-rgb));
+  background: rgb(var(--border-soft));
+  color: rgb(var(--text-base));
   padding: 2px 6px;
   border-radius: 6px;
   font-family: 'Fira Code', monospace;
@@ -875,7 +875,7 @@ const assignZone = (zoneId) => {
 .mindmap-interpreter-modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(var(--text-strong-rgb) / 0.45);
+  background: rgb(var(--text-strong) / 0.45);
   backdrop-filter: blur(2px);
 }
 
@@ -884,10 +884,10 @@ const assignZone = (zoneId) => {
   width: min(960px, 100%);
   max-height: 80vh;
   overflow-y: auto;
-  background: rgb(var(--white-rgb));
+  background: rgb(var(--white));
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 24px 60px rgb(var(--text-strong-rgb) / 0.35);
+  box-shadow: 0 24px 60px rgb(var(--text-strong) / 0.35);
   z-index: 1;
 }
 
@@ -896,7 +896,7 @@ const assignZone = (zoneId) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  color: rgb(var(--text-strong-rgb));
+  color: rgb(var(--text-strong));
 }
 
 .mindmap-interpreter-modal__close {
@@ -905,12 +905,12 @@ const assignZone = (zoneId) => {
   font-size: 24px;
   cursor: pointer;
   line-height: 1;
-  color: rgb(var(--text-strong-rgb));
+  color: rgb(var(--text-strong));
   transition: transform 0.2s ease, color 0.2s ease;
 }
 
 .mindmap-interpreter-modal__close:hover {
-  color: rgb(var(--info-rgb));
+  color: rgb(var(--info));
   transform: scale(1.1);
 }
 </style>

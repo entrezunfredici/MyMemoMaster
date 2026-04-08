@@ -4,49 +4,49 @@
 /* App theme */
 :root {
     /* Theme colors */
-    --primary-rgb: 30 59 161;
-    --primary-hover-rgb: 22 44 122;
-    --light-primary-rgb: 130 143 188;
-    --secondary-rgb: 250 66 56;
-    --secondary-hover-rgb: 220 53 44;
-    --light-secondary-rgb: 253 199 196;
-    --light-rgb: 253 247 255;
-    --gray-rgb: 213 218 237;
-    --dark-rgb: 16 31 86;
-    --white-rgb: 255 255 255;
+    --primary: 30 59 161;
+    --primary-hover: 22 44 122;
+    --light-primary: 130 143 188;
+    --secondary: 250 66 56;
+    --secondary-hover: 220 53 44;
+    --light-secondary: 253 199 196;
+    --light: 253 247 255;
+    --gray: 213 218 237;
+    --dark: 16 31 86;
+    --white: 255 255 255;
 
     /* Other colors */
-    --success-rgb: 16 185 129;
-    --warning-rgb: 245 158 11;
-    --danger-rgb: 220 38 38;
-    --danger-hover-rgb: 239 68 68;
+    --success: 16 185 129;
+    --warning: 245 158 11;
+    --danger: 220 38 38;
+    --danger-hover: 239 68 68;
 
     /* Semantic UI colors */
-    --surface-soft-rgb: 248 250 252;
-    --surface-muted-rgb: 241 245 249;
-    --surface-subtle-rgb: 243 244 246;
-    --surface-neutral-rgb: 229 231 235;
-    --surface-info-rgb: 224 242 254;
-    --surface-info-strong-rgb: 219 234 254;
-    --border-soft-rgb: 226 232 240;
-    --border-strong-rgb: 203 213 245;
-    --text-strong-rgb: 15 23 42;
-    --text-base-rgb: 31 41 55;
-    --text-muted-rgb: 71 85 105;
-    --text-soft-rgb: 100 116 139;
-    --info-rgb: 37 99 235;
-    --info-hover-rgb: 29 78 216;
-    --accent-rgb: 56 189 248;
-    --accent-hover-rgb: 14 165 233;
-    --disabled-rgb: 148 163 184;
-    --danger-soft-rgb: 254 202 202;
+    --surface-soft: 248 250 252;
+    --surface-muted: 241 245 249;
+    --surface-subtle: 243 244 246;
+    --surface-neutral: 229 231 235;
+    --surface-info: 224 242 254;
+    --surface-info-strong: 219 234 254;
+    --border-soft: 226 232 240;
+    --border-strong: 203 213 245;
+    --text-strong: 15 23 42;
+    --text-base: 31 41 55;
+    --text-muted: 71 85 105;
+    --text-soft: 100 116 139;
+    --info: 37 99 235;
+    --info-hover: 29 78 216;
+    --accent: 56 189 248;
+    --accent-hover: 14 165 233;
+    --disabled: 148 163 184;
+    --danger-soft: 254 202 202;
 
     /* Mindmap defaults */
-    --mindmap-primary-rgb: 30 58 138;
-    --mindmap-secondary-rgb: 192 197 210;
-    --mindmap-text-rgb: 238 242 255;
-    --zone-fill-rgb: 191 219 254;
-    --zone-border-rgb: 96 165 250;
+    --mindmap-primary: 30 58 138;
+    --mindmap-secondary: 192 197 210;
+    --mindmap-text: 238 242 255;
+    --zone-fill: 191 219 254;
+    --zone-border: 96 165 250;
 
     /* Border radius */
     --radius-xs: 9px;
@@ -54,11 +54,11 @@
     --radius-xl: 50px;
 
     /* Password colors */
-    --password-step-1-rgb: 220 38 38;
-    --password-step-2-rgb: 220 126 38;
-    --password-step-3-rgb: 220 217 38;
-    --password-step-4-rgb: 120 220 38;
-    --password-step-5-rgb: 41 175 0;
+    --password-step-1: 220 38 38;
+    --password-step-2: 220 126 38;
+    --password-step-3: 220 217 38;
+    --password-step-4: 120 220 38;
+    --password-step-5: 41 175 0;
 }
 
 /* Vue-toastification overrides */
@@ -68,23 +68,23 @@
 }
 
 .Vue-Toastification__toast--info {
-    background-color: rgb(var(--info-rgb)) !important;
-    color: rgb(var(--white-rgb)) !important;
+    background-color: rgb(var(--info)) !important;
+    color: rgb(var(--white)) !important;
 }
 
 .Vue-Toastification__toast--success {
-    background-color: rgb(var(--success-rgb)) !important;
-    color: rgb(var(--white-rgb)) !important;
+    background-color: rgb(var(--success)) !important;
+    color: rgb(var(--white)) !important;
 }
 
 .Vue-Toastification__toast--warning {
-    background-color: rgb(var(--warning-rgb)) !important;
-    color: rgb(var(--white-rgb)) !important;
+    background-color: rgb(var(--warning)) !important;
+    color: rgb(var(--white)) !important;
 }
 
 .Vue-Toastification__toast--error {
-    background-color: rgb(var(--danger-rgb)) !important;
-    color: rgb(var(--white-rgb)) !important;
+    background-color: rgb(var(--danger)) !important;
+    color: rgb(var(--white)) !important;
 }
 
 /* Fonts */
@@ -138,8 +138,8 @@ body {
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    color: rgb(var(--dark-rgb));
-    background: rgb(var(--light-rgb));
+    color: rgb(var(--dark));
+    background: rgb(var(--light));
 }
 
 

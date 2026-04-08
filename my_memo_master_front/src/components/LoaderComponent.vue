@@ -19,7 +19,7 @@ const props = defineProps({
 .loader {
   width: 84px;
   height: 84px;
-  border: 5px solid rgb(var(--white-rgb));
+  border: 5px solid rgb(var(--white));
   border-bottom-color: transparent;
   border-radius: 50%;
   display: inline-block;

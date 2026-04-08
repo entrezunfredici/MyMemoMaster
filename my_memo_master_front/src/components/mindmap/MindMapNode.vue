@@ -13,7 +13,7 @@
         :rx="borderRadius"
         :ry="borderRadius"
         :fill="primaryColor"
-        :stroke="selected ? 'rgb(var(--accent-hover-rgb))' : primaryColor"
+        :stroke="selected ? 'rgb(var(--accent-hover))' : primaryColor"
         :stroke-width="selected ? 4 : 2"
         opacity="0.92"
       />
@@ -45,11 +45,11 @@
       :transform="`translate(${width / 2 - 18}, ${-height / 2 + 18})`"
       @pointerdown.stop="toggleCollapse"
     >
-      <circle r="12" :fill="secondaryColor" stroke="rgb(var(--text-strong-rgb))" stroke-width="1" />
+      <circle r="12" :fill="secondaryColor" stroke="rgb(var(--text-strong))" stroke-width="1" />
       <text
         text-anchor="middle"
         dominant-baseline="central"
-        fill="rgb(var(--text-strong-rgb))"
+        fill="rgb(var(--text-strong))"
         font-size="16"
         font-weight="600"
       >
@@ -63,11 +63,11 @@
       :transform="`translate(${width / 2 + 36}, 0)`"
       @pointerdown.stop.prevent="createChildNode"
     >
-      <circle r="12" stroke="rgb(var(--text-strong-rgb))" stroke-width="1" />
+      <circle r="12" stroke="rgb(var(--text-strong))" stroke-width="1" />
       <text
         text-anchor="middle"
         dominant-baseline="central"
-        fill="rgb(var(--text-strong-rgb))"
+        fill="rgb(var(--text-strong))"
         font-size="16"
         font-weight="600"
       >
@@ -104,8 +104,8 @@ const creationType = computed(() => normalizeCreationType(store.tool));
 
 const width = computed(() => props.node.style?.width || 220);
 const height = computed(() => props.node.style?.height || 120);
-const primaryColor = computed(() => props.node.style?.primaryColor || 'rgb(var(--mindmap-primary-rgb))');
-const secondaryColor = computed(() => props.node.style?.secondaryColor || 'rgb(var(--mindmap-secondary-rgb))');
+const primaryColor = computed(() => props.node.style?.primaryColor || 'rgb(var(--mindmap-primary))');
+const secondaryColor = computed(() => props.node.style?.secondaryColor || 'rgb(var(--mindmap-secondary))');
 const shape = computed(() => props.node.style?.shape || 'bubble');
 const borderRadius = computed(() => {
   if (shape.value === 'rect') return 12;
@@ -131,7 +131,7 @@ const bodyStyle = computed(() => {
   const rawSize = Number.parseInt(props.node.style?.fontSize, 10);
   const fontSize = Number.isFinite(rawSize) ? rawSize : 14;
   return {
-    color: props.node.style?.textColor || 'rgb(var(--mindmap-text-rgb))',
+    color: props.node.style?.textColor || 'rgb(var(--mindmap-text))',
     fontSize: `${fontSize}px`,
     fontWeight: props.node.style?.fontWeight || 'normal',
     fontStyle: props.node.style?.fontStyle || 'normal',
@@ -170,7 +170,7 @@ const createChildNode = () => {
 }
 
 .mindmap-node:hover {
-  filter: drop-shadow(0 0 6px rgb(var(--accent-hover-rgb) / 0.35));
+  filter: drop-shadow(0 0 6px rgb(var(--accent-hover) / 0.35));
 }
 
 .mindmap-node__content {
@@ -179,7 +179,7 @@ const createChildNode = () => {
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-  color: rgb(var(--white-rgb));
+  color: rgb(var(--white));
 }
 
 .mindmap-node__title {
@@ -192,7 +192,7 @@ const createChildNode = () => {
 .mindmap-node__body {
   font-size: 14px;
   line-height: 1.35;
-  color: rgb(var(--mindmap-text-rgb));
+  color: rgb(var(--mindmap-text));
   word-break: break-word;
   white-space: pre-wrap;
 }
@@ -228,12 +228,12 @@ const createChildNode = () => {
   max-height: 100%;
   border-radius: 8px;
   object-fit: contain;
-  box-shadow: 0 4px 12px rgb(var(--text-strong-rgb) / 0.35);
+  box-shadow: 0 4px 12px rgb(var(--text-strong) / 0.35);
 }
 
 .mindmap-node__image-placeholder {
   font-size: 12px;
-  color: rgb(var(--surface-info-strong-rgb));
+  color: rgb(var(--surface-info-strong));
   text-align: center;
   padding: 0 8px;
 }
@@ -254,11 +254,11 @@ const createChildNode = () => {
 }
 
 .mindmap-node__add circle {
-  fill: rgb(var(--accent-rgb));
+  fill: rgb(var(--accent));
 }
 
 .mindmap-node__add:hover circle {
-  fill: rgb(var(--accent-hover-rgb));
+  fill: rgb(var(--accent-hover));
 }
 </style>
 
