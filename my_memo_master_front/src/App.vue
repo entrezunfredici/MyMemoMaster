@@ -38,6 +38,10 @@
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
+          <router-link to="/todos"
+            :class="[route?.name && route.name.includes('todos') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+            <TodoIcon class="size-8" />
+          </router-link>
           <!-- <router-link to="/credits"
             :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <CreditsIcon class="size-8" />
@@ -101,6 +105,10 @@
         :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
+      <router-link to="/todos"
+        :class="[route?.name && route.name.includes('todos') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+        <TodoIcon class="size-8" />
+      </router-link>
       <!-- <router-link to="/credits"
         :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
@@ -127,6 +135,7 @@ import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
 import ClassroomIcon from '@/icons/ClassroomIcon.vue'
+import TodoIcon from '@/icons/TodoIcon.vue'
 import { HomeIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
