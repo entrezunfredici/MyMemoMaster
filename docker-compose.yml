@@ -47,7 +47,7 @@ services:
       - my_memo_master_network
 
   front:
-    image: node:18-alpine
+    image: node:20-alpine
     working_dir: /app
     env_file: .env
     volumes:
@@ -67,7 +67,7 @@ services:
       - "traefik.http.services.front.loadbalancer.server.port=${VITE_PORT}"
 
   api:
-    image: node:18-alpine
+    image: node:20-alpine
     working_dir: /app
     env_file: .env
     environment:

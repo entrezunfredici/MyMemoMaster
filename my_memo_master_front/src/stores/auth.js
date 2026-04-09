@@ -176,7 +176,8 @@ export const useAuthStore = defineStore('auth', {
 
         return true
       }).catch(error => {
-        notif.notify(`An error occured: ${error}`, 'error')
+        //notif.notify(`An error occured: ${error}`, 'error')
+        notif.notify(`Invalid credentials`, 'error')
         return false
       })
       if (redirect) {
