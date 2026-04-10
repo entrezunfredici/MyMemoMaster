@@ -58,7 +58,7 @@ const routes = [
     name: 'flashcardssession',
     component: () => import('../pages/FlashcardsSessionPage.vue'),
     meta: {
-      title: 'Session de Flashcards',
+      title: '',
       private: true,
     },
   },
