@@ -221,7 +221,6 @@
 <script setup>
 import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import Button from '@/components/ButtonComponent.vue'
 
 const router = useRouter()
 const showModal = ref(false)
