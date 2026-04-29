@@ -4,7 +4,6 @@ jest.mock('@xenova/transformers', () => {
   return {
     pipeline: jest.fn(async () => {
       // retourne une fonction d'extraction de features simulée
-      //return jest.fn(async (text, options) => {
       return jest.fn(async (text) => {
         // simule une embedding vectorielle basée sur le hash du texte
         const hash = text.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
@@ -17,7 +16,7 @@ jest.mock('@xenova/transformers', () => {
       });
     }),
   };
-});
+}, { virtual: true });
 
 const SemanticService = require('../../services/Semantic.service');
 
