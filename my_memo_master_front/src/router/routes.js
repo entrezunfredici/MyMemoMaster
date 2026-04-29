@@ -54,6 +54,15 @@ const routes = [
     },
   },
   {
+    path: '/flashcardssession',
+    name: 'flashcardssession',
+    component: () => import('../pages/FlashcardsSessionPage.vue'),
+    meta: {
+      title: 'Session de Flashcards',
+      private: true,
+    },
+  },
+  {
     path: '/mindmaps',
     name: 'mindmaps',
     component: () => import('../pages/mind_maps/MindmapsPage.vue'),
