@@ -5,8 +5,8 @@ const routes = [
     component: () => import('../pages/HomePage.vue'),
     meta: {
       title: 'Accueil',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/exercises',
@@ -14,8 +14,8 @@ const routes = [
     component: () => import('../pages/ExercisesPage.vue'),
     meta: {
       title: 'Exercises',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/onboarding',
@@ -23,8 +23,8 @@ const routes = [
     component: () => import('../pages/OnboardingPage.vue'),
     meta: {
       title: 'Onboarding',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/tutorials',
@@ -32,8 +32,8 @@ const routes = [
     component: () => import('../pages/TutorialsPage.vue'),
     meta: {
       title: 'Tutoriels',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/credits',
@@ -41,8 +41,8 @@ const routes = [
     component: () => import('../pages/CreditsPage.vue'),
     meta: {
       title: 'Credits',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/flashcards',
@@ -50,8 +50,8 @@ const routes = [
     component: () => import('../pages/FlashcardsPage.vue'),
     meta: {
       title: 'Flashcards',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/flashcardssession',
@@ -59,8 +59,8 @@ const routes = [
     component: () => import('../pages/FlashcardsSessionPage.vue'),
     meta: {
       title: 'Session de Flashcards',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/mindmaps',
@@ -68,8 +68,17 @@ const routes = [
     component: () => import('../pages/MindmapsPage.vue'),
     meta: {
       title: 'Mindmaps',
-      private: true,
-    },
+      private: true
+    }
+  },
+  {
+    path: '/calendar',
+    name: 'calendar',
+    component: () => import('../pages/CalendarPage.vue'),
+    meta: {
+      title: 'Calendar',
+      private: false
+    }
   },
   {
     path: '/profile',
@@ -77,8 +86,8 @@ const routes = [
     component: () => import('../pages/ProfilePage.vue'),
     meta: {
       title: 'Profile',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/settings',
@@ -86,8 +95,8 @@ const routes = [
     component: () => import('../pages/SettingsPage.vue'),
     meta: {
       title: 'Settings',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/create-test',
@@ -95,8 +104,8 @@ const routes = [
     component: () => import('../pages/CreateTestPage.vue'),
     meta: {
       title: 'Create Test',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/classroom',
@@ -104,8 +113,8 @@ const routes = [
     component: () => import('../pages/ClassroomPage.vue'),
     meta: {
       title: 'Class Group',
-      private: true,
-    },
+      private: true
+    }
   },
   // ==================== AUTH & ACCOUNT ====================
   {
@@ -114,8 +123,8 @@ const routes = [
     component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
       title: 'Authentification',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/register',
@@ -123,8 +132,8 @@ const routes = [
     component: () => import('../pages/register/InscriptionPage.vue'),
     meta: {
       title: 'register',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/account',
@@ -132,8 +141,8 @@ const routes = [
     component: () => import('../pages/AccountPage.vue'),
     meta: {
       title: 'Mon compte',
-      private: true,
-    },
+      private: true
+    }
   },
   // ==================== CATCH ====================
   {
@@ -141,18 +150,17 @@ const routes = [
     name: 'error.server',
     component: () => import('../pages/error/ErrorServerPage.vue'),
     meta: {
-      title: 'Error',
-    },
+      title: 'Error'
+    }
   },
   {
     path: '/:catchAll(.*)*',
     name: 'error.routing',
     component: () => import('../pages/error/ErrorRoutingPage.vue'),
     meta: {
-      title: 'Error',
-    },
+      title: 'Error'
+    }
   }
-
 ]
 
 export default routes
