@@ -171,7 +171,7 @@ jobs:
 
             compose pull
             compose up -d postgres
-            compose run --rm db-sync
+            # compose run --rm db-sync
             compose up -d pgadmin api front
             compose ps
 
