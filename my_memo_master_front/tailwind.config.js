@@ -9,17 +9,17 @@ export default {
     extend: {},
     colors: {
       /* Theme colors */
-      primary: 'var(--primary)',
-      'light-primary': 'var(--light-primary)',
-      secondary: 'var(--secondary)',
-      'light-secondary': 'var(--light-secondary)',
-      light: 'var(--light)',
-      gray: 'var(--gray)',
-      dark: 'var(--dark)',
+      primary: 'rgb(var(--primary) / <alpha-value>)',
+      'light-primary': 'rgb(var(--light-primary) / <alpha-value>)',
+      secondary: 'rgb(var(--secondary) / <alpha-value>)',
+      'light-secondary': 'rgb(var(--light-secondary) / <alpha-value>)',
+      light: 'rgb(var(--light) / <alpha-value>)',
+      gray: 'rgb(var(--gray) / <alpha-value>)',
+      dark: 'rgb(var(--dark) / <alpha-value>)',
       /* Other colors */
-      success: 'var(--success)',
-      warning: 'var(--warning)',
-      danger: 'var(--danger)',
+      success: 'rgb(var(--success) / <alpha-value>)',
+      warning: 'rgb(var(--warning) / <alpha-value>)',
+      danger: 'rgb(var(--danger) / <alpha-value>)',
     },
     screens: {
       'xsm': '460px',
