@@ -107,8 +107,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      db-sync:
-        # condition: service_completed_successfully
     labels:
       - traefik.enable=true
       - traefik.http.routers.mmm-${ENVIRONMENT}-api.rule=Host(`${API_DOMAIN}`)
