@@ -14,7 +14,16 @@ const routes = [
     component: () => import('../pages/ExercisesPage.vue'),
     meta: {
       title: 'Exercises',
-      private: true,
+      private: false,
+    },
+  },
+  {
+    path: '/exercises/:id',
+    name: 'exercise-detail',
+    component: () => import('../pages/ExerciseDetailPage.vue'),
+    meta: {
+      title: 'Exercise Detail',
+      private: false,
     },
   },
   {

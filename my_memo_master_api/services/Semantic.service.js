@@ -1,11 +1,9 @@
-//const { env } = require('process');
-
 // Import transformer pipeline at module level (allows jest.mock to intercept)
 let pipeline;
 try {
   pipeline = require('@xenova/transformers').pipeline;
 } catch (error) {
-  console.warn('[SemanticService] Failed to import @xenova/transformers at startup', error);
+  console.error(error);
 }
 
 const STOPWORDS = new Set([
