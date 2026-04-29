@@ -49,7 +49,16 @@ const routes = [
     name: 'flashcards',
     component: () => import('../pages/FlashcardsPage.vue'),
     meta: {
-      title: 'Flashcards',
+      title: 'Mes sessions du jour',
+      private: true,
+    },
+  },
+  {
+    path: '/flashcardssession',
+    name: 'flashcardssession',
+    component: () => import('../pages/FlashcardsSessionPage.vue'),
+    meta: {
+      title: '',
       private: true,
     },
   },
