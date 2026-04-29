@@ -5,8 +5,7 @@
       <router-link to="/create-test">
         <div class="flex gap-5 mr-10">
           <button class="flex items-center gap-2 bg-primary rounded-lg py-0 px-5 text-[#F5F5F5]">
-            <PenIcon class="size-16" />
-            <img class="w-[16px] h-[16px]" :src="editIcon" alt="editIcon" />
+            <PencilIcon class="size-16" />
             Create test
           </button>
           <InformationCircleIcon class="text-primary size-8" />
@@ -31,7 +30,7 @@ import { useTestStore } from '@/stores/test'
 import SubjectFilterComponent from '@/components/SubjectFilterComponent.vue'
 import Grid from '@/components/GridComponent.vue'
 import Tutorial from '@/components/TutorialItem.vue'
-import { PenIcon } from '@heroicons/vue/24/outline'
+import { PencilIcon } from '@heroicons/vue/24/outline'
 import { InformationCircleIcon } from '@heroicons/vue/24/outline'
 
 
