@@ -101,9 +101,9 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import Mindmap from '@/components/MindmapComponent.vue'
+// import Mindmap from '@/components/MindmapComponent.vue'
 import Button from '@/components/ButtonComponent.vue'
-import { XMarkIcon } from '@heroicons/vue/24/solid'
+// import { XMarkIcon } from '@heroicons/vue/24/solid'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
