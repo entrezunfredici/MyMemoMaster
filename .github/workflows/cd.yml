@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - dev
+      - '*devops*'
 
 permissions:
   contents: read
@@ -22,7 +23,8 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       (
         github.event.workflow_run.head_branch == 'main' ||
-        github.event.workflow_run.head_branch == 'dev'
+        github.event.workflow_run.head_branch == 'dev' ||
+        github.event.workflow_run.head_branch == '*devops*'
       )
     steps:
       - name: Checkout Code

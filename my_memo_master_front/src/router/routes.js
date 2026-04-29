@@ -2,10 +2,10 @@ const routes = [
   {
     path: '/',
     name: 'home',
-    component: () => import('../pages/HomePage.vue'),
+    component: () => import('../pages/home_page/HomePage.vue'),
     meta: {
       title: 'Accueil',
-      private: false,
+      private: true,
     },
   },
   {
@@ -32,7 +32,7 @@ const routes = [
     component: () => import('../pages/TutorialsPage.vue'),
     meta: {
       title: 'Tutoriels',
-      private: false,
+      private: true,
     },
   },
   {
@@ -65,7 +65,7 @@ const routes = [
   {
     path: '/mindmaps',
     name: 'mindmaps',
-    component: () => import('../pages/MindmapsPage.vue'),
+    component: () => import('../pages/mind_maps/MindmapsPage.vue'),
     meta: {
       title: 'Mindmaps',
       private: true,
