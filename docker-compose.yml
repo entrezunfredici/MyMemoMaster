@@ -59,14 +59,14 @@ services:
       - VITE_FRONT_URL=${VITE_FRONT_URL}
       - CHOKIDAR_USEPOLLING=1
       - VITE_PORT=${VITE_PORT:-5173}
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}"
+    command: sh -c "(diff -q package-lock.json node_modules/.package-lock.json > /dev/null 2>&1 || npm ci) && npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}"
     networks:
       - my_memo_master_network
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.front.rule=Host(`localhost`)"
       - "traefik.http.routers.front.entrypoints=web"
-      - "traefik.http.services.front.loadbalancer.server.port=${VITE_PORT}"
+      - "traefik.http.services.front.loadbalancer.server.port=${VITE_PORT:-5173}"
 
   api:
     image: node:20-bookworm-slim
@@ -83,7 +83,8 @@ services:
     volumes:
       - ./my_memo_master_api:/app
       - api-node-modules:/app/node_modules
-    command: sh -c "npm ci && (npx --yes nodemon --watch . --ext js,ts --exec \"npm start\" || npm start)"
+    command: sh -c "(diff -q package-lock.json node_modules/.package-lock.json > /dev/null 2>&1 || npm ci) && (npx --yes nodemon --watch . --ext js,ts --exec \"npm start\" || npm start)"
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,11 +96,9 @@ services:
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.middlewares.api-strip.stripprefix.prefixes=/api"
       - "traefik.http.routers.api.middlewares=api-strip"
-      - "traefik.http.services.api.loadbalancer.server.port=${API_PORT}"
+      - "traefik.http.services.api.loadbalancer.server.port=${API_PORT:-3000}"
 
 volumes:
-  api-data:
-  front-data:
   postgres-data:
   pgadmin-data:
   api-node-modules:
