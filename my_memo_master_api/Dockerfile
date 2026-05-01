@@ -1,13 +1,13 @@
 # File my_memo_master_api/Dockerfile
 
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
 COPY package*.json ./
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
-    && npm install \
+    && npm ci --omit=dev \
     && npm cache clean --force \
     && apt-get purge -y --auto-remove python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
