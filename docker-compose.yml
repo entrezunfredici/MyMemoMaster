@@ -15,10 +15,8 @@ services:
       - my_memo_master_network
 
   postgres:
+    image: postgres:17-alpine
     env_file: .env
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile-postgres
     environment:
       - POSTGRES_USER=${PG_USER}
       - POSTGRES_PASSWORD=${PG_PASS}
@@ -29,11 +27,14 @@ services:
       - "${PG_PORT}:5432"
     networks:
       - my_memo_master_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   pgadmin:
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile-pgadmin
+    image: dpage/pgadmin4:8
     ports:
       - "${PGADMIN_PORT}:80"
     volumes:
@@ -47,11 +48,12 @@ services:
       - my_memo_master_network
 
   front:
-    image: node:18-alpine
+    image: node:20-alpine
     working_dir: /app
     env_file: .env
     volumes:
       - ./my_memo_master_front:/app
+      - front-node-modules:/app/node_modules
     environment:
       - VITE_API_URL=${VITE_API_URL}
       - VITE_FRONT_URL=${VITE_FRONT_URL}
@@ -67,7 +69,7 @@ services:
       - "traefik.http.services.front.loadbalancer.server.port=${VITE_PORT}"
 
   api:
-    image: node:18-alpine
+    image: node:20-bookworm-slim
     working_dir: /app
     env_file: .env
     environment:
@@ -80,9 +82,11 @@ services:
       - PG_DB=${PG_DB}
     volumes:
       - ./my_memo_master_api:/app
+      - api-node-modules:/app/node_modules
     command: sh -c "npm ci && (npx --yes nodemon --watch . --ext js,ts --exec \"npm start\" || npm start)"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - my_memo_master_network
     labels:
@@ -98,6 +102,8 @@ volumes:
   front-data:
   postgres-data:
   pgadmin-data:
+  api-node-modules:
+  front-node-modules:
 
 networks:
   my_memo_master_network:
