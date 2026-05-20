@@ -27,7 +27,7 @@ const menuItems = [
   { label: 'Mindmaps', to: '/mindmaps' },
   { label: 'Systemes de Leitner', to: '/flashcards' },
   { label: 'Exercices', to: '/exercises' },
-  { label: 'Calendar', to: '/calendar' },
+  { label: 'Calendrier', to: '/calendar' },
 ]
 
 function goTo(path) {

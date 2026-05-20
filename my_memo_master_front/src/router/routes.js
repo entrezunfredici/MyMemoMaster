@@ -14,7 +14,7 @@ const routes = [
     component: () => import('../pages/ExercisesPage.vue'),
     meta: {
       title: 'Exercises',
-      private: true
+      private: false
     }
   },
   {
@@ -76,7 +76,7 @@ const routes = [
     name: 'calendar',
     component: () => import('../pages/CalendarPage.vue'),
     meta: {
-      title: 'Calendar',
+      title: 'Calendrier',
       private: false
     }
   },
