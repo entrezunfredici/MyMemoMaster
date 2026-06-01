@@ -4,5 +4,7 @@
 .env.prod
 .idea
 *.sqlite
+.docker-tmp
+node_modules
 
 server_docker_compose/server_proxy/
