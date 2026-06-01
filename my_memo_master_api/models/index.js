@@ -3,7 +3,7 @@ const dbmsConfig = require("../config/dbms.config");
 const dbConfig = require("../config/db.config");
 
 // Instantiate Sequelize using the right configuration for the current environment
-const instance = new Sequelize(process.env.ENVIRONMENT === "prod" ? dbmsConfig : dbConfig);
+const instance = new Sequelize(process.env.PG_HOST ? dbmsConfig : dbConfig);
 
 // Register models
 const models = {};

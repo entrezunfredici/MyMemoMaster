@@ -1,15 +1,11 @@
+name: Notify CI
+
 on:
   workflow_run:
     workflows:
       - CI
     types:
       - completed
-    branches:
-      - main
-      - dev
-      - '*devops*'
-      - 'dev_back_*'
-      - 'dev_front_*'
 
 jobs:
   notify_failure:

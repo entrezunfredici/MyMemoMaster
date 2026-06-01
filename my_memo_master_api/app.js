@@ -35,12 +35,12 @@ const app = express();
 // CORS
 app.use(
   cors({
-    origin: process.env.VITE_FRONT_URL,
+    origin: process.env.CORS_ORIGIN || process.env.VITE_FRONT_URL,
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-console.log("CORS autorise les requêtes depuis :", process.env.VITE_FRONT_URL);
+console.log("CORS autorise les requêtes depuis :", process.env.CORS_ORIGIN || process.env.VITE_FRONT_URL);
 // app.use(cors()); // Autorise toutes les requêtes (à ne pas laisser en prod)
 
 
