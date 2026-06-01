@@ -1,0 +1,17 @@
+.custom-border {
+    border: thick solid #1E3BA1;
+    border-radius: 18px;
+}
+.imageConnexion {
+    border-radius: 9px;
+}
+.valider{
+    color: white
+}
+.contenue{
+    background-color: #1E3BA1;
+    border-radius: 50px;
+}
+.formulaire{
+    background-color: white;
+}
