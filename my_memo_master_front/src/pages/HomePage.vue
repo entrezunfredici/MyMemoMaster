@@ -27,6 +27,7 @@ const menuItems = [
   { label: 'Mindmaps', to: '/mindmaps' },
   { label: 'Systemes de Leitner', to: '/flashcards' },
   { label: 'Exercices', to: '/exercises' },
+  { label: 'Calendar', to: '/calendar' },
 ]
 
 function goTo(path) {
@@ -42,6 +43,7 @@ function goTo(path) {
 .home_menu {
   max-width: 960px;
   margin: 0 auto 24px;
+  align-items: center;
 }
 
 .home__interpreter {
