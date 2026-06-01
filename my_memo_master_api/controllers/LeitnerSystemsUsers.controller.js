@@ -1,4 +1,5 @@
 const LeitnerSystemsUsersService = require("../services/LeitnerSystemsUsers.service");
+const logger = require("../helpers/logger");
 
 module.exports = {
   async create(req, res) {
@@ -7,7 +8,7 @@ module.exports = {
       const result = await LeitnerSystemsUsersService.create(data);
       return res.status(201).json(result);
     } catch (error) {
-      console.error(error?.message || error);
+      logger.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },
@@ -17,7 +18,7 @@ module.exports = {
       const result = await LeitnerSystemsUsersService.findAll();
       return res.status(200).json(result);
     } catch (error) {
-      console.error(error?.message || error);
+      logger.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },
@@ -31,7 +32,7 @@ module.exports = {
       }
       return res.status(200).json(result);
     } catch (error) {
-      console.error(error?.message || error);
+      logger.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },
@@ -64,11 +65,8 @@ module.exports = {
         updatedData: result,
       });
     } catch (error) {
-      console.error("Erreur lors de la mise à jour :", error.message);
-      return res.status(500).json({
-        message: "Erreur serveur lors de la mise à jour.",
-        error: error.message,
-      });
+      logger.error(error?.message || error);
+      return res.status(500).json({ message: "Erreur serveur lors de la mise à jour." });
     }
   },
 
@@ -80,7 +78,7 @@ module.exports = {
         .status(200)
         .json({ message: "Relation supprimée avec succès" });
     } catch (error) {
-      console.error(error?.message || error);
+      logger.error(error?.message || error);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   },

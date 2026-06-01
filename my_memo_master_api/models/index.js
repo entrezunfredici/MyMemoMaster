@@ -1,6 +1,7 @@
 const { Sequelize } = require("sequelize");
 const dbmsConfig = require("../config/dbms.config");
 const dbConfig = require("../config/db.config");
+const logger = require("../helpers/logger");
 
 // Création de l'instance Sequelize
 const instance = new Sequelize(process.env.ENVIRONMENT === "prod" ? dbmsConfig : dbConfig);
@@ -32,14 +33,14 @@ Object.keys(models).forEach((modelName) => {
 
 //reset database
 // instance.sync({ force: true }).then(() => {
-//   console.log("reset database success"); 
+//   logger.info("reset database success"); 
 // });
 
 instance.sync({ alter: true }).then(() => {
-  console.log("Base de données synchronisée (force true)");
+  logger.info("Base de données synchronisée (force true)");
   // Ici tu peux démarrer ton serveur ou ta seed
 }).catch((err) => {
-  console.error("Erreur lors de la synchronisation de la base :", err);
+  logger.error("Erreur lors de la synchronisation de la base :", err);
 });
 
 module.exports = {

@@ -91,8 +91,6 @@ class UserService {
     if (password.length < 10) throw new Error('Le mot de passe doit contenir au moins 10 caractères');
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    if (bcrypt.compare(password, hashedPassword)) throw new Error('Le mot de passe doit être différent de l\'ancien');
-
     await User.update({ password: hashedPassword }, {
       where: { userId: userId }
     });
@@ -124,6 +122,7 @@ class UserService {
     await User.update({ resetPasswordCode: code }, {
       where: { userId: userId }
     });
+    return code;
   }
 
   async verifyResetPasswordCode(userId, code) {

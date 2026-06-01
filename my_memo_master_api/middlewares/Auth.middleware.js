@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
+const logger = require('../helpers/logger');
 
 module.exports = (req, res, next) => {
-    if (process.env.API_BYPASS_AUTH == 'true') {
+    if (process.env.API_BYPASS_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
         next();
         return;
     }
@@ -25,7 +26,7 @@ module.exports = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (error) {
-        console.error(error?.message || error);
+        logger.error(error?.message || error);
         res.status(401).send({ message: 'Unauthorized!' });
         return;
     }

@@ -1,11 +1,12 @@
 const LeitnerBoxService = require("../services/LeitnerBox.service.js");
+const logger = require("../helpers/logger");
 
 exports.findAll = async (req, res) => {
   try {
     const boxes = await LeitnerBoxService.findAll();
     res.status(200).send(boxes);
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).send({
       message: "Erreur lors de la récupération des boîtes de Leitner.",
     });
@@ -23,7 +24,7 @@ exports.findOne = async (req, res) => {
       res.status(200).send(box);
     }
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la récupération de la boîte: " });
@@ -41,7 +42,7 @@ exports.create = async (req, res) => {
     });
     res.status(201).send(box);
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la création de la boîte." });
@@ -63,10 +64,8 @@ exports.update = async (req, res) => {
 
     return res.status(200).json(updatedBox);
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de la boîte :", error.message);
-    return res
-      .status(500)
-      .json({ message: "Erreur serveur.", error: error.message });
+    logger.error(error?.message || error);
+    return res.status(500).json({ message: "Erreur lors de la mise à jour de la boîte." });
   }
 };
 
@@ -81,7 +80,7 @@ exports.delete = async (req, res) => {
       res.status(200).send({ message: "Boîte supprimée avec succès." });
     }
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur lors de la suppression de la boîte." });

@@ -1,11 +1,12 @@
 const unitService = require("../services/Unit.service");
+const logger = require("../helpers/logger");
 
 async function getAllUnits(req, res) {
   try {
     const units = await unitService.getAllUnits();
     res.status(200).json(units);
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).json({ error: "Failed to fetch units" });
   }
 }
@@ -19,7 +20,7 @@ async function getUnitById(req, res) {
       res.status(200).json(unit);
     }
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).json({ error: "Failed to fetch unit" });
   }
 }
@@ -34,7 +35,7 @@ async function addUnit(req, res) {
     });
     res.status(201).json(newUnit);
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).json({ error: "Failed to add unit" });
   }
 }
@@ -48,7 +49,7 @@ async function updateUnit(req, res) {
       res.status(200).json(updatedUnit);
     }
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).json({ error: "Failed to update unit" });
   }
 }
@@ -62,7 +63,7 @@ async function deleteUnit(req, res) {
       res.status(200).json({ message: "Unit deleted successfully" });
     }
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).json({ error: "Failed to delete unit" });
   }
 }

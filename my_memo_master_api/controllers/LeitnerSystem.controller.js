@@ -1,10 +1,11 @@
 const leitnerSystemService = require("../services/LeitnerSystem.service.js");
+const logger = require("../helpers/logger");
 exports.findAll = async (req, res) => {
   try {
     const data = await leitnerSystemService.findAll();
     res.status(200).send(data);
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).send({
       message:
         "Une erreur s'est produite lors de la récupération des systèmes de Leitner.",
@@ -22,7 +23,7 @@ exports.findBySubject = async (req, res) => {
       res.status(200).send(data);
     }
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res
       .status(500)
       .send({ message: "Erreur serveur lors de la récupération." });
@@ -39,7 +40,7 @@ exports.findOne = async (req, res) => {
       res.status(200).send(data);
     }
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).send({ message: "Erreur serveur." });
   }
 };
@@ -66,11 +67,8 @@ exports.create = async (req, res) => {
     // Réponse avec le nouveau système créé
     return res.status(201).json(newSystem);
   } catch (error) {
-    console.error("Erreur Sequelize :", error.message, error);
-    return res.status(500).json({
-      message: "Erreur lors de la création du système.",
-      error: error.message,
-    });
+    logger.error(error?.message || error);
+    return res.status(500).json({ message: "Erreur lors de la création du système." });
   }
 };
 
@@ -94,11 +92,8 @@ exports.update = async (req, res) => {
 
     res.status(200).send({ message: "Système modifié avec succès." });
   } catch (error) {
-    console.error("Erreur lors de la modification :", error.message);
-    res.status(500).send({
-      message: "Erreur lors de la modification.",
-      error: error.message,
-    });
+    logger.error(error?.message || error);
+    res.status(500).json({ message: "Erreur lors de la modification." });
   }
 };
 
@@ -107,7 +102,7 @@ exports.share = async (req, res) => {
     const result = await leitnerSystemService.shareSystem(req.body);
     res.status(200).send(result);
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(403).send({ message: "Erreur de partage." });
   }
 };
@@ -124,7 +119,7 @@ exports.delete = async (req, res) => {
     }
     res.status(200).send({ message: "Système supprimé avec succès." });
   } catch (error) {
-    console.error(error?.message || error);
+    logger.error(error?.message || error);
     res.status(500).send({ message: "Erreur serveur lors de la suppression." });
   }
 };

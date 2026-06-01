@@ -1,12 +1,15 @@
 const path = require("path");
 const dotenv = require("dotenv");
 const express = require("express");
+const helmet = require("helmet");
 const favicon = require("serve-favicon");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
+const sanitize = require("./middlewares/sanitize.middleware");
+const errorHandler = require("./middlewares/errorHandler.middleware");
 
 // Importation des routes
 const subjectRoutes = require("./routes/Subject.routes");
@@ -29,7 +32,9 @@ const { startFifoCron } = require('./jobs/fifo.cron');
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
 
 const app = express();
-console.log("CORS autorise les requêtes depuis :", process.env.VITE_FRONT_URL);
+
+// Security headers
+app.use(helmet());
 
 // CORS
 app.use(
@@ -39,11 +44,12 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-// app.use(cors()); // Autorise toutes les requêtes (à ne pas laisser en prod)
-
 
 // Body parser
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10kb' }));
+
+// Sanitize HTML tags from all body string fields
+app.use(sanitize);
 
 // Middleware for favicon
 app.use(favicon(__dirname + "/public/favicon.ico"));
@@ -72,8 +78,11 @@ tutorialRoutes(app);
 startFifoCron();
 
 // Si rien n'est trouvé
-app.use(({ res }) => {
+app.use((_req, res) => {
   return res.status(404).json({ message: "Route not found" });
 });
+
+// Global error handler (must be last)
+app.use(errorHandler);
 
 module.exports = app;

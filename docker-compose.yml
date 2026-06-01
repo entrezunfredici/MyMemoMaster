@@ -48,15 +48,16 @@ services:
       - my_memo_master_network
 
   front:
-    image: node:18-alpine
+    image: node:22-alpine
     working_dir: /app
     env_file: .env
     volumes:
       - ./my_memo_master_front:/app
+      - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=1
       - VITE_PORT=${VITE_PORT:-5173}
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}"
     networks:
       - my_memo_master_network
     labels:
@@ -66,7 +67,7 @@ services:
       - "traefik.http.services.front.loadbalancer.server.port=${VITE_PORT}"
 
   api:
-    image: node:18-alpine
+    image: node:22-alpine
     working_dir: /app
     env_file: .env
     environment:
@@ -79,7 +80,8 @@ services:
       - PG_DB=${PG_DB}
     volumes:
       - ./my_memo_master_api:/app
-    command: sh -c "npm ci && (npx --yes nodemon --watch . --ext js,ts --exec \"npm start\" || npm start)"
+      - /app/node_modules
+    command: sh -c "npm install && (npx --yes nodemon --watch . --ext js,ts --exec \"npm start\" || npm start)"
     depends_on:
       - postgres
     networks:

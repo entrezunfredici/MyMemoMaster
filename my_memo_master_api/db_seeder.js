@@ -1,3 +1,4 @@
+const logger = require('./helpers/logger');
 const db = require("./models/index");
 const bcrypt = require("bcryptjs");
 
@@ -9,10 +10,10 @@ const listTables = async () => {
     const tables = await db.instance.query(
       "SELECT name FROM sqlite_master WHERE type='table';"
     );
-    console.log(tables[0].map((table) => table.name));
+    logger.info(tables[0].map((table) => table.name));
   } catch (error) {
-    console.error("Error listing tables");
-    console.error(error);
+    logger.error("Error listing tables");
+    logger.error(error);
     throw error;
   }
 };
@@ -21,10 +22,10 @@ const seedDatabase = async () => {
   // * This function will drop all existing tables, recreate them, and insert sample data
   try {
     await db.instance.authenticate();
-    console.log("Database connected successfully");
+    logger.info("Database connected successfully");
 
     await db.instance.sync({ force: true });
-    console.log("Database synchronized successfully");
+    logger.info("Database synchronized successfully");
 
     await db.instance.query("PRAGMA foreign_keys = OFF");
 
@@ -33,30 +34,30 @@ const seedDatabase = async () => {
       user.password = bcrypt.hashSync(user.password, 10);
     });
     await db.User.bulkCreate(users);
-    console.log("Users table seeded successfully");
+    logger.info("Users table seeded successfully");
 
     const roles = require("./seeds/Role.seed.json");
     await db.Role.bulkCreate(roles);
-    console.log("Roles table seeded successfully");
+    logger.info("Roles table seeded successfully");
 
     const subjects = require("./seeds/Subject.seed.json");
     await db.Subject.bulkCreate(subjects);
-    console.log("Subjects table seeded successfully");
+    logger.info("Subjects table seeded successfully");
 
     await db.LeitnerSystem.bulkCreate(
       require("./seeds/LeitnerSystem.seed.json")
     );
-    console.log("LeitnerSystems table seeded successfully");
+    logger.info("LeitnerSystems table seeded successfully");
     await db.LeitnerBox.bulkCreate(require("./seeds/LeitnerBox.seed.json"));
-    console.log("LeitnerBoxes table seeded successfully");
+    logger.info("LeitnerBoxes table seeded successfully");
     await db.LeitnerCard.bulkCreate(require("./seeds/LeitnerCard.seed.json"));
-    console.log("LeitnerCards table seeded successfully");
+    logger.info("LeitnerCards table seeded successfully");
     await db.instance.query("PRAGMA foreign_keys = ON");
 
-    console.log("Sample data inserted");
+    logger.info("Sample data inserted");
   } catch (error) {
-    console.error("Error inserting sample data");
-    console.error(error);
+    logger.error("Error inserting sample data");
+    logger.error(error);
     throw error;
   }
 };
@@ -66,13 +67,13 @@ const checkSeed = async () => {
   try {
     const roles = await db.Role.findAll();
     if (roles.length === 0) {
-      console.warn("No data found in the database");
+      logger.warn("No data found in the database");
     } else {
-      console.log("Sample data verified");
+      logger.info("Sample data verified");
     }
   } catch (error) {
-    console.error("Error verifying sample data");
-    console.error(error);
+    logger.error("Error verifying sample data");
+    logger.error(error);
     throw error;
   }
 };
@@ -82,11 +83,11 @@ const checkSeed = async () => {
     await listTables();
     await seedDatabase();
     await checkSeed();
-    console.log("Data seeding completed");
+    logger.info("Data seeding completed");
     process.exit(0);
   } catch (error) {
-    console.error("Error running the script");
-    console.error(error);
+    logger.error("Error running the script");
+    logger.error(error);
     process.exit(1);
   } finally {
     await db.instance.close();
