@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (instance) => {
-  const Question =  instance.define(
+  const Question = instance.define(
     "Question",
     {
       idQuestion: {
@@ -33,7 +33,7 @@ module.exports = (instance) => {
     Question.belongsToMany(models.Subject, {
       through: "questionSubject",
       foreignKey: "idQuestion",
-      otherKey: "idSubject",
+      otherKey: "subjectId",
       as: "subject",
     });
 

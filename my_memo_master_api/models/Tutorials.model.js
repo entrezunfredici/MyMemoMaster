@@ -23,7 +23,7 @@ module.exports = (instance) => {
         allowNull: false,
         defaultValue: false,
       },
-      idSubject: {
+      subjectId: {
         type: DataTypes.INTEGER,
         allowNull: false,
       },

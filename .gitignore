@@ -1,6 +1,10 @@
 .env
+.env.dev
+.env.test
+.env.prod
 .idea
-*lock.json
-my_memo_master_api/node_modules
-my_memo_master_api/database/db.sqlite
-my_memo_master_api/.envs
+*.sqlite
+.docker-tmp
+node_modules
+
+server_docker_compose/server_proxy/

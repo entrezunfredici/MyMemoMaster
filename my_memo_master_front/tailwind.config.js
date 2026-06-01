@@ -9,18 +9,17 @@ export default {
     extend: {},
     colors: {
       /* Theme colors */
-      primary: '#1E3BA1',
-      'light-primary': '#828FBC',
-      secondary: '#FA4238',
-      'light-secondary': '#FDC7C4',
-      light: '#FDF7FF',
-      gray: '#d5daed',
-      dark: '#101f56',
-      greyCustom: '#F5F5F5',
+      primary: 'rgb(var(--primary) / <alpha-value>)',
+      'light-primary': 'rgb(var(--light-primary) / <alpha-value>)',
+      secondary: 'rgb(var(--secondary) / <alpha-value>)',
+      'light-secondary': 'rgb(var(--light-secondary) / <alpha-value>)',
+      light: 'rgb(var(--light) / <alpha-value>)',
+      gray: 'rgb(var(--gray) / <alpha-value>)',
+      dark: 'rgb(var(--dark) / <alpha-value>)',
       /* Other colors */
-      success: '#10b981',
-      warning: '#f59e0b',
-      danger: '#dc2626',
+      success: 'rgb(var(--success) / <alpha-value>)',
+      warning: 'rgb(var(--warning) / <alpha-value>)',
+      danger: 'rgb(var(--danger) / <alpha-value>)',
     },
     screens: {
       'xsm': '460px',

@@ -1,10 +1,9 @@
 # MyMemoMaster
 
-
 ## Partie 1: Présentation
 
 MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leur révisions. En centralisant diverses fonctionnalités visant à optimiser l’apprentissage. La ou MyMEmoMaster pourra se démarquer de ces concurrents c’est sur le fait de proposer un large éventail de fonctionnalités :
-
+[.env.example](.env.example)
 Les fonctionnalitées principales sont :
 ⇒ un éditeur de cartes mentales
 ⇒ un système de leitner
@@ -97,6 +96,12 @@ npm run dev
 
 5. Lancer le seed de la base de données:
 
+avec docker (dans un terminal classique)
+```sh
+docker compose exec api sh -c "npm run seed"
+```
+
+sans docker ou dans le terminal docker 
 ```sh
 cd MyMemoMaster/my_memo_master_api
 npm run seed
@@ -168,3 +173,21 @@ un adjectif:
 - [REF] pour les refactorisations
 - [FIX] pour les corrections de bugs
   suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
+
+Workflow
+
+```mermaid
+flowchart TD
+    Backlog --> Cadrage
+    Cadrage --> ToDo
+    Cadrage --> Annule[Annulé]
+    ToDo --> Spec[Spécification]
+    ToDo --> En_cours
+    ToDo --> Annule
+    En_cours --> Spec
+    En_cours --> Annule
+    En_cours --> Valide[Validé]
+    Spec --> En_cours
+    Spec --> Annule
+    Valide --> Spec
+```

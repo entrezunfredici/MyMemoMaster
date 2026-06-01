@@ -18,6 +18,7 @@ const testRoutes = require("./routes/Test.routes");
 const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
 const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
 const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
+const kpiRoutes = require("./routes/Kpi.routes");
 const responseRoutes = require("./routes/Response.routes");
 const userRoutes = require("./routes/User.routes");
 const unitRoutes = require("./routes/Unit.routes");
@@ -27,6 +28,7 @@ const fieldsTypeRoutes = require("./routes/FieldsType.routes.js");
 const diagrammeRoutes = require("./routes/Diagramme.routes");
 const questionRoutes = require("./routes/Question.routes");
 const tutorialRoutes = require("./routes/Tutorials.routes");
+const gradingRoutes = require("./routes/Grading.routes");
 const { startFifoCron } = require('./jobs/fifo.cron');
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
@@ -39,7 +41,7 @@ app.use(helmet());
 // CORS
 app.use(
   cors({
-    origin: process.env.VITE_FRONT_URL,
+    origin: process.env.CORS_ORIGIN || process.env.VITE_FRONT_URL,
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -54,6 +56,9 @@ app.use(sanitize);
 // Middleware for favicon
 app.use(favicon(__dirname + "/public/favicon.ico"));
 
+// Static files for uploaded assets
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
+
 // Middleware pour servir la documentation Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -64,6 +69,7 @@ testRoutes(app);
 responseRoutes(app);
 unitRoutes(app);
 userRoutes(app);
+kpiRoutes(app);
 leitnerSystemRoutes(app);
 leitnerCardRoutes(app);
 leitnerBoxRoutes(app);
@@ -73,6 +79,7 @@ fieldsTypeRoutes(app);
 diagrammeRoutes(app);
 questionRoutes(app);
 tutorialRoutes(app);
+gradingRoutes(app);
 
 // ... Autres middlewares
 startFifoCron();
