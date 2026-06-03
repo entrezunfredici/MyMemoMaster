@@ -1,65 +1,167 @@
-const { LeitnerCard, LeitnerBox, Response } = require("../models");
+const { Op } = require("sequelize");
+const dayjs = require("dayjs");
+const { LeitnerCard, LeitnerBox, Question, Response } = require("../models");
 
 class LeitnerCardService {
+  /**
+   * Récupère toutes les cartes d'une boîte.
+   *
+   * @param {number} leitnerBoxId - ID de la boîte
+   * @returns {Promise<LeitnerCard[]>}
+   */
   async getCardsByBoxId(leitnerBoxId) {
-    return await LeitnerCard.findAll({ where: { idBox: leitnerBoxId } });
+    return await LeitnerCard.findAll({
+      where: { idBox: leitnerBoxId },
+      include: [{ model: Question, as: "question" }],
+    });
   }
 
+  /**
+   * Récupère une carte par son ID.
+   *
+   * @param {number} id - ID de la carte
+   * @returns {Promise<LeitnerCard|null>}
+   */
   async getCardById(id) {
-    return await LeitnerCard.findByPk(id);
+    return await LeitnerCard.findByPk(id, {
+      include: [
+        { model: LeitnerBox, as: "leitnerBox" },
+        { model: Question, as: "question" },
+      ],
+    });
   }
 
+  /**
+   * Retourne les cartes d'un système dont la date de révision est atteinte ou dépassée.
+   *
+   * @param {number} systemId - ID du système Leitner
+   * @returns {Promise<LeitnerCard[]>}
+   */
+  async getDueCards(systemId) {
+    const now = dayjs().toDate();
+    return await LeitnerCard.findAll({
+      include: [
+        {
+          model: LeitnerBox,
+          as: "leitnerBox",
+          where: { idSystem: systemId },
+          required: true,
+        },
+        { model: Question, as: "question" },
+      ],
+      where: {
+        [Op.or]: [
+          { next_review_at: { [Op.lte]: now } },
+          { next_review_at: null },
+        ],
+      },
+    });
+  }
+
+  /**
+   * Ajoute une carte dans la boîte de niveau 1 du système.
+   *
+   * @param {object} data - Données de la carte (idQuestion, idSystem...)
+   * @param {{ canAdd: boolean }} userRights - Droits de l'utilisateur
+   * @returns {Promise<LeitnerCard>}
+   * @throws {Error} Si l'utilisateur n'a pas les droits ou si la boîte niveau 1 est introuvable
+   */
   async addCard(data, userRights) {
-    // Vérification des droits utilisateur
-    if (userRights.canAdd) {
-      // Carte ajoutée dans la boîte de niveau 0 avec fifo à true
-      const leitnerBox = await LeitnerBox.findOne({ where: { level: 0 } });
-      return await LeitnerCard.create({
-        ...data,
-        fifo: true,
-        idBox: leitnerBox.idBox,
-      });
+    if (!userRights.canAdd) {
+      throw new Error("Droits insuffisants pour ajouter une carte.");
     }
-    throw new Error("User does not have permission to add a card.");
+
+    const box = await LeitnerBox.findOne({ where: { level: 1 } });
+    if (!box) throw new Error("Boîte de niveau 1 introuvable.");
+
+    return await LeitnerCard.create({
+      ...data,
+      fifo: true,
+      idBox: box.idBox,
+      next_review_at: null,
+      last_review_at: null,
+      review_count: 0,
+      correct_count: 0,
+      incorrect_count: 0,
+    });
   }
 
+  /**
+   * Met à jour les données d'une carte.
+   *
+   * @param {number} id - ID de la carte
+   * @param {object} data - Nouvelles données
+   * @param {{ canEdit: boolean }} userRights - Droits de l'utilisateur
+   * @returns {Promise<LeitnerCard|null>}
+   */
   async updateCard(id, data, userRights) {
     const card = await LeitnerCard.findByPk(id);
-    if (card && userRights.canEdit) {
-      await card.update(data);
-      return card;
-    }
-    return null;
+    if (!card || !userRights.canEdit) return null;
+    await card.update(data);
+    return card;
   }
 
+  /**
+   * Traite la réponse à une carte et applique l'algorithme Leitner :
+   * - Bonne réponse → boîte suivante (max niveau 5)
+   * - Mauvaise réponse → retour boîte niveau 1
+   * Met à jour next_review_at, les compteurs et last_review_at.
+   *
+   * @param {number} cardId - ID de la carte
+   * @param {number} responseId - ID de la réponse soumise
+   * @returns {Promise<{ success: boolean, correction: string }|null>}
+   */
   async correctResponse(cardId, responseId) {
-    const card = await LeitnerCard.findByPk(cardId);
+    const card = await LeitnerCard.findByPk(cardId, {
+      include: [{ model: LeitnerBox, as: "leitnerBox" }],
+    });
     const response = await Response.findByPk(responseId);
 
     if (!card || !response) return null;
 
     const isCorrect = response.content === response.correction;
+    const currentLevel = card.leitnerBox.level;
+    const systemId = card.leitnerBox.idSystem;
 
-    // Mise à jour de la boîte en fonction de la correction
-    const newLevel = isCorrect ? card.idBox + 1 : Math.max(card.idBox - 1, 0);
-    const nextBox = await LeitnerBox.findOne({ where: { level: newLevel } });
+    // CHOIX: retour au niveau 1 sur mauvaise réponse (règle Leitner classique)
+    // plutôt que niveau - 1, pour renforcer la mémorisation des cartes oubliées
+    const newLevel = isCorrect ? Math.min(currentLevel + 1, 5) : 1;
 
-    card.update({
+    const nextBox = await LeitnerBox.findOne({
+      where: { level: newLevel, idSystem: systemId },
+    });
+
+    const now = dayjs();
+    const nextReviewAt = nextBox
+      ? now.add(nextBox.intervall, "second").toDate()
+      : null;
+
+    await card.update({
       idBox: nextBox ? nextBox.idBox : card.idBox,
-      fifo: false,
-      dateTimeFifo: new Date(Date.now() + nextBox.intervall * 1000),
+      fifo: newLevel < 5,
+      dateTimeFifo: nextReviewAt,
+      next_review_at: nextReviewAt,
+      last_review_at: now.toDate(),
+      review_count: card.review_count + 1,
+      correct_count: isCorrect ? card.correct_count + 1 : card.correct_count,
+      incorrect_count: isCorrect ? card.incorrect_count : card.incorrect_count + 1,
     });
 
     return { success: isCorrect, correction: response.correction };
   }
 
+  /**
+   * Supprime une carte.
+   *
+   * @param {number} id - ID de la carte
+   * @param {{ canDelete: boolean }} userRights - Droits de l'utilisateur
+   * @returns {Promise<boolean>}
+   */
   async deleteCard(id, userRights) {
     const card = await LeitnerCard.findByPk(id);
-    if (card && userRights.canDelete) {
-      await card.destroy();
-      return true;
-    }
-    return false;
+    if (!card || !userRights.canDelete) return false;
+    await card.destroy();
+    return true;
   }
 }
 

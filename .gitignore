@@ -6,5 +6,7 @@
 *.sqlite
 .docker-tmp
 node_modules
+cadrage
+*lock.json
 
 server_docker_compose/server_proxy/

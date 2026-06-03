@@ -1,7 +1,6 @@
 const { Sequelize } = require("sequelize");
 const dbmsConfig = require("../config/dbms.config");
 const dbConfig = require("../config/db.config");
-const logger = require("../helpers/logger");
 
 // Instantiate Sequelize using the right configuration for the current environment
 const instance = new Sequelize(process.env.PG_HOST ? dbmsConfig : dbConfig);

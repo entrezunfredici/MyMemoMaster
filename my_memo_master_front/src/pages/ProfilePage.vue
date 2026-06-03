@@ -2,7 +2,7 @@
   <section>
     <h4 v-if="roleStore.role.name == 'Admin'" class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4"> Informations Administrateur</h4>
     <h4 v-else class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4"> Informations utilisateur</h4>
-    <p>Nom utilisateur : Jeannine</p>
+    <p>Nom utilisateur : {{ authStore.user.name }}</p>
     <p v-if="roleStore.role.name">Role : {{ roleStore.role.name }}</p>
     <p v-else>Chargement du role...</p>
     <button

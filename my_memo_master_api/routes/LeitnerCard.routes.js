@@ -4,6 +4,27 @@ const leitnerCardController = require("../controllers/LeitnerCard.controller");
 
 /**
  * @swagger
+ * /leitnercards/due/{systemId}:
+ *   get:
+ *     summary: Obtenir les cartes à réviser pour un système Leitner
+ *     tags: [LeitnerCards]
+ *     parameters:
+ *       - in: path
+ *         name: systemId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du système Leitner
+ *     responses:
+ *       200:
+ *         description: Liste des cartes dont la date de révision est atteinte ou dépassée.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.get("/due/:systemId", leitnerCardController.getDueCards);
+
+/**
+ * @swagger
  * /leitnercards/leitnerboxes/{leitnerboxid}:
  *   get:
  *     summary: Obtenir toutes les cartes liées à une boîte de Leitner

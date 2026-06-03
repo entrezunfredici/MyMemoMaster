@@ -26,6 +26,29 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
+      next_review_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      last_review_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      review_count: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
+      correct_count: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
+      incorrect_count: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
     },
     {
       tableName: "LeitnerCard",

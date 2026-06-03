@@ -99,7 +99,7 @@ exports.update = async (req, res) => {
 
 exports.share = async (req, res) => {
   try {
-    const result = await leitnerSystemService.shareSystem(req.body);
+    const result = await leitnerSystemService.share(req.body);
     res.status(200).send(result);
   } catch (error) {
     logger.error(error?.message || error);
