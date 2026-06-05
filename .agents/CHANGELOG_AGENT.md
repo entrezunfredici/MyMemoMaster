@@ -34,7 +34,10 @@
 | Tutorials | Stable | init |
 | OnboardingState | Stable | init |
 | Kpi | Stable (lecture seule) | init |
-| Middlewares (Auth, errorHandler, sanitize, validate) | Stable | init |
+| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — Multer errors → 400, validators ajoutés | 2026-06-05 |
+| Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
+| Migrations Sequelize CLI | Stable — 23 migrations + migration index FK | 2026-06-05 |
+| Seeders Sequelize CLI | Stable — Roles + User admin | 2026-06-05 |
 | Jobs (fifo.cron.js) | Stable | init |
 | Front — Auth (login, register) | Stable | init |
 | Front — HomePage | Stable | init |
@@ -143,3 +146,111 @@
 - Frontend Leitner (stores Pinia + composants de session) non implémenté — endpoints prêts.
 - `dateTimeFifo` conservé et mis à jour en parallèle de `next_review_at` pour compatibilité — à supprimer dans un ticket de nettoyage.
 - Intervalles des boîtes en secondes (dev) — à passer en jours avant la mise en production.
+
+---
+
+### [M-00.04] — Socle technique — Améliorations qualité — 2026-06-05
+
+**Fichiers modifiés :**
+- `middlewares/errorHandler.middleware.js` — détection `MulterError` + `isFileFilterError` → retour 400 au lieu de 500
+- `middlewares/upload.middleware.js` — tag `isFileFilterError` sur les erreurs fileFilter
+- `routes/*.routes.js` (14 fichiers) — conventions REST : `GET /all` → `GET /`, `POST /add` → `POST /`, `GET /responses/all/:id` → `GET /responses/question/:id`; Swagger JSDoc mis à jour en conséquence
+- `routes/Response.routes.js`, `Test.routes.js`, `Role.routes.js`, `Question.routes.js`, `Unit.routes.js`, `Fields.routes.js`, `FieldsType.routes.js`, `Tutorials.routes.js` — ajout des imports validate + validators et branchement sur POST et PUT
+- `models/LeitnerCard.model.js` — index sur `idQuestion`, `idBox`, `next_review_at`
+- `models/LeitnerBox.model.js` — index sur `idSystem`
+- `models/LeitnerSystem.model.js` — index sur `idUser`
+- `models/Response.model.js` — index sur `idQuestion`
+- `models/User.model.js` — index sur `roleId`
+- `models/Fields.model.js` — index sur `idType`, `idUnit`
+- `models/diagramme.model.js` — index sur `userId`, `subjectId`
+- `models/Test.model.js` — index sur `subjectId`
+- `models/Tutorials.model.js` — index sur `subjectId`
+- `config/dbms.config.js` — pool Sequelize : max/min/acquire/idle via env vars
+- `.env.example` — ajout `PG_POOL_MAX/MIN/ACQUIRE/IDLE`
+
+**Fichiers créés :**
+- `validators/Response.validators.js`, `Test.validators.js`, `Role.validators.js`, `Question.validators.js`, `Unit.validators.js`, `Fields.validators.js`, `FieldsType.validators.js`, `Tutorials.validators.js` — 8 nouveaux validators express-validator
+
+**Fichiers modifiés (front) :**
+- `src/stores/diagrammes.js`, `fields.js`, `questions.js`, `responses.js`, `roles.js`, `subjects.js`, `test.js`, `tests.js` — URLs API mises à jour (suppression `/all` et `/add`)
+- `src/pages/MindmapsPage.vue` — URLs API mises à jour
+
+**Ce qui est utilisable :**
+- Toutes les routes API suivent maintenant `GET /resource` et `POST /resource`
+- `GET /responses/question/:questionId` pour récupérer les réponses d'une question
+- Tous les endpoints POST/PUT des 8 entités sans validators sont maintenant validés
+- Les index FK sont créés au `db.sync()` — actifs immédiatement en dev, nécessitent une migration en prod
+- Pool PostgreSQL configurable via `.env` sans changer le code
+
+**Hypothèses posées :**
+- Les index Sequelize sont créés via `sync()` en dev/test — en prod ils nécessitent une migration Sequelize CLI dédiée.
+- Pool par défaut : max=10, min=2 — suffisant pour un MVP mono-instance.
+
+**Dette / points d'attention :**
+- ~~Créer des migrations Sequelize pour les 9 nouveaux index avant déploiement prod.~~ — Résolu en M-00.05
+- `stores/fields.js` est un copier-coller de `stores/diagrammes.js` — à refactorer ou supprimer si inutilisé.
+- `test.js` et `tests.js` dans les stores Pinia définissent tous deux `useTestStore` avec le même ID `'tests'` — conflit potentiel à résoudre.
+
+---
+
+### [M-00.05] — Connexion PostgreSQL (migrations, seeds) — 2026-06-05
+
+**Fichiers créés :**
+- `migrations/20260605000001-add-indexes.js` — migration Sequelize CLI pour les 13 index FK créés en M-00.04 (User.roleId, LeitnerSystem.idUser, LeitnerBox.idSystem, LeitnerCard.idQuestion/idBox/next_review_at, Response.idQuestion, Fields.idType/idUnit, MindMap.userId/subjectId, Test.subjectId, Tutorials.subjectId)
+- `seeders/20260605000001-seed-roles.js` — seeder CLI : insère les rôles Admin et Étudiant dans la table Role
+- `seeders/20260605000002-seed-admin-user.js` — seeder CLI : insère un user admin (`admin@mymemomaster.local` / `Admin1234!`) avec password hashé bcrypt
+
+**Fichiers modifiés :**
+- `.sequelizerc` — ajout de `seeders-path` pointant vers `my_memo_master_api/seeders/`
+
+**Ce qui est utilisable :**
+- `npx sequelize-cli db:migrate` — applique les 23 migrations de schéma + migration des index
+- `npx sequelize-cli db:seed:all` — insère les données de référence (rôles + user admin)
+- `npx sequelize-cli db:seed:undo:all` — annule les seeds
+- Lancer depuis `my_memo_master_api/` — le `.sequelizerc` résout les chemins automatiquement
+
+**Hypothèses posées :**
+- Les seeds JSON dans `seeds/*.seed.json` sont conservés comme documentation de structure mais ne sont pas utilisés par Sequelize CLI — les seeders CLI sont dans `seeders/`.
+- Le mot de passe admin par défaut est `Admin1234!` — à changer impérativement avant la mise en production.
+- Le seeder user admin n'est pas idempotent (échec si userId=1 existe déjà) — à lancer une seule fois sur une base vide.
+
+**Dette / points d'attention :**
+- Les seeds JSON (`seeds/*.seed.json`) pour Subject, LeitnerSystem, LeitnerCard, Question, Response, Test, Diagramme sont des données métier interdépendantes — non converties en seeders CLI car elles supposent un utilisateur et des relations déjà en place. À créer séparément si des jeux de données de démo sont nécessaires.
+- Définir `ADMIN_SEED_PASSWORD` dans `.env` avant le premier `db:seed:all` en production (fallback `Admin1234!` actif uniquement en dev).
+
+---
+
+### [M-00.06] — Validation des entrées — couverture complète — 2026-06-05
+
+**Fichiers créés :**
+- `validators/Grading.validators.js` — règles pour `gradeDateAnswer` et `gradeSemantic` (correct_answers accepte string ou tableau de strings non vides via `.custom()`)
+- `validators/OnboardingState.validators.js` — règles pour `update` (tourSeen booléen, checklist objet JSON)
+- `test/controllers/Grading.controller.test.js` — 9 tests validators pour POST /api/v1/grading/date et POST /api/v1/grading/semantic
+- `test/controllers/OnboardingState.controller.test.js` — 5 tests validators pour PUT /api/v1/onboardingState/:id
+
+**Fichiers modifiés :**
+- `validators/User.validators.js` — ajout `exports.update` (name optionnel 2-50 chars, email optionnel)
+- `routes/Grading.routes.js` — branchement `gradingValidators.gradeDateAnswer + validate`
+- `routes/Semantic.routes.js` — branchement `gradingValidators.gradeSemantic + validate`
+- `routes/OnboardingState.routes.js` — ajout `authMiddleware` (manquant) + branchement validator
+- `routes/FieldsType.routes.js` — ajout route PUT `/:id` avec `fieldsTypeValidators.update + validate`
+- `routes/User.routes.js` — branchement `userValidators.update + validate` sur PUT `/:id`
+- `controllers/Grading.controller.js` — suppression validation inline (en anglais) → migration vers middleware
+- `controllers/Semantic.controller.js` — suppression validation inline (en anglais) → migration vers middleware ; `console.error` → `logger.error`
+- `controllers/FieldsType.controller.js` — ajout `exports.update` ; correction `allowunit` → `allowUnit` (casse modèle)
+- `services/FieldsType.service.js` — ajout méthode `update(idType, data)`
+- `app.js` — ajout import et enregistrement des routes `Semantic` et `OnboardingState` (manquants)
+
+**Ce qui est utilisable :**
+- Tous les endpoints POST/PUT de toutes les entités sont désormais validés via express-validator
+- La validation inline dans Grading/Semantic controllers a été migrée vers le middleware standard
+- `PUT /fieldstypes/:id` est maintenant fonctionnel (route + service + controller + validator)
+- `PUT /api/v1/users/:id` valide désormais name et email
+
+**Hypothèses posées :**
+- Le validateur `correct_answers` dans Grading.validators.js accepte string ou tableau de strings — express-validator ne supporte pas nativement ce cas polymorphe, d'où l'usage de `.custom()`.
+- `FieldsType.controller.js` utilisait `allowunit` (lowercase) en base mais le modèle Sequelize déclare `allowUnit` (camelCase) — corrigé dans les deux méthodes `create` et `update`.
+
+**Dette / points d'attention :**
+- Les tests dans `test/controllers/` (User, Subject, LeitnerSystem) utilisent des chemins sans préfixe `/api/v1` (héritage d'avant la mise en place du versioning). Ces tests retournent 404 et sont brisés — à corriger en remplaçant les chemins par `/api/v1/...`.
+- Les routes OnboardingState `GET /byUserId` utilisent `req.params.id` mais il n'y a pas de paramètre `:id` dans le chemin — bug logique préexistant hors périmètre M-00.06.

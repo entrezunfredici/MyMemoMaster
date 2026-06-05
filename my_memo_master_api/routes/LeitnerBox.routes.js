@@ -8,7 +8,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /leitnerboxes/all:
+ * /leitnerboxes:
  *   get:
  *     summary: Obtenir toutes les boîtes de Leitner
  *     tags: [LeitnerBoxes]
@@ -18,7 +18,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/all", authMiddleware, leitnerBox.findAll);
+router.get("/", authMiddleware, leitnerBox.findAll);
 
 /**
  * @swagger
@@ -45,7 +45,7 @@ router.get("/:id", authMiddleware, leitnerBox.findOne);
 
 /**
  * @swagger
- * /leitnerboxes/add:
+ * /leitnerboxes:
  *   post:
  *     summary: Ajouter une nouvelle boîte de Leitner
  *     tags: [LeitnerBoxes]
@@ -74,7 +74,7 @@ router.get("/:id", authMiddleware, leitnerBox.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/add", authMiddleware, leitnerBoxValidators.create, validate, leitnerBox.create);
+router.post("/", authMiddleware, leitnerBoxValidators.create, validate, leitnerBox.create);
 
 /**
  * @swagger

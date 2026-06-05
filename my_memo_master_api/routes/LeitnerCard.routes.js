@@ -50,7 +50,7 @@ router.get("/:id", authMiddleware, leitnerCardController.getCardById);
 
 /**
  * @swagger
- * /leitnercards/add:
+ * /leitnercards:
  *   post:
  *     summary: Ajouter une carte de Leitner
  *     tags: [LeitnerCards]
@@ -70,7 +70,7 @@ router.get("/:id", authMiddleware, leitnerCardController.getCardById);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/add", authMiddleware, leitnerCardValidators.addCard, validate, leitnerCardController.addCard);
+router.post("/", authMiddleware, leitnerCardValidators.addCard, validate, leitnerCardController.addCard);
 
 /**
  * @swagger

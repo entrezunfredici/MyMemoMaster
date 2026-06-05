@@ -8,7 +8,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /diagrammes/all:
+ * /diagrammes:
  *   get:
  *     summary: Récupère tous les diagrammes
  *     tags:
@@ -35,7 +35,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", authMiddleware, diagramme.findAll);
+router.get("/", authMiddleware, diagramme.findAll);
 
 /**
  * @swagger
@@ -77,7 +77,7 @@ router.get("/:id", authMiddleware, diagramme.findOne);
 
 /**
  * @swagger
- * /diagrammes/add:
+ * /diagrammes:
  *   post:
  *     summary: Ajoute un nouveau diagramme
  *     tags:
@@ -106,7 +106,7 @@ router.get("/:id", authMiddleware, diagramme.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", authMiddleware, diagrammeValidators.create, validate, diagramme.create);
+router.post("/", authMiddleware, diagrammeValidators.create, validate, diagramme.create);
 
 /**
  * @swagger

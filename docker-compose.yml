@@ -139,8 +139,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.mmm-api.rule=Host(`${API_DOMAIN}`) && PathPrefix(`/api`)
       - traefik.http.routers.mmm-api.entrypoints=web
-      - traefik.http.middlewares.mmm-api-strip.stripprefix.prefixes=/api
-      - traefik.http.routers.mmm-api.middlewares=mmm-api-strip
       - traefik.http.services.mmm-api.loadbalancer.server.port=${API_PORT:-3000}
     networks:
       - mmm_network

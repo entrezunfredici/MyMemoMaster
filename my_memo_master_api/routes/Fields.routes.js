@@ -1,11 +1,13 @@
 const express = require("express");
 const fieldController = require("../controllers/Fields.controller.js");
+const validate = require("../middlewares/validate.middleware");
+const fieldsValidators = require("../validators/Fields.validators");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /fields/all:
+ * /fields:
  *   get:
  *     summary: Récupère tous les champs
  *     tags:
@@ -35,7 +37,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", fieldController.findAll);
+router.get("/", fieldController.findAll);
 
 /**
  * @swagger
@@ -63,7 +65,7 @@ router.get("/:id", fieldController.findOne);
 
 /**
  * @swagger
- * /fields/add:
+ * /fields:
  *   post:
  *     summary: Ajoute un nouveau champ
  *     tags:
@@ -92,7 +94,7 @@ router.get("/:id", fieldController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", fieldController.create);
+router.post("/", fieldsValidators.create, validate, fieldController.create);
 
 /**
  * @swagger
@@ -132,7 +134,7 @@ router.post("/add", fieldController.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", fieldController.update);
+router.put("/:id", fieldsValidators.update, validate, fieldController.update);
 
 /**
  * @swagger

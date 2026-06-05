@@ -13,6 +13,15 @@ const decodeJwtPayload = (token) => {
   }
 }
 
+const extractApiError = (resp, fallback = 'Une erreur est survenue.') => {
+  if (!resp) return fallback
+  if (resp.data?.message) return resp.data.message
+  if (Array.isArray(resp.data?.errors) && resp.data.errors.length > 0) {
+    return resp.data.errors.map(e => e.msg).join(' · ')
+  }
+  return fallback
+}
+
 export const useAuthStore = defineStore('auth', {
   persist: true,
   state: () => ({
@@ -99,11 +108,11 @@ export const useAuthStore = defineStore('auth', {
         const resp = await api.post('users/register', user)
 
         if (!resp || resp.status !== 201) {
-          const message = resp?.data?.message || 'Registration failed.'
+          const message = extractApiError(resp, "Erreur lors de l'inscription.")
           throw new Error(message)
         }
 
-        notif.notify('You have been registered', 'success')
+        notif.notify('Inscription réussie !', 'success')
 
         if (redirect) {
           router.push(redirect)
@@ -111,7 +120,7 @@ export const useAuthStore = defineStore('auth', {
 
         return true
       } catch (error) {
-        const message = error?.response?.data?.message || error?.message || "Erreur lors de l'inscription."
+        const message = error?.message || "Erreur lors de l'inscription."
         notif.notify(message, 'error')
         throw new Error(message)
       }
@@ -121,7 +130,8 @@ export const useAuthStore = defineStore('auth', {
       const resp = await api.post('users/login', { email, password })
 
       if (!resp || resp.status !== 200) {
-        notif.notify(resp?.data?.message || 'Erreur lors de la connexion.', 'error')
+        const message = extractApiError(resp, 'Email ou mot de passe incorrect.')
+        notif.notify(message, 'error')
         return false
       }
 

@@ -11,7 +11,7 @@ export const useSubjectStore = defineStore('subjects', {
   actions: {
     async fetchSubjects() {
       try {
-        const resp = await api.get('subjects/all')
+        const resp = await api.get('subjects')
         if (resp.status !== 200) {
           notif.notify(resp.data.message, 'error')
           return false
@@ -41,7 +41,7 @@ export const useSubjectStore = defineStore('subjects', {
 
     async addSubject() {
       try {
-        const resp = await api.post('subjects/add', this.subject)
+        const resp = await api.post('subjects', this.subject)
         if (resp.status !== 201) {
           notif.notify(resp.data.message, 'error')
           return false

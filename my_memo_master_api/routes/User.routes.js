@@ -149,7 +149,7 @@ router.get("/:id", authMiddleware, user.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, user.update);
+router.put("/:id", authMiddleware, userValidators.update, validate, user.update);
 
 /**
  * @swagger

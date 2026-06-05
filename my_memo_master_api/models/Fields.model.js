@@ -39,7 +39,14 @@ module.exports = (instance) => {
         onUpdate: "CASCADE",
       },
     },
-    { tableName: "Fields", timestamps: false }
+    {
+      tableName: "Fields",
+      timestamps: false,
+      indexes: [
+        { fields: ['idType'] },
+        { fields: ['idUnit'] },
+      ],
+    }
   );
 
   //Associations

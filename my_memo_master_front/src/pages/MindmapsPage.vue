@@ -32,7 +32,7 @@ let autoSaveTimer = null;
 
 const fetchDiagrams = async () => {
   try {
-    const response = await api.get('diagrammes/all');
+    const response = await api.get('diagrammes');
     diagrams.value = response?.data || [];
     if (currentDiagramId.value) {
       const match = diagrams.value.find((d) => d.idMindMap === currentDiagramId.value);
@@ -201,7 +201,7 @@ const performAutoSave = async () => {
         pendingCreate.value = false;
       }
     } else {
-      const response = await api.post('diagrammes/add', body);
+      const response = await api.post('diagrammes', body);
       const newId = response?.data?.id || response?.data?.idMindMap;
       if (newId) {
         const createdMeta = { ...body, idMindMap: newId };
@@ -302,7 +302,7 @@ const confirmExportModal = async () => {
         }
       }
     } else {
-      const response = await api.post('diagrammes/add', body);
+      const response = await api.post('diagrammes', body);
       const newId = response?.data?.id || response?.data?.idMindMap;
       if (newId) {
         currentDiagramId.value = newId;

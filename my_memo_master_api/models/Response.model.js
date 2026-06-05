@@ -27,6 +27,9 @@ module.exports = (instance) => {
     {
       tableName: "Response",
       timestamps: false,
+      indexes: [
+        { fields: ['idQuestion'] },
+      ],
     },
   );
 

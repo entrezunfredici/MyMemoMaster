@@ -8,7 +8,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /leitnersystems/all:
+ * /leitnersystems:
  *   get:
  *     summary: Récupère tous les systèmes de Leitner
  *     tags:
@@ -32,7 +32,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", authMiddleware, leitnerSystem.findAll);
+router.get("/", authMiddleware, leitnerSystem.findAll);
 
 /**
  * @swagger
@@ -84,7 +84,7 @@ router.get("/:id", authMiddleware, leitnerSystem.findOne);
 
 /**
  * @swagger
- * /leitnersystems/add:
+ * /leitnersystems:
  *   post:
  *     summary: Ajoute un nouveau système de Leitner
  *     tags:
@@ -117,7 +117,7 @@ router.get("/:id", authMiddleware, leitnerSystem.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", authMiddleware, leitnerSystemValidators.create, validate, leitnerSystem.create);
+router.post("/", authMiddleware, leitnerSystemValidators.create, validate, leitnerSystem.create);
 
 /**
  * @swagger

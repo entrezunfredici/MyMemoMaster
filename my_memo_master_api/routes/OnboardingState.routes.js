@@ -1,10 +1,14 @@
-const express = require('express')
+const express = require('express');
 const onboardingState = require("../controllers/OnboardingState.controller.js");
+const authMiddleware = require("../middlewares/Auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const onboardingStateValidators = require("../validators/OnboardingState.validators");
+
 const router = express.Router();
 
-router.get("/byUserId", onboardingState.findByUserId);
+router.get("/byUserId", authMiddleware, onboardingState.findByUserId);
 
-router.put("/:id", onboardingState.updateOnboarding);
+router.put("/:id", authMiddleware, onboardingStateValidators.update, validate, onboardingState.updateOnboarding);
 
 module.exports = (app) => {
   /**

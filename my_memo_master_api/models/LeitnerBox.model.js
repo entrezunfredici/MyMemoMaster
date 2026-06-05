@@ -30,6 +30,9 @@ module.exports = (instance) => {
     {
       tableName: "LeitnerBox",
       timestamps: false,
+      indexes: [
+        { fields: ['idSystem'] },
+      ],
     }
   );
 

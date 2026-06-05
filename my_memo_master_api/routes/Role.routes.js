@@ -1,12 +1,14 @@
 const express = require("express");
 const role = require("../controllers/Role.controller.js");
 const authMiddleware = require("../middlewares/Auth.middleware.js");
+const validate = require("../middlewares/validate.middleware");
+const roleValidators = require("../validators/Role.validators");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /roles/all:
+ * /roles:
  *   get:
  *     summary: Récupère tous les rôles
  *     tags:
@@ -30,7 +32,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", authMiddleware, role.findAll);
+router.get("/", authMiddleware, role.findAll);
 
 /**
  * @swagger
@@ -69,7 +71,7 @@ router.get("/:id", authMiddleware, role.findOne);
 
 /**
  * @swagger
- * /roles/add:
+ * /roles:
  *   post:
  *     summary: Ajoute un nouveau rôle
  *     tags:
@@ -92,7 +94,7 @@ router.get("/:id", authMiddleware, role.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", authMiddleware, role.create);
+router.post("/", authMiddleware, roleValidators.create, validate, role.create);
 
 /**
  * @swagger
@@ -125,7 +127,7 @@ router.post("/add", authMiddleware, role.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", authMiddleware, role.update);
+router.put("/:id", authMiddleware, roleValidators.update, validate, role.update);
 
 /**
  * @swagger

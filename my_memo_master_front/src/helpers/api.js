@@ -250,21 +250,16 @@ axiosApi.interceptors.request.use(async (config) => {
   return config;
 });
 
-function isStatusOk(status) {
-  if (!status) return false
-
-  // 401: Unauthorized
+function handleSpecialStatus(status) {
   if (status === 401) {
     useAuthStore().logout()
-    return false
+    return true
   }
+  return false
+}
 
-  // 204: No Content (ex: user not found)
-  if (status === 204) {
-    return false
-  }
-
-  return status >= 200 && status < 300;
+function toResponse(response) {
+  return { data: response.data, status: response.status }
 }
 
 async function get(endpoint, params = {}) {
@@ -274,13 +269,9 @@ async function get(endpoint, params = {}) {
 
   try {
     const response = await axiosApi.get(endpoint, { params })
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });
@@ -295,13 +286,9 @@ async function post(endpoint, data = {}, config = {}) {
 
   try {
     const response = await axiosApi.post(endpoint, data, config)
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });
@@ -316,13 +303,9 @@ async function put(endpoint, data = {}, config = {}) {
 
   try {
     const response = await axiosApi.put(endpoint, data, config)
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });
@@ -336,13 +319,9 @@ async function del(endpoint, data = {}) {
 
   try {
     const response = await axiosApi.delete(endpoint, { data })
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });

@@ -1,11 +1,13 @@
 const express = require("express");
 const QuestionController = require("../controllers/Question.controller.js");
+const validate = require("../middlewares/validate.middleware");
+const questionValidators = require("../validators/Question.validators");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /questions/all:
+ * /questions:
  *   get:
  *     summary: Récupère toutes les questions
  *     tags:
@@ -35,7 +37,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", QuestionController.getAllQuestions);
+router.get("/", QuestionController.getAllQuestions);
 
 /**
  * @swagger
@@ -205,7 +207,7 @@ router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
 
 /**
  * @swagger
- * /questions/add:
+ * /questions:
  *   post:
  *     summary: Ajoute une nouvelle question
  *     tags:
@@ -246,7 +248,7 @@ router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", QuestionController.create);
+router.post("/", questionValidators.create, validate, QuestionController.create);
 
 /**
  * @swagger
@@ -294,7 +296,7 @@ router.post("/add", QuestionController.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/edit/:id", QuestionController.update);
+router.put("/edit/:id", questionValidators.update, validate, QuestionController.update);
 
 /**
  * @swagger

@@ -29,6 +29,8 @@ const diagrammeRoutes = require("./routes/Diagramme.routes");
 const questionRoutes = require("./routes/Question.routes");
 const tutorialRoutes = require("./routes/Tutorials.routes");
 const gradingRoutes = require("./routes/Grading.routes");
+const semanticRoutes = require("./routes/Semantic.routes");
+const onboardingStateRoutes = require("./routes/OnboardingState.routes");
 const storageRoutes = require("./routes/Storage.routes");
 const { startFifoCron } = require('./jobs/fifo.cron');
 
@@ -82,6 +84,8 @@ diagrammeRoutes(v1);
 questionRoutes(v1);
 tutorialRoutes(v1);
 gradingRoutes(v1);
+semanticRoutes(v1);
+onboardingStateRoutes(v1);
 storageRoutes(v1);
 app.use('/api/v1', v1);
 

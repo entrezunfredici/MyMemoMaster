@@ -9,7 +9,7 @@ export const useRoleStore = defineStore('roles', {
     }),
     actions: {
         async fetchRoles() {
-            await api.get(`roles/all`).then(resp => {
+            await api.get(`roles`).then(resp => {
                 if (resp.status !== 200) {
                     notif.notify(resp.data.message, 'error')
                     return false
@@ -37,7 +37,7 @@ export const useRoleStore = defineStore('roles', {
         },
         async addRole() {
             const rolePayload = this.role
-            await api.post(`roles/add`, rolePayload).then(resp => {
+            await api.post(`roles`, rolePayload).then(resp => {
                 if (resp.status !== 201) {
                     notif.notify(resp.data.message, 'error')
                     return false

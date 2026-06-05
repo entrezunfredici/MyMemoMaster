@@ -29,12 +29,16 @@
           </div> -->
 
         <div class="flex flex-col items-center">
-          <button type="submit" class="w-[116px] bg-[#1E3BA1] text-white !text-white hover:bg-[#162c7a] focus:outline-none py-2 px-4 rounded valider">
-            Valider
+          <button
+            type="submit"
+            :disabled="submitting"
+            class="w-[116px] bg-[#1E3BA1] text-white !text-white hover:bg-[#162c7a] focus:outline-none py-2 px-4 rounded valider disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {{ submitting ? 'Connexion...' : 'Valider' }}
           </button>
           <a href="/register" class="underline m-3">Vous n'avez pas un compte? Créez en un!
           </a>
-          <p v-if="errorMessage" class="text-red-500 text-sm text-center mt-2">
+          <p v-if="errorMessage" class="text-red-600 text-sm text-center mt-2 font-medium">
             {{ errorMessage }}
           </p>
         </div>

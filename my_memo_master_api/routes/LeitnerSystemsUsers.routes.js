@@ -8,7 +8,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /leitnerSystemsUsers/add:
+ * /leitnersystemsusers:
  *   post:
  *     summary: Créer une relation entre un utilisateur et un système Leitner
  *     tags: [LeitnerSystemsUsers]
@@ -43,11 +43,11 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/add", authMiddleware, leitnerSystemsUsersValidators.create, validate, controller.create);
+router.post("/", authMiddleware, leitnerSystemsUsersValidators.create, validate, controller.create);
 
 /**
  * @swagger
- * /leitnerSystemsUsers/all:
+ * /leitnersystemsusers:
  *   get:
  *     summary: Récupérer toutes les relations entre utilisateurs et systèmes Leitner
  *     tags: [LeitnerSystemsUsers]
@@ -57,7 +57,7 @@ router.post("/add", authMiddleware, leitnerSystemsUsersValidators.create, valida
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/all", authMiddleware, controller.findAll);
+router.get("/", authMiddleware, controller.findAll);
 
 /**
  * @swagger

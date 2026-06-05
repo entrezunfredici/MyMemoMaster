@@ -53,6 +53,11 @@ module.exports = (instance) => {
     {
       tableName: "LeitnerCard",
       timestamps: false,
+      indexes: [
+        { fields: ['idQuestion'] },
+        { fields: ['idBox'] },
+        { fields: ['next_review_at'] },
+      ],
     }
   );
 

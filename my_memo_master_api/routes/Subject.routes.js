@@ -8,7 +8,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /subjects/all:
+ * /subjects:
  *   get:
  *     summary: Récupère tous les sujets
  *     tags: [Subjects]
@@ -31,7 +31,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/all", authMiddleware, subject.findAll);
+router.get("/", authMiddleware, subject.findAll);
 
 /**
  * @swagger
@@ -69,7 +69,7 @@ router.get("/:id", authMiddleware, subject.findOne);
 
 /**
  * @swagger
- * /subjects/add:
+ * /subjects:
  *   post:
  *     summary: Ajoute un nouveau sujet
  *     tags: [Subjects]
@@ -100,7 +100,7 @@ router.get("/:id", authMiddleware, subject.findOne);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/add", authMiddleware, subjectValidators.create, validate, subject.create);
+router.post("/", authMiddleware, subjectValidators.create, validate, subject.create);
 
 /**
  * @swagger

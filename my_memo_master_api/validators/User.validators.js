@@ -38,3 +38,8 @@ exports.changePassword = [
     body('oldPassword').notEmpty().withMessage('Ancien mot de passe requis'),
     newPasswordRules,
 ];
+
+exports.update = [
+    body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Le nom doit contenir entre 2 et 50 caractères'),
+    body('email').optional().isEmail().withMessage('Email invalide').normalizeEmail(),
+];

@@ -3,19 +3,26 @@ import { useAuthStore } from '@/stores/auth'
 export default {
     data() {
         return {
-        email: "",
-        password: "",
-        errorMessage: "",
+            email: "",
+            password: "",
+            errorMessage: "",
+            submitting: false,
         };
     },
     methods: {
         ...mapActions(useAuthStore, ['login']),
         async submitForm() {
             this.errorMessage = ''
+            this.submitting = true
             try {
-                await this.login(this.email, this.password, '/')
+                const success = await this.login(this.email, this.password, '/')
+                if (!success) {
+                    this.errorMessage = "Email ou mot de passe incorrect."
+                }
             } catch (e) {
-                this.errorMessage = e?.response?.data?.message || e?.message || "Erreur lors de l'inscription."
+                this.errorMessage = e?.message || "Erreur lors de la connexion."
+            } finally {
+                this.submitting = false
             }
         },
     },

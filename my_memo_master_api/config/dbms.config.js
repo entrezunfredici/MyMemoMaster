@@ -7,4 +7,10 @@ module.exports = {
   port: process.env.PG_PORT,
   dialect: "postgres",
   logging: false,
+  pool: {
+    max: parseInt(process.env.PG_POOL_MAX) || 10,
+    min: parseInt(process.env.PG_POOL_MIN) || 2,
+    acquire: parseInt(process.env.PG_POOL_ACQUIRE) || 30000,
+    idle: parseInt(process.env.PG_POOL_IDLE) || 10000,
+  },
 };

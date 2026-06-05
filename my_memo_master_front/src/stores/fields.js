@@ -9,7 +9,7 @@ export const useDiagrammeStore = defineStore('diagramme', {
     }),
     actions: {
         async fetchDiagrammes() {
-            await api.get(`diagrammes/all`).then(resp => {
+            await api.get(`diagrammes`).then(resp => {
                 if (resp.status !== 200) {
                     notif.notify(resp.data.message, 'error')
                     return false
@@ -37,7 +37,7 @@ export const useDiagrammeStore = defineStore('diagramme', {
         },
         async addDiagramme() {
             const diagrammePayload = this.diagramme
-            await api.post(`diagrammes/add`, diagrammePayload).then(resp => {
+            await api.post(`diagrammes`, diagrammePayload).then(resp => {
                 if (resp.status !== 201) {
                     notif.notify(resp.data.message, 'error')
                     return false

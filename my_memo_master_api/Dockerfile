@@ -1,12 +1,13 @@
 # ---- Stage 1: build native dependencies ----
-FROM node:22-alpine AS deps
-RUN apk add --no-cache python3 make g++
+# node:22-bookworm-slim est basé sur Debian (glibc) — requis par onnxruntime-node (@xenova/transformers)
+FROM node:22-bookworm-slim AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
 
 # ---- Stage 2: production image (no build tools) ----
-FROM node:22-alpine AS production
+FROM node:22-bookworm-slim AS production
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules

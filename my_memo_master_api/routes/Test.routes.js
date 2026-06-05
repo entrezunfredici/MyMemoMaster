@@ -1,11 +1,13 @@
 const express = require("express");
 const test = require("../controllers/Test.controller.js");
+const validate = require("../middlewares/validate.middleware");
+const testValidators = require("../validators/Test.validators");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /tests/all:
+ * /tests:
  *   get:
  *     summary: Récupère la liste complète des tests.
  *     tags:
@@ -19,7 +21,7 @@ const router = express.Router();
  *         description: Erreur interne du serveur
  *
  */
-router.get("/all", test.findAll);
+router.get("/", test.findAll);
 
 /**
  * @swagger
@@ -61,7 +63,7 @@ router.get("/:id", test.findOne);
 
 /**
  * @swagger
- * /tests/add:
+ * /tests:
  *   post:
  *     summary: Ajoute un nouveau test
  *     tags:
@@ -88,7 +90,7 @@ router.get("/:id", test.findOne);
  *         description: Erreur interne du serveur
  *
  */
-router.post("/add", test.create);
+router.post("/", testValidators.create, validate, test.create);
 
 /**
  * @swagger
@@ -127,7 +129,7 @@ router.post("/add", test.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", test.update);
+router.put("/:id", testValidators.update, validate, test.update);
 
 /**
  * @swagger

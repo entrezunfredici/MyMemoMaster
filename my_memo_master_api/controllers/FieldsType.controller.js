@@ -30,16 +30,26 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
     try {
-        const { name, allowunit } = req.body;
-        if (!name || allowunit === undefined) {
-            return res.status(400).send({ message: "Les champs 'Nom' et 'Unit' sont requis." });
-        }
-
-        const newFieldType = await fieldTypeService.create({ name, allowunit });
+        const { name, allowUnit } = req.body;
+        const newFieldType = await fieldTypeService.create({ name, allowUnit });
         res.status(201).send(newFieldType);
     } catch (error) {
         res.status(500).send({
             message: error.message || "Une erreur s'est produite lors de la création du type de champ.",
+        });
+    }
+};
+
+exports.update = async (req, res) => {
+    try {
+        const updated = await fieldTypeService.update(req.params.id, req.body);
+        if (!updated) {
+            return res.status(404).send({ message: `Type de champ introuvable pour l'identifiant ${req.params.id}.` });
+        }
+        res.status(200).send({ message: "Type de champ mis à jour avec succès." });
+    } catch (error) {
+        res.status(500).send({
+            message: error.message || "Erreur lors de la mise à jour du type de champ.",
         });
     }
 };

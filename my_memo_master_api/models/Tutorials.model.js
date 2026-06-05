@@ -31,6 +31,9 @@ module.exports = (instance) => {
     {
       tableName: "Tutorials",
       timestamps: false,
+      indexes: [
+        { fields: ['subjectId'] },
+      ],
     }
   );
 };

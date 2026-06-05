@@ -37,6 +37,9 @@ module.exports = (instance) => {
         updatedAt: 'updatedAt',
         createdAt: 'createdAt',
         timestamps: true,
+        indexes: [
+            { fields: ['subjectId'] },
+        ],
     }
     );
 

@@ -1,12 +1,14 @@
 const express = require("express");
 const unitController = require("../controllers/Unit.controller");
 const authMiddleware = require("../middlewares/Auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const unitValidators = require("../validators/Unit.validators");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /units/all:
+ * /units:
  *   get:
  *     summary: Obtenir toutes les unités
  *     tags: [Units]
@@ -16,7 +18,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/all", authMiddleware, unitController.getAllUnits);
+router.get("/", authMiddleware, unitController.getAllUnits);
 //router.get("/all", subject.findAll);
 
 /**
@@ -42,7 +44,7 @@ router.get("/:id", authMiddleware, unitController.getUnitById);
 
 /**
  * @swagger
- * /units/add:
+ * /units:
  *   post:
  *     summary: Ajouter une nouvelle unité
  *     tags: [Units]
@@ -66,7 +68,7 @@ router.get("/:id", authMiddleware, unitController.getUnitById);
  *       201:
  *         description: Unité ajoutée avec succès.
  */
-router.post("/add", authMiddleware, unitController.addUnit);
+router.post("/", authMiddleware, unitValidators.create, validate, unitController.addUnit);
 
 /**
  * @swagger
@@ -96,7 +98,7 @@ router.post("/add", authMiddleware, unitController.addUnit);
  *       200:
  *         description: Unité mise à jour avec succès.
  */
-router.put("/:id", authMiddleware, unitController.updateUnit);
+router.put("/:id", authMiddleware, unitValidators.update, validate, unitController.updateUnit);
 
 /**
  * @swagger

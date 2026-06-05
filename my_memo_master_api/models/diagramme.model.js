@@ -38,6 +38,10 @@ module.exports = (sequelize) => {
     {
       tableName: "MindMap",
       timestamps: false,
+      indexes: [
+        { fields: ['userId'] },
+        { fields: ['subjectId'] },
+      ],
     }
   );
 

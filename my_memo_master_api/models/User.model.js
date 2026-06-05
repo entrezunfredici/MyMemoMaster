@@ -70,6 +70,9 @@ module.exports = (instance) => {
       updatedAt: "updatedAt",
       createdAt: "createdAt",
       timestamps: false,
+      indexes: [
+        { fields: ['roleId'] },
+      ],
     }
   );
 

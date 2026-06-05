@@ -32,29 +32,32 @@
 }
 
 /* Vue-toastification overrides */
+.Vue-Toastification__container {
+    z-index: 99999 !important;
+}
+
 .Vue-Toastification__toast {
     font-family: "Roboto", sans-serif !important;
     border-radius: 0.75rem !important;
+    color: #ffffff !important;
+    font-size: 0.95rem !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
 }
 
 .Vue-Toastification__toast--info {
-    background-color: var(--blue) !important;
-    color: var(--ivory) !important;
+    background-color: rgb(var(--primary)) !important;
 }
 
 .Vue-Toastification__toast--success {
-    background-color: var(--success) !important;
-    color: var(--ivory) !important;
+    background-color: rgb(var(--success)) !important;
 }
 
 .Vue-Toastification__toast--warning {
-    background-color: var(--warning) !important;
-    color: var(--ivory) !important;
+    background-color: rgb(var(--warning)) !important;
 }
 
 .Vue-Toastification__toast--error {
-    background-color: var(--danger) !important;
-    color: var(--ivory) !important;
+    background-color: rgb(var(--danger)) !important;
 }
 
 /* Fonts */

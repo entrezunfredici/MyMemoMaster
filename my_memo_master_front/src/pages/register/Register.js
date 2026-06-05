@@ -17,17 +17,21 @@ export default {
         }
     },
     computed: {
+        passwordStrengthError() {
+            const p = this.password || ''
+            if (p.length < 10) return 'Le mot de passe doit contenir au moins 10 caractères.'
+            if (!/[A-Z]/.test(p)) return 'Le mot de passe doit contenir au moins une majuscule.'
+            if (!/[0-9]/.test(p)) return 'Le mot de passe doit contenir au moins un chiffre.'
+            return null
+        },
         canSubmit() {
             const trimmedName = (this.name || '').trim()
             const trimmedEmail = (this.email || '').trim()
-            const password = this.password || ''
-            const confirmPassword = this.confirmPassword || ''
-            const hasValidPassword = password.length >= 6
             return (
-                trimmedName.length > 0 &&
+                trimmedName.length >= 2 &&
                 EMAIL_REGEX.test(trimmedEmail) &&
-                hasValidPassword &&
-                password === confirmPassword
+                !this.passwordStrengthError &&
+                this.password === this.confirmPassword
             )
         },
     },
@@ -42,8 +46,8 @@ export default {
             const password = this.password || ''
             const confirmPassword = this.confirmPassword || ''
 
-            if (!trimmedName) {
-                const message = 'Le nom est obligatoire.'
+            if (trimmedName.length < 2) {
+                const message = 'Le nom doit contenir au moins 2 caractères.'
                 fieldErrors.name = message
                 errors.push(message)
             }
@@ -51,15 +55,14 @@ export default {
                 fieldErrors.email = 'Format de courriel invalide.'
                 errors.push("Le format de l'email est invalide.")
             }
-            if (password.length < 6) {
-                const message = 'Le mot de passe doit contenir au moins 6 caracteres.'
-                fieldErrors.password = message
-                errors.push('Le mot de passe doit faire au moins 6 caracteres.')
+            if (this.passwordStrengthError) {
+                fieldErrors.password = this.passwordStrengthError
+                errors.push(this.passwordStrengthError)
             }
             if (password !== confirmPassword) {
                 const message = 'Les mots de passe ne correspondent pas.'
                 fieldErrors.confirmPassword = message
-                errors.push('Les mots de passe doivent etre identiques.')
+                errors.push(message)
             }
 
             return { errors, fieldErrors }

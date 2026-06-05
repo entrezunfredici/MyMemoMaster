@@ -1,11 +1,13 @@
 const express = require('express');
 const tutorials = require('../controllers/Tutorials.controller.js');
+const validate = require('../middlewares/validate.middleware');
+const tutorialsValidators = require('../validators/Tutorials.validators');
 
 const router = express.Router();
 
 /**
  * @swagger
- * /tutorials/all:
+ * /tutorials:
  *   get:
  *     summary: Obtenir tous les tutoriels
  *     tags: [Tutorials]
@@ -41,7 +43,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get('/all', tutorials.findAll);
+router.get('/', tutorials.findAll);
 
 /**
  * @swagger
@@ -68,7 +70,7 @@ router.get('/:id', tutorials.findOne);
 
 /**
  * @swagger
- * /tutorials/add:
+ * /tutorials:
  *   post:
  *     summary: Ajouter un nouveau tutoriel
  *     tags: [Tutorials]
@@ -93,7 +95,7 @@ router.get('/:id', tutorials.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post('/add', tutorials.create);
+router.post('/', tutorialsValidators.create, validate, tutorials.create);
 
 /**
  * @swagger
@@ -131,7 +133,7 @@ router.post('/add', tutorials.create);
  *       500:
  *         description: Erreur serveur.
  */
-router.put('/:id', tutorials.update);
+router.put('/:id', tutorialsValidators.update, validate, tutorials.update);
 
 /**
  * @swagger

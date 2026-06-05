@@ -12,7 +12,7 @@ export const useTestStore = defineStore('tests', {
   actions: {
     async fetchTests() {
       try {
-        const resp = await api.get('tests/all')
+        const resp = await api.get('tests')
         if (resp.status !== 200) {
           notif.notify(resp.data?.message || 'Erreur inconnue', 'error')
           return false
@@ -42,7 +42,7 @@ export const useTestStore = defineStore('tests', {
 
   async createTest() {
     try {
-        const resp = await api.post('tests/add', this.test)
+        const resp = await api.post('tests', this.test)
         if (resp.status !== 201) {
         notif.notify(resp.data?.message || 'Erreur lors de la création', 'error')
         return false
