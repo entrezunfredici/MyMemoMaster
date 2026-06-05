@@ -62,24 +62,26 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 // Middleware pour servir la documentation Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Routes
-subjectRoutes(app);
-roleRoutes(app);
-testRoutes(app);
-responseRoutes(app);
-unitRoutes(app);
-userRoutes(app);
-kpiRoutes(app);
-leitnerSystemRoutes(app);
-leitnerCardRoutes(app);
-leitnerBoxRoutes(app);
-leitnerSystemsUsersRoutes(app);
-fieldsRoutes(app);
-fieldsTypeRoutes(app);
-diagrammeRoutes(app);
-questionRoutes(app);
-tutorialRoutes(app);
-gradingRoutes(app);
+// Routes v1
+const v1 = express.Router();
+subjectRoutes(v1);
+roleRoutes(v1);
+testRoutes(v1);
+responseRoutes(v1);
+unitRoutes(v1);
+userRoutes(v1);
+kpiRoutes(v1);
+leitnerSystemRoutes(v1);
+leitnerCardRoutes(v1);
+leitnerBoxRoutes(v1);
+leitnerSystemsUsersRoutes(v1);
+fieldsRoutes(v1);
+fieldsTypeRoutes(v1);
+diagrammeRoutes(v1);
+questionRoutes(v1);
+tutorialRoutes(v1);
+gradingRoutes(v1);
+app.use('/api/v1', v1);
 
 // ... Autres middlewares
 startFifoCron();

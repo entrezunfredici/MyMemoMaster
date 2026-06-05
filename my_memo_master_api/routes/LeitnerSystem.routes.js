@@ -1,6 +1,8 @@
 const express = require("express");
 const leitnerSystem = require("../controllers/LeitnerSystem.controller.js");
 const authMiddleware = require("../middlewares/Auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const leitnerSystemValidators = require("../validators/LeitnerSystem.validators");
 
 const router = express.Router();
 
@@ -115,7 +117,7 @@ router.get("/:id", authMiddleware, leitnerSystem.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", authMiddleware, leitnerSystem.create);
+router.post("/add", authMiddleware, leitnerSystemValidators.create, validate, leitnerSystem.create);
 
 /**
  * @swagger
@@ -152,7 +154,7 @@ router.post("/add", authMiddleware, leitnerSystem.create);
  *       500:
  *         description: Erreur serveur
  */
-router.put("/:id", authMiddleware, leitnerSystem.update);
+router.put("/:id", authMiddleware, leitnerSystemValidators.update, validate, leitnerSystem.update);
 
 /**
  * @swagger
@@ -220,7 +222,7 @@ router.put("/:id", authMiddleware, leitnerSystem.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/share", authMiddleware, leitnerSystem.share);
+router.post("/share", authMiddleware, leitnerSystemValidators.share, validate, leitnerSystem.share);
 
 /**
  * @swagger

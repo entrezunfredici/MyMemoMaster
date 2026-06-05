@@ -4,7 +4,7 @@ const servers = [
     process.env.API_PUBLIC_URL,     // e.g. http://localhost/api (Traefik)
     process.env.VITE_API_URL,       // front-end base URL
     `http://localhost:${composePort}`, // direct port if exposed
-].filter(Boolean).filter((url, index, arr) => arr.indexOf(url) === index).map((url) => ({ url }));
+].filter(Boolean).filter((url, index, arr) => arr.indexOf(url) === index).map((url) => ({ url: `${url}/api/v1` }));
 
 const swaggerOptions = {
     definition: {

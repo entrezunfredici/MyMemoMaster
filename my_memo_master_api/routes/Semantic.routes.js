@@ -6,7 +6,7 @@ module.exports = function (app) {
 
   /**
    * @swagger
-   * /api/grading/semantic:
+   * /grading/semantic:
    *   post:
    *     summary: Corriger automatiquement une réponse par similarité sémantique
    *     tags: [Grading]
@@ -60,5 +60,5 @@ module.exports = function (app) {
    */
   router.post('/semantic', semantic.gradeSemantic);
 
-  app.use('/api/grading', router);
+  app.use('/grading', router);
 };

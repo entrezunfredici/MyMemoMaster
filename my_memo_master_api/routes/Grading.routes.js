@@ -6,7 +6,7 @@ module.exports = function (app) {
 
   /**
    * @swagger
-   * /api/grading/date:
+   * /grading/date:
    *   post:
    *     summary: Corriger automatiquement une réponse de type date
    *     tags: [Grading]
@@ -49,5 +49,5 @@ module.exports = function (app) {
    */
   router.post('/date', grading.gradeDateAnswer);
 
-  app.use('/api/grading', router);
+  app.use('/grading', router);
 };

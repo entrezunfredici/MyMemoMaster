@@ -1,6 +1,8 @@
 const express = require("express");
 const subject = require("../controllers/Subject.controller.js");
 const authMiddleware = require("../middlewares/Auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const subjectValidators = require("../validators/Subject.validators");
 
 const router = express.Router();
 
@@ -98,7 +100,7 @@ router.get("/:id", authMiddleware, subject.findOne);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/add", authMiddleware, subject.create);
+router.post("/add", authMiddleware, subjectValidators.create, validate, subject.create);
 
 /**
  * @swagger
@@ -131,7 +133,7 @@ router.post("/add", authMiddleware, subject.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", authMiddleware, subject.update);
+router.put("/:id", authMiddleware, subjectValidators.update, validate, subject.update);
 
 /**
  * @swagger

@@ -2,6 +2,8 @@ const express = require("express");
 const diagramme = require("../controllers/Diagramme.controller.js");
 const mindmapImageUpload = require("../middlewares/mindmapImageUpload");
 const authMiddleware = require("../middlewares/Auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const diagrammeValidators = require("../validators/Diagramme.validators");
 const router = express.Router();
 
 /**
@@ -104,7 +106,7 @@ router.get("/:id", authMiddleware, diagramme.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", authMiddleware, diagramme.create);
+router.post("/add", authMiddleware, diagrammeValidators.create, validate, diagramme.create);
 
 /**
  * @swagger
@@ -141,7 +143,7 @@ router.post("/add", authMiddleware, diagramme.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", authMiddleware, diagramme.update);
+router.put("/:id", authMiddleware, diagrammeValidators.update, validate, diagramme.update);
 
 /**
  * @swagger
