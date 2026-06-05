@@ -35,6 +35,7 @@
 | OnboardingState | Stable | init |
 | Kpi | Stable (lecture seule) | init |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — couverture logger complète (19/19 controllers) | 2026-06-05 |
+| Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
 | Migrations Sequelize CLI | Stable — 23 migrations + migration index FK | 2026-06-05 |
 | Seeders Sequelize CLI | Stable — Roles + User admin | 2026-06-05 |
@@ -282,3 +283,36 @@
 
 **Dette / points d'attention :**
 - Aucune dette nouvelle introduite.
+
+---
+
+### [M-00.08] — Upload et gestion des fichiers — 2026-06-05
+
+**Fichiers modifiés :**
+- `middlewares/upload.middleware.js` — `console.warn` → `logger.warn` pour cohérence avec Winston
+- `routes/Diagramme.routes.js` — suppression fuite `error: error.message` dans la réponse 500 du handler `upload-image`
+
+**Ce qui était déjà en place (constaté à l'audit) :**
+- `middlewares/upload.middleware.js` — Multer dual mode S3 (prod) / disk temp (dev sans S3), filtre MIME (jpeg/png/gif/webp/pdf), limite 10 Mo, tag `isFileFilterError` → errorHandler retourne 400
+- `middlewares/mindmapImageUpload.js` — upload local `public/uploads/mindmaps/`, images uniquement, 5 Mo, sanitize filename
+- `config/storage.config.js` — client S3 configurable (AWS, MinIO, Scaleway, Cloudflare R2) via env vars
+- `controllers/Storage.controller.js` — `upload`, `uploadMultiple` (max 5 fichiers), `delete` (S3)
+- `routes/Storage.routes.js` — 3 routes protégées auth, Swagger JSDoc complet, wrapper `handleUpload` → erreurs Multer en 400
+- `validators/Storage.validators.js` — validation `key` query param sur DELETE
+- `routes/Diagramme.routes.js` — `POST /diagrammes/upload-image` avec gestion 413 (taille), 400 (type), 500 (autre)
+- `.env.example` — variables S3 documentées avec commentaires fournisseurs compatibles
+
+**Ce qui est utilisable :**
+- `POST /api/v1/storage/upload` — upload fichier unique vers S3 (auth requis)
+- `POST /api/v1/storage/upload/multiple` — upload jusqu'à 5 fichiers vers S3 (auth requis)
+- `DELETE /api/v1/storage/file?key=...` — suppression fichier S3 (auth requis)
+- `POST /api/v1/diagrammes/upload-image` — upload image mind map en local (auth requis)
+- En dev sans S3 configuré : l'upload bascule automatiquement sur `os.tmpdir()` avec warning logger
+
+**Hypothèses posées :**
+- `S3_BUCKET` non configuré = fallback disk temporaire actif uniquement en dev. En prod, `S3_BUCKET` doit être renseigné.
+- Les fichiers uploadés via `upload-image` (mindmaps) restent en local — ils ne passent pas par S3.
+
+**Dette / points d'attention :**
+- Pas de tests unitaires pour les endpoints storage/upload — à prévoir avant prod.
+- Les fichiers mindmap uploadés localement ne sont pas répliqués en prod si le conteneur redémarre (volume Docker nécessaire).

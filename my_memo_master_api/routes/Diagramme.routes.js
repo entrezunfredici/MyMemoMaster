@@ -223,7 +223,6 @@ router.post("/upload-image", authMiddleware, (req, res) => {
     if (error) {
       return res.status(500).json({
         message: "Une erreur est survenue lors de l'upload de l'image.",
-        error: error.message,
       });
     }
 

@@ -3,6 +3,7 @@ const os = require("os");
 const multer = require("multer");
 const multerS3 = require("multer-s3");
 const { s3Client, bucket } = require("../config/storage.config");
+const logger = require("../helpers/logger");
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -47,7 +48,7 @@ const storage = bucket
     });
 
 if (!bucket) {
-  console.warn("[upload] S3_BUCKET non configuré — stockage temporaire local (disk) actif. Configurer S3 pour la production.");
+  logger.warn("[upload] S3_BUCKET non configuré — stockage temporaire local (disk) actif. Configurer S3 pour la production.");
 }
 
 const upload = multer({
