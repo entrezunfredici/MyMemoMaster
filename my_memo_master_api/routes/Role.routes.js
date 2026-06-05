@@ -30,7 +30,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", role.findAll);
+router.get("/all", authMiddleware, role.findAll);
 
 /**
  * @swagger
@@ -65,7 +65,7 @@ router.get("/all", role.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", role.findOne);
+router.get("/:id", authMiddleware, role.findOne);
 
 /**
  * @swagger
@@ -92,7 +92,7 @@ router.get("/:id", role.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", role.create);
+router.post("/add", authMiddleware, role.create);
 
 /**
  * @swagger

@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const dayjs = require("dayjs");
 const { LeitnerCard, LeitnerBox, Question, Response } = require("../models");
+const semanticService = require("./Semantic.service");
 
 class LeitnerCardService {
   /**
@@ -97,7 +98,8 @@ class LeitnerCardService {
   async updateCard(id, data, userRights) {
     const card = await LeitnerCard.findByPk(id);
     if (!card || !userRights.canEdit) return null;
-    await card.update(data);
+    const { idQuestion } = data;
+    await card.update({ idQuestion });
     return card;
   }
 
@@ -106,20 +108,30 @@ class LeitnerCardService {
    * - Bonne réponse → boîte suivante (max niveau 5)
    * - Mauvaise réponse → retour boîte niveau 1
    * Met à jour next_review_at, les compteurs et last_review_at.
+   * La correction est sémantique : on compare la réponse libre de l'étudiant
+   * aux bonnes réponses enregistrées pour la question.
    *
    * @param {number} cardId - ID de la carte
-   * @param {number} responseId - ID de la réponse soumise
-   * @returns {Promise<{ success: boolean, correction: string }|null>}
+   * @param {string} studentAnswer - Réponse saisie par l'étudiant
+   * @returns {Promise<{ success: boolean, correction: string, score: number, explanation: string, decision_zone: string }|null>}
    */
-  async correctResponse(cardId, responseId) {
+  async correctResponse(cardId, studentAnswer) {
     const card = await LeitnerCard.findByPk(cardId, {
       include: [{ model: LeitnerBox, as: "leitnerBox" }],
     });
-    const response = await Response.findByPk(responseId);
 
-    if (!card || !response) return null;
+    if (!card) return null;
 
-    const isCorrect = response.content === response.correction;
+    const correctResponses = await Response.findAll({
+      where: { idQuestion: card.idQuestion, correction: true },
+    });
+
+    if (correctResponses.length === 0) return null;
+
+    const correctAnswers = correctResponses.map((r) => r.content);
+    const gradeResult = await semanticService.gradeSemantic(correctAnswers, studentAnswer);
+    const isCorrect = gradeResult.is_correct;
+
     const currentLevel = card.leitnerBox.level;
     const systemId = card.leitnerBox.idSystem;
 
@@ -147,7 +159,13 @@ class LeitnerCardService {
       incorrect_count: isCorrect ? card.incorrect_count : card.incorrect_count + 1,
     });
 
-    return { success: isCorrect, correction: response.correction };
+    return {
+      success: isCorrect,
+      correction: correctAnswers.join(" / "),
+      score: gradeResult.score,
+      explanation: gradeResult.explanation,
+      decision_zone: gradeResult.decision_zone,
+    };
   }
 
   /**

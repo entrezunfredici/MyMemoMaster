@@ -4,8 +4,16 @@ const logger = require("../helpers/logger");
 module.exports = {
   async create(req, res) {
     try {
-      const data = req.body;
-      const result = await LeitnerSystemsUsersService.create(data);
+      const { idSystem, writeRight, shareRight, shareWithWriteRightRight, shareWithAllRights } = req.body;
+      const idUser = req.user.id;
+      const result = await LeitnerSystemsUsersService.create({
+        idUser,
+        idSystem,
+        writeRight,
+        shareRight,
+        shareWithWriteRightRight,
+        shareWithAllRights,
+      });
       return res.status(201).json(result);
     } catch (error) {
       logger.error(error?.message || error);
@@ -26,6 +34,9 @@ module.exports = {
   async findOne(req, res) {
     try {
       const { idUser, idSystem } = req.params;
+      if (String(req.user.id) !== String(idUser)) {
+        return res.status(403).json({ message: "Accès refusé." });
+      }
       const result = await LeitnerSystemsUsersService.findOne(idUser, idSystem);
       if (!result) {
         return res.status(404).json({ message: "Relation non trouvée" });
@@ -40,13 +51,11 @@ module.exports = {
   async update(req, res) {
     try {
       const { idUser, idSystem } = req.params;
-      const data = req.body;
-
-      if (!idUser || !idSystem) {
-        return res.status(400).json({
-          message: "Les paramètres idUser et idSystem sont requis.",
-        });
+      if (String(req.user.id) !== String(idUser)) {
+        return res.status(403).json({ message: "Accès refusé." });
       }
+      const { writeRight, shareRight, shareWithWriteRightRight, shareWithAllRights } = req.body;
+      const data = { writeRight, shareRight, shareWithWriteRightRight, shareWithAllRights };
 
       const result = await LeitnerSystemsUsersService.update(
         idUser,
@@ -73,6 +82,9 @@ module.exports = {
   async delete(req, res) {
     try {
       const { idUser, idSystem } = req.params;
+      if (String(req.user.id) !== String(idUser)) {
+        return res.status(403).json({ message: "Accès refusé." });
+      }
       await LeitnerSystemsUsersService.delete(idUser, idSystem);
       return res
         .status(200)

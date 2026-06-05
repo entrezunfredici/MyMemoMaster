@@ -47,21 +47,20 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, idUser, idMindMap, sujet } = req.body;
+    const { name, idMindMap, sujet } = req.body;
+    const idUser = req.user.id;
 
-    // Validation des données reçues
-    if (!name || !idUser) {
+    if (!name) {
       return res
         .status(400)
-        .json({ message: "Les champs name et idUser sont obligatoires." });
+        .json({ message: "Le champ name est obligatoire." });
     }
 
-    // Création du système dans la base de données
     const newSystem = await leitnerSystemService.create({
       name,
       idUser,
       idMindMap,
-      sujet, // Sequelize gère JSON directement si la colonne est déclarée comme JSON
+      sujet,
     });
 
     // Réponse avec le nouveau système créé
@@ -75,7 +74,8 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { idUser, name, idMindMap } = req.body;
+    const { name, idMindMap } = req.body;
+    const idUser = req.user.id;
 
     const updated = await leitnerSystemService.update({
       idSystem: id,
@@ -99,7 +99,16 @@ exports.update = async (req, res) => {
 
 exports.share = async (req, res) => {
   try {
-    const result = await leitnerSystemService.share(req.body);
+    const { idUserShared, idSystem, writeRight, shareRight, shareWithWriteRightRight, shareWithAllRights } = req.body;
+    const result = await leitnerSystemService.share({
+      idUserOwner: req.user.id,
+      idUserShared,
+      idSystem,
+      writeRight,
+      shareRight,
+      shareWithWriteRightRight,
+      shareWithAllRights,
+    });
     res.status(200).send(result);
   } catch (error) {
     logger.error(error?.message || error);
@@ -110,7 +119,7 @@ exports.share = async (req, res) => {
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;
-    const { idUser } = req.body;
+    const idUser = req.user.id;
     const deleted = await leitnerSystemService.delete(id, idUser);
     if (!deleted) {
       return res

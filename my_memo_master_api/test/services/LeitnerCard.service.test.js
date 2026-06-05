@@ -13,9 +13,15 @@ jest.mock("../../models", () => ({
     findOne: jest.fn(),
   },
   Response: {
-    findByPk: jest.fn(),
+    findAll: jest.fn(),
   },
 }));
+
+jest.mock("../../services/Semantic.service", () => ({
+  gradeSemantic: jest.fn(),
+}));
+
+const semanticService = require("../../services/Semantic.service");
 
 describe("LeitnerCardService", () => {
   beforeEach(() => {
@@ -80,26 +86,52 @@ describe("LeitnerCardService", () => {
     expect(result).toEqual(mockCard);
   });
 
-  test("should correct a response", async () => {
-    const mockCard = { idCard: 1, idBox: 1, update: jest.fn() };
-    const mockResponse = {
-      idResponse: 1,
-      content: "answer",
-      correction: "answer",
+  test("should correct a response using semantic grading", async () => {
+    const mockCard = {
+      idCard: 1,
+      idBox: 1,
+      idQuestion: 42,
+      leitnerBox: { level: 1, idSystem: 10 },
+      review_count: 0,
+      correct_count: 0,
+      incorrect_count: 0,
+      update: jest.fn(),
     };
+    const mockCorrectResponses = [{ content: "La bonne réponse" }];
     const mockBox = { idBox: 2, intervall: 1000 };
+    const mockGradeResult = {
+      is_correct: true,
+      score: 0.92,
+      explanation: "Correct (similarity=0.92).",
+      decision_zone: "high",
+    };
 
     LeitnerCard.findByPk.mockResolvedValue(mockCard);
-    Response.findByPk.mockResolvedValue(mockResponse);
+    Response.findAll.mockResolvedValue(mockCorrectResponses);
+    semanticService.gradeSemantic.mockResolvedValue(mockGradeResult);
     LeitnerBox.findOne.mockResolvedValue(mockBox);
 
-    const result = await LeitnerCardService.correctResponse(1, 1, 5);
+    const result = await LeitnerCardService.correctResponse(1, "ma réponse");
 
-    expect(LeitnerCard.findByPk).toHaveBeenCalledWith(1);
-    expect(Response.findByPk).toHaveBeenCalledWith(1);
-    expect(LeitnerBox.findOne).toHaveBeenCalledWith({ where: { level: 2 } });
+    expect(LeitnerCard.findByPk).toHaveBeenCalledWith(1, expect.any(Object));
+    expect(Response.findAll).toHaveBeenCalledWith({
+      where: { idQuestion: 42, correction: true },
+    });
+    expect(semanticService.gradeSemantic).toHaveBeenCalledWith(
+      ["La bonne réponse"],
+      "ma réponse"
+    );
+    expect(LeitnerBox.findOne).toHaveBeenCalledWith({
+      where: { level: 2, idSystem: 10 },
+    });
     expect(mockCard.update).toHaveBeenCalled();
-    expect(result).toEqual({ success: true, correction: "answer" });
+    expect(result).toEqual({
+      success: true,
+      correction: "La bonne réponse",
+      score: 0.92,
+      explanation: "Correct (similarity=0.92).",
+      decision_zone: "high",
+    });
   });
 
   test("should delete a Leitner card", async () => {

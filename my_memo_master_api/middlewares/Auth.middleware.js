@@ -2,11 +2,6 @@ const jwt = require('jsonwebtoken');
 const logger = require('../helpers/logger');
 
 module.exports = (req, res, next) => {
-    if (process.env.API_BYPASS_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
-        next();
-        return;
-    }
-
     const authHeader = req.headers['authorization'];
 
     if (!authHeader) {

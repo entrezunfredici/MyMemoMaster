@@ -1,6 +1,7 @@
 const express = require("express");
 const diagramme = require("../controllers/Diagramme.controller.js");
 const mindmapImageUpload = require("../middlewares/mindmapImageUpload");
+const authMiddleware = require("../middlewares/Auth.middleware");
 const router = express.Router();
 
 /**
@@ -32,7 +33,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", diagramme.findAll);
+router.get("/all", authMiddleware, diagramme.findAll);
 
 /**
  * @swagger
@@ -70,7 +71,7 @@ router.get("/all", diagramme.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", diagramme.findOne);
+router.get("/:id", authMiddleware, diagramme.findOne);
 
 /**
  * @swagger
@@ -103,7 +104,7 @@ router.get("/:id", diagramme.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", diagramme.create);
+router.post("/add", authMiddleware, diagramme.create);
 
 /**
  * @swagger
@@ -140,7 +141,7 @@ router.post("/add", diagramme.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", diagramme.update);
+router.put("/:id", authMiddleware, diagramme.update);
 
 /**
  * @swagger
@@ -164,7 +165,7 @@ router.put("/:id", diagramme.update);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", diagramme.delete);
+router.delete("/:id", authMiddleware, diagramme.delete);
 
 /**
  * @swagger
@@ -205,7 +206,7 @@ router.delete("/:id", diagramme.delete);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/upload-image", (req, res) => {
+router.post("/upload-image", authMiddleware, (req, res) => {
   mindmapImageUpload.single("image")(req, res, (error) => {
     if (error && error.code === "LIMIT_FILE_SIZE") {
       return res.status(413).json({
@@ -214,7 +215,7 @@ router.post("/upload-image", (req, res) => {
     }
     if (error && error.code === "INVALID_FILE_TYPE") {
       return res.status(400).json({
-        message: "Format d'image non supporté. Formats acceptés : JPG, PNG, GIF, WEBP et SVG.",
+        message: "Format d'image non supporté. Formats acceptés : JPG, PNG, GIF, WEBP.",
       });
     }
     if (error) {

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const leitnerCardController = require("../controllers/LeitnerCard.controller");
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 /**
  * @swagger
@@ -21,7 +22,7 @@ const leitnerCardController = require("../controllers/LeitnerCard.controller");
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/due/:systemId", leitnerCardController.getDueCards);
+router.get("/due/:systemId", authMiddleware, leitnerCardController.getDueCards);
 
 /**
  * @swagger
@@ -32,6 +33,7 @@ router.get("/due/:systemId", leitnerCardController.getDueCards);
  */
 router.get(
   "/leitnerboxes/:leitnerboxid",
+  authMiddleware,
   leitnerCardController.getCardsByBoxId
 );
 
@@ -42,7 +44,7 @@ router.get(
  *     summary: Obtenir une carte de Leitner par ID
  *     tags: [LeitnerCards]
  */
-router.get("/:id", leitnerCardController.getCardById);
+router.get("/:id", authMiddleware, leitnerCardController.getCardById);
 
 /**
  * @swagger
@@ -66,7 +68,7 @@ router.get("/:id", leitnerCardController.getCardById);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/add", leitnerCardController.addCard);
+router.post("/add", authMiddleware, leitnerCardController.addCard);
 
 /**
  * @swagger
@@ -75,16 +77,53 @@ router.post("/add", leitnerCardController.addCard);
  *     summary: Modifier une carte de Leitner
  *     tags: [LeitnerCards]
  */
-router.put("/:id", leitnerCardController.updateCard);
+router.put("/:id", authMiddleware, leitnerCardController.updateCard);
 
 /**
  * @swagger
  * /leitnercards/response:
  *   post:
- *     summary: Corriger une réponse
+ *     summary: Corriger une réponse par comparaison sémantique IA
  *     tags: [LeitnerCards]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [cardId, studentAnswer]
+ *             properties:
+ *               cardId:
+ *                 type: integer
+ *                 example: 1
+ *               studentAnswer:
+ *                 type: string
+ *                 example: "La photosynthèse est le processus par lequel les plantes produisent de l'énergie."
+ *     responses:
+ *       200:
+ *         description: Résultat de la correction avec mise à jour Leitner.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 correction:
+ *                   type: string
+ *                 score:
+ *                   type: number
+ *                 explanation:
+ *                   type: string
+ *                 decision_zone:
+ *                   type: string
+ *                   enum: [high, grey_zone, low]
+ *       404:
+ *         description: Carte introuvable ou aucune réponse correcte définie.
+ *       500:
+ *         description: Erreur serveur.
  */
-router.post("/response", leitnerCardController.correctResponse);
+router.post("/response", authMiddleware, leitnerCardController.correctResponse);
 
 /**
  * @swagger
@@ -93,7 +132,7 @@ router.post("/response", leitnerCardController.correctResponse);
  *     summary: Supprimer une carte de Leitner
  *     tags: [LeitnerCards]
  */
-router.delete("/:id", leitnerCardController.deleteCard);
+router.delete("/:id", authMiddleware, leitnerCardController.deleteCard);
 
 module.exports = (app) => {
   /**

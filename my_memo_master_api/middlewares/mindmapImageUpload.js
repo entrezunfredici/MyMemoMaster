@@ -7,7 +7,6 @@ const allowedMimeTypes = [
   "image/png",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
 ];
 
 const uploadsRoot = path.join(__dirname, "..", "public", "uploads", "mindmaps");

@@ -1,5 +1,6 @@
 const express = require("express");
 const leitnerBox = require("../controllers/LeitnerBox.controller.js");
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/all", leitnerBox.findAll);
+router.get("/all", authMiddleware, leitnerBox.findAll);
 
 /**
  * @swagger
@@ -38,7 +39,7 @@ router.get("/all", leitnerBox.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", leitnerBox.findOne);
+router.get("/:id", authMiddleware, leitnerBox.findOne);
 
 /**
  * @swagger
@@ -71,7 +72,7 @@ router.get("/:id", leitnerBox.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/add", leitnerBox.create);
+router.post("/add", authMiddleware, leitnerBox.create);
 
 /**
  * @swagger
@@ -106,7 +107,7 @@ router.post("/add", leitnerBox.create);
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", leitnerBox.update);
+router.put("/:id", authMiddleware, leitnerBox.update);
 
 /**
  * @swagger
@@ -129,7 +130,7 @@ router.put("/:id", leitnerBox.update);
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", leitnerBox.delete);
+router.delete("/:id", authMiddleware, leitnerBox.delete);
 
 module.exports = (app) => {
   /**

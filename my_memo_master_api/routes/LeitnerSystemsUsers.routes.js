@@ -1,5 +1,6 @@
 const express = require("express");
 const controller = require("../controllers/LeitnerSystemsUsers.controller");
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/add", controller.create);
+router.post("/add", authMiddleware, controller.create);
 
 /**
  * @swagger
@@ -54,7 +55,7 @@ router.post("/add", controller.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/all", controller.findAll);
+router.get("/all", authMiddleware, controller.findAll);
 
 /**
  * @swagger
@@ -83,7 +84,7 @@ router.get("/all", controller.findAll);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/:idUser/:idSystem", controller.findOne);
+router.get("/:idUser/:idSystem", authMiddleware, controller.findOne);
 
 /**
  * @swagger
@@ -129,7 +130,7 @@ router.get("/:idUser/:idSystem", controller.findOne);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:idUser/:idSystem", controller.update);
+router.put("/:idUser/:idSystem", authMiddleware, controller.update);
 
 /**
  * @swagger
@@ -156,7 +157,7 @@ router.put("/:idUser/:idSystem", controller.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:idUser/:idSystem", controller.delete);
+router.delete("/:idUser/:idSystem", authMiddleware, controller.delete);
 
 module.exports = (app) => {
     /**

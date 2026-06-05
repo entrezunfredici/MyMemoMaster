@@ -8,7 +8,6 @@ import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 const toast = useToast();
 const mindmapStore = useMindMapBuilderStore();
 
-const builderRef = ref(null);
 const diagrams = ref([]);
 const currentDiagramId = ref(null);
 const currentDiagramMeta = ref(null);
@@ -19,9 +18,7 @@ const deleteMode = ref(false);
 const showEditModal = ref(false);
 const editedName = ref('');
 const currentEditId = ref(null);
-const users = ref([]);
 const subjects = ref([]);
-const selectedUser = ref('');
 const selectedSubject = ref('');
 const isSaving = ref(false);
 const isExporting = ref(false);
@@ -50,16 +47,14 @@ const fetchDiagrams = async () => {
 };
 
 const fetchFilters = () => {
-  users.value = [...new Set(diagrams.value.map((d) => d.userId).filter(Boolean))];
   subjects.value = [...new Set(diagrams.value.map((d) => d.subjectId).filter(Boolean))];
 };
 
 const filteredDiagrams = computed(() => {
   return diagrams.value.filter((diagram) => {
-    const matchUser = selectedUser.value ? String(diagram.userId) === String(selectedUser.value) : true;
     const matchSubject = selectedSubject.value ? String(diagram.subjectId) === String(selectedSubject.value) : true;
     const matchSearch = diagram.mmName?.toLowerCase().includes(searchQuery.value.toLowerCase());
-    return matchUser && matchSubject && matchSearch;
+    return matchSubject && matchSearch;
   });
 });
 
@@ -107,7 +102,6 @@ const confirmEdit = async () => {
     const payload = {
       mmName: editedName.value,
       mindMapJson: diagram.mindMapJson,
-      userId: diagram.userId,
       subjectId: diagram.subjectId,
     };
     const response = await api.put(`/diagrammes/${currentEditId.value}`, payload);
@@ -141,10 +135,8 @@ const loadDiagram = (diagram) => {
 };
 
 const ensureMeta = (payload) => {
-  const fallbackUser = selectedUser.value || currentDiagramMeta.value?.userId || 1;
   const fallbackSubject = selectedSubject.value || currentDiagramMeta.value?.subjectId || 1;
   return {
-    userId: Number(fallbackUser),
     subjectId: Number(fallbackSubject),
     mmName: exportName.value || payload.title || 'Carte mentale',
   };
@@ -190,7 +182,6 @@ const performAutoSave = async () => {
   const body = {
     mmName: meta.mmName,
     mindMapJson: payload,
-    userId: meta.userId,
     subjectId: meta.subjectId,
   };
 
@@ -248,7 +239,6 @@ const handleSave = async (payload) => {
     const response = await api.put(`/diagrammes/${currentDiagramId.value}`, {
       mmName: meta.mmName,
       mindMapJson: payload,
-      userId: meta.userId,
       subjectId: meta.subjectId,
     });
     if (response) {
@@ -280,7 +270,6 @@ const handleNewMap = (payload) => {
   currentDiagramId.value = null;
   currentDiagramMeta.value = {
     mmName: payload.title,
-    userId: selectedUser.value || 1,
     subjectId: selectedSubject.value || 1,
   };
   currentMapPayload.value = payload;
@@ -297,7 +286,6 @@ const confirmExportModal = async () => {
     const body = {
       mmName: meta.mmName,
       mindMapJson: pendingPayload.value,
-      userId: meta.userId,
       subjectId: meta.subjectId,
     };
 
@@ -376,10 +364,6 @@ onBeforeUnmount(() => {
             <button @click="toggleDeleteMode" :class="{ active: deleteMode }">Supprimer</button>
           </div>
           <input v-model="searchQuery" placeholder="Rechercher..." />
-          <select v-model="selectedUser">
-            <option value="">Tous les utilisateurs</option>
-            <option v-for="user in users" :key="user" :value="user">Utilisateur {{ user }}</option>
-          </select>
           <select v-model="selectedSubject">
             <option value="">Toutes les matieres</option>
             <option v-for="subject in subjects" :key="subject" :value="subject">Matiere {{ subject }}</option>
@@ -393,7 +377,7 @@ onBeforeUnmount(() => {
           >
             <div class="sidebar__item-main" @click="loadDiagram(diagram)">
               <span class="sidebar__item-title">{{ diagram.mmName }}</span>
-              <small class="sidebar__item-meta">Utilisateur {{ diagram.userId }} - Matiere {{ diagram.subjectId }}</small>
+              <small class="sidebar__item-meta">Matiere {{ diagram.subjectId }}</small>
             </div>
             <div class="sidebar__item-actions">
               <button v-if="editMode" @click.stop="openEditModal(diagram)">Renommer</button>
@@ -405,7 +389,6 @@ onBeforeUnmount(() => {
 
       <main class="mindmaps-page__content">
         <MindMapBuilder
-          ref="builderRef"
           :map-payload="currentMapPayload"
           :loading="isSaving || isExporting"
           @save="handleSave"

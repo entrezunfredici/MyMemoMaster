@@ -5,7 +5,7 @@ const { Subject } = require("../models");
 
 exports.findAll = async (req, res) => {
   try {
-    const responses = await DiagrammeService.findAll();
+    const responses = await DiagrammeService.findByUser(req.user.id);
     res.status(200).json(responses);
   } catch (error) {
     logger.error(error?.message || error);
@@ -28,10 +28,11 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    let { mmName, mindMapJson, userId, subjectId } = req.body;
+    let { mmName, mindMapJson, subjectId } = req.body;
+    const userId = req.user.id;
 
-    if (!mmName || !mindMapJson || !userId) {
-      return res.status(400).json({ message: "Les champs mmName, mindMapJson et userId sont requis." });
+    if (!mmName || !mindMapJson) {
+      return res.status(400).json({ message: "Les champs mmName et mindMapJson sont requis." });
     }
 
     try {
@@ -62,16 +63,21 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { mmName, mindMapJson, userId } = req.body;
+    const { mmName, mindMapJson } = req.body;
 
-    if (!mmName || !mindMapJson || !userId) {
-      return res.status(400).json({ message: "Tous les champs (mmName, mindMapJson, userId) sont requis." });
+    if (!mmName || !mindMapJson) {
+      return res.status(400).json({ message: "Les champs mmName et mindMapJson sont requis." });
     }
 
-    const updatedDiagramme = await DiagrammeService.update(id, { mmName, mindMapJson, userId });
-    if (!updatedDiagramme) {
+    const existing = await DiagrammeService.findById(id);
+    if (!existing) {
       return res.status(404).json({ message: `Diagramme avec l'ID ${id} non trouvé.` });
     }
+    if (String(existing.userId) !== String(req.user.id)) {
+      return res.status(403).json({ message: "Accès refusé." });
+    }
+
+    const updatedDiagramme = await DiagrammeService.update(id, { mmName, mindMapJson });
     res.status(200).json(updatedDiagramme);
   } catch (error) {
     logger.error(error?.message || error);
@@ -85,6 +91,9 @@ exports.delete = async (req, res) => {
     const diagramme = await DiagrammeService.findById(id);
     if (!diagramme) {
       return res.status(404).json({ message: `Diagramme avec l'ID ${id} non trouvé.` });
+    }
+    if (String(diagramme.userId) !== String(req.user.id)) {
+      return res.status(403).json({ message: "Accès refusé." });
     }
     await DiagrammeService.delete(id);
     res.status(204).send();

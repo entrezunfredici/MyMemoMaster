@@ -1,5 +1,6 @@
 const express = require("express");
 const leitnerSystem = require("../controllers/LeitnerSystem.controller.js");
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", leitnerSystem.findAll);
+router.get("/all", authMiddleware, leitnerSystem.findAll);
 
 /**
  * @swagger
@@ -53,7 +54,7 @@ router.get("/all", leitnerSystem.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/bySubjects/:subjectid", leitnerSystem.findBySubject);
+router.get("/bySubjects/:subjectid", authMiddleware, leitnerSystem.findBySubject);
 
 /**
  * @swagger
@@ -77,7 +78,7 @@ router.get("/bySubjects/:subjectid", leitnerSystem.findBySubject);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", leitnerSystem.findOne);
+router.get("/:id", authMiddleware, leitnerSystem.findOne);
 
 /**
  * @swagger
@@ -114,7 +115,7 @@ router.get("/:id", leitnerSystem.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", leitnerSystem.create);
+router.post("/add", authMiddleware, leitnerSystem.create);
 
 /**
  * @swagger
@@ -151,7 +152,7 @@ router.post("/add", leitnerSystem.create);
  *       500:
  *         description: Erreur serveur
  */
-router.put("/:id", leitnerSystem.update);
+router.put("/:id", authMiddleware, leitnerSystem.update);
 
 /**
  * @swagger
@@ -219,7 +220,7 @@ router.put("/:id", leitnerSystem.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/share", leitnerSystem.share);
+router.post("/share", authMiddleware, leitnerSystem.share);
 
 /**
  * @swagger
@@ -249,7 +250,7 @@ router.post("/share", leitnerSystem.share);
  *       500:
  *         description: Erreur serveur
  */
-router.delete("/:id", leitnerSystem.delete);
+router.delete("/:id", authMiddleware, leitnerSystem.delete);
 
 module.exports = (app) => {
   /**

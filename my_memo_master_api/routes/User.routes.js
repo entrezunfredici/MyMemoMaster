@@ -308,7 +308,7 @@ router.delete("/:id/role", authMiddleware, user.removeRole);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/verify-email", user.verifyEmail);
+router.post("/verify-email", authLimiter, user.verifyEmail);
 
 /**
  * @swagger

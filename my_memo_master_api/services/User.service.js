@@ -57,7 +57,8 @@ class UserService {
 
 
   async update(userId, user) {
-    await User.update(user, {
+    const { name, email } = user;
+    await User.update({ name, email }, {
       where: { userId: userId }
     });
     return this.findOne(userId);
@@ -129,7 +130,8 @@ class UserService {
 
   async setResetPasswordCode(userId, code = '') {
     if (!code) code = generateCode();
-    await User.update({ resetPasswordCode: code }, {
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await User.update({ resetPasswordCode: code, resetPasswordCodeExpiresAt: expiresAt }, {
       where: { userId: userId }
     });
     return code;
@@ -137,8 +139,12 @@ class UserService {
 
   async verifyResetPasswordCode(userId, code) {
     const user = await User.findByPk(userId);
-    const isValid = user.resetPasswordCode === code;
+    const now = new Date();
+    const isValid = user.resetPasswordCode === Number(code)
+      && user.resetPasswordCodeExpiresAt
+      && user.resetPasswordCodeExpiresAt > now;
     user.resetPasswordCode = null;
+    user.resetPasswordCodeExpiresAt = null;
     await user.save();
     return isValid;
   }

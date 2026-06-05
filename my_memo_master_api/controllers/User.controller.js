@@ -20,15 +20,16 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await userService.findByEmail(email);
-    if (!user) return res.status(404).send({ message: "Utilisateur introuvable." });
+    if (!user) return res.status(401).send({ message: "Identifiants invalides." });
 
     const isPasswordValid = await userService.verifyPassword(user.userId, password);
-    if (!isPasswordValid) return res.status(401).send({ message: "Mot de passe incorrect." });
+    if (!isPasswordValid) return res.status(401).send({ message: "Identifiants invalides." });
 
+    const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '24h';
     const token = jwt.sign(
-      { id: user.userId, name: user.name, email: user.email, role: user.role },
+      { id: user.userId },
       process.env.AUTH_JWT_SECRET,
-      { expiresIn: process.env.AUTH_JWT_EXPIRES_IN }
+      { expiresIn }
     );
 
     await userService.updateLoginDate(user.userId);
@@ -97,6 +98,9 @@ exports.resetPassword = async (req, res) => {
 
 exports.findOne = async (req, res) => {
   try {
+    if (String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).send({ message: "Accès refusé." });
+    }
     const user = await userService.findOne(req.params.id);
     if (!user) return res.status(404).send({ message: "Utilisateur introuvable." });
 
@@ -111,6 +115,9 @@ exports.findOne = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    if (String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).send({ message: "Accès refusé." });
+    }
     await userService.update(req.params.id, req.body);
     const updatedUser = await userService.findOne(req.params.id);
     res.status(200).send(updatedUser);
@@ -121,7 +128,8 @@ exports.update = async (req, res) => {
 };
 
 exports.changePassword = async (req, res) => {
-  const { id, oldPassword, newPassword } = req.body;
+  const { oldPassword, newPassword } = req.body;
+  const id = req.user.id;
   try {
     const user = await userService.findOne(id);
     if (!user) return res.status(404).send({ message: "Utilisateur introuvable." });
@@ -173,6 +181,9 @@ exports.removeRole = async (req, res) => {
 
 exports.delete = async (req, res) => {
   try {
+    if (String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).send({ message: "Accès refusé." });
+    }
     await userService.delete(req.params.id);
     res.status(200).send({ message: "Utilisateur supprimé avec succès." });
   } catch (error) {

@@ -52,9 +52,9 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const newData = req.body;
+    const { level, intervall, color } = req.body;
 
-    const updatedBox = await LeitnerBoxService.update(id, newData);
+    const updatedBox = await LeitnerBoxService.update(id, { level, intervall, color });
 
     if (!updatedBox) {
       return res

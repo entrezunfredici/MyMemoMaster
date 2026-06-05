@@ -1,6 +1,6 @@
 const express = require("express");
 const subject = require("../controllers/Subject.controller.js");
-//const authMiddleware = require("../middlewares/Auth.middleware");
+const authMiddleware = require("../middlewares/Auth.middleware");
 
 const router = express.Router();
 
@@ -29,7 +29,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/all", subject.findAll);
+router.get("/all", authMiddleware, subject.findAll);
 
 /**
  * @swagger
@@ -63,7 +63,7 @@ router.get("/all", subject.findAll);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/:id", subject.findOne);
+router.get("/:id", authMiddleware, subject.findOne);
 
 /**
  * @swagger
@@ -98,7 +98,7 @@ router.get("/:id", subject.findOne);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/add", subject.create);
+router.post("/add", authMiddleware, subject.create);
 
 /**
  * @swagger
@@ -131,7 +131,7 @@ router.post("/add", subject.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", subject.update);
+router.put("/:id", authMiddleware, subject.update);
 
 /**
  * @swagger
@@ -154,7 +154,7 @@ router.put("/:id", subject.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:id", subject.delete);
+router.delete("/:id", authMiddleware, subject.delete);
 
 module.exports = (app) => {
   /**
