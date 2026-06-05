@@ -1,12 +1,14 @@
 const fieldService = require("../services/Fields.service.js");
+const logger = require("../helpers/logger");
 
 exports.findAll = async (req, res) => {
     try {
         const data = await fieldService.findAll();
         res.status(200).send(data);
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la récupération des champs.",
+            message: "Une erreur s'est produite lors de la récupération des champs.",
         });
     }
 };
@@ -22,8 +24,9 @@ exports.findOne = async (req, res) => {
             res.status(200).send(data);
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || `Erreur lors de la récupération du champ avec l'identifiant ${req.params.id}.`,
+            message: `Erreur lors de la récupération du champ avec l'identifiant ${req.params.id}.`,
         });
     }
 };
@@ -38,8 +41,9 @@ exports.create = async (req, res) => {
         const newField = await fieldService.create({ fieldletter, idType, data });
         res.status(201).send(newField);
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la création du champ.",
+            message: "Une erreur s'est produite lors de la création du champ.",
         });
     }
 };
@@ -55,8 +59,9 @@ exports.update = async (req, res) => {
             res.status(200).send(updatedField);
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la mise à jour du champ.",
+            message: "Une erreur s'est produite lors de la mise à jour du champ.",
         });
     }
 };
@@ -72,8 +77,9 @@ exports.delete = async (req, res) => {
             res.status(204).send();
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la suppression du champ.",
+            message: "Une erreur s'est produite lors de la suppression du champ.",
         });
     }
 };

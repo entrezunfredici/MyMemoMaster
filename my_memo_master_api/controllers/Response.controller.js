@@ -1,4 +1,5 @@
 const ResponseService = require("../services/Response.service.js");
+const logger = require("../helpers/logger");
 
 // Obtenir toutes les réponses d'une question
 exports.findAllByQuestion = async (req, res) => {
@@ -7,8 +8,9 @@ exports.findAllByQuestion = async (req, res) => {
     const responses = await ResponseService.getAllResponsesByQuestion(questionId);
     res.status(200).json(responses);
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: error.message || `Une erreur s'est produite lors de la récupération des réponses.`,
+      message: "Une erreur s'est produite lors de la récupération des réponses.",
     });
   }
 };
@@ -26,8 +28,9 @@ exports.findCorrectionByQuestion = async (req, res) => {
       res.status(200).json(correction);
     }
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: `Erreur lors de la récupération de la correction pour la question ${req.params.questionId}. ${error.message}`,
+      message: `Erreur lors de la récupération de la correction pour la question ${req.params.questionId}.`,
     });
   }
 };
@@ -44,8 +47,9 @@ exports.findOne = async (req, res) => {
       res.status(200).json(response);
     }
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: `Erreur lors de la récupération de la réponse avec l'identifiant ${req.params.id}. ${error.message}`,
+      message: `Erreur lors de la récupération de la réponse avec l'identifiant ${req.params.id}.`,
     });
   }
 };
@@ -57,8 +61,9 @@ exports.create = async (req, res) => {
     const response = await ResponseService.create({ content, idQuestion, correction });
     res.status(201).json(response);
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: `Une erreur s'est produite lors de la création de la réponse. ${error.message}`,
+      message: "Une erreur s'est produite lors de la création de la réponse.",
     });
   }
 };
@@ -70,8 +75,9 @@ exports.update = async (req, res) => {
     const updatedResponse = await ResponseService.update(id, req.body);
     res.status(200).json(updatedResponse);
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: `Une erreur s'est produite lors de la modification de la réponse. ${error.message}`,
+      message: "Une erreur s'est produite lors de la modification de la réponse.",
     });
   }
 };
@@ -83,8 +89,9 @@ exports.delete = async (req, res) => {
     await ResponseService.delete(id);
     res.status(204).send();
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: `Une erreur s'est produite lors de la suppression de la réponse. ${error.message}`,
+      message: "Une erreur s'est produite lors de la suppression de la réponse.",
     });
   }
 };

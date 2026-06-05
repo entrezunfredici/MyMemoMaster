@@ -94,7 +94,7 @@ startFifoCron();
 
 // Si rien n'est trouvé
 app.use((_req, res) => {
-  return res.status(404).json({ message: "Route not found" });
+  return res.status(404).json({ message: "Route introuvable." });
 });
 
 // Global error handler (must be last)

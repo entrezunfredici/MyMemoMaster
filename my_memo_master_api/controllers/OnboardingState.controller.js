@@ -1,4 +1,5 @@
 const OnboardingStateService = require('../services/OnboardingState.service');
+const logger = require('../helpers/logger');
 
 
 exports.findByUserId = async (req, res) => {
@@ -12,8 +13,9 @@ exports.findByUserId = async (req, res) => {
       res.status(200).send(user);
     }
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: error.message || `Erreur lors de la récupération de l'utilisateur: ${req.params.id}.`,
+      message: `Erreur lors de la récupération de l'utilisateur: ${req.params.id}.`,
     });
   }
 };
@@ -30,8 +32,9 @@ exports.updateOnboarding = async (req, res) => {
       res.status(200).send(updated);
     }
   } catch (error) {
+    logger.error(error?.message || error);
     res.status(500).send({
-      message: error.message || `Erreur lors du changement de l'état de l'onboarding: ${req.params.userId}.`,
+      message: `Erreur lors du changement de l'état de l'onboarding: ${req.params.userId}.`,
     });
   }
 };

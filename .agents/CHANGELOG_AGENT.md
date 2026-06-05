@@ -34,7 +34,7 @@
 | Tutorials | Stable | init |
 | OnboardingState | Stable | init |
 | Kpi | Stable (lecture seule) | init |
-| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — Multer errors → 400, validators ajoutés | 2026-06-05 |
+| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — couverture logger complète (19/19 controllers) | 2026-06-05 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
 | Migrations Sequelize CLI | Stable — 23 migrations + migration index FK | 2026-06-05 |
 | Seeders Sequelize CLI | Stable — Roles + User admin | 2026-06-05 |
@@ -254,3 +254,31 @@
 **Dette / points d'attention :**
 - Les tests dans `test/controllers/` (User, Subject, LeitnerSystem) utilisent des chemins sans préfixe `/api/v1` (héritage d'avant la mise en place du versioning). Ces tests retournent 404 et sont brisés — à corriger en remplaçant les chemins par `/api/v1/...`.
 - Les routes OnboardingState `GET /byUserId` utilisent `req.params.id` mais il n'y a pas de paramètre `:id` dans le chemin — bug logique préexistant hors périmètre M-00.06.
+
+---
+
+### [M-00.07] — Gestion des erreurs (codes, logging) — couverture complète — 2026-06-05
+
+**Fichiers modifiés :**
+- `app.js` — message 404 corrigé en français (`"Route not found"` → `"Route introuvable."`)
+- `controllers/Role.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+- `controllers/Test.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+- `controllers/Fields.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+- `controllers/FieldsType.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+- `controllers/Question.controller.js` — ajout `logger`, correction format réponse `{ error }` → `{ message }`, messages en français, suppressions fuites
+- `controllers/OnboardingState.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+- `controllers/Response.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+- `controllers/Tutorials.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+- `controllers/Storage.controller.js` — ajout `logger`, suppression fuite `error.message` dans les 500
+
+**Ce qui est utilisable :**
+- Logger Winston actif sur 19/19 controllers — toute erreur 500 est loguée côté serveur
+- Aucun `error.message` technique ne fuite vers le client en production (messages génériques uniquement)
+- `errorHandler.middleware.js` reste le filet de sécurité global pour les erreurs non catchées
+- 404 retourne `"Route introuvable."` en français
+
+**Hypothèses posées :**
+- Les controllers qui utilisaient `{ error: ... }` (Question) ont été normalisés vers `{ message: ... }` conformément à la convention du projet.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.

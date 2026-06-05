@@ -1,12 +1,14 @@
 const roleService = require("../services/Role.service.js");
+const logger = require("../helpers/logger");
 
 exports.findAll = async (req, res) => {
     try {
         const data = await roleService.findAll();
         res.status(200).send(data);
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la récupération des rôles.",
+            message: "Une erreur s'est produite lors de la récupération des rôles.",
         });
     }
 };
@@ -22,8 +24,9 @@ exports.findOne = async (req, res) => {
             res.status(200).send(data);
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || `Erreur lors de la récupération du rôle avec l'identifiant ${req.params.id}.`,
+            message: `Erreur lors de la récupération du rôle avec l'identifiant ${req.params.id}.`,
         });
     }
 };
@@ -34,8 +37,9 @@ exports.create = async (req, res) => {
         const data = await roleService.create({ name });
         res.status(201).send(data);
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la création du rôle.",
+            message: "Une erreur s'est produite lors de la création du rôle.",
         });
     }
 };
@@ -51,8 +55,9 @@ exports.update = async (req, res) => {
             res.status(200).send(updatedRole);
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la mise à jour du rôle.",
+            message: "Une erreur s'est produite lors de la mise à jour du rôle.",
         });
     }
 }
@@ -68,8 +73,9 @@ exports.delete = async (req, res) => {
             res.status(204).send();
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).send({
-            message: error.message || "Une erreur s'est produite lors de la suppression du rôle.",
+            message: "Une erreur s'est produite lors de la suppression du rôle.",
         });
     }
 }

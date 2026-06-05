@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const TutorialsService = require('../services/Tutorials.service');
+const logger = require('../helpers/logger');
 
 exports.findAll = async (req, res) => {
     let { page, perPage, search, subjectId, revisionTips } = req.query;
@@ -36,9 +37,10 @@ exports.findAll = async (req, res) => {
             pagination,
         });
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).json({
             status: 'error',
-            message: error.message,
+            message: "Une erreur s'est produite lors de la récupération des tutoriels.",
         });
     }
 };
@@ -58,9 +60,10 @@ exports.findOne = async (req, res) => {
             });
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).json({
             status: 'error',
-            message: `Erreur lors de la récupération du tutoriel avec l'identifiant ${req.params.id}. ${error.message}`,
+            message: `Erreur lors de la récupération du tutoriel avec l'identifiant ${req.params.id}.`,
         });
     }
 };
@@ -74,9 +77,10 @@ exports.create = async (req, res) => {
             data,
         });
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).json({
             status: 'error',
-            message: `Une erreur s'est produite lors de la création du tutoriel. ${error.message}`,
+            message: "Une erreur s'est produite lors de la création du tutoriel.",
         });
     }
 };
@@ -98,9 +102,10 @@ exports.update = async (req, res) => {
             });
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).json({
             status: 'error',
-            message: `Erreur lors de la mise à jour du tutoriel avec l'identifiant ${req.params.id}. ${error.message}`,
+            message: `Erreur lors de la mise à jour du tutoriel avec l'identifiant ${req.params.id}.`,
         });
     }
 };
@@ -121,9 +126,10 @@ exports.delete = async (req, res) => {
             });
         }
     } catch (error) {
+        logger.error(error?.message || error);
         res.status(500).json({
             status: 'error',
-            message: `Erreur lors de la suppression du tutoriel avec l'identifiant ${req.params.id}. ${error.message}`,
+            message: `Erreur lors de la suppression du tutoriel avec l'identifiant ${req.params.id}.`,
         });
     }
 };

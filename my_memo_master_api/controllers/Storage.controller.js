@@ -1,5 +1,6 @@
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { s3Client, bucket, publicUrl } = require("../config/storage.config");
+const logger = require("../helpers/logger");
 
 exports.upload = async (req, res) => {
   try {
@@ -13,9 +14,8 @@ exports.upload = async (req, res) => {
       size: req.file.size,
     });
   } catch (error) {
-    return res
-      .status(500)
-      .send({ message: error.message || "Erreur lors de l'upload du fichier." });
+    logger.error(error?.message || error);
+    return res.status(500).send({ message: "Erreur lors de l'upload du fichier." });
   }
 };
 
@@ -32,9 +32,8 @@ exports.uploadMultiple = async (req, res) => {
     }));
     return res.status(201).send(files);
   } catch (error) {
-    return res
-      .status(500)
-      .send({ message: error.message || "Erreur lors de l'upload des fichiers." });
+    logger.error(error?.message || error);
+    return res.status(500).send({ message: "Erreur lors de l'upload des fichiers." });
   }
 };
 
@@ -49,8 +48,7 @@ exports.delete = async (req, res) => {
     );
     return res.status(200).send({ message: "Fichier supprimé avec succès." });
   } catch (error) {
-    return res
-      .status(500)
-      .send({ message: error.message || "Erreur lors de la suppression du fichier." });
+    logger.error(error?.message || error);
+    return res.status(500).send({ message: "Erreur lors de la suppression du fichier." });
   }
 };
