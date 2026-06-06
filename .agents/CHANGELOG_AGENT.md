@@ -35,6 +35,7 @@
 | OnboardingState | Stable | init |
 | Kpi | Stable (lecture seule) | init |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — couverture logger complète (19/19 controllers) | 2026-06-05 |
+| Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
 | Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
 | Migrations Sequelize CLI | Stable — 23 migrations + migration index FK | 2026-06-05 |
@@ -316,3 +317,32 @@
 **Dette / points d'attention :**
 - Pas de tests unitaires pour les endpoints storage/upload — à prévoir avant prod.
 - Les fichiers mindmap uploadés localement ne sont pas répliqués en prod si le conteneur redémarre (volume Docker nécessaire).
+
+---
+
+### [M-00.09] — Sécurité fonctionnelle (CORS, rate limit) — 2026-06-06
+
+**Fichiers créés :**
+- `middlewares/rateLimit.middleware.js` — `authLimiter` (5 req/15 min), `registerLimiter` (10 req/1h), `apiLimiter` (200 req/15 min) ; skip automatique en `NODE_ENV=test` ; limites configurables via env vars
+- `test/middlewares/security.test.js` — 8 tests : CORS (origine autorisée, origine bloquée, preflight OPTIONS, headers autorisés) + rate limiting (429 après seuil authLimiter, registerLimiter, apiLimiter, skip en test)
+
+**Fichiers modifiés :**
+- `middlewares/rateLimit.middleware.js` — extrait de `User.routes.js` (les limiteurs inline ont été déplacés ici)
+- `routes/User.routes.js` — suppression des définitions inline `authLimiter` / `registerLimiter` et de `rateLimit` ; import depuis `rateLimit.middleware.js`
+- `app.js` — ajout `app.set('trust proxy', 1)` pour compatibilité Traefik ; CORS reconfiguré avec fonction (au lieu de string) pour un vrai contrôle côté serveur ; ajout `apiLimiter` global sur le router v1 ; support multi-origines via `CORS_ORIGIN` séparé par des virgules
+- `.env.example` — ajout section "Sécurité" : `CORS_ORIGIN`, vars rate limiting commentées
+
+**Ce qui est utilisable :**
+- CORS fonctionnel côté serveur : origines non configurées → aucun header CORS (navigateur bloque) ; `CORS_ORIGIN=a.com,b.com` pour plusieurs origines
+- Rate limiting actif en prod sur toutes les routes `/api/v1` (200 req/15 min) + routes auth (5 req/15 min) + register (10 req/1h)
+- `X-RateLimit-*` headers (standardHeaders) exposés dans les réponses
+- Tout désactivé en `NODE_ENV=test` — les tests existants ne sont pas impactés
+
+**Hypothèses posées :**
+- `trust proxy: 1` correspond à un seul proxy devant l'API (Traefik). Si l'architecture change (double proxy), cette valeur doit être ajustée.
+- `!origin` (pas d'en-tête Origin) est autorisé par le CORS — couvre mobile apps, Postman, appels serveur-à-serveur.
+- Les limites rate limiting (200/5/10) sont des valeurs MVP — à ajuster selon la charge réelle en production.
+
+**Dette / points d'attention :**
+- `express-rate-limit` utilise un `MemoryStore` par défaut — non partagé entre plusieurs instances Node. En prod multi-instance (scale horizontal), il faudra un store Redis partagé.
+- Les tests `User.controller.test.js`, `Subject.controller.test.js`, `LeitnerSystem.controller.test.js` utilisent des chemins sans préfixe `/api/v1` — déjà documenté comme dette dans M-00.04, non dans le périmètre de ce ticket.

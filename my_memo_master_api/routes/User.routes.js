@@ -1,31 +1,11 @@
 const express = require("express");
-const rateLimit = require("express-rate-limit");
 const user = require("../controllers/User.controller.js");
 const authMiddleware = require("../middlewares/Auth.middleware.js");
 const validate = require("../middlewares/validate.middleware.js");
 const userValidators = require("../validators/User.validators.js");
+const { authLimiter, registerLimiter } = require("../middlewares/rateLimit.middleware.js");
 
 const router = express.Router();
-
-const skipInTest = () => process.env.NODE_ENV === 'test';
-
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    skip: skipInTest,
-    message: { message: "Trop de tentatives, réessayez dans 15 minutes." },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-const registerLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 10,
-    skip: skipInTest,
-    message: { message: "Trop de créations de compte, réessayez dans 1 heure." },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
 
 /**
  * @swagger

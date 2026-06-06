@@ -10,6 +10,7 @@ const bodyParser = require("body-parser");
 const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
 const sanitize = require("./middlewares/sanitize.middleware");
 const errorHandler = require("./middlewares/errorHandler.middleware");
+const { apiLimiter } = require("./middlewares/rateLimit.middleware");
 
 // Importation des routes
 const subjectRoutes = require("./routes/Subject.routes");
@@ -38,13 +39,31 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed i
 
 const app = express();
 
+// CHOIX: trust proxy activé pour que req.ip reflète le vrai client derrière Traefik
+// RAISON: sans ça, tous les clients partagent l'IP de Traefik — rate limiting inefficace en prod
+app.set("trust proxy", 1);
+
 // Security headers
 app.use(helmet());
 
-// CORS
+// CORS — supporte plusieurs origines via CORS_ORIGIN séparé par des virgules
+// CHOIX: origin en fonction plutôt qu'en string
+// RAISON: cors avec string retourne toujours l'origine configurée sans comparer ;
+//         la fonction permet de ne pas poser le header pour les origines inconnues
+const CORS_ORIGINS = (process.env.CORS_ORIGIN || process.env.VITE_FRONT_URL || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || process.env.VITE_FRONT_URL,
+    origin: (origin, callback) => {
+      if (!origin || CORS_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -67,6 +86,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes v1
 const v1 = express.Router();
+v1.use(apiLimiter);
 subjectRoutes(v1);
 roleRoutes(v1);
 testRoutes(v1);
