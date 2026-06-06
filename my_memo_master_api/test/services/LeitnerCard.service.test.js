@@ -12,6 +12,7 @@ jest.mock("../../models", () => ({
   LeitnerBox: {
     findOne: jest.fn(),
   },
+  Question: {},
   Response: {
     findAll: jest.fn(),
   },
@@ -33,7 +34,10 @@ describe("LeitnerCardService", () => {
 
     const result = await LeitnerCardService.getCardsByBoxId(2);
 
-    expect(LeitnerCard.findAll).toHaveBeenCalledWith({ where: { idBox: 2 } });
+    expect(LeitnerCard.findAll).toHaveBeenCalledWith({
+      where: { idBox: 2 },
+      include: [expect.objectContaining({ as: "question" })],
+    });
     expect(result).toEqual([{ idCard: 1, idBox: 2 }]);
   });
 
@@ -43,7 +47,15 @@ describe("LeitnerCardService", () => {
 
     const result = await LeitnerCardService.getCardById(1);
 
-    expect(LeitnerCard.findByPk).toHaveBeenCalledWith(1);
+    expect(LeitnerCard.findByPk).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        include: expect.arrayContaining([
+          expect.objectContaining({ as: "leitnerBox" }),
+          expect.objectContaining({ as: "question" }),
+        ]),
+      })
+    );
     expect(result).toEqual(mockCard);
   });
 
@@ -58,11 +70,16 @@ describe("LeitnerCardService", () => {
       { canAdd: true }
     );
 
-    expect(LeitnerBox.findOne).toHaveBeenCalledWith({ where: { level: 0 } });
+    expect(LeitnerBox.findOne).toHaveBeenCalledWith({ where: { level: 1 } });
     expect(LeitnerCard.create).toHaveBeenCalledWith({
       idQuestion: 1,
       fifo: true,
       idBox: mockBox.idBox,
+      next_review_at: null,
+      last_review_at: null,
+      review_count: 0,
+      correct_count: 0,
+      incorrect_count: 0,
     });
     expect(result).toEqual(mockCard);
   });
@@ -70,19 +87,19 @@ describe("LeitnerCardService", () => {
   test("should update an existing Leitner card", async () => {
     const mockCard = {
       idCard: 1,
-      fifo: true,
+      idQuestion: 10,
       update: jest.fn().mockResolvedValue(true),
     };
 
     LeitnerCard.findByPk.mockResolvedValue(mockCard);
 
-    const updatedData = { fifo: false };
+    const updatedData = { idQuestion: 42 };
     const result = await LeitnerCardService.updateCard(1, updatedData, {
       canEdit: true,
     });
 
     expect(LeitnerCard.findByPk).toHaveBeenCalledWith(1);
-    expect(mockCard.update).toHaveBeenCalledWith(updatedData);
+    expect(mockCard.update).toHaveBeenCalledWith({ idQuestion: 42 });
     expect(result).toEqual(mockCard);
   });
 

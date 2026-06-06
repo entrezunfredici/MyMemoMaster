@@ -50,6 +50,7 @@
 | Front — CalendarPage | Stable | init |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable | init |
+| Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -317,6 +318,40 @@
 **Dette / points d'attention :**
 - Pas de tests unitaires pour les endpoints storage/upload — à prévoir avant prod.
 - Les fichiers mindmap uploadés localement ne sont pas répliqués en prod si le conteneur redémarre (volume Docker nécessaire).
+
+---
+
+### [M-00.10] — Configuration Axios / couche API front — 2026-06-06
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/helpers/api.js` — JSDoc ajouté sur les 4 fonctions exportées (`get`, `post`, `put`, `del`) ; messages d'erreur internes traduits en français
+- `my_memo_master_front/vitest.config.js` — ajout `resolve.alias` (`@/` → `src/`) pour permettre les imports dans les tests
+
+**Fichiers créés :**
+- `my_memo_master_front/test/helpers/api.test.js` — 20 tests Vitest : get (6), post (5), put (4), del (5) — cas nominal, 204, 401 → logout, erreur réseau → redirect, endpoint manquant → throw
+
+**Ce qui était déjà en place (constaté à l'audit) :**
+- Instance Axios configurée avec `baseURL` dynamique (VITE_API_URL / runtime config Docker)
+- Timeout 10s, `validateStatus` accepte 2xx-4xx sans throw (5xx → catch → /error-server)
+- Intercepteur request : injection JWT Bearer depuis `authStore.token`, support FormData (suppression Content-Type), multi-modes sécurité (public, api-key, static-bearer, google-identity)
+- `handleSpecialStatus` : 401 → `authStore.logout()`, retour undefined aux appelants
+- `config.js` : résolution runtime Docker (`window.__APP_CONFIG__`) avec fallback `import.meta.env.VITE_*`
+
+**Ce qui est utilisable :**
+- `api.get(endpoint, params?)` — GET avec query params
+- `api.post(endpoint, data?, config?)` — POST avec JSON ou FormData
+- `api.put(endpoint, data?, config?)` — PUT
+- `api.del(endpoint, data?)` — DELETE avec corps optionnel
+- Toutes les fonctions retournent `{ data, status }` ou `undefined` (204 / 401 / erreur réseau)
+- 20 tests Vitest passants : `npm test` dans `my_memo_master_front/`
+
+**Hypothèses posées :**
+- Les `console.error` dans les catch blocks restent en anglais — ce sont des logs développeur, non des messages utilisateur (la convention "français" vise les messages HTTP)
+- `vitest.config.js` a été rendu indépendant de `vite.config.js` pour éviter d'importer le plugin Vue dans le contexte de test (inutile et source d'erreurs)
+
+**Dette / points d'attention :**
+- Les stores Pinia (`auth.js`, etc.) contiennent des messages en anglais (`'You have been logged in'`, etc.) — hors périmètre de ce ticket, à corriger dans un ticket dédié
+- Les tests d'intercepteur (injection JWT, FormData) ne sont pas couverts — ils relèvent de tests d'intégration nécessitant un environnement Vue complet
 
 ---
 

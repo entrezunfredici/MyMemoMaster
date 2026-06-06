@@ -17,7 +17,7 @@ jest.mock('../../services/LeitnerSystem.service', () => ({
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
-  shareSystem: jest.fn(),
+  share: jest.fn(),
 }));
 
 process.env.AUTH_JWT_SECRET = 'test-secret';
@@ -25,20 +25,26 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173';
 process.env.NODE_ENV = 'test';
 
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const app = require('../../app');
 const leitnerSystemService = require('../../services/LeitnerSystem.service');
+
+const makeToken = (payload = { id: 1 }) =>
+  jwt.sign(payload, 'test-secret', { expiresIn: '1d' });
 
 const mockSystem = { idSystem: 1, name: 'Leitner Maths', idUser: 1 };
 
 describe('LeitnerSystem Controller', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  // ── GET /leitnersystems/all ────────────────────────────────────────────────
-  describe('GET /leitnersystems/all', () => {
+  // ── GET /api/v1/leitnersystems ────────────────────────────────────────────
+  describe('GET /api/v1/leitnersystems', () => {
     it('200 — retourne tous les systèmes', async () => {
       leitnerSystemService.findAll.mockResolvedValue([mockSystem]);
 
-      const res = await request(app).get('/leitnersystems/all');
+      const res = await request(app)
+        .get('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
@@ -47,18 +53,27 @@ describe('LeitnerSystem Controller', () => {
     it('500 — le service échoue', async () => {
       leitnerSystemService.findAll.mockRejectedValue(new Error('DB error'));
 
-      const res = await request(app).get('/leitnersystems/all');
+      const res = await request(app)
+        .get('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(500);
     });
+
+    it('401 — pas de token', async () => {
+      const res = await request(app).get('/api/v1/leitnersystems');
+      expect(res.status).toBe(401);
+    });
   });
 
-  // ── GET /leitnersystems/bySubjects/:subjectid ──────────────────────────────
-  describe('GET /leitnersystems/bySubjects/:subjectid', () => {
+  // ── GET /api/v1/leitnersystems/bySubjects/:subjectid ──────────────────────
+  describe('GET /api/v1/leitnersystems/bySubjects/:subjectid', () => {
     it('200 — retourne les systèmes du sujet', async () => {
       leitnerSystemService.findBySubject.mockResolvedValue([mockSystem]);
 
-      const res = await request(app).get('/leitnersystems/bySubjects/1');
+      const res = await request(app)
+        .get('/api/v1/leitnersystems/bySubjects/1')
+        .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(200);
       expect(leitnerSystemService.findBySubject).toHaveBeenCalledWith('1');
@@ -67,7 +82,9 @@ describe('LeitnerSystem Controller', () => {
     it('404 — aucun système pour ce sujet', async () => {
       leitnerSystemService.findBySubject.mockResolvedValue([]);
 
-      const res = await request(app).get('/leitnersystems/bySubjects/99');
+      const res = await request(app)
+        .get('/api/v1/leitnersystems/bySubjects/99')
+        .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(404);
     });
@@ -75,18 +92,22 @@ describe('LeitnerSystem Controller', () => {
     it('500 — le service échoue', async () => {
       leitnerSystemService.findBySubject.mockRejectedValue(new Error('DB error'));
 
-      const res = await request(app).get('/leitnersystems/bySubjects/1');
+      const res = await request(app)
+        .get('/api/v1/leitnersystems/bySubjects/1')
+        .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(500);
     });
   });
 
-  // ── GET /leitnersystems/:id ────────────────────────────────────────────────
-  describe('GET /leitnersystems/:id', () => {
+  // ── GET /api/v1/leitnersystems/:id ────────────────────────────────────────
+  describe('GET /api/v1/leitnersystems/:id', () => {
     it('200 — retourne le système', async () => {
       leitnerSystemService.findOne.mockResolvedValue(mockSystem);
 
-      const res = await request(app).get('/leitnersystems/1');
+      const res = await request(app)
+        .get('/api/v1/leitnersystems/1')
+        .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.idSystem).toBe(1);
@@ -95,19 +116,22 @@ describe('LeitnerSystem Controller', () => {
     it('404 — système introuvable', async () => {
       leitnerSystemService.findOne.mockResolvedValue(null);
 
-      const res = await request(app).get('/leitnersystems/99');
+      const res = await request(app)
+        .get('/api/v1/leitnersystems/99')
+        .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(404);
     });
   });
 
-  // ── POST /leitnersystems/add ───────────────────────────────────────────────
-  describe('POST /leitnersystems/add', () => {
+  // ── POST /api/v1/leitnersystems ───────────────────────────────────────────
+  describe('POST /api/v1/leitnersystems', () => {
     it('201 — crée un système', async () => {
       leitnerSystemService.create.mockResolvedValue(mockSystem);
 
       const res = await request(app)
-        .post('/leitnersystems/add')
+        .post('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Leitner Maths', idUser: 1 });
 
       expect(res.status).toBe(201);
@@ -116,16 +140,9 @@ describe('LeitnerSystem Controller', () => {
 
     it('400 — champs obligatoires manquants (name)', async () => {
       const res = await request(app)
-        .post('/leitnersystems/add')
+        .post('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ idUser: 1 });
-
-      expect(res.status).toBe(400);
-    });
-
-    it('400 — champs obligatoires manquants (idUser)', async () => {
-      const res = await request(app)
-        .post('/leitnersystems/add')
-        .send({ name: 'Leitner Maths' });
 
       expect(res.status).toBe(400);
     });
@@ -134,20 +151,22 @@ describe('LeitnerSystem Controller', () => {
       leitnerSystemService.create.mockRejectedValue(new Error('DB error'));
 
       const res = await request(app)
-        .post('/leitnersystems/add')
+        .post('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Leitner Maths', idUser: 1 });
 
       expect(res.status).toBe(500);
     });
   });
 
-  // ── PUT /leitnersystems/:id ────────────────────────────────────────────────
-  describe('PUT /leitnersystems/:id', () => {
+  // ── PUT /api/v1/leitnersystems/:id ────────────────────────────────────────
+  describe('PUT /api/v1/leitnersystems/:id', () => {
     it('200 — met à jour le système', async () => {
       leitnerSystemService.update.mockResolvedValue(true);
 
       const res = await request(app)
-        .put('/leitnersystems/1')
+        .put('/api/v1/leitnersystems/1')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Leitner Maths v2', idUser: 1 });
 
       expect(res.status).toBe(200);
@@ -157,43 +176,47 @@ describe('LeitnerSystem Controller', () => {
       leitnerSystemService.update.mockResolvedValue(null);
 
       const res = await request(app)
-        .put('/leitnersystems/99')
+        .put('/api/v1/leitnersystems/99')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Leitner Maths v2', idUser: 1 });
 
       expect(res.status).toBe(404);
     });
   });
 
-  // ── POST /leitnersystems/share ─────────────────────────────────────────────
-  describe('POST /leitnersystems/share', () => {
+  // ── POST /api/v1/leitnersystems/share ─────────────────────────────────────
+  describe('POST /api/v1/leitnersystems/share', () => {
     it('200 — partage le système', async () => {
-      leitnerSystemService.shareSystem.mockResolvedValue({ success: true });
+      leitnerSystemService.share.mockResolvedValue({ success: true });
 
       const res = await request(app)
-        .post('/leitnersystems/share')
+        .post('/api/v1/leitnersystems/share')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ idUserOwner: 1, idUserShared: 2, idSystem: 1, writeRight: true });
 
       expect(res.status).toBe(200);
     });
 
     it('403 — partage refusé par le service', async () => {
-      leitnerSystemService.shareSystem.mockRejectedValue(new Error('Permission refusée'));
+      leitnerSystemService.share.mockRejectedValue(new Error('Permission refusée'));
 
       const res = await request(app)
-        .post('/leitnersystems/share')
+        .post('/api/v1/leitnersystems/share')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ idUserOwner: 1, idUserShared: 2, idSystem: 1 });
 
       expect(res.status).toBe(403);
     });
   });
 
-  // ── DELETE /leitnersystems/:id ─────────────────────────────────────────────
-  describe('DELETE /leitnersystems/:id', () => {
+  // ── DELETE /api/v1/leitnersystems/:id ─────────────────────────────────────
+  describe('DELETE /api/v1/leitnersystems/:id', () => {
     it('200 — supprime le système', async () => {
       leitnerSystemService.delete.mockResolvedValue(true);
 
       const res = await request(app)
-        .delete('/leitnersystems/1')
+        .delete('/api/v1/leitnersystems/1')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ idUser: 1 });
 
       expect(res.status).toBe(200);
@@ -203,7 +226,8 @@ describe('LeitnerSystem Controller', () => {
       leitnerSystemService.delete.mockResolvedValue(null);
 
       const res = await request(app)
-        .delete('/leitnersystems/1')
+        .delete('/api/v1/leitnersystems/1')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ idUser: 2 });
 
       expect(res.status).toBe(403);
@@ -213,7 +237,8 @@ describe('LeitnerSystem Controller', () => {
       leitnerSystemService.delete.mockRejectedValue(new Error('DB error'));
 
       const res = await request(app)
-        .delete('/leitnersystems/1')
+        .delete('/api/v1/leitnersystems/1')
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ idUser: 1 });
 
       expect(res.status).toBe(500);

@@ -53,7 +53,7 @@ describe('User Controller', () => {
       userService.create.mockResolvedValue({ userId: 1, name: 'Bob', email: 'bob@example.com' });
 
       const res = await request(app)
-        .post('/users/register')
+        .post('/api/v1/users/register')
         .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123' });
 
       expect(res.status).toBe(201);
@@ -62,7 +62,7 @@ describe('User Controller', () => {
 
     it('400 — email invalide', async () => {
       const res = await request(app)
-        .post('/users/register')
+        .post('/api/v1/users/register')
         .send({ name: 'Bob', email: 'not-an-email', password: 'Password123' });
 
       expect(res.status).toBe(400);
@@ -71,7 +71,7 @@ describe('User Controller', () => {
 
     it('400 — mot de passe trop court', async () => {
       const res = await request(app)
-        .post('/users/register')
+        .post('/api/v1/users/register')
         .send({ name: 'Bob', email: 'bob@example.com', password: 'short' });
 
       expect(res.status).toBe(400);
@@ -79,7 +79,7 @@ describe('User Controller', () => {
 
     it('400 — mot de passe sans majuscule', async () => {
       const res = await request(app)
-        .post('/users/register')
+        .post('/api/v1/users/register')
         .send({ name: 'Bob', email: 'bob@example.com', password: 'alllower123' });
 
       expect(res.status).toBe(400);
@@ -87,7 +87,7 @@ describe('User Controller', () => {
 
     it('400 — nom trop court', async () => {
       const res = await request(app)
-        .post('/users/register')
+        .post('/api/v1/users/register')
         .send({ name: 'B', email: 'bob@example.com', password: 'Password123' });
 
       expect(res.status).toBe(400);
@@ -97,7 +97,7 @@ describe('User Controller', () => {
       userService.create.mockRejectedValue(new Error('Email déjà utilisé'));
 
       const res = await request(app)
-        .post('/users/register')
+        .post('/api/v1/users/register')
         .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123' });
 
       expect(res.status).toBe(500);
@@ -113,21 +113,21 @@ describe('User Controller', () => {
       userService.updateLoginDate.mockResolvedValue();
 
       const res = await request(app)
-        .post('/users/login')
+        .post('/api/v1/users/login')
         .send({ email: 'bob@example.com', password: 'Password123' });
 
       expect(res.status).toBe(200);
       expect(res.body.token).toBeDefined();
     });
 
-    it('404 — utilisateur introuvable', async () => {
+    it('401 — utilisateur introuvable (identifiants invalides)', async () => {
       userService.findByEmail.mockResolvedValue(null);
 
       const res = await request(app)
-        .post('/users/login')
+        .post('/api/v1/users/login')
         .send({ email: 'unknown@example.com', password: 'Password123' });
 
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(401);
     });
 
     it('401 — mauvais mot de passe', async () => {
@@ -135,7 +135,7 @@ describe('User Controller', () => {
       userService.verifyPassword.mockResolvedValue(false);
 
       const res = await request(app)
-        .post('/users/login')
+        .post('/api/v1/users/login')
         .send({ email: 'bob@example.com', password: 'WrongPass1' });
 
       expect(res.status).toBe(401);
@@ -143,7 +143,7 @@ describe('User Controller', () => {
 
     it('400 — mot de passe manquant', async () => {
       const res = await request(app)
-        .post('/users/login')
+        .post('/api/v1/users/login')
         .send({ email: 'bob@example.com' });
 
       expect(res.status).toBe(400);
@@ -151,7 +151,7 @@ describe('User Controller', () => {
 
     it('400 — email invalide', async () => {
       const res = await request(app)
-        .post('/users/login')
+        .post('/api/v1/users/login')
         .send({ email: 'bad-email', password: 'Password123' });
 
       expect(res.status).toBe(400);
@@ -166,7 +166,7 @@ describe('User Controller', () => {
       roleService.findOne.mockResolvedValue({ roleId: 1, name: 'admin' });
 
       const res = await request(app)
-        .get('/users/1')
+        .get('/api/v1/users/1')
         .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(200);
@@ -174,13 +174,13 @@ describe('User Controller', () => {
     });
 
     it('401 — pas de token', async () => {
-      const res = await request(app).get('/users/1');
+      const res = await request(app).get('/api/v1/users/1');
       expect(res.status).toBe(401);
     });
 
     it('401 — token invalide', async () => {
       const res = await request(app)
-        .get('/users/1')
+        .get('/api/v1/users/1')
         .set('Authorization', 'Bearer invalid.token.here');
       expect(res.status).toBe(401);
     });
@@ -188,9 +188,10 @@ describe('User Controller', () => {
     it('404 — utilisateur introuvable', async () => {
       userService.findOne.mockResolvedValue(null);
 
+      // Le token doit avoir id=1 et le param doit être 1 pour passer la vérif d'ownership
       const res = await request(app)
-        .get('/users/99')
-        .set('Authorization', `Bearer ${makeToken()}`);
+        .get('/api/v1/users/1')
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`);
 
       expect(res.status).toBe(404);
     });
@@ -204,7 +205,7 @@ describe('User Controller', () => {
       sendEmail.mockResolvedValue();
 
       const res = await request(app)
-        .post('/users/forgot-password')
+        .post('/api/v1/users/forgot-password')
         .send({ email: 'bob@example.com' });
 
       expect(res.status).toBe(201);
@@ -219,7 +220,7 @@ describe('User Controller', () => {
       userService.findByEmail.mockResolvedValue(null);
 
       const res = await request(app)
-        .post('/users/forgot-password')
+        .post('/api/v1/users/forgot-password')
         .send({ email: 'unknown@example.com' });
 
       expect(res.status).toBe(404);
@@ -227,7 +228,7 @@ describe('User Controller', () => {
 
     it('400 — email invalide', async () => {
       const res = await request(app)
-        .post('/users/forgot-password')
+        .post('/api/v1/users/forgot-password')
         .send({ email: 'bad' });
 
       expect(res.status).toBe(400);
@@ -242,7 +243,7 @@ describe('User Controller', () => {
       userService.setPassword.mockResolvedValue();
 
       const res = await request(app)
-        .post('/users/reset-password')
+        .post('/api/v1/users/reset-password')
         .send({ email: 'bob@example.com', code: 'ABC123', newPassword: 'NewPass123' });
 
       expect(res.status).toBe(201);
@@ -253,7 +254,7 @@ describe('User Controller', () => {
       userService.verifyResetPasswordCode.mockResolvedValue(false);
 
       const res = await request(app)
-        .post('/users/reset-password')
+        .post('/api/v1/users/reset-password')
         .send({ email: 'bob@example.com', code: 'WRONG', newPassword: 'NewPass123' });
 
       expect(res.status).toBe(401);
@@ -261,7 +262,7 @@ describe('User Controller', () => {
 
     it('400 — code manquant', async () => {
       const res = await request(app)
-        .post('/users/reset-password')
+        .post('/api/v1/users/reset-password')
         .send({ email: 'bob@example.com', newPassword: 'NewPass123' });
 
       expect(res.status).toBe(400);
@@ -276,7 +277,7 @@ describe('User Controller', () => {
       userService.setPassword.mockResolvedValue();
 
       const res = await request(app)
-        .put('/users/1/change-password')
+        .put('/api/v1/users/1/change-password')
         .set('Authorization', `Bearer ${makeToken()}`)
         .send({ id: 1, oldPassword: 'OldPass123', newPassword: 'NewPass123' });
 
@@ -288,7 +289,7 @@ describe('User Controller', () => {
       userService.verifyPassword.mockResolvedValue(false);
 
       const res = await request(app)
-        .put('/users/1/change-password')
+        .put('/api/v1/users/1/change-password')
         .set('Authorization', `Bearer ${makeToken()}`)
         .send({ id: 1, oldPassword: 'WrongOld1', newPassword: 'NewPass123' });
 
@@ -297,7 +298,7 @@ describe('User Controller', () => {
 
     it('401 — pas de token', async () => {
       const res = await request(app)
-        .put('/users/1/change-password')
+        .put('/api/v1/users/1/change-password')
         .send({ id: 1, oldPassword: 'OldPass123', newPassword: 'NewPass123' });
 
       expect(res.status).toBe(401);
@@ -305,7 +306,7 @@ describe('User Controller', () => {
 
     it('400 — id invalide', async () => {
       const res = await request(app)
-        .put('/users/1/change-password')
+        .put('/api/v1/users/1/change-password')
         .set('Authorization', `Bearer ${makeToken()}`)
         .send({ id: 'not-an-int', oldPassword: 'OldPass123', newPassword: 'NewPass123' });
 
@@ -319,14 +320,14 @@ describe('User Controller', () => {
       userService.delete.mockResolvedValue();
 
       const res = await request(app)
-        .delete('/users/1')
+        .delete('/api/v1/users/1')
         .set('Authorization', `Bearer ${makeToken()}`);
 
       expect(res.status).toBe(200);
     });
 
     it('401 — pas de token', async () => {
-      const res = await request(app).delete('/users/1');
+      const res = await request(app).delete('/api/v1/users/1');
       expect(res.status).toBe(401);
     });
   });
