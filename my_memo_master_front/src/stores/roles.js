@@ -11,27 +11,27 @@ export const useRoleStore = defineStore('roles', {
         async fetchRoles() {
             await api.get(`roles`).then(resp => {
                 if (resp.status !== 200) {
-                    notif.notify(resp.data.message, 'error')
+                    notif.notify(resp.data?.message || 'Erreur lors du chargement.', 'error')
                     return false
                 }
 
                 this.roles = resp.data
                 return true
             }).catch(error => {
-                notif.notify(`An error occured: ${error}`, 'error')
+                notif.notify(`Une erreur est survenue : ${error}`, 'error')
                 return false
             })
         },
         async fetchRoleById(id) {
             await api.get(`roles/${id}`).then(resp => {
                 if (resp.status !== 200) {
-                    notif.notify(resp.data.message, 'error');
+                    notif.notify(resp.data?.message || 'Rôle introuvable.', 'error');
                     return false;
                 }
                 this.role = resp.data;
                 return true;
             }).catch(error => {
-                notif.notify(`An error occured: ${error}`, 'error')
+                notif.notify(`Une erreur est survenue : ${error}`, 'error')
                 return false
             })
         },
@@ -39,41 +39,41 @@ export const useRoleStore = defineStore('roles', {
             const rolePayload = this.role
             await api.post(`roles`, rolePayload).then(resp => {
                 if (resp.status !== 201) {
-                    notif.notify(resp.data.message, 'error')
+                    notif.notify(resp.data?.message || 'Erreur lors de la création.', 'error')
                     return false
                 }
-                notif.notify('Role has been added', 'success')
+                notif.notify('Rôle créé avec succès.', 'success')
                 return true
             }).catch(error => {
-                notif.notify(`An error occured: ${error}`, 'error')
+                notif.notify(`Une erreur est survenue : ${error}`, 'error')
                 return false
             })
         },
         async updateRole(id) {
             const rolePayload = this.role
             await api.put(`roles/${id}`, rolePayload).then(resp => {
-                if (resp.status === 200) {
-                    notif.notify(resp.data.message, 'error')
+                if (resp.status !== 200) {
+                    notif.notify(resp.data?.message || 'Erreur lors de la mise à jour.', 'error')
                     return false
                 }
-                notif.notify('Role has been updated', 'success')
+                notif.notify('Rôle mis à jour avec succès.', 'success')
                 return true
             }).catch(error => {
-                notif.notify(`An error occured: ${error}`, 'error')
+                notif.notify(`Une erreur est survenue : ${error}`, 'error')
                 return false
             })
         },
         async deleteRole(id) {
             const rolePayload = this.role
             await api.del(`roles/${id}`, rolePayload).then(resp => {
-                if (resp.status === 204) {
-                    notif.notify(resp.data.message, 'error')
+                if (resp.status !== 204) {
+                    notif.notify(resp.data?.message || 'Erreur lors de la suppression.', 'error')
                     return false
                 }
-                notif.notify('Role has been deleted', 'success')
+                notif.notify('Rôle supprimé avec succès.', 'success')
                 return true
             }).catch(error => {
-                notif.notify(`An error occured: ${error}`, 'error')
+                notif.notify(`Une erreur est survenue : ${error}`, 'error')
                 return false
             })
         },

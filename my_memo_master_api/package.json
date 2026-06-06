@@ -57,6 +57,9 @@
   "jest": {
     "testMatch": [
       "**/test/**/*.(spec|test).[tj]s?(x)"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^@xenova/transformers$": "<rootDir>/__mocks__/@xenova/transformers.js"
+    }
   }
 }

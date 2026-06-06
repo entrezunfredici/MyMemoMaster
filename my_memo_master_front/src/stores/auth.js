@@ -145,7 +145,7 @@ export const useAuthStore = defineStore('auth', {
         await this.fetchUserInfos()
       }
 
-      notif.notify('You have been logged in', 'success')
+      notif.notify('Connexion réussie.', 'success')
 
       if (redirect) {
         router.push(redirect)
@@ -158,7 +158,7 @@ export const useAuthStore = defineStore('auth', {
       const name = this.user.name?.trim() || null
 
       if (!name || name.length === 0) {
-        notif.notify("Please enter your name", 'error')
+        notif.notify('Veuillez saisir votre nom.', 'error')
         return false
       }
 
@@ -172,7 +172,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = { ...this.user, ...resp.data }
 
       if (notify) {
-        notif.notify('Your informations have been updated', 'success')
+        notif.notify('Vos informations ont été mises à jour.', 'success')
       }
 
       return true
@@ -181,9 +181,9 @@ export const useAuthStore = defineStore('auth', {
     async verifyEmail(email, code, notify = true) {
       let error = null
 
-      if (!error && (!code || String(code).length === 0)) error = "No code provided"
-      if (!error && (!email || email.length === 0)) error = "No email provided"
-      if (!error && !isValidEmail(email)) error = "The email is not valid"
+      if (!error && (!code || String(code).length === 0)) error = 'Veuillez saisir le code reçu.'
+      if (!error && (!email || email.length === 0)) error = 'Veuillez saisir votre adresse email.'
+      if (!error && !isValidEmail(email)) error = "L'adresse email n'est pas valide."
 
       if (error) {
         notif.notify(error, 'error')
@@ -198,7 +198,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       if (notify) {
-        notif.notify('Your email has been verified', 'success')
+        notif.notify('Votre adresse email a été vérifiée.', 'success')
       }
 
       return true
@@ -208,11 +208,11 @@ export const useAuthStore = defineStore('auth', {
       const email = this.authentication.tabs.forgotPassword.fields.email.trim() || null
 
       if (!email) {
-        notif.notify("Please enter your email", 'error')
+        notif.notify('Veuillez saisir votre adresse email.', 'error')
         return false
       }
       if (!isValidEmail(email)) {
-        notif.notify("Please enter a valid email", 'error')
+        notif.notify("L'adresse email n'est pas valide.", 'error')
         return false
       }
 
@@ -223,7 +223,7 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
 
-      notif.notify('An email has been sent with a code', 'success')
+      notif.notify('Un email avec le code de réinitialisation a été envoyé.', 'success')
       this.setAuthenticationTab('resetPassword')
 
       return true
@@ -235,10 +235,10 @@ export const useAuthStore = defineStore('auth', {
 
       let error = null
 
-      if (!error && !code) error = "Please enter your code"
-      if (!error && !newPassword) error = "Please enter your password"
+      if (!error && !code) error = 'Veuillez saisir le code reçu.'
+      if (!error && !newPassword) error = 'Veuillez saisir votre nouveau mot de passe.'
       if (!error && missingsElementsPassword(newPassword).length > 0) {
-        error = `Password must at least contain: ${missingsElementsPassword(newPassword).join(', ')}`
+        error = `Le mot de passe doit contenir au minimum : ${missingsElementsPassword(newPassword).join(', ')}`
       }
 
       if (error) {
@@ -255,7 +255,7 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
 
-      notif.notify('Your password has been reset', 'success')
+      notif.notify('Votre mot de passe a été réinitialisé.', 'success')
 
       this.clearTabFields('forgotPassword')
       this.clearTabFields('resetPassword')
@@ -275,7 +275,7 @@ export const useAuthStore = defineStore('auth', {
 
       if (notify) {
         notif.clear()
-        notif.notify('You have been logged out', 'info')
+        notif.notify('Vous avez été déconnecté.', 'info')
       }
     },
   },

@@ -49,7 +49,7 @@
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
 | Front — CalendarPage | Stable | init |
 | Front — SettingsPage | Stable | init |
-| Front — Stores Pinia (auth, tests, questions, etc.) | Stable | init |
+| Front — Stores Pinia (auth, tests, questions, etc.) | Stable — M-00.11 : bugs update/delete corrigés, messages FR, fields.js réécrit | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
 
 **Modules implémentés et stables :**
@@ -352,6 +352,31 @@
 **Dette / points d'attention :**
 - Les stores Pinia (`auth.js`, etc.) contiennent des messages en anglais (`'You have been logged in'`, etc.) — hors périmètre de ce ticket, à corriger dans un ticket dédié
 - Les tests d'intercepteur (injection JWT, FormData) ne sont pas couverts — ils relèvent de tests d'intégration nécessitant un environnement Vue complet
+
+---
+
+### [M-00.11] — Gestion états globaux (Pinia stores) — 2026-06-06
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/stores/diagrammes.js` — correction conditions inversées `updateDiagramme` (`=== 200` → `!== 200`) et `deleteDiagramme` (`=== 204` → `!== 204`) ; messages de notification traduits en français
+- `my_memo_master_front/src/stores/roles.js` — même corrections que diagrammes.js + messages FR
+- `my_memo_master_front/src/stores/auth.js` — tous les messages utilisateur traduits en français (login, logout, updateUser, verifyEmail, forgotPassword, resetPassword)
+
+**Fichiers réécrits :**
+- `my_memo_master_front/src/stores/fields.js` — était une copie erronée de `diagrammes.js` exportant `useDiagrammeStore` avec ID `'diagramme'` ; réécrit comme un vrai store `useFieldStore` (ID `'fields'`) pour l'entité Fields (`fieldletter`, `idType`, `data`)
+
+**Ce qui est utilisable :**
+- `useDiagrammeStore` — `updateDiagramme` et `deleteDiagramme` fonctionnent correctement
+- `useRoleStore` — `updateRole` et `deleteRole` fonctionnent correctement
+- `useFieldStore` — CRUD complet sur l'endpoint `/fields` (create, read, update, delete)
+- `useAuthStore` — tous les messages sont en français
+
+**Hypothèses posées :**
+- `fields.js` n'était importé nulle part dans les pages — la réécriture n'a aucun impact sur le code existant.
+
+**Dette / points d'attention :**
+- Les stores Leitner (cartes, sessions) restent absents — déjà signalé dans M-02.01.
+- Aucun test Vitest pour les stores Pinia — à prévoir dans un ticket dédié.
 
 ---
 

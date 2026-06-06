@@ -16,7 +16,7 @@ jest.mock('@xenova/transformers', () => {
       });
     }),
   };
-}, { virtual: true });
+});
 
 const SemanticService = require('../../services/Semantic.service');
 
