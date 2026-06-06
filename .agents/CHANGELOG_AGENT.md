@@ -24,15 +24,15 @@
 | User (CRUD, profil) | Stable | init |
 | Role | Stable | init |
 | Subject / Unit | Stable | init |
-| Test / Question / Response | Stable | init |
+| Test / Question / Response | Stable — 4 bugs corrigés (alias Sequelize, params route, champ validateur) | 2026-06-06 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
-| LeitnerCard — algo répétition espacée | Stable — M-02.01 implémenté | 2026-06-03 |
+| LeitnerCard — algo répétition espacée | Stable — droits résolus depuis DB (req.user.rights → service) | 2026-06-06 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable | init |
 | LeitnerSystemsUsers | Stable | init |
 | Diagramme (mind maps) | Stable — couplage Subject déplacé vers DiagrammeService.resolveSubject() | 2026-06-06 |
 | Fields / FieldsType | Stable | init |
-| Tutorials | Stable | init |
-| OnboardingState | Stable | init |
+| Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
+| OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
 | Kpi | Stable (lecture seule) | init |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
@@ -52,7 +52,7 @@
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
 | Front — CalendarPage | Stable | init |
 | Front — SettingsPage | Stable | init |
-| Front — Stores Pinia (auth, tests, questions, etc.) | Stable — M-00.11 : bugs update/delete corrigés, messages FR, fields.js réécrit · persist auth réduit à sessionStorage | 2026-06-06 |
+| Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
 | Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
 
@@ -540,3 +540,57 @@
 **Dette / points d'attention :**
 - Pas de tests pour `Storage.controller.js`, `LeitnerBox.controller.js`, `LeitnerSystemsUsers.controller.js`, `Kpi.controller.js` — à couvrir dans un ticket dédié.
 - ~~`bcrypt` doublon de `bcryptjs`~~ — supprimé.
+
+---
+
+### [TEST-ROUTES] — Test complet des routes API + corrections de bugs — 2026-06-06
+
+**Contexte :** Test de toutes les routes de l'API sur les conteneurs Docker en cours d'exécution. 7 bugs identifiés et corrigés au fil du test.
+
+**Fichiers modifiés (API) :**
+- `Dockerfile` — ajout `libvips-dev` dans apt-get : permet à `sharp` (@xenova/transformers) de trouver la lib système au lieu de télécharger depuis GitHub (timeout réseau en build Docker)
+- `package.json` + `package-lock.json` — suppression `"swagger": "^0.0.1"` (paquet 2012 inutilisé, Node ~0.6.6)
+- `controllers/Tutorials.controller.js` — `exports.create` : destructuration corrigée (`name, link` → `name, link, subjectId, revision_tips`), les deux champs étaient silencieusement ignorés → `subjectId: null` en base
+- `services/LeitnerCard.service.js` — ajout `resolveUserRights(userId, idSystem)` (propriétaire → droits complets, partagé → droits LeitnerSystemsUsers) + `getCardSystem(cardId)` (remonte idSystem depuis idBox)
+- `controllers/LeitnerCard.controller.js` — `addCard`, `updateCard`, `deleteCard` : remplacent `req.user.rights` (toujours `undefined`) par `resolveUserRights()` depuis le service
+- `validators/Response.validators.js` — `questionId` → `idQuestion` dans les règles `create` et `update` (le controller utilisait `idQuestion`, aligné sur le modèle)
+- `controllers/OnboardingState.controller.js` — `updateOnboarding` : `req.user.userId` → `req.user.id` (le JWT contient `{ id: userId }`, pas `userId`)
+- `services/Question.service.js` — `getQuestionsByTest` : ajout `as: "test"` et correction colonne `idTest` → `testId` (alias Sequelize obligatoire, clé primaire réelle) ; `getQuestionByCard` : ajout `as: "leitnerCard"` (même problème d'alias)
+- `controllers/Question.controller.js` — `getCorrectionByQuestion` : `req.params.idQuestion` → `req.params.id` (la route déclare `/:id`, pas `/:idQuestion`)
+
+**Fichiers modifiés (front) :**
+- `my_memo_master_front/vite.config.js` — VitePWA : `workbox.globPatterns: []` désactive le précaching de tous les assets (cache service worker était "énorme" selon l'utilisateur)
+- `my_memo_master_front/src/stores/auth.js` — `persist: true` → `persist: { paths: ['token', 'user', 'authenticated'] }` : seules les données d'auth sont persistées en localStorage
+
+**Ce qui est utilisable après correction :**
+- `POST /tutorials` — `subjectId` et `revision_tips` sont maintenant correctement enregistrés
+- `POST/PUT/DELETE /leitnercards` — les droits d'écriture sont résolus depuis la DB (plus de crash `403` systématique)
+- `POST /responses` — `idQuestion` est correctement validé (plus d'erreur 400 sur champ inexistant)
+- `PUT /onboardingState/:id` — met à jour l'état de l'utilisateur connecté (plus de 404 silencieux)
+- `GET /questions/tests/:testId` — retourne les questions d'un test (plus d'erreur 500 alias Sequelize)
+- `GET /questions/card/:cardId` — retourne la question d'une carte (plus d'erreur 500 alias)
+- `GET /questions/correction/:id` — retourne la correction d'une question (plus de WHERE `undefined`)
+- Swagger UI accessible sur `GET /api-docs/` (200)
+- `POST /grading/semantic` — fonctionne avec `correct_answers` + `student_answer` (NLP, ~30s premier appel)
+
+**Routes vérifiées OK :**
+- Auth : register, login, verify-email, forgot-password, reset-password
+- Users : GET/:id, PUT/:id
+- Subjects, Tests, Questions, Responses : CRUD complet
+- LeitnerSystem, LeitnerBox, LeitnerCard : CRUD + due cards + correction sémantique
+- Diagrammes, Tutorials : CRUD complet
+- Fields, FieldsType, Units : CRUD complet
+- Grading : date + semantic
+- OnboardingState : GET byUserId + PUT /:id
+- Storage : upload (image/pdf uniquement), delete
+
+**Hypothèses posées :**
+- Le JWT contient uniquement `{ id: userId }` — aucun champ `rights`, `userId` ou autre. Tout controller qui lirait autre chose est buggué.
+- Les associations Sequelize avec `as:` obligatoire : tout `include: [{ model: X }]` sans alias échoue si l'association est définie avec `as`. Pattern à auditer sur le reste de la base de code.
+- `LeitnerBox.color` est un `BIGINT` (valeur entière) — le frontend doit envoyer un entier, pas une chaîne hexadécimale.
+
+**Dette / points d'attention :**
+- Les tests Supertest existants pour `LeitnerCard.controller` utilisent `{ rights: true }` dans le token de test — ils continuent de passer car le service est mocké. Si le mock est retiré, les tests échoueront.
+- `GET /questions/tests/:testId` : la requête Sequelize fait un JOIN via la table `testQuestions` (belongsToMany). Si l'association through est incohérente, Sequelize peut retourner 0 résultats silencieusement.
+- Aucun test pour Storage (upload multipart) ni pour LeitnerSystemsUsers — dette documentée dans les entrées précédentes.
+- Le rate limiter auth (`5 req/15 min`, in-memory) se déclenche rapidement lors des tests manuels répétés. Redémarrer le conteneur pour vider le store.
