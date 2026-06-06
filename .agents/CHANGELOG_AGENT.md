@@ -35,6 +35,7 @@
 | OnboardingState | Stable | init |
 | Kpi | Stable (lecture seule) | init |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — couverture logger complète (19/19 controllers) | 2026-06-05 |
+| Tests intégration API (Supertest) | Stable — 15 suites controllers, 420 tests total | 2026-06-06 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
 | Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
@@ -406,3 +407,35 @@
 **Dette / points d'attention :**
 - `express-rate-limit` utilise un `MemoryStore` par défaut — non partagé entre plusieurs instances Node. En prod multi-instance (scale horizontal), il faudra un store Redis partagé.
 - Les tests `User.controller.test.js`, `Subject.controller.test.js`, `LeitnerSystem.controller.test.js` utilisent des chemins sans préfixe `/api/v1` — déjà documenté comme dette dans M-00.04, non dans le périmètre de ce ticket.
+
+---
+
+### [M-00.12] — Tests intégration API (Supertest) — 2026-06-06
+
+**Fichiers créés :**
+- `test/controllers/Role.controller.test.js` — 18 tests : CRUD complet + auth (401) + validators (400) + 500
+- `test/controllers/Unit.controller.test.js` — 20 tests : CRUD complet + auth (401) + validators (400) + 500
+- `test/controllers/Test.controller.test.js` — 16 tests : CRUD complet + validators (400 name/subjectId) + 500 (routes sans auth)
+- `test/controllers/Question.controller.test.js` — 23 tests : CRUD + routes spéciales (tests/:testId, card/:cardId, correction/:id, edit/:id) + validators
+- `test/controllers/Response.controller.test.js` — 20 tests : CRUD + routes spéciales (question/:id, correction/:id, edit/:id) + validators
+- `test/controllers/Tutorials.controller.test.js` — 18 tests : CRUD + pagination + validators (URL) + 500
+- `test/controllers/Fields.controller.test.js` — 18 tests : CRUD + validators (fieldletter/idType/data) + 500
+- `test/controllers/FieldsType.controller.test.js` — 18 tests : CRUD (sans DELETE) + validators (name/allowUnit) + 500
+- `test/controllers/LeitnerCard.controller.test.js` — 28 tests : CRUD + routes spéciales (due/:systemId, leitnerboxes/:id, response) + validators + 403 droits
+- `test/controllers/Diagramme.controller.test.js` — 24 tests : CRUD + mock Subject (findByPk/findOrCreate) + ownership check (403) + validators
+
+**Ce qui est utilisable :**
+- 15 suites de tests controllers (283 nouveaux tests)
+- 420 tests total dans la suite API — `npm test` dans `my_memo_master_api/`
+- Tous les tests passent : `npm test -- --testPathPattern="controllers"` → 283/283
+- Pattern standard réutilisable : mock models/index + mock service + mock logger + makeToken()
+- Diagramme : Subject mocké avec `findByPk` et `findOrCreate` pour les tests de create
+
+**Hypothèses posées :**
+- Les tokens de test incluent `{ rights: true }` pour LeitnerCard (simule les droits d'écriture injectés par Auth.middleware depuis le JWT ou une relation en DB — le mock service gère la vraie logique).
+- Les routes sans authMiddleware (Question, Response, Test, Tutorials, Fields, FieldsType) sont testées sans token — comportement correct selon les routes.
+
+**Dette / points d'attention :**
+- `Unit.controller.js` retourne `{ error: "..." }` au lieu de `{ message: "..." }` pour les 404 et 500 — non conforme à la convention du projet, hors périmètre de ce ticket.
+- Pas de tests pour `Storage.controller.js` (uploads multipart), `LeitnerBox.controller.js`, `LeitnerSystemsUsers.controller.js`, `Kpi.controller.js` — à prévoir dans un ticket dédié.
+- `Diagramme.controller.js` appelle `Subject.findByPk` et `Subject.findOrCreate` directement (pas via un service) — couplage fort au modèle, à refactorer si l'architecture évolue.
