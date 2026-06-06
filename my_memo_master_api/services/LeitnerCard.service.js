@@ -1,6 +1,6 @@
 const { Op } = require("sequelize");
 const dayjs = require("dayjs");
-const { LeitnerCard, LeitnerBox, Question, Response } = require("../models");
+const { LeitnerCard, LeitnerBox, Question, Response, LeitnerSystem, LeitnerSystemsUsers } = require("../models");
 const semanticService = require("./Semantic.service");
 
 class LeitnerCardService {
@@ -166,6 +166,41 @@ class LeitnerCardService {
       explanation: gradeResult.explanation,
       decision_zone: gradeResult.decision_zone,
     };
+  }
+
+  /**
+   * Résout les droits d'un utilisateur sur un système Leitner.
+   * Propriétaire du système → droits complets. Utilisateur partagé → droits depuis LeitnerSystemsUsers.
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @param {number} idSystem - ID du système Leitner
+   * @returns {Promise<{ canAdd: boolean, canEdit: boolean, canDelete: boolean }>}
+   */
+  async resolveUserRights(userId, idSystem) {
+    const owned = await LeitnerSystem.findOne({ where: { idSystem, idUser: userId } });
+    if (owned) return { canAdd: true, canEdit: true, canDelete: true };
+
+    const shared = await LeitnerSystemsUsers.findOne({ where: { idUser: userId, idSystem } });
+    if (!shared) return { canAdd: false, canEdit: false, canDelete: false };
+
+    return {
+      canAdd: shared.writeRight,
+      canEdit: shared.writeRight,
+      canDelete: shared.shareWithAllRights,
+    };
+  }
+
+  /**
+   * Retourne l'idSystem d'une carte via sa boîte.
+   *
+   * @param {number} cardId - ID de la carte
+   * @returns {Promise<number|null>}
+   */
+  async getCardSystem(cardId) {
+    const card = await LeitnerCard.findByPk(cardId, {
+      include: [{ model: LeitnerBox, as: "leitnerBox" }],
+    });
+    return card?.leitnerBox?.idSystem ?? null;
   }
 
   /**

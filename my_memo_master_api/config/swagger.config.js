@@ -10,11 +10,24 @@ const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'API Documentation',
+            title: 'MyMemoMaster API',
             version: '1.0.0',
-            description: "Documentation de l'API MyMemoMaster avec OpenAPI et Swagger",
+            description: "Documentation complète de l'API MyMemoMaster — révision active, organisation et suivi de progression.",
         },
         servers,
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                    description: 'Token JWT obtenu via POST /api/v1/users/login',
+                },
+            },
+        },
+        // CHOIX: sécurité globale plutôt que par route
+        // RAISON: évite de dupliquer security: [{bearerAuth:[]}] sur chaque route protégée
+        security: [{ bearerAuth: [] }],
     },
     apis: ['./routes/*.js'],
 };

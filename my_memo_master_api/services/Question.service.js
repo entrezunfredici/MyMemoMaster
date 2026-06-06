@@ -10,8 +10,9 @@ class QuestionService {
     return await Question.findAll({
       include: [{
         model: Test,
-        where: { idTest: testId }
-      }]
+        as: "test",
+        where: { testId },
+      }],
     });
   }
 
@@ -19,8 +20,9 @@ class QuestionService {
     return await Question.findOne({
       include: [{
         model: LeitnerCard,
-        where: { idCard: cardId }
-      }]
+        as: "leitnerCard",
+        where: { idCard: cardId },
+      }],
     });
   }
 

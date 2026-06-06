@@ -47,8 +47,8 @@ exports.findOne = async (req, res) => {
 
 exports.getCorrectionByQuestion = async (req, res) => {
   try {
-    const { idQuestion } = req.params;
-    const correction = await QuestionService.getCorrectionByQuestion(idQuestion);
+    const { id } = req.params;
+    const correction = await QuestionService.getCorrectionByQuestion(id);
     res.status(200).json(correction);
   } catch (error) {
     logger.error(error?.message || error);

@@ -121,7 +121,7 @@ router.post("/", authMiddleware, leitnerSystemValidators.create, validate, leitn
 
 /**
  * @swagger
- * /leitnesystem/{id}:
+ * /leitnersystems/{id}:
  *   put:
  *     summary: Modifie un système de Leitner existant
  *     tags:

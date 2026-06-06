@@ -34,7 +34,8 @@ exports.getDueCards = async (req, res) => {
 
 exports.addCard = async (req, res) => {
   try {
-    const card = await leitnerCardService.addCard(req.body, req.user.rights);
+    const rights = await leitnerCardService.resolveUserRights(req.user.id, req.body.idSystem);
+    const card = await leitnerCardService.addCard(req.body, rights);
     res.status(201).json(card);
   } catch (error) {
     logger.error(error?.message || error);
@@ -44,7 +45,11 @@ exports.addCard = async (req, res) => {
 
 exports.updateCard = async (req, res) => {
   try {
-    const card = await leitnerCardService.updateCard(req.params.id, req.body, req.user.rights);
+    const idSystem = await leitnerCardService.getCardSystem(req.params.id);
+    const rights = idSystem
+      ? await leitnerCardService.resolveUserRights(req.user.id, idSystem)
+      : { canAdd: false, canEdit: false, canDelete: false };
+    const card = await leitnerCardService.updateCard(req.params.id, req.body, rights);
     if (!card) return res.status(403).json({ message: "Droits insuffisants ou carte introuvable." });
     res.status(200).json(card);
   } catch (error) {
@@ -66,7 +71,11 @@ exports.correctResponse = async (req, res) => {
 
 exports.deleteCard = async (req, res) => {
   try {
-    const deleted = await leitnerCardService.deleteCard(req.params.id, req.user.rights);
+    const idSystem = await leitnerCardService.getCardSystem(req.params.id);
+    const rights = idSystem
+      ? await leitnerCardService.resolveUserRights(req.user.id, idSystem)
+      : { canAdd: false, canEdit: false, canDelete: false };
+    const deleted = await leitnerCardService.deleteCard(req.params.id, rights);
     if (!deleted) return res.status(403).json({ message: "Droits insuffisants ou carte introuvable." });
     res.status(200).json({ message: "Carte supprimée avec succès." });
   } catch (error) {

@@ -29,13 +29,15 @@
 | LeitnerCard — algo répétition espacée | Stable — M-02.01 implémenté | 2026-06-03 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable | init |
 | LeitnerSystemsUsers | Stable | init |
-| Diagramme (mind maps) | Stable | init |
+| Diagramme (mind maps) | Stable — couplage Subject déplacé vers DiagrammeService.resolveSubject() | 2026-06-06 |
 | Fields / FieldsType | Stable | init |
 | Tutorials | Stable | init |
 | OnboardingState | Stable | init |
 | Kpi | Stable (lecture seule) | init |
-| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — couverture logger complète (19/19 controllers) | 2026-06-05 |
-| Tests intégration API (Supertest) | Stable — 15 suites controllers, 420 tests total | 2026-06-06 |
+| Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
+| Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
+| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
+| Tests intégration API (Supertest) | Stable — M-00.13 : 424 tests total (+4 GET /onboardingState/byUserId) | 2026-06-06 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
 | Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
@@ -50,7 +52,8 @@
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
 | Front — CalendarPage | Stable | init |
 | Front — SettingsPage | Stable | init |
-| Front — Stores Pinia (auth, tests, questions, etc.) | Stable — M-00.11 : bugs update/delete corrigés, messages FR, fields.js réécrit | 2026-06-06 |
+| Front — Stores Pinia (auth, tests, questions, etc.) | Stable — M-00.11 : bugs update/delete corrigés, messages FR, fields.js réécrit · persist auth réduit à sessionStorage | 2026-06-06 |
+| Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
 
 **Modules implémentés et stables :**
@@ -410,6 +413,32 @@
 
 ---
 
+### [M-00.14] — Documentation API (OpenAPI / Swagger) — 2026-06-06
+
+**Fichiers modifiés :**
+- `config/swagger.config.js` — ajout `components.securitySchemes.bearerAuth` (type http/bearer/JWT) + `security: [{bearerAuth:[]}]` globale ; titre corrigé en "MyMemoMaster API" ; description enrichie
+- `routes/User.routes.js` — ajout `security: []` sur les 5 routes publiques (register, login, verify-email, forgot-password, reset-password)
+- `routes/Grading.routes.js` — ajout `security: []` sur `POST /grading/date`
+- `routes/Semantic.routes.js` — ajout `security: []` sur `POST /grading/semantic`
+- `routes/Storage.routes.js` — suppression des `security: [{bearerAuth:[]}]` redondants (couverts par le global)
+- `routes/LeitnerCard.routes.js` — complétion des 4 annotations incomplètes (`GET /leitnerboxes/:id`, `GET /:id`, `PUT /:id`, `DELETE /:id`) avec `parameters` et `responses`
+- `routes/LeitnerSystem.routes.js` — correction typo chemin PUT (`/leitnesystem/{id}` → `/leitnersystems/{id}`)
+
+**Ce qui est utilisable :**
+- `GET /api-docs` — Swagger UI complet avec bouton "Authorize" fonctionnel (JWT Bearer)
+- Toutes les routes protégées montrent le cadenas fermé dans l'UI
+- Les 5 routes publiques (auth) montrent le cadenas ouvert
+- Toutes les routes ont `parameters` et `responses` documentés
+
+**Hypothèses posées :**
+- La sécurité globale (`security: [{bearerAuth:[]}]`) est la stratégie retenue plutôt que de dupliquer `security` sur chaque route — plus maintenable, cf. DECISIONS.md
+- Les routes Grading et Semantic n'ont pas d'`authMiddleware` — décision préexistante (hors périmètre ce ticket)
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
 ### [M-00.12] — Tests intégration API (Supertest) — 2026-06-06
 
 **Fichiers créés :**
@@ -436,6 +465,78 @@
 - Les routes sans authMiddleware (Question, Response, Test, Tutorials, Fields, FieldsType) sont testées sans token — comportement correct selon les routes.
 
 **Dette / points d'attention :**
-- `Unit.controller.js` retourne `{ error: "..." }` au lieu de `{ message: "..." }` pour les 404 et 500 — non conforme à la convention du projet, hors périmètre de ce ticket.
+- ~~`Unit.controller.js` retourne `{ error: "..." }` au lieu de `{ message: "..." }`~~ — résolu en M-00.13
 - Pas de tests pour `Storage.controller.js` (uploads multipart), `LeitnerBox.controller.js`, `LeitnerSystemsUsers.controller.js`, `Kpi.controller.js` — à prévoir dans un ticket dédié.
 - `Diagramme.controller.js` appelle `Subject.findByPk` et `Subject.findOrCreate` directement (pas via un service) — couplage fort au modèle, à refactorer si l'architecture évolue.
+
+---
+
+### [M-00.13] — Revue architecture & merge — 2026-06-06
+
+**Fichiers modifiés :**
+- `services/OnboardingState.service.js` — `module.exports = OnboardingStateService` → `module.exports = new OnboardingStateService()` ; le service exportait la classe sans instanciation → toute route /onboardingState produisait `TypeError: X is not a function` en prod
+- `controllers/OnboardingState.controller.js` — `findByUserId` : `req.params.id` (undefined, aucun `:id` dans le chemin `/byUserId`) → `req.user.id` (ID de l'utilisateur authentifié depuis le JWT) ; messages 404/500 nettoyés (suppression de l'interpolation `req.params.userId` erronée)
+- `controllers/Unit.controller.js` — 8 réponses `{ error: "...English..." }` → `{ message: "...Français..." }` sur tous les handlers (getAllUnits, getUnitById, addUnit, updateUnit, deleteUnit)
+- `middlewares/Auth.middleware.js` — 3 messages HTTP en anglais → français ("No header provided!" → "Authentification requise.", "No token provided!" → "Token manquant.", "Unauthorized!" → "Token invalide ou expiré.")
+- `test/controllers/OnboardingState.controller.test.js` — ajout de 4 tests pour `GET /onboardingState/byUserId` (200 nominal, 404 onboarding absent, 500 service KO, 401 sans token)
+
+**Ce qui est utilisable :**
+- `GET /api/v1/onboardingState/byUserId` — fonctionnel et testé ; retourne l'état d'onboarding de l'utilisateur connecté (JWT requis)
+- Tous les endpoints OnboardingState sont opérationnels en production (bug service/class corrigé)
+- `Unit.controller.js` est conforme à la convention `{ message }` du projet
+- 424 tests passants (420 → 424)
+
+**Hypothèses posées :**
+- Le JWT signé lors du login contient `{ id: user.userId }` — `req.user.id` dans `findByUserId` est cohérent avec ce payload.
+- Les messages Auth.middleware sont des réponses HTTP (pas des logs internes) — ils tombent sous la convention "messages en français".
+
+**Dette / points d'attention :**
+- ~~`Diagramme.controller.js` importe `Subject` directement~~ — résolu dans le refactor dette technique
+- Pas de tests pour `Storage.controller.js`, `LeitnerBox.controller.js`, `LeitnerSystemsUsers.controller.js`, `Kpi.controller.js` — dette documentée, à couvrir dans un ticket dédié.
+
+---
+
+### [M-00.15] — Documentation schéma BDD — 2026-06-06
+
+**Fichiers créés :**
+- `diagrams/schema_bdd.md` — documentation complète du schéma BDD implémenté : ERD Mermaid (erDiagram), groupes fonctionnels, index, comportements ON DELETE, points d'attention
+
+**Ce qui était déjà en place (constaté à l'audit) :**
+- `diagrams/classes_diagram.md` — diagramme de design conceptuel initial (classDiagram Mermaid), non conforme à l'implémentation réelle — conservé comme artefact de conception
+
+**Ce qui est utilisable :**
+- `diagrams/schema_bdd.md` est la référence authoritative du schéma tel qu'implémenté en base
+- 16 tables principales + 5 tables de jointure documentées avec types, contraintes, index et comportements de suppression
+- ERD Mermaid rendu directement dans GitHub / VS Code / tout éditeur Markdown
+
+**Hypothèses posées :**
+- `diagrams/classes_diagram.md` n'est pas supprimé — c'est un artefact de la phase de conception, utile comme trace historique des choix initiaux avant implémentation.
+
+**Dette / points d'attention :**
+- `LeitnerBox.intervall` en secondes (dev) → à passer en jours avant prod (documenté dans `schema_bdd.md` et `DECISIONS.md`)
+- `UserOnboardingState.checklist` en JSONB (PostgreSQL) / émulé JSON (SQLite) — comportement silencieusement différent selon le dialecte
+
+---
+
+### [M-00.13-REF] — Refactor dette technique — 2026-06-06
+
+**Fichiers modifiés :**
+- `services/Diagramme.service.js` — ajout de `resolveSubject(subjectId)` : encapsule le `Subject.findByPk` + `Subject.findOrCreate` qui était dans le controller ; import `Subject` ajouté au niveau du module
+- `controllers/Diagramme.controller.js` — suppression de `const { Subject } = require("../models")` ; le bloc try/catch Subject interne remplacé par `await DiagrammeService.resolveSubject(subjectId)` (8 lignes → 1 ligne)
+- `test/controllers/Diagramme.controller.test.js` — mock models nettoyé (`Subject: {}` au lieu de `{ findByPk, findOrCreate }`), `resolveSubject: jest.fn()` ajouté au mock service, `beforeEach` mis à jour, assertion ligne 143 migrée de `models.Subject.findOrCreate` vers `diagrammeService.resolveSubject`
+- `routes/User.routes.js` — réorganisation : routes publiques (register, login, verify-email, forgot-password, reset-password) déclarées avant les routes paramétrées (`/:id`, `/:id/*`) ; Swagger JSDoc `PUT /:id` complété (`parameters` manquant ajouté)
+- `package.json` — suppression de `mysql2` (non utilisé, PostgreSQL via `pg`) et `sqlite3` (remplacé par `better-sqlite3`)
+
+**Ce qui est utilisable :**
+- `DiagrammeService.resolveSubject(subjectId)` — utilisable depuis tout service ou controller qui doit résoudre un sujet pour un diagramme
+- Architecture controller → service → model respectée sur toutes les entités sans exception
+- `User.routes.js` : les routes publiques sont désormais en tête du fichier, conforme aux bonnes pratiques Express (statique avant paramétré)
+- 424 tests passants
+
+**Hypothèses posées :**
+- `mysql2` et `sqlite3` ne sont importés nulle part dans le code — vérification par grep avant suppression.
+- `resolveSubject` conserve la logique exacte qui était dans le controller : si `subjectId` valide → l'utiliser ; sinon → `findOrCreate("Sujet par défaut")`.
+
+**Dette / points d'attention :**
+- Pas de tests pour `Storage.controller.js`, `LeitnerBox.controller.js`, `LeitnerSystemsUsers.controller.js`, `Kpi.controller.js` — à couvrir dans un ticket dédié.
+- ~~`bcrypt` doublon de `bcryptjs`~~ — supprimé.

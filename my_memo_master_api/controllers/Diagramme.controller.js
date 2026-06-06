@@ -1,7 +1,6 @@
 const path = require("path");
 const DiagrammeService = require("../services/Diagramme.service.js");
 const logger = require("../helpers/logger");
-const { Subject } = require("../models");
 
 exports.findAll = async (req, res) => {
   try {
@@ -36,17 +35,7 @@ exports.create = async (req, res) => {
     }
 
     try {
-      if (subjectId) {
-        const subject = await Subject.findByPk(subjectId);
-        if (!subject) subjectId = null;
-      }
-      if (!subjectId) {
-        const [subject] = await Subject.findOrCreate({
-          where: { name: "Sujet par défaut" },
-          defaults: { name: "Sujet par défaut" },
-        });
-        subjectId = subject.subjectId;
-      }
+      subjectId = await DiagrammeService.resolveSubject(subjectId);
     } catch (err) {
       logger.error(err?.message || err);
       return res.status(500).json({ message: "Impossible de résoudre le sujet associé à la carte mentale." });

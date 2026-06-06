@@ -32,6 +32,20 @@ router.get("/due/:systemId", authMiddleware, leitnerCardController.getDueCards);
  *   get:
  *     summary: Obtenir toutes les cartes liées à une boîte de Leitner
  *     tags: [LeitnerCards]
+ *     parameters:
+ *       - in: path
+ *         name: leitnerboxid
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la boîte de Leitner
+ *     responses:
+ *       200:
+ *         description: Liste des cartes de la boîte.
+ *       404:
+ *         description: Boîte introuvable.
+ *       500:
+ *         description: Erreur serveur.
  */
 router.get(
   "/leitnerboxes/:leitnerboxid",
@@ -45,6 +59,20 @@ router.get(
  *   get:
  *     summary: Obtenir une carte de Leitner par ID
  *     tags: [LeitnerCards]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la carte
+ *     responses:
+ *       200:
+ *         description: Carte récupérée avec succès.
+ *       404:
+ *         description: Carte introuvable.
+ *       500:
+ *         description: Erreur serveur.
  */
 router.get("/:id", authMiddleware, leitnerCardController.getCardById);
 
@@ -78,6 +106,33 @@ router.post("/", authMiddleware, leitnerCardValidators.addCard, validate, leitne
  *   put:
  *     summary: Modifier une carte de Leitner
  *     tags: [LeitnerCards]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la carte
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idQuestion:
+ *                 type: integer
+ *                 example: 2
+ *               idBox:
+ *                 type: integer
+ *                 example: 3
+ *     responses:
+ *       200:
+ *         description: Carte mise à jour avec succès.
+ *       404:
+ *         description: Carte introuvable.
+ *       500:
+ *         description: Erreur serveur.
  */
 router.put("/:id", authMiddleware, leitnerCardValidators.updateCard, validate, leitnerCardController.updateCard);
 
@@ -133,6 +188,20 @@ router.post("/response", authMiddleware, leitnerCardValidators.correctResponse, 
  *   delete:
  *     summary: Supprimer une carte de Leitner
  *     tags: [LeitnerCards]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la carte
+ *     responses:
+ *       200:
+ *         description: Carte supprimée avec succès.
+ *       404:
+ *         description: Carte introuvable.
+ *       500:
+ *         description: Erreur serveur.
  */
 router.delete("/:id", authMiddleware, leitnerCardController.deleteCard);
 

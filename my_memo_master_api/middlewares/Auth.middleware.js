@@ -5,14 +5,14 @@ module.exports = (req, res, next) => {
     const authHeader = req.headers['authorization'];
 
     if (!authHeader) {
-        res.status(401).send({ message: 'No header provided!' });
+        res.status(401).send({ message: 'Authentification requise.' });
         return;
     }
 
     const token = authHeader.split(' ')[1] || authHeader || null; // * authHeader as 'Bearer <token>'
 
     if (!token) {
-        res.status(401).send({ message: 'No token provided!' });
+        res.status(401).send({ message: 'Token manquant.' });
         return;
     }
 
@@ -22,7 +22,7 @@ module.exports = (req, res, next) => {
         next();
     } catch (error) {
         logger.error(error?.message || error);
-        res.status(401).send({ message: 'Unauthorized!' });
+        res.status(401).send({ message: 'Token invalide ou expiré.' });
         return;
     }
 };

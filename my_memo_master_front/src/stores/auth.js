@@ -23,7 +23,10 @@ const extractApiError = (resp, fallback = 'Une erreur est survenue.') => {
 }
 
 export const useAuthStore = defineStore('auth', {
-  persist: true,
+  persist: {
+    // Seules les données d'authentification sont persistées — pas les champs de formulaire.
+    paths: ['token', 'user', 'authenticated'],
+  },
   state: () => ({
     authentication: {
       tab: 'login',

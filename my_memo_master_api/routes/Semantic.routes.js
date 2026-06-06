@@ -12,6 +12,7 @@ module.exports = function (app) {
    *   post:
    *     summary: Corriger automatiquement une réponse par similarité sémantique
    *     tags: [Grading]
+   *     security: []
    *     requestBody:
    *       required: true
    *       content:

@@ -1,8 +1,7 @@
 jest.mock('../../models/index', () => ({
   instance: { sync: jest.fn() },
   sequelize: { transaction: jest.fn() },
-  User: {}, Role: {},
-  Subject: { findByPk: jest.fn(), findOrCreate: jest.fn() },
+  User: {}, Role: {}, Subject: {},
   LeitnerSystem: {},
   LeitnerCard: {}, LeitnerBox: {}, LeitnerSystemsUsers: {},
   Unit: {}, Response: {}, Fields: {}, FieldsType: {},
@@ -19,6 +18,7 @@ jest.mock('../../services/Diagramme.service', () => ({
   findById: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
+  resolveSubject: jest.fn(),
 }));
 
 process.env.AUTH_JWT_SECRET = 'test-secret';
@@ -29,7 +29,6 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const app = require('../../app');
 const diagrammeService = require('../../services/Diagramme.service');
-const models = require('../../models');
 
 const BASE = '/api/v1';
 
@@ -41,8 +40,7 @@ const mockDiagramme = { id: 1, mmName: 'Mind Map Maths', mindMapJson: '{}', user
 describe('Diagramme Controller', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    models.Subject.findByPk.mockResolvedValue({ subjectId: 1 });
-    models.Subject.findOrCreate.mockResolvedValue([{ subjectId: 1 }]);
+    diagrammeService.resolveSubject.mockResolvedValue(1);
   });
 
   // ── GET /diagrammes ────────────────────────────────────────────────────────
@@ -140,7 +138,7 @@ describe('Diagramme Controller', () => {
         .send({ mmName: 'Mind Map Maths', mindMapJson: '{}' });
 
       expect(res.status).toBe(201);
-      expect(models.Subject.findOrCreate).toHaveBeenCalledTimes(1);
+      expect(diagrammeService.resolveSubject).toHaveBeenCalledWith(undefined);
     });
 
     it('400 — mmName manquant (validator)', async () => {

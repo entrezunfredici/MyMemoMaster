@@ -7,12 +7,15 @@ const { authLimiter, registerLimiter } = require("../middlewares/rateLimit.middl
 
 const router = express.Router();
 
+// ── Routes publiques (pas d'authMiddleware) ────────────────────────────────
+
 /**
  * @swagger
  * /users/register:
  *   post:
  *     summary: Inscrire un nouvel utilisateur
  *     tags: [Users]
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
@@ -43,6 +46,7 @@ router.post("/register", registerLimiter, userValidators.register, validate, use
  *   post:
  *     summary: Connecter un utilisateur et obtenir un Token JWT
  *     tags: [Users]
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
@@ -77,6 +81,102 @@ router.post("/login", authLimiter, userValidators.login, validate, user.login);
 
 /**
  * @swagger
+ * /users/verify-email:
+ *   post:
+ *     summary: Vérifier l'email d'un utilisateur
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "mathieu@example.com"
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       201:
+ *         description: Email vérifié avec succès.
+ *       401:
+ *         description: Code invalide.
+ *       404:
+ *         description: Utilisateur introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post("/verify-email", authLimiter, user.verifyEmail);
+
+/**
+ * @swagger
+ * /users/forgot-password:
+ *   post:
+ *     summary: Envoyer un code de réinitialisation de mot de passe
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "mathieu@example.com"
+ *     responses:
+ *       201:
+ *         description: Code de réinitialisation envoyé avec succès.
+ *       404:
+ *         description: Utilisateur introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post("/forgot-password", authLimiter, userValidators.forgotPassword, validate, user.forgotPassword);
+
+/**
+ * @swagger
+ * /users/reset-password:
+ *   post:
+ *     summary: Réinitialiser le mot de passe
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "mathieu@example.com"
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 example: "newpassword123"
+ *     responses:
+ *       201:
+ *         description: Mot de passe réinitialisé avec succès.
+ *       401:
+ *         description: Code invalide.
+ *       404:
+ *         description: Utilisateur introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post("/reset-password", authLimiter, userValidators.resetPassword, validate, user.resetPassword);
+
+// ── Routes protégées (authMiddleware requis) ───────────────────────────────
+
+/**
+ * @swagger
  * /users/{id}:
  *   get:
  *     summary: Récupérer un utilisateur par son ID
@@ -103,8 +203,15 @@ router.get("/:id", authMiddleware, user.findOne);
  * /users/{id}:
  *   put:
  *     summary: Mettre à jour un utilisateur
- *     tags: 
+ *     tags:
  *       - Users
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID de l'utilisateur
+ *         schema:
+ *           type: integer
  *     requestBody:
  *       required: true
  *       content:
@@ -112,9 +219,6 @@ router.get("/:id", authMiddleware, user.findOne);
  *           schema:
  *             type: object
  *             properties:
- *               id:
- *                 type: integer
- *                 example: 1
  *               name:
  *                 type: string
  *                 example: "updated_name"
@@ -130,39 +234,6 @@ router.get("/:id", authMiddleware, user.findOne);
  *         description: Erreur serveur.
  */
 router.put("/:id", authMiddleware, userValidators.update, validate, user.update);
-
-/**
- * @swagger
- * /users/{id}:
- *   delete:
- *     summary: Supprimer un utilisateur
- *     tags: [Users]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID de l'utilisateur à supprimer
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               requesterId:
- *                 type: integer
- *                 example: 1
- *     responses:
- *       200:
- *         description: Utilisateur supprimé avec succès.
- *       403:
- *         description: Opération non autorisée.
- *       500:
- *         description: Erreur lors de la suppression.
- */
-router.delete("/:id", authMiddleware, user.delete);
 
 /**
  * @swagger
@@ -184,12 +255,17 @@ router.delete("/:id", authMiddleware, user.delete);
  *           schema:
  *             type: object
  *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 example: "oldpassword123"
  *               newPassword:
  *                 type: string
  *                 example: "newpassword123"
  *     responses:
  *       200:
  *         description: Mot de passe modifié avec succès.
+ *       401:
+ *         description: Ancien mot de passe incorrect.
  *       404:
  *         description: Utilisateur non trouvé.
  *       500:
@@ -231,6 +307,37 @@ router.post("/:id/role", authMiddleware, user.addRole);
 /**
  * @swagger
  * /users/{id}/role:
+ *   put:
+ *     summary: Mettre à jour le rôle d'un utilisateur
+ *     tags: [Users]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID de l'utilisateur
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               roleId:
+ *                 type: integer
+ *                 example: 2
+ *     responses:
+ *       200:
+ *         description: Rôle mis à jour avec succès.
+ *       500:
+ *         description: Erreur lors de la mise à jour du rôle.
+ */
+router.put("/:id/role", authMiddleware, user.updateRole);
+
+/**
+ * @swagger
+ * /users/{id}/role:
  *   delete:
  *     summary: Supprimer un rôle d'un utilisateur
  *     tags: [Users]
@@ -261,126 +368,26 @@ router.delete("/:id/role", authMiddleware, user.removeRole);
 
 /**
  * @swagger
- * /users/verify-email:
- *   post:
- *     summary: Vérifier l'email d'un utilisateur
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 example: "mathieu@example.com"
- *               code:
- *                 type: string
- *                 example: "123456"
- *     responses:
- *       201:
- *         description: Email vérifié avec succès.
- *       401:
- *         description: Code invalide.
- *       404:
- *         description: Utilisateur introuvable.
- *       500:
- *         description: Erreur serveur.
- */
-router.post("/verify-email", authLimiter, user.verifyEmail);
-
-/**
- * @swagger
- * /users/forgot-password:
- *   post:
- *     summary: Envoyer un code de réinitialisation de mot de passe
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 example: "mathieu@example.com"
- *     responses:
- *       201:
- *         description: Code de réinitialisation envoyé avec succès.
- *       404:
- *         description: Utilisateur introuvable.
- *       500:
- *         description: Erreur serveur.
- */
-router.post("/forgot-password", authLimiter, userValidators.forgotPassword, validate, user.forgotPassword);
-
-/**
- * @swagger
- * /users/reset-password:
- *   post:
- *     summary: Réinitialiser le mot de passe
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 example: "mathieu@example.com"
- *               code:
- *                 type: string
- *                 example: "123456"
- *               newPassword:
- *                 type: string
- *                 example: "newpassword123"
- *     responses:
- *       201:
- *         description: Mot de passe réinitialisé avec succès.
- *       401:
- *         description: Code invalide.
- *       404:
- *         description: Utilisateur introuvable.
- *       500:
- *         description: Erreur serveur.
- */
-router.post("/reset-password", authLimiter, userValidators.resetPassword, validate, user.resetPassword);
-
-/**
- * @swagger
- * /users/{id}/role:
- *   put:
- *     summary: Mettre à jour le rôle d'un utilisateur
+ * /users/{id}:
+ *   delete:
+ *     summary: Supprimer un utilisateur
  *     tags: [Users]
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID de l'utilisateur
+ *         description: ID de l'utilisateur à supprimer
  *         schema:
  *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               roleId:
- *                 type: integer
- *                 example: 2
  *     responses:
  *       200:
- *         description: Rôle mis à jour avec succès.
+ *         description: Utilisateur supprimé avec succès.
+ *       403:
+ *         description: Opération non autorisée.
  *       500:
- *         description: Erreur lors de la mise à jour du rôle.
+ *         description: Erreur lors de la suppression.
  */
-router.put("/:id/role", authMiddleware, user.updateRole);
-
+router.delete("/:id", authMiddleware, user.delete);
 
 module.exports = (app) => {
     /**

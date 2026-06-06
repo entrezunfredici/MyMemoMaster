@@ -32,6 +32,45 @@ const makeToken = (payload = { id: 1 }) =>
 describe('OnboardingState Controller — validation', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  // ── GET /onboardingState/byUserId ─────────────────────────────────────────
+  describe('GET /onboardingState/byUserId', () => {
+    it('200 — retourne l\'état d\'onboarding de l\'utilisateur connecté', async () => {
+      onboardingStateService.getOnboardingByUserId.mockResolvedValue({ tour_seen: true, checklist: {} });
+
+      const res = await request(app)
+        .get(`${BASE}/onboardingState/byUserId`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`);
+
+      expect(res.status).toBe(200);
+      expect(onboardingStateService.getOnboardingByUserId).toHaveBeenCalledWith(1);
+    });
+
+    it('404 — onboarding introuvable (service retourne null)', async () => {
+      onboardingStateService.getOnboardingByUserId.mockResolvedValue(null);
+
+      const res = await request(app)
+        .get(`${BASE}/onboardingState/byUserId`)
+        .set('Authorization', `Bearer ${makeToken({ id: 99 })}`);
+
+      expect(res.status).toBe(404);
+    });
+
+    it('500 — le service lève une erreur', async () => {
+      onboardingStateService.getOnboardingByUserId.mockRejectedValue(new Error('DB error'));
+
+      const res = await request(app)
+        .get(`${BASE}/onboardingState/byUserId`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`);
+
+      expect(res.status).toBe(500);
+    });
+
+    it('401 — non authentifié', async () => {
+      const res = await request(app).get(`${BASE}/onboardingState/byUserId`);
+      expect(res.status).toBe(401);
+    });
+  });
+
   // ── PUT /onboardingState/:id ───────────────────────────────────────────────
   describe('PUT /onboardingState/:id', () => {
     it('200 — met à jour l\'onboarding avec des données valides', async () => {

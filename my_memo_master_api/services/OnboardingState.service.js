@@ -48,4 +48,4 @@ class OnboardingStateService {
 
 }
 
-module.exports = OnboardingStateService;
+module.exports = new OnboardingStateService();

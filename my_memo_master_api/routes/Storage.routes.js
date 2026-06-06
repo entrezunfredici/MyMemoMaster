@@ -29,8 +29,6 @@ const handleUpload = (multerMiddleware) => (req, res, next) => {
  *   post:
  *     summary: Upload d'un fichier vers le stockage S3
  *     tags: [Storage]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -84,8 +82,6 @@ router.post(
  *   post:
  *     summary: Upload de plusieurs fichiers vers le stockage S3 (max 5)
  *     tags: [Storage]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -139,8 +135,6 @@ router.post(
  *   delete:
  *     summary: Supprime un fichier du stockage S3
  *     tags: [Storage]
- *     security:
- *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: key

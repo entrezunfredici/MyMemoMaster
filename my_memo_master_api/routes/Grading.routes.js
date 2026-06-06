@@ -12,6 +12,7 @@ module.exports = function (app) {
    *   post:
    *     summary: Corriger automatiquement une réponse de type date
    *     tags: [Grading]
+   *     security: []
    *     requestBody:
    *       required: true
    *       content:

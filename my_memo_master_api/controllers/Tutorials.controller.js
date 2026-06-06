@@ -70,8 +70,8 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
     try {
-        const { name, link } = req.body;
-        const data = await TutorialsService.create({ name, link });
+        const { name, link, subjectId, revision_tips } = req.body;
+        const data = await TutorialsService.create({ name, link, subjectId, revision_tips });
         res.status(201).json({
             status: 'success',
             data,
