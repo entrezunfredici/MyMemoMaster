@@ -1,6 +1,6 @@
 <template>
   <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-grey rounded-[2px] p-1.5">
-    
+
     <section class="mx-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
       <div class="w-full flex-grow">
 
@@ -12,202 +12,167 @@
             ← Retour
           </button>
           <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold">
-            Session : {{ sessionName }}
+            Session : {{ systemStore.system.name || '...' }}
           </h4>
           <span class="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-            {{ currentIndex + 1 }} / {{ cards.length }}
+            {{ currentIndex + 1 }} / {{ cardStore.dueCards.length }}
           </span>
         </div>
 
-        <div v-if="!isFinished" class="space-y-4">
+        <div v-if="loading" class="text-center text-gray-light py-10">
+          Chargement des cartes...
+        </div>
+
+        <div v-else-if="cardStore.dueCards.length === 0" class="text-center py-10">
+          <h3 class="text-2xl font-bold text-primary mb-4">Aucune carte à réviser !</h3>
+          <p class="mb-6 text-gray-light">Revenez plus tard, vos cartes ne sont pas encore dues.</p>
+          <Button :callback="() => router.push('/flashcards')">Retour aux systèmes</Button>
+        </div>
+
+        <div v-else-if="!isFinished" class="space-y-4">
           <div class="w-full p-3 bg-white text-dark text-xl text-center font-semibold mt-1">
-            {{ currentCard.question }}
-           </div>
+            {{ currentCard.question?.statement }}
+          </div>
 
           <div class="py-2">
             <span class="text-sm font-medium text-gray-light uppercase">Ta Réponse</span>
-            
-            <textarea 
-              v-if="currentCard.type === 'text'"
+            <textarea
               v-model="userAnswer"
-              :disabled="showFeedback"
-              placeholder="Saisissez votre réponse..." 
+              :disabled="showFeedback || submitting"
+              placeholder="Saisissez votre réponse..."
               class="w-full p-3 rounded-lg text-dark border-2 border-gray focus:border-primary outline-none transition mt-1"
               rows="3"
             />
-
-            <div v-else class="grid gap-2 mt-1">
-              <button 
-                v-for="opt in currentCard.options" :key="opt"
-                @click="userAnswer = opt"
-                :disabled="showFeedback"
-                :class="[
-                  'w-full p-3 text-left rounded-lg border-2 transition',
-                  userAnswer === opt ? 'border-primary bg-primary/5' : 'border-gray bg-white',
-                  showFeedback && opt === currentCard.answer ? 'border-green-500 bg-green-50' : '',
-                  showFeedback && userAnswer === opt && opt !== currentCard.answer ? 'border-red-500 bg-red-50' : ''
-                ]"
-              >
-                {{ opt }}
-              </button>
-            </div>
           </div>
 
-          <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-            <p class="font-bold mb-1">{{ isCorrect ? '✅ Excellent !' : '❌ À revoir' }}</p>
-            <p v-if="!isCorrect" class="text-sm italic">Réponse : {{ currentCard.answer }}</p>
+          <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="cardStore.lastCorrection?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+            <p class="font-bold mb-1">{{ cardStore.lastCorrection?.success ? '✅ Excellent !' : '❌ À revoir' }}</p>
+            <p class="text-sm">Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%</p>
+            <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
+              Réponse attendue : {{ cardStore.lastCorrection?.correction }}
+            </p>
+            <p v-if="cardStore.lastCorrection?.explanation" class="text-sm mt-1 opacity-80">
+              {{ cardStore.lastCorrection?.explanation }}
+            </p>
             <Button class="mt-4 w-full" :callback="nextStep">Continuer</Button>
           </div>
 
           <div v-else class="pb-4 w-full flex justify-center mt-4">
-            <Button class="w-full" :callback="handleValidation" :disabled="!userAnswer">Valider</Button>
+            <Button
+              class="w-full"
+              :callback="handleValidation"
+              :disabled="!userAnswer || submitting"
+            >
+              {{ submitting ? 'Correction en cours...' : 'Valider' }}
+            </Button>
           </div>
         </div>
 
         <div v-else class="text-center py-10">
           <h3 class="text-2xl font-bold text-primary mb-4">Session terminée !</h3>
-          <p class="mb-6">Vous avez progressé sur {{ cards.length }} notions.</p>
-          <Button :callback="reset">Recommencer</Button>
+          <p class="mb-6">Vous avez révisé {{ cardStore.dueCards.length }} cartes.</p>
+          <Button :callback="() => router.push('/flashcards')">Retour aux systèmes</Button>
         </div>
+
       </div>
     </section>
+
     <section class="mx-16 mt-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
-      <div v-if="!isFinished" class="mb-4">
+      <div v-if="!isFinished && errors.length > 0" class="mb-4">
         <h4 class="text-primary text-lg font-semibold pb-2">Dernières erreurs</h4>
         <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
           <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-primary/10 rounded-lg px-3 py-2 text-sm">
-            <span>{{ err.question }}</span>
+            <span>{{ err.question?.statement }}</span>
           </div>
         </div>
       </div>
-      <h4 class="text-primary text-lg font-semibold pb-2">Prochaines sessions</h4>
+
+      <h4 class="text-primary text-lg font-semibold pb-2">Répartition par boîte</h4>
       <div class="grid grid-cols-5 gap-2 mb-6 text-center">
-          <div
-            v-for="(count, group) in groupCounts"
-            :key="group"
-            class="bg-white rounded border border-gray p-1"
-          >
-            <div class="text-[10px] uppercase text-gray-light font-bold">
-              {{ groupLabels[group] }}
-            </div>
-            <div class="text-sm font-semibold text-primary">
-              {{ count }}
-            </div>
+        <div
+          v-for="level in [1, 2, 3, 4, 5]"
+          :key="level"
+          class="bg-white rounded border border-gray p-1"
+        >
+          <div class="text-[10px] uppercase text-gray-light font-bold">
+            Boîte {{ level }}
           </div>
+          <div class="text-sm font-semibold text-primary">
+            {{ boxCounts[level] || 0 }}
+          </div>
+        </div>
       </div>
     </section>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-// import Mindmap from '@/components/MindmapComponent.vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import Button from '@/components/ButtonComponent.vue'
-// import { XMarkIcon } from '@heroicons/vue/24/solid'
-import { useRouter } from 'vue-router'
+import { useLeitnerCardStore } from '@/stores/leitnerCards'
+import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 
 const router = useRouter()
+const route = useRoute()
+const cardStore = useLeitnerCardStore()
+const systemStore = useLeitnerSystemStore()
 
-const confirmExit = () => {
-  const confirmed = window.confirm(
-    "⚠️ Attention : la session en cours sera perdue. Voulez-vous vraiment quitter ?"
-  )
+const systemId = Number(route.params.systemId)
 
-  if (confirmed) {
-    router.push('/flashcards') 
-  }
-}
-
-// --- DATA & MOCK ---
-const sessionName = ref("Physique Quantique")
-const groupCounts = ref({
-  G1: 5,
-  G2: 8,
-  G3: 15,
-  G4: 3,
-  G5: 12
-})
-
-const groupLabels = {
-  G1: "Aujourd'hui",
-  G2: "Demain",
-  G3: "3 jours",
-  G4: "1 semaine",
-  G5: "1 mois"
-}
-
-const cards = ref([
-  { 
-    id: 1, 
-    question: "Quelle est la loi de Bernoulli ?", 
-    answer: "P + ρgh + ½ρv² = cst", 
-    type: "text" },
-  { 
-    id: 2, 
-    question: "L'entropie d'un système isolé...", 
-    options: ["Diminue", "Reste constante ou augmente", "Est toujours nulle"], 
-    answer: "Reste constante ou augmente", type: "choice" },
-  { 
-    id: 3, 
-    question: "Quelle est l'unité de la force dans le Système International ?", 
-    answer: "Newton", 
-    type: "text" 
-  },
-  { 
-    id: 4, 
-    question: "Selon la loi d'Ohm, quelle est la relation entre U, R et I ?", 
-    options: ["U = R / I", "U = R + I", "U = R * I"], 
-    answer: "U = R * I", 
-    type: "choice" 
-  },
-  { 
-    id: 5, 
-    question: "Quel principe stipule que rien ne se perd, rien ne se crée, tout se transforme ?", 
-    answer: "Lavoisier", 
-    type: "text" 
-  }
-])
-
-// --- STATE ---
+const loading = ref(true)
 const currentIndex = ref(0)
-const userAnswer = ref("")
+const userAnswer = ref('')
 const showFeedback = ref(false)
+const submitting = ref(false)
 const isFinished = ref(false)
 const errors = ref([])
 
-// --- LOGIQUE ---
-const currentCard = computed(() => cards.value[currentIndex.value])
-const isCorrect = computed(() => {
-  if (!userAnswer.value) return false
-  return userAnswer.value.toLowerCase().trim() === currentCard.value.answer.toLowerCase().trim()
+onMounted(async () => {
+  await Promise.all([
+    cardStore.fetchDueCards(systemId),
+    systemStore.fetchSystemById(systemId),
+  ])
+  loading.value = false
 })
 
-const handleValidation = () => {
-  showFeedback.value = true
-  if (!isCorrect.value) {
+const currentCard = computed(() => cardStore.dueCards[currentIndex.value])
+
+const boxCounts = computed(() => {
+  const counts = {}
+  cardStore.dueCards.forEach(card => {
+    const level = card.leitnerBox?.level
+    if (level) counts[level] = (counts[level] || 0) + 1
+  })
+  return counts
+})
+
+const handleValidation = async () => {
+  submitting.value = true
+  const ok = await cardStore.submitResponse(currentCard.value.idCard, userAnswer.value)
+  submitting.value = false
+
+  if (!ok) return  // le store a déjà affiché le notif d'erreur
+
+  if (!cardStore.lastCorrection?.success) {
     errors.value.push(currentCard.value)
-    cards.value.push(currentCard.value) // A refaire le jour meme
-  } else {
-    groupCounts.value.G2++     // Progression
-    groupCounts.value.G1--
   }
+  showFeedback.value = true
 }
 
 const nextStep = () => {
-  if (currentIndex.value < cards.value.length - 1) {
+  if (currentIndex.value < cardStore.dueCards.length - 1) {
     currentIndex.value++
-    userAnswer.value = ""
+    userAnswer.value = ''
     showFeedback.value = false
   } else {
     isFinished.value = true
   }
 }
 
-const reset = () => {
-  currentIndex.value = 0
-  userAnswer.value = ""
-  showFeedback.value = false
-  isFinished.value = false
-  errors.value = []
+const confirmExit = () => {
+  const confirmed = window.confirm('⚠️ Attention : la session en cours sera perdue. Voulez-vous vraiment quitter ?')
+  if (confirmed) router.push('/flashcards')
 }
 </script>

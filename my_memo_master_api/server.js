@@ -2,6 +2,7 @@ const http = require('http');
 const db = require('./models');
 const app = require('./app');
 const logger = require('./helpers/logger');
+const semanticService = require('./services/Semantic.service');
 
 const DEFAULT_MAX_RETRIES = 10;
 const DEFAULT_RETRY_DELAY_MS = 5000;
@@ -50,3 +51,9 @@ server.listen(PORT, HOST, () => {
 
   logger.error('DB still unreachable; API keeps serving non-DB routes.');
 })();
+
+// Pre-warm the semantic model in the background so the first Leitner correction
+// doesn't block a user request for 30+ seconds (model download ~80 MB).
+semanticService.getModel().catch((err) => {
+  logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`);
+});

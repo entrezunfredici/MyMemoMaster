@@ -2,6 +2,7 @@ const { body } = require('express-validator');
 
 exports.addCard = [
     body('idQuestion').isInt({ min: 1 }).withMessage('idQuestion doit être un entier positif'),
+    body('idSystem').isInt({ min: 1 }).withMessage('idSystem doit être un entier positif'),
 ];
 
 exports.updateCard = [

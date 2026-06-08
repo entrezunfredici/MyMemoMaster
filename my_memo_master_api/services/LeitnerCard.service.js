@@ -72,8 +72,8 @@ class LeitnerCardService {
       throw new Error("Droits insuffisants pour ajouter une carte.");
     }
 
-    const box = await LeitnerBox.findOne({ where: { level: 1 } });
-    if (!box) throw new Error("Boîte de niveau 1 introuvable.");
+    const box = await LeitnerBox.findOne({ where: { level: 1, idSystem: data.idSystem } });
+    if (!box) throw new Error("Boîte de niveau 1 introuvable pour ce système.");
 
     return await LeitnerCard.create({
       ...data,

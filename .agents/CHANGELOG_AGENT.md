@@ -46,13 +46,14 @@
 | Jobs (fifo.cron.js) | Stable | init |
 | Front — Auth (login, register) | Stable | init |
 | Front — HomePage | Stable | init |
-| Front — FlashcardsPage | Stable | init |
+| Front — FlashcardsPage | Stable — CRUD systèmes, MenuItemComponent, stats via cardStore.loadSystemStats | 2026-06-08 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable | init |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
 | Front — CalendarPage | Stable | init |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
+| Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
 | Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
 
@@ -540,6 +541,109 @@
 **Dette / points d'attention :**
 - Pas de tests pour `Storage.controller.js`, `LeitnerBox.controller.js`, `LeitnerSystemsUsers.controller.js`, `Kpi.controller.js` — à couvrir dans un ticket dédié.
 - ~~`bcrypt` doublon de `bcryptjs`~~ — supprimé.
+
+---
+
+### [M-02-CARDS-CRUD] — Gestion des cartes Leitner (front + fix backend) — 2026-06-08
+
+**Fichiers modifiés (API) :**
+- `my_memo_master_api/services/LeitnerCard.service.js` — fix bug `addCard` : `LeitnerBox.findOne({ level: 1 })` → `findOne({ level: 1, idSystem: data.idSystem })` (sans filtre, toutes les cartes allaient dans la boîte 1 du premier système venu)
+- `my_memo_master_api/validators/LeitnerCard.validators.js` — ajout `idSystem` requis dans `addCard`
+
+**Fichiers créés (front) :**
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` — page de gestion des cartes d'un système : liste par boîte (1-5), ajout/modification/suppression inline
+  - Ajout : POST /questions → POST /responses → POST /leitnercards (3 appels séquentiels)
+  - Modification : PUT /questions/:id + PUT /responses/:id
+  - Suppression : DELETE /leitnercards/:id (question et réponse conservées)
+
+**Fichiers modifiés (front) :**
+- `my_memo_master_front/src/router/routes.js` — ajout route `/flashcards/:systemId/cards` (name: `flashcards.cards`)
+- `my_memo_master_front/src/pages/FlashcardsPage.vue` — lien "Gérer les cartes →" dans le slot stats de chaque carte système
+
+**Ce qui est utilisable :**
+- Depuis FlashcardsPage : clic "Gérer les cartes →" → page de gestion
+- Cartes affichées par boîte avec question + réponse correcte visible
+- Ajout d'une carte = formulaire question/réponse (le modèle Q/R est transparent pour l'utilisateur)
+
+**Hypothèses posées :**
+- La suppression d'une carte ne supprime pas la question/réponse associée (elles peuvent être partagées avec des tests)
+- La réponse correcte est la première réponse avec `correction: true` — si plusieurs existent, seule la première est affichée/modifiée
+
+**Dette / points d'attention :**
+- Si une question n'a pas de réponse `correction: true`, `card.correctAnswer` sera vide dans la liste
+- Si `POST /questions` réussit mais `POST /responses` échoue, une question orpheline est créée — à nettoyer manuellement ou via une transaction côté API
+
+---
+
+### [M-01.09] — Tableau de bord maîtrise + MenuItemComponent — 2026-06-08
+
+**Fichiers créés :**
+- `my_memo_master_front/src/components/MenuItemComponent.vue` — composant générique de carte : title, description, slot `stats`, onAction (bouton), onEdit / onDelete optionnels (icônes ✎ / ✕)
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/pages/FlashcardsPage.vue` — utilise `MenuItemComponent` ; charge les cartes dues par système via `api.get` direct (pas le store, pour éviter la race condition sur `dueCards`) ; affiche "X cartes à réviser" + répartition B1-B5
+- `my_memo_master_front/src/pages/ExercisesPage.vue` — remplace le HTML inline de la grille par `MenuItemComponent` ; slot `stats` = nombre de questions + badge module
+
+**Ce qui est utilisable :**
+- `MenuItemComponent` réutilisable dans toutes les vues liste (ExercisesPage, FlashcardsPage, futures pages)
+- FlashcardsPage : tableau de bord maîtrise inline sur chaque carte — nombre de cartes dues + répartition par boîte (B1–B5)
+- ExercisesPage : même rendu qu'avant, code simplifié
+
+**Hypothèses posées :**
+- Les stats sont chargées en parallèle au montage (un appel `GET /leitnercards/due/:id` par système). Acceptable pour un MVP mono-instance avec peu de systèmes.
+- `api.get` est utilisé directement dans la page (pas via le store) pour éviter d'écraser `cardStore.dueCards` partagé entre les systèmes.
+- MindmapsPage non refactorisée — UX sidebar incompatible avec les cards.
+
+**Dette / points d'attention :**
+- Si l'utilisateur a beaucoup de systèmes, les appels parallèles peuvent être lourds — à paginer ou à battre en cas de scale.
+
+---
+
+### [M-01.07] — Interface Leitner (5 boîtes) — 2026-06-08
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/pages/FlashcardsPage.vue` — suppression données mockées ; branchement `useLeitnerSystemStore.fetchSystems()` sur `onMounted` ; affichage des systèmes réels ; navigation vers `/flashcardssession/:systemId`
+- `my_memo_master_front/src/pages/FlashcardsSessionPage.vue` — suppression données mockées ; branchement `useLeitnerCardStore.fetchDueCards(systemId)` + `submitResponse(cardId, studentAnswer)` ; `useLeitnerSystemStore.fetchSystemById(systemId)` pour le nom de session ; affichage `lastCorrection` (score, correction, explanation) ; répartition par boîte calculée depuis `dueCards` ; états `loading`, `submitting`, `isFinished`
+- `my_memo_master_front/src/router/routes.js` — route `/flashcardssession` → `/flashcardssession/:systemId`
+
+**Ce qui est utilisable :**
+- FlashcardsPage affiche les vrais systèmes Leitner de l'utilisateur
+- FlashcardsSessionPage charge les cartes dues, soumet au moteur sémantique IA et affiche le résultat (score %, correction, explication)
+- La répartition des 5 boîtes est calculée dynamiquement depuis les cartes dues
+- Écran "aucune carte" si `dueCards` est vide, écran "session terminée" en fin de session
+
+**Hypothèses posées :**
+- Le champ texte de la question est `question.statement` (confirmé sur `Question.model.js`)
+- La correction est toujours sémantique (textarea libre) — le mode QCM de l'ancienne maquette est supprimé car l'API ne le supporte pas
+
+**Dette / points d'attention :**
+- Le bouton "Valider" est désactivé pendant l'appel IA (`submitting`), qui peut prendre ~30s au premier appel (`@xenova/transformers`)
+- Pas de tests Vitest sur ces composants — cohérent avec la dette front déjà documentée
+
+---
+
+### [M-02-STORES] — Stores Pinia Leitner — 2026-06-08
+
+**Fichiers créés :**
+- `my_memo_master_front/src/stores/leitnerSystems.js` — `useLeitnerSystemStore` : fetchSystems, fetchSystemById, fetchSystemsBySubject, createSystem, updateSystem, shareSystem, deleteSystem
+- `my_memo_master_front/src/stores/leitnerBoxes.js` — `useLeitnerBoxStore` : fetchBoxes, fetchBoxById, createBox, updateBox, deleteBox
+- `my_memo_master_front/src/stores/leitnerCards.js` — `useLeitnerCardStore` : fetchCardsByBox, fetchCardById, fetchDueCards, createCard, updateCard, submitResponse, deleteCard
+
+**Ce qui est utilisable :**
+- `useLeitnerSystemStore` — CRUD complet + partage avec droits granulaires (`shareSystem(payload)`)
+- `useLeitnerBoxStore` — CRUD complet sur les boîtes (niveau, intervalle, couleur)
+- `useLeitnerCardStore` :
+  - `fetchDueCards(systemId)` → alimente `store.dueCards` (cartes à réviser)
+  - `submitResponse(cardId, studentAnswer)` → alimente `store.lastCorrection` avec `{ success, correction, score, explanation, decision_zone }`
+- Pattern identique aux stores existants (try/catch, notif FR, fetchX() post-mutation)
+
+**Hypothèses posées :**
+- `submitResponse` passe `studentAnswer` (string libre) et non `responseId` — la correction est sémantique IA côté API.
+- `shareSystem` reçoit le payload complet en paramètre (pas stocké dans `state`) car les champs de partage sont ponctuels.
+
+**Dette / points d'attention :**
+- Pas de tests Vitest pour ces stores — cohérent avec la dette déjà documentée sur les autres stores Pinia.
+- Les pages/composants qui consomment ces stores restent à implémenter (FlashcardsPage ou SessionPage).
 
 ---
 

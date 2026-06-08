@@ -38,9 +38,10 @@ class SemanticService {
       return this.modelLoading;
     }
 
-    this.modelLoading = this._initializeModel();
+    this.modelLoading = this._initializeModel().finally(() => {
+      this.modelLoading = null;
+    });
     this.model = await this.modelLoading;
-    this.modelLoading = null;
     return this.model;
   }
 

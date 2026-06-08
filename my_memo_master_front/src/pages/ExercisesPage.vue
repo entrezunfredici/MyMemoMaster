@@ -48,50 +48,23 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div
+      <MenuItem
         v-for="exercise in filteredExercises"
         :key="exercise.id"
-        class="bg-neutral-primary-soft block p-6 border border-default rounded-base shadow-xs hover:bg-neutral-secondary-medium hover:shadow-lg transition-all duration-200 flex flex-col h-full"
+        :title="exercise.title"
+        :description="exercise.description"
+        action-label="Commencer l'exercice"
+        :on-action="() => navigateToExercise(exercise.id)"
+        :on-edit="() => editExercise(exercise)"
+        :on-delete="() => deleteExercise(exercise.id)"
       >
-        <!-- Header with title and action buttons -->
-        <div class="flex items-start justify-between gap-4 mb-4">
-          <h5 class="text-2xl font-semibold tracking-tight text-heading leading-8">{{ exercise.title }}</h5>
-          <!-- Edit and Delete buttons -->
-          <div class="flex gap-2 flex-shrink-0">
-            <button
-              @click="editExercise(exercise)"
-              class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-2 rounded transition duration-200 border-2 border-yellow-800 hover:scale-110 hover:shadow-lg"
-              title="Modifier"
-            >
-              ✎
-            </button>
-            <button
-              @click="deleteExercise(exercise.id)"
-              class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded transition duration-200 border-2 border-red-800 hover:scale-110 hover:shadow-lg"
-              title="Supprimer"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        <!-- Exercise content -->
-        <div class="mb-4 flex-1">
-          <p class="text-body">{{ exercise.description }}</p>
-          <div class="flex items-center gap-3 mt-4">
+        <template #stats>
+          <div class="flex items-center gap-3 mt-1">
             <p class="text-sm text-gray-500">{{ exercise.questions.length }} questions</p>
             <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">{{ exercise.module }}</span>
           </div>
-        </div>
-
-        <!-- Start Exercise button at bottom -->
-        <button
-          @click="navigateToExercise(exercise.id)"
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 mt-4 border-2 border-blue-800 hover:scale-105 hover:shadow-lg"
-        >
-          Commencer l'exercice
-        </button>
-      </div>
+        </template>
+      </MenuItem>
     </div>
 
     <!-- Modal Backdrop -->
@@ -221,6 +194,7 @@
 <script setup>
 import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import MenuItem from '@/components/MenuItemComponent.vue'
 
 const router = useRouter()
 const showModal = ref(false)

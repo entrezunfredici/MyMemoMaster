@@ -63,7 +63,16 @@ const routes = [
     }
   },
   {
-    path: '/flashcardssession',
+    path: '/flashcards/:systemId/cards',
+    name: 'flashcards.cards',
+    component: () => import('../pages/FlashcardsCardsPage.vue'),
+    meta: {
+      title: 'Gestion des cartes',
+      private: true
+    }
+  },
+  {
+    path: '/flashcardssession/:systemId',
     name: 'flashcardssession',
     component: () => import('../pages/FlashcardsSessionPage.vue'),
     meta: {
