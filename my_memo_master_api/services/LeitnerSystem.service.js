@@ -1,5 +1,12 @@
-const { LeitnerSystem } = require("../models/index");
-const { LeitnerSystemsUsers } = require("../models/index");
+const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, instance } = require("../models/index");
+
+const DEFAULT_BOXES = [
+  { level: 1, intervall: 5,  color: 123456 },
+  { level: 2, intervall: 10, color: 654321 },
+  { level: 3, intervall: 15, color: 111111 },
+  { level: 4, intervall: 20, color: 222222 },
+  { level: 5, intervall: 30, color: 333333 },
+];
 
 class LeitnerSystemService {
   async findAll() {
@@ -17,7 +24,19 @@ class LeitnerSystemService {
   }
 
   async create(data) {
-    return await LeitnerSystem.create(data);
+    const t = await instance.transaction();
+    try {
+      const system = await LeitnerSystem.create(data, { transaction: t });
+      await LeitnerBox.bulkCreate(
+        DEFAULT_BOXES.map(box => ({ ...box, idSystem: system.idSystem })),
+        { transaction: t }
+      );
+      await t.commit();
+      return system;
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
   }
 
   async update(data) {

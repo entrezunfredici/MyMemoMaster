@@ -165,6 +165,7 @@ class LeitnerCardService {
       score: gradeResult.score,
       explanation: gradeResult.explanation,
       decision_zone: gradeResult.decision_zone,
+      newLevel: nextBox ? newLevel : currentLevel,
     };
   }
 

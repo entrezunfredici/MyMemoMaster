@@ -96,6 +96,11 @@ export const useLeitnerCardStore = defineStore('leitnerCards', {
           return false
         }
         this.lastCorrection = resp.data
+        const newLevel = resp.data.newLevel
+        if (newLevel) {
+          const card = this.dueCards.find(c => c.idCard === cardId)
+          if (card?.leitnerBox) card.leitnerBox.level = newLevel
+        }
         return true
       } catch (err) {
         notif.notify('Erreur lors de la correction de la réponse.', 'error')
@@ -104,18 +109,38 @@ export const useLeitnerCardStore = defineStore('leitnerCards', {
     },
 
     async loadSystemStats(systemIds) {
+      const boxResp = await api.get('leitnerboxes')
+      const allBoxes = boxResp?.status === 200 ? boxResp.data : []
+
       await Promise.all(
         systemIds.map(async (systemId) => {
           try {
-            const resp = await api.get(`leitnercards/due/${systemId}`)
-            if (!resp || resp.status !== 200) return
-            const cards = resp.data
-            const boxes = {}
-            cards.forEach(card => {
+            const systemBoxes = allBoxes.filter(b => b.idSystem === systemId)
+
+            const [dueResp, ...boxCardResps] = await Promise.all([
+              api.get(`leitnercards/due/${systemId}`),
+              ...systemBoxes.map(b => api.get(`leitnercards/leitnerboxes/${b.idBox}`)),
+            ])
+
+            if (!dueResp || dueResp.status !== 200) return
+
+            const dueByLevel = {}
+            dueResp.data.forEach(card => {
               const level = card.leitnerBox?.level
-              if (level) boxes[level] = (boxes[level] || 0) + 1
+              if (level) dueByLevel[level] = (dueByLevel[level] || 0) + 1
             })
-            this.systemStats[systemId] = { total: cards.length, boxes }
+
+            const totalByLevel = {}
+            systemBoxes.forEach((box, idx) => {
+              if (boxCardResps[idx]?.status === 200)
+                totalByLevel[box.level] = boxCardResps[idx].data.length
+            })
+
+            this.systemStats[systemId] = {
+              total: dueResp.data.length,
+              boxes: dueByLevel,
+              totalByLevel,
+            }
           } catch {
             // erreur silencieuse par système
           }

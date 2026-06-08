@@ -8,6 +8,14 @@ export const useLeitnerBoxStore = defineStore('leitnerBoxes', {
     boxes: []
   }),
 
+  getters: {
+    levelsForSystem: (state) => (systemId) =>
+      state.boxes
+        .filter(b => b.idSystem === systemId)
+        .sort((a, b) => a.level - b.level)
+        .map(b => b.level),
+  },
+
   actions: {
     async fetchBoxes() {
       try {

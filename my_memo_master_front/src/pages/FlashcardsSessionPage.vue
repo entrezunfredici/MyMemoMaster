@@ -90,7 +90,7 @@
       <h4 class="text-primary text-lg font-semibold pb-2">Répartition par boîte</h4>
       <div class="grid grid-cols-5 gap-2 mb-6 text-center">
         <div
-          v-for="level in [1, 2, 3, 4, 5]"
+          v-for="level in (boxStore.levelsForSystem(systemId).length ? boxStore.levelsForSystem(systemId) : [1, 2, 3, 4, 5])"
           :key="level"
           class="bg-white rounded border border-gray p-1"
         >
@@ -113,11 +113,13 @@ import { useRouter, useRoute } from 'vue-router'
 import Button from '@/components/ButtonComponent.vue'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
 import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
+import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 
 const router = useRouter()
 const route = useRoute()
 const cardStore = useLeitnerCardStore()
 const systemStore = useLeitnerSystemStore()
+const boxStore = useLeitnerBoxStore()
 
 const systemId = Number(route.params.systemId)
 
@@ -133,6 +135,7 @@ onMounted(async () => {
   await Promise.all([
     cardStore.fetchDueCards(systemId),
     systemStore.fetchSystemById(systemId),
+    boxStore.fetchBoxes(),
   ])
   loading.value = false
 })

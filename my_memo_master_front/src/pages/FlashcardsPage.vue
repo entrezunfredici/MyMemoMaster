@@ -37,13 +37,19 @@
               </span>
               <div class="flex gap-1 mt-2 w-full">
                 <div
-                  v-for="level in [1, 2, 3, 4, 5]"
+                  v-for="level in (boxStore.levelsForSystem(system.idSystem).length ? boxStore.levelsForSystem(system.idSystem) : [1, 2, 3, 4, 5])"
                   :key="level"
                   class="flex-1 text-center bg-white border border-gray-200 rounded p-1"
                 >
                   <div class="text-[10px] text-gray-400 font-bold">B{{ level }}</div>
                   <div class="text-xs font-semibold text-primary">
-                    {{ cardStore.systemStats[system.idSystem].boxes[level] || 0 }}
+                    {{ cardStore.systemStats[system.idSystem].totalByLevel?.[level] || 0 }}
+                  </div>
+                  <div
+                    class="text-[10px] font-semibold"
+                    :class="(cardStore.systemStats[system.idSystem].boxes[level] || 0) > 0 ? 'text-orange-500' : 'text-gray-300'"
+                  >
+                    {{ cardStore.systemStats[system.idSystem].boxes[level] || 0 }}↑
                   </div>
                 </div>
               </div>
@@ -122,10 +128,12 @@ import { useRouter } from 'vue-router'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
+import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 
 const router = useRouter()
 const systemStore = useLeitnerSystemStore()
 const cardStore = useLeitnerCardStore()
+const boxStore = useLeitnerBoxStore()
 
 const loading = ref(true)
 const showModal = ref(false)
@@ -141,7 +149,7 @@ const loadStats = async () => {
 
 onMounted(async () => {
   await systemStore.fetchSystems()
-  await loadStats()
+  await Promise.all([loadStats(), boxStore.fetchBoxes()])
   loading.value = false
 })
 
