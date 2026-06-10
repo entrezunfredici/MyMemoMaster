@@ -41,6 +41,7 @@
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
+| Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
 | Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
@@ -801,3 +802,34 @@
 
 **Dette / points d'attention :**
 - Aucune dette nouvelle introduite.
+
+---
+
+### [M-02.12] — Revue de code & merge — Révision active Leitner — 2026-06-10
+
+**Périmètre audité :**
+- `services/LeitnerCard.service.js` — algo Leitner, calcul next_review_at, resolveUserRights, getCardSystem
+- `controllers/LeitnerCard.controller.js` — handlers HTTP, gestion droits
+- `routes/LeitnerCard.routes.js` — routing, validators, Swagger
+- `models/LeitnerCard.model.js` — champs spaced-repetition, index, associations
+- `validators/LeitnerCard.validators.js` — addCard, updateCard, correctResponse
+- `stores/leitnerCards.js`, `leitnerSystems.js`, `leitnerBoxes.js` — stores Pinia front
+- `pages/FlashcardsSessionPage.vue`, `FlashcardsPage.vue`, `FlashcardsCardsPage.vue`
+- Tous les tests Leitner (unitaires, controllers, BDD, front)
+
+**Résultats de la revue :**
+- Architecture conforme controller → service → model sur tout le périmètre
+- JSDoc présent sur toutes les méthodes publiques du service
+- Messages d'erreur en français partout
+- Validators branchés sur POST et PUT
+- Lint : 3 erreurs corrigées (variable `response` non utilisée dans leitner.session.test.js, imports `useLeitnerSystemStore`/`useLeitnerBoxStore` inutilisés dans FlashcardsSessionPage.test.js)
+- 453 tests back + 41 tests front — tous verts après corrections
+
+**Fichiers modifiés :**
+- `test/bdd/leitner.session.test.js` — suppression variable `response` inutilisée
+- `test/components/FlashcardsSessionPage.test.js` — suppression imports inutilisés
+
+**Points d'attention documentés (non bloquants) :**
+- `addCard` controller : le catch renvoie 403 avec `error.message` pour toutes les erreurs. Si le service lève une erreur DB inattendue, le message Sequelize serait exposé en 403 plutôt qu'en 500. À refactorer dans un ticket dédié.
+- `loadSystemStats` store : catch silencieux par système — voulu (les stats ne bloquent pas l'UI).
+- Intervalles des boîtes en secondes (dev) — à passer en jours avant prod (déjà documenté dans DECISIONS.md).
