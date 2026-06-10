@@ -38,6 +38,10 @@
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
 | Tests intégration API (Supertest) | Stable — M-00.13 : 424 tests total (+4 GET /onboardingState/byUserId) | 2026-06-06 |
+| Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
+| Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
+| Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
+| Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
 | Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
@@ -289,7 +293,42 @@
 - Les controllers qui utilisaient `{ error: ... }` (Question) ont été normalisés vers `{ message: ... }` conformément à la convention du projet.
 
 **Dette / points d'attention :**
-- Aucune dette nouvelle introduite.
+- Aucune dette nouvelle introduite en M-00.07.
+
+---
+
+### [M-01.11] — Tests fonctionnels session complète Leitner — 2026-06-10
+
+**Fichiers créés :**
+- `test/bdd/leitner.session.test.js` — 12 tests fonctionnels session complète (SQLite in-memory)
+
+**Fichiers modifiés :**
+- `config/db.config.js` — ajout `process.env.DB_STORAGE || "./db.sqlite"` pour permettre la surcharge en test (`:memory:`)
+
+**Ce qui est couvert :**
+- Carte jamais révisée (next_review_at null) → visible dans la session
+- Auth requise (401 sans token)
+- Bonne réponse → boîte suivante + compteurs + next_review_at dans la fenêtre attendue (±5s)
+- Session vide après révision récente (next_review_at dans le futur → 0 cartes dues)
+- Écoulement de l'intervalle simulé → carte redevient disponible
+- Mauvaise réponse → retour boîte 1 + incorrect_count++
+- Bonne réponse en boîte 5 → plafonnement (reste boîte 5, fifo=false)
+- Historique : review_count / correct_count / incorrect_count / last_review_at après 3 révisions
+- Session multi-cartes : plusieurs cartes dues retournées ensemble
+- Cas d'erreur : carte inexistante (404), corps invalide (400)
+
+**Approche :**
+- Base SQLite `:memory:` — isolée par fichier de test, aucune pollution entre runs
+- `syncModels({ force: true })` dans `beforeAll` pour créer les tables
+- Seul `Semantic.service` est mocké (dépendance NLP externe ~30s) — toutes les autres couches sont réelles
+- Tests séquentiels (partagent l'état de la carte) — exécutés dans l'ordre de définition
+
+**Hypothèses posées :**
+- `process.env.DB_STORAGE = ':memory:'` positionné avant tout `require` dans le fichier → Sequelize utilise la DB in-memory dès le premier chargement du module.
+- La tolérance sur `next_review_at` (±5s) couvre les variations de timing CPU sans fragiliser le test.
+
+**Dette / points d'attention :**
+- `--runInBand` requis si les tests BDD sont lancés en isolation (ils partagent état via `beforeAll`). En mode parallèle Jest standard, chaque fichier est dans son propre worker avec sa propre DB in-memory — pas de conflit.
 
 ---
 
@@ -698,3 +737,99 @@
 - `GET /questions/tests/:testId` : la requête Sequelize fait un JOIN via la table `testQuestions` (belongsToMany). Si l'association through est incohérente, Sequelize peut retourner 0 résultats silencieusement.
 - Aucun test pour Storage (upload multipart) ni pour LeitnerSystemsUsers — dette documentée dans les entrées précédentes.
 - Le rate limiter auth (`5 req/15 min`, in-memory) se déclenche rapidement lors des tests manuels répétés. Redémarrer le conteneur pour vider le store.
+
+---
+
+### [M-02] — Tests unitaires moteur répétition espacée — 2026-06-10
+
+**Fichiers modifiés :**
+- `test/services/LeitnerCard.service.test.js` — réécriture complète : 6 tests existants (dont 2 buggés) → 23 tests couvrant l'ensemble du service
+
+**Bugs corrigés dans les tests précédents :**
+- `addCard` : assertion `LeitnerBox.findOne({ level: 1 })` → `{ level: 1, idSystem: 5 }` (le service filtre par système depuis M-02-CARDS-CRUD)
+- `correctResponse` bonne réponse : `toEqual` ne comprenait pas `newLevel` ajouté au retour du service, test échouait silencieusement
+
+**Tests ajoutés :**
+- `getDueCards` — filtre par système, retourne cartes dues et cartes jamais révisées (next_review_at null)
+- `addCard` — droits insuffisants (throw), boîte niveau 1 introuvable (throw)
+- `updateCard` — droits insuffisants (null), carte introuvable (null)
+- `correctResponse` — mauvaise réponse (retour boîte 1, incorrect_count++), bonne réponse en boîte 5 (plafonnement, fifo=false), carte introuvable (null), aucune réponse correcte (null), calcul `next_review_at` (fake timers, intervalle en secondes)
+- `deleteCard` — droits insuffisants (false), carte introuvable (false)
+- `resolveUserRights` — propriétaire (droits complets), partagé avec écriture, non-membre (aucun droit)
+- `getCardSystem` — retourne idSystem, carte introuvable (null)
+
+**Ce qui est utilisable :**
+- `npx jest test/services/LeitnerCard.service.test.js` → 23/23 tests passent
+- Couverture complète du moteur Leitner : algo boîtes, compteurs, dates, droits
+
+**Hypothèses posées :**
+- `jest.useFakeTimers()` / `jest.setSystemTime()` affecte bien `dayjs()` (dayjs utilise le clock système) — `jest.useRealTimers()` appelé en fin de test pour ne pas polluer les autres suites.
+- Les modèles `LeitnerSystem` et `LeitnerSystemsUsers` ajoutés au mock de `../../models` pour couvrir `resolveUserRights`.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [M-01.11-FRONT] — Tests fonctionnels session Leitner (front) — 2026-06-10
+
+**Fichiers créés :**
+- `my_memo_master_front/test/stores/leitnerCards.store.test.js` — 7 tests Pinia store (`fetchDueCards`, `submitResponse`) : succès, réponse non-200, erreur réseau, bonne/mauvaise réponse, 500, timeout
+- `my_memo_master_front/test/components/FlashcardsSessionPage.test.js` — 13 tests composant Vue : chargement, état vide, affichage question, compteur, titre système, Valider désactivé/actif, feedback correct (vert+score), feedback incorrect (rouge+correction), navigation multi-cartes, session terminée, sortie confirmée, sortie annulée
+
+**Fichiers modifiés :**
+- `my_memo_master_front/vitest.config.js` — ajout `@vitejs/plugin-vue` dans `plugins` (sans lui, Vitest ne sait pas transformer les fichiers `.vue`)
+- `my_memo_master_front/test/stores/leitnerCards.store.test.js` — `mockGet/mockPost/mockNotify` déclarés via `vi.hoisted()` pour éviter la TDZ (les factories `vi.mock` sont hoistées avant les `const`)
+- `my_memo_master_front/test/components/FlashcardsSessionPage.test.js` — mock `vue-router` via `importOriginal` pour préserver `createRouter`/`createWebHistory` (requis par `src/router/index.js` via `src/stores/auth.js`) tout en overridant `useRouter`/`useRoute`
+
+**Ce qui est couvert :**
+- `useLeitnerCardStore.fetchDueCards` : succès, non-200, erreur réseau
+- `useLeitnerCardStore.submitResponse` : bonne réponse (lastCorrection + level++), mauvaise (level→1), 500, timeout
+- Rendu initial : loading, empty state, question + compteur + titre système
+- Interaction : bouton Valider désactivé sans texte, actif avec texte
+- Feedback après soumission : vert "Excellent / 95%" ou rouge "À revoir / 10% / correction attendue"
+- Navigation : Continuer → carte suivante + compteur 2/2
+- Fin de session : écran "Session terminée" après dernière carte
+- Sortie : window.confirm(true) → push('/flashcards') ; confirm(false) → reste sur page
+
+**Packages installés :**
+- `@vue/test-utils` devDependency (avec `--legacy-peer-deps` pour compatibilité Vitest 3)
+- `@pinia/testing` devDependency
+
+**Hypothèses posées :**
+- `createTestingPinia({ stubActions: true })` : les actions stubées retournent `undefined` par défaut. `mockImplementation` utilisé dans les tests pour simuler les effets de bord (`cardStore.lastCorrection = ...`).
+- Le mock `vue-router` utilise `importOriginal` pour réexporter `createRouter`, `createWebHistory`, `RouterLink`, etc. — seules `useRouter` et `useRoute` sont surchargées.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [M-02.12] — Revue de code & merge — Révision active Leitner — 2026-06-10
+
+**Périmètre audité :**
+- `services/LeitnerCard.service.js` — algo Leitner, calcul next_review_at, resolveUserRights, getCardSystem
+- `controllers/LeitnerCard.controller.js` — handlers HTTP, gestion droits
+- `routes/LeitnerCard.routes.js` — routing, validators, Swagger
+- `models/LeitnerCard.model.js` — champs spaced-repetition, index, associations
+- `validators/LeitnerCard.validators.js` — addCard, updateCard, correctResponse
+- `stores/leitnerCards.js`, `leitnerSystems.js`, `leitnerBoxes.js` — stores Pinia front
+- `pages/FlashcardsSessionPage.vue`, `FlashcardsPage.vue`, `FlashcardsCardsPage.vue`
+- Tous les tests Leitner (unitaires, controllers, BDD, front)
+
+**Résultats de la revue :**
+- Architecture conforme controller → service → model sur tout le périmètre
+- JSDoc présent sur toutes les méthodes publiques du service
+- Messages d'erreur en français partout
+- Validators branchés sur POST et PUT
+- Lint : 3 erreurs corrigées (variable `response` non utilisée dans leitner.session.test.js, imports `useLeitnerSystemStore`/`useLeitnerBoxStore` inutilisés dans FlashcardsSessionPage.test.js)
+- 453 tests back + 41 tests front — tous verts après corrections
+
+**Fichiers modifiés :**
+- `test/bdd/leitner.session.test.js` — suppression variable `response` inutilisée
+- `test/components/FlashcardsSessionPage.test.js` — suppression imports inutilisés
+
+**Points d'attention documentés (non bloquants) :**
+- `addCard` controller : le catch renvoie 403 avec `error.message` pour toutes les erreurs. Si le service lève une erreur DB inattendue, le message Sequelize serait exposé en 403 plutôt qu'en 500. À refactorer dans un ticket dédié.
+- `loadSystemStats` store : catch silencieux par système — voulu (les stats ne bloquent pas l'UI).
+- Intervalles des boîtes en secondes (dev) — à passer en jours avant prod (déjà documenté dans DECISIONS.md).

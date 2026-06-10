@@ -1,5 +1,5 @@
 module.exports = {
   dialect: "sqlite",
-  storage: "./db.sqlite",
+  storage: process.env.DB_STORAGE || "./db.sqlite",
   logging: false,
 };

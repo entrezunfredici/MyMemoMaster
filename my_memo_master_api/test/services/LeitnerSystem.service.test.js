@@ -1,5 +1,7 @@
-const { LeitnerSystem } = require("../../models/index");
+const { LeitnerSystem, LeitnerBox, instance } = require("../../models/index");
 const LeitnerSystemService = require("../../services/LeitnerSystem.service");
+
+const mockTransaction = { commit: jest.fn(), rollback: jest.fn() };
 
 jest.mock("../../models/index", () => ({
   LeitnerSystem: {
@@ -9,11 +11,19 @@ jest.mock("../../models/index", () => ({
     update: jest.fn(),
     destroy: jest.fn(),
   },
+  LeitnerBox: {
+    bulkCreate: jest.fn(),
+  },
+  instance: {
+    transaction: jest.fn(),
+  },
 }));
 
 describe("LeitnerSystemService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTransaction.commit.mockResolvedValue();
+    mockTransaction.rollback.mockResolvedValue();
   });
 
   test("should retrieve all Leitner systems", async () => {
@@ -56,14 +66,16 @@ describe("LeitnerSystemService", () => {
     expect(systems).toEqual(mockLeitnerSystems);
   });
 
-  test("should create a new Leitner system", async () => {
+  test("should create a new Leitner system with 5 default boxes", async () => {
     const mockLeitnerSystem = {
       idSystem: 3,
       name: "Système Leitner Chimie",
       idUser: 3,
       idMindMap: null,
     };
+    instance.transaction.mockResolvedValue(mockTransaction);
     LeitnerSystem.create.mockResolvedValue(mockLeitnerSystem);
+    LeitnerBox.bulkCreate.mockResolvedValue([]);
 
     const system = await LeitnerSystemService.create({
       name: "Système Leitner Chimie",
@@ -71,11 +83,20 @@ describe("LeitnerSystemService", () => {
       idMindMap: null,
     });
 
-    expect(LeitnerSystem.create).toHaveBeenCalledWith({
-      name: "Système Leitner Chimie",
-      idUser: 3,
-      idMindMap: null,
-    });
+    expect(instance.transaction).toHaveBeenCalled();
+    expect(LeitnerSystem.create).toHaveBeenCalledWith(
+      { name: "Système Leitner Chimie", idUser: 3, idMindMap: null },
+      { transaction: mockTransaction }
+    );
+    expect(LeitnerBox.bulkCreate).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ idSystem: 3, level: 1 })]),
+      { transaction: mockTransaction }
+    );
+    expect(LeitnerBox.bulkCreate).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ level: 5 })]),
+      expect.anything()
+    );
+    expect(mockTransaction.commit).toHaveBeenCalled();
     expect(system).toEqual(mockLeitnerSystem);
   });
 
