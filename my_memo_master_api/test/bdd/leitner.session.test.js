@@ -30,7 +30,6 @@ let system;
 let boxes; // { 1: LeitnerBox, 2: LeitnerBox, ... 5: LeitnerBox }
 let card;
 let question;
-let response;
 
 describe('Leitner — session complète (tests fonctionnels)', () => {
 
@@ -74,7 +73,7 @@ describe('Leitner — session complète (tests fonctionnels)', () => {
       questionPosition: 1,
       type: 'text',
     });
-    response = await Response.create({
+    await Response.create({
       content: 'Paris',
       correction: true,
       idQuestion: question.idQuestion,

@@ -3,8 +3,6 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import FlashcardsSessionPage from '@/pages/FlashcardsSessionPage.vue'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
-import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
-import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 
 // ── Mocks globaux ────────────────────────────────────────────────────────────
 
