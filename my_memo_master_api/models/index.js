@@ -23,6 +23,12 @@ models.Test = require("./Test.model")(instance);
 models.Question = require("./Question.model")(instance);
 models.Tutorials = require("./Tutorials.model")(instance);
 models.UserOnboardingState = require("./OnboardingState.model")(instance);
+models.ClassGroup = require("./ClassGroup.model")(instance);
+models.ClassGroupUsers = require("./ClassGroupUsers.model")(instance);
+models.CalendarEvent = require("./CalendarEvent.model")(instance);
+models.EventOccurrence = require("./EventOccurrence.model")(instance);
+models.Deadline = require("./Deadline.model")(instance);
+models.RevisionSession = require("./RevisionSession.model")(instance);
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

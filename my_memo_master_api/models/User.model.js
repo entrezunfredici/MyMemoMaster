@@ -92,6 +92,31 @@ module.exports = (instance) => {
       foreignKey: "userId",
       as: "onboardingState",
     });
+
+    User.hasMany(models.ClassGroup, {
+      foreignKey: "createdBy",
+      as: "classGroups",
+    });
+
+    User.hasMany(models.ClassGroupUsers, {
+      foreignKey: "userId",
+      as: "classGroupMemberships",
+    });
+
+    User.hasMany(models.CalendarEvent, {
+      foreignKey: "createdBy",
+      as: "calendarEvents",
+    });
+
+    User.hasMany(models.Deadline, {
+      foreignKey: "createdBy",
+      as: "deadlines",
+    });
+
+    User.hasMany(models.RevisionSession, {
+      foreignKey: "userId",
+      as: "revisionSessions",
+    });
   };
 
   return User;

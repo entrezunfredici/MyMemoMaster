@@ -37,8 +37,13 @@
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
+| Documentation règles métier Calendrier | Stable — M-03.01 : modèle données, acteurs, règles synchro, todo list, récurrence | 2026-06-10 |
+| ClassGroup / ClassGroupUsers | Stable — CRUD complet + gestion membres, droits admin | 2026-06-10 |
+| CalendarEvent / EventOccurrence | Stable — CRUD complet + récurrence auto/manual, protection RESTRICT | 2026-06-10 |
+| Deadline | Stable — CRUD complet, droits enseignant par groupe | 2026-06-10 |
+| RevisionSession | Stable — CRUD complet + GET /today (todo list) | 2026-06-10 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
-| Tests intégration API (Supertest) | Stable — M-00.13 : 424 tests total (+4 GET /onboardingState/byUserId) | 2026-06-06 |
+| Tests intégration API (Supertest) | Stable — M-03 : 606 tests total (153 nouveaux pour ClassGroup, CalendarEvent, Deadline, RevisionSession) | 2026-06-10 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
@@ -72,7 +77,7 @@
 - Docker Compose (API + Front + PostgreSQL + PgAdmin + Traefik)
 
 **Modules partiellement implémentés :**
-- Tests unitaires (dossier `test/` présent, couverture à compléter)
+- Tests unitaires (dossier `test/` présent, couverture à compléter — les 4 nouvelles entités M-03 sont couvertes)
 
 **Ce qui n'existe pas encore :**
 - ARCHITECTURE.md (référencé dans AGENT.md mais absent)
@@ -859,3 +864,161 @@
 
 **Dette / points d'attention :**
 - Pas de table de log par révision en MVP — si un historique détaillé est nécessaire (analytics, courbe de progression), il faudra une nouvelle entité `RevisionLog`.
+
+---
+
+### [M-03.01] — Définition règles métier Calendrier et organisation — 2026-06-10
+
+**Fichiers créés :**
+- `diagrams/calendar_rules.md` — règles métier complètes du module Calendrier
+
+**Ce qui est couvert :**
+- Acteurs et permissions (Admin établissement, Enseignant, Étudiant)
+- Modèle de données : 6 nouvelles entités (ClassGroup, ClassGroupUsers, CalendarEvent, EventOccurrence, Deadline, RevisionSession)
+- Règles de récurrence des événements (mode manual vs auto, format JSON de la règle)
+- Principe de synchronisation : calendrier personnel = événements groupe + échéances enseignant + séances de révision perso
+- Règle todo list : RevisionSession avec date = aujourd'hui → affiché automatiquement (même objet, pas de doublon)
+- Priorisation MVP (tri par heure, sans champ priorité)
+- Cas limites et hors-périmètre MVP documentés
+
+**Hypothèses posées :**
+- Les occurrences récurrentes sont générées et persistées en base à la création de l'événement (approche "matérialisée" plutôt que calcul à la volée) — plus simple à filtrer/supprimer individuellement.
+- `occurrenceId` et `dueDate` sont indépendants sur Deadline : l'échéance est annoncée dans une séance mais peut être due à une date différente.
+- Un utilisateur peut avoir des rôles différents dans des groupes différents (enseignant dans un groupe, étudiant dans un autre) — géré par ClassGroupUsers avec un champ `role` par ligne.
+
+**Dépendances pour l'implémentation :**
+- Nouveau rôle système `Enseignant` à ajouter via seeder
+- 6 nouveaux models Sequelize + migrations
+- 6 nouveaux controllers + routes + services + validators
+- Stores Pinia côté front (calendar, classGroups, revisionSessions)
+
+**Dette / points d'attention :**
+- Pas de champ `priority` sur RevisionSession en MVP — à prévoir si la fonctionnalité de priorisation est demandée.
+- Suppression d'une EventOccurrence avec Deadlines rattachées : comportement (bloquer ou cascade) à décider à l'implémentation et documenter dans DECISIONS.md.
+- Les occurrences tombant sur un jour férié ne sont pas filtrées automatiquement.
+
+---
+
+### [M-03.03] — Modèle de données (tâches, rappels) — 2026-06-10
+
+**Fichiers créés (models) :**
+- `models/ClassGroup.model.js` — groupe classe, créé par un admin, FK User (createdBy)
+- `models/ClassGroupUsers.model.js` — table de jointure PK composite (classGroupId + userId), champ role 'teacher'|'student'
+- `models/CalendarEvent.model.js` — événement de calendrier (cours/examen/autre), recurrenceMode + recurrenceRule JSON
+- `models/EventOccurrence.model.js` — occurrence matérialisée d'un événement (date + startTime + endTime)
+- `models/Deadline.model.js` — échéance liée à une occurrence spécifique, RESTRICT sur suppression occurrence
+- `models/RevisionSession.model.js` — séance de révision étudiant, objet unique affiché dans calendrier et todo list
+
+**Fichiers créés (migrations) :**
+- `migrations/20260610000001-create-classgroup-table.js`
+- `migrations/20260610000002-create-classgroupusers-table.js`
+- `migrations/20260610000003-create-calendarevent-table.js`
+- `migrations/20260610000004-create-eventoccurrence-table.js`
+- `migrations/20260610000005-create-deadline-table.js`
+- `migrations/20260610000006-create-revisionsession-table.js`
+- `migrations/20260610000007-add-calendar-indexes.js` — 10 index sur les colonnes FK + date
+
+**Fichiers créés (seeders) :**
+- `seeders/20260610000001-seed-enseignant-role.js` — insère le rôle `Enseignant` (roleId: 3)
+
+**Fichiers modifiés :**
+- `models/index.js` — enregistrement des 6 nouveaux models
+- `models/User.model.js` — 5 nouvelles associations (classGroups, classGroupMemberships, calendarEvents, deadlines, revisionSessions)
+
+**Ce qui est utilisable :**
+- `npx sequelize-cli db:migrate` — crée les 6 nouvelles tables avec leurs FK et contraintes
+- `npx sequelize-cli db:seed --seed 20260610000001-seed-enseignant-role.js` — ajoute le rôle Enseignant
+- Toutes les associations Sequelize sont opérationnelles pour les `include` dans les services futurs
+- `Deadline.occurrenceId` → RESTRICT en base : la suppression d'une EventOccurrence avec des Deadlines associées est bloquée
+
+**Hypothèses posées :**
+- Les champs type (CalendarEvent, Deadline) et role (ClassGroupUsers) sont stockés en STRING(20) avec validation côté application — pas d'ENUM SQL pour assurer la portabilité SQLite/PostgreSQL.
+- `recurrenceRule` est un champ JSON nullable — non nul uniquement si `recurrenceMode = 'auto'`. La logique de génération des occurrences sera dans le service (ticket suivant).
+- L'ordre des migrations (000001→000006) respecte les dépendances FK : ClassGroup avant ClassGroupUsers, CalendarEvent avant EventOccurrence, EventOccurrence avant Deadline.
+
+**Dette / points d'attention :**
+- En SQLite, le RESTRICT sur `Deadline.occurrenceId` n'est actif que si `PRAGMA foreign_keys = ON` — activée automatiquement avec `better-sqlite3`.
+- Le rôle Enseignant (roleId: 3) n'est pas encore assignable depuis l'UI — nécessite un ticket d'administration des comptes.
+
+---
+
+### [M-03.03-CRUD] — CRUD CalendarEvent, RevisionSession, Deadline, ClassGroup — 2026-06-10
+
+**Fichiers créés (services) :**
+- `services/ClassGroup.service.js` — findAll (filtré par rôle), create/update/delete (admin), addMember/removeMember (admin)
+- `services/RevisionSession.service.js` — findAll + findToday (filtrés userId), CRUD avec vérification ownership
+- `services/CalendarEvent.service.js` — findAll (filtré par groupes), CRUD admin, génération occurrences (_generateOccurrences : weekly/biweekly/monthly via dayjs), addOccurrence / deleteOccurrence
+- `services/Deadline.service.js` — findAll (via JOIN groupes), create (vérif teacher via ClassGroupUsers), update/delete (ownership createdBy)
+
+**Fichiers créés (controllers) :**
+- `controllers/ClassGroup.controller.js`
+- `controllers/RevisionSession.controller.js`
+- `controllers/CalendarEvent.controller.js` — gère le 409 sur SequelizeForeignKeyConstraintError (RESTRICT)
+- `controllers/Deadline.controller.js`
+
+**Fichiers créés (validators) :**
+- `validators/ClassGroup.validators.js`
+- `validators/RevisionSession.validators.js` — validation HH:MM + endTime > startTime
+- `validators/CalendarEvent.validators.js` — validation recurrenceRule complète (frequency, days, startDate/endDate)
+- `validators/Deadline.validators.js`
+
+**Fichiers créés (routes) :**
+- `routes/ClassGroup.routes.js` — GET /, GET /:id, POST /, PUT /:id, DELETE /:id, POST /:id/members, DELETE /:id/members/:userId
+- `routes/RevisionSession.routes.js` — GET /, GET /today, GET /:id, POST /, PUT /:id, DELETE /:id
+- `routes/CalendarEvent.routes.js` — GET /, GET /:id, POST /, PUT /:id, DELETE /:id, POST /:id/occurrences, DELETE /occurrences/:occurrenceId
+- `routes/Deadline.routes.js` — GET /, GET /:id, POST /, PUT /:id, DELETE /:id
+
+**Fichiers modifiés :**
+- `app.js` — enregistrement des 4 nouvelles routes
+
+**Ce qui est utilisable :**
+- `GET /api/v1/revision-sessions/today` → todo list du jour (séances date = aujourd'hui)
+- `POST /api/v1/calendar-events` avec `recurrenceMode: "auto"` → génère et persiste toutes les occurrences automatiquement
+- `DELETE /api/v1/calendar-events/occurrences/:id` → 409 si des Deadlines y sont liées (RESTRICT)
+- `POST /api/v1/deadlines` → 403 si l'utilisateur n'est pas enseignant dans le groupe de l'occurrence
+
+**Hypothèses posées :**
+- La vérification admin (roleId = 1) utilise un appel DB dans chaque service — pas de cache. Acceptable pour MVP.
+- `_generateOccurrences` pour biweekly utilise `startOf("week")` de dayjs (semaine débutant le dimanche par défaut). Les occurrences de la semaine de startDate sont incluses (weekDiff = 0 → pair).
+- `CalendarEvent.update` ne modifie que name/description/type — les occurrences et la règle de récurrence ne sont pas modifiables via PUT pour éviter les incohérences.
+
+**Dette / points d'attention :**
+- ~~Pas de tests pour ces 4 entités~~ — Résolu dans M-03.03-TESTS.
+- `findAll` pour CalendarEvent retourne les occurrences en include : pour de nombreux événements, la réponse peut être volumineuse. À paginer si nécessaire.
+- `_generateOccurrences` biweekly : si startDate est au milieu d'une semaine, les jours avant startDate de cette semaine ne sont pas inclus (correct). La semaine de référence est celle de startDate.
+
+---
+
+### [M-03.03-TESTS] — Tests contrôleurs et services M-03 — 2026-06-10
+
+**Fichiers créés :**
+- `test/controllers/ClassGroup.controller.test.js` — 29 tests : CRUD, membres (addMember/removeMember), 200/201/400/401/403/404/500
+- `test/controllers/RevisionSession.controller.test.js` — 26 tests : 6 routes (GET /, GET /today, GET /:id, POST, PUT, DELETE), validation HH:MM + endTime>startTime, 401, 404, 500
+- `test/controllers/CalendarEvent.controller.test.js` — 34 tests : 7 routes (dont POST /:id/occurrences et DELETE /occurrences/:id), 403 non-admin, 409 SequelizeForeignKeyConstraintError (RESTRICT), 401
+- `test/controllers/Deadline.controller.test.js` — 25 tests : CRUD complet, 403 non-enseignant, 401, 500
+- `test/services/CalendarEvent.service.test.js` — 25 tests unitaires : _generateOccurrences (monthly/weekly/biweekly/multi-jours/startDate>endDate), _isAdmin, findAll (admin/non-admin/aucun groupe), create (manuel/auto/non-admin), update, delete, addOccurrence, deleteOccurrence
+- `test/services/RevisionSession.service.test.js` — 14 tests unitaires : findAll, findToday (date = today), findOne (ownership), create (userId attaché), update (ownership + toHaveBeenCalled), delete (ownership)
+
+**Total :** 153 nouveaux tests — tous passent
+
+**Pattern de mock :**
+- Tous les tests controllers mockent `../../models/index` avec les 22 modèles (y compris les 6 nouveaux M-03)
+- `jest.mock` du service concerné uniquement ; les autres services non importés sont ignorés
+- `makeToken({ id: 1 })` via `jwt.sign` avec `AUTH_JWT_SECRET = 'test-secret'`
+- Tests 409 : `const err = new Error(); err.name = 'SequelizeForeignKeyConstraintError'; service.deleteOccurrence.mockRejectedValue(err)`
+
+**Ce qui est couvert :**
+- Cas nominal 200/201
+- Validation express-validator : champs manquants, format HH:MM, endTime ≤ startTime, role invalide
+- 401 sans token (Auth.middleware)
+- 403 retour `false` du service (droits insuffisants)
+- 404 retour `null` du service (not found)
+- 409 sur contrainte FK RESTRICT (CalendarEvent deleteOccurrence)
+- 500 sur `throw` du service
+- Logique métier service : admin check, ownership check, génération occurrences
+
+**Hypothèses posées :**
+- Le service `RevisionSession.update` appelle `session.update(data)` mais retourne l'objet session (non muté par Jest). L'assertion est sur `toHaveBeenCalledWith` + `toBeTruthy()` pour éviter une fausse négative sur le nom.
+
+**Dette / points d'attention :**
+- Pas de tests pour `Deadline.service.js` — les tests de service couvrent CalendarEvent et RevisionSession ; Deadline service est couvert indirectement par les tests controller.

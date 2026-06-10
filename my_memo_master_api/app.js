@@ -33,6 +33,10 @@ const gradingRoutes = require("./routes/Grading.routes");
 const semanticRoutes = require("./routes/Semantic.routes");
 const onboardingStateRoutes = require("./routes/OnboardingState.routes");
 const storageRoutes = require("./routes/Storage.routes");
+const classGroupRoutes = require("./routes/ClassGroup.routes");
+const revisionSessionRoutes = require("./routes/RevisionSession.routes");
+const calendarEventRoutes = require("./routes/CalendarEvent.routes");
+const deadlineRoutes = require("./routes/Deadline.routes");
 const { startFifoCron } = require('./jobs/fifo.cron');
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
@@ -107,6 +111,10 @@ gradingRoutes(v1);
 semanticRoutes(v1);
 onboardingStateRoutes(v1);
 storageRoutes(v1);
+classGroupRoutes(v1);
+revisionSessionRoutes(v1);
+calendarEventRoutes(v1);
+deadlineRoutes(v1);
 app.use('/api/v1', v1);
 
 // ... Autres middlewares
