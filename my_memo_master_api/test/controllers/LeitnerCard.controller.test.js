@@ -18,6 +18,8 @@ jest.mock('../../services/LeitnerCard.service', () => ({
   updateCard: jest.fn(),
   correctResponse: jest.fn(),
   deleteCard: jest.fn(),
+  getCardSystem: jest.fn(),
+  resolveUserRights: jest.fn(),
 }));
 
 process.env.AUTH_JWT_SECRET = 'test-secret';
@@ -38,7 +40,12 @@ const makeToken = (payload = { id: 1, rights: true }) =>
 const mockCard = { idCard: 1, idQuestion: 1, idBox: 1 };
 
 describe('LeitnerCard Controller', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // updateCard et deleteCard appellent ces deux méthodes avant d'agir
+    leitnerCardService.getCardSystem.mockResolvedValue(1);
+    leitnerCardService.resolveUserRights.mockResolvedValue({ canAdd: true, canEdit: true, canDelete: true });
+  });
 
   // ── GET /leitnercards/due/:systemId ────────────────────────────────────────
   describe('GET /leitnercards/due/:systemId', () => {
@@ -145,7 +152,7 @@ describe('LeitnerCard Controller', () => {
       const res = await request(app)
         .post(`${BASE}/leitnercards`)
         .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ idQuestion: 1 });
+        .send({ idQuestion: 1, idSystem: 1 });
 
       expect(res.status).toBe(201);
       expect(leitnerCardService.addCard).toHaveBeenCalledTimes(1);
@@ -184,7 +191,7 @@ describe('LeitnerCard Controller', () => {
       const res = await request(app)
         .post(`${BASE}/leitnercards`)
         .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ idQuestion: 1 });
+        .send({ idQuestion: 1, idSystem: 1 });
 
       expect(res.status).toBe(403);
     });

@@ -50,7 +50,7 @@ describe("QuestionService", () => {
     const questions = await QuestionService.getQuestionsByTest(testId);
 
     expect(Question.findAll).toHaveBeenCalledWith({
-      include: [{ model: Test, where: { idTest: testId } }],
+      include: [{ model: Test, as: "test", where: { testId: testId } }],
     });
     expect(questions).toEqual(mockQuestions);
   });
@@ -63,7 +63,7 @@ describe("QuestionService", () => {
     const question = await QuestionService.getQuestionByCard(cardId);
 
     expect(Question.findOne).toHaveBeenCalledWith({
-      include: [{ model: LeitnerCard, where: { idCard: cardId } }],
+      include: [{ model: LeitnerCard, as: "leitnerCard", where: { idCard: cardId } }],
     });
     expect(question).toEqual(mockQuestion);
   });

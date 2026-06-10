@@ -120,7 +120,7 @@ describe('Response Controller', () => {
 
   // ── POST /responses ────────────────────────────────────────────────────────
   describe('POST /responses', () => {
-    const validBody = { content: 'Paris', correction: true, questionId: 1 };
+    const validBody = { content: 'Paris', correction: true, idQuestion: 1 };
 
     it('201 — crée une réponse', async () => {
       responseService.create.mockResolvedValue(mockResponse);
