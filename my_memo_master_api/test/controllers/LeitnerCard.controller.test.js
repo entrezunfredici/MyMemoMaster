@@ -186,7 +186,9 @@ describe('LeitnerCard Controller', () => {
     });
 
     it('403 — le service refuse (droits insuffisants)', async () => {
-      leitnerCardService.addCard.mockRejectedValue(new Error('Droits insuffisants'));
+      const err = new Error('Droits insuffisants');
+      err.statusCode = 403;
+      leitnerCardService.addCard.mockRejectedValue(err);
 
       const res = await request(app)
         .post(`${BASE}/leitnercards`)

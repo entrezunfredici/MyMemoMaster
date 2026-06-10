@@ -39,7 +39,10 @@ exports.addCard = async (req, res) => {
     res.status(201).json(card);
   } catch (error) {
     logger.error(error?.message || error);
-    res.status(403).json({ message: error.message });
+    if (error.statusCode === 403) {
+      return res.status(403).json({ message: error.message });
+    }
+    res.status(500).json({ message: "Erreur lors de l'ajout de la carte." });
   }
 };
 

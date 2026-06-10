@@ -69,7 +69,9 @@ class LeitnerCardService {
    */
   async addCard(data, userRights) {
     if (!userRights.canAdd) {
-      throw new Error("Droits insuffisants pour ajouter une carte.");
+      const err = new Error("Droits insuffisants pour ajouter une carte.");
+      err.statusCode = 403;
+      throw err;
     }
 
     const box = await LeitnerBox.findOne({ where: { level: 1, idSystem: data.idSystem } });
