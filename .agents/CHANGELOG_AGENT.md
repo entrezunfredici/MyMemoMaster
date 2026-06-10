@@ -36,6 +36,7 @@
 | Kpi | Stable (lecture seule) | init |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
+| Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
 | Tests intégration API (Supertest) | Stable — M-00.13 : 424 tests total (+4 GET /onboardingState/byUserId) | 2026-06-06 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
@@ -833,3 +834,28 @@
 - `addCard` controller : le catch renvoie 403 avec `error.message` pour toutes les erreurs. Si le service lève une erreur DB inattendue, le message Sequelize serait exposé en 403 plutôt qu'en 500. À refactorer dans un ticket dédié.
 - `loadSystemStats` store : catch silencieux par système — voulu (les stats ne bloquent pas l'UI).
 - Intervalles des boîtes en secondes (dev) — à passer en jours avant prod (déjà documenté dans DECISIONS.md).
+
+---
+
+### [M-01.13] — Documentation algo et règles métier Leitner — 2026-06-10
+
+**Fichiers créés :**
+- `diagrams/leitner_algo.md` — documentation complète de l'algorithme Leitner implémenté
+
+**Ce qui est couvert :**
+- Vue d'ensemble du système (5 boîtes, progression/régression)
+- Structure des données (LeitnerSystem, LeitnerBox, LeitnerCard, champs de révision)
+- Algorithme de progression : bonne réponse → boîte + 1 (plafond 5), mauvaise → boîte 1
+- Calcul de `next_review_at` : `dayjs().add(intervall, "second")`, table dev vs prod
+- Correction sémantique IA : embeddings NLP, score, decision_zone
+- Règles de session : démarrage, déroulement, abandon (progression déjà soumise conservée)
+- Historique : review_count / correct_count / incorrect_count / last_review_at (cumulatif, pas de log par révision)
+- Droits d'accès : propriétaire → droits complets, partagé → selon LeitnerSystemsUsers, non-membre → 403
+- Cas limites : boîte 5 plafonnée, carte sans réponse correcte, session vide, nouvelle carte
+
+**Hypothèses posées :**
+- Le document décrit l'algorithme tel qu'implémenté au 2026-06-10 — à mettre à jour si les règles changent.
+- Les valeurs prod recommandées (1j/3j/7j/14j/30j) sont des recommandations, non des valeurs par défaut codées.
+
+**Dette / points d'attention :**
+- Pas de table de log par révision en MVP — si un historique détaillé est nécessaire (analytics, courbe de progression), il faudra une nouvelle entité `RevisionLog`.
