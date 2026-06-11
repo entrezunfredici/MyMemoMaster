@@ -75,6 +75,7 @@
 - Mind map editor
 - Système d'exercices / tests
 - Docker Compose (API + Front + PostgreSQL + PgAdmin + Traefik)
+- Infrastructure Docker server compose + CI Node 22 + backup + runbook — M-00b.01 — 2026-06-11
 
 **Modules partiellement implémentés :**
 - Tests unitaires (dossier `test/` présent, couverture à compléter — les 4 nouvelles entités M-03 sont couvertes)
@@ -1022,3 +1023,34 @@
 
 **Dette / points d'attention :**
 - Pas de tests pour `Deadline.service.js` — les tests de service couvrent CalendarEvent et RevisionSession ; Deadline service est couvert indirectement par les tests controller.
+
+---
+
+### [M-00b.01] — Infrastructure Docker (Dockerfiles, CI/CD, backup, runbook) — 2026-06-11
+
+**Fichiers créés :**
+- `server_docker_compose/docker-compose.yml` — compose VPS (services: postgres, pgadmin, api, front) avec images DockerHub, Traefik HTTPS Let's Encrypt, réseau traefik_proxy externe ; correspond exactement aux noms de services attendus par le pipeline CD
+- `server_docker_compose/.env.example` — template pour le `.env` VPS (prod/preprod) ; validé par `docker compose config -q` dans le pipeline CD
+- `scripts/backup.sh` — pg_dump avec timestamp, rétention configurable (défaut 7 jours), recherche dynamique du conteneur postgres par réseau Docker
+- `docs/RUNBOOK.md` — documentation d'exploitation complète : premier déploiement, mise à jour, rollback, logs, backup/restauration, cron, variables critiques, PgAdmin
+
+**Fichiers modifiés :**
+- `my_memo_master_front/Dockerfile` — `node:20-alpine` → `node:22-alpine` (alignement CONVENTIONS.md)
+- `.github/workflows/ci.yml` — `node-version: 20` → `22` (alignement avec runtime réel)
+
+**Ce qui est utilisable :**
+- Pipeline CD : l'étape "Validate server docker-compose" passe maintenant (le dossier `server_docker_compose/` n'existait pas)
+- `scripts/backup.sh` : utilisable directement ou via cron, s'adapte à prod/preprod via `ENVIRONMENT`
+- `docs/RUNBOOK.md` : référence complète pour l'exploitation quotidienne
+- Build front Docker en Node 22 (cohérent avec l'API et les conventions)
+- Tests CI en Node 22 (cohérent avec les Dockerfiles)
+
+**Hypothèses posées :**
+- Le VPS dispose d'un Traefik déjà en cours avec certresolver `letsencrypt` sur l'entrypoint `websecure` (port 443) — le runbook documente ce prérequis
+- Les noms d'images DockerHub dans `server_docker_compose/.env.example` sont `fredissimo/mymemomaster_api:latest` / `fredissimo/mymemomaster_front:latest` — à adapter si le nom d'organisation DockerHub change
+- `server_docker_compose/server_proxy/` reste exclu du dépôt (`.gitignore`) — c'est le répertoire de configuration locale du Traefik sur le VPS
+
+**Dette / points d'attention :**
+- Les images de base (`node:22-alpine`, `nginx:stable-alpine`) présentent des vulnérabilités CVE signalées par le scanner Docker IDE — inhérentes aux images publiques, à surveiller et mettre à jour quand des images corrigées sont publiées
+- Le `backup.sh` utilise `pg_dump -Fc` (format custom) — la restauration nécessite `pg_restore`, pas un simple `psql < dump.sql`
+- Migrations et seeds après premier déploiement sont manuelles (voir RUNBOOK) — automatisation possible dans un ticket dédié via un service `db-sync` (commenté dans cd.yml)

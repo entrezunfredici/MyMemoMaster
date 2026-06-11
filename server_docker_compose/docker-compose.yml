@@ -1,23 +1,24 @@
 # =============================================================================
-#  MyMemoMaster — docker-compose.yml (unified)
+#  MyMemoMaster — server_docker_compose/docker-compose.yml
 #
-#  Usage:
-#    Dev local : docker compose --env-file .env.dev  up --build
-#    Test VPS  : docker compose --env-file .env.test up
-#    Prod  VPS : docker compose --env-file .env.prod up
+#  Fichier déployé sur le VPS par le pipeline CD.
+#  À utiliser avec le fichier .env du serveur (copier .env.example → .env).
 #
-#  Profiles (défini via COMPOSE_PROFILES dans le .env.*) :
-#    dev  — Traefik local HTTP, build depuis les sources, hot-reload API
-#    test — Images DockerHub, Traefik externe HTTPS, domaines de test
-#    prod — Images DockerHub, Traefik externe HTTPS, domaines de prod
+#  Usage VPS :
+#    docker compose --env-file .env pull
+#    docker compose --env-file .env up -d postgres
+#    docker compose --env-file .env up -d pgadmin api front
 #
-#  Kubernetes (preprod/prod) : voir k8s/ — docker-compose non utilisé
+#  Prérequis VPS :
+#    - Réseau Docker "traefik_proxy" existant (Traefik déjà en cours)
+#    - Certificats Let's Encrypt gérés par Traefik (certresolver=letsencrypt)
+#    - Variables .env renseignées (copier .env.example → .env et remplir)
 # =============================================================================
 
 services:
 
   # ═══════════════════════════════════════════════════════════════════════════
-  #  BASE — démarré dans tous les environnements (aucun profil)
+  #  Base de données PostgreSQL
   # ═══════════════════════════════════════════════════════════════════════════
 
   postgres:
@@ -44,154 +45,13 @@ services:
           memory: ${POSTGRES_RESERVE_MEMORY:-256M}
     networks:
       - mmm_network
+    restart: unless-stopped
 
   # ═══════════════════════════════════════════════════════════════════════════
-  #  DEV — machine locale, HTTP, images buildées localement
-  #  Commande : docker compose --env-file .env.dev up --build
-  #  Note : le front ne supporte pas le hot-reload (image nginx).
-  #         Pour modifier le front, relancer : docker compose ... build front && up -d front
+  #  PgAdmin — interface d'administration PostgreSQL
   # ═══════════════════════════════════════════════════════════════════════════
-
-  traefik:
-    profiles: ["dev"]
-    image: traefik:v2.10
-    ports:
-      - "80:80"
-      - "8080:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command:
-      - --api.insecure=true
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
-    deploy:
-      resources:
-        limits:
-          cpus: ${TRAEFIK_LIMIT_CPUS:-0.25}
-          memory: ${TRAEFIK_LIMIT_MEMORY:-256M}
-        reservations:
-          cpus: ${TRAEFIK_RESERVE_CPUS:-0.10}
-          memory: ${TRAEFIK_RESERVE_MEMORY:-64M}
-    networks:
-      - mmm_network
 
   pgadmin:
-    profiles: ["dev"]
-    image: dpage/pgadmin4:8
-    ports:
-      - "${PGADMIN_PORT:-5051}:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: ${PGADMIN_LIMIT_CPUS:-0.25}
-          memory: ${PGADMIN_LIMIT_MEMORY:-256M}
-        reservations:
-          cpus: ${PGADMIN_RESERVE_CPUS:-0.10}
-          memory: ${PGADMIN_RESERVE_MEMORY:-64M}
-    networks:
-      - mmm_network
-
-  api:
-    profiles: ["dev"]
-    image: ${IMAGE_API}
-    build:
-      context: ./my_memo_master_api
-      dockerfile: Dockerfile
-    volumes:
-      - ./my_memo_master_api:/app
-      - api-node-modules:/app/node_modules
-    environment:
-      NODE_ENV: development
-      API_PORT: ${API_PORT:-3000}
-      PG_HOST: postgres
-      PG_PORT: ${PG_PORT:-5432}
-      PG_USER: ${PG_USER}
-      PG_PASS: ${PG_PASS}
-      PG_DB: ${PG_DB}
-      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
-      AUTH_JWT_EXPIRES_IN: ${AUTH_JWT_EXPIRES_IN:-1d}
-      API_BYPASS_AUTH: ${API_BYPASS_AUTH:-false}
-      API_PUBLIC_URL: http://${API_DOMAIN}
-      CORS_ORIGIN: ${VITE_FRONT_URL}
-      EMAIL_FROM: ${EMAIL_FROM}
-      EMAIL_USER: ${EMAIL_USER}
-      EMAIL_PASS: ${EMAIL_PASS}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: ${API_LIMIT_CPUS:-0.50}
-          memory: ${API_LIMIT_MEMORY:-512M}
-        reservations:
-          cpus: ${API_RESERVE_CPUS:-0.25}
-          memory: ${API_RESERVE_MEMORY:-128M}
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.mmm-api.rule=Host(`${API_DOMAIN}`) && PathPrefix(`/api`)
-      - traefik.http.routers.mmm-api.entrypoints=web
-      - traefik.http.services.mmm-api.loadbalancer.server.port=${API_PORT:-3000}
-    networks:
-      - mmm_network
-    restart: on-failure
-
-  front:
-    profiles: ["dev"]
-    image: ${IMAGE_FRONT}
-    build:
-      context: ./my_memo_master_front
-      dockerfile: Dockerfile
-      args:
-        VITE_APP_NAME: ${VITE_APP_NAME}
-        VITE_APP_COMPANY_NAME: ${VITE_APP_COMPANY_NAME}
-        VITE_APP_AUTHOR_NAME: ${VITE_APP_AUTHOR_NAME}
-        VITE_APP_DESCRIPTION: ${VITE_APP_DESCRIPTION}
-        VITE_APP_THEME_COLOR: ${VITE_APP_THEME_COLOR}
-        VITE_APP_BG_COLOR: ${VITE_APP_BG_COLOR}
-        VITE_FRONT_URL: ${VITE_FRONT_URL}
-        VITE_API_URL: ${VITE_API_URL}
-    depends_on:
-      - api
-    deploy:
-      resources:
-        limits:
-          cpus: ${FRONT_LIMIT_CPUS:-0.25}
-          memory: ${FRONT_LIMIT_MEMORY:-256M}
-        reservations:
-          cpus: ${FRONT_RESERVE_CPUS:-0.10}
-          memory: ${FRONT_RESERVE_MEMORY:-64M}
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.mmm-front.rule=Host(`${FRONT_DOMAIN}`)
-      - traefik.http.routers.mmm-front.entrypoints=web
-      - traefik.http.services.mmm-front.loadbalancer.server.port=80
-    networks:
-      - mmm_network
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
-      interval: 30s
-      timeout: 3s
-      start_period: 5s
-      retries: 3
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  #  TEST / PROD VPS — images DockerHub, Traefik externe, HTTPS Let's Encrypt
-  #  Commande : docker compose --env-file .env.test up
-  #  Prérequis VPS : réseau Docker "traefik_proxy" existant (Traefik déjà lancé)
-  # ═══════════════════════════════════════════════════════════════════════════
-
-  pgadmin_server:
-    profiles: ["test", "prod"]
     image: dpage/pgadmin4:8
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
@@ -219,9 +79,13 @@ services:
     networks:
       - mmm_network
       - traefik_proxy
+    restart: unless-stopped
 
-  api_server:
-    profiles: ["test", "prod"]
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  API Node.js — image tirée de DockerHub
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  api:
     image: ${IMAGE_API}
     volumes:
       - api-data:/app/data
@@ -267,11 +131,14 @@ services:
       - traefik_proxy
     restart: unless-stopped
 
-  front_server:
-    profiles: ["test", "prod"]
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  Frontend Vue 3 — image nginx tirée de DockerHub
+  #  La commande injecte window.__APP_CONFIG__ au runtime pour permettre
+  #  de déployer la même image sur plusieurs environnements sans rebuild.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  front:
     image: ${IMAGE_FRONT}
-    # Injection runtime de la config : permet de déployer la même image sur
-    # plusieurs environnements sans rebuild. L'app lit window.__APP_CONFIG__.
     command:
       - /bin/sh
       - -c
@@ -288,7 +155,7 @@ services:
         fi
         exec nginx -g 'daemon off;'
     depends_on:
-      - api_server
+      - api
     deploy:
       resources:
         limits:
@@ -323,8 +190,7 @@ networks:
   mmm_network:
     name: my_memo_master_${ENVIRONMENT}_network
     driver: bridge
-  # Réseau externe géré par Traefik sur le VPS (test/prod uniquement)
-  # En dev, ce réseau n'est pas utilisé → pas besoin qu'il existe localement
+  # Réseau externe géré par Traefik sur le VPS (doit exister avant le déploiement)
   traefik_proxy:
     external: true
 
@@ -335,5 +201,4 @@ networks:
 volumes:
   postgres-data:
   pgadmin-data:
-  api-node-modules:
   api-data:
