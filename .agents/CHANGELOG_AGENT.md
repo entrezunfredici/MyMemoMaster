@@ -76,6 +76,9 @@
 - Système d'exercices / tests
 - Docker Compose (API + Front + PostgreSQL + PgAdmin + Traefik)
 - Infrastructure Docker server compose + CI Node 22 + backup + runbook — M-00b.01 — 2026-06-11
+- Traefik HTTPS + HSTS + redirect HTTP→HTTPS via labels Docker Compose — M-00b.03 — 2026-06-12
+- Scripts + config automatisation HTTPS (VPS setup-traefik.sh + k8s setup.sh + cert-manager + doc) — 2026-06-12
+- Pipeline CI complet (lint + tests + build front) — M-00b.04 — 2026-06-12
 
 **Modules partiellement implémentés :**
 - Tests unitaires (dossier `test/` présent, couverture à compléter — les 4 nouvelles entités M-03 sont couvertes)
@@ -1054,3 +1057,50 @@
 - Les images de base (`node:22-alpine`, `nginx:stable-alpine`) présentent des vulnérabilités CVE signalées par le scanner Docker IDE — inhérentes aux images publiques, à surveiller et mettre à jour quand des images corrigées sont publiées
 - Le `backup.sh` utilise `pg_dump -Fc` (format custom) — la restauration nécessite `pg_restore`, pas un simple `psql < dump.sql`
 - Migrations et seeds après premier déploiement sont manuelles (voir RUNBOOK) — automatisation possible dans un ticket dédié via un service `db-sync` (commenté dans cd.yml)
+- ~~HSTS et redirect HTTP→HTTPS absents~~ — Résolu dans M-00b.03
+
+---
+
+### [M-00b.04] — Pipeline CI (lint, tests, build) — 2026-06-12
+
+**Fichiers modifiés :**
+- `.github/workflows/ci.yml` — ajout step `Build` (conditionnel `matrix.service == 'front'`) : `npm run build` après lint, détecte les erreurs Vite sur toutes les branches
+
+**Ce qui est couvert (pipeline complet) :**
+- `npm run test` — API + front, sur toutes les branches feature/dev/main
+- `npm run lint` — API + front
+- `npm run build` — front uniquement (l'API n'a pas de build Vite/transpile)
+- Matrix dynamique : branches `dev_back_*` → API seulement ; `dev_front_*` → front seulement ; `main`/`dev` → les deux
+
+**Hypothèses posées :**
+- L'API (Express) n'a pas d'étape de build — le step est conditionné à `matrix.service == 'front'` uniquement.
+- `npm run build` utilise `vite build` (déjà défini dans `my_memo_master_front/package.json`).
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [M-00b.03] — Configuration Traefik HTTPS + HSTS — 2026-06-12
+
+**Fichiers modifiés :**
+- `server_docker_compose/docker-compose.yml` — ajout middlewares HSTS + redirect HTTP→HTTPS sur les 3 services (pgadmin, api, front) via labels Traefik
+- `docker-compose.yml` — idem sur les services test/prod (pgadmin_server, api_server, front_server)
+- `docs/RUNBOOK.md` — prérequis Traefik mis à jour : entrypoint `web:80` requis en plus de `websecure:443`
+
+**Ce qui est configuré :**
+- Middleware `mmm-${ENVIRONMENT}-hsts` : `stsSeconds=63072000` (2 ans), `stsIncludeSubdomains=true`, `stsPreload=true` — appliqué sur tous les routers HTTPS
+- Middleware `mmm-${ENVIRONMENT}-https-redirect` : redirect permanente (301) HTTP → HTTPS — appliqué sur les nouveaux routers HTTP (entrypoint `web`)
+- Les middlewares sont définis sur le service `api` et réutilisés par les services `front` et `pgadmin`
+- Noms d'environnement inclus (`mmm-${ENVIRONMENT}-*`) — prod et preprod coexistent sur le même Traefik sans conflit
+
+**Approche retenue :**
+- Configuration 100 % dynamique via labels Docker Compose — aucune modification de la config statique Traefik sur le VPS requise
+- Déployé automatiquement par le pipeline CD à chaque push sur `main` / `dev`
+
+**Hypothèses posées :**
+- Le Traefik sur le VPS expose un entrypoint `web` sur le port 80 (standard Traefik v2/v3) — documenté dans RUNBOOK.md comme prérequis
+
+**Dette / points d'attention :**
+- HSTS avec `stsPreload=true` est un engagement fort : une fois activé sur un domaine, il est difficile à révoquer (2 ans côté navigateur). Ne pas activer si le domaine peut passer en HTTP un jour.
+- Le middleware HSTS est appliqué à l'API également — les clients non-navigateur (Postman, scripts curl) ne sont pas impactés par HSTS (ignoré en dehors des navigateurs).

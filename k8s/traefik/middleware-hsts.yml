@@ -1,0 +1,31 @@
+# =============================================================================
+#  Middleware Traefik — HSTS + redirect HTTP → HTTPS
+#  Namespace : mymemomaster
+#
+#  Ces middlewares sont référencés par les Ingress dans app/ingress.yml.
+# =============================================================================
+
+# ── HSTS ──────────────────────────────────────────────────────────────────────
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: hsts
+  namespace: mymemomaster
+spec:
+  headers:
+    stsSeconds: 63072000          # 2 ans
+    stsIncludeSubdomains: true
+    stsPreload: true
+
+---
+
+# ── Redirect HTTP → HTTPS ─────────────────────────────────────────────────────
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirect
+  namespace: mymemomaster
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true

@@ -59,6 +59,11 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run lint
 
+      - name: Build
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run build
+
   # sonar_analysis:
   #   name: Run SonarQube Analysis
   #   runs-on: ubuntu-latest

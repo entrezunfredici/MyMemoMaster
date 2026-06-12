@@ -11,7 +11,11 @@
 - Traefik en cours d'exécution avec le réseau externe `traefik_proxy` :
   ```sh
   docker network create traefik_proxy
-  # Traefik doit être configuré avec certresolver=letsencrypt et entrypoint websecure:443
+  # Traefik doit exposer deux entrypoints :
+  #   web      → port 80  (HTTP — requis pour la redirection automatique vers HTTPS)
+  #   websecure → port 443 (HTTPS — avec certresolver=letsencrypt)
+  # La redirection HTTP→HTTPS et les headers HSTS sont configurés via les labels
+  # Docker Compose du projet — aucune modification de la config Traefik statique requise.
   ```
 - DNS configurés : `FRONT_DOMAIN`, `API_DOMAIN`, `PGADMIN_DOMAIN` → IP du VPS
 

@@ -74,6 +74,10 @@ services:
       - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)
       - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin.entrypoints=websecure
       - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin.tls.certresolver=letsencrypt
+      - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin.middlewares=mmm-${ENVIRONMENT}-hsts
+      - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin-http.rule=Host(`${PGADMIN_DOMAIN}`)
+      - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin-http.entrypoints=web
+      - traefik.http.routers.mmm-${ENVIRONMENT}-pgadmin-http.middlewares=mmm-${ENVIRONMENT}-https-redirect
       - traefik.http.services.mmm-${ENVIRONMENT}-pgadmin.loadbalancer.server.port=80
       - traefik.docker.network=traefik_proxy
     networks:
@@ -121,9 +125,21 @@ services:
           memory: ${API_RESERVE_MEMORY:-128M}
     labels:
       - traefik.enable=true
+      # Middlewares — définis une fois sur l'API, réutilisables par tous les services
+      - traefik.http.middlewares.mmm-${ENVIRONMENT}-https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.mmm-${ENVIRONMENT}-https-redirect.redirectscheme.permanent=true
+      - traefik.http.middlewares.mmm-${ENVIRONMENT}-hsts.headers.stsSeconds=63072000
+      - traefik.http.middlewares.mmm-${ENVIRONMENT}-hsts.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.mmm-${ENVIRONMENT}-hsts.headers.stsPreload=true
+      # Router HTTPS
       - traefik.http.routers.mmm-${ENVIRONMENT}-api.rule=Host(`${API_DOMAIN}`)
       - traefik.http.routers.mmm-${ENVIRONMENT}-api.entrypoints=websecure
       - traefik.http.routers.mmm-${ENVIRONMENT}-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.mmm-${ENVIRONMENT}-api.middlewares=mmm-${ENVIRONMENT}-hsts
+      # Router HTTP → redirect HTTPS
+      - traefik.http.routers.mmm-${ENVIRONMENT}-api-http.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.mmm-${ENVIRONMENT}-api-http.entrypoints=web
+      - traefik.http.routers.mmm-${ENVIRONMENT}-api-http.middlewares=mmm-${ENVIRONMENT}-https-redirect
       - traefik.http.services.mmm-${ENVIRONMENT}-api.loadbalancer.server.port=${API_PORT:-3000}
       - traefik.docker.network=traefik_proxy
     networks:
@@ -169,6 +185,10 @@ services:
       - traefik.http.routers.mmm-${ENVIRONMENT}-front.rule=Host(`${FRONT_DOMAIN}`)
       - traefik.http.routers.mmm-${ENVIRONMENT}-front.entrypoints=websecure
       - traefik.http.routers.mmm-${ENVIRONMENT}-front.tls.certresolver=letsencrypt
+      - traefik.http.routers.mmm-${ENVIRONMENT}-front.middlewares=mmm-${ENVIRONMENT}-hsts
+      - traefik.http.routers.mmm-${ENVIRONMENT}-front-http.rule=Host(`${FRONT_DOMAIN}`)
+      - traefik.http.routers.mmm-${ENVIRONMENT}-front-http.entrypoints=web
+      - traefik.http.routers.mmm-${ENVIRONMENT}-front-http.middlewares=mmm-${ENVIRONMENT}-https-redirect
       - traefik.http.services.mmm-${ENVIRONMENT}-front.loadbalancer.server.port=80
       - traefik.docker.network=traefik_proxy
     networks:

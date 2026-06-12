@@ -1,0 +1,76 @@
+# =============================================================================
+#  MyMemoMaster — Traefik (reverse proxy VPS)
+#
+#  Fichier indépendant du projet — à déployer une seule fois sur le VPS,
+#  avant de lancer le compose applicatif (server_docker_compose/docker-compose.yml).
+#
+#  Usage :
+#    1. cp .env.example .env && nano .env   # renseigner LETSENCRYPT_EMAIL au minimum
+#    2. docker network create traefik_proxy  # si pas encore créé
+#    3. docker compose --env-file .env up -d
+#
+#  Vérification :
+#    docker compose --env-file .env ps
+#    docker compose --env-file .env logs traefik
+# =============================================================================
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-letsencrypt:/letsencrypt
+    command:
+      # ── Providers ──────────────────────────────────────────────────────────
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=traefik_proxy
+
+      # ── Entrypoints ────────────────────────────────────────────────────────
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+
+      # ── Let's Encrypt (HTTP-01 challenge via entrypoint web:80) ────────────
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+
+      # ── Logs ───────────────────────────────────────────────────────────────
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+
+      # ── Dashboard (désactivé par défaut) ───────────────────────────────────
+      - --api.dashboard=${TRAEFIK_DASHBOARD:-false}
+
+    labels:
+      - traefik.enable=true
+      # Dashboard (activer via TRAEFIK_DASHBOARD=true + TRAEFIK_DASHBOARD_DOMAIN)
+      - traefik.http.routers.traefik-dashboard.rule=Host(`${TRAEFIK_DASHBOARD_DOMAIN:-traefik.localhost}`)
+      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+      - traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.traefik-dashboard.service=api@internal
+      - traefik.http.routers.traefik-dashboard.middlewares=traefik-auth
+      # Générer le hash : echo $(htpasswd -nB admin) | sed -e s/\\$/\\$\\$/g
+      - traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH:-admin:$$2y$$10$$disabled}
+
+    networks:
+      - traefik_proxy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  traefik-letsencrypt:
+    name: traefik_letsencrypt
+
+networks:
+  traefik_proxy:
+    external: true
