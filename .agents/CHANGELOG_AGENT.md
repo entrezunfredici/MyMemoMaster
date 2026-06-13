@@ -41,13 +41,13 @@
 | ClassGroup / ClassGroupUsers | Stable — CRUD complet + gestion membres, droits admin | 2026-06-10 |
 | CalendarEvent / EventOccurrence | Stable — CRUD complet + récurrence auto/manual, protection RESTRICT | 2026-06-10 |
 | Deadline | Stable — CRUD complet, droits enseignant par groupe | 2026-06-10 |
-| RevisionSession | Stable — CRUD complet + GET /today (todo list) | 2026-06-10 |
+| RevisionSession | Stable — CRUD + liens optionnels idSystem/idTest + bouton Planifier depuis FlashcardsPage | 2026-06-13 |
 | Reminder (rappels BullMQ) | Stable — CRUD complet, queue Redis, worker email | 2026-06-12 |
 | ESLint / Prettier (front + back) | Stable — configs alignées, CI lint vert | 2026-06-13 |
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
-| Tests intégration API (Supertest) | Stable — M-03.05 : 639 tests total (33 nouveaux pour Reminder) | 2026-06-12 |
+| Tests intégration API (Supertest) | Stable — M-03.08 : 645 tests total (6 nouveaux pour RevisionSession markDone) | 2026-06-13 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
@@ -60,11 +60,11 @@
 | Jobs (fifo.cron.js) | Stable | init |
 | Front — Auth (login, register) | Stable | init |
 | Front — HomePage | Stable | init |
-| Front — FlashcardsPage | Stable — CRUD systèmes, MenuItemComponent, stats via cardStore.loadSystemStats | 2026-06-08 |
+| Front — FlashcardsPage | Stable — bouton "+ Planifier" par système → crée une RevisionSession liée via idSystem | 2026-06-13 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable | init |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
-| Front — CalendarPage | Stable — M-03.07 : vue calendrier interactif complète + agenda latéral priorisé via API Planning | 2026-06-13 |
+| Front — CalendarPage | Stable — M-03.07/M-03.08 : calendrier interactif + sidebar onglets Agenda/To-do | 2026-06-13 |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
@@ -1226,6 +1226,60 @@
 
 **Dette / points d'attention :**
 - Aucune dette nouvelle introduite.
+
+---
+
+### [M-03.08] — Liste to-do (tri, filtre, marquage) — 2026-06-13
+
+**Fichiers créés (API) :**
+- `migrations/20260613000001-add-is-done-to-revision-session.js` — ajoute `isDone BOOLEAN NOT NULL DEFAULT FALSE` sur la table `RevisionSession`
+
+**Fichiers modifiés (API) :**
+- `models/RevisionSession.model.js` — champ `isDone` (BOOLEAN, default false) + index sur `isDone`
+- `services/RevisionSession.service.js` — méthode `markDone(id, userId, isDone)` : findOne ownership + update
+- `controllers/RevisionSession.controller.js` — handler `markDone` : 200/404/500
+- `validators/RevisionSession.validators.js` — règle `markDone` : `isDone` booléen requis
+- `routes/RevisionSession.routes.js` — `PUT /:id/done` avec authMiddleware + validator + JSDoc Swagger
+- `test/controllers/RevisionSession.controller.test.js` — 6 nouveaux tests (200 done/undone, 400 invalid, 404, 401, 500)
+
+**Fichiers créés (front) :**
+- `src/components/TodoWidget.vue` — composant réutilisable to-do list :
+  - 4 onglets : À faire / Aujourd'hui / À venir / Terminé avec compteurs
+  - Items mixtes : RevisionSessions (avec checkbox) + Deadlines (informatif, sans checkbox)
+  - Checkbox personnalisée : coche verte, nom barré quand terminé
+  - `toggle(item)` appelle `revisionStore.markDone(id, !isDone)` → mise à jour optimiste dans le store
+  - Tri par date+heure dans chaque onglet
+- `src/pages/TodoPage.vue` — page dédiée mobile : charge sessions + deadlines au montage, affiche TodoWidget plein écran
+
+**Fichiers modifiés (front) :**
+- `src/stores/revisionSessions.js` — action `markDone(id, isDone)` : `PUT revision-sessions/:id/done`, met à jour `sessions` et `todaySessions` en place
+- `src/pages/CalendarPage.vue` — sidebar augmentée avec onglets "Agenda" / "To-do" ; l'onglet To-do affiche TodoWidget ; import `TodoWidget`
+- `src/router/routes.js` — route `/todo` (name: `todo`, private: true) → TodoPage.vue
+
+**Ce qui est utilisable :**
+- `PUT /api/v1/revision-sessions/:id/done` — `{ isDone: true|false }` — bascule l'état terminé (ownership vérifié)
+- `GET /todo` (front) — page To-do dédiée (mobile) : 4 onglets, filtrage client-side, marquage inline
+- Sur le CalendarPage (desktop) : onglet "To-do" dans la sidebar pour accéder au même widget sans quitter le calendrier
+- Les deadlines apparaissent dans la to-do liste comme éléments informatifs (non cochables)
+
+**Onglet À faire** : séances non terminées (toutes dates) + deadlines du jour et à venir
+**Onglet Aujourd'hui** : items dont la date = aujourd'hui (sessions + deadlines)
+**Onglet À venir** : sessions non terminées avec date > aujourd'hui + deadlines futures
+**Onglet Terminé** : sessions avec `isDone = true`
+
+**Hypothèses posées :**
+- Les deadlines ne peuvent pas être "marquées comme terminées" — elles représentent des échéances fixes imposées par un enseignant, non des tâches personnelles. Seules les RevisionSessions (créées par l'étudiant) sont cochables.
+- `isDone` est persisté en base via le nouvel endpoint ; il n'est pas réinitialisé automatiquement. Si une séance est terminée mais que l'étudiant recrée le même travail, il doit créer une nouvelle séance.
+- La mise à jour du store après `markDone` est faite en place (remplacement de l'objet dans `sessions` et `todaySessions`) pour éviter un rechargement complet.
+
+**Migration à jouer en prod :**
+```
+npx sequelize-cli db:migrate --migration 20260613000001-add-is-done-to-revision-session.js
+```
+
+**Dette / points d'attention :**
+- Pas de tests Vitest pour TodoWidget ni TodoPage — cohérent avec la dette front déjà documentée.
+- Le filtre "À faire" inclut les séances avec date passée non cochées (séances oubliées) — comportement voulu pour ne pas perdre d'items.
 
 ---
 

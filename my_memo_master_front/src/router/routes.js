@@ -99,6 +99,15 @@ const routes = [
     }
   },
   {
+    path: '/todo',
+    name: 'todo',
+    component: () => import('../pages/TodoPage.vue'),
+    meta: {
+      title: 'To-do',
+      private: true
+    }
+  },
+  {
     path: '/profile',
     name: 'profile',
     component: () => import('../pages/ProfilePage.vue'),

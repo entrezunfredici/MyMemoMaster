@@ -207,6 +207,28 @@
 
     <!-- ────────── Agenda latéral ────────── -->
     <aside class="cal-agenda">
+      <!-- Onglets Agenda / To-do -->
+      <div class="sidebar-tabs">
+        <button
+          class="sidebar-tab"
+          :class="{ active: sidebarTab === 'agenda' }"
+          @click="sidebarTab = 'agenda'"
+        >Agenda</button>
+        <button
+          class="sidebar-tab"
+          :class="{ active: sidebarTab === 'todo' }"
+          @click="sidebarTab = 'todo'"
+        >To-do</button>
+      </div>
+
+      <!-- Contenu To-do -->
+      <template v-if="sidebarTab === 'todo'">
+        <TodoWidget />
+      </template>
+
+      <!-- Contenu Agenda -->
+      <template v-else>
+
       <!-- En retard -->
       <div v-if="!loading && planningStore.priorities.overdue.length > 0" class="agenda-section">
         <h4 class="agenda-title agenda-title--overdue">En retard</h4>
@@ -278,6 +300,8 @@
           <span>Révision</span>
         </div>
       </div>
+
+      </template>
     </aside>
   </div>
 </template>
@@ -290,6 +314,7 @@ import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useDeadlineStore } from '@/stores/deadlines'
 import { usePlanningStore } from '@/stores/planning'
 import ReminderWidget from '@/components/ReminderWidget.vue'
+import TodoWidget from '@/components/TodoWidget.vue'
 
 /* ── Stores ── */
 const calendarStore = useCalendarEventStore()
@@ -317,6 +342,7 @@ const DAYS_SHORT = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
 /* ── État ── */
 const today = new Date()
 const view = ref('month')
+const sidebarTab = ref('agenda')
 const currentYear = ref(today.getFullYear())
 const currentMonth = ref(today.getMonth())
 const loading = ref(false)
@@ -774,6 +800,33 @@ const trailingDays = computed(() => {
 .event-pill--revision {
   background: rgba(22, 163, 74, 0.1);
   color: #16a34a;
+}
+
+/* ── Onglets sidebar ── */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 0.5px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.15s;
+  border-bottom: 2px solid transparent;
+}
+
+.sidebar-tab.active {
+  color: #1a1aff;
+  border-bottom-color: #1a1aff;
 }
 
 /* ── Agenda latéral ── */

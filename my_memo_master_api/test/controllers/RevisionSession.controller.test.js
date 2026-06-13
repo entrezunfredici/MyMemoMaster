@@ -33,6 +33,7 @@ jest.mock('../../services/RevisionSession.service', () => ({
   findOne: jest.fn(),
   create: jest.fn(),
   update: jest.fn(),
+  markDone: jest.fn(),
   delete: jest.fn()
 }))
 
@@ -325,6 +326,75 @@ describe('RevisionSession Controller', () => {
       const res = await request(app)
         .delete(`${BASE}/revision-sessions/1`)
         .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(500)
+    })
+  })
+
+  // ── PUT /revision-sessions/:id/done ──────────────────────────────────────────
+  describe('PUT /revision-sessions/:id/done', () => {
+    const mockDone = { id: 1, name: 'Révision maths', isDone: true, date: '2026-06-15', startTime: '09:00', endTime: '11:00', userId: 1 }
+
+    it('200 — marque la séance comme terminée', async () => {
+      revisionSessionService.markDone.mockResolvedValue(mockDone)
+
+      const res = await request(app)
+        .put(`${BASE}/revision-sessions/1/done`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ isDone: true })
+
+      expect(res.status).toBe(200)
+      expect(res.body.data.isDone).toBe(true)
+    })
+
+    it('200 — démarque la séance (isDone: false)', async () => {
+      revisionSessionService.markDone.mockResolvedValue({ ...mockDone, isDone: false })
+
+      const res = await request(app)
+        .put(`${BASE}/revision-sessions/1/done`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ isDone: false })
+
+      expect(res.status).toBe(200)
+      expect(res.body.data.isDone).toBe(false)
+    })
+
+    it('400 — isDone absent ou non booléen', async () => {
+      const res = await request(app)
+        .put(`${BASE}/revision-sessions/1/done`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ isDone: 'oui' })
+
+      expect(res.status).toBe(400)
+      expect(revisionSessionService.markDone).not.toHaveBeenCalled()
+    })
+
+    it('404 — séance introuvable ou non propriétaire', async () => {
+      revisionSessionService.markDone.mockResolvedValue(null)
+
+      const res = await request(app)
+        .put(`${BASE}/revision-sessions/99/done`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ isDone: true })
+
+      expect(res.status).toBe(404)
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app)
+        .put(`${BASE}/revision-sessions/1/done`)
+        .send({ isDone: true })
+
+      expect(res.status).toBe(401)
+    })
+
+    it('500 — le service échoue', async () => {
+      revisionSessionService.markDone.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .put(`${BASE}/revision-sessions/1/done`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ isDone: true })
 
       expect(res.status).toBe(500)
     })

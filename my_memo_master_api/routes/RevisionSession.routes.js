@@ -137,6 +137,46 @@ router.post('/', authMiddleware, revisionSessionValidators.create, validate, rev
  *       500:
  *         description: Erreur serveur.
  */
+/**
+ * @swagger
+ * /revision-sessions/{id}/done:
+ *   put:
+ *     summary: Marquer une séance comme terminée ou non terminée
+ *     tags: [RevisionSession]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [isDone]
+ *             properties:
+ *               isDone:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Séance mise à jour.
+ *       400:
+ *         description: Données invalides.
+ *       404:
+ *         description: Séance introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.put(
+  '/:id/done',
+  authMiddleware,
+  revisionSessionValidators.markDone,
+  validate,
+  revisionSession.markDone
+)
+
 router.put(
   '/:id',
   authMiddleware,

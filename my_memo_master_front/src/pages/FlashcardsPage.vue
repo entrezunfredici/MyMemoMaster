@@ -54,12 +54,20 @@
                 </div>
               </div>
             </div>
-            <button
-              @click.stop="router.push({ name: 'flashcards.cards', params: { systemId: system.idSystem } })"
-              class="mt-3 text-sm text-primary hover:underline font-medium"
-            >
-              Gérer les cartes →
-            </button>
+            <div class="mt-3 flex gap-3">
+              <button
+                @click.stop="router.push({ name: 'flashcards.cards', params: { systemId: system.idSystem } })"
+                class="text-sm text-primary hover:underline font-medium"
+              >
+                Gérer les cartes →
+              </button>
+              <button
+                @click.stop="openPlanModal(system)"
+                class="text-sm text-green-600 hover:underline font-medium"
+              >
+                + Planifier
+              </button>
+            </div>
           </div>
         </template>
       </MenuItem>
@@ -119,6 +127,90 @@
       </div>
     </div>
 
+  <!-- Modal planification de session -->
+  <div
+    v-if="showPlanModal"
+    class="fixed inset-0 flex items-center justify-center z-50"
+    style="background-color: rgba(0,0,0,0.5)"
+    @click="closePlanModal"
+  >
+    <div
+      class="rounded-lg shadow-xl p-8 w-full max-w-md relative"
+      style="background-color: white"
+      @click.stop
+    >
+      <button
+        @click="closePlanModal"
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl leading-none font-bold"
+      >&times;</button>
+
+      <h2 class="text-xl font-bold mb-1 text-heading">Planifier une session</h2>
+      <p class="text-sm text-gray-500 mb-6">Système : <span class="font-semibold text-primary">{{ planningSystem?.name }}</span></p>
+
+      <form @submit.prevent="submitPlanForm">
+        <div class="mb-4">
+          <label class="block text-sm font-semibold text-heading mb-2">Nom de la session</label>
+          <input
+            v-model="planForm.name"
+            type="text"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            required
+          />
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-semibold text-heading mb-2">Date</label>
+          <input
+            v-model="planForm.date"
+            type="date"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            required
+          />
+        </div>
+
+        <div class="flex gap-4 mb-6">
+          <div class="flex-1">
+            <label class="block text-sm font-semibold text-heading mb-2">Heure de début</label>
+            <input
+              v-model="planForm.startTime"
+              type="time"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+          <div class="flex-1">
+            <label class="block text-sm font-semibold text-heading mb-2">Heure de fin</label>
+            <input
+              v-model="planForm.endTime"
+              type="time"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+        </div>
+
+        <p v-if="planError" class="text-red-600 text-sm mb-4">{{ planError }}</p>
+
+        <div class="flex gap-4">
+          <button
+            type="submit"
+            :disabled="submittingPlan"
+            class="flex-1 bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+          >
+            {{ submittingPlan ? 'Enregistrement...' : 'Planifier' }}
+          </button>
+          <button
+            type="button"
+            @click="closePlanModal"
+            class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition"
+          >
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   </div>
 </template>
 
@@ -129,17 +221,56 @@ import MenuItem from '@/components/MenuItemComponent.vue'
 import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
 import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
+import { useRevisionSessionStore } from '@/stores/revisionSessions'
 
 const router = useRouter()
 const systemStore = useLeitnerSystemStore()
 const cardStore = useLeitnerCardStore()
 const boxStore = useLeitnerBoxStore()
+const sessionStore = useRevisionSessionStore()
 
 const loading = ref(true)
 const showModal = ref(false)
 const submitting = ref(false)
 const editingId = ref(null)
 const form = reactive({ name: '' })
+
+// --- Planification de session ---
+const showPlanModal = ref(false)
+const planningSystem = ref(null)
+const submittingPlan = ref(false)
+const planError = ref('')
+const planForm = reactive({ name: '', date: '', startTime: '', endTime: '' })
+
+const openPlanModal = (system) => {
+  planningSystem.value = system
+  planForm.name = system.name
+  planForm.date = ''
+  planForm.startTime = ''
+  planForm.endTime = ''
+  planError.value = ''
+  showPlanModal.value = true
+}
+
+const closePlanModal = () => {
+  showPlanModal.value = false
+  planningSystem.value = null
+}
+
+const submitPlanForm = async () => {
+  submittingPlan.value = true
+  planError.value = ''
+  const ok = await sessionStore.createSession({
+    name: planForm.name,
+    date: planForm.date,
+    startTime: planForm.startTime,
+    endTime: planForm.endTime,
+    idSystem: planningSystem.value.idSystem
+  })
+  submittingPlan.value = false
+  if (ok) closePlanModal()
+  else planError.value = 'Erreur lors de la création de la session.'
+}
 
 const loadStats = async () => {
   if (systemStore.systems.length > 0) {

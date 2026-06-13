@@ -30,6 +30,11 @@ module.exports = (instance) => {
         type: DataTypes.TIME,
         allowNull: false
       },
+      isDone: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
       userId: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -39,12 +44,38 @@ module.exports = (instance) => {
         },
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE'
+      },
+      idSystem: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'LeitnerSystem',
+          key: 'idSystem'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
+      },
+      idTest: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'Test',
+          key: 'testId'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
       }
     },
     {
       tableName: 'RevisionSession',
       timestamps: false,
-      indexes: [{ fields: ['userId'] }, { fields: ['date'] }]
+      indexes: [
+        { fields: ['userId'] },
+        { fields: ['date'] },
+        { fields: ['isDone'] },
+        { fields: ['idSystem'] },
+        { fields: ['idTest'] }
+      ]
     }
   )
 
@@ -52,6 +83,14 @@ module.exports = (instance) => {
     RevisionSession.belongsTo(models.User, {
       foreignKey: 'userId',
       as: 'user'
+    })
+    RevisionSession.belongsTo(models.LeitnerSystem, {
+      foreignKey: 'idSystem',
+      as: 'leitnerSystem'
+    })
+    RevisionSession.belongsTo(models.Test, {
+      foreignKey: 'idTest',
+      as: 'test'
     })
   }
 

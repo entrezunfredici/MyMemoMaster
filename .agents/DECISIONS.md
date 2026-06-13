@@ -27,6 +27,14 @@
 
 ---
 
+### [2026-06-13] Lien optionnel RevisionSession ↔ LeitnerSystem / Test
+**Contexte** : L'utilisateur veut pouvoir planifier des sessions de révision directement depuis un système Leitner ou une série d'exercices.  
+**Décision** : Ajouter deux FK nullable (`idSystem`, `idTest`) à `RevisionSession`. La création est déclenchée manuellement depuis le frontend (bouton "+ Planifier" sur chaque système Leitner). ExercisesPage non connectée à l'API : `idTest` réservé pour quand ce module sera branché.  
+**Alternative écartée** : Cron backend qui crée automatiquement des sessions depuis un champ `nextReviewDate` sur LeitnerSystem — plus puissant mais complexe ; la valeur est déjà accessible via `GET /leitnercards/due/:systemId`.  
+**Conséquences** : Migration `20260613000002` à passer. `findAll`/`findOne` du service incluent désormais `leitnerSystem` et `test` (nom uniquement). Le calendrier et la todo list afficheront le contexte de chaque session.
+
+---
+
 ### [2026-06-03] better-sqlite3 plutôt que sqlite3
 **Contexte** : Le projet avait initialement `sqlite3` comme dépendance. `better-sqlite3` a été introduit pour les performances et l'API synchrone.  
 **Décision** : Utiliser `better-sqlite3` comme driver SQLite principal.  

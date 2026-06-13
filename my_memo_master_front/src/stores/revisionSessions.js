@@ -88,6 +88,27 @@ export const useRevisionSessionStore = defineStore('revisionSessions', {
       }
     },
 
+    async markDone(id, isDone) {
+      try {
+        const resp = await api.put(`revision-sessions/${id}/done`, { isDone })
+        if (resp?.status !== 200) {
+          notif.notify(resp?.data?.message || 'Erreur lors de la mise à jour.', 'error')
+          return false
+        }
+        const updated = resp.data.data
+        const applyUpdate = (list) => {
+          const idx = list.findIndex((s) => s.id === id)
+          if (idx !== -1) list[idx] = updated
+        }
+        applyUpdate(this.sessions)
+        applyUpdate(this.todaySessions)
+        return true
+      } catch {
+        notif.notify('Erreur lors de la mise à jour.', 'error')
+        return false
+      }
+    },
+
     async deleteSession(id) {
       try {
         const resp = await api.del(`revision-sessions/${id}`)

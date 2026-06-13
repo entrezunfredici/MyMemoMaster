@@ -1,5 +1,9 @@
 const { body } = require('express-validator')
 
+exports.markDone = [
+  body('isDone').isBoolean().withMessage('isDone doit être un booléen.')
+]
+
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
 
 exports.create = [
@@ -30,7 +34,9 @@ exports.create = [
         throw new Error("L'heure de fin doit être postérieure à l'heure de début.")
       }
       return true
-    })
+    }),
+  body('idSystem').optional({ nullable: true }).isInt({ min: 1 }).withMessage('idSystem doit être un entier positif.'),
+  body('idTest').optional({ nullable: true }).isInt({ min: 1 }).withMessage('idTest doit être un entier positif.')
 ]
 
 exports.update = [
@@ -57,5 +63,7 @@ exports.update = [
         throw new Error("L'heure de fin doit être postérieure à l'heure de début.")
       }
       return true
-    })
+    }),
+  body('idSystem').optional({ nullable: true }).isInt({ min: 1 }).withMessage('idSystem doit être un entier positif.'),
+  body('idTest').optional({ nullable: true }).isInt({ min: 1 }).withMessage('idTest doit être un entier positif.')
 ]

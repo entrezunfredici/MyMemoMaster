@@ -34,13 +34,15 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, description, date, startTime, endTime } = req.body
+    const { name, description, date, startTime, endTime, idSystem, idTest } = req.body
     const session = await RevisionSessionService.create(req.user.id, {
       name,
       description,
       date,
       startTime,
-      endTime
+      endTime,
+      idSystem: idSystem ?? null,
+      idTest: idTest ?? null
     })
     res.status(201).json({ message: 'Séance de révision créée avec succès.', data: session })
   } catch (error) {
@@ -54,6 +56,17 @@ exports.update = async (req, res) => {
     const session = await RevisionSessionService.update(req.params.id, req.user.id, req.body)
     if (!session) return res.status(404).json({ message: 'Séance introuvable.' })
     res.status(200).json({ message: 'Séance mise à jour avec succès.', data: session })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la mise à jour de la séance.' })
+  }
+}
+
+exports.markDone = async (req, res) => {
+  try {
+    const session = await RevisionSessionService.markDone(req.params.id, req.user.id, req.body.isDone)
+    if (!session) return res.status(404).json({ message: 'Séance introuvable.' })
+    res.status(200).json({ message: 'Séance mise à jour.', data: session })
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).json({ message: 'Erreur lors de la mise à jour de la séance.' })

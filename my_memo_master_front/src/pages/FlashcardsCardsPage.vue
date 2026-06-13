@@ -348,7 +348,7 @@ const handleUpdate = async () => {
   const card = editingCard.value
 
   // Mettre à jour la question
-  const qResp = await api.put(`questions/${card.idQuestion}`, { statement: form.statement })
+  const qResp = await api.put(`questions/edit/${card.idQuestion}`, { statement: form.statement })
   if (!qResp || qResp.status !== 200) {
     formError.value = qResp?.data?.message || 'Erreur lors de la mise à jour de la question.'
     return
@@ -356,7 +356,7 @@ const handleUpdate = async () => {
 
   // Mettre à jour la réponse si elle existe, sinon la créer (carte orpheline)
   if (card.idResponse) {
-    const rResp = await api.put(`responses/${card.idResponse}`, { content: form.answer })
+    const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: form.answer })
     if (!rResp || rResp.status !== 200) {
       formError.value = rResp?.data?.message || 'Erreur lors de la mise à jour de la réponse.'
       return
