@@ -308,6 +308,22 @@
 
 ---
 
+### [2026-06-13] Isolation BullMQ dans les tests (mock total, pas de Redis)
+**Contexte** : Les tests BDD backend (Supertest) et unitaires appellent des services qui initialisent une connexion BullMQ/Redis au require. Lancer ces tests sans un Redis disponible fait échouer tous les imports.
+**Décision** : Mocker `jobs/reminder.queue` et `jobs/reminder.worker` avec `jest.mock(...)` avant tout `require`, en retournant un `mockQueue` en mémoire (`{ add: jest.fn(), getJob: jest.fn() }`). Le mock est défini au niveau module (`const mockQueue = {...}`) pour permettre les assertions (`expect(mockQueue.add).toHaveBeenCalled()`).
+**Alternative écartée** : Redis en mémoire (`ioredis-mock`) — plus fidèle mais plus fragile (couplage à l'implémentation interne de BullMQ) et nécessiterait une dépendance dev supplémentaire.
+**Conséquences** : Les tests BDD vérifient que les jobs sont *planifiés* (mock.add appelé) et *annulés* (mock.getJob + job.remove appelés) mais ne testent pas le comportement réel du worker. C'est acceptable car le worker est testé séparément ou en intégration réelle.
+
+---
+
+### [2026-06-13] vi.hoisted pour les mocks de directives Vue dans Vitest
+**Contexte** : `vi.mock('@/directives/clickOutside.js')` est hoisted en haut du fichier par Vitest. Si la factory référence une variable déclarée avec `const` au-dessus, elle n'est pas encore initialisée → `ReferenceError`.
+**Décision** : Utiliser `vi.hoisted(() => ({ ... }))` pour déclarer les stubs de directives. Cette fonction est exécutée AVANT le hoisting des `vi.mock`, garantissant que la variable est disponible dans la factory.
+**Alternative écartée** : Inline la valeur directement dans la factory (sans variable) — fonctionne mais interdit de réutiliser le stub dans les tests (impossible de vérifier que la directive a été appelée).
+**Conséquences** : Tout mock de module qui référence une variable locale doit déclarer cette variable via `vi.hoisted`. Convention à documenter dans les templates de tests front.
+
+---
+
 ### [2026-06-13] Polling 5 min pour NotificationBellComponent (pas de WebSocket)
 **Contexte** : La cloche de notification doit afficher les rappels en temps quasi-réel pour informer l'utilisateur des rappels bientôt dus ou déjà traités (status sent/failed).
 **Décision** : `setInterval(() => store.fetchReminders(), 5 * 60 * 1000)` dans `onMounted`, nettoyé par `clearInterval` dans `onBeforeUnmount`. Fetch au montage, puis toutes les 5 minutes.

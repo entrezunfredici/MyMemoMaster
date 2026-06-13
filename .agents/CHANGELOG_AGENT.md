@@ -47,10 +47,11 @@
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
-| Tests intégration API (Supertest) | Stable — M-03.08 : 645 tests total (6 nouveaux pour RevisionSession markDone) | 2026-06-13 |
+| Tests intégration API (Supertest) | Stable — M-03.10 : 695 tests total (11 Deadline.service unit + 15 BDD deadline.reminder) | 2026-06-13 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
+| Tests fonctionnels Deadline + Reminder (front) | Stable — M-03.10 : 19 tests TodoWidget + 33 tests NotificationBellComponent (Vitest) | 2026-06-13 |
 | Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
 | Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
@@ -1387,3 +1388,28 @@ Les composants de rappels (`NotificationBellComponent.vue`, `ReminderWidget.vue`
 
 **Dette / points d'attention :**
 - Le CI ne lance pas `prettier --check` — uniquement ESLint. Si un fichier est mal formaté sans erreur ESLint, le CI ne le détecte pas. À ajouter si la rigueur de format est requise en CI.
+
+---
+
+### [M-03.10] — Tests fonctionnels Deadline + Reminder — 2026-06-13
+
+**Fichiers créés :**
+- `my_memo_master_api/test/services/Deadline.service.test.js` — 11 tests unitaires Jest pour DeadlineService (findAll, findOne, create, update, delete). Models Sequelize mockés via `jest.mock('../../models/index')`. Pattern `mockResolvedValueOnce` pour les méthodes qui appellent `findByPk` deux fois (update → findOne en fin).
+- `my_memo_master_api/test/bdd/deadline.reminder.test.js` — 15 tests fonctionnels BDD (Supertest + SQLite in-memory). Flux complet : création données (Role → User → ClassGroup → CalendarEvent → EventOccurrence) → POST /deadlines → GET /deadlines → POST /reminders → GET /reminders → DELETE /reminders. BullMQ entièrement mocké (pas de Redis).
+- `my_memo_master_front/test/components/TodoWidget.test.js` — 19 tests Vitest pour TodoWidget. Stores `revisionSessions` et `deadlines` mockés via `createTestingPinia`. Temps figé via `vi.setSystemTime`. Vérifie filtres par onglet, compteurs, badges type, checkbox, tri par date/heure.
+- `my_memo_master_front/test/components/NotificationBellComponent.test.js` — 33 tests Vitest pour NotificationBellComponent. `v-click-outside` mockée via `vi.hoisted + vi.mock`. Vérifie badge, ouverture/fermeture panneau, liste pending/sent, formatage date, suppression, polling 5 min, nettoyage `clearInterval`.
+
+**Ce qui est utilisable :**
+- `npm test` (back) : 695 tests ✅ (anciennement 645 + 39 + 11)
+- `npm test` (front) : 76 tests ✅ (anciennement 24 + 19 + 33)
+- Couverture M-03.10 : Échéances, Rappels, To-do, Calendrier, Priorisation — tests unitaires + BDD + composants
+
+**Hypothèses posées :**
+- Le type de deadline utilisé dans les tests BDD est `'devoir'` (les types valides sont `['ds', 'devoir', 'exposé', 'autre']` — `'homework'` est invalide).
+- Le champ FK de `EventOccurrence` vers `CalendarEvent` s'appelle `eventId` (pas `calendarEventId`).
+- La directive `v-click-outside` doit être mockée dans les tests Vitest (JSDOM n'a pas de support natif pour les directives custom qui font des event listeners globaux).
+- Le test de formatage "Dans 1h" nécessite `vi.useFakeTimers()` pour figer `Date.now()` — sans cela, le délai calculé peut être 59 min si quelques ms s'écoulent entre `makePendingReminder()` et le rendu.
+
+**Dette / points d'attention :**
+- Les tests BDD ne couvrent pas : PUT /deadlines, DELETE /deadlines, PUT /reminders — à compléter si la couverture doit être exhaustive.
+- Le test "retourne 400 si la date de rappel est déjà passée" suppose que 99999 min > (35 jours = 50400 min) — vrai. Si la deadline devenait > 69 jours, ce test échouerait.
