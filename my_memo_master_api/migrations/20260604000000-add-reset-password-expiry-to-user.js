@@ -1,15 +1,20 @@
 'use strict'
 
-/** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('User', 'resetPasswordCodeExpiresAt', {
-      type: Sequelize.DATE,
-      allowNull: true
-    })
+    const existing = await queryInterface.describeTable('User')
+    if (!existing.resetPasswordCodeExpiresAt) {
+      await queryInterface.addColumn('User', 'resetPasswordCodeExpiresAt', {
+        type: Sequelize.DATE,
+        allowNull: true
+      })
+    }
   },
 
   async down(queryInterface) {
-    await queryInterface.removeColumn('User', 'resetPasswordCodeExpiresAt')
+    const existing = await queryInterface.describeTable('User')
+    if (existing.resetPasswordCodeExpiresAt) {
+      await queryInterface.removeColumn('User', 'resetPasswordCodeExpiresAt')
+    }
   }
 }

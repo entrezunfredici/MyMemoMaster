@@ -1,6 +1,8 @@
 jest.mock('../../models/index', () => ({
   instance: { sync: jest.fn() },
   User: {},
+  LeitnerSystem: {},
+  Test: {},
   RevisionSession: {
     findAll: jest.fn(),
     findOne: jest.fn(),
@@ -24,7 +26,8 @@ const mockSession = {
   endTime: '11:00',
   userId: 1,
   update: jest.fn(),
-  destroy: jest.fn()
+  destroy: jest.fn(),
+  reload: jest.fn().mockResolvedValue({ id: 1, name: 'Révision maths', leitnerSystem: null, test: null })
 }
 
 describe('RevisionSession Service', () => {

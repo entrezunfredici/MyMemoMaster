@@ -1,10 +1,19 @@
 <template>
   <div class="w-full max-w-5xl mx-auto p-6">
 
-    <div class="flex justify-end mb-6">
+    <div class="flex gap-4 items-center mb-6">
+      <div class="relative flex-1 max-w-2xl">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Rechercher un système..."
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        <span class="absolute right-4 top-3.5 text-gray-400">🔍</span>
+      </div>
       <button
         @click="openCreateModal"
-        class="bg-primary hover:bg-primary/90 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg"
+        class="bg-primary hover:bg-primary/90 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg whitespace-nowrap ml-auto"
       >
         + Nouveau système
       </button>
@@ -18,9 +27,13 @@
       Aucun système Leitner trouvé. Créez-en un pour commencer.
     </div>
 
+    <div v-else-if="filteredSystems.length === 0" class="text-center text-gray-light py-10">
+      Aucun système ne correspond à "{{ searchQuery }}".
+    </div>
+
     <div v-else class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <MenuItem
-        v-for="system in systemStore.systems"
+        v-for="system in filteredSystems"
         :key="system.idSystem"
         :title="system.name"
         action-label="Lancer la session"
@@ -215,7 +228,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
@@ -230,10 +243,17 @@ const boxStore = useLeitnerBoxStore()
 const sessionStore = useRevisionSessionStore()
 
 const loading = ref(true)
+const searchQuery = ref('')
 const showModal = ref(false)
 const submitting = ref(false)
 const editingId = ref(null)
 const form = reactive({ name: '' })
+
+const filteredSystems = computed(() => {
+  if (!searchQuery.value.trim()) return systemStore.systems
+  const q = searchQuery.value.toLowerCase()
+  return systemStore.systems.filter(s => s.name?.toLowerCase().includes(q))
+})
 
 // --- Planification de session ---
 const showPlanModal = ref(false)

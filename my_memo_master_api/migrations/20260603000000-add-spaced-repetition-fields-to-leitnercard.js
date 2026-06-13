@@ -1,38 +1,29 @@
 'use strict'
 
-/** @type {import('sequelize-cli').Migration} */
+const COLUMNS = [
+  { name: 'next_review_at', definition: (Sequelize) => ({ type: Sequelize.DATE, allowNull: true }) },
+  { name: 'last_review_at', definition: (Sequelize) => ({ type: Sequelize.DATE, allowNull: true }) },
+  { name: 'review_count',   definition: (Sequelize) => ({ type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 }) },
+  { name: 'correct_count',  definition: (Sequelize) => ({ type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 }) },
+  { name: 'incorrect_count',definition: (Sequelize) => ({ type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 }) },
+]
+
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('LeitnerCard', 'next_review_at', {
-      type: Sequelize.DATE,
-      allowNull: true
-    })
-    await queryInterface.addColumn('LeitnerCard', 'last_review_at', {
-      type: Sequelize.DATE,
-      allowNull: true
-    })
-    await queryInterface.addColumn('LeitnerCard', 'review_count', {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-      defaultValue: 0
-    })
-    await queryInterface.addColumn('LeitnerCard', 'correct_count', {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-      defaultValue: 0
-    })
-    await queryInterface.addColumn('LeitnerCard', 'incorrect_count', {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-      defaultValue: 0
-    })
+    const existing = await queryInterface.describeTable('LeitnerCard')
+    for (const col of COLUMNS) {
+      if (!existing[col.name]) {
+        await queryInterface.addColumn('LeitnerCard', col.name, col.definition(Sequelize))
+      }
+    }
   },
 
   async down(queryInterface) {
-    await queryInterface.removeColumn('LeitnerCard', 'next_review_at')
-    await queryInterface.removeColumn('LeitnerCard', 'last_review_at')
-    await queryInterface.removeColumn('LeitnerCard', 'review_count')
-    await queryInterface.removeColumn('LeitnerCard', 'correct_count')
-    await queryInterface.removeColumn('LeitnerCard', 'incorrect_count')
+    const existing = await queryInterface.describeTable('LeitnerCard')
+    for (const col of COLUMNS) {
+      if (existing[col.name]) {
+        await queryInterface.removeColumn('LeitnerCard', col.name)
+      }
+    }
   }
 }
