@@ -1,7 +1,15 @@
-const dayjs = require("dayjs");
-const { CalendarEvent, EventOccurrence, ClassGroupUsers, User } = require("../models/index");
+const dayjs = require('dayjs')
+const { CalendarEvent, EventOccurrence, ClassGroupUsers, User } = require('../models/index')
 
-const DAY_MAP = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+const DAY_MAP = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6
+}
 
 class CalendarEventService {
   /**
@@ -12,42 +20,44 @@ class CalendarEventService {
    * @returns {{ date: string, startTime: string, endTime: string }[]}
    */
   _generateOccurrences(rule) {
-    const { frequency, days, startDate, endDate, startTime, endTime } = rule;
-    const start = dayjs(startDate);
-    const end = dayjs(endDate);
-    const result = [];
+    const { frequency, days, startDate, endDate, startTime, endTime } = rule
+    const start = dayjs(startDate)
+    const end = dayjs(endDate)
+    const result = []
 
-    if (frequency === "monthly") {
-      let cur = start;
+    if (frequency === 'monthly') {
+      let cur = start
       while (!cur.isAfter(end)) {
-        result.push({ date: cur.format("YYYY-MM-DD"), startTime, endTime });
-        cur = cur.add(1, "month");
+        result.push({ date: cur.format('YYYY-MM-DD'), startTime, endTime })
+        cur = cur.add(1, 'month')
       }
-      return result;
+      return result
     }
 
     // weekly ou biweekly : itération jour par jour
-    const targetDays = (days || []).map((d) => DAY_MAP[d.toLowerCase()]).filter((d) => d !== undefined);
+    const targetDays = (days || [])
+      .map((d) => DAY_MAP[d.toLowerCase()])
+      .filter((d) => d !== undefined)
     // Pour biweekly : référence = début de semaine de startDate
-    const refWeekStart = start.startOf("week");
-    let cur = start;
+    const refWeekStart = start.startOf('week')
+    let cur = start
 
     while (!cur.isAfter(end)) {
       if (targetDays.includes(cur.day())) {
-        if (frequency === "weekly") {
-          result.push({ date: cur.format("YYYY-MM-DD"), startTime, endTime });
+        if (frequency === 'weekly') {
+          result.push({ date: cur.format('YYYY-MM-DD'), startTime, endTime })
         } else {
           // biweekly : inclure uniquement les semaines paires (0, 2, 4...) par rapport à refWeekStart
-          const weekDiff = cur.startOf("week").diff(refWeekStart, "week");
+          const weekDiff = cur.startOf('week').diff(refWeekStart, 'week')
           if (weekDiff % 2 === 0) {
-            result.push({ date: cur.format("YYYY-MM-DD"), startTime, endTime });
+            result.push({ date: cur.format('YYYY-MM-DD'), startTime, endTime })
           }
         }
       }
-      cur = cur.add(1, "day");
+      cur = cur.add(1, 'day')
     }
 
-    return result;
+    return result
   }
 
   /**
@@ -57,8 +67,8 @@ class CalendarEventService {
    * @returns {Promise<boolean>}
    */
   async _isAdmin(userId) {
-    const user = await User.findByPk(userId, { attributes: ["roleId"] });
-    return user?.roleId === 1;
+    const user = await User.findByPk(userId, { attributes: ['roleId'] })
+    return user?.roleId === 1
   }
 
   /**
@@ -68,8 +78,8 @@ class CalendarEventService {
    * @returns {Promise<number[]>}
    */
   async _getUserGroupIds(userId) {
-    const memberships = await ClassGroupUsers.findAll({ where: { userId } });
-    return memberships.map((m) => m.classGroupId);
+    const memberships = await ClassGroupUsers.findAll({ where: { userId } })
+    return memberships.map((m) => m.classGroupId)
   }
 
   /**
@@ -79,17 +89,17 @@ class CalendarEventService {
    * @returns {Promise<CalendarEvent[]>}
    */
   async findAll(userId) {
-    let groupIds;
+    let groupIds
     if (await this._isAdmin(userId)) {
       // Admin : tous les événements
-      return CalendarEvent.findAll({ include: [{ model: EventOccurrence, as: "occurrences" }] });
+      return CalendarEvent.findAll({ include: [{ model: EventOccurrence, as: 'occurrences' }] })
     }
-    groupIds = await this._getUserGroupIds(userId);
-    if (groupIds.length === 0) return [];
+    groupIds = await this._getUserGroupIds(userId)
+    if (groupIds.length === 0) return []
     return CalendarEvent.findAll({
       where: { classGroupId: groupIds },
-      include: [{ model: EventOccurrence, as: "occurrences" }],
-    });
+      include: [{ model: EventOccurrence, as: 'occurrences' }]
+    })
   }
 
   /**
@@ -100,8 +110,8 @@ class CalendarEventService {
    */
   async findOne(id) {
     return CalendarEvent.findByPk(id, {
-      include: [{ model: EventOccurrence, as: "occurrences", order: [["date", "ASC"]] }],
-    });
+      include: [{ model: EventOccurrence, as: 'occurrences', order: [['date', 'ASC']] }]
+    })
   }
 
   /**
@@ -113,21 +123,35 @@ class CalendarEventService {
    * @returns {Promise<CalendarEvent|false>} false si droits insuffisants
    */
   async create(userId, data) {
-    if (!(await this._isAdmin(userId))) return false;
+    if (!(await this._isAdmin(userId))) return false
 
-    const { name, description, type, classGroupId, recurrenceMode, recurrenceRule, occurrences } = data;
-    const event = await CalendarEvent.create({ name, description, type, classGroupId, createdBy: userId, recurrenceMode, recurrenceRule });
+    const { name, description, type, classGroupId, recurrenceMode, recurrenceRule, occurrences } =
+      data
+    const event = await CalendarEvent.create({
+      name,
+      description,
+      type,
+      classGroupId,
+      createdBy: userId,
+      recurrenceMode,
+      recurrenceRule
+    })
 
     const occurrencesToInsert =
-      recurrenceMode === "auto"
+      recurrenceMode === 'auto'
         ? this._generateOccurrences(recurrenceRule).map((o) => ({ ...o, eventId: event.id }))
-        : (occurrences || []).map((o) => ({ date: o.date, startTime: o.startTime, endTime: o.endTime, eventId: event.id }));
+        : (occurrences || []).map((o) => ({
+            date: o.date,
+            startTime: o.startTime,
+            endTime: o.endTime,
+            eventId: event.id
+          }))
 
     if (occurrencesToInsert.length > 0) {
-      await EventOccurrence.bulkCreate(occurrencesToInsert);
+      await EventOccurrence.bulkCreate(occurrencesToInsert)
     }
 
-    return this.findOne(event.id);
+    return this.findOne(event.id)
   }
 
   /**
@@ -139,11 +163,11 @@ class CalendarEventService {
    * @returns {Promise<CalendarEvent|null|false>}
    */
   async update(id, userId, data) {
-    if (!(await this._isAdmin(userId))) return false;
-    const event = await CalendarEvent.findByPk(id);
-    if (!event) return null;
-    await event.update({ name: data.name, description: data.description, type: data.type });
-    return this.findOne(id);
+    if (!(await this._isAdmin(userId))) return false
+    const event = await CalendarEvent.findByPk(id)
+    if (!event) return null
+    await event.update({ name: data.name, description: data.description, type: data.type })
+    return this.findOne(id)
   }
 
   /**
@@ -154,11 +178,11 @@ class CalendarEventService {
    * @returns {Promise<boolean|null|false>}
    */
   async delete(id, userId) {
-    if (!(await this._isAdmin(userId))) return false;
-    const event = await CalendarEvent.findByPk(id);
-    if (!event) return null;
-    await event.destroy();
-    return true;
+    if (!(await this._isAdmin(userId))) return false
+    const event = await CalendarEvent.findByPk(id)
+    if (!event) return null
+    await event.destroy()
+    return true
   }
 
   /**
@@ -170,10 +194,10 @@ class CalendarEventService {
    * @returns {Promise<EventOccurrence|null|false>}
    */
   async addOccurrence(eventId, userId, data) {
-    if (!(await this._isAdmin(userId))) return false;
-    const event = await CalendarEvent.findByPk(eventId);
-    if (!event) return null;
-    return EventOccurrence.create({ ...data, eventId });
+    if (!(await this._isAdmin(userId))) return false
+    const event = await CalendarEvent.findByPk(eventId)
+    if (!event) return null
+    return EventOccurrence.create({ ...data, eventId })
   }
 
   /**
@@ -186,12 +210,12 @@ class CalendarEventService {
    * @throws {Error} si des Deadlines sont liées à cette occurrence
    */
   async deleteOccurrence(occurrenceId, userId) {
-    if (!(await this._isAdmin(userId))) return false;
-    const occurrence = await EventOccurrence.findByPk(occurrenceId);
-    if (!occurrence) return null;
-    await occurrence.destroy();
-    return true;
+    if (!(await this._isAdmin(userId))) return false
+    const occurrence = await EventOccurrence.findByPk(occurrenceId)
+    if (!occurrence) return null
+    await occurrence.destroy()
+    return true
   }
 }
 
-module.exports = new CalendarEventService();
+module.exports = new CalendarEventService()

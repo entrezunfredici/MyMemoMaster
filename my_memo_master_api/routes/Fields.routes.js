@@ -1,9 +1,9 @@
-const express = require("express");
-const fieldController = require("../controllers/Fields.controller.js");
-const validate = require("../middlewares/validate.middleware");
-const fieldsValidators = require("../validators/Fields.validators");
+const express = require('express')
+const fieldController = require('../controllers/Fields.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const fieldsValidators = require('../validators/Fields.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -37,7 +37,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/", fieldController.findAll);
+router.get('/', fieldController.findAll)
 
 /**
  * @swagger
@@ -61,7 +61,7 @@ router.get("/", fieldController.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", fieldController.findOne);
+router.get('/:id', fieldController.findOne)
 
 /**
  * @swagger
@@ -94,7 +94,7 @@ router.get("/:id", fieldController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/", fieldsValidators.create, validate, fieldController.create);
+router.post('/', fieldsValidators.create, validate, fieldController.create)
 
 /**
  * @swagger
@@ -134,7 +134,7 @@ router.post("/", fieldsValidators.create, validate, fieldController.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", fieldsValidators.update, validate, fieldController.update);
+router.put('/:id', fieldsValidators.update, validate, fieldController.update)
 
 /**
  * @swagger
@@ -158,7 +158,7 @@ router.put("/:id", fieldsValidators.update, validate, fieldController.update);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", fieldController.delete);
+router.delete('/:id', fieldController.delete)
 
 module.exports = (app) => {
   /**
@@ -167,5 +167,5 @@ module.exports = (app) => {
    *   name: Fields
    *   description: Gestion des champs
    */
-  app.use("/fields", router);
-};
+  app.use('/fields', router)
+}

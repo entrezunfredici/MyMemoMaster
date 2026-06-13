@@ -1,4 +1,4 @@
-const { Deadline, EventOccurrence, CalendarEvent, ClassGroupUsers } = require("../models/index");
+const { Deadline, EventOccurrence, CalendarEvent, ClassGroupUsers } = require('../models/index')
 
 class DeadlineService {
   /**
@@ -10,13 +10,13 @@ class DeadlineService {
    */
   async _isTeacherForOccurrence(occurrenceId, userId) {
     const occurrence = await EventOccurrence.findByPk(occurrenceId, {
-      include: [{ model: CalendarEvent, as: "calendarEvent", attributes: ["classGroupId"] }],
-    });
-    if (!occurrence) return false;
+      include: [{ model: CalendarEvent, as: 'calendarEvent', attributes: ['classGroupId'] }]
+    })
+    if (!occurrence) return false
     const membership = await ClassGroupUsers.findOne({
-      where: { classGroupId: occurrence.calendarEvent.classGroupId, userId, role: "teacher" },
-    });
-    return !!membership;
+      where: { classGroupId: occurrence.calendarEvent.classGroupId, userId, role: 'teacher' }
+    })
+    return !!membership
   }
 
   /**
@@ -26,8 +26,8 @@ class DeadlineService {
    * @returns {Promise<number[]>}
    */
   async _getUserGroupIds(userId) {
-    const memberships = await ClassGroupUsers.findAll({ where: { userId } });
-    return memberships.map((m) => m.classGroupId);
+    const memberships = await ClassGroupUsers.findAll({ where: { userId } })
+    return memberships.map((m) => m.classGroupId)
   }
 
   /**
@@ -37,27 +37,27 @@ class DeadlineService {
    * @returns {Promise<Deadline[]>}
    */
   async findAll(userId) {
-    const groupIds = await this._getUserGroupIds(userId);
-    if (groupIds.length === 0) return [];
+    const groupIds = await this._getUserGroupIds(userId)
+    if (groupIds.length === 0) return []
 
     return Deadline.findAll({
       include: [
         {
           model: EventOccurrence,
-          as: "occurrence",
+          as: 'occurrence',
           required: true,
           include: [
             {
               model: CalendarEvent,
-              as: "calendarEvent",
+              as: 'calendarEvent',
               where: { classGroupId: groupIds },
-              attributes: ["id", "name", "classGroupId"],
-            },
-          ],
-        },
+              attributes: ['id', 'name', 'classGroupId']
+            }
+          ]
+        }
       ],
-      order: [["dueDate", "ASC"]],
-    });
+      order: [['dueDate', 'ASC']]
+    })
   }
 
   /**
@@ -71,11 +71,11 @@ class DeadlineService {
       include: [
         {
           model: EventOccurrence,
-          as: "occurrence",
-          include: [{ model: CalendarEvent, as: "calendarEvent" }],
-        },
-      ],
-    });
+          as: 'occurrence',
+          include: [{ model: CalendarEvent, as: 'calendarEvent' }]
+        }
+      ]
+    })
   }
 
   /**
@@ -86,8 +86,8 @@ class DeadlineService {
    * @returns {Promise<Deadline|false>} false si droits insuffisants
    */
   async create(userId, data) {
-    if (!(await this._isTeacherForOccurrence(data.occurrenceId, userId))) return false;
-    return Deadline.create({ ...data, createdBy: userId });
+    if (!(await this._isTeacherForOccurrence(data.occurrenceId, userId))) return false
+    return Deadline.create({ ...data, createdBy: userId })
   }
 
   /**
@@ -99,11 +99,17 @@ class DeadlineService {
    * @returns {Promise<Deadline|null|false>} null si introuvable, false si non propriétaire
    */
   async update(id, userId, data) {
-    const deadline = await Deadline.findByPk(id);
-    if (!deadline) return null;
-    if (deadline.createdBy !== userId) return false;
-    await deadline.update({ name: data.name, type: data.type, description: data.description, dueDate: data.dueDate, dueTime: data.dueTime });
-    return this.findOne(id);
+    const deadline = await Deadline.findByPk(id)
+    if (!deadline) return null
+    if (deadline.createdBy !== userId) return false
+    await deadline.update({
+      name: data.name,
+      type: data.type,
+      description: data.description,
+      dueDate: data.dueDate,
+      dueTime: data.dueTime
+    })
+    return this.findOne(id)
   }
 
   /**
@@ -114,12 +120,12 @@ class DeadlineService {
    * @returns {Promise<boolean|null|false>}
    */
   async delete(id, userId) {
-    const deadline = await Deadline.findByPk(id);
-    if (!deadline) return null;
-    if (deadline.createdBy !== userId) return false;
-    await deadline.destroy();
-    return true;
+    const deadline = await Deadline.findByPk(id)
+    if (!deadline) return null
+    if (deadline.createdBy !== userId) return false
+    await deadline.destroy()
+    return true
   }
 }
 
-module.exports = new DeadlineService();
+module.exports = new DeadlineService()

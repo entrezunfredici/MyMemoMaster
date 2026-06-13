@@ -1,10 +1,10 @@
-const express = require('express');
-const semantic = require('../controllers/Semantic.controller');
-const validate = require('../middlewares/validate.middleware');
-const gradingValidators = require('../validators/Grading.validators');
+const express = require('express')
+const semantic = require('../controllers/Semantic.controller')
+const validate = require('../middlewares/validate.middleware')
+const gradingValidators = require('../validators/Grading.validators')
 
 module.exports = function (app) {
-  const router = express.Router();
+  const router = express.Router()
 
   /**
    * @swagger
@@ -61,7 +61,7 @@ module.exports = function (app) {
    *       500:
    *         description: Erreur serveur
    */
-  router.post('/semantic', gradingValidators.gradeSemantic, validate, semantic.gradeSemantic);
+  router.post('/semantic', gradingValidators.gradeSemantic, validate, semantic.gradeSemantic)
 
-  app.use('/grading', router);
-};
+  app.use('/grading', router)
+}

@@ -1,9 +1,9 @@
-const express = require("express");
-const router = express.Router();
-const leitnerCardController = require("../controllers/LeitnerCard.controller");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const leitnerCardValidators = require("../validators/LeitnerCard.validators");
+const express = require('express')
+const router = express.Router()
+const leitnerCardController = require('../controllers/LeitnerCard.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const leitnerCardValidators = require('../validators/LeitnerCard.validators')
 
 /**
  * @swagger
@@ -24,7 +24,7 @@ const leitnerCardValidators = require("../validators/LeitnerCard.validators");
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/due/:systemId", authMiddleware, leitnerCardController.getDueCards);
+router.get('/due/:systemId', authMiddleware, leitnerCardController.getDueCards)
 
 /**
  * @swagger
@@ -47,11 +47,7 @@ router.get("/due/:systemId", authMiddleware, leitnerCardController.getDueCards);
  *       500:
  *         description: Erreur serveur.
  */
-router.get(
-  "/leitnerboxes/:leitnerboxid",
-  authMiddleware,
-  leitnerCardController.getCardsByBoxId
-);
+router.get('/leitnerboxes/:leitnerboxid', authMiddleware, leitnerCardController.getCardsByBoxId)
 
 /**
  * @swagger
@@ -74,7 +70,7 @@ router.get(
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", authMiddleware, leitnerCardController.getCardById);
+router.get('/:id', authMiddleware, leitnerCardController.getCardById)
 
 /**
  * @swagger
@@ -98,7 +94,13 @@ router.get("/:id", authMiddleware, leitnerCardController.getCardById);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/", authMiddleware, leitnerCardValidators.addCard, validate, leitnerCardController.addCard);
+router.post(
+  '/',
+  authMiddleware,
+  leitnerCardValidators.addCard,
+  validate,
+  leitnerCardController.addCard
+)
 
 /**
  * @swagger
@@ -134,7 +136,13 @@ router.post("/", authMiddleware, leitnerCardValidators.addCard, validate, leitne
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, leitnerCardValidators.updateCard, validate, leitnerCardController.updateCard);
+router.put(
+  '/:id',
+  authMiddleware,
+  leitnerCardValidators.updateCard,
+  validate,
+  leitnerCardController.updateCard
+)
 
 /**
  * @swagger
@@ -180,7 +188,13 @@ router.put("/:id", authMiddleware, leitnerCardValidators.updateCard, validate, l
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/response", authMiddleware, leitnerCardValidators.correctResponse, validate, leitnerCardController.correctResponse);
+router.post(
+  '/response',
+  authMiddleware,
+  leitnerCardValidators.correctResponse,
+  validate,
+  leitnerCardController.correctResponse
+)
 
 /**
  * @swagger
@@ -203,7 +217,7 @@ router.post("/response", authMiddleware, leitnerCardValidators.correctResponse, 
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", authMiddleware, leitnerCardController.deleteCard);
+router.delete('/:id', authMiddleware, leitnerCardController.deleteCard)
 
 module.exports = (app) => {
   /**
@@ -212,5 +226,5 @@ module.exports = (app) => {
    *   name: LeitnerCards
    *   description: Gestion des cartes de Leitner
    */
-  app.use("/leitnercards", router);
-};
+  app.use('/leitnercards', router)
+}

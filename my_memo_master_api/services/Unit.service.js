@@ -1,33 +1,33 @@
-const { Unit } = require("../models");
+const { Unit } = require('../models')
 
 async function getAllUnits() {
-  return await Unit.findAll();
+  return await Unit.findAll()
 }
 
 async function getUnitById(id) {
-  return await Unit.findByPk(id);
+  return await Unit.findByPk(id)
 }
 
 async function addUnit(data) {
-  return await Unit.create(data);
+  return await Unit.create(data)
 }
 
 async function updateUnit(id, newData) {
-  const unit = await Unit.findByPk(id);
+  const unit = await Unit.findByPk(id)
   if (unit) {
-    await unit.update(newData);
-    return unit;
+    await unit.update(newData)
+    return unit
   }
-  return null;
+  return null
 }
 
 async function deleteUnit(id) {
-  const unit = await Unit.findByPk(id);
+  const unit = await Unit.findByPk(id)
   if (unit) {
-    await unit.destroy();
-    return true;
+    await unit.destroy()
+    return true
   }
-  return false;
+  return false
 }
 
 module.exports = {
@@ -35,5 +35,5 @@ module.exports = {
   getUnitById,
   addUnit,
   updateUnit,
-  deleteUnit,
-};
+  deleteUnit
+}

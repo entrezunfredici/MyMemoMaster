@@ -1,10 +1,10 @@
-const express = require("express");
-const unitController = require("../controllers/Unit.controller");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const unitValidators = require("../validators/Unit.validators");
+const express = require('express')
+const unitController = require('../controllers/Unit.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const unitValidators = require('../validators/Unit.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -18,7 +18,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/", authMiddleware, unitController.getAllUnits);
+router.get('/', authMiddleware, unitController.getAllUnits)
 //router.get("/all", subject.findAll);
 
 /**
@@ -40,7 +40,7 @@ router.get("/", authMiddleware, unitController.getAllUnits);
  *       404:
  *         description: Unité non trouvée.
  */
-router.get("/:id", authMiddleware, unitController.getUnitById);
+router.get('/:id', authMiddleware, unitController.getUnitById)
 
 /**
  * @swagger
@@ -68,7 +68,7 @@ router.get("/:id", authMiddleware, unitController.getUnitById);
  *       201:
  *         description: Unité ajoutée avec succès.
  */
-router.post("/", authMiddleware, unitValidators.create, validate, unitController.addUnit);
+router.post('/', authMiddleware, unitValidators.create, validate, unitController.addUnit)
 
 /**
  * @swagger
@@ -98,7 +98,7 @@ router.post("/", authMiddleware, unitValidators.create, validate, unitController
  *       200:
  *         description: Unité mise à jour avec succès.
  */
-router.put("/:id", authMiddleware, unitValidators.update, validate, unitController.updateUnit);
+router.put('/:id', authMiddleware, unitValidators.update, validate, unitController.updateUnit)
 
 /**
  * @swagger
@@ -117,14 +117,14 @@ router.put("/:id", authMiddleware, unitValidators.update, validate, unitControll
  *       200:
  *         description: Unité supprimée avec succès.
  */
-router.delete("/:id", authMiddleware, unitController.deleteUnit);
+router.delete('/:id', authMiddleware, unitController.deleteUnit)
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   name: Units
-     *   description: Gestion des unités
-     */
-    app.use("/units", router);
-};
+  /**
+   * @swagger
+   * tags:
+   *   name: Units
+   *   description: Gestion des unités
+   */
+  app.use('/units', router)
+}

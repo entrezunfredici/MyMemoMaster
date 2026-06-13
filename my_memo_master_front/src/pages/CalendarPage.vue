@@ -8,6 +8,7 @@
           <button :class="{ active: view === 'year' }" @click="view = 'year'">Année</button>
           <button :class="{ active: view === 'month' }" @click="view = 'month'">Mois</button>
         </div>
+        <button class="add-btn" @click="openCreateModal()" title="Nouvelle séance de révision">+</button>
       </header>
 
       <div class="cal-content">
@@ -81,14 +82,17 @@
                 today: isToday(currentYear, currentMonth, day),
                 weekend: isWeekend(currentYear, currentMonth, day)
               }"
+              @click="openCreateModal(currentYear, currentMonth, day)"
             >
               <div class="day-num">{{ day }}</div>
               <div
                 v-for="(ev, ei) in getEvents(currentYear, currentMonth, day)"
                 :key="ei"
                 class="event-pill"
+                :class="`event-pill--${ev.type}`"
+                @click.stop="openDetail(ev)"
               >
-                {{ ev }}
+                {{ ev.label }}
               </div>
             </div>
 
@@ -100,11 +104,179 @@
         </template>
       </div>
     </main>
+
+    <!-- ────────── Modale création séance ────────── -->
+    <Transition
+      enter-active-class="transition ease-out duration-150"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div v-if="showCreateModal" class="detail-overlay" @click.self="showCreateModal = false">
+        <div class="detail-modal">
+          <div class="detail-modal__header">
+            <div class="detail-modal__meta">
+              <span class="detail-modal__badge detail-modal__badge--revision">Révision</span>
+              <h3 class="detail-modal__title">Nouvelle séance</h3>
+            </div>
+            <button class="detail-modal__close" @click="showCreateModal = false">
+              <XMarkIcon class="size-5" />
+            </button>
+          </div>
+
+          <form class="create-form" @submit.prevent="submitCreate">
+            <div class="create-form__field">
+              <label>Nom <span class="required">*</span></label>
+              <input v-model="createForm.name" type="text" placeholder="Ex: Maths — Chapitre 3" maxlength="150" required />
+            </div>
+
+            <div class="create-form__row">
+              <div class="create-form__field">
+                <label>Date <span class="required">*</span></label>
+                <input v-model="createForm.date" type="date" required />
+              </div>
+            </div>
+
+            <div class="create-form__row">
+              <div class="create-form__field">
+                <label>Début <span class="required">*</span></label>
+                <input v-model="createForm.startTime" type="time" required />
+              </div>
+              <div class="create-form__field">
+                <label>Fin <span class="required">*</span></label>
+                <input v-model="createForm.endTime" type="time" required />
+              </div>
+            </div>
+
+            <div class="create-form__field">
+              <label>Description</label>
+              <textarea v-model="createForm.description" placeholder="Notes optionnelles…" rows="2" maxlength="1000" />
+            </div>
+
+            <div class="create-form__actions">
+              <button type="button" class="btn-cancel" @click="showCreateModal = false">Annuler</button>
+              <button type="submit" class="btn-submit" :disabled="creating">
+                {{ creating ? 'Création…' : 'Créer la séance' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ────────── Modale détail événement ────────── -->
+    <Transition
+      enter-active-class="transition ease-out duration-150"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div v-if="selectedEvent" class="detail-overlay" @click.self="selectedEvent = null">
+        <div class="detail-modal">
+          <!-- En-tête -->
+          <div class="detail-modal__header">
+            <div class="detail-modal__meta">
+              <span class="detail-modal__badge" :class="`detail-modal__badge--${selectedEvent.type}`">
+                {{ typeLabel(selectedEvent.type) }}
+              </span>
+              <h3 class="detail-modal__title">{{ selectedEvent.label }}</h3>
+            </div>
+            <button class="detail-modal__close" @click="selectedEvent = null">
+              <XMarkIcon class="size-5" />
+            </button>
+          </div>
+
+          <!-- Rappels (deadline et revision_session uniquement) -->
+          <div v-if="selectedEvent.type !== 'calendar'" class="detail-modal__body">
+            <p class="detail-modal__section-title">Rappels</p>
+            <ReminderWidget
+              :entity-type="reminderEntityType(selectedEvent.type)"
+              :entity-id="selectedEvent.id"
+            />
+          </div>
+          <div v-else class="detail-modal__body">
+            <p class="detail-modal__info">Les rappels ne sont pas disponibles pour les événements de calendrier.</p>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ────────── Agenda latéral ────────── -->
+    <aside class="cal-agenda">
+      <!-- Aujourd'hui -->
+      <div class="agenda-section">
+        <h4 class="agenda-title">Aujourd'hui</h4>
+        <div v-if="loading" class="agenda-loading">
+          <span class="agenda-spinner" />
+        </div>
+        <template v-else-if="revisionStore.todaySessions.length > 0">
+          <div
+            v-for="s in revisionStore.todaySessions"
+            :key="s.id"
+            class="agenda-item agenda-item--revision"
+          >
+            <span class="agenda-time">{{ s.startTime?.slice(0, 5) }}</span>
+            <span class="agenda-name">{{ s.name }}</span>
+          </div>
+        </template>
+        <p v-else class="agenda-empty">Aucune séance</p>
+      </div>
+
+      <!-- Échéances à venir -->
+      <div class="agenda-section">
+        <h4 class="agenda-title">Échéances (14 j.)</h4>
+        <div v-if="loading" class="agenda-loading">
+          <span class="agenda-spinner" />
+        </div>
+        <template v-else-if="upcomingDeadlines.length > 0">
+          <div
+            v-for="d in upcomingDeadlines"
+            :key="d.id"
+            class="agenda-item agenda-item--deadline"
+          >
+            <span class="agenda-time">{{ formatDate(d.dueDate) }}</span>
+            <span class="agenda-name">{{ d.name }}</span>
+          </div>
+        </template>
+        <p v-else class="agenda-empty">Aucune échéance</p>
+      </div>
+
+      <!-- Légende -->
+      <div class="agenda-section agenda-legend">
+        <h4 class="agenda-title">Légende</h4>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--calendar" />
+          <span>Événement</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--deadline" />
+          <span>Échéance</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--revision" />
+          <span>Révision</span>
+        </div>
+      </div>
+    </aside>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
+import { useCalendarEventStore } from '@/stores/calendarEvents'
+import { useRevisionSessionStore } from '@/stores/revisionSessions'
+import { useDeadlineStore } from '@/stores/deadlines'
+import ReminderWidget from '@/components/ReminderWidget.vue'
+
+/* ── Stores ── */
+const calendarStore = useCalendarEventStore()
+const revisionStore = useRevisionSessionStore()
+const deadlineStore = useDeadlineStore()
 
 /* ── Constantes ── */
 const MONTHS = [
@@ -128,13 +300,101 @@ const today = new Date()
 const view = ref('month')
 const currentYear = ref(today.getFullYear())
 const currentMonth = ref(today.getMonth())
+const loading = ref(false)
+const selectedEvent = ref(null)
 
-/**
- * Dictionnaire d'événements — clé : "YYYY-MM-DD"
- */
-const events = ref({
-  [`${today.getFullYear()}-${String(today.getMonth()).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`]:
-    ['Contrôle math']
+/* ── Création séance ── */
+const showCreateModal = ref(false)
+const creating = ref(false)
+const createForm = ref({ name: '', date: '', startTime: '', endTime: '', description: '' })
+
+function openCreateModal(y, m, d) {
+  createForm.value = {
+    name: '',
+    date: y != null ? `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '',
+    startTime: '',
+    endTime: '',
+    description: '',
+  }
+  showCreateModal.value = true
+}
+
+async function submitCreate() {
+  creating.value = true
+  const payload = {
+    name: createForm.value.name,
+    date: createForm.value.date,
+    startTime: createForm.value.startTime,
+    endTime: createForm.value.endTime,
+    ...(createForm.value.description ? { description: createForm.value.description } : {}),
+  }
+  const ok = await revisionStore.createSession(payload)
+  creating.value = false
+  if (ok) {
+    showCreateModal.value = false
+    if (createForm.value.date === today.toISOString().slice(0, 10)) {
+      revisionStore.fetchTodaySessions()
+    }
+  }
+}
+
+/* ── Chargement ── */
+onMounted(async () => {
+  loading.value = true
+  await Promise.all([
+    calendarStore.fetchEvents(),
+    revisionStore.fetchSessions(),
+    revisionStore.fetchTodaySessions(),
+    deadlineStore.fetchDeadlines(),
+  ])
+  loading.value = false
+})
+
+/* ── Conversion date API (mois 1-indexé) → clé interne (mois 0-indexé) ── */
+function parseDateToKey(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return `${y}-${String(m - 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+/* ── Dictionnaire calculé depuis les stores ── */
+const allEvents = computed(() => {
+  const dict = {}
+  const add = (key, entry) => {
+    if (!dict[key]) dict[key] = []
+    dict[key].push(entry)
+  }
+
+  calendarStore.events.forEach((ev) => {
+    ev.occurrences?.forEach((occ) => {
+      add(parseDateToKey(occ.date), { label: ev.name, type: 'calendar', id: ev.id })
+    })
+  })
+
+  deadlineStore.deadlines.forEach((dl) => {
+    add(parseDateToKey(dl.dueDate), { label: dl.name, type: 'deadline', id: dl.id })
+  })
+
+  revisionStore.sessions.forEach((rs) => {
+    add(parseDateToKey(rs.date), { label: rs.name, type: 'revision', id: rs.id })
+  })
+
+  return dict
+})
+
+/* ── Échéances dans les 14 prochains jours ── */
+const upcomingDeadlines = computed(() => {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const limit = new Date(now)
+  limit.setDate(limit.getDate() + 14)
+  return deadlineStore.deadlines
+    .filter((d) => {
+      const [y, m, day] = d.dueDate.split('-').map(Number)
+      const due = new Date(y, m - 1, day)
+      return due >= now && due <= limit
+    })
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 8)
 })
 
 /* ── Helpers ── */
@@ -161,11 +421,31 @@ function eventKey(y, m, d) {
 }
 
 function hasEvent(y, m, d) {
-  return !!events.value[eventKey(y, m, d)]?.length
+  return !!allEvents.value[eventKey(y, m, d)]?.length
 }
 
 function getEvents(y, m, d) {
-  return events.value[eventKey(y, m, d)] || []
+  return allEvents.value[eventKey(y, m, d)] || []
+}
+
+function formatDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+/* ── Modale détail ── */
+function openDetail(ev) {
+  selectedEvent.value = ev
+}
+
+function typeLabel(type) {
+  if (type === 'deadline') return 'Échéance'
+  if (type === 'revision') return 'Révision'
+  return 'Événement'
+}
+
+function reminderEntityType(type) {
+  return type === 'revision' ? 'revision_session' : type
 }
 
 /* ── Navigation ── */
@@ -210,88 +490,13 @@ const trailingDays = computed(() => {
   border-radius: 16px;
 }
 
-/* ── Sidebar ── */
-.sidebar {
-  width: 52px;
-  background: #ffffff;
-  border-right: 0.5px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px 0;
-  flex-shrink: 0;
-}
-
-.sidebar__logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: #1a1aff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-  flex-shrink: 0;
-}
-
-.sidebar__logo svg {
-  width: 20px;
-  height: 20px;
-}
-.sidebar__logo--sm {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
-.sidebar__nav {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.sidebar__bottom {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding-bottom: 8px;
-}
-
-.nav-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #94a3b8;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-
-.nav-icon svg {
-  width: 18px;
-  height: 18px;
-}
-.nav-icon:hover,
-.nav-icon.active {
-  background: #eff6ff;
-  color: #1a1aff;
-}
-
 /* ── Main ── */
 .cal-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
 }
 
 .cal-header {
@@ -529,16 +734,402 @@ const trailingDays = computed(() => {
   color: #ffffff;
 }
 
+/* Pills d'événements colorées par type */
 .event-pill {
   font-size: 11px;
-  background: rgba(26, 26, 255, 0.1);
-  color: #1a1aff;
   border-radius: 4px;
   padding: 2px 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 500;
+}
+
+.event-pill--calendar {
+  background: rgba(26, 26, 255, 0.1);
+  color: #1a1aff;
+}
+
+.event-pill--deadline {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.event-pill--revision {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+/* ── Agenda latéral ── */
+.cal-agenda {
+  width: 220px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-left: 0.5px solid #e2e8f0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.agenda-section {
+  padding: 14px 14px 12px;
+  border-bottom: 0.5px solid #f1f5f9;
+}
+
+.agenda-legend {
+  margin-top: auto;
+  border-bottom: none;
+}
+
+.agenda-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin: 0 0 10px;
+}
+
+.agenda-empty {
+  font-size: 12px;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+.agenda-loading {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.agenda-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #1a1aff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agenda-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 0.5px solid #f8fafc;
+}
+
+.agenda-item:first-of-type {
+  border-top: none;
+}
+
+.agenda-time {
+  font-size: 11px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  min-width: 34px;
+  padding-top: 1px;
+}
+
+.agenda-name {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.agenda-item--revision .agenda-name {
+  color: #16a34a;
+}
+
+.agenda-item--deadline .agenda-name {
+  color: #dc2626;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.legend-item span:last-child {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-dot--calendar {
+  background: #1a1aff;
+}
+
+.legend-dot--deadline {
+  background: #dc2626;
+}
+
+.legend-dot--revision {
+  background: #16a34a;
+}
+
+/* ── Modale détail ── */
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.detail-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.detail-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  border-bottom: 0.5px solid #f1f5f9;
+}
+
+.detail-modal__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.detail-modal__badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.detail-modal__badge--deadline {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.detail-modal__badge--revision {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+
+.detail-modal__badge--calendar {
+  background: rgba(26, 26, 255, 0.1);
+  color: #1a1aff;
+}
+
+.detail-modal__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.detail-modal__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 2px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.detail-modal__close:hover {
+  color: #0f172a;
+}
+
+.detail-modal__body {
+  padding: 16px 18px 20px;
+}
+
+.detail-modal__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+  margin: 0 0 12px;
+}
+
+.detail-modal__info {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* pills cliquables */
+.event-pill {
+  cursor: pointer;
+}
+
+.event-pill:hover {
+  filter: brightness(0.92);
+}
+
+/* ── Bouton + ── */
+.add-btn {
+  margin-left: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #1a1aff;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.add-btn:hover {
+  background: #0000cc;
+}
+
+/* ── Cellule jour cliquable ── */
+.month-day-cell {
+  cursor: pointer;
+}
+
+.month-day-cell:hover {
+  background: #f0f0ff;
+}
+
+/* ── Formulaire création ── */
+.create-form {
+  padding: 16px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.create-form__row {
+  display: flex;
+  gap: 12px;
+}
+
+.create-form__row .create-form__field {
+  flex: 1;
+}
+
+.create-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.create-form__field label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+
+.required {
+  color: #dc2626;
+}
+
+.create-form__field input,
+.create-form__field textarea {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+  resize: none;
+}
+
+.create-form__field input:focus,
+.create-form__field textarea:focus {
+  border-color: #1a1aff;
+  background: #fff;
+}
+
+.create-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-cancel {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-cancel:hover {
+  background: #f1f5f9;
+}
+
+.btn-submit {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #1a1aff;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #0000cc;
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* ── Responsive ── */
@@ -548,6 +1139,9 @@ const trailingDays = computed(() => {
   }
   .year-number {
     font-size: 32px;
+  }
+  .cal-agenda {
+    display: none;
   }
 }
 

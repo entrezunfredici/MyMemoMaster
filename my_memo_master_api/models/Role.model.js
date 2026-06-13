@@ -1,35 +1,35 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (instance) => {
   return instance.define(
-    "Role",
+    'Role',
     {
       roleId: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         allowNull: false,
-        primaryKey: true,
+        primaryKey: true
       },
       name: {
         type: DataTypes.STRING(50),
-        allowNull: false,
+        allowNull: false
       },
       updatedAt: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: DataTypes.NOW
       },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-      },
+        defaultValue: DataTypes.NOW
+      }
     },
     {
-      tableName: "Role",
-      updatedAt: "updatedAt",
-      createdAt: "createdAt",
-      timestamps: true,
+      tableName: 'Role',
+      updatedAt: 'updatedAt',
+      createdAt: 'createdAt',
+      timestamps: true
     }
-  );
-};
+  )
+}

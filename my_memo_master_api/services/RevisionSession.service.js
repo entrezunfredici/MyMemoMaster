@@ -1,5 +1,5 @@
-const dayjs = require("dayjs");
-const { RevisionSession } = require("../models/index");
+const dayjs = require('dayjs')
+const { RevisionSession } = require('../models/index')
 
 class RevisionSessionService {
   /**
@@ -9,7 +9,13 @@ class RevisionSessionService {
    * @returns {Promise<RevisionSession[]>}
    */
   async findAll(userId) {
-    return RevisionSession.findAll({ where: { userId }, order: [["date", "ASC"], ["startTime", "ASC"]] });
+    return RevisionSession.findAll({
+      where: { userId },
+      order: [
+        ['date', 'ASC'],
+        ['startTime', 'ASC']
+      ]
+    })
   }
 
   /**
@@ -19,11 +25,11 @@ class RevisionSessionService {
    * @returns {Promise<RevisionSession[]>}
    */
   async findToday(userId) {
-    const today = dayjs().format("YYYY-MM-DD");
+    const today = dayjs().format('YYYY-MM-DD')
     return RevisionSession.findAll({
       where: { userId, date: today },
-      order: [["startTime", "ASC"]],
-    });
+      order: [['startTime', 'ASC']]
+    })
   }
 
   /**
@@ -34,7 +40,7 @@ class RevisionSessionService {
    * @returns {Promise<RevisionSession|null>}
    */
   async findOne(id, userId) {
-    return RevisionSession.findOne({ where: { id, userId } });
+    return RevisionSession.findOne({ where: { id, userId } })
   }
 
   /**
@@ -45,7 +51,7 @@ class RevisionSessionService {
    * @returns {Promise<RevisionSession>}
    */
   async create(userId, data) {
-    return RevisionSession.create({ ...data, userId });
+    return RevisionSession.create({ ...data, userId })
   }
 
   /**
@@ -57,10 +63,10 @@ class RevisionSessionService {
    * @returns {Promise<RevisionSession|null>}
    */
   async update(id, userId, data) {
-    const session = await RevisionSession.findOne({ where: { id, userId } });
-    if (!session) return null;
-    await session.update(data);
-    return session;
+    const session = await RevisionSession.findOne({ where: { id, userId } })
+    if (!session) return null
+    await session.update(data)
+    return session
   }
 
   /**
@@ -71,11 +77,11 @@ class RevisionSessionService {
    * @returns {Promise<boolean>}
    */
   async delete(id, userId) {
-    const session = await RevisionSession.findOne({ where: { id, userId } });
-    if (!session) return false;
-    await session.destroy();
-    return true;
+    const session = await RevisionSession.findOne({ where: { id, userId } })
+    if (!session) return false
+    await session.destroy()
+    return true
   }
 }
 
-module.exports = new RevisionSessionService();
+module.exports = new RevisionSessionService()

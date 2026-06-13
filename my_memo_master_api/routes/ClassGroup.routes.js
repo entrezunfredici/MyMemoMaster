@@ -1,10 +1,10 @@
-const express = require("express");
-const classGroup = require("../controllers/ClassGroup.controller");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const classGroupValidators = require("../validators/ClassGroup.validators");
+const express = require('express')
+const classGroup = require('../controllers/ClassGroup.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const classGroupValidators = require('../validators/ClassGroup.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -20,7 +20,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/", authMiddleware, classGroup.findAll);
+router.get('/', authMiddleware, classGroup.findAll)
 
 /**
  * @swagger
@@ -42,7 +42,7 @@ router.get("/", authMiddleware, classGroup.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", authMiddleware, classGroup.findOne);
+router.get('/:id', authMiddleware, classGroup.findOne)
 
 /**
  * @swagger
@@ -72,7 +72,7 @@ router.get("/:id", authMiddleware, classGroup.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/", authMiddleware, classGroupValidators.create, validate, classGroup.create);
+router.post('/', authMiddleware, classGroupValidators.create, validate, classGroup.create)
 
 /**
  * @swagger
@@ -107,7 +107,7 @@ router.post("/", authMiddleware, classGroupValidators.create, validate, classGro
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, classGroupValidators.update, validate, classGroup.update);
+router.put('/:id', authMiddleware, classGroupValidators.update, validate, classGroup.update)
 
 /**
  * @swagger
@@ -131,7 +131,7 @@ router.put("/:id", authMiddleware, classGroupValidators.update, validate, classG
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", authMiddleware, classGroup.delete);
+router.delete('/:id', authMiddleware, classGroup.delete)
 
 /**
  * @swagger
@@ -170,7 +170,13 @@ router.delete("/:id", authMiddleware, classGroup.delete);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/:id/members", authMiddleware, classGroupValidators.addMember, validate, classGroup.addMember);
+router.post(
+  '/:id/members',
+  authMiddleware,
+  classGroupValidators.addMember,
+  validate,
+  classGroup.addMember
+)
 
 /**
  * @swagger
@@ -199,7 +205,7 @@ router.post("/:id/members", authMiddleware, classGroupValidators.addMember, vali
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id/members/:userId", authMiddleware, classGroup.removeMember);
+router.delete('/:id/members/:userId', authMiddleware, classGroup.removeMember)
 
 module.exports = (app) => {
   /**
@@ -208,5 +214,5 @@ module.exports = (app) => {
    *   name: ClassGroup
    *   description: Gestion des groupes classes
    */
-  app.use("/class-groups", router);
-};
+  app.use('/class-groups', router)
+}

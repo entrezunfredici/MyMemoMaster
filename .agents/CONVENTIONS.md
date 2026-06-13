@@ -34,7 +34,7 @@
 ```
 MyMemoMaster/
 ├── my_memo_master_api/
-│   ├── config/              # db.config.js, dbms.config.js, swagger.config.js
+│   ├── config/              # db.config.js, dbms.config.js, swagger.config.js, redis.config.js
 │   ├── controllers/         # [Entity].controller.js — handlers Express
 │   ├── routes/              # [Entity].routes.js — définitions de routes + JSDoc Swagger
 │   ├── services/            # [Entity].service.js — logique métier
@@ -188,6 +188,7 @@ router.get("/", authMiddleware, entity.findAll);
 | Auth | jsonwebtoken + bcryptjs |
 | Email | nodemailer |
 | Cron | node-cron |
+| Queue/jobs asynchrones | bullmq + ioredis |
 | HTTP client front | axios |
 | Notifications front | vue-toastification |
 | Math front | KaTeX / MathJax |
@@ -198,5 +199,5 @@ router.get("/", authMiddleware, entity.findAll);
 
 - Pas de TypeScript (le projet est en JS pur)
 - Pas de GraphQL
-- Pas de Redis / cache applicatif
+- Redis est utilisé exclusivement comme broker BullMQ (rappels/notifications) — pas de cache applicatif
 - Pas de microservices — architecture monolithique API + front séparés

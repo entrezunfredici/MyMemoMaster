@@ -260,6 +260,30 @@
 
 ---
 
+### [2026-06-12] BullMQ + Redis pour les rappels (vs node-cron polling)
+**Contexte** : Le ticket M-03.05 spécifie explicitement BullMQ pour le système de rappels. L'alternative naturelle (node-cron + polling DB) était disponible sans nouvelle dépendance.
+**Décision** : BullMQ avec Redis comme broker. Chaque rappel génère un job avec un `delay` précis (ms jusqu'à l'heure du rappel). Redis est ajouté à docker-compose et CONVENTIONS.md.
+**Alternative écartée** : node-cron avec polling toutes les N minutes — moins précis (granularité de la fenêtre cron), pas de retry intégré, pas de persistance des jobs entre redémarrages du process.
+**Conséquences** : Redis est désormais une infrastructure requise. CONVENTIONS.md mis à jour ("Redis utilisé exclusivement comme broker BullMQ"). Si Redis est indisponible, les rappels ne sont pas envoyés mais l'API reste fonctionnelle. En cas de redémarrage Redis, les jobs en queue sont perdus (pas de persistance AOF/RDB configurée par défaut).
+
+---
+
+### [2026-06-12] Reminder.entityType polymorphique sans FK en base
+**Contexte** : Les rappels peuvent pointer vers Deadline ou RevisionSession. Deux options : FK spécifique par type (deux colonnes nullables) ou relation polymorphique (entityType + entityId sans contrainte FK).
+**Décision** : `entityType STRING + entityId INTEGER` sans FK en base. L'ownership et l'existence de l'entité sont vérifiés dans le service (`_resolveEntity`).
+**Alternative écartée** : Deux colonnes `deadlineId` / `revisionSessionId` nullables — contraint d'ajouter une colonne à chaque nouvel entityType, et crée des champs toujours NULL.
+**Conséquences** : L'intégrité référentielle n'est pas garantie au niveau DB — si un Deadline est supprimé, le Reminder orphelin reste. Acceptable pour MVP car les Deadlines et RevisionSessions sont protégées par CASCADE sur userId.
+
+---
+
+### [2026-06-12] CalendarPage — clé d'événement avec mois 0-indexé (JavaScript)
+**Contexte** : L'ancien dict `events` et la fonction `eventKey(y, m, d)` utilisaient les mois 0-indexés (comme `Date.getMonth()`). Les dates retournées par l'API sont `YYYY-MM-DD` avec mois 1-indexés.
+**Décision** : Conserver le format 0-indexé en interne (cohérent avec `isToday`, `isWeekend`, `getFirstDay`). Ajouter `parseDateToKey(dateStr)` qui soustrait 1 au mois API avant de construire la clé.
+**Alternative écartée** : Passer à un format 1-indexé partout — aurait cassé `isToday` (qui compare avec `today.getMonth()` 0-indexé) et nécessité une réécriture complète des helpers.
+**Conséquences** : Tout ajout de données de dates dans `allEvents` (computed) doit passer par `parseDateToKey`. Ne jamais passer directement une date API à `eventKey`.
+
+---
+
 ### [2026-06-06] Rate limiters extraits dans un middleware dédié
 **Contexte** : `authLimiter` et `registerLimiter` étaient définis inline dans `User.routes.js`. Le nouvel `apiLimiter` global nécessitait un point de centralisation.  
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  

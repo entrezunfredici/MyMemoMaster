@@ -42,8 +42,11 @@
 | CalendarEvent / EventOccurrence | Stable — CRUD complet + récurrence auto/manual, protection RESTRICT | 2026-06-10 |
 | Deadline | Stable — CRUD complet, droits enseignant par groupe | 2026-06-10 |
 | RevisionSession | Stable — CRUD complet + GET /today (todo list) | 2026-06-10 |
+| Reminder (rappels BullMQ) | Stable — CRUD complet, queue Redis, worker email | 2026-06-12 |
+| ESLint / Prettier (front + back) | Stable — configs alignées, CI lint vert | 2026-06-13 |
+| Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
-| Tests intégration API (Supertest) | Stable — M-03 : 606 tests total (153 nouveaux pour ClassGroup, CalendarEvent, Deadline, RevisionSession) | 2026-06-10 |
+| Tests intégration API (Supertest) | Stable — M-03.05 : 639 tests total (33 nouveaux pour Reminder) | 2026-06-12 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
@@ -60,9 +63,11 @@
 | Front — ExercisesPage / ExerciseDetailPage | Stable | init |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
-| Front — CalendarPage | Stable | init |
+| Front — CalendarPage | Stable — connecté aux stores réels (calendarEvents, revisionSessions, deadlines) + panneau agenda latéral | 2026-06-12 |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
+| Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
+| Front — Stores Pinia Rappels | Stable — reminders.js : CRUD complet, pendingReminders, remindersByEntity | 2026-06-12 |
 | Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
 | Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
@@ -76,6 +81,8 @@
 - Système d'exercices / tests
 - Docker Compose (API + Front + PostgreSQL + PgAdmin + Traefik)
 - Infrastructure Docker server compose + CI Node 22 + backup + runbook — M-00b.01 — 2026-06-11
+- Système de rappels BullMQ (Redis) pour Deadline et RevisionSession — M-03.05 — 2026-06-12
+- CalendarPage connectée au backend avec stores Pinia + agenda latéral coloré par type — 2026-06-12
 - Traefik HTTPS + HSTS + redirect HTTP→HTTPS via labels Docker Compose — M-00b.03 — 2026-06-12
 - Scripts + config automatisation HTTPS (VPS setup-traefik.sh + k8s setup.sh + cert-manager + doc) — 2026-06-12
 - Pipeline CI complet (lint + tests + build front) — M-00b.04 — 2026-06-12
@@ -1104,3 +1111,112 @@
 **Dette / points d'attention :**
 - HSTS avec `stsPreload=true` est un engagement fort : une fois activé sur un domaine, il est difficile à révoquer (2 ans côté navigateur). Ne pas activer si le domaine peut passer en HTTP un jour.
 - Le middleware HSTS est appliqué à l'API également — les clients non-navigateur (Postman, scripts curl) ne sont pas impactés par HSTS (ignoré en dehors des navigateurs).
+
+---
+
+### [M-03.05] — Système rappels et notifications (BullMQ) — 2026-06-12
+
+**Fichiers créés :**
+- `config/redis.config.js` — config de connexion Redis (host/port/pass via env vars)
+- `models/Reminder.model.js` — entité Reminder : userId, entityType, entityId, reminderAt, delayMinutes, channel, status, jobId, message
+- `migrations/20260612000001-create-reminder-table.js` — migration Sequelize CLI avec 4 index
+- `jobs/reminder.queue.js` — singleton BullMQ Queue (`reminders`) avec options retry/cleanup
+- `jobs/reminder.worker.js` — Worker BullMQ qui envoie l'email via sendEmail + met à jour le status
+- `services/Reminder.service.js` — CRUD complet + _resolveEntity, _buildReminderAt, _scheduleJob, _cancelJob
+- `controllers/Reminder.controller.js` — 5 handlers HTTP avec gestion status 400/404/500
+- `validators/Reminder.validators.js` — create (entityType, entityId, delayMinutes, message) + update
+- `routes/Reminder.routes.js` — 5 routes avec JSDoc Swagger
+- `test/controllers/Reminder.controller.test.js` — 20 tests controller
+- `test/services/Reminder.service.test.js` — 13 tests service
+
+**Fichiers modifiés :**
+- `models/index.js` — enregistrement de Reminder
+- `models/User.model.js` — association hasMany Reminder
+- `app.js` — import + enregistrement route + démarrage worker
+- `docker-compose.yml` — service Redis (tous les profils) + vars REDIS_* dans api/api_server
+- `server_docker_compose/docker-compose.yml` — service Redis + vars REDIS_* dans api
+- `.env.example` — section Redis avec variables commentées
+- `.agents/CONVENTIONS.md` — bullmq + ioredis dans dépendances approuvées, restriction Redis mise à jour
+
+**Ce qui est utilisable :**
+- `GET /api/v1/reminders` — liste des rappels de l'utilisateur connecté
+- `GET /api/v1/reminders/:id` — rappel par ID (ownership)
+- `POST /api/v1/reminders` — crée un rappel pour un deadline ou une séance de révision
+  - body : `{ entityType, entityId, delayMinutes, message? }`
+  - Le job BullMQ est planifié avec `delay = reminderAt - now`
+- `PUT /api/v1/reminders/:id` — modifie le délai/message (replanifie le job)
+- `DELETE /api/v1/reminders/:id` — annule et supprime (retire le job de la queue)
+- Worker envoie un email nodemailer à l'heure prévue, met status → 'sent'
+- En cas d'échec (3 tentatives exponentielles), status → 'failed'
+- 639 tests passant au total
+
+**Hypothèses posées :**
+- `entityType` est polymorphique (`deadline` | `revision_session`) — pas de FK directe en base pour éviter la complexité des contraintes cross-tables polymorphes. La vérification d'ownership est faite dans le service.
+- Pour Deadline sans `dueTime`, le rappel est calculé à partir de 08:00 le jour de l'échéance.
+- Le canal est fixé à `email` en MVP — le champ `channel` est persisté pour extension future.
+- Redis est requis pour le fonctionnement du worker. Si Redis est indisponible, le worker log une erreur mais ne crash pas l'API (BullMQ gère la reconnexion).
+- En local sans Docker, `REDIS_HOST=127.0.0.1` (défaut redis.config.js) — Redis doit être lancé séparément.
+
+**Fichiers créés (front) :**
+- `my_memo_master_front/src/stores/reminders.js` — `useReminderStore` : fetchReminders, fetchReminderById, createReminder, updateReminder, deleteReminder, resetForm ; getters pendingReminders + remindersByEntity
+- `my_memo_master_front/src/components/NotificationBellComponent.vue` — cloche avec badge compteur, panneau dropdown (liste rappels en attente, formatage temps relatif, suppression inline, état vide)
+
+**Fichiers modifiés (front) :**
+- `my_memo_master_front/src/App.vue` — import + intégration NotificationBellComponent dans le header desktop et mobile
+
+**Dette / points d'attention :**
+- Le worker charge les modèles en différé (`require('../models')` dans le callback) pour éviter les problèmes d'init DB au démarrage. Ce pattern est cohérent avec la séquentialité de `server.js`.
+- BullMQ utilise un `MemoryStore` Redis — si Redis redémarre, les jobs en attente sont perdus. À surveiller pour une instance de prod long terme (les rappels actifs doivent être recréés après un crash Redis).
+- Pas de tests pour `reminder.worker.js` (requiert une instance Redis réelle) — à couvrir dans un ticket d'intégration dédié si nécessaire.
+- Pas de store Pinia ni de page front pour les rappels — à implémenter dans un ticket front M-03.
+
+---
+
+### [M-00b.08] — Variables d'environnement (.env) — 2026-06-13
+
+**Fichiers modifiés :**
+- `server_docker_compose/docker-compose.yml` — correction bug : `EMAIL_USER`/`EMAIL_PASS` → `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS`/`EMAIL_FROM` (alignement avec ce que `sendEmail.js` lit réellement — les emails ne fonctionnaient pas en production)
+- `server_docker_compose/.env.example` — ajout section Redis (REDIS_PASS, REDIS_PORT, resource limits) + remplacement section email par les vraies variables SMTP_*
+
+**Ce qui existait déjà et est conforme :**
+- `.env.example` (racine) — complet : API, Front, DB, Redis, S3, CORS, rate limit, resource limits, domaines
+- `server_docker_compose/.env.example` — template VPS (complété)
+- `traefik/.env.example` — Let's Encrypt, dashboard, logs
+- `.gitignore` — exclut `.env`, `.env.dev`, `.env.test`, `.env.prod`
+
+**Bug corrigé :**
+- `sendEmail.js` lit `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS` mais le compose serveur injectait `EMAIL_USER`/`EMAIL_PASS` inexistants → emails silencieusement cassés en production depuis l'ajout de Redis (M-03.05 avait introduit un docker-compose serveur avec les mauvaises vars)
+
+**Hypothèses posées :**
+- `REDIS_PASS` est commenté/vide par défaut dans le `.env.example` serveur — Redis sans mot de passe est acceptable sur un réseau Docker privé (mmm_network) non exposé à l'extérieur.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [M-00b.06] — ESLint / Prettier (front + back) — 2026-06-13
+
+**Fichiers créés (API) :**
+- `my_memo_master_api/.prettierrc.json` — config Prettier alignée sur le front (semi:false, singleQuote:true, tabWidth:2, printWidth:100, trailingComma:none)
+- `my_memo_master_api/.prettierignore` — exclut node_modules, dist, coverage, *.lock
+
+**Fichiers modifiés (API) :**
+- `my_memo_master_api/eslint.config.mjs` — ajout `eslint-config-prettier` pour désactiver les règles ESLint en conflit avec Prettier
+- `my_memo_master_api/package.json` — ajout `prettier` + `eslint-config-prettier` en devDependencies ; ajout script `"format": "prettier --write ."`
+- Tous les fichiers source API — reformatés par `prettier --write .` (commit rétroactif)
+
+**Ce qui existait déjà (front) :**
+- `my_memo_master_front/.eslintrc.cjs` — ESLint vue3-essential + prettier/skip-formatting (déjà en place)
+- `my_memo_master_front/.prettierrc.json` — config Prettier (déjà en place)
+
+**Ce qui est utilisable :**
+- `npm run lint` — ESLint (sans conflits Prettier) sur les deux services
+- `npm run format` — reformate tout le code API via `prettier --write .`
+- CI `npm run lint` passe pour api et front
+
+**Hypothèses posées :**
+- La config Prettier API est volontairement identique à celle du front pour une cohérence maximale entre les deux services.
+
+**Dette / points d'attention :**
+- Le CI ne lance pas `prettier --check` — uniquement ESLint. Si un fichier est mal formaté sans erreur ESLint, le CI ne le détecte pas. À ajouter si la rigueur de format est requise en CI.

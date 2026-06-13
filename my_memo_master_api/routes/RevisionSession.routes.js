@@ -1,10 +1,10 @@
-const express = require("express");
-const revisionSession = require("../controllers/RevisionSession.controller");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const revisionSessionValidators = require("../validators/RevisionSession.validators");
+const express = require('express')
+const revisionSession = require('../controllers/RevisionSession.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const revisionSessionValidators = require('../validators/RevisionSession.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -20,7 +20,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/", authMiddleware, revisionSession.findAll);
+router.get('/', authMiddleware, revisionSession.findAll)
 
 /**
  * @swagger
@@ -36,7 +36,7 @@ router.get("/", authMiddleware, revisionSession.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/today", authMiddleware, revisionSession.findToday);
+router.get('/today', authMiddleware, revisionSession.findToday)
 
 /**
  * @swagger
@@ -58,7 +58,7 @@ router.get("/today", authMiddleware, revisionSession.findToday);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", authMiddleware, revisionSession.findOne);
+router.get('/:id', authMiddleware, revisionSession.findOne)
 
 /**
  * @swagger
@@ -95,7 +95,7 @@ router.get("/:id", authMiddleware, revisionSession.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/", authMiddleware, revisionSessionValidators.create, validate, revisionSession.create);
+router.post('/', authMiddleware, revisionSessionValidators.create, validate, revisionSession.create)
 
 /**
  * @swagger
@@ -137,7 +137,13 @@ router.post("/", authMiddleware, revisionSessionValidators.create, validate, rev
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, revisionSessionValidators.update, validate, revisionSession.update);
+router.put(
+  '/:id',
+  authMiddleware,
+  revisionSessionValidators.update,
+  validate,
+  revisionSession.update
+)
 
 /**
  * @swagger
@@ -159,7 +165,7 @@ router.put("/:id", authMiddleware, revisionSessionValidators.update, validate, r
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", authMiddleware, revisionSession.delete);
+router.delete('/:id', authMiddleware, revisionSession.delete)
 
 module.exports = (app) => {
   /**
@@ -168,5 +174,5 @@ module.exports = (app) => {
    *   name: RevisionSession
    *   description: Séances de révision (affiché dans le calendrier et la todo list du jour)
    */
-  app.use("/revision-sessions", router);
-};
+  app.use('/revision-sessions', router)
+}

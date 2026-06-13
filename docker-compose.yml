@@ -45,6 +45,28 @@ services:
     networks:
       - mmm_network
 
+  redis:
+    image: redis:7-alpine
+    command: >
+      sh -c "if [ -n '${REDIS_PASS}' ]; then redis-server --requirepass ${REDIS_PASS}; else redis-server; fi"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: ${REDIS_LIMIT_CPUS:-0.25}
+          memory: ${REDIS_LIMIT_MEMORY:-128M}
+        reservations:
+          cpus: ${REDIS_RESERVE_CPUS:-0.10}
+          memory: ${REDIS_RESERVE_MEMORY:-32M}
+    networks:
+      - mmm_network
+
   # ═══════════════════════════════════════════════════════════════════════════
   #  DEV — machine locale, HTTP, images buildées localement
   #  Commande : docker compose --env-file .env.dev up --build
@@ -125,8 +147,13 @@ services:
       EMAIL_FROM: ${EMAIL_FROM}
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASS: ${EMAIL_PASS}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASS: ${REDIS_PASS:-}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     deploy:
       resources:
@@ -248,8 +275,13 @@ services:
       EMAIL_FROM: ${EMAIL_FROM}
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASS: ${EMAIL_PASS}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASS: ${REDIS_PASS:-}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     deploy:
       resources:
@@ -357,3 +389,4 @@ volumes:
   pgadmin-data:
   api-node-modules:
   api-data:
+  redis-data:

@@ -1,48 +1,48 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (instance) => {
   const UserOnboardingState = instance.define(
-    "UserOnboardingState",
+    'UserOnboardingState',
     {
       userId: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         allowNull: false,
         references: {
-          model: "User",
-          key: "userId",
+          model: 'User',
+          key: 'userId'
         },
-        onDelete: "CASCADE",
-        onUpdate: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       tourSeen: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
-        defaultValue: false,
+        defaultValue: false
       },
       checklist: {
         type: DataTypes.JSONB,
         allowNull: false,
-        defaultValue: {},
+        defaultValue: {}
       },
       updatedAt: {
         type: DataTypes.DATE, //Pas de timestampz
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: DataTypes.NOW
       }
     },
     {
-      tableName: "UserOnboardingState",
-      timestamps: false,
+      tableName: 'UserOnboardingState',
+      timestamps: false
     }
-  );
+  )
 
   UserOnboardingState.associate = (models) => {
     UserOnboardingState.belongsTo(models.User, {
-      foreignKey: "userId",
-      as: "user",
-    });
-  };
+      foreignKey: 'userId',
+      as: 'user'
+    })
+  }
 
-  return UserOnboardingState;
-};
+  return UserOnboardingState
+}

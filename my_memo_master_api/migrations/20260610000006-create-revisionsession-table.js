@@ -1,48 +1,48 @@
-"use strict";
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("RevisionSession", {
+    await queryInterface.createTable('RevisionSession', {
       id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false,
+        allowNull: false
       },
       name: {
         type: Sequelize.STRING(150),
-        allowNull: false,
+        allowNull: false
       },
       description: {
         type: Sequelize.TEXT,
-        allowNull: true,
+        allowNull: true
       },
       date: {
         type: Sequelize.DATEONLY,
-        allowNull: false,
+        allowNull: false
       },
       startTime: {
         type: Sequelize.TIME,
-        allowNull: false,
+        allowNull: false
       },
       endTime: {
         type: Sequelize.TIME,
-        allowNull: false,
+        allowNull: false
       },
       userId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "User",
-          key: "userId",
+          model: 'User',
+          key: 'userId'
         },
-        onDelete: "CASCADE",
-        onUpdate: "CASCADE",
-      },
-    });
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
+      }
+    })
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("RevisionSession");
-  },
-};
+    await queryInterface.dropTable('RevisionSession')
+  }
+}

@@ -21,6 +21,29 @@ services:
   #  Base de données PostgreSQL
   # ═══════════════════════════════════════════════════════════════════════════
 
+  redis:
+    image: redis:7-alpine
+    command: >
+      sh -c "if [ -n '${REDIS_PASS}' ]; then redis-server --requirepass ${REDIS_PASS}; else redis-server; fi"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: ${REDIS_LIMIT_CPUS:-0.25}
+          memory: ${REDIS_LIMIT_MEMORY:-128M}
+        reservations:
+          cpus: ${REDIS_RESERVE_CPUS:-0.10}
+          memory: ${REDIS_RESERVE_MEMORY:-32M}
+    networks:
+      - mmm_network
+    restart: unless-stopped
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -109,11 +132,19 @@ services:
       API_BYPASS_AUTH: ${API_BYPASS_AUTH:-false}
       API_PUBLIC_URL: https://${API_DOMAIN}
       CORS_ORIGIN: https://${FRONT_DOMAIN}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
       EMAIL_FROM: ${EMAIL_FROM}
-      EMAIL_USER: ${EMAIL_USER}
-      EMAIL_PASS: ${EMAIL_PASS}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASS: ${REDIS_PASS:-}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     deploy:
       resources:
@@ -222,3 +253,4 @@ volumes:
   postgres-data:
   pgadmin-data:
   api-data:
+  redis-data:

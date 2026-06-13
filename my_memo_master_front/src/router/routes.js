@@ -23,7 +23,7 @@ const routes = [
     component: () => import('../pages/ExerciseDetailPage.vue'),
     meta: {
       title: 'Exercise Detail',
-      private: false,
+      private: true,
     },
   },
   {

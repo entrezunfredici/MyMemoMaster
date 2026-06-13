@@ -1,10 +1,10 @@
-const express = require("express");
-const subject = require("../controllers/Subject.controller.js");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const subjectValidators = require("../validators/Subject.validators");
+const express = require('express')
+const subject = require('../controllers/Subject.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const subjectValidators = require('../validators/Subject.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -31,7 +31,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/", authMiddleware, subject.findAll);
+router.get('/', authMiddleware, subject.findAll)
 
 /**
  * @swagger
@@ -65,7 +65,7 @@ router.get("/", authMiddleware, subject.findAll);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/:id", authMiddleware, subject.findOne);
+router.get('/:id', authMiddleware, subject.findOne)
 
 /**
  * @swagger
@@ -100,7 +100,7 @@ router.get("/:id", authMiddleware, subject.findOne);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/", authMiddleware, subjectValidators.create, validate, subject.create);
+router.post('/', authMiddleware, subjectValidators.create, validate, subject.create)
 
 /**
  * @swagger
@@ -133,7 +133,7 @@ router.post("/", authMiddleware, subjectValidators.create, validate, subject.cre
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", authMiddleware, subjectValidators.update, validate, subject.update);
+router.put('/:id', authMiddleware, subjectValidators.update, validate, subject.update)
 
 /**
  * @swagger
@@ -156,7 +156,7 @@ router.put("/:id", authMiddleware, subjectValidators.update, validate, subject.u
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:id", authMiddleware, subject.delete);
+router.delete('/:id', authMiddleware, subject.delete)
 
 module.exports = (app) => {
   /**
@@ -165,5 +165,5 @@ module.exports = (app) => {
    *   - name: Subjects
    *     description: Gestion des sujets
    */
-  app.use("/subjects", router);
-};
+  app.use('/subjects', router)
+}

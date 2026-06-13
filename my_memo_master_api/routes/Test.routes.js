@@ -1,9 +1,9 @@
-const express = require("express");
-const test = require("../controllers/Test.controller.js");
-const validate = require("../middlewares/validate.middleware");
-const testValidators = require("../validators/Test.validators");
+const express = require('express')
+const test = require('../controllers/Test.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const testValidators = require('../validators/Test.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -21,7 +21,7 @@ const router = express.Router();
  *         description: Erreur interne du serveur
  *
  */
-router.get("/", test.findAll);
+router.get('/', test.findAll)
 
 /**
  * @swagger
@@ -59,7 +59,7 @@ router.get("/", test.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", test.findOne);
+router.get('/:id', test.findOne)
 
 /**
  * @swagger
@@ -90,7 +90,7 @@ router.get("/:id", test.findOne);
  *         description: Erreur interne du serveur
  *
  */
-router.post("/", testValidators.create, validate, test.create);
+router.post('/', testValidators.create, validate, test.create)
 
 /**
  * @swagger
@@ -129,7 +129,7 @@ router.post("/", testValidators.create, validate, test.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", testValidators.update, validate, test.update);
+router.put('/:id', testValidators.update, validate, test.update)
 
 /**
  * @swagger
@@ -153,14 +153,14 @@ router.put("/:id", testValidators.update, validate, test.update);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", test.delete);
+router.delete('/:id', test.delete)
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Tests
-     *     description: Gestion des tests
-     */
-    app.use("/tests", router);
-};
+  /**
+   * @swagger
+   * tags:
+   *   - name: Tests
+   *     description: Gestion des tests
+   */
+  app.use('/tests', router)
+}

@@ -1,52 +1,50 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (instance) => {
   const LeitnerBox = instance.define(
-    "LeitnerBox",
+    'LeitnerBox',
     {
       idBox: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false,
+        allowNull: false
       },
       level: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: false
       },
       intervall: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: false
       },
       color: {
         type: DataTypes.BIGINT,
-        allowNull: false,
+        allowNull: false
       },
       idSystem: {
         type: DataTypes.INTEGER,
-        allowNull: true,
-      },
+        allowNull: true
+      }
     },
     {
-      tableName: "LeitnerBox",
+      tableName: 'LeitnerBox',
       timestamps: false,
-      indexes: [
-        { fields: ['idSystem'] },
-      ],
+      indexes: [{ fields: ['idSystem'] }]
     }
-  );
+  )
 
   LeitnerBox.associate = (models) => {
     LeitnerBox.belongsTo(models.LeitnerSystem, {
-      foreignKey: "idSystem",
-      as: "leitnerSystem",
-    });
+      foreignKey: 'idSystem',
+      as: 'leitnerSystem'
+    })
 
     LeitnerBox.hasMany(models.LeitnerCard, {
-      foreignKey: "idBox",
-      as: "leitnerCards",
-    });
-  };
+      foreignKey: 'idBox',
+      as: 'leitnerCards'
+    })
+  }
 
-  return LeitnerBox;
-};
+  return LeitnerBox
+}

@@ -1,9 +1,9 @@
-const express = require("express");
-const ResponseController = require("../controllers/Response.controller.js");
-const validate = require("../middlewares/validate.middleware");
-const responseValidators = require("../validators/Response.validators");
+const express = require('express')
+const ResponseController = require('../controllers/Response.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const responseValidators = require('../validators/Response.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -46,7 +46,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/question/:questionId", ResponseController.findAllByQuestion);
+router.get('/question/:questionId', ResponseController.findAllByQuestion)
 
 /**
  * @swagger
@@ -87,7 +87,7 @@ router.get("/question/:questionId", ResponseController.findAllByQuestion);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/correction/:questionId", ResponseController.findCorrectionByQuestion);
+router.get('/correction/:questionId', ResponseController.findCorrectionByQuestion)
 
 /**
  * @swagger
@@ -128,7 +128,7 @@ router.get("/correction/:questionId", ResponseController.findCorrectionByQuestio
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", ResponseController.findOne);
+router.get('/:id', ResponseController.findOne)
 
 /**
  * @swagger
@@ -161,7 +161,7 @@ router.get("/:id", ResponseController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/", responseValidators.create, validate, ResponseController.create);
+router.post('/', responseValidators.create, validate, ResponseController.create)
 
 /**
  * @swagger
@@ -203,7 +203,7 @@ router.post("/", responseValidators.create, validate, ResponseController.create)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/edit/:id", responseValidators.update, validate, ResponseController.update);
+router.put('/edit/:id', responseValidators.update, validate, ResponseController.update)
 
 /**
  * @swagger
@@ -227,7 +227,7 @@ router.put("/edit/:id", responseValidators.update, validate, ResponseController.
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", ResponseController.delete);
+router.delete('/:id', ResponseController.delete)
 
 module.exports = (app) => {
   /**
@@ -236,5 +236,5 @@ module.exports = (app) => {
    *   - name: Responses
    *     description: Gestion des réponses
    */
-  app.use("/responses", router);
-};
+  app.use('/responses', router)
+}

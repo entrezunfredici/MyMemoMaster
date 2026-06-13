@@ -1,54 +1,54 @@
-const { Tutorials } = require("../models/index");
-const { Op } = require("sequelize");
+const { Tutorials } = require('../models/index')
+const { Op } = require('sequelize')
 
 class TutorialsService {
   async findAll({ where, offset, limit }) {
-    return await Tutorials.findAll({ where, offset, limit });
+    return await Tutorials.findAll({ where, offset, limit })
   }
 
   async findOne(id) {
-    return await Tutorials.findByPk(id);
+    return await Tutorials.findByPk(id)
   }
 
   async create(data) {
-    return await Tutorials.create(data);
+    return await Tutorials.create(data)
   }
 
   async update(id, newData) {
-    const tutorial = await Tutorials.findByPk(id);
+    const tutorial = await Tutorials.findByPk(id)
     if (tutorial) {
-      await tutorial.update(newData);
-      return tutorial;
+      await tutorial.update(newData)
+      return tutorial
     }
-    return null;
+    return null
   }
 
   async delete(id) {
-    const tutorial = await Tutorials.findByPk(id);
+    const tutorial = await Tutorials.findByPk(id)
     if (tutorial) {
-      await tutorial.destroy();
-      return true;
+      await tutorial.destroy()
+      return true
     }
-    return false;
+    return false
   }
 
   async count({ search, subjectId, revisionTips }) {
-    const where = {};
+    const where = {}
     if (search) {
       where[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
+        { name: { [Op.like]: `%${search}%` } }
         // { description: { [Op.like]: `%${search}%` } },
-      ];
+      ]
     }
     if (subjectId) {
-      where.subjectId = subjectId;
+      where.subjectId = subjectId
     }
     if (revisionTips !== undefined) {
-      where.revisionTips = revisionTips;
+      where.revisionTips = revisionTips
     }
 
-    return await Tutorials.count({ where });
+    return await Tutorials.count({ where })
   }
 }
 
-module.exports = new TutorialsService();
+module.exports = new TutorialsService()

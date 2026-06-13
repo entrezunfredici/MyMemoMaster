@@ -1,78 +1,76 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (instance) => {
   const LeitnerSystem = instance.define(
-    "LeitnerSystem",
+    'LeitnerSystem',
     {
       idSystem: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false,
+        allowNull: false
       },
       sujet: {
         type: DataTypes.JSON,
-        allowNull: true,
+        allowNull: true
       },
       name: {
         type: DataTypes.STRING(50),
-        allowNull: true,
+        allowNull: true
       },
       idUser: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: "User",
-          key: "userId",
+          model: 'User',
+          key: 'userId'
         },
-        onDelete: "SET NULL",
-        onUpdate: "CASCADE",
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
       },
       idMindMap: {
         type: DataTypes.INTEGER,
-        allowNull: true,
-      },
+        allowNull: true
+      }
     },
     {
-      tableName: "LeitnerSystem",
+      tableName: 'LeitnerSystem',
       timestamps: false,
-      indexes: [
-        { fields: ['idUser'] },
-      ],
+      indexes: [{ fields: ['idUser'] }]
     }
-  );
+  )
 
   // Associations
   LeitnerSystem.associate = (models) => {
     LeitnerSystem.belongsTo(models.User, {
-      foreignKey: "idUser",
-      as: "user",
-    });
+      foreignKey: 'idUser',
+      as: 'user'
+    })
 
     LeitnerSystem.hasMany(models.LeitnerBox, {
-      foreignKey: "idSystem",
-      as: "leitnerBoxes",
-    });
+      foreignKey: 'idSystem',
+      as: 'leitnerBoxes'
+    })
 
     LeitnerSystem.belongsToMany(models.LeitnerCard, {
-      through: "cardSystems",
-      foreignKey: "idSystem",
-      otherKey: "idCard",
-      as: "leitnerCards",
-    });
+      through: 'cardSystems',
+      foreignKey: 'idSystem',
+      otherKey: 'idCard',
+      as: 'leitnerCards'
+    })
 
     LeitnerSystem.belongsToMany(models.Subject, {
-      through: "systemSubject",
-      foreignKey: "idSystem",
-      otherKey: "subjectId",
-      as: "subjects",
-    });
+      through: 'systemSubject',
+      foreignKey: 'idSystem',
+      otherKey: 'subjectId',
+      as: 'subjects'
+    })
 
     LeitnerSystem.hasMany(models.LeitnerSystemsUsers, {
-      foreignKey: "idSystem",
-      as: "leitnerSystemsUsers",
-    });
-  };
+      foreignKey: 'idSystem',
+      as: 'leitnerSystemsUsers'
+    })
+  }
 
-  return LeitnerSystem;
-};
+  return LeitnerSystem
+}

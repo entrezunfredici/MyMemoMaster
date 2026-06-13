@@ -1,44 +1,43 @@
-const { User, Role, UserOnboardingState } = require("../models/index");
-const bcrypt = require('bcryptjs');
+const { User, Role, UserOnboardingState } = require('../models/index')
+const bcrypt = require('bcryptjs')
 const generateCode = require('../helpers/generateCode')
 
 class UserService {
-
   async findAll() {
-    const users = await User.findAll();
-    return users.map(user => {
+    const users = await User.findAll()
+    return users.map((user) => {
       // eslint-disable-next-line no-unused-vars
-      const { password, ...userWithoutPassword } = user?.dataValues || user;
-      return userWithoutPassword;
-    });
+      const { password, ...userWithoutPassword } = user?.dataValues || user
+      return userWithoutPassword
+    })
   }
 
   async findByEmail(email) {
     const user = await User.findOne({
-      where: { email },
-    });
-    if (!user) return null;
+      where: { email }
+    })
+    if (!user) return null
     // eslint-disable-next-line no-unused-vars
-    const { password, ...userWithoutPassword } = user?.dataValues || user;
-    return userWithoutPassword;
+    const { password, ...userWithoutPassword } = user?.dataValues || user
+    return userWithoutPassword
   }
 
   async findOne(userId) {
-    const user = await User.findByPk(userId);
-    if (!user) return null;
+    const user = await User.findByPk(userId)
+    if (!user) return null
     // eslint-disable-next-line no-unused-vars
-    const { password, ...userWithoutPassword } = user?.dataValues || user;
-    return userWithoutPassword;
+    const { password, ...userWithoutPassword } = user?.dataValues || user
+    return userWithoutPassword
   }
 
   async create(user) {
-    if (await this.findByEmail(user.email)) throw new Error('Email déjà utilisé');
-    if (!user.name || !user.password || !user.email) throw new Error('Champs manquants');
+    if (await this.findByEmail(user.email)) throw new Error('Email déjà utilisé')
+    if (!user.name || !user.password || !user.email) throw new Error('Champs manquants')
 
-    user.password = await bcrypt.hash(user.password, 10);
+    user.password = await bcrypt.hash(user.password, 10)
 
-    const newUser = await User.create(user);
-    if (!newUser) throw new Error('Erreur lors de la création de l\'utilisateur');
+    const newUser = await User.create(user)
+    if (!newUser) throw new Error("Erreur lors de la création de l'utilisateur")
 
     await UserOnboardingState.create({
       userId: newUser.userId,
@@ -48,117 +47,145 @@ class UserService {
         profile_completed: false,
         first_action: false
       }
-    });
+    })
 
     // eslint-disable-next-line no-unused-vars
-    const { password, ...userWithoutPassword } = newUser?.dataValues || newUser;
-    return userWithoutPassword;
+    const { password, ...userWithoutPassword } = newUser?.dataValues || newUser
+    return userWithoutPassword
   }
 
-
   async update(userId, user) {
-    const { name, email } = user;
-    await User.update({ name, email }, {
-      where: { userId: userId }
-    });
-    return this.findOne(userId);
+    const { name, email } = user
+    await User.update(
+      { name, email },
+      {
+        where: { userId: userId }
+      }
+    )
+    return this.findOne(userId)
   }
 
   async delete(userId) {
     await User.destroy({
       where: { userId: userId }
-    });
+    })
   }
 
   async setRole(userId, roleId) {
-    if (!await Role.findByPk(roleId)) throw new Error('Le rôle n\'existe pas');
+    if (!(await Role.findByPk(roleId))) throw new Error("Le rôle n'existe pas")
 
-    await User.update({ roleId: roleId }, {
-      where: { userId: userId }
-    });
-    return this.findOne(userId);
+    await User.update(
+      { roleId: roleId },
+      {
+        where: { userId: userId }
+      }
+    )
+    return this.findOne(userId)
   }
 
   async deleteRole(userId) {
-    await User.update({ roleId: null }, {
-      where: { userId: userId }
-    });
-    return this.findOne(userId);
+    await User.update(
+      { roleId: null },
+      {
+        where: { userId: userId }
+      }
+    )
+    return this.findOne(userId)
   }
 
   async updateLoginDate(userId) {
-    await User.update({ lastLogin: new Date() }, {
-      where: { userId: userId }
-    });
+    await User.update(
+      { lastLogin: new Date() },
+      {
+        where: { userId: userId }
+      }
+    )
   }
 
   async verifyPassword(userId, password) {
-    const user = await User.findByPk(userId);
-    return await bcrypt.compare(password, user.password);
+    const user = await User.findByPk(userId)
+    return await bcrypt.compare(password, user.password)
   }
 
   async setPassword(userId, password) {
-    if (!password) throw new Error('Mot de passe manquant');
-    if (password.length < 10) throw new Error('Le mot de passe doit contenir au moins 10 caractères');
+    if (!password) throw new Error('Mot de passe manquant')
+    if (password.length < 10)
+      throw new Error('Le mot de passe doit contenir au moins 10 caractères')
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await User.update({ password: hashedPassword }, {
-      where: { userId: userId }
-    });
+    const hashedPassword = await bcrypt.hash(password, 10)
+    await User.update(
+      { password: hashedPassword },
+      {
+        where: { userId: userId }
+      }
+    )
   }
 
   async setValidEmailCode(userId, code = '') {
-    if (!code) code = generateCode();
-    await User.update({ validEmailCode: code }, {
-      where: { userId: userId }
-    });
+    if (!code) code = generateCode()
+    await User.update(
+      { validEmailCode: code },
+      {
+        where: { userId: userId }
+      }
+    )
   }
 
   async verifyValidEmailCode(userId, code) {
-    const user = await User.findByPk(userId);
-    const isValid = user.validEmailCode === code;
-    user.validEmailCode = null;
-    await user.save();
-    return isValid;
+    const user = await User.findByPk(userId)
+    const isValid = user.validEmailCode === code
+    user.validEmailCode = null
+    await user.save()
+    return isValid
   }
 
   async clearValidEmailCode(userId) {
-    await User.update({ validEmailCode: null }, {
-      where: { userId: userId }
-    });
+    await User.update(
+      { validEmailCode: null },
+      {
+        where: { userId: userId }
+      }
+    )
   }
 
   async setResetPasswordCode(userId, code = '') {
-    if (!code) code = generateCode();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await User.update({ resetPasswordCode: code, resetPasswordCodeExpiresAt: expiresAt }, {
-      where: { userId: userId }
-    });
-    return code;
+    if (!code) code = generateCode()
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
+    await User.update(
+      { resetPasswordCode: code, resetPasswordCodeExpiresAt: expiresAt },
+      {
+        where: { userId: userId }
+      }
+    )
+    return code
   }
 
   async verifyResetPasswordCode(userId, code) {
-    const user = await User.findByPk(userId);
-    const now = new Date();
-    const isValid = user.resetPasswordCode === Number(code)
-      && user.resetPasswordCodeExpiresAt
-      && user.resetPasswordCodeExpiresAt > now;
-    user.resetPasswordCode = null;
-    user.resetPasswordCodeExpiresAt = null;
-    await user.save();
-    return isValid;
+    const user = await User.findByPk(userId)
+    const now = new Date()
+    const isValid =
+      user.resetPasswordCode === Number(code) &&
+      user.resetPasswordCodeExpiresAt &&
+      user.resetPasswordCodeExpiresAt > now
+    user.resetPasswordCode = null
+    user.resetPasswordCodeExpiresAt = null
+    await user.save()
+    return isValid
   }
 
   async clearResetPasswordCode(userId) {
-    await User.update({ resetPasswordCode: null }, {
-      where: { userId: userId }
-    });
+    await User.update(
+      { resetPasswordCode: null },
+      {
+        where: { userId: userId }
+      }
+    )
   }
 
   async clearAllCodes(userId) {
-    await this.clearValidEmailCode(userId);
-    await this.clearResetPasswordCode(userId);
+    await this.clearValidEmailCode(userId)
+    await this.clearResetPasswordCode(userId)
   }
 }
 
-module.exports = new UserService();
+module.exports = new UserService()

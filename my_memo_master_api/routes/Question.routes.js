@@ -1,9 +1,9 @@
-const express = require("express");
-const QuestionController = require("../controllers/Question.controller.js");
-const validate = require("../middlewares/validate.middleware");
-const questionValidators = require("../validators/Question.validators");
+const express = require('express')
+const QuestionController = require('../controllers/Question.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const questionValidators = require('../validators/Question.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -37,7 +37,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/", QuestionController.getAllQuestions);
+router.get('/', QuestionController.getAllQuestions)
 
 /**
  * @swagger
@@ -80,7 +80,7 @@ router.get("/", QuestionController.getAllQuestions);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/tests/:testId", QuestionController.getQuestionsByTest);
+router.get('/tests/:testId', QuestionController.getQuestionsByTest)
 
 /**
  * @swagger
@@ -121,7 +121,7 @@ router.get("/tests/:testId", QuestionController.getQuestionsByTest);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/card/:cardId", QuestionController.getQuestionByCard);
+router.get('/card/:cardId', QuestionController.getQuestionByCard)
 
 /**
  * @swagger
@@ -162,7 +162,7 @@ router.get("/card/:cardId", QuestionController.getQuestionByCard);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", QuestionController.findOne);
+router.get('/:id', QuestionController.findOne)
 
 /**
  * @swagger
@@ -203,7 +203,7 @@ router.get("/:id", QuestionController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
+router.get('/correction/:id', QuestionController.getCorrectionByQuestion)
 
 /**
  * @swagger
@@ -248,7 +248,7 @@ router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/", questionValidators.create, validate, QuestionController.create);
+router.post('/', questionValidators.create, validate, QuestionController.create)
 
 /**
  * @swagger
@@ -296,7 +296,7 @@ router.post("/", questionValidators.create, validate, QuestionController.create)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/edit/:id", questionValidators.update, validate, QuestionController.update);
+router.put('/edit/:id', questionValidators.update, validate, QuestionController.update)
 
 /**
  * @swagger
@@ -320,7 +320,7 @@ router.put("/edit/:id", questionValidators.update, validate, QuestionController.
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", QuestionController.delete);
+router.delete('/:id', QuestionController.delete)
 
 module.exports = (app) => {
   /**
@@ -329,5 +329,5 @@ module.exports = (app) => {
    *   - name: Questions
    *     description: Gestion des questions
    */
-  app.use("/questions", router);
-};
+  app.use('/questions', router)
+}

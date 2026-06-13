@@ -1,10 +1,10 @@
-const express = require('express');
-const grading = require('../controllers/Grading.controller');
-const validate = require('../middlewares/validate.middleware');
-const gradingValidators = require('../validators/Grading.validators');
+const express = require('express')
+const grading = require('../controllers/Grading.controller')
+const validate = require('../middlewares/validate.middleware')
+const gradingValidators = require('../validators/Grading.validators')
 
 module.exports = function (app) {
-  const router = express.Router();
+  const router = express.Router()
 
   /**
    * @swagger
@@ -50,7 +50,7 @@ module.exports = function (app) {
    *       500:
    *         description: Erreur serveur
    */
-  router.post('/date', gradingValidators.gradeDateAnswer, validate, grading.gradeDateAnswer);
+  router.post('/date', gradingValidators.gradeDateAnswer, validate, grading.gradeDateAnswer)
 
-  app.use('/grading', router);
-};
+  app.use('/grading', router)
+}

@@ -1,5 +1,5 @@
-const { randomInt } = require('crypto');
+const { randomInt } = require('crypto')
 
 module.exports = () => {
-    return randomInt(100000, 1000000);
-};
+  return randomInt(100000, 1000000)
+}

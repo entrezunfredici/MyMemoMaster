@@ -1,52 +1,52 @@
-const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, instance } = require("../models/index");
+const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, instance } = require('../models/index')
 
 const DEFAULT_BOXES = [
-  { level: 1, intervall: 5,  color: 123456 },
+  { level: 1, intervall: 5, color: 123456 },
   { level: 2, intervall: 10, color: 654321 },
   { level: 3, intervall: 15, color: 111111 },
   { level: 4, intervall: 20, color: 222222 },
-  { level: 5, intervall: 30, color: 333333 },
-];
+  { level: 5, intervall: 30, color: 333333 }
+]
 
 class LeitnerSystemService {
   async findAll() {
-    return await LeitnerSystem.findAll();
+    return await LeitnerSystem.findAll()
   }
 
   async findBySubject(subjectId) {
     return await LeitnerSystem.findAll({
-      where: { idMindMap: subjectId },
-    });
+      where: { idMindMap: subjectId }
+    })
   }
 
   async findOne(id) {
-    return await LeitnerSystem.findByPk(id);
+    return await LeitnerSystem.findByPk(id)
   }
 
   async create(data) {
-    const t = await instance.transaction();
+    const t = await instance.transaction()
     try {
-      const system = await LeitnerSystem.create(data, { transaction: t });
+      const system = await LeitnerSystem.create(data, { transaction: t })
       await LeitnerBox.bulkCreate(
-        DEFAULT_BOXES.map(box => ({ ...box, idSystem: system.idSystem })),
+        DEFAULT_BOXES.map((box) => ({ ...box, idSystem: system.idSystem })),
         { transaction: t }
-      );
-      await t.commit();
-      return system;
+      )
+      await t.commit()
+      return system
     } catch (err) {
-      await t.rollback();
-      throw err;
+      await t.rollback()
+      throw err
     }
   }
 
   async update(data) {
-    const { idSystem, idUser, ...updates } = data;
-    const system = await LeitnerSystem.findByPk(idSystem);
+    const { idSystem, idUser, ...updates } = data
+    const system = await LeitnerSystem.findByPk(idSystem)
     if (system && system.idUser === idUser) {
-      await system.update(updates);
-      return true;
+      await system.update(updates)
+      return true
     }
-    return false;
+    return false
   }
 
   async share(data) {
@@ -57,15 +57,15 @@ class LeitnerSystemService {
       writeRight = false,
       shareRight = false,
       shareWithWriteRightRight = false,
-      shareWithAllRights = false,
-    } = data;
+      shareWithAllRights = false
+    } = data
 
     const ownerRights = await LeitnerSystemsUsers.findOne({
-      where: { idUser: idUserOwner, idSystem },
-    });
+      where: { idUser: idUserOwner, idSystem }
+    })
 
     if (!ownerRights || !ownerRights.shareRight) {
-      throw new Error("Vous n'avez pas les droits pour partager ce système.");
+      throw new Error("Vous n'avez pas les droits pour partager ce système.")
     }
 
     await LeitnerSystemsUsers.upsert({
@@ -74,20 +74,20 @@ class LeitnerSystemService {
       writeRight,
       shareRight,
       shareWithWriteRightRight,
-      shareWithAllRights,
-    });
+      shareWithAllRights
+    })
 
-    return { message: "Système partagé avec succès." };
+    return { message: 'Système partagé avec succès.' }
   }
 
   async delete(id, idUser) {
-    const system = await LeitnerSystem.findByPk(id);
+    const system = await LeitnerSystem.findByPk(id)
     if (system && system.idUser === idUser) {
-      await system.destroy();
-      return true;
+      await system.destroy()
+      return true
     }
-    return false;
+    return false
   }
 }
 
-module.exports = new LeitnerSystemService();
+module.exports = new LeitnerSystemService()

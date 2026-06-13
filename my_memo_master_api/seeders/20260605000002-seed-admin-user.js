@@ -1,34 +1,34 @@
-"use strict";
+'use strict'
 
-const bcrypt = require("bcryptjs");
+const bcrypt = require('bcryptjs')
 
 // CHOIX: mot de passe lu depuis ADMIN_SEED_PASSWORD, fallback "Admin1234!" en dev
 // RAISON: évite un secret en dur dans le code ; configurable sans modifier le seeder
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface) {
-    const rawPassword = process.env.ADMIN_SEED_PASSWORD || "Admin1234!";
-    const password = await bcrypt.hash(rawPassword, 10);
-    const now = new Date();
+    const rawPassword = process.env.ADMIN_SEED_PASSWORD || 'Admin1234!'
+    const password = await bcrypt.hash(rawPassword, 10)
+    const now = new Date()
     await queryInterface.bulkInsert(
-      "User",
+      'User',
       [
         {
           userId: 1,
-          email: "admin@mymemomaster.local",
-          name: "Admin",
+          email: 'admin@mymemomaster.local',
+          name: 'Admin',
           roleId: 1,
           password,
           hasValidatedEmail: true,
           createdAt: now,
-          updatedAt: now,
-        },
+          updatedAt: now
+        }
       ],
       { ignoreDuplicates: true }
-    );
+    )
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete("User", { email: "admin@mymemomaster.local" });
-  },
-};
+    await queryInterface.bulkDelete('User', { email: 'admin@mymemomaster.local' })
+  }
+}

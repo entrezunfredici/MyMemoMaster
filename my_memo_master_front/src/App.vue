@@ -1,6 +1,6 @@
 <template>
   <!-- NO LAYOUT -->
-  <div v-if="route?.name?.includes?.('auth')">
+  <div v-if="route?.name?.includes?.('auth') || route?.name === 'register'">
     <main>
       <RouterView />
     </main>
@@ -57,9 +57,10 @@
     </aside>
 
     <div class="flex-1">
-      <header class="mt-20 lg:mt-16 xl:mt-12 mb-3">
+      <header class="mt-20 lg:mt-16 xl:mt-12 mb-3 flex items-start justify-between pr-4">
         <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
           route.meta.title }}</h1>
+        <NotificationBell class="mt-3" />
       </header>
       <main class="mb-8 mr-4">
         <RouterView />
@@ -68,9 +69,10 @@
   </div>
   <!-- MOBIL LAYOUT -->
   <div v-else-if="isMobile()" class="min-h-screen">
-    <header class="m-4">
+    <header class="m-4 flex items-start justify-between">
       <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
         route.meta.title }}</h1>
+      <NotificationBell class="mt-3" />
     </header>
     <main class="m-4 pb-[75px]">
       <RouterView />
@@ -131,6 +133,7 @@ import { HomeIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
 import { isMobile } from '@/helpers/functions';
+import NotificationBell from '@/components/NotificationBellComponent.vue'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 

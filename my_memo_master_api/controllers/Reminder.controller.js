@@ -1,0 +1,59 @@
+const reminderService = require('../services/Reminder.service')
+const logger = require('../helpers/logger')
+
+exports.findAll = async (req, res) => {
+  try {
+    const data = await reminderService.findAll(req.user.id)
+    res.status(200).send({ message: 'Rappels récupérés avec succès', data })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la récupération des rappels' })
+  }
+}
+
+exports.findOne = async (req, res) => {
+  try {
+    const data = await reminderService.findOne(parseInt(req.params.id), req.user.id)
+    if (!data) return res.status(404).send({ message: 'Rappel introuvable' })
+    res.status(200).send({ message: 'Rappel récupéré avec succès', data })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la récupération du rappel' })
+  }
+}
+
+exports.create = async (req, res) => {
+  try {
+    const data = await reminderService.create(req.user.id, req.body)
+    res.status(201).send({ message: 'Rappel créé avec succès', data })
+  } catch (error) {
+    if (error.status === 404) return res.status(404).send({ message: error.message })
+    if (error.status === 400) return res.status(400).send({ message: error.message })
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la création du rappel' })
+  }
+}
+
+exports.update = async (req, res) => {
+  try {
+    const data = await reminderService.update(parseInt(req.params.id), req.user.id, req.body)
+    if (!data) return res.status(404).send({ message: 'Rappel introuvable' })
+    res.status(200).send({ message: 'Rappel mis à jour avec succès', data })
+  } catch (error) {
+    if (error.status === 404) return res.status(404).send({ message: error.message })
+    if (error.status === 400) return res.status(400).send({ message: error.message })
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la mise à jour du rappel' })
+  }
+}
+
+exports.delete = async (req, res) => {
+  try {
+    const found = await reminderService.delete(parseInt(req.params.id), req.user.id)
+    if (!found) return res.status(404).send({ message: 'Rappel introuvable' })
+    res.status(200).send({ message: 'Rappel supprimé avec succès' })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la suppression du rappel' })
+  }
+}

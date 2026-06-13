@@ -1,40 +1,40 @@
-"use strict";
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("EventOccurrence", {
+    await queryInterface.createTable('EventOccurrence', {
       id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false,
+        allowNull: false
       },
       eventId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "CalendarEvent",
-          key: "id",
+          model: 'CalendarEvent',
+          key: 'id'
         },
-        onDelete: "CASCADE",
-        onUpdate: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       date: {
         type: Sequelize.DATEONLY,
-        allowNull: false,
+        allowNull: false
       },
       startTime: {
         type: Sequelize.TIME,
-        allowNull: false,
+        allowNull: false
       },
       endTime: {
         type: Sequelize.TIME,
-        allowNull: false,
-      },
-    });
+        allowNull: false
+      }
+    })
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("EventOccurrence");
-  },
-};
+    await queryInterface.dropTable('EventOccurrence')
+  }
+}

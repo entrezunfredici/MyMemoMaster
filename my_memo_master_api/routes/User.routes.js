@@ -1,11 +1,11 @@
-const express = require("express");
-const user = require("../controllers/User.controller.js");
-const authMiddleware = require("../middlewares/Auth.middleware.js");
-const validate = require("../middlewares/validate.middleware.js");
-const userValidators = require("../validators/User.validators.js");
-const { authLimiter, registerLimiter } = require("../middlewares/rateLimit.middleware.js");
+const express = require('express')
+const user = require('../controllers/User.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware.js')
+const validate = require('../middlewares/validate.middleware.js')
+const userValidators = require('../validators/User.validators.js')
+const { authLimiter, registerLimiter } = require('../middlewares/rateLimit.middleware.js')
 
-const router = express.Router();
+const router = express.Router()
 
 // ── Routes publiques (pas d'authMiddleware) ────────────────────────────────
 
@@ -38,7 +38,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur lors de l'inscription.
  */
-router.post("/register", registerLimiter, userValidators.register, validate, user.register);
+router.post('/register', registerLimiter, userValidators.register, validate, user.register)
 
 /**
  * @swagger
@@ -77,7 +77,7 @@ router.post("/register", registerLimiter, userValidators.register, validate, use
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/login", authLimiter, userValidators.login, validate, user.login);
+router.post('/login', authLimiter, userValidators.login, validate, user.login)
 
 /**
  * @swagger
@@ -109,7 +109,7 @@ router.post("/login", authLimiter, userValidators.login, validate, user.login);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/verify-email", authLimiter, user.verifyEmail);
+router.post('/verify-email', authLimiter, user.verifyEmail)
 
 /**
  * @swagger
@@ -136,7 +136,13 @@ router.post("/verify-email", authLimiter, user.verifyEmail);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/forgot-password", authLimiter, userValidators.forgotPassword, validate, user.forgotPassword);
+router.post(
+  '/forgot-password',
+  authLimiter,
+  userValidators.forgotPassword,
+  validate,
+  user.forgotPassword
+)
 
 /**
  * @swagger
@@ -171,7 +177,13 @@ router.post("/forgot-password", authLimiter, userValidators.forgotPassword, vali
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/reset-password", authLimiter, userValidators.resetPassword, validate, user.resetPassword);
+router.post(
+  '/reset-password',
+  authLimiter,
+  userValidators.resetPassword,
+  validate,
+  user.resetPassword
+)
 
 // ── Routes protégées (authMiddleware requis) ───────────────────────────────
 
@@ -196,7 +208,7 @@ router.post("/reset-password", authLimiter, userValidators.resetPassword, valida
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", authMiddleware, user.findOne);
+router.get('/:id', authMiddleware, user.findOne)
 
 /**
  * @swagger
@@ -233,7 +245,7 @@ router.get("/:id", authMiddleware, user.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, userValidators.update, validate, user.update);
+router.put('/:id', authMiddleware, userValidators.update, validate, user.update)
 
 /**
  * @swagger
@@ -271,7 +283,13 @@ router.put("/:id", authMiddleware, userValidators.update, validate, user.update)
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id/change-password", authMiddleware, userValidators.changePassword, validate, user.changePassword);
+router.put(
+  '/:id/change-password',
+  authMiddleware,
+  userValidators.changePassword,
+  validate,
+  user.changePassword
+)
 
 /**
  * @swagger
@@ -302,7 +320,7 @@ router.put("/:id/change-password", authMiddleware, userValidators.changePassword
  *       500:
  *         description: Erreur lors de l'ajout du rôle.
  */
-router.post("/:id/role", authMiddleware, user.addRole);
+router.post('/:id/role', authMiddleware, user.addRole)
 
 /**
  * @swagger
@@ -333,7 +351,7 @@ router.post("/:id/role", authMiddleware, user.addRole);
  *       500:
  *         description: Erreur lors de la mise à jour du rôle.
  */
-router.put("/:id/role", authMiddleware, user.updateRole);
+router.put('/:id/role', authMiddleware, user.updateRole)
 
 /**
  * @swagger
@@ -364,7 +382,7 @@ router.put("/:id/role", authMiddleware, user.updateRole);
  *       500:
  *         description: Erreur lors de la suppression du rôle.
  */
-router.delete("/:id/role", authMiddleware, user.removeRole);
+router.delete('/:id/role', authMiddleware, user.removeRole)
 
 /**
  * @swagger
@@ -387,14 +405,14 @@ router.delete("/:id/role", authMiddleware, user.removeRole);
  *       500:
  *         description: Erreur lors de la suppression.
  */
-router.delete("/:id", authMiddleware, user.delete);
+router.delete('/:id', authMiddleware, user.delete)
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Users
-     *     description: Gestion des utilisateurs
-     */
-    app.use("/users", router);
-};
+  /**
+   * @swagger
+   * tags:
+   *   - name: Users
+   *     description: Gestion des utilisateurs
+   */
+  app.use('/users', router)
+}

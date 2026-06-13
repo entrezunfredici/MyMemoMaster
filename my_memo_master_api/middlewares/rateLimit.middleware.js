@@ -1,8 +1,8 @@
-const rateLimit = require("express-rate-limit");
+const rateLimit = require('express-rate-limit')
 
 // CHOIX: skipInTest comme fonction (pas booléen) pour être réévalué à chaque requête
 // RAISON: permet de modifier NODE_ENV en cours de test sans recréer le middleware
-const skipInTest = () => process.env.NODE_ENV === "test";
+const skipInTest = () => process.env.NODE_ENV === 'test'
 
 /**
  * Limiteur pour les actions d'authentification sensibles.
@@ -15,10 +15,10 @@ const authLimiter = rateLimit({
   windowMs: parseInt(process.env.AUTH_RATE_WINDOW_MS, 10) || 15 * 60 * 1000,
   max: parseInt(process.env.AUTH_RATE_MAX, 10) || 5,
   skip: skipInTest,
-  message: { message: "Trop de tentatives, réessayez dans 15 minutes." },
+  message: { message: 'Trop de tentatives, réessayez dans 15 minutes.' },
   standardHeaders: true,
-  legacyHeaders: false,
-});
+  legacyHeaders: false
+})
 
 /**
  * Limiteur pour la création de compte.
@@ -30,10 +30,10 @@ const registerLimiter = rateLimit({
   windowMs: parseInt(process.env.REGISTER_RATE_WINDOW_MS, 10) || 60 * 60 * 1000,
   max: parseInt(process.env.REGISTER_RATE_MAX, 10) || 10,
   skip: skipInTest,
-  message: { message: "Trop de créations de compte, réessayez dans 1 heure." },
+  message: { message: 'Trop de créations de compte, réessayez dans 1 heure.' },
   standardHeaders: true,
-  legacyHeaders: false,
-});
+  legacyHeaders: false
+})
 
 /**
  * Limiteur global sur l'ensemble des routes API.
@@ -46,9 +46,9 @@ const apiLimiter = rateLimit({
   windowMs: parseInt(process.env.API_RATE_WINDOW_MS, 10) || 15 * 60 * 1000,
   max: parseInt(process.env.API_RATE_MAX, 10) || 200,
   skip: skipInTest,
-  message: { message: "Trop de requêtes, réessayez plus tard." },
+  message: { message: 'Trop de requêtes, réessayez plus tard.' },
   standardHeaders: true,
-  legacyHeaders: false,
-});
+  legacyHeaders: false
+})
 
-module.exports = { authLimiter, registerLimiter, apiLimiter };
+module.exports = { authLimiter, registerLimiter, apiLimiter }

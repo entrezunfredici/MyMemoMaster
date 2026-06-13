@@ -1,10 +1,10 @@
-const express = require("express");
-const calendarEvent = require("../controllers/CalendarEvent.controller");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const calendarEventValidators = require("../validators/CalendarEvent.validators");
+const express = require('express')
+const calendarEvent = require('../controllers/CalendarEvent.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const calendarEventValidators = require('../validators/CalendarEvent.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -20,7 +20,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/", authMiddleware, calendarEvent.findAll);
+router.get('/', authMiddleware, calendarEvent.findAll)
 
 /**
  * @swagger
@@ -42,7 +42,7 @@ router.get("/", authMiddleware, calendarEvent.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", authMiddleware, calendarEvent.findOne);
+router.get('/:id', authMiddleware, calendarEvent.findOne)
 
 /**
  * @swagger
@@ -96,7 +96,7 @@ router.get("/:id", authMiddleware, calendarEvent.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/", authMiddleware, calendarEventValidators.create, validate, calendarEvent.create);
+router.post('/', authMiddleware, calendarEventValidators.create, validate, calendarEvent.create)
 
 /**
  * @swagger
@@ -134,7 +134,7 @@ router.post("/", authMiddleware, calendarEventValidators.create, validate, calen
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, calendarEventValidators.update, validate, calendarEvent.update);
+router.put('/:id', authMiddleware, calendarEventValidators.update, validate, calendarEvent.update)
 
 /**
  * @swagger
@@ -158,7 +158,7 @@ router.put("/:id", authMiddleware, calendarEventValidators.update, validate, cal
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", authMiddleware, calendarEvent.delete);
+router.delete('/:id', authMiddleware, calendarEvent.delete)
 
 /**
  * @swagger
@@ -199,7 +199,13 @@ router.delete("/:id", authMiddleware, calendarEvent.delete);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/:id/occurrences", authMiddleware, calendarEventValidators.addOccurrence, validate, calendarEvent.addOccurrence);
+router.post(
+  '/:id/occurrences',
+  authMiddleware,
+  calendarEventValidators.addOccurrence,
+  validate,
+  calendarEvent.addOccurrence
+)
 
 /**
  * @swagger
@@ -225,7 +231,7 @@ router.post("/:id/occurrences", authMiddleware, calendarEventValidators.addOccur
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/occurrences/:occurrenceId", authMiddleware, calendarEvent.deleteOccurrence);
+router.delete('/occurrences/:occurrenceId', authMiddleware, calendarEvent.deleteOccurrence)
 
 module.exports = (app) => {
   /**
@@ -234,5 +240,5 @@ module.exports = (app) => {
    *   name: CalendarEvent
    *   description: Événements de calendrier et occurrences
    */
-  app.use("/calendar-events", router);
-};
+  app.use('/calendar-events', router)
+}

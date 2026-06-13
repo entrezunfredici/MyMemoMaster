@@ -1,12 +1,12 @@
-const express = require("express");
-const multer = require("multer");
-const storage = require("../controllers/Storage.controller");
-const upload = require("../middlewares/upload.middleware");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const storageValidators = require("../validators/Storage.validators");
+const express = require('express')
+const multer = require('multer')
+const storage = require('../controllers/Storage.controller')
+const upload = require('../middlewares/upload.middleware')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const storageValidators = require('../validators/Storage.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * Wrapper pour capturer les erreurs Multer et les renvoyer en JSON propre.
@@ -14,14 +14,14 @@ const router = express.Router();
 const handleUpload = (multerMiddleware) => (req, res, next) => {
   multerMiddleware(req, res, (err) => {
     if (err instanceof multer.MulterError) {
-      return res.status(400).send({ message: err.message });
+      return res.status(400).send({ message: err.message })
     }
     if (err) {
-      return res.status(400).send({ message: err.message });
+      return res.status(400).send({ message: err.message })
     }
-    next();
-  });
-};
+    next()
+  })
+}
 
 /**
  * @swagger
@@ -69,12 +69,7 @@ const handleUpload = (multerMiddleware) => (req, res, next) => {
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post(
-  "/upload",
-  authMiddleware,
-  handleUpload(upload.single("file")),
-  storage.upload
-);
+router.post('/upload', authMiddleware, handleUpload(upload.single('file')), storage.upload)
 
 /**
  * @swagger
@@ -123,11 +118,11 @@ router.post(
  *         description: Erreur interne du serveur.
  */
 router.post(
-  "/upload/multiple",
+  '/upload/multiple',
   authMiddleware,
-  handleUpload(upload.array("files", 5)),
+  handleUpload(upload.array('files', 5)),
   storage.uploadMultiple
-);
+)
 
 /**
  * @swagger
@@ -152,13 +147,7 @@ router.post(
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete(
-  "/file",
-  authMiddleware,
-  storageValidators.delete,
-  validate,
-  storage.delete
-);
+router.delete('/file', authMiddleware, storageValidators.delete, validate, storage.delete)
 
 module.exports = (app) => {
   /**
@@ -167,5 +156,5 @@ module.exports = (app) => {
    *   - name: Storage
    *     description: Gestion du stockage de fichiers (S3)
    */
-  app.use("/storage", router);
-};
+  app.use('/storage', router)
+}

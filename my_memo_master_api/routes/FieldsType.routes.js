@@ -1,9 +1,9 @@
-const express = require("express");
-const fieldTypeController = require("../controllers/FieldsType.controller.js");
-const validate = require("../middlewares/validate.middleware");
-const fieldsTypeValidators = require("../validators/FieldsType.validators");
+const express = require('express')
+const fieldTypeController = require('../controllers/FieldsType.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const fieldsTypeValidators = require('../validators/FieldsType.validators')
 
-const router = express.Router();
+const router = express.Router()
 /**
  * @swagger
  * /fieldstypes:
@@ -33,7 +33,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/", fieldTypeController.findAll);
+router.get('/', fieldTypeController.findAll)
 
 /**
  * @swagger
@@ -57,7 +57,7 @@ router.get("/", fieldTypeController.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", fieldTypeController.findOne);
+router.get('/:id', fieldTypeController.findOne)
 
 /**
  * @swagger
@@ -87,7 +87,7 @@ router.get("/:id", fieldTypeController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/", fieldsTypeValidators.create, validate, fieldTypeController.create);
+router.post('/', fieldsTypeValidators.create, validate, fieldTypeController.create)
 
 /**
  * @swagger
@@ -124,7 +124,7 @@ router.post("/", fieldsTypeValidators.create, validate, fieldTypeController.crea
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", fieldsTypeValidators.update, validate, fieldTypeController.update);
+router.put('/:id', fieldsTypeValidators.update, validate, fieldTypeController.update)
 
 module.exports = (app) => {
   /**
@@ -133,5 +133,5 @@ module.exports = (app) => {
    *   name: FieldsType
    *   description: Gestion des types de champs
    */
-  app.use("/fieldstypes", router);
-};
+  app.use('/fieldstypes', router)
+}

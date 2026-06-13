@@ -1,10 +1,10 @@
-const express = require("express");
-const leitnerBox = require("../controllers/LeitnerBox.controller.js");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const leitnerBoxValidators = require("../validators/LeitnerBox.validators");
+const express = require('express')
+const leitnerBox = require('../controllers/LeitnerBox.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const leitnerBoxValidators = require('../validators/LeitnerBox.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -18,7 +18,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/", authMiddleware, leitnerBox.findAll);
+router.get('/', authMiddleware, leitnerBox.findAll)
 
 /**
  * @swagger
@@ -41,7 +41,7 @@ router.get("/", authMiddleware, leitnerBox.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", authMiddleware, leitnerBox.findOne);
+router.get('/:id', authMiddleware, leitnerBox.findOne)
 
 /**
  * @swagger
@@ -74,7 +74,7 @@ router.get("/:id", authMiddleware, leitnerBox.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/", authMiddleware, leitnerBoxValidators.create, validate, leitnerBox.create);
+router.post('/', authMiddleware, leitnerBoxValidators.create, validate, leitnerBox.create)
 
 /**
  * @swagger
@@ -109,7 +109,7 @@ router.post("/", authMiddleware, leitnerBoxValidators.create, validate, leitnerB
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, leitnerBoxValidators.update, validate, leitnerBox.update);
+router.put('/:id', authMiddleware, leitnerBoxValidators.update, validate, leitnerBox.update)
 
 /**
  * @swagger
@@ -132,7 +132,7 @@ router.put("/:id", authMiddleware, leitnerBoxValidators.update, validate, leitne
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", authMiddleware, leitnerBox.delete);
+router.delete('/:id', authMiddleware, leitnerBox.delete)
 
 module.exports = (app) => {
   /**
@@ -141,5 +141,5 @@ module.exports = (app) => {
    *   name: LeitnerBoxes
    *   description: Gestion des boîtes de Leitner
    */
-  app.use("/leitnerboxes", router);
-};
+  app.use('/leitnerboxes', router)
+}

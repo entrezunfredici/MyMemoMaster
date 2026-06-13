@@ -1,9 +1,9 @@
-const express = require('express');
-const tutorials = require('../controllers/Tutorials.controller.js');
-const validate = require('../middlewares/validate.middleware');
-const tutorialsValidators = require('../validators/Tutorials.validators');
+const express = require('express')
+const tutorials = require('../controllers/Tutorials.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const tutorialsValidators = require('../validators/Tutorials.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -43,7 +43,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get('/', tutorials.findAll);
+router.get('/', tutorials.findAll)
 
 /**
  * @swagger
@@ -66,7 +66,7 @@ router.get('/', tutorials.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get('/:id', tutorials.findOne);
+router.get('/:id', tutorials.findOne)
 
 /**
  * @swagger
@@ -95,7 +95,7 @@ router.get('/:id', tutorials.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post('/', tutorialsValidators.create, validate, tutorials.create);
+router.post('/', tutorialsValidators.create, validate, tutorials.create)
 
 /**
  * @swagger
@@ -133,7 +133,7 @@ router.post('/', tutorialsValidators.create, validate, tutorials.create);
  *       500:
  *         description: Erreur serveur.
  */
-router.put('/:id', tutorialsValidators.update, validate, tutorials.update);
+router.put('/:id', tutorialsValidators.update, validate, tutorials.update)
 
 /**
  * @swagger
@@ -156,15 +156,14 @@ router.put('/:id', tutorialsValidators.update, validate, tutorials.update);
  *       500:
  *         description: Erreur serveur.
  */
-router.delete('/:id', tutorials.delete);
+router.delete('/:id', tutorials.delete)
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   name: Tutorials
-     *   description: Gestion des tutoriels
-     */
-    app.use('/tutorials', router);
-  
-  };
+  /**
+   * @swagger
+   * tags:
+   *   name: Tutorials
+   *   description: Gestion des tutoriels
+   */
+  app.use('/tutorials', router)
+}

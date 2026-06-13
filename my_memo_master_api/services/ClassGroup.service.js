@@ -1,4 +1,4 @@
-const { ClassGroup, ClassGroupUsers, User } = require("../models/index");
+const { ClassGroup, ClassGroupUsers, User } = require('../models/index')
 
 class ClassGroupService {
   /**
@@ -9,17 +9,17 @@ class ClassGroupService {
    * @returns {Promise<ClassGroup[]>}
    */
   async findAll(userId) {
-    const user = await User.findByPk(userId, { attributes: ["roleId"] });
+    const user = await User.findByPk(userId, { attributes: ['roleId'] })
     if (user?.roleId === 1) {
-      return ClassGroup.findAll({ include: [{ model: ClassGroupUsers, as: "members" }] });
+      return ClassGroup.findAll({ include: [{ model: ClassGroupUsers, as: 'members' }] })
     }
-    const memberships = await ClassGroupUsers.findAll({ where: { userId } });
-    const groupIds = memberships.map((m) => m.classGroupId);
-    if (groupIds.length === 0) return [];
+    const memberships = await ClassGroupUsers.findAll({ where: { userId } })
+    const groupIds = memberships.map((m) => m.classGroupId)
+    if (groupIds.length === 0) return []
     return ClassGroup.findAll({
       where: { id: groupIds },
-      include: [{ model: ClassGroupUsers, as: "members" }],
-    });
+      include: [{ model: ClassGroupUsers, as: 'members' }]
+    })
   }
 
   /**
@@ -30,8 +30,8 @@ class ClassGroupService {
    */
   async findOne(id) {
     return ClassGroup.findByPk(id, {
-      include: [{ model: ClassGroupUsers, as: "members" }],
-    });
+      include: [{ model: ClassGroupUsers, as: 'members' }]
+    })
   }
 
   /**
@@ -42,9 +42,9 @@ class ClassGroupService {
    * @returns {Promise<ClassGroup|false>} false si droits insuffisants
    */
   async create(userId, data) {
-    const user = await User.findByPk(userId, { attributes: ["roleId"] });
-    if (user?.roleId !== 1) return false;
-    return ClassGroup.create({ ...data, createdBy: userId });
+    const user = await User.findByPk(userId, { attributes: ['roleId'] })
+    if (user?.roleId !== 1) return false
+    return ClassGroup.create({ ...data, createdBy: userId })
   }
 
   /**
@@ -56,12 +56,12 @@ class ClassGroupService {
    * @returns {Promise<ClassGroup|null|false>} null si introuvable, false si droits insuffisants
    */
   async update(id, userId, data) {
-    const user = await User.findByPk(userId, { attributes: ["roleId"] });
-    if (user?.roleId !== 1) return false;
-    const group = await ClassGroup.findByPk(id);
-    if (!group) return null;
-    await group.update(data);
-    return group;
+    const user = await User.findByPk(userId, { attributes: ['roleId'] })
+    if (user?.roleId !== 1) return false
+    const group = await ClassGroup.findByPk(id)
+    if (!group) return null
+    await group.update(data)
+    return group
   }
 
   /**
@@ -72,12 +72,12 @@ class ClassGroupService {
    * @returns {Promise<boolean|false>} false si droits insuffisants
    */
   async delete(id, userId) {
-    const user = await User.findByPk(userId, { attributes: ["roleId"] });
-    if (user?.roleId !== 1) return false;
-    const group = await ClassGroup.findByPk(id);
-    if (!group) return null;
-    await group.destroy();
-    return true;
+    const user = await User.findByPk(userId, { attributes: ['roleId'] })
+    if (user?.roleId !== 1) return false
+    const group = await ClassGroup.findByPk(id)
+    if (!group) return null
+    await group.destroy()
+    return true
   }
 
   /**
@@ -89,18 +89,18 @@ class ClassGroupService {
    * @returns {Promise<ClassGroupUsers|null|false>}
    */
   async addMember(groupId, requesterId, memberData) {
-    const requester = await User.findByPk(requesterId, { attributes: ["roleId"] });
-    if (requester?.roleId !== 1) return false;
-    const group = await ClassGroup.findByPk(groupId);
-    if (!group) return null;
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    if (requester?.roleId !== 1) return false
+    const group = await ClassGroup.findByPk(groupId)
+    if (!group) return null
     const [membership] = await ClassGroupUsers.findOrCreate({
       where: { classGroupId: groupId, userId: memberData.userId },
-      defaults: { role: memberData.role },
-    });
+      defaults: { role: memberData.role }
+    })
     if (membership.role !== memberData.role) {
-      await membership.update({ role: memberData.role });
+      await membership.update({ role: memberData.role })
     }
-    return membership;
+    return membership
   }
 
   /**
@@ -112,15 +112,15 @@ class ClassGroupService {
    * @returns {Promise<boolean|null|false>}
    */
   async removeMember(groupId, targetUserId, requesterId) {
-    const requester = await User.findByPk(requesterId, { attributes: ["roleId"] });
-    if (requester?.roleId !== 1) return false;
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    if (requester?.roleId !== 1) return false
     const membership = await ClassGroupUsers.findOne({
-      where: { classGroupId: groupId, userId: targetUserId },
-    });
-    if (!membership) return null;
-    await membership.destroy();
-    return true;
+      where: { classGroupId: groupId, userId: targetUserId }
+    })
+    if (!membership) return null
+    await membership.destroy()
+    return true
   }
 }
 
-module.exports = new ClassGroupService();
+module.exports = new ClassGroupService()

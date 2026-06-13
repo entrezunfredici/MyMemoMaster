@@ -1,10 +1,10 @@
-const express = require("express");
-const deadline = require("../controllers/Deadline.controller");
-const authMiddleware = require("../middlewares/Auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const deadlineValidators = require("../validators/Deadline.validators");
+const express = require('express')
+const deadline = require('../controllers/Deadline.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const deadlineValidators = require('../validators/Deadline.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -20,7 +20,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/", authMiddleware, deadline.findAll);
+router.get('/', authMiddleware, deadline.findAll)
 
 /**
  * @swagger
@@ -42,7 +42,7 @@ router.get("/", authMiddleware, deadline.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", authMiddleware, deadline.findOne);
+router.get('/:id', authMiddleware, deadline.findOne)
 
 /**
  * @swagger
@@ -84,7 +84,7 @@ router.get("/:id", authMiddleware, deadline.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/", authMiddleware, deadlineValidators.create, validate, deadline.create);
+router.post('/', authMiddleware, deadlineValidators.create, validate, deadline.create)
 
 /**
  * @swagger
@@ -127,7 +127,7 @@ router.post("/", authMiddleware, deadlineValidators.create, validate, deadline.c
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", authMiddleware, deadlineValidators.update, validate, deadline.update);
+router.put('/:id', authMiddleware, deadlineValidators.update, validate, deadline.update)
 
 /**
  * @swagger
@@ -151,7 +151,7 @@ router.put("/:id", authMiddleware, deadlineValidators.update, validate, deadline
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", authMiddleware, deadline.delete);
+router.delete('/:id', authMiddleware, deadline.delete)
 
 module.exports = (app) => {
   /**
@@ -160,5 +160,5 @@ module.exports = (app) => {
    *   name: Deadline
    *   description: Échéances liées aux séances de cours
    */
-  app.use("/deadlines", router);
-};
+  app.use('/deadlines', router)
+}
