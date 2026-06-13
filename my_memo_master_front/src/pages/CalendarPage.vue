@@ -207,42 +207,59 @@
 
     <!-- ────────── Agenda latéral ────────── -->
     <aside class="cal-agenda">
+      <!-- En retard -->
+      <div v-if="!loading && planningStore.priorities.overdue.length > 0" class="agenda-section">
+        <h4 class="agenda-title agenda-title--overdue">En retard</h4>
+        <div
+          v-for="item in planningStore.priorities.overdue"
+          :key="String(item.id || item.systemId) + item.type"
+          class="agenda-item agenda-item--overdue"
+        >
+          <span class="agenda-badge agenda-badge--overdue">-{{ item.daysOverdue }}j</span>
+          <span class="agenda-name">{{ item.name }}</span>
+        </div>
+      </div>
+
       <!-- Aujourd'hui -->
       <div class="agenda-section">
         <h4 class="agenda-title">Aujourd'hui</h4>
         <div v-if="loading" class="agenda-loading">
           <span class="agenda-spinner" />
         </div>
-        <template v-else-if="revisionStore.todaySessions.length > 0">
+        <template v-else-if="planningStore.priorities.today.length > 0">
           <div
-            v-for="s in revisionStore.todaySessions"
-            :key="s.id"
-            class="agenda-item agenda-item--revision"
+            v-for="item in planningStore.priorities.today"
+            :key="String(item.id || item.systemId) + item.type"
+            class="agenda-item"
+            :class="agendaItemClass(item.type)"
           >
-            <span class="agenda-time">{{ s.startTime?.slice(0, 5) }}</span>
-            <span class="agenda-name">{{ s.name }}</span>
+            <span class="agenda-time">{{ itemTime(item) }}</span>
+            <span class="agenda-name">
+              {{ item.name }}{{ item.type === 'leitner' ? ` (${item.cardsDue})` : '' }}
+            </span>
           </div>
         </template>
-        <p v-else class="agenda-empty">Aucune séance</p>
+        <p v-else class="agenda-empty">Rien aujourd'hui</p>
       </div>
 
-      <!-- Échéances à venir -->
+      <!-- À venir -->
       <div class="agenda-section">
-        <h4 class="agenda-title">Échéances (14 j.)</h4>
+        <h4 class="agenda-title">À venir</h4>
         <div v-if="loading" class="agenda-loading">
           <span class="agenda-spinner" />
         </div>
-        <template v-else-if="upcomingDeadlines.length > 0">
+        <template v-else-if="planningStore.priorities.upcoming.length > 0">
           <div
-            v-for="d in upcomingDeadlines"
-            :key="d.id"
-            class="agenda-item agenda-item--deadline"
+            v-for="item in planningStore.priorities.upcoming"
+            :key="String(item.id || item.systemId) + item.type"
+            class="agenda-item"
+            :class="agendaItemClass(item.type)"
           >
-            <span class="agenda-time">{{ formatDate(d.dueDate) }}</span>
-            <span class="agenda-name">{{ d.name }}</span>
+            <span class="agenda-badge">+{{ item.daysUntil }}j</span>
+            <span class="agenda-name">{{ item.name }}</span>
           </div>
         </template>
-        <p v-else class="agenda-empty">Aucune échéance</p>
+        <p v-else class="agenda-empty">Aucun élément</p>
       </div>
 
       <!-- Légende -->
@@ -271,12 +288,14 @@ import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useDeadlineStore } from '@/stores/deadlines'
+import { usePlanningStore } from '@/stores/planning'
 import ReminderWidget from '@/components/ReminderWidget.vue'
 
 /* ── Stores ── */
 const calendarStore = useCalendarEventStore()
 const revisionStore = useRevisionSessionStore()
 const deadlineStore = useDeadlineStore()
+const planningStore = usePlanningStore()
 
 /* ── Constantes ── */
 const MONTHS = [
@@ -332,9 +351,8 @@ async function submitCreate() {
   creating.value = false
   if (ok) {
     showCreateModal.value = false
-    if (createForm.value.date === today.toISOString().slice(0, 10)) {
-      revisionStore.fetchTodaySessions()
-    }
+    revisionStore.fetchSessions()
+    planningStore.fetchPriorities()
   }
 }
 
@@ -344,8 +362,8 @@ onMounted(async () => {
   await Promise.all([
     calendarStore.fetchEvents(),
     revisionStore.fetchSessions(),
-    revisionStore.fetchTodaySessions(),
     deadlineStore.fetchDeadlines(),
+    planningStore.fetchPriorities(),
   ])
   loading.value = false
 })
@@ -381,21 +399,19 @@ const allEvents = computed(() => {
   return dict
 })
 
-/* ── Échéances dans les 14 prochains jours ── */
-const upcomingDeadlines = computed(() => {
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  const limit = new Date(now)
-  limit.setDate(limit.getDate() + 14)
-  return deadlineStore.deadlines
-    .filter((d) => {
-      const [y, m, day] = d.dueDate.split('-').map(Number)
-      const due = new Date(y, m - 1, day)
-      return due >= now && due <= limit
-    })
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-    .slice(0, 8)
-})
+/* ── Helpers planning ── */
+function agendaItemClass(type) {
+  if (type === 'deadline') return 'agenda-item--deadline'
+  if (type === 'revision_session') return 'agenda-item--revision'
+  if (type === 'leitner') return 'agenda-item--leitner'
+  return ''
+}
+
+function itemTime(item) {
+  if (item.startTime) return item.startTime.slice(0, 5)
+  if (item.dueTime) return item.dueTime.slice(0, 5)
+  return ''
+}
 
 /* ── Helpers ── */
 function getDaysInMonth(y, m) {
@@ -853,6 +869,32 @@ const trailingDays = computed(() => {
 }
 
 .agenda-item--deadline .agenda-name {
+  color: #dc2626;
+}
+
+.agenda-item--leitner .agenda-name {
+  color: #7c3aed;
+}
+
+.agenda-item--overdue .agenda-name {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.agenda-title--overdue {
+  color: #dc2626;
+}
+
+.agenda-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  flex-shrink: 0;
+  min-width: 26px;
+  padding-top: 1px;
+}
+
+.agenda-badge--overdue {
   color: #dc2626;
 }
 

@@ -284,6 +284,22 @@
 
 ---
 
+### [2026-06-13] Score de charge pondéré pour le planning
+**Contexte** : L'endpoint `GET /planning/load` doit retourner un `loadScore` agrégé permettant de comparer la charge entre les jours.
+**Décision** : Score = `cardsDue × 1 + sessions × 3 + deadlines × 5`. Les deadlines ont le poids le plus fort car les conséquences d'un oubli sont les plus graves.
+**Alternative écartée** : Score simple (somme égale) — ne reflète pas l'urgence relative des différents types de tâches.
+**Conséquences** : Les coefficients sont des constantes hardcodées dans le service. Si les règles métier évoluent, ils devront être ajustés manuellement dans `Planning.service.js`.
+
+---
+
+### [2026-06-13] Erreurs DeadlineService non-bloquantes dans Planning
+**Contexte** : Un utilisateur sans groupe classe ne peut pas charger ses deadlines (DeadlineService.findAll retourne [] ou peut lever une erreur). Si cette erreur propagait, l'endpoint /planning échouerait pour tous les utilisateurs sans groupe.
+**Décision** : Encapsuler l'appel DeadlineService dans un try/catch non-bloquant avec logger.warn. L'utilisateur voit deadlines=0 au lieu d'une 500.
+**Alternative écartée** : Laisser l'erreur se propager — trop restrictif pour un MVP où beaucoup d'étudiants n'ont pas encore de groupe.
+**Conséquences** : Les erreurs DB réelles sur DeadlineService sont silenciées dans /planning (mais loguées). À monitorer si des erreurs inattendues apparaissent.
+
+---
+
 ### [2026-06-06] Rate limiters extraits dans un middleware dédié
 **Contexte** : `authLimiter` et `registerLimiter` étaient définis inline dans `User.routes.js`. Le nouvel `apiLimiter` global nécessitait un point de centralisation.  
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  

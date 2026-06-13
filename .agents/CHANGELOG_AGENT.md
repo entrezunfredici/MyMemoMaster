@@ -45,6 +45,7 @@
 | Reminder (rappels BullMQ) | Stable — CRUD complet, queue Redis, worker email | 2026-06-12 |
 | ESLint / Prettier (front + back) | Stable — configs alignées, CI lint vert | 2026-06-13 |
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
+| Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
 | Tests intégration API (Supertest) | Stable — M-03.05 : 639 tests total (33 nouveaux pour Reminder) | 2026-06-12 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
@@ -63,7 +64,7 @@
 | Front — ExercisesPage / ExerciseDetailPage | Stable | init |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
-| Front — CalendarPage | Stable — connecté aux stores réels (calendarEvents, revisionSessions, deadlines) + panneau agenda latéral | 2026-06-12 |
+| Front — CalendarPage | Stable — M-03.07 : vue calendrier interactif complète + agenda latéral priorisé via API Planning | 2026-06-13 |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
@@ -1172,6 +1173,39 @@
 
 ---
 
+### [M-03.06] — Calcul charge révision et priorisation — 2026-06-13
+
+**Fichiers créés :**
+- `services/Planning.service.js` — `getLoad(userId, days)` + `getPriorities(userId)` + helper privé `_resolveUserLeitner`
+- `controllers/Planning.controller.js` — `getLoad` + `getPriorities`
+- `routes/Planning.routes.js` — `GET /planning/load` + `GET /planning/priorities` avec JSDoc Swagger
+- `validators/Planning.validators.js` — validation `days` (entier 1-90, optionnel)
+- `test/controllers/Planning.controller.test.js` — 9 tests (200 nominal, 400 validation, 401 sans token, 500 service KO)
+- `test/services/Planning.service.test.js` — 13 tests (données vides, sessions, deadlines, cartes, tri, erreur non-bloquante)
+
+**Fichiers modifiés :**
+- `app.js` — import + enregistrement `planningRoutes`
+
+**Ce qui est utilisable :**
+- `GET /api/v1/planning/load?days=14` — tableau de N jours avec `{date, cardsDue, sessions, deadlines, loadScore}`
+  - `loadScore` = `cardsDue × 1 + sessions × 3 + deadlines × 5`
+  - Les cartes en retard ou jamais révisées sont ajoutées au jour courant
+- `GET /api/v1/planning/priorities` — objet `{overdue, today, upcoming}` trié par urgence
+  - `today` : deadlines d'abord, puis sessions (par startTime), puis cartes Leitner dues
+  - `upcoming` : tout ce qui arrive dans les 7 prochains jours, trié par `daysUntil`
+- 22 tests passants
+
+**Hypothèses posées :**
+- Les erreurs de `DeadlineService.findAll` (ex. utilisateur sans groupe) sont non-bloquantes — loguées en `warn` et ignorées (l'utilisateur voit load = 0 pour les deadlines).
+- Le `loadScore` est une heuristique MVP : deadlines(5) > sessions(3) > cartes(1). Les coefficients peuvent être ajustés sans changer l'interface.
+- Les cartes jamais révisées (`next_review_at: null`) sont considérées comme "dues immédiatement" et comptées dans `today`.
+
+**Dette / points d'attention :**
+- ~~Pas de front-end pour cette fonctionnalité~~ — Résolu dans M-03.07.
+- Si l'utilisateur a beaucoup de systèmes Leitner, `getPriorities` exécute un `LeitnerCard.count` par système — acceptable pour MVP, à optimiser avec une requête GROUP BY si la charge devient importante.
+
+---
+
 ### [M-00b.08] — Variables d'environnement (.env) — 2026-06-13
 
 **Fichiers modifiés :**
@@ -1192,6 +1226,43 @@
 
 **Dette / points d'attention :**
 - Aucune dette nouvelle introduite.
+
+---
+
+### [M-03.07] — Vue calendrier interactif — 2026-06-13
+
+**Fichiers créés :**
+- `my_memo_master_front/src/stores/planning.js` — `usePlanningStore` : `fetchPriorities()` (GET /planning/priorities) + `fetchLoad(days)` (GET /planning/load)
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/pages/CalendarPage.vue` — remplacement des deux sections agenda statiques ("Aujourd'hui" sessions seules, "Échéances 14j.") par trois sections dynamiques pilotées par l'API Planning :
+  - **En retard** : visible uniquement si au moins un item ; badge `-Xj` rouge ; items deadline/session/leitner
+  - **Aujourd'hui** : todos du jour triés deadline > session > leitner (tri côté API)
+  - **À venir** : items des 7 prochains jours, badge `+Xj` ; couleur par type
+  - Import et appel `planningStore.fetchPriorities()` dans `onMounted` (remplace `revisionStore.fetchTodaySessions()`)
+  - CSS ajouté : `.agenda-badge`, `.agenda-badge--overdue`, `.agenda-title--overdue`, `.agenda-item--overdue`, `.agenda-item--leitner`
+
+**Ce qui est utilisable :**
+- Agenda latéral entièrement piloté par `GET /api/v1/planning/priorities`
+- Section "En retard" toujours visible en tête si des items sont en retard (jamais affiché avant)
+- Types d'items reconnus : `deadline` (rouge), `revision_session` (vert), `leitner` (violet avec compteur de cartes)
+- La vue calendrier principale (pills colorées, navigation, modale création/détail, rappels) est inchangée
+
+**Périmètre M-03.07 couvert :**
+- ✅ Calendrier (vues annuelle + mensuelle interactives)
+- ✅ Échéances (pills calendrier + agenda via Planning API)
+- ✅ To-do (séances du jour via Planning API)
+- ✅ Rappels (ReminderWidget dans modale de détail)
+- ✅ Priorisation (agenda latéral via `/planning/priorities` avec tri deadline > session > leitner)
+- ✅ Vue calendrier interactif (création séance via bouton + clic sur jour, modale détail)
+
+**Hypothèses posées :**
+- `revisionStore.fetchTodaySessions()` supprimé de `onMounted` — les items du jour sont maintenant fournis par `planningStore.fetchPriorities()` qui inclut les sessions du jour dans `priorities.today`.
+- La section "En retard" n'a pas de spinner pendant le chargement — elle est masquée entièrement jusqu'à ce que les données soient chargées (`v-if="!loading && ...overdue.length > 0"`), ce qui évite un flash vide.
+
+**Dette / points d'attention :**
+- Pas de tests Vitest pour CalendarPage ni pour le store planning — cohérent avec la dette front déjà documentée.
+- `GET /planning/load` est disponible dans le store mais non utilisé dans l'UI pour l'instant — à utiliser dans un futur widget de charge si nécessaire.
 
 ---
 
