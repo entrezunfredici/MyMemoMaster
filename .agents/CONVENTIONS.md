@@ -153,6 +153,7 @@ router.get("/", authMiddleware, entity.findAll);
 
 ## Règles spécifiques au projet
 
+- Les popups, modales et panneaux dropdown **doivent avoir un fond blanc explicite** (`bg-white` / `background: #ffffff`) pour rester lisibles quelle que soit la page en dessous — ne pas laisser le fond transparent ou hérité
 - Pas de logique métier dans les controllers — tout passe par les services
 - Les messages d'erreur sont en français
 - Les variables d'environnement passent par `config/db.config.js` ou `config/dbms.config.js` côté API, et `src/config.js` côté front

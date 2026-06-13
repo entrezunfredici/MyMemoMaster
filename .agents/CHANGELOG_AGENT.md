@@ -65,6 +65,7 @@
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
 | Front — CalendarPage | Stable — M-03.07/M-03.08 : calendrier interactif + sidebar onglets Agenda/To-do | 2026-06-13 |
+| Front — M-03.09 Rappels in-app | Stable — Nav /calendar + /todo, NotificationBell polling 5 min | 2026-06-13 |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
@@ -1317,6 +1318,47 @@ npx sequelize-cli db:migrate --migration 20260613000001-add-is-done-to-revision-
 **Dette / points d'attention :**
 - Pas de tests Vitest pour CalendarPage ni pour le store planning — cohérent avec la dette front déjà documentée.
 - `GET /planning/load` est disponible dans le store mais non utilisé dans l'UI pour l'instant — à utiliser dans un futur widget de charge si nécessaire.
+
+---
+
+### [M-03.09] — Intégration rappels in-app — 2026-06-13
+
+**Contexte :**
+Les composants de rappels (`NotificationBellComponent.vue`, `ReminderWidget.vue`, `TodoWidget.vue`, `TodoPage.vue`) et le store `reminders.js` étaient déjà implémentés, mais aucun lien de navigation n'existait vers `/calendar` et `/todo`, et la cloche de notification ne se rafraîchissait qu'au montage.
+
+**Fichiers modifiés (front) :**
+- `my_memo_master_front/src/App.vue` — ajout de deux liens de navigation (desktop sidebar + mobile nav) :
+  - `/calendar` → `CalendarIcon` (heroicons) avec title "Calendrier & rappels"
+  - `/todo` → `CheckCircleIcon` (heroicons) avec title "To-do"
+  - Import de `CalendarIcon` et `CheckCircleIcon` depuis `@heroicons/vue/24/outline`
+- `my_memo_master_front/src/components/NotificationBellComponent.vue` — ajout d'un polling automatique toutes les 5 minutes :
+  - `setInterval(store.fetchReminders, 5 * 60 * 1000)` dans `onMounted` (uniquement si `authStore.authenticated`)
+  - `clearInterval` dans `onBeforeUnmount` (pas de fuite mémoire)
+  - Import de `onBeforeUnmount` ajouté
+
+**Ce qui est utilisable :**
+- Navigation directe vers `/calendar` et `/todo` depuis la barre latérale (desktop) et la nav inférieure (mobile)
+- La cloche de notification affiche le nombre de rappels en attente dès le chargement de l'app et se rafraîchit automatiquement toutes les 5 minutes
+- Flux rappels in-app complet : bell badge → panneau dropdown → suppression ; clic event calendrier → modale → ReminderWidget → création rappel
+- `TodoWidget` accessible depuis la sidebar CalendarPage (onglet To-do) et depuis la page `/todo`
+
+**Périmètre M-03.09 couvert :**
+- ✅ Échéances (pills calendrier + agenda + to-do + rappels via modale)
+- ✅ To-do (TodoWidget dans sidebar CalendarPage + page /todo accessible via nav)
+- ✅ Calendrier (CalendarPage accessible via nav)
+- ✅ Rappels in-app (bell + polling + ReminderWidget par event)
+- ✅ Priorisation (agenda latéral Planning API, déjà en place)
+- ✅ Intégration rappels in-app (bell global + polling + modale par entité)
+- ❌ Synchronisation agenda externe (hors périmètre)
+- ❌ Notifications mobiles natives (hors périmètre)
+
+**Hypothèses posées :**
+- Le polling 5 min est un compromis acceptable en MVP (pas de WebSocket/SSE). Les rappels envoyés par email sont déjà gérés par BullMQ côté backend — le polling in-app sert uniquement à rafraîchir l'état affiché (statut pending/sent).
+- `CalendarIcon` et `CheckCircleIcon` sont disponibles dans `@heroicons/vue/24/outline` (déjà installé comme dépendance).
+
+**Dette / points d'attention :**
+- Pas de tests Vitest pour `NotificationBellComponent` ni `TodoWidget` — cohérent avec la dette front déjà documentée.
+- Le polling charge systématiquement tous les rappels de l'utilisateur — acceptable pour un MVP avec peu de rappels par utilisateur.
 
 ---
 

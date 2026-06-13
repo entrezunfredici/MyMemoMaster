@@ -27,15 +27,16 @@
     >
       <div
         v-if="open"
-        class="absolute right-0 mt-2 w-80 bg-white border-2 border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden"
+        class="absolute right-0 mt-2 w-80 border-2 border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden"
+        style="background-color: #ffffff"
       >
         <!-- En-tête panneau -->
-        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <h3 class="font-semibold text-primary text-base">Rappels</h3>
+        <div class="flex items-center justify-between px-4 py-3 bg-primary border-b border-blue-700">
+          <h3 class="font-semibold text-white text-base">Rappels</h3>
           <button
             @click="refresh"
             :disabled="loading"
-            class="text-xs text-gray-400 hover:text-primary transition-colors"
+            class="text-xs text-blue-200 hover:text-white transition-colors"
             title="Rafraîchir"
           >
             <ArrowPathIcon :class="['size-4', loading ? 'animate-spin' : '']" />
@@ -43,7 +44,7 @@
         </div>
 
         <!-- Liste -->
-        <div class="max-h-80 overflow-y-auto">
+        <div class="max-h-80 overflow-y-auto" style="background-color: #ffffff">
           <div v-if="loading && reminders.length === 0" class="flex justify-center py-8">
             <ArrowPathIcon class="size-5 animate-spin text-gray-400" />
           </div>
@@ -105,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { BellIcon, BellSlashIcon, XMarkIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { useReminderStore } from '@/stores/reminders'
 import { useAuthStore } from '@/stores/auth'
@@ -162,8 +163,17 @@ function close() {
   open.value = false
 }
 
-// Charge les rappels au montage uniquement si l'utilisateur est connecté
+let pollInterval = null
+
 onMounted(() => {
-  if (authStore.authenticated) store.fetchReminders()
+  if (!authStore.authenticated) return
+  store.fetchReminders()
+  pollInterval = setInterval(() => {
+    if (authStore.authenticated) store.fetchReminders()
+  }, 5 * 60 * 1000)
+})
+
+onBeforeUnmount(() => {
+  if (pollInterval) clearInterval(pollInterval)
 })
 </script>

@@ -308,6 +308,14 @@
 
 ---
 
+### [2026-06-13] Polling 5 min pour NotificationBellComponent (pas de WebSocket)
+**Contexte** : La cloche de notification doit afficher les rappels en temps quasi-réel pour informer l'utilisateur des rappels bientôt dus ou déjà traités (status sent/failed).
+**Décision** : `setInterval(() => store.fetchReminders(), 5 * 60 * 1000)` dans `onMounted`, nettoyé par `clearInterval` dans `onBeforeUnmount`. Fetch au montage, puis toutes les 5 minutes.
+**Alternative écartée** : WebSocket ou SSE côté serveur — plus réactif mais complexe à mettre en place (infrastructure Redis pub/sub, gestion des reconnexions), non requis pour un MVP où les rappels ont une granularité de plusieurs minutes.
+**Conséquences** : L'utilisateur peut voir un délai jusqu'à 5 min entre l'envoi réel d'un email de rappel (BullMQ) et la mise à jour du badge. Acceptable car l'email constitue la notification principale ; le badge in-app est informatif.
+
+---
+
 ### [2026-06-06] Rate limiters extraits dans un middleware dédié
 **Contexte** : `authLimiter` et `registerLimiter` étaient définis inline dans `User.routes.js`. Le nouvel `apiLimiter` global nécessitait un point de centralisation.  
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  
