@@ -34,6 +34,7 @@ class UserService {
     if (await this.findByEmail(user.email)) throw new Error('Email déjà utilisé')
     if (!user.name || !user.password || !user.email) throw new Error('Champs manquants')
 
+    user.roleId = user.roleId ?? 2
     user.password = await bcrypt.hash(user.password, 10)
 
     const newUser = await User.create(user)

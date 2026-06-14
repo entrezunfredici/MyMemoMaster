@@ -68,7 +68,7 @@ class CalendarEventService {
    */
   async _isAdmin(userId) {
     const user = await User.findByPk(userId, { attributes: ['roleId'] })
-    return user?.roleId === 1
+    return [1, 4].includes(user?.roleId)
   }
 
   /**

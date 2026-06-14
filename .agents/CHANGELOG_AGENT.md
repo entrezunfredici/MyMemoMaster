@@ -22,7 +22,7 @@
 |--------|------|----------------|
 | Auth (register, login, reset password) | Stable | init |
 | User (CRUD, profil) | Stable | init |
-| Role | Stable | init |
+| Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
 | Test / Question / Response | Stable — 4 bugs corrigés (alias Sequelize, params route, champ validateur) | 2026-06-06 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
@@ -38,12 +38,12 @@
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
 | Documentation règles métier Calendrier | Stable — M-03.01 : modèle données, acteurs, règles synchro, todo list, récurrence | 2026-06-10 |
-| ClassGroup / ClassGroupUsers | Stable — CRUD complet + gestion membres, droits admin | 2026-06-10 |
+| ClassGroup / ClassGroupUsers | Stable — M-05.01 : droits élargis à Admin établissement (roleId=4) | 2026-06-14 |
 | CalendarEvent / EventOccurrence | Stable — CRUD complet + récurrence auto/manual, protection RESTRICT | 2026-06-10 |
 | Deadline | Stable — CRUD complet, droits enseignant par groupe | 2026-06-10 |
 | RevisionSession | Stable — CRUD + liens optionnels idSystem/idTest + bouton Planifier depuis FlashcardsPage | 2026-06-13 |
 | Reminder (rappels BullMQ) | Stable — CRUD complet, queue Redis, worker email | 2026-06-12 |
-| ESLint / Prettier (front + back) | Stable — configs alignées, CI lint vert | 2026-06-13 |
+| ESLint / Prettier (front + back) | Stable — lint vert après revue M-03 (formatDate supprimée, globalThis→window, Reminder.controller normalisé) | 2026-06-14 |
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
@@ -69,6 +69,9 @@
 | Front — M-03.09 Rappels in-app | Stable — Nav /calendar + /todo, NotificationBell polling 5 min | 2026-06-13 |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
+| Front — RBAC (useRole, router guard) | Stable — M-05.01 : composable useRole + meta.roles guard router | 2026-06-14 |
+| Rôle par défaut inscription | Stable — roleId=2 (Étudiant) par défaut dans modèle + service | 2026-06-14 |
+| Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
 | Front — Stores Pinia Rappels | Stable — reminders.js : CRUD complet, pendingReminders, remindersByEntity | 2026-06-12 |
 | Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
@@ -1413,3 +1416,112 @@ Les composants de rappels (`NotificationBellComponent.vue`, `ReminderWidget.vue`
 **Dette / points d'attention :**
 - Les tests BDD ne couvrent pas : PUT /deadlines, DELETE /deadlines, PUT /reminders — à compléter si la couverture doit être exhaustive.
 - Le test "retourne 400 si la date de rappel est déjà passée" suppose que 99999 min > (35 jours = 50400 min) — vrai. Si la deadline devenait > 69 jours, ce test échouerait.
+
+---
+
+### [M-03-REVIEW] — Revue de code M-03 (dette technique) — 2026-06-14
+
+**Contexte :** Revue de code et correction de la dette technique accumulée sur les tickets M-03.
+
+**Fichiers modifiés (API) :**
+- `services/RevisionSession.service.js` — ajout JSDoc complet sur toutes les méthodes publiques (AGENT.md exige JSDoc sur toutes les méthodes exportées)
+- `services/ClassGroup.service.js` — correction JSDoc `delete` : retour déclaré `{Promise<boolean|false>}` mais la méthode pouvait aussi retourner `null` → corrigé en `{Promise<true|null|false>}`
+- `controllers/Reminder.controller.js` — 2 corrections dette :
+  - `res.send()` → `res.json()` (cohérence avec tous les autres controllers du projet)
+  - Messages sans point final → point final ajouté (ex. `'Rappel créé avec succès'` → `'Rappel créé avec succès.'`)
+
+**Fichiers modifiés (front) :**
+- `src/pages/CalendarPage.vue` — suppression de `formatDate()` (définie ligne 473, jamais utilisée dans le template ni dans le script après refacto vers l'API Planning)
+- `test/components/NotificationBellComponent.test.js` — `vi.spyOn(globalThis, 'clearInterval')` → `vi.spyOn(window, 'clearInterval')` (ESLint `no-undef` : `globalThis` non reconnu dans l'environnement JSDOM ; `window` est équivalent en jsdom)
+
+**Résultat :**
+- `npm run lint` (back) : ✅ 0 erreur
+- `npm run lint` (front) : ✅ 0 erreur
+- `npm test` (back) : ✅ 695/695 tests
+- `npm test` (front) : ✅ 76/76 tests
+
+**Hypothèses posées :**
+- `formatDate` dans CalendarPage.vue avait été créée pour l'agenda initial (affichage de dates). Depuis M-03.07, l'agenda est piloté par `GET /planning/priorities` et n'utilise plus cette fonction — suppression sans impact.
+- `window` et `globalThis` sont identiques en contexte jsdom/browser — le spy reste valide.
+
+**Dette / points d'attention :**
+- Worker process warning sur les tests back (`"A worker process has failed to exit gracefully"`) — préexistant, causé par le BullMQ singleton qui garde des handles ouverts. Non bloquant (tous les tests passent), mais `jest --detectOpenHandles` permettrait d'en identifier la source précise.
+- Le CI ne lance pas `prettier --check` côté back — déjà documenté dans M-00b.06.
+
+---
+
+### [M-05.01] — Définition rôles et permissions (RBAC) — 2026-06-14
+
+**Fichiers créés (API) :**
+- `seeders/20260614000001-seed-admin-etablissement-moderateur-roles.js` — roles 4 (Admin établissement) et 5 (Modérateur) insérés en base
+- `middlewares/requireRole.middleware.js` — middleware RBAC centralisé : `requireRole(...allowedRoleIds)` → 403 si roleId absent de la liste ; injecte `req.user.roleId` pour les handlers suivants
+
+**Fichiers modifiés (API) :**
+- `routes/Role.routes.js` — `POST /roles`, `PUT /roles/:id`, `DELETE /roles/:id` protégés par `requireRole(1)` (admin plateforme uniquement)
+- `routes/User.routes.js` — `POST/PUT/DELETE /users/:id/role` protégés par `requireRole(1)`
+- `services/ClassGroup.service.js` — toutes les vérifications `roleId !== 1` → `![1, 4].includes(roleId)` : l'admin établissement (4) peut créer/modifier/supprimer des groupes classes et gérer les membres
+- `services/CalendarEvent.service.js` — `_isAdmin` : `roleId === 1` → `[1, 4].includes(roleId)` pour l'admin établissement
+
+**Fichiers créés (front) :**
+- `src/composables/useRole.js` — composable RBAC : expose `isAdminPlateforme`, `isEtudiant`, `isEnseignant`, `isAdminEtablissement`, `isModerateur`, `isAdmin`, `canManageGroups`, `hasAnyRole`, `ROLE_IDS`
+
+**Fichiers modifiés (front) :**
+- `src/router/index.js` — guard `meta.roles` : redirige vers `/` si le roleId de l'utilisateur n'est pas dans la liste des rôles autorisés de la route
+- `src/pages/ClassroomPage.vue` — refacto RBAC : rôle détecté automatiquement depuis `useRole()` + `useAuthStore()` ; connexion API réelle (`GET /class-groups`) au montage ; toggle vue visible uniquement pour les admins ; `currentUserId` issu du store ; `filteredGroups` filtre sur le vrai userId
+
+**Ce qui est utilisable :**
+- 5 rôles définis : Admin plateforme (1), Étudiant (2), Enseignant (3), Admin établissement (4), Modérateur (5)
+- `requireRole(1, 4)` utilisable sur n'importe quelle route protégée (après `authMiddleware`)
+- `useRole()` utilisable dans tout composant Vue pour conditionner l'affichage
+- `meta.roles: [1]` dans les routes Vue pour restreindre l'accès à certaines pages
+- ClassroomPage affiche la vue "Professeur" pour Enseignant/Admin, "Étudiant" pour Étudiant — automatiquement
+- Admin plateforme/établissement peut basculer entre les deux vues (toggle de prévisualisation)
+- Groupes chargés depuis l'API réelle ; membres filtrés par rôle dans le groupe
+
+**Rôles et périmètres :**
+- roleId=1 Admin plateforme : accès total, seul à pouvoir CRUD les rôles et assigner des rôles à des users
+- roleId=2 Étudiant : accès lecture groupes/calendrier, pas de création
+- roleId=3 Enseignant : vue "professeur" dans ClassroomPage, peut accéder aux fonctions enseignant
+- roleId=4 Admin établissement : peut créer/modifier/supprimer groupes classes et gérer membres (comme roleId=1 pour ce périmètre)
+- roleId=5 Modérateur : rôle créé, à utiliser sur des routes de modération à définir
+
+**Hypothèses posées :**
+- `requireRole` fait une requête DB par appel (pas de cache) — acceptable en MVP mono-instance ; à passer en JWT-claim si la latence devient un problème.
+- L'unicité du compte admin plateforme n'est pas contrainte en DB — à gérer par convention (ne pas créer plusieurs users roleId=1).
+- ClassroomPage en vue étudiante filtre les groupes sur `members.find(m => m.userId === currentUserId)` — si l'étudiant n'est dans aucun groupe API, il voit les données mock de démo jusqu'à ce que des groupes réels soient créés.
+
+**Dette / points d'attention :**
+- Tests à mettre à jour : `Role.controller.test.js` — `POST/PUT/DELETE /roles` retournent désormais 403 sans token admin (les tests actuels ne mockent pas le roleId). À corriger dans un ticket de test.
+- `ClassroomPage.vue` — les sections/événements/ressources restent en données mock (non connectées à l'API) — à brancher sur `GET /class-groups/:id` + entités Calendrier dans un ticket dédié.
+- `requireRole` n'est pas encore appliqué sur les routes ClassGroup (la vérification reste dans le service via DB) — cohérent avec l'architecture actuelle (logique métier dans les services), mais un doublon middleware+service serait plus défensif.
+
+---
+
+### [INFRA] — Fixes démarrage Docker local + rôle par défaut — 2026-06-14
+
+**Contexte :** DB entièrement vidée (docker compose down -v), redémarrage propre avec Docker.
+
+**Fichiers modifiés (API) :**
+- `server.js` — `require('dotenv').config()` déplacé en **toute première ligne** (avant `require('./models')`). Bug : les variables d'env (PG_HOST, API_PORT, etc.) n'étaient pas chargées quand `models/index.js` s'exécutait → fallback SQLite involontaire + mauvais port.
+- `models/index.js` — `sync({ alter: true })` → `sync({ alter: { drop: false } })`. Sans `drop: false`, Sequelize essayait de supprimer des colonnes référencées par des FK PostgreSQL → erreur bloquante à chaque démarrage en dev.
+- `models/User.model.js` — `roleId.defaultValue: 2` ajouté — valeur DB-level pour les insertions ORM sans roleId.
+- `services/User.service.js` — `user.roleId = user.roleId ?? 2` dans `create()` — garantit le rôle Étudiant même si le defaultValue Sequelize n'est pas propagé.
+- `seeders/20260605000001-seed-roles.js` — `'Admin'` → `'Admin plateforme'` pour cohérence avec `ROLE_IDS.ADMIN_PLATEFORME`.
+
+**Problème connu (seeding + séquences PostgreSQL) :**
+Les seeders insèrent avec des `roleId` explicites (1-5). PostgreSQL ne fait pas avancer la séquence lors d'insertions avec ID explicite. Après seeding, la séquence `Role_roleId_seq` reste à 1, et le premier `Role.create()` échoue avec `SequelizeUniqueConstraintError: roleId must be unique`.
+**Fix appliqué manuellement (à faire après chaque `db:seed:all`) :**
+```sql
+SELECT setval('"Role_roleId_seq"', (SELECT MAX("roleId") FROM "Role"));
+SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
+```
+**Dette :** ajouter cette remise à zéro dans le dernier seeder ou dans `entrypoint.sh`.
+
+**Tests validés :**
+- `POST /api/v1/users/login` → 200 + token JWT (admin@mymemomaster.local / Admin1234!)
+- `GET /api/v1/roles` → 200 + 5 rôles (Admin plateforme, Étudiant, Enseignant, Admin établissement, Modérateur)
+- `POST /api/v1/roles` sans token → 401
+- `POST /api/v1/roles` avec token étudiant → 403
+- `POST /api/v1/roles` avec token admin → 201
+- `DELETE /api/v1/roles/:id` avec token admin → 204
+- Inscription nouvel utilisateur → `roleId=2` confirmé en base

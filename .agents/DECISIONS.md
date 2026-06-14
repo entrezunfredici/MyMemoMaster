@@ -27,6 +27,22 @@
 
 ---
 
+### [2026-06-14] Middleware RBAC `requireRole` — vérification DB par requête, pas par JWT
+**Contexte** : Les routes sensibles (CRUD rôles, assignation de rôle à un user) doivent être réservées à certains rôles. Le JWT actuel ne contient que `{ id: userId }`, pas le roleId.
+**Décision** : Créer `requireRole.middleware.js` qui fait une `User.findByPk(req.user.id, { attributes: ['roleId'] })` à chaque requête pour vérifier le rôle. Le résultat est injecté dans `req.user.roleId` pour les handlers suivants.
+**Alternative écartée** : Inclure `roleId` dans le payload JWT (évite la requête DB). Rejeté car un changement de rôle en base ne prendrait effet qu'à l'expiration du JWT — comportement non souhaité pour un système RBAC réactif.
+**Conséquences** : Une requête DB supplémentaire par endpoint protégé par `requireRole`. Acceptable pour un MVP mono-instance. Si la latence devient un problème à l'échelle, passer à un JWT enrichi avec durée courte (ex: 15 min) + refresh token.
+
+---
+
+### [2026-06-14] Définition des 5 rôles système
+**Contexte** : L'application doit distinguer plusieurs types d'acteurs avec des permissions différentes.
+**Décision** : 5 rôles définis par ID stable : 1=Admin plateforme (accès total), 2=Étudiant, 3=Enseignant (vue professeur dans ClassroomPage), 4=Admin établissement (gestion groupes/calendrier, comme roleId=1 sur ce périmètre), 5=Modérateur (rôle réservé, périmètre à définir).
+**Alternative écartée** : Table de permissions granulaires (Permission, RolePermission, UserPermission) — plus flexible mais disproportionné pour le MVP. Les rôles suffisent si les périmètres sont bien définis.
+**Conséquences** : Les roleIds sont des constantes métier — ne jamais les changer en base sans migration. `ROLE_IDS` dans `useRole.js` (front) et les literals `1, 4` dans les services doivent rester synchronisés.
+
+---
+
 ### [2026-06-13] Lien optionnel RevisionSession ↔ LeitnerSystem / Test
 **Contexte** : L'utilisateur veut pouvoir planifier des sessions de révision directement depuis un système Leitner ou une série d'exercices.  
 **Décision** : Ajouter deux FK nullable (`idSystem`, `idTest`) à `RevisionSession`. La création est déclenchée manuellement depuis le frontend (bouton "+ Planifier" sur chaque système Leitner). ExercisesPage non connectée à l'API : `idTest` réservé pour quand ce module sera branché.  
@@ -329,6 +345,26 @@
 **Décision** : `setInterval(() => store.fetchReminders(), 5 * 60 * 1000)` dans `onMounted`, nettoyé par `clearInterval` dans `onBeforeUnmount`. Fetch au montage, puis toutes les 5 minutes.
 **Alternative écartée** : WebSocket ou SSE côté serveur — plus réactif mais complexe à mettre en place (infrastructure Redis pub/sub, gestion des reconnexions), non requis pour un MVP où les rappels ont une granularité de plusieurs minutes.
 **Conséquences** : L'utilisateur peut voir un délai jusqu'à 5 min entre l'envoi réel d'un email de rappel (BullMQ) et la mise à jour du badge. Acceptable car l'email constitue la notification principale ; le badge in-app est informatif.
+
+---
+
+### [2026-06-14] dotenv chargé en tête de server.js, avant tout require()
+**Contexte** : `dotenv.config()` était appelé à la ligne 45 de `app.js`, après tous les `require('./routes/...')`. Or `server.js` fait `require('./models')` avant `require('./app')`. Résultat : `models/index.js` voyait `PG_HOST` vide → bascule sur SQLite ; `process.env.API_PORT` n'était pas défini au moment de `const PORT = ...` → port inattendu.
+**Décision** : Ajouter `require('dotenv').config({ path: ... })` comme **toute première ligne** de `server.js`, avant tout autre `require`. `app.js` conserve son propre appel (idempotent grâce au comportement de dotenv qui n'écrase pas les vars déjà définies).
+**Alternative écartée** : Passer les vars en CLI (`PG_HOST=... node server.js`) — fonctionnel mais fragile, non reproductible sans script wrapper.
+**Conséquences** : En Docker, les vars sont déjà dans l'environnement du conteneur (`environment:` du compose) — l'appel dotenv est no-op, aucun effet de bord. En local hors Docker, le `.env` est lu dès le démarrage, PostgreSQL est sélectionné correctement.
+
+---
+
+### [2026-06-14] Séquences PostgreSQL non avancées par les seeders (bulkInsert avec ID explicite)
+**Contexte** : Les seeders Sequelize CLI utilisent `queryInterface.bulkInsert` avec des `roleId`/`userId` explicites (1, 2, 3…). PostgreSQL ne fait pas avancer la séquence `<table>_<pk>_seq` lors d'insertions avec valeur explicite. Le premier `Role.create()` après seeding tente d'utiliser `roleId=1` (nextval de la séquence) → `SequelizeUniqueConstraintError: roleId must be unique`.
+**Décision** : Après chaque `npx sequelize-cli db:seed:all` sur une DB fraîche, exécuter manuellement la remise à zéro des séquences :
+```sql
+SELECT setval('"Role_roleId_seq"', (SELECT MAX("roleId") FROM "Role"));
+SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
+```
+**Alternative écartée** : Utiliser `OVERRIDING SYSTEM VALUE` dans les seeders ou `RESTART WITH` dans des migrations — plus propre mais nécessite de modifier tous les seeders existants.
+**Conséquences** : Dette technique : ce reset manuel est à automatiser dans le dernier seeder ou dans `entrypoint.sh` via `ALTER SEQUENCE ... RESTART WITH`. À faire avant la mise en prod pour éviter les erreurs de création en DB fraîche.
 
 ---
 

@@ -3,18 +3,24 @@
     <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-sm text-dark/70">Vue</span>
-          <button
-            :class="[role === 'prof' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'px-3 py-2 rounded-lg text-sm font-medium']"
-            @click="role = 'prof'">
-            Professeur
-          </button>
-          <button
-            :class="[role === 'student' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'px-3 py-2 rounded-lg text-sm font-medium']"
-            @click="role = 'student'">
-            Etudiant
-          </button>
-       
+          <!-- Badge rôle courant -->
+          <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            {{ viewRole === 'prof' ? 'Vue Professeur' : 'Vue Étudiant' }}
+          </span>
+          <!-- Toggle uniquement visible pour les admins plateforme/établissement -->
+          <template v-if="isAdmin">
+            <span class="text-sm text-dark/70">Prévisualiser :</span>
+            <button
+              :class="[viewRole === 'prof' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'px-3 py-2 rounded-lg text-sm font-medium']"
+              @click="setViewRole('prof')">
+              Professeur
+            </button>
+            <button
+              :class="[viewRole === 'student' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'px-3 py-2 rounded-lg text-sm font-medium']"
+              @click="setViewRole('student')">
+              Etudiant
+            </button>
+          </template>
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <input v-model="filters.search" type="search" placeholder="Rechercher une classe"
@@ -24,7 +30,7 @@
             <option value="all">Tous niveaux</option>
             <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
           </select>
-          <Button v-if="role === 'prof'" type="outline" :callback="warnNoBackend">Nouvelle classe</Button>
+          <Button v-if="canManageGroups" type="outline" :callback="warnNoBackend">Nouvelle classe</Button>
         </div>
       </div>
 
@@ -186,7 +192,7 @@
               </div>
             </div>
           </div>
-          <div v-if="role === 'student'" class="mt-4 rounded-xl border border-primary/40 bg-primary/5 p-3">
+          <div v-if="viewRole === 'student'" class="mt-4 rounded-xl border border-primary/40 bg-primary/5 p-3">
             <p class="text-sm font-semibold text-primary">Mon prochain créneau</p>
             <p class="text-sm text-dark/70">{{ nextForStudent?.title || 'Rien de planifié' }}</p>
             <p class="text-xs text-dark/60">{{ formatDate(nextForStudent?.start) }} {{ formatTimeRange(nextForStudent?.start, nextForStudent?.end) }}</p>
@@ -195,7 +201,7 @@
       </div>
 
       <div class="space-y-4">
-        <div v-if="role === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+        <div v-if="viewRole === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
           <h3 class="text-lg font-semibold text-dark">Créer une section / un rendu</h3>
           <input v-model="sessionForm.title" type="text" placeholder="Nom de section"
             class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
@@ -216,7 +222,7 @@
           <p v-if="sessionForm.message" :class="[sessionForm.status === 'error' ? 'text-secondary' : 'text-success', 'text-xs']">{{ sessionForm.message }}</p>
         </div>
 
-        <div v-if="role === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+        <div v-if="viewRole === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
           <h3 class="text-lg font-semibold text-dark">Planifier un évènement</h3>
           <input v-model="eventForm.title" type="text" placeholder="Titre"
             class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
@@ -256,7 +262,7 @@
               <span class="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">{{ resource.by }}</span>
             </div>
           </div>
-          <div v-if="role === 'prof'" class="rounded-xl border border-dashed border-gray bg-light/60 p-3">
+          <div v-if="viewRole === 'prof'" class="rounded-xl border border-dashed border-gray bg-light/60 p-3">
             <p class="text-sm font-semibold text-dark">Ajouter une ressource</p>
             <div class="mt-2 flex flex-col gap-2">
               <input v-model="resourceForm.title" type="text" placeholder="Titre du document"
@@ -273,7 +279,7 @@
           </div>
         </div>
 
-        <div v-if="role === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+        <div v-if="viewRole === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
           <h3 class="text-lg font-semibold text-dark">Affecter / retirer des étudiants</h3>
           <div class="space-y-2">
             <label v-for="student in currentGroup.students" :key="student.id" class="flex items-center justify-between rounded-xl border border-gray px-3 py-2 text-sm">
@@ -299,12 +305,33 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from '@/components/ButtonComponent.vue'
 import { AcademicCapIcon, CalendarDaysIcon, DocumentIcon } from '@heroicons/vue/24/outline'
 import { ArrowUpOnSquareIcon, CheckCircleIcon, ChevronRightIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/solid'
+import { useAuthStore } from '@/stores/auth'
+import { useRole } from '@/composables/useRole'
+import { api } from '@/helpers/api'
 
-const role = ref('prof')
+const authStore = useAuthStore()
+const { isEnseignant, isAdmin, canManageGroups } = useRole()
+
+const currentUserId = computed(() => authStore.user?.userId ?? null)
+
+// Les admins peuvent basculer manuellement entre les vues ; les autres ont une vue fixe
+const manualViewOverride = ref(null)
+
+const autoViewRole = computed(() => {
+  if (isAdmin.value || isEnseignant.value) return 'prof'
+  return 'student'
+})
+
+const viewRole = computed(() => manualViewOverride.value ?? autoViewRole.value)
+
+function setViewRole(val) {
+  if (isAdmin.value) manualViewOverride.value = val
+}
+
 const levels = ['Prépa', 'Licence', 'Terminale']
 const filters = reactive({ search: '', level: 'all' })
 const selectedGroupId = ref(null)
@@ -312,8 +339,10 @@ const expandedSessions = reactive({})
 const membershipMessage = ref('')
 const creationMessage = ref('')
 const uploadForms = reactive({})
+const loading = ref(false)
 const SAMPLE_PDF_URL = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
 
+// Données mock par défaut — remplacées par l'API au montage si disponibles
 const groups = ref([
   {
     id: 'grp-mp2i',
@@ -396,7 +425,32 @@ const sessionForm = reactive({ title: '', type: 'section', dueDate: '', status: 
 const resourceForm = reactive({ title: '', type: 'Cours', status: 'idle', message: '' })
 const eventForm = reactive({ title: '', type: 'course', date: '', time: '08:00', duration: 90, participants: [], location: '', description: '', status: 'idle', message: '', error: '' })
 
-const currentUserId = 'stu-1'
+onMounted(async () => {
+  loading.value = true
+  const resp = await api.get('class-groups')
+  if (resp && resp.status === 200 && Array.isArray(resp.data?.data) && resp.data.data.length > 0) {
+    groups.value = resp.data.data.map((g) => ({
+      ...g,
+      code: g.code ?? null,
+      level: g.level ?? null,
+      teacher: null,
+      // membres mappés au format attendu par le template
+      students: (g.members ?? [])
+        .filter((m) => m.role === 'student')
+        .map((m) => ({ id: m.userId, name: `Étudiant #${m.userId}`, email: '', active: true })),
+      sessions: [],
+      resources: [],
+      events: [],
+    }))
+    // Ajuster la vue étudiant selon le rôle dans le groupe courant
+    if (!isAdmin.value && !isEnseignant.value && currentUserId.value) {
+      const firstGroup = groups.value[0]
+      const membership = firstGroup?.members?.find((m) => m.userId === currentUserId.value)
+      if (membership?.role === 'teacher') manualViewOverride.value = 'prof'
+    }
+  }
+  loading.value = false
+})
 
 watch(groups, (list) => {
   if (!selectedGroupId.value && list.length) {
@@ -407,9 +461,9 @@ watch(groups, (list) => {
 const filteredGroups = computed(() => {
   const search = filters.search.toLowerCase()
   return groups.value.filter((group) => {
-    const matchSearch = group.name.toLowerCase().includes(search) || group.code.toLowerCase().includes(search)
+    const matchSearch = group.name.toLowerCase().includes(search) || (group.code ?? '').toLowerCase().includes(search)
     const matchLevel = filters.level === 'all' || group.level === filters.level
-    const matchRole = role.value === 'prof' || group.students.some((s) => s.id === currentUserId && s.active)
+    const matchRole = viewRole.value === 'prof' || group.students.some((s) => s.id === currentUserId.value && s.active)
     return matchSearch && matchLevel && matchRole
   })
 })
@@ -433,7 +487,7 @@ const nextDs = computed(() => getNextEvent(currentGroup.value, 'ds'))
 const nextForStudent = computed(() => {
   if (!currentGroup.value) return null
   return currentGroup.value.events
-    .filter((evt) => evt.students.includes(currentUserId) && new Date(evt.start) > new Date())
+    .filter((evt) => evt.students.includes(currentUserId.value) && new Date(evt.start) > new Date())
     .sort((a, b) => new Date(a.start) - new Date(b.start))[0]
 })
 

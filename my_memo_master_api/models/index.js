@@ -97,7 +97,7 @@ const syncModels = async (options = {}) => {
     Object.prototype.hasOwnProperty.call(options, 'alter') === false
 
   if (shouldAlter) {
-    syncOptions.alter = true
+    syncOptions.alter = { drop: false }
   }
 
   await instance.sync(syncOptions)

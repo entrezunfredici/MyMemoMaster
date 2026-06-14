@@ -260,7 +260,7 @@ describe('NotificationBellComponent', () => {
 
   it('nettoie le polling au démontage (clearInterval)', async () => {
     vi.useFakeTimers()
-    const clearSpy = vi.spyOn(globalThis, 'clearInterval')
+    const clearSpy = vi.spyOn(window, 'clearInterval')
 
     const wrapper = mountBell({ authenticated: true })
     await flushPromises()

@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs')
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface) {
+    const email = process.env.ADMIN_SEED_EMAIL || 'admin@mymemomaster.local'
     const rawPassword = process.env.ADMIN_SEED_PASSWORD || 'Admin1234!'
     const password = await bcrypt.hash(rawPassword, 10)
     const now = new Date()
@@ -15,7 +16,7 @@ module.exports = {
       [
         {
           userId: 1,
-          email: 'admin@mymemomaster.local',
+          email,
           name: 'Admin',
           roleId: 1,
           password,
@@ -29,6 +30,7 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('User', { email: 'admin@mymemomaster.local' })
+    const email = process.env.ADMIN_SEED_EMAIL || 'admin@mymemomaster.local'
+    await queryInterface.bulkDelete('User', { email })
   }
 }

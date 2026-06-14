@@ -1,6 +1,7 @@
 const express = require('express')
 const role = require('../controllers/Role.controller.js')
 const authMiddleware = require('../middlewares/Auth.middleware.js')
+const requireRole = require('../middlewares/requireRole.middleware')
 const validate = require('../middlewares/validate.middleware')
 const roleValidators = require('../validators/Role.validators')
 
@@ -94,7 +95,7 @@ router.get('/:id', authMiddleware, role.findOne)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post('/', authMiddleware, roleValidators.create, validate, role.create)
+router.post('/', authMiddleware, requireRole(1), roleValidators.create, validate, role.create)
 
 /**
  * @swagger
@@ -127,7 +128,7 @@ router.post('/', authMiddleware, roleValidators.create, validate, role.create)
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put('/:id', authMiddleware, roleValidators.update, validate, role.update)
+router.put('/:id', authMiddleware, requireRole(1), roleValidators.update, validate, role.update)
 
 /**
  * @swagger
@@ -150,7 +151,7 @@ router.put('/:id', authMiddleware, roleValidators.update, validate, role.update)
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete('/:id', authMiddleware, role.delete)
+router.delete('/:id', authMiddleware, requireRole(1), role.delete)
 
 module.exports = (app) => {
   /**

@@ -22,6 +22,7 @@ module.exports = (instance) => {
       roleId: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        defaultValue: 2,
         references: {
           model: 'Role',
           key: 'roleId'

@@ -470,11 +470,6 @@ function getEvents(y, m, d) {
   return allEvents.value[eventKey(y, m, d)] || []
 }
 
-function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-}
-
 /* ── Modale détail ── */
 function openDetail(ev) {
   selectedEvent.value = ev

@@ -1,6 +1,7 @@
 const express = require('express')
 const user = require('../controllers/User.controller.js')
 const authMiddleware = require('../middlewares/Auth.middleware.js')
+const requireRole = require('../middlewares/requireRole.middleware')
 const validate = require('../middlewares/validate.middleware.js')
 const userValidators = require('../validators/User.validators.js')
 const { authLimiter, registerLimiter } = require('../middlewares/rateLimit.middleware.js')
@@ -320,7 +321,7 @@ router.put(
  *       500:
  *         description: Erreur lors de l'ajout du rôle.
  */
-router.post('/:id/role', authMiddleware, user.addRole)
+router.post('/:id/role', authMiddleware, requireRole(1), user.addRole)
 
 /**
  * @swagger
@@ -351,7 +352,7 @@ router.post('/:id/role', authMiddleware, user.addRole)
  *       500:
  *         description: Erreur lors de la mise à jour du rôle.
  */
-router.put('/:id/role', authMiddleware, user.updateRole)
+router.put('/:id/role', authMiddleware, requireRole(1), user.updateRole)
 
 /**
  * @swagger
@@ -382,7 +383,7 @@ router.put('/:id/role', authMiddleware, user.updateRole)
  *       500:
  *         description: Erreur lors de la suppression du rôle.
  */
-router.delete('/:id/role', authMiddleware, user.removeRole)
+router.delete('/:id/role', authMiddleware, requireRole(1), user.removeRole)
 
 /**
  * @swagger

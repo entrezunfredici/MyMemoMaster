@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') })
 const http = require('http')
 const db = require('./models')
 const app = require('./app')

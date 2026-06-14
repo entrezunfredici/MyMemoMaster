@@ -10,7 +10,7 @@ class ClassGroupService {
    */
   async findAll(userId) {
     const user = await User.findByPk(userId, { attributes: ['roleId'] })
-    if (user?.roleId === 1) {
+    if ([1, 4].includes(user?.roleId)) {
       return ClassGroup.findAll({ include: [{ model: ClassGroupUsers, as: 'members' }] })
     }
     const memberships = await ClassGroupUsers.findAll({ where: { userId } })
@@ -43,7 +43,7 @@ class ClassGroupService {
    */
   async create(userId, data) {
     const user = await User.findByPk(userId, { attributes: ['roleId'] })
-    if (user?.roleId !== 1) return false
+    if (![1, 4].includes(user?.roleId)) return false
     return ClassGroup.create({ ...data, createdBy: userId })
   }
 
@@ -57,7 +57,7 @@ class ClassGroupService {
    */
   async update(id, userId, data) {
     const user = await User.findByPk(userId, { attributes: ['roleId'] })
-    if (user?.roleId !== 1) return false
+    if (![1, 4].includes(user?.roleId)) return false
     const group = await ClassGroup.findByPk(id)
     if (!group) return null
     await group.update(data)
@@ -69,11 +69,11 @@ class ClassGroupService {
    *
    * @param {number} id
    * @param {number} userId
-   * @returns {Promise<boolean|false>} false si droits insuffisants
+   * @returns {Promise<true|null|false>} null si groupe introuvable, false si droits insuffisants
    */
   async delete(id, userId) {
     const user = await User.findByPk(userId, { attributes: ['roleId'] })
-    if (user?.roleId !== 1) return false
+    if (![1, 4].includes(user?.roleId)) return false
     const group = await ClassGroup.findByPk(id)
     if (!group) return null
     await group.destroy()
