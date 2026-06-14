@@ -1,7 +1,7 @@
 jest.mock('../../models/index', () => ({
   instance: { sync: jest.fn() },
   sequelize: { transaction: jest.fn() },
-  User: {},
+  User: { findByPk: jest.fn() },
   Role: {},
   Subject: {},
   LeitnerSystem: {},
@@ -37,13 +37,17 @@ const request = require('supertest')
 const jwt = require('jsonwebtoken')
 const app = require('../../app')
 const roleService = require('../../services/Role.service')
+const { User } = require('../../models/index')
 
 const makeToken = (payload = { id: 1 }) => jwt.sign(payload, 'test-secret', { expiresIn: '1d' })
 
 const BASE = '/api/v1'
 
 describe('Role Controller', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    User.findByPk.mockResolvedValue({ roleId: 1 })
+  })
 
   // ── GET /roles ─────────────────────────────────────────────────────────────
   describe('GET /roles', () => {

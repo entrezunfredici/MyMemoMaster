@@ -55,6 +55,14 @@ module.exports = (instance) => {
         type: DataTypes.DATE,
         allowNull: true
       },
+      refreshToken: {
+        type: DataTypes.STRING(128),
+        allowNull: true
+      },
+      refreshTokenExpiresAt: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
       updatedAt: {
         type: DataTypes.DATE,
         allowNull: false,

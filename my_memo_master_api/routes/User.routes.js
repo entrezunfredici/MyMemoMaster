@@ -186,6 +186,67 @@ router.post(
   user.resetPassword
 )
 
+/**
+ * @swagger
+ * /users/refresh-token:
+ *   post:
+ *     summary: Renouveler l'access token via le refresh token
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 example: "abc123..."
+ *     responses:
+ *       200:
+ *         description: Nouveaux tokens générés.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *       401:
+ *         description: Token de rafraîchissement invalide ou expiré.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post('/refresh-token', authLimiter, userValidators.refreshToken, validate, user.refreshToken)
+
+/**
+ * @swagger
+ * /users/logout:
+ *   post:
+ *     summary: Déconnecter l'utilisateur et révoquer le refresh token
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 example: "abc123..."
+ *     responses:
+ *       200:
+ *         description: Déconnexion réussie.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post('/logout', userValidators.refreshToken, validate, user.logout)
+
 // ── Routes protégées (authMiddleware requis) ───────────────────────────────
 
 /**

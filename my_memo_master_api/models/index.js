@@ -92,7 +92,6 @@ const syncModels = async (options = {}) => {
 
   const syncOptions = { ...options }
   const shouldAlter =
-    instance.getDialect() === 'postgres' &&
     options.force !== true &&
     Object.prototype.hasOwnProperty.call(options, 'alter') === false
 

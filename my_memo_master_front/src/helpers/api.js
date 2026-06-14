@@ -216,6 +216,30 @@ const axiosApi = axios.create({
   },
 })
 
+let _isRefreshing = false
+
+async function _tryRefreshToken() {
+  const authStore = useAuthStore()
+  if (!authStore.refreshToken || _isRefreshing) return false
+
+  _isRefreshing = true
+  try {
+    const resp = await axiosApi.post('users/refresh-token', {
+      refreshToken: authStore.refreshToken
+    })
+    if (resp?.status === 200 && resp.data?.token) {
+      authStore.token = resp.data.token
+      authStore.refreshToken = resp.data.refreshToken ?? null
+      return true
+    }
+    return false
+  } catch {
+    return false
+  } finally {
+    _isRefreshing = false
+  }
+}
+
 axiosApi.interceptors.request.use(async (config) => {
   config.headers = config.headers || {};
   const headers = config.headers;
@@ -249,6 +273,18 @@ axiosApi.interceptors.request.use(async (config) => {
 
   return config;
 });
+
+axiosApi.interceptors.response.use(async (response) => {
+  if (response.status === 401 && !response.config._retried) {
+    const refreshed = await _tryRefreshToken()
+    if (refreshed) {
+      response.config._retried = true
+      removeHeader(response.config.headers, 'Authorization')
+      return axiosApi(response.config)
+    }
+  }
+  return response
+})
 
 function handleSpecialStatus(status) {
   if (status === 401) {

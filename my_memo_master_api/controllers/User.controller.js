@@ -1,6 +1,7 @@
 const userService = require('../services/User.service')
 const roleService = require('../services/Role.service')
 const jwt = require('jsonwebtoken')
+const crypto = require('crypto')
 const sendEmail = require('../helpers/sendEmail')
 const logger = require('../helpers/logger')
 
@@ -25,15 +26,56 @@ exports.login = async (req, res) => {
     const isPasswordValid = await userService.verifyPassword(user.userId, password)
     if (!isPasswordValid) return res.status(401).send({ message: 'Identifiants invalides.' })
 
-    const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '24h'
+    const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '15m'
     const token = jwt.sign({ id: user.userId }, process.env.AUTH_JWT_SECRET, { expiresIn })
+
+    const refreshToken = crypto.randomBytes(64).toString('hex')
+    const refreshTokenDays = parseInt(process.env.AUTH_REFRESH_TOKEN_EXPIRES_DAYS || '7', 10)
+    const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenDays * 24 * 60 * 60 * 1000)
+    await userService.setRefreshToken(user.userId, refreshToken, refreshTokenExpiresAt)
 
     await userService.updateLoginDate(user.userId)
 
-    res.status(200).send({ token })
+    res.status(200).send({ token, refreshToken })
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).send({ message: 'Erreur lors de la connexion.' })
+  }
+}
+
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body
+    const user = await userService.verifyRefreshToken(refreshToken)
+    if (!user) return res.status(401).send({ message: 'Token de rafraîchissement invalide ou expiré.' })
+
+    const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '15m'
+    const token = jwt.sign({ id: user.userId }, process.env.AUTH_JWT_SECRET, { expiresIn })
+
+    // Rotation : nouveau refresh token à chaque renouvellement
+    const newRefreshToken = crypto.randomBytes(64).toString('hex')
+    const refreshTokenDays = parseInt(process.env.AUTH_REFRESH_TOKEN_EXPIRES_DAYS || '7', 10)
+    const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenDays * 24 * 60 * 60 * 1000)
+    await userService.setRefreshToken(user.userId, newRefreshToken, refreshTokenExpiresAt)
+
+    res.status(200).send({ token, refreshToken: newRefreshToken })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors du rafraîchissement du token.' })
+  }
+}
+
+exports.logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body
+    if (refreshToken) {
+      const user = await userService.verifyRefreshToken(refreshToken)
+      if (user) await userService.clearRefreshToken(user.userId)
+    }
+    res.status(200).send({ message: 'Déconnexion réussie.' })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la déconnexion.' })
   }
 }
 

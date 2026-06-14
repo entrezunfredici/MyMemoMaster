@@ -20,7 +20,7 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
-| Auth (register, login, reset password) | Stable | init |
+| Auth (register, login, reset password) | Stable — M-05.03 : refresh token (rotation), intercepteur Axios, révocation logout | 2026-06-14 |
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
@@ -72,6 +72,7 @@
 | Front — RBAC (useRole, router guard) | Stable — M-05.01 : composable useRole + meta.roles guard router | 2026-06-14 |
 | Rôle par défaut inscription | Stable — roleId=2 (Étudiant) par défaut dans modèle + service | 2026-06-14 |
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
+| Refresh token (rotation, révocation) | Stable — M-05.03 : opaque 128-char hex, rotation à chaque refresh, intercepteur Axios front | 2026-06-14 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
 | Front — Stores Pinia Rappels | Stable — reminders.js : CRUD complet, pendingReminders, remindersByEntity | 2026-06-12 |
 | Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
@@ -1525,3 +1526,41 @@ SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
 - `POST /api/v1/roles` avec token admin → 201
 - `DELETE /api/v1/roles/:id` avec token admin → 204
 - Inscription nouvel utilisateur → `roleId=2` confirmé en base
+
+---
+
+### [M-05.03] — Modèle de données utilisateurs (refresh token) — 2026-06-14
+
+**Fichiers modifiés (API) :**
+- `models/User.model.js` — ajout `refreshToken` (STRING 128, nullable) + `refreshTokenExpiresAt` (DATE, nullable)
+- `services/User.service.js` — 3 nouvelles méthodes : `setRefreshToken`, `verifyRefreshToken`, `clearRefreshToken`
+- `controllers/User.controller.js` — `login` retourne maintenant `{ token, refreshToken }` + nouveaux handlers `refreshToken` et `logout`
+- `routes/User.routes.js` — 2 nouvelles routes publiques : `POST /users/refresh-token` + `POST /users/logout`
+- `validators/User.validators.js` — `exports.refreshToken` (body.refreshToken requis)
+- `.env.example` — `AUTH_JWT_EXPIRES_IN=15m` (anciennement 1d) + `AUTH_REFRESH_TOKEN_EXPIRES_DAYS=7`
+
+**Fichiers créés (API) :**
+- `migrations/20260614000002-add-refresh-token-to-user.js` — ajout des 2 colonnes sur la table User
+
+**Fichiers modifiés (front) :**
+- `src/stores/auth.js` — `refreshToken: null` dans l'état, persisté, stocké au login, révoqué au logout (fire-and-forget vers `POST /users/logout`)
+- `src/helpers/api.js` — `_tryRefreshToken()` + intercepteur response Axios : 401 → tentative refresh → retry transparent ; si échec → `handleSpecialStatus` → logout
+- `test/helpers/api.test.js` — mock axios étendu avec `response: { use: vi.fn() }`
+
+**Ce qui est utilisable :**
+- `POST /api/v1/users/login` → `{ token, refreshToken }` (accès 15 min, refresh 7 jours)
+- `POST /api/v1/users/refresh-token` → `{ refreshToken }` en body → `{ token, refreshToken }` (rotation)
+- `POST /api/v1/users/logout` → `{ refreshToken }` en body → révocation en base → 200
+- Côté front : le refresh est transparent (géré par l'intercepteur, les composants ne voient pas les 401 si le refresh token est encore valide)
+- `npx sequelize-cli db:migrate` — applique la migration `20260614000002`
+
+**Hypothèses posées :**
+- Le refresh token est stocké en clair en base, cohérent avec `validEmailCode` et `resetPasswordCode` (décision documentée dans `DECISIONS.md`)
+- La rotation systématique (nouveau token à chaque refresh) limite la fenêtre d'exploitation en cas de vol
+- `POST /users/logout` est une route publique : elle accepte le `{ refreshToken }` dans le body sans JWT — l'utilisateur peut révoquer même si son access token est expiré
+- `AUTH_JWT_EXPIRES_IN` est passé de `1d` à `15m` par défaut — les installations existantes avec `.env` explicite (`AUTH_JWT_EXPIRES_IN=1d`) ne sont pas affectées
+
+**Dette / points d'attention :**
+- Les tests existants de `User.controller` (`POST /login`) n'ont pas été mis à jour pour vérifier `refreshToken` dans la réponse — à ajouter dans un ticket de test
+- Si la DB est compromise, les refresh tokens en clair sont exploitables — à passer en hash SHA-256 si les exigences de sécurité augmentent
+- `POST /users/logout` est idempotent et retourne 200 même si le token n'existe pas en base

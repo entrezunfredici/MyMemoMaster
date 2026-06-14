@@ -51,3 +51,7 @@ exports.update = [
     .withMessage('Le nom doit contenir entre 2 et 50 caractères'),
   body('email').optional().isEmail().withMessage('Email invalide').normalizeEmail()
 ]
+
+exports.refreshToken = [
+  body('refreshToken').notEmpty().withMessage('Token de rafraîchissement requis')
+]

@@ -187,6 +187,46 @@ class UserService {
     await this.clearValidEmailCode(userId)
     await this.clearResetPasswordCode(userId)
   }
+
+  /**
+   * Enregistre un refresh token pour un utilisateur.
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @param {string} token - Token opaque généré côté controller
+   * @param {Date} expiresAt - Date d'expiration du token
+   */
+  async setRefreshToken(userId, token, expiresAt) {
+    await User.update(
+      { refreshToken: token, refreshTokenExpiresAt: expiresAt },
+      { where: { userId } }
+    )
+  }
+
+  /**
+   * Vérifie un refresh token et retourne l'utilisateur associé s'il est valide.
+   *
+   * @param {string} token - Refresh token à vérifier
+   * @returns {Promise<User|null>} L'utilisateur si le token est valide, null sinon
+   */
+  async verifyRefreshToken(token) {
+    if (!token) return null
+    const user = await User.findOne({ where: { refreshToken: token } })
+    if (!user) return null
+    if (!user.refreshTokenExpiresAt || user.refreshTokenExpiresAt < new Date()) return null
+    return user
+  }
+
+  /**
+   * Révoque le refresh token d'un utilisateur (déconnexion ou rotation forcée).
+   *
+   * @param {number} userId - ID de l'utilisateur
+   */
+  async clearRefreshToken(userId) {
+    await User.update(
+      { refreshToken: null, refreshTokenExpiresAt: null },
+      { where: { userId } }
+    )
+  }
 }
 
 module.exports = new UserService()

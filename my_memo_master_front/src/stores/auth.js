@@ -25,7 +25,7 @@ const extractApiError = (resp, fallback = 'Une erreur est survenue.') => {
 export const useAuthStore = defineStore('auth', {
   persist: {
     // Seules les données d'authentification sont persistées — pas les champs de formulaire.
-    paths: ['token', 'user', 'authenticated'],
+    paths: ['token', 'refreshToken', 'user', 'authenticated'],
   },
   state: () => ({
     authentication: {
@@ -51,6 +51,7 @@ export const useAuthStore = defineStore('auth', {
     },
     authenticated: false,
     token: null,
+    refreshToken: null,
     user: {},
   }),
 
@@ -139,6 +140,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       this.token = resp.data.token
+      this.refreshToken = resp.data.refreshToken ?? null
       this.authenticated = true
 
       // Décoder le JWT pour récupérer l'userId, puis charger le profil complet
@@ -268,9 +270,17 @@ export const useAuthStore = defineStore('auth', {
     },
 
     logout(notify = true, redirect = '/auth') {
+      const rt = this.refreshToken
+
       this.authenticated = false
       this.user = {}
       this.token = null
+      this.refreshToken = null
+
+      // Révocation côté serveur — best effort, fire and forget
+      if (rt) {
+        api.post('users/logout', { refreshToken: rt }).catch(() => {})
+      }
 
       if (redirect) {
         router.push(redirect)

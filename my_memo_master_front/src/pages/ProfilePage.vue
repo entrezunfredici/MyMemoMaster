@@ -94,8 +94,34 @@
         <p class="profile__deconnect-label">Déconnexion</p>
         <p class="profile__deconnect-hint">Terminer votre session sur cet appareil.</p>
       </div>
-      <button class="profile__btn profile__btn--danger" @click="authStore.logout()">
+      <button class="profile__btn" @click="authStore.logout()">
         Se déconnecter
+      </button>
+    </div>
+
+    <!-- Zone dangereuse -->
+    <div class="profile__card profile__card--danger-zone">
+      <h2 class="profile__title profile__title--danger">Zone dangereuse</h2>
+      <p class="profile__danger-desc">
+        La suppression de votre compte est <strong>irréversible</strong>. Toutes vos données
+        (flashcards, exercices, mind maps, sessions) seront définitivement supprimées.
+      </p>
+      <div class="profile__field">
+        <label for="delete-confirm">Tapez <strong>SUPPRIMER</strong> pour confirmer</label>
+        <input
+          id="delete-confirm"
+          v-model="deleteConfirm"
+          type="text"
+          placeholder="SUPPRIMER"
+          autocomplete="off"
+        />
+      </div>
+      <button
+        class="profile__btn profile__btn--red"
+        :disabled="deleteConfirm !== 'SUPPRIMER' || deletingAccount"
+        @click="deleteAccount"
+      >
+        {{ deletingAccount ? 'Suppression...' : 'Supprimer mon compte' }}
       </button>
     </div>
 
@@ -127,6 +153,9 @@ const savingProfile = ref(false)
 const security = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const savingPassword = ref(false)
 const passwordError = ref('')
+
+const deleteConfirm = ref('')
+const deletingAccount = ref(false)
 
 onMounted(async () => {
   await authStore.fetchUserInfos()
@@ -180,6 +209,15 @@ async function changePassword() {
 
   notif.notify('Mot de passe modifié avec succès.', 'success')
   security.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+}
+
+async function deleteAccount() {
+  deletingAccount.value = true
+  const ok = await authStore.deleteAccount()
+  if (!ok) {
+    deletingAccount.value = false
+    deleteConfirm.value = ''
+  }
 }
 </script>
 
@@ -316,5 +354,32 @@ async function changePassword() {
   font-size: 0.85rem;
   color: #6b7280;
   margin-top: 2px;
+}
+
+.profile__card--danger-zone {
+  border-color: #fca5a5;
+  background: #fff5f5;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile__title--danger {
+  color: #dc2626;
+}
+
+.profile__danger-desc {
+  font-size: 0.9rem;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.profile__btn--red {
+  background: #dc2626;
+  align-self: flex-start;
+}
+
+.profile__btn--red:hover:not(:disabled) {
+  background: #b91c1c;
 }
 </style>
