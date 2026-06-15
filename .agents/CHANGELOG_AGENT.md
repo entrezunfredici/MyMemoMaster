@@ -20,7 +20,7 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
-| Auth (register, login, reset password) | Stable — M-05.03 : refresh token (rotation), intercepteur Axios, révocation logout | 2026-06-14 |
+| Auth (register, login, reset password) | Stable — M-05.06 : reset token hashé SHA-256, migration colonne STRING(64) | 2026-06-15 |
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
@@ -73,6 +73,7 @@
 | Rôle par défaut inscription | Stable — roleId=2 (Étudiant) par défaut dans modèle + service | 2026-06-14 |
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
 | Refresh token (rotation, révocation) | Stable — M-05.03 : opaque 128-char hex, rotation à chaque refresh, intercepteur Axios front | 2026-06-14 |
+| Reset mot de passe (token hashé) | Stable — M-05.06 : token 64-char hex brut envoyé par email, hash SHA-256 stocké en base | 2026-06-15 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
 | Front — Stores Pinia Rappels | Stable — reminders.js : CRUD complet, pendingReminders, remindersByEntity | 2026-06-12 |
 | Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
@@ -1561,6 +1562,44 @@ SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
 - `AUTH_JWT_EXPIRES_IN` est passé de `1d` à `15m` par défaut — les installations existantes avec `.env` explicite (`AUTH_JWT_EXPIRES_IN=1d`) ne sont pas affectées
 
 **Dette / points d'attention :**
-- Les tests existants de `User.controller` (`POST /login`) n'ont pas été mis à jour pour vérifier `refreshToken` dans la réponse — à ajouter dans un ticket de test
+- ~~Les tests existants de `User.controller` (`POST /login`) n'ont pas été mis à jour pour vérifier `refreshToken` dans la réponse~~ — Résolu en M-05.06
 - Si la DB est compromise, les refresh tokens en clair sont exploitables — à passer en hash SHA-256 si les exigences de sécurité augmentent
 - `POST /users/logout` est idempotent et retourne 200 même si le token n'existe pas en base
+
+---
+
+### [M-05.06] — Reset mot de passe (token hashé) — 2026-06-15
+
+**Fichiers modifiés (API) :**
+- `models/User.model.js` — `resetPasswordCode` : `DataTypes.INTEGER` → `DataTypes.STRING(64)` (stocke un hash SHA-256)
+- `services/User.service.js` — suppression import `generateCode` → import `crypto` ; `setResetPasswordCode` : génère `crypto.randomBytes(32).toString('hex')` (token brut 64 chars), stocke `SHA-256(token)` en base, retourne le token brut ; `verifyResetPasswordCode` : hash le token reçu, compare au hash stocké
+- `controllers/User.controller.js` — `forgotPassword` : message email mis à jour ("token" + instruction copier-coller)
+- `validators/User.validators.js` — `resetPassword.code` : `.isHexadecimal().isLength({ min: 64, max: 64 })` (valide le format avant d'appeler le service)
+- `test/controllers/User.controller.test.js` — mock `setRefreshToken`/`verifyRefreshToken`/`clearRefreshToken` ajoutés (dette M-05.03) ; tests reset-password mis à jour avec tokens 64-char hex ; test format invalide ajouté ; test login corrigé (`refreshToken` dans la réponse asserté)
+- `test/services/User.service.test.js` — 4 nouveaux tests : `setResetPasswordCode` (vérifie token brut ≠ hash stocké), `verifyResetPasswordCode` (hash correct, token incorrect, token expiré)
+
+**Fichiers créés (API) :**
+- `migrations/20260615000001-change-reset-password-code-column.js` — `ALTER COLUMN resetPasswordCode STRING(64)`
+
+**Fichiers modifiés (front) :**
+- `src/stores/auth.js` — messages utilisateur mis à jour : "token de réinitialisation" + instruction copier-coller
+
+**Ce qui est utilisable :**
+- `POST /api/v1/users/forgot-password` → génère un token 64-char hex, envoie le token brut par email, stocke le SHA-256 en base
+- `POST /api/v1/users/reset-password` → body `{ email, code: <token_64chars_hex>, newPassword }` → vérifie `SHA-256(code) === hash_stocké` + expiration 30 min
+- Le token expiré ou déjà utilisé est automatiquement effacé en base (même si invalide)
+- `npx sequelize-cli db:migrate` — applique la migration `20260615000001`
+
+**Hypothèses posées :**
+- Le token brut (64 chars hex = 32 octets) a 2^256 valeurs possibles : infaisable à brute-forcer. Le hash SHA-256 en base protège contre l'exploitation d'une fuite de base de données.
+- Le champ body reste `code` (pas `token`) pour ne pas casser le frontend existant — seule la nature de la valeur change (64-char hex à copier-coller vs 6 chiffres à taper).
+- Le refresh token reste stocké en clair (décision MVP documentée) — seul le reset password token est hashé car il est plus critique (accès complet au compte sans connaître le mot de passe actuel).
+
+**Migration à jouer en prod :**
+```
+npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-code-column.js
+```
+
+**Dette / points d'attention :**
+- UX : l'utilisateur doit maintenant copier-coller un token de 64 caractères depuis son email, au lieu de saisir un code à 6 chiffres. Un lien cliquable (`/reset-password?token=xxx`) serait une meilleure UX — à prévoir dans un ticket front dédié.
+- Le refresh token et `validEmailCode` restent en clair — à traiter si les exigences de sécurité augmentent.

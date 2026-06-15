@@ -174,6 +174,83 @@ describe('UserService', () => {
     })
   })
 
+  describe('setResetPasswordCode', () => {
+    it('stocke le hash SHA-256 en base et retourne le token brut', async () => {
+      User.update.mockResolvedValue([1])
+
+      const token = await UserService.setResetPasswordCode(1)
+
+      expect(typeof token).toBe('string')
+      expect(token).toHaveLength(64)
+      expect(/^[0-9a-f]+$/.test(token)).toBe(true)
+
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).not.toBe(token) // le hash ≠ le token brut
+      expect(fields.resetPasswordCode).toHaveLength(64)
+      expect(fields.resetPasswordCodeExpiresAt).toBeInstanceOf(Date)
+    })
+  })
+
+  describe('verifyResetPasswordCode', () => {
+    it('retourne true si le hash correspond et le token est non expiré', async () => {
+      const crypto = require('crypto')
+      const token = crypto.randomBytes(32).toString('hex')
+      const hash = crypto.createHash('sha256').update(token).digest('hex')
+      const future = new Date(Date.now() + 10 * 60 * 1000)
+
+      const mockUser = {
+        resetPasswordCode: hash,
+        resetPasswordCodeExpiresAt: future,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyResetPasswordCode(1, token)
+
+      expect(result).toBe(true)
+      expect(mockUser.resetPasswordCode).toBeNull()
+      expect(mockUser.resetPasswordCodeExpiresAt).toBeNull()
+      expect(mockUser.save).toHaveBeenCalled()
+    })
+
+    it('retourne false si le token ne correspond pas', async () => {
+      const crypto = require('crypto')
+      const correctToken = crypto.randomBytes(32).toString('hex')
+      const hash = crypto.createHash('sha256').update(correctToken).digest('hex')
+      const future = new Date(Date.now() + 10 * 60 * 1000)
+
+      const mockUser = {
+        resetPasswordCode: hash,
+        resetPasswordCodeExpiresAt: future,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const wrongToken = crypto.randomBytes(32).toString('hex')
+      const result = await UserService.verifyResetPasswordCode(1, wrongToken)
+
+      expect(result).toBe(false)
+    })
+
+    it('retourne false si le token est expiré', async () => {
+      const crypto = require('crypto')
+      const token = crypto.randomBytes(32).toString('hex')
+      const hash = crypto.createHash('sha256').update(token).digest('hex')
+      const past = new Date(Date.now() - 1000)
+
+      const mockUser = {
+        resetPasswordCode: hash,
+        resetPasswordCodeExpiresAt: past,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyResetPasswordCode(1, token)
+
+      expect(result).toBe(false)
+    })
+  })
+
   describe('setRole', () => {
     it('should set a role for a user', async () => {
       Role.findByPk.mockResolvedValue({ userId: 1, name: 'Admin' })

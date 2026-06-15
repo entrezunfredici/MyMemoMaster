@@ -1,6 +1,6 @@
 const { User, Role, UserOnboardingState } = require('../models/index')
 const bcrypt = require('bcryptjs')
-const generateCode = require('../helpers/generateCode')
+const crypto = require('crypto')
 
 class UserService {
   async findAll() {
@@ -149,23 +149,36 @@ class UserService {
     )
   }
 
-  async setResetPasswordCode(userId, code = '') {
-    if (!code) code = generateCode()
+  /**
+   * Génère un token de réinitialisation, stocke son hash SHA-256 en base et retourne le token brut.
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @returns {Promise<string>} Token brut à envoyer par email (32 octets hex, 64 chars)
+   */
+  async setResetPasswordCode(userId) {
+    const token = crypto.randomBytes(32).toString('hex')
+    const hash = crypto.createHash('sha256').update(token).digest('hex')
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
     await User.update(
-      { resetPasswordCode: code, resetPasswordCodeExpiresAt: expiresAt },
-      {
-        where: { userId: userId }
-      }
+      { resetPasswordCode: hash, resetPasswordCodeExpiresAt: expiresAt },
+      { where: { userId } }
     )
-    return code
+    return token
   }
 
-  async verifyResetPasswordCode(userId, code) {
+  /**
+   * Vérifie un token de réinitialisation en comparant son hash SHA-256 avec celui stocké en base.
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @param {string} token - Token brut reçu depuis le formulaire
+   * @returns {Promise<boolean>} true si le token est valide et non expiré
+   */
+  async verifyResetPasswordCode(userId, token) {
     const user = await User.findByPk(userId)
+    const hash = crypto.createHash('sha256').update(token).digest('hex')
     const now = new Date()
     const isValid =
-      user.resetPasswordCode === Number(code) &&
+      user.resetPasswordCode === hash &&
       user.resetPasswordCodeExpiresAt &&
       user.resetPasswordCodeExpiresAt > now
     user.resetPasswordCode = null

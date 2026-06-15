@@ -33,7 +33,12 @@ exports.forgotPassword = [emailRules]
 
 exports.resetPassword = [
   emailRules,
-  body('code').trim().notEmpty().withMessage('Code requis'),
+  body('code')
+    .trim()
+    .isHexadecimal()
+    .withMessage('Token invalide')
+    .isLength({ min: 64, max: 64 })
+    .withMessage('Token invalide'),
   newPasswordRules
 ]
 

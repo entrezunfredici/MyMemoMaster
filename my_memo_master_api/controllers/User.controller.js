@@ -106,7 +106,7 @@ exports.forgotPassword = async (req, res) => {
     const code = await userService.setResetPasswordCode(user.userId)
     await sendEmail(
       'Réinitialisation de mot de passe - MyMemoMaster',
-      `Votre code de réinitialisation est : ${code}\n\nCe code est valable 30 minutes.`,
+      `Votre token de réinitialisation est :\n\n${code}\n\nCopiez-collez ce token dans le formulaire de réinitialisation.\nIl est valable 30 minutes.`,
       email
     )
 

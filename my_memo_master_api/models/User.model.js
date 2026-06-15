@@ -39,7 +39,7 @@ module.exports = (instance) => {
         allowNull: true
       },
       resetPasswordCode: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING(64),
         allowNull: true
       },
       resetPasswordCodeExpiresAt: {

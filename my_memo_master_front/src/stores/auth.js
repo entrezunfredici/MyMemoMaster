@@ -228,7 +228,7 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
 
-      notif.notify('Un email avec le code de réinitialisation a été envoyé.', 'success')
+      notif.notify('Un email avec votre token de réinitialisation a été envoyé. Copiez-collez le token reçu dans le formulaire.', 'success')
       this.setAuthenticationTab('resetPassword')
 
       return true
@@ -240,7 +240,7 @@ export const useAuthStore = defineStore('auth', {
 
       let error = null
 
-      if (!error && !code) error = 'Veuillez saisir le code reçu.'
+      if (!error && !code) error = 'Veuillez coller le token de réinitialisation reçu par email.'
       if (!error && !newPassword) error = 'Veuillez saisir votre nouveau mot de passe.'
       if (!error && missingsElementsPassword(newPassword).length > 0) {
         error = `Le mot de passe doit contenir au minimum : ${missingsElementsPassword(newPassword).join(', ')}`

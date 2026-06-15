@@ -154,6 +154,24 @@ const routes = [
     }
   },
   {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('../pages/ForgotPasswordPage.vue'),
+    meta: {
+      title: 'Mot de passe oublié',
+      private: false
+    }
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('../pages/ResetPasswordPage.vue'),
+    meta: {
+      title: 'Réinitialiser le mot de passe',
+      private: false
+    }
+  },
+  {
     path: '/register',
     name: 'register',
     component: () => import('../pages/register/InscriptionPage.vue'),

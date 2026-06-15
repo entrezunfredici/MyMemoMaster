@@ -30,6 +30,9 @@ jest.mock('../../services/User.service', () => ({
   delete: jest.fn(),
   verifyPassword: jest.fn(),
   updateLoginDate: jest.fn(),
+  setRefreshToken: jest.fn(),
+  verifyRefreshToken: jest.fn(),
+  clearRefreshToken: jest.fn(),
   setResetPasswordCode: jest.fn(),
   setPassword: jest.fn(),
   setRole: jest.fn(),
@@ -117,10 +120,11 @@ describe('User Controller', () => {
 
   // ── POST /users/login ──────────────────────────────────────────────────────
   describe('POST /users/login', () => {
-    it('200 — retourne un token JWT', async () => {
+    it('200 — retourne un token JWT et un refresh token', async () => {
       const mockUser = { userId: 1, name: 'Bob', email: 'bob@example.com', role: 'user' }
       userService.findByEmail.mockResolvedValue(mockUser)
       userService.verifyPassword.mockResolvedValue(true)
+      userService.setRefreshToken.mockResolvedValue()
       userService.updateLoginDate.mockResolvedValue()
 
       const res = await request(app)
@@ -129,6 +133,7 @@ describe('User Controller', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.token).toBeDefined()
+      expect(res.body.refreshToken).toBeDefined()
     })
 
     it('401 — utilisateur introuvable (identifiants invalides)', async () => {
@@ -208,9 +213,11 @@ describe('User Controller', () => {
 
   // ── POST /users/forgot-password ────────────────────────────────────────────
   describe('POST /users/forgot-password', () => {
-    it("201 — envoie l'email avec le code", async () => {
+    const FAKE_TOKEN = 'a'.repeat(64)
+
+    it("201 — envoie l'email avec le token", async () => {
       userService.findByEmail.mockResolvedValue({ userId: 1, email: 'bob@example.com' })
-      userService.setResetPasswordCode.mockResolvedValue('ABC123')
+      userService.setResetPasswordCode.mockResolvedValue(FAKE_TOKEN)
       sendEmail.mockResolvedValue()
 
       const res = await request(app)
@@ -220,7 +227,7 @@ describe('User Controller', () => {
       expect(res.status).toBe(201)
       expect(sendEmail).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('ABC123'),
+        expect.stringContaining(FAKE_TOKEN),
         'bob@example.com'
       )
     })
@@ -244,6 +251,9 @@ describe('User Controller', () => {
 
   // ── POST /users/reset-password ─────────────────────────────────────────────
   describe('POST /users/reset-password', () => {
+    const VALID_TOKEN = 'a'.repeat(64)
+    const WRONG_TOKEN = 'b'.repeat(64)
+
     it('201 — réinitialise le mot de passe', async () => {
       userService.findByEmail.mockResolvedValue({ userId: 1 })
       userService.verifyResetPasswordCode.mockResolvedValue(true)
@@ -251,26 +261,34 @@ describe('User Controller', () => {
 
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', code: 'ABC123', newPassword: 'NewPass123' })
+        .send({ email: 'bob@example.com', code: VALID_TOKEN, newPassword: 'NewPass123' })
 
       expect(res.status).toBe(201)
     })
 
-    it('401 — code invalide', async () => {
+    it('401 — token invalide (ne correspond pas)', async () => {
       userService.findByEmail.mockResolvedValue({ userId: 1 })
       userService.verifyResetPasswordCode.mockResolvedValue(false)
 
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', code: 'WRONG', newPassword: 'NewPass123' })
+        .send({ email: 'bob@example.com', code: WRONG_TOKEN, newPassword: 'NewPass123' })
 
       expect(res.status).toBe(401)
     })
 
-    it('400 — code manquant', async () => {
+    it('400 — token absent', async () => {
       const res = await request(app)
         .post('/api/v1/users/reset-password')
         .send({ email: 'bob@example.com', newPassword: 'NewPass123' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('400 — token format invalide (trop court)', async () => {
+      const res = await request(app)
+        .post('/api/v1/users/reset-password')
+        .send({ email: 'bob@example.com', code: 'abc123', newPassword: 'NewPass123' })
 
       expect(res.status).toBe(400)
     })

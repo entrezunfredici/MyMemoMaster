@@ -19,7 +19,7 @@
         <div class="mb-4">
           <label for="login-password" class="block text-gray-700">Mot de passe</label>
           <input id="login-password" name="password" type="password" v-model="password" required class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-          <a href="#" class="text-sm text-blue-600">Mot de passe oublié ?</a>
+          <router-link to="/forgot-password" class="text-sm text-blue-600">Mot de passe oublié ?</router-link>
         </div>
         
         <!-- <div class="mb-4">

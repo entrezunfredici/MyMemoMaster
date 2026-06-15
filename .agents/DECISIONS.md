@@ -30,8 +30,16 @@
 ### [2026-06-14] Refresh token — opaque, stocké en clair, rotation à chaque renouvellement
 **Contexte** : L'access token JWT est court (15 min). Il faut un mécanisme pour renouveler sans redemander les identifiants.
 **Décision** : Refresh token opaque (`crypto.randomBytes(64).toString('hex')`, 128 chars hex), stocké en clair dans `User.refreshToken` (+ `refreshTokenExpiresAt`). Rotation systématique : chaque `POST /users/refresh-token` invalide l'ancien et en émet un nouveau. Côté front : intercepteur Axios response qui tente le refresh en cas de 401 avant de logger l'utilisateur. Le logout révoque le token côté serveur (route publique `POST /users/logout`).
-**Alternative écartée** : Stocker le refresh token hashé en base (sha256) — plus sécurisé si la DB est compromise, mais ajoute de la complexité sans bénéfice MVP. Le token en clair est cohérent avec l'approche des codes `validEmailCode` et `resetPasswordCode` déjà en clair. / Refresh token dans un httpOnly cookie — pas de XSS, mais ajoute de la complexité CORS hors MVP.
+**Alternative écartée** : Stocker le refresh token hashé en base (sha256) — plus sécurisé si la DB est compromise, mais ajoute de la complexité sans bénéfice MVP. Le token en clair est cohérent avec l'approche des codes `validEmailCode` déjà en clair. / Refresh token dans un httpOnly cookie — pas de XSS, mais ajoute de la complexité CORS hors MVP.
 **Conséquences** : Migration `20260614000002` à passer. Si la DB est compromise, les refresh tokens actifs sont lisibles. La rotation limite la fenêtre d'exploitation. `AUTH_JWT_EXPIRES_IN=15m` et `AUTH_REFRESH_TOKEN_EXPIRES_DAYS=7` sont les nouvelles valeurs par défaut (ancienne valeur: 24h pour l'access token).
+
+---
+
+### [2026-06-15] Reset password token — hashé SHA-256, token brut envoyé par email
+**Contexte** : Le code de reset password (6 chiffres, stocké en INTEGER en clair) offrait une faible entropie (900 000 valeurs) et était lisible en cas de fuite de base de données. Ticket M-05.06 impose "token hashé".
+**Décision** : Token opaque `crypto.randomBytes(32).toString('hex')` (64 chars hex, 2^256 valeurs), hash SHA-256 stocké en base (`User.resetPasswordCode STRING(64)`). Le token brut est envoyé par email. À la vérification, `SHA-256(token_reçu)` est comparé au hash stocké. Le token est effacé en base après la première vérification (valide ou non).
+**Alternative écartée** : Conserver le code à 6 chiffres mais le hasher avec bcrypt — bcrypt sur 900 000 valeurs reste vulnérable aux rainbow tables pré-calculées. / Garder le stockage en clair — exposé en cas de fuite DB.
+**Conséquences** : Migration `20260615000001` à passer (colonne INTEGER → STRING(64)). L'utilisateur doit désormais copier-coller un token de 64 chars depuis son email au lieu de saisir un code court — UX dégradée, un lien cliquable serait idéal dans un ticket front dédié. Le `validEmailCode` et le `refreshToken` restent en clair (décisions distinctes documentées ci-dessus).
 
 ---
 
