@@ -59,7 +59,7 @@
 | Migrations Sequelize CLI | Stable — 23 migrations + migration index FK | 2026-06-05 |
 | Seeders Sequelize CLI | Stable — Roles + User admin | 2026-06-05 |
 | Jobs (fifo.cron.js) | Stable | init |
-| Front — Auth (login, register) | Stable — M-05.09b : CSS partagé extrait dans auth-form.css (bug ForgotPassword/Reset corrigé) | 2026-06-16 |
+| Front — Auth (login, register) | Stable — M-05.09c : AuthFormLayout.vue composant layout partagé (4 pages auth refactorisées) | 2026-06-16 |
 | Front — HomePage | Stable | init |
 | Front — FlashcardsPage | Stable — bouton "+ Planifier" par système → crée une RevisionSession liée via idSystem | 2026-06-13 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable | init |
@@ -1584,6 +1584,25 @@ SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
 **Build Vite :** ✅ 0 erreur après suppression
 
 **Dette résolue :** style Vue mixte (Options API vs Composition API), AuthPage vide, minlength incohérent
+
+---
+
+### [M-05.09c] — Composant layout partagé AuthFormLayout — 2026-06-16
+
+**Contexte :** Les 4 pages d'auth (Connexion, Inscription, ForgotPassword, ResetPassword) partageaient exactement le même squelette HTML (wrapper 2 colonnes, image gauche, panel droit avec logo + titre). Ce layout était copié-collé dans chaque page.
+
+**Fichiers créés :**
+- `src/components/AuthFormLayout.vue` — composant layout pur (aucune logique métier). Props : `title` (required), `imageSrc` (default `/connexion.jpg`), `imageAlt`, `description` (optionnel, affiche un `<p>` sous le titre), `titleClass` (default `md:text-[2.5rem]`). Slot default = contenu du formulaire.
+
+**Fichiers modifiés (réécriture template uniquement, logique inchangée) :**
+- `pages/login/ConnexionPage.vue` — template réduit à `<AuthFormLayout title="Connexion" title-class="md:text-[3rem] neue-haas-grotesk-font">` + le formulaire
+- `pages/register/InscriptionPage.vue` — idem + correction : `../../../public/inscription.png` → `/inscription.png` ; `../../../public/logo/logo-full.svg` → via le layout ; `bg-blue-500` (bleu Tailwind #3B82F6 incorrect) → `bg-primary` (#1E3BA1 via layout)
+- `pages/ForgotPasswordPage.vue` — `description` passée en prop, layout HTML supprimé
+- `pages/ResetPasswordPage.vue` — idem
+
+**Bug corrigé :** InscriptionPage utilisait `bg-blue-500` (bleu Tailwind standard, différent du bleu primaire du projet) sur le panel gauche. Normalisé via le layout.
+
+**Build Vite :** ✅ 0 erreur (897 modules → -2 vs avant : le layout mutualisé réduit les chunks d'auth)
 
 ---
 
