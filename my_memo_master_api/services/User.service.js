@@ -123,7 +123,7 @@ class UserService {
   }
 
   async setValidEmailCode(userId, code = '') {
-    if (!code) code = generateCode()
+    if (!code) code = crypto.randomInt(100000, 1000000).toString()
     await User.update(
       { validEmailCode: code },
       {
