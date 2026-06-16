@@ -39,6 +39,7 @@
 </template>
 
 <script setup>
+import '@/assets/auth-form.css'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/helpers/api'

@@ -59,7 +59,7 @@
 | Migrations Sequelize CLI | Stable — 23 migrations + migration index FK | 2026-06-05 |
 | Seeders Sequelize CLI | Stable — Roles + User admin | 2026-06-05 |
 | Jobs (fifo.cron.js) | Stable | init |
-| Front — Auth (login, register) | Stable | init |
+| Front — Auth (login, register) | Stable — M-05.09b : CSS partagé extrait dans auth-form.css (bug ForgotPassword/Reset corrigé) | 2026-06-16 |
 | Front — HomePage | Stable | init |
 | Front — FlashcardsPage | Stable — bouton "+ Planifier" par système → crée une RevisionSession liée via idSystem | 2026-06-13 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable | init |
@@ -1568,6 +1568,25 @@ SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
 
 ---
 
+### [M-05.09] — Dette technique pages Auth (Composition API) — 2026-06-16
+
+**Fichiers réécrits (migration Options API → `<script setup>`) :**
+- `pages/login/ConnexionPage.vue` — `<script src="./Connexion.js">` remplacé par `<script setup>` ; `<style scoped src="./Connexion.css">` inliné ; commentaire HTML mort supprimé
+- `pages/register/InscriptionPage.vue` — même migration ; `minlength="6"` → `minlength="10"` (alignement avec la validation JS et le backend) ; label "Name" → "Nom"
+
+**Fichiers supprimés :**
+- `pages/login/Connexion.js` — logique maintenant dans le SFC
+- `pages/login/Connexion.css` — styles maintenant inlinés dans `<style scoped>`
+- `pages/register/Register.js` — idem
+- `pages/register/Register.css` — idem
+- `pages/AuthPage.vue` — fichier vide non référencé (route `/auth` pointait déjà vers `ConnexionPage.vue`)
+
+**Build Vite :** ✅ 0 erreur après suppression
+
+**Dette résolue :** style Vue mixte (Options API vs Composition API), AuthPage vide, minlength incohérent
+
+---
+
 ### [M-05.08] — Tests gestion sessions et déconnexion — 2026-06-16
 
 **Fichiers modifiés :**
@@ -1638,3 +1657,22 @@ npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-co
 **Dette / points d'attention :**
 - UX : l'utilisateur doit maintenant copier-coller un token de 64 caractères depuis son email, au lieu de saisir un code à 6 chiffres. Un lien cliquable (`/reset-password?token=xxx`) serait une meilleure UX — à prévoir dans un ticket front dédié.
 - Le refresh token et `validEmailCode` restent en clair — à traiter si les exigences de sécurité augmentent.
+
+---
+
+### [M-05.09b] — CSS partagé pages auth (auth-form.css) — 2026-06-16
+
+**Contexte :** Les 4 pages d'auth (ConnexionPage, InscriptionPage, ForgotPasswordPage, ResetPasswordPage) partageaient les mêmes classes CSS (`.custom-border`, `.imageConnexion`, `.formulaire`, `.valider`, `.contenue`). Les styles étaient dupliqués dans les `<style scoped>` de Connexion et Inscription, et absents (bug silencieux) dans ForgotPassword et ResetPassword qui utilisaient ces classes sans les définir.
+
+**Fichiers créés :**
+- `my_memo_master_front/src/assets/auth-form.css` — 5 classes partagées : `.custom-border`, `.imageConnexion`, `.valider`, `.contenue`, `.formulaire`
+
+**Fichiers modifiés :**
+- `pages/login/ConnexionPage.vue` — ajout `import '@/assets/auth-form.css'` ; suppression `<style scoped>`
+- `pages/register/InscriptionPage.vue` — ajout `import '@/assets/auth-form.css'` ; suppression `<style scoped>`
+- `pages/ForgotPasswordPage.vue` — ajout `import '@/assets/auth-form.css'` (corrige bug : `.custom-border` et `.formulaire` étaient définis dans le template mais n'avaient aucun style)
+- `pages/ResetPasswordPage.vue` — même correction
+
+**Bug corrigé :** ForgotPasswordPage et ResetPasswordPage utilisaient `.custom-border` et `.formulaire` dans le template sans que ces classes soient définies — la bordure arrondie bleue et le fond blanc n'étaient pas appliqués sur ces deux pages.
+
+**Build Vite :** ✅ 0 erreur
