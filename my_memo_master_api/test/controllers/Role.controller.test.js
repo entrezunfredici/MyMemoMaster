@@ -171,6 +171,18 @@ describe('Role Controller', () => {
       expect(res.status).toBe(401)
     })
 
+    it('403 — rôle non autorisé (étudiant)', async () => {
+      User.findByPk.mockResolvedValueOnce({ roleId: 2 })
+
+      const res = await request(app)
+        .post(`${BASE}/roles`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Professeur' })
+
+      expect(res.status).toBe(403)
+      expect(roleService.create).not.toHaveBeenCalled()
+    })
+
     it('500 — le service échoue', async () => {
       roleService.create.mockRejectedValue(new Error('DB error'))
 
@@ -221,6 +233,18 @@ describe('Role Controller', () => {
 
       expect(res.status).toBe(401)
     })
+
+    it('403 — rôle non autorisé (étudiant)', async () => {
+      User.findByPk.mockResolvedValueOnce({ roleId: 2 })
+
+      const res = await request(app)
+        .put(`${BASE}/roles/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Super Admin' })
+
+      expect(res.status).toBe(403)
+      expect(roleService.update).not.toHaveBeenCalled()
+    })
   })
 
   // ── DELETE /roles/:id ──────────────────────────────────────────────────────
@@ -248,6 +272,17 @@ describe('Role Controller', () => {
     it('401 — pas de token', async () => {
       const res = await request(app).delete(`${BASE}/roles/1`)
       expect(res.status).toBe(401)
+    })
+
+    it('403 — rôle non autorisé (étudiant)', async () => {
+      User.findByPk.mockResolvedValueOnce({ roleId: 2 })
+
+      const res = await request(app)
+        .delete(`${BASE}/roles/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+      expect(roleService.delete).not.toHaveBeenCalled()
     })
 
     it('500 — le service échoue', async () => {

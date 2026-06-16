@@ -4,7 +4,7 @@
       <img src="/connexion.jpg" alt="Connexion" class="w-full h-full object-cover imageConnexion">
     </div>
 
-    <div class="w-full md:w-[30%] flex flex-col justify-center items-center bg-white px-8 md:px-16 border border-[#1E3BA1] custom-border formulaire">
+    <div class="w-full md:w-[30%] flex flex-col justify-center items-center bg-white px-8 md:px-16 border border-[#1E3BA1]  custom-border formulaire">
       <img src="/logo/logo-full.svg" alt="logo" class="w-auto h-auto object-cover">
       <h2 class="text-primary text-[2rem] md:text-[2.5rem] font-bold text-center">Mot de passe oublié</h2>
       <p class="text-gray-500 text-sm text-center mt-2 mb-6">Saisissez votre email, vous recevrez un token de réinitialisation.</p>

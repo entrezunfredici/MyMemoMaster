@@ -47,7 +47,7 @@
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
-| Tests intégration API (Supertest) | Stable — M-03.10 : 695 tests total (11 Deadline.service unit + 15 BDD deadline.reminder) | 2026-06-13 |
+| Tests intégration API (Supertest) | Stable — M-05.08 : 724 tests total (+8 : POST /refresh-token + POST /logout) | 2026-06-16 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
@@ -1565,6 +1565,41 @@ SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
 - ~~Les tests existants de `User.controller` (`POST /login`) n'ont pas été mis à jour pour vérifier `refreshToken` dans la réponse~~ — Résolu en M-05.06
 - Si la DB est compromise, les refresh tokens en clair sont exploitables — à passer en hash SHA-256 si les exigences de sécurité augmentent
 - `POST /users/logout` est idempotent et retourne 200 même si le token n'existe pas en base
+
+---
+
+### [M-05.08] — Tests gestion sessions et déconnexion — 2026-06-16
+
+**Fichiers modifiés :**
+- `test/controllers/User.controller.test.js` — 8 tests ajoutés :
+  - `POST /users/refresh-token` : 200 nominal (nouveau token + rotation refreshToken), 401 token invalide/expiré, 400 body vide, 500 service KO
+  - `POST /users/logout` : 200 révocation, 200 idempotent (token inconnu → pas de clearRefreshToken), 400 body vide, 500 service KO
+
+**Résultat :** 724 tests (716 → +8) — tous verts
+
+**Dette résolue :** routes `/refresh-token` et `/logout` sans couverture Supertest (signalée dans M-05.03)
+
+---
+
+### [M-05.07] — Tests RBAC middleware — 2026-06-16
+
+**Contexte :** Le middleware `requireRole` avait été livré dans M-05.01 sans couverture de tests. Les tests `Role.controller.test.js` ne vérifiaient pas les cas 403 sur POST/PUT/DELETE. Les routes `POST/PUT/DELETE /users/:id/role` n'étaient pas testées du tout.
+
+**Fichiers créés :**
+- `test/middlewares/requireRole.middleware.test.js` — 8 tests unitaires purs : rôle autorisé → next(), multi-rôles, injection req.user.roleId, rôle refusé → 403, user null → 403, DB error → 500, vérification userId
+
+**Fichiers modifiés :**
+- `test/controllers/Role.controller.test.js` — 3 tests 403 ajoutés (POST, PUT, DELETE /roles avec roleId=2)
+- `test/controllers/User.controller.test.js` — mock `User: { findByPk: jest.fn() }` ajouté ; `beforeEach` mis à jour pour setter `User.findByPk.mockResolvedValue({ roleId: 1 })` ; 3 nouveaux describe (POST/PUT/DELETE /users/:id/role) avec 11 tests (200 admin, 403 étudiant, 401, 500)
+
+**Ce qui est couvert :**
+- Middleware unitaire : autorisé, refusé, user null, DB error, multi-rôles, injection roleId
+- Intégration Role.controller : 403 sur POST/PUT/DELETE avec non-admin
+- Intégration User.controller : CRUD routes rôle (admin : 200, étudiant : 403, sans token : 401)
+
+**Résultat :** 716 tests (695 + 21 nouveaux) — tous verts
+
+**Dette résolue :** ~~Tests à mettre à jour : Role.controller.test.js — POST/PUT/DELETE /roles retournent désormais 403 sans token admin~~ (M-05.01)
 
 ---
 

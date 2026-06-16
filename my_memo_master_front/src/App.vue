@@ -1,6 +1,6 @@
 <template>
   <!-- NO LAYOUT -->
-  <div v-if="route?.name?.includes?.('auth') || route?.name === 'register'">
+  <div v-if="route?.name?.includes?.('auth') || route?.name === 'register' || route?.name === 'forgot-password' || route?.name === 'reset-password'">
     <main>
       <RouterView />
     </main>
