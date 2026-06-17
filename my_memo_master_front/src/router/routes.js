@@ -95,7 +95,7 @@ const routes = [
     component: () => import('../pages/CalendarPage.vue'),
     meta: {
       title: 'Calendar',
-      private: false
+      private: true
     }
   },
   {

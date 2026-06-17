@@ -16,7 +16,7 @@ router.beforeEach((to, from, next) => {
 
   // Guard authentification
   if (to.meta.private === true) {
-    if (!authStore.authenticated || !(authStore.user.connectionToken || authStore.token)) {
+    if (!authStore.authenticated || !authStore.token) {
       authStore.logout(false, null)
       return next({ path: '/auth' })
     }

@@ -70,7 +70,7 @@
 | Front — M-03.09 Rappels in-app | Stable — Nav /calendar + /todo, NotificationBell polling 5 min | 2026-06-13 |
 | Front — SettingsPage | Stable | init |
 | Front — Stores Pinia (auth, tests, questions, etc.) | Stable — persist auth réduit : paths ['token','user','authenticated'] localStorage | 2026-06-06 |
-| Front — RBAC (useRole, router guard) | Stable — M-05.01 : composable useRole + meta.roles guard router | 2026-06-14 |
+| Front — RBAC (useRole, router guard) | Stable — M-05.11 : 2 bugs corrigés (connectionToken mort + /calendar private:false) + 12+20 tests Vitest | 2026-06-17 |
 | Rôle par défaut inscription | Stable — roleId=2 (Étudiant) par défaut dans modèle + service | 2026-06-14 |
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
 | Refresh token (rotation, révocation) | Stable — M-05.03 : opaque 128-char hex, rotation à chaque refresh, intercepteur Axios front | 2026-06-14 |
@@ -1357,6 +1357,52 @@ Les composants de rappels (`NotificationBellComponent.vue`, `ReminderWidget.vue`
 - ✅ Priorisation (agenda latéral Planning API, déjà en place)
 - ✅ Intégration rappels in-app (bell global + polling + modale par entité)
 - ❌ Synchronisation agenda externe (hors périmètre)
+
+---
+
+### [M-05.11] — Guards Vue Router — routes protégées — 2026-06-17
+
+**Objectif :** Vérifier le guard `beforeEach`, corriger les anomalies détectées, ajouter les tests unitaires.
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/router/index.js` — Bug 1 : suppression du dead code `authStore.user.connectionToken`
+  - Avant : `if (!authStore.authenticated || !(authStore.user.connectionToken || authStore.token))`
+  - Après : `if (!authStore.authenticated || !authStore.token)`
+  - `connectionToken` n'existe pas dans le state de authStore — champ toujours `undefined`, condition jamais vraie
+- `my_memo_master_front/src/router/routes.js` — Bug 2 : `/calendar` passé de `private: false` à `private: true`
+  - CalendarPage affiche des données personnelles (events, sessions, deadlines) — accès sans auth était un bug de sécurité
+
+**Fichiers créés :**
+- `my_memo_master_front/test/router/router.guard.test.js` — 12 tests Vitest du guard `beforeEach`
+- `my_memo_master_front/test/composables/useRole.test.js` — 20 tests Vitest du composable `useRole`
+
+**Résultats tests :** 124 tests / 9 fichiers — tous verts ✅
+
+**Couverture tests router.guard :**
+- Route privée + non authentifié → redirect `/auth` ✅
+- Route privée + non authentifié → `authStore.logout(false, null)` appelé ✅
+- `/calendar` (privé depuis fix) + non authentifié → redirect `/auth` ✅
+- Route privée + authentifié → navigation acceptée (profile, flashcards) ✅
+- Route publique + non/authentifié → navigation acceptée ✅
+- `/auth` + authentifié → redirect `/profile` ✅
+- `/register` + authentifié → redirect `/profile` ✅
+- `meta.roles: [1]` + roleId=2 → redirect `/` ✅
+- `meta.roles: [1]` + roleId=1 → navigation acceptée ✅
+- `meta.roles: [1, 4]` + roleId=4 → navigation acceptée ✅
+
+**Couverture tests useRole :**
+- Export `ROLE_IDS` avec les 5 constantes correctes ✅
+- Computed `isAdminPlateforme / isEtudiant / isEnseignant / isAdminEtablissement / isModerateur` pour chaque roleId ✅
+- `roleId=null` → tous computed false ✅
+- `isAdmin` : true pour roleId 1 et 4, false pour 2 ✅
+- `canManageGroups` : true pour roleId 1, 3, 4 ; false pour 2, 5 ✅
+- `hasAnyRole(1, 4)` : true/false selon roleId ✅
+- `hasAnyRole()` sans argument → false ✅
+
+**Hypothèses / Dette :**
+- Le bruit `window.scrollTo not implemented` dans jsdom est inoffensif (scrollBehavior du router) — aucun test ne fail
+- Le router singleton est partagé entre les tests : `setActivePinia(createPinia())` avant chaque test + reset sur `/` garantit l'isolation
+- Les routes temporaires ajoutées pour tester `meta.roles` sont supprimées via `router.removeRoute()` après chaque test
 - ❌ Notifications mobiles natives (hors périmètre)
 
 **Hypothèses posées :**
