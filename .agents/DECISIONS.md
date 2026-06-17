@@ -384,6 +384,14 @@ SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
 
 ---
 
+### [2026-06-17] Suppression de compte — confirmation textuelle "SUPPRIMER"
+**Contexte** : La suppression de compte est irréversible (toutes les données de l'utilisateur sont effacées). Il faut une friction UX suffisante pour éviter les erreurs de clic, sans alourdir le parcours standard.
+**Décision** : Le bouton "Supprimer mon compte" reste `:disabled` tant que l'utilisateur n'a pas tapé exactement la chaîne `"SUPPRIMER"` dans un champ texte dédié. La comparaison est `deleteConfirm !== 'SUPPRIMER'` côté client.
+**Alternative écartée** : `window.confirm()` (dialog natif) — trop facilement cliqué, pas de friction suffisante sur mobile. Modale Vue dédiée — over-engineering pour un MVP ; la friction textuelle est plus efficace que deux clics sur un bouton.
+**Conséquences** : La protection réelle reste côté serveur (`DELETE /users/:id` vérifie `req.user.id === req.params.id`). La validation client est purement UX. Tout autre composant implémentant une action irréversible doit suivre ce pattern.
+
+---
+
 ### [2026-06-06] Rate limiters extraits dans un middleware dédié
 **Contexte** : `authLimiter` et `registerLimiter` étaient définis inline dans `User.routes.js`. Le nouvel `apiLimiter` global nécessitait un point de centralisation.  
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  

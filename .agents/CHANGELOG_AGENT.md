@@ -52,6 +52,7 @@
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
 | Tests fonctionnels Deadline + Reminder (front) | Stable — M-03.10 : 19 tests TodoWidget + 33 tests NotificationBellComponent (Vitest) | 2026-06-13 |
+| Tests fonctionnels ProfilePage (front) | Stable — M-05.10 : 17 tests Vitest (rendu, saveProfile, changePassword, logout, deleteAccount) | 2026-06-17 |
 | Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
 | Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
@@ -64,7 +65,7 @@
 | Front — FlashcardsPage | Stable — bouton "+ Planifier" par système → crée une RevisionSession liée via idSystem | 2026-06-13 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable | init |
 | Front — MindmapsPage | Stable | init |
-| Front — ProfilePage | Stable — nom utilisateur dynamique depuis authStore | 2026-06-03 |
+| Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
 | Front — CalendarPage | Stable — M-03.07/M-03.08 : calendrier interactif + sidebar onglets Agenda/To-do | 2026-06-13 |
 | Front — M-03.09 Rappels in-app | Stable — Nav /calendar + /todo, NotificationBell polling 5 min | 2026-06-13 |
 | Front — SettingsPage | Stable | init |
@@ -1695,3 +1696,53 @@ npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-co
 **Bug corrigé :** ForgotPasswordPage et ResetPasswordPage utilisaient `.custom-border` et `.formulaire` dans le template sans que ces classes soient définies — la bordure arrondie bleue et le fond blanc n'étaient pas appliqués sur ces deux pages.
 
 **Build Vite :** ✅ 0 erreur
+
+---
+
+### [M-05.10] — Page profil utilisateur (tests + revue + doc) — 2026-06-17
+
+**Contexte :** `ProfilePage.vue` était fonctionnellement implémentée depuis l'init du projet mais sans tests, sans revue formelle et sans entrée CHANGELOG dédiée. Ce ticket couvre la finalisation DoD.
+
+**Fichiers créés :**
+- `my_memo_master_front/test/components/ProfilePage.test.js` — 17 tests Vitest
+
+**État du composant (déjà implémenté, non modifié) :**
+- `my_memo_master_front/src/pages/ProfilePage.vue` — 5 sections fonctionnelles :
+  - **Informations personnelles** : nom, email, rôle calculé depuis `ROLE_LABELS[authStore.user.roleId]`
+  - **Modifier le profil** : formulaire nom + email → `PUT /users/:id` (ownership check, validator)
+  - **Sécurité** : changement de mot de passe (validation front `missingsElementsPassword` + `PUT /users/:id/change-password`)
+  - **Déconnexion** : `authStore.logout()` (révocation refresh token + redirect)
+  - **Zone dangereuse** : suppression compte avec confirmation textuelle "SUPPRIMER" → `authStore.deleteAccount()` → `DELETE /users/:id`
+
+**Couverture tests :**
+- Rendu initial : nom, email, rôle (Étudiant / Inconnu si roleId hors liste), formulaire pré-rempli
+- `fetchUserInfos()` appelé au montage
+- `saveProfile` : succès (200 → notif + update store), erreur API (message serveur), réponse absente (message générique)
+- `changePassword` : mots de passe différents, password invalide (critères manquants), succès (notif + reset form), erreur API
+- Déconnexion : clic → `authStore.logout()` appelé
+- Zone dangereuse : bouton désactivé si `deleteConfirm ≠ 'SUPPRIMER'`, activé si égal, clic → `authStore.deleteAccount()`
+
+**Résultats tests :** 93/93 tests front ✅ (76 → +17 ProfilePage)
+
+**Revue de code :**
+- ✅ Architecture conforme : contrôleurs minces (try/catch + appel service + réponse HTTP), ownership check sur `update`, `changePassword`, `delete`
+- ✅ Messages d'erreur en français sur tous les endpoints concernés
+- ✅ Validator `changePassword` branché sur la route
+- ✅ Validation côté front avant appel API (évite les aller-retours sur les cas triviaux)
+- ⚠️ `changePassword` controller utilise `req.user.id` (JWT) et non `req.params.id` — la vérification ownership est implicite (le changement s'applique toujours au propriétaire du JWT). L'URL `/:id` est trompeuse mais sans impact sécurité. Dette documentée.
+- ⚠️ Validator `exports.changePassword` valide `body('id')` mais le controller ignore `req.body.id` (utilise `req.user.id`). Le front envoie ce champ uniquement pour passer le validator. Redondance acceptable en MVP.
+
+**Endpoints backend utilisés :**
+- `GET /api/v1/users/:id` (authMiddleware + ownership) — chargé par `fetchUserInfos()` au montage
+- `PUT /api/v1/users/:id` (authMiddleware + ownership + validator) — modification nom/email
+- `PUT /api/v1/users/:id/change-password` (authMiddleware + validator) — changement mot de passe
+- `DELETE /api/v1/users/:id` (authMiddleware + ownership) — suppression compte
+
+**Hypothèses posées :**
+- La validation `missingsElementsPassword` côté front est en anglais (messages internes) ; le texte affiché à l'utilisateur est assemblé en français dans le composant (`Le mot de passe doit contenir : ...`).
+- `authStore.user.userId` est l'identifiant utilisé dans les URLs (payload JWT `{ id: userId }` → stocké comme `user.userId` au login).
+- `deleteAccount()` est délégué à l'authStore car la suppression doit enchaîner un logout (nettoyage état + révocation refresh token).
+
+**Dette / points d'attention :**
+- `changePassword` route : l'`:id` URL est ignoré par la logique de sécurité — à aligner en supprimant l'`:id` de l'URL (route dédiée `POST /users/me/change-password`) si le projet monte en maturité.
+- `saveProfile()` dans le composant duplique partiellement `authStore.updateUserInfos()` (même PUT endpoint). Pas de bug, refacto possible dans un ticket de nettoyage.
