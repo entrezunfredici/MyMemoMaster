@@ -48,6 +48,7 @@
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
 | Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
 | Tests intégration API (Supertest) | Stable — M-05.08 : 724 tests total (+8 : POST /refresh-token + POST /logout) | 2026-06-16 |
+| Tests unitaires auth (Bcrypt, JWT, RBAC) | Stable — M-05.12 : Auth.middleware (7 tests JWT) + bcrypt User.service (6 tests verifyPassword/setPassword/create) | 2026-06-17 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
 | Tests fonctionnels session Leitner (back) | Stable — M-01.11 : 12 tests BDD session complète (SQLite in-memory, flow réel) | 2026-06-10 |
 | Tests fonctionnels session Leitner (front) | Stable — M-01.11 : 7 tests store + 13 tests composant FlashcardsSessionPage (Vitest + @vue/test-utils) | 2026-06-10 |
@@ -1792,3 +1793,47 @@ npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-co
 **Dette / points d'attention :**
 - `changePassword` route : l'`:id` URL est ignoré par la logique de sécurité — à aligner en supprimant l'`:id` de l'URL (route dédiée `POST /users/me/change-password`) si le projet monte en maturité.
 - `saveProfile()` dans le composant duplique partiellement `authStore.updateUserInfos()` (même PUT endpoint). Pas de bug, refacto possible dans un ticket de nettoyage.
+
+---
+
+### [M-05.12] — Tests unitaires auth (Bcrypt, JWT, RBAC) — 2026-06-17
+
+**Objectif :** Combler les 2 gaps de couverture identifiés lors de la vérification : Auth.middleware.js (JWT) non testé en isolation, et bcrypt (verifyPassword/setPassword/create) non testé en unitaire dans User.service.
+
+**Fichiers créés :**
+- `test/middlewares/Auth.middleware.test.js` — 7 tests Jest du middleware JWT
+
+**Fichiers modifiés :**
+- `test/services/User.service.test.js` — +6 tests bcrypt (verifyPassword, setPassword, hachage au create)
+  - Import `bcryptjs` ajouté
+
+**Résultats tests :** 743 tests / 48 suites — tous verts ✅
+
+**Couverture Auth.middleware.test.js (7 tests) :**
+- Header Authorization absent → 401 "Authentification requise." ✅
+- Token malformé → 401 "Token invalide ou expiré." ✅
+- Token signé avec mauvaise clé secrète → 401 "Token invalide ou expiré." ✅
+- Token expiré → 401 "Token invalide ou expiré." ✅
+- Token valide avec préfixe "Bearer" → next() + req.user peuplé ✅
+- Token valide sans préfixe "Bearer" → next() + req.user peuplé ✅
+- req.user contient exactement le payload encodé (y compris roleId) ✅
+
+**Couverture bcrypt User.service.test.js (+6 tests) :**
+- verifyPassword : bon mot de passe → true ✅
+- verifyPassword : mauvais mot de passe → false ✅
+- setPassword : mot de passe vide → throw "Mot de passe manquant" ✅
+- setPassword : trop court (< 10 chars) → throw ✅
+- setPassword : hash bcrypt stocké, pas le plaintext ✅
+- create : mot de passe hashé avant User.create (hash ≠ plain, bcrypt.compare valide) ✅
+
+**Ce qui était déjà couvert (non redoublé) :**
+- RBAC : `requireRole.middleware.test.js` (8 tests) — inchangé ✅
+- JWT côté controller (login → token, refresh-token, logout) : `User.controller.test.js` — inchangé ✅
+- Reset password SHA-256 : `User.service.test.js` (3 tests) — inchangé ✅
+- CORS + Rate limiting : `security.test.js` — inchangé ✅
+- Guards front (router + useRole) : M-05.11 — inchangé ✅
+
+**Hypothèses / Dette :**
+- La branche "Token manquant." du middleware est théoriquement inatteignable (si authHeader est truthy, token l'est aussi) — non testée car dead code ; à nettoyer dans un futur ticket.
+- bcrypt.hash(password, 10) est testé avec le vrai algorithme (pas mocké) : les tests sont lents (~0.1s/test) mais fiables.
+- Le warning `worker process force exited` sur BullMQ est préexistant (tests deadline/reminder) — non introduit par M-05.12.

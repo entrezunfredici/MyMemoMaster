@@ -18,6 +18,7 @@ jest.mock('../../models/index', () => ({
 }))
 
 const { User, Role, UserOnboardingState } = require('../../models/index')
+const bcrypt = require('bcryptjs')
 const UserService = require('../../services/User.service')
 
 describe('UserService', () => {
@@ -266,6 +267,79 @@ describe('UserService', () => {
       expect(Role.findByPk).toHaveBeenCalledWith(1)
       expect(User.update).toHaveBeenCalledWith({ roleId: 1 }, { where: { userId: 1 } })
       expect(user).toEqual({ userId: 1, name: 'User 1', roleId: 1 })
+    })
+  })
+
+  // ── Bcrypt — verifyPassword ────────────────────────────────────────────────
+
+  describe('verifyPassword', () => {
+    it('retourne true si le mot de passe en clair correspond au hash stocké', async () => {
+      const plain = 'MonPassword1'
+      const hash = await bcrypt.hash(plain, 10)
+      User.findByPk.mockResolvedValue({ password: hash })
+
+      const result = await UserService.verifyPassword(1, plain)
+
+      expect(result).toBe(true)
+      expect(User.findByPk).toHaveBeenCalledWith(1)
+    })
+
+    it('retourne false si le mot de passe ne correspond pas au hash', async () => {
+      const hash = await bcrypt.hash('CorrectPassword1', 10)
+      User.findByPk.mockResolvedValue({ password: hash })
+
+      const result = await UserService.verifyPassword(1, 'WrongPassword1')
+
+      expect(result).toBe(false)
+    })
+  })
+
+  // ── Bcrypt — setPassword ───────────────────────────────────────────────────
+
+  describe('setPassword', () => {
+    it('lance une erreur si le mot de passe est absent (chaîne vide)', async () => {
+      await expect(UserService.setPassword(1, '')).rejects.toThrow('Mot de passe manquant')
+    })
+
+    it('lance une erreur si le mot de passe est trop court (< 10 chars)', async () => {
+      await expect(UserService.setPassword(1, 'Short1')).rejects.toThrow(
+        'Le mot de passe doit contenir au moins 10 caractères'
+      )
+    })
+
+    it('stocke un hash bcrypt et non le mot de passe en clair', async () => {
+      User.update.mockResolvedValue([1])
+      const plain = 'MonMotDePasse1'
+
+      await UserService.setPassword(1, plain)
+
+      const [fields, opts] = User.update.mock.calls[0]
+      expect(fields.password).not.toBe(plain)
+      expect(opts).toEqual({ where: { userId: 1 } })
+      const isValid = await bcrypt.compare(plain, fields.password)
+      expect(isValid).toBe(true)
+    })
+  })
+
+  // ── Bcrypt — create (hachage au moment de la persistance) ─────────────────
+
+  describe('create — hachage du mot de passe', () => {
+    it('hache le mot de passe avant de le passer à User.create', async () => {
+      const plain = 'SecurePass1'
+      User.findOne.mockResolvedValue(null)
+      User.create.mockImplementation((data) => ({
+        ...data,
+        userId: 1,
+        dataValues: { ...data, userId: 1 },
+      }))
+      UserOnboardingState.create.mockResolvedValue({})
+
+      await UserService.create({ email: 'test@example.com', name: 'Test', password: plain })
+
+      const [createArgs] = User.create.mock.calls[0]
+      expect(createArgs.password).not.toBe(plain)
+      const isHash = await bcrypt.compare(plain, createArgs.password)
+      expect(isHash).toBe(true)
     })
   })
 })
