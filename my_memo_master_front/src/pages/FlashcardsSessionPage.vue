@@ -34,7 +34,8 @@
             {{ currentCard.question?.statement }}
           </div>
 
-          <div class="py-2">
+          <!-- Réponse ouverte -->
+          <div v-if="currentCard.question?.type !== 'mcq'" class="py-2">
             <span class="text-sm font-medium text-gray-light uppercase">Ta Réponse</span>
             <textarea
               v-model="userAnswer"
@@ -45,9 +46,41 @@
             />
           </div>
 
+          <!-- QCM -->
+          <div v-else class="py-2 space-y-2">
+            <span class="text-sm font-medium text-gray-light uppercase">Choisis la bonne réponse</span>
+            <template v-if="currentCard.question.content?.options?.length">
+              <label
+                v-for="(opt, oi) in currentCard.question.content.options"
+                :key="oi"
+                class="flex items-center gap-3 p-3 border-2 rounded-lg transition"
+                :class="[
+                  showFeedback ? 'cursor-default' : 'cursor-pointer',
+                  mcqOptClass(String(oi), opt),
+                ]"
+              >
+                <input
+                  type="radio"
+                  :name="`session-mcq`"
+                  :value="String(oi)"
+                  v-model="userAnswer"
+                  :disabled="showFeedback || submitting"
+                  class="accent-primary shrink-0"
+                />
+                <span class="text-dark">{{ opt.text }}</span>
+              </label>
+            </template>
+            <p v-else class="text-sm text-red-400 italic py-2">
+              Options manquantes.
+            </p>
+          </div>
+
           <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="cardStore.lastCorrection?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
             <p class="font-bold mb-1">{{ cardStore.lastCorrection?.success ? '✅ Excellent !' : '❌ À revoir' }}</p>
-            <p class="text-sm">Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%</p>
+            <!-- Score IA uniquement pour les questions ouvertes -->
+            <p v-if="currentCard.question?.type !== 'mcq'" class="text-sm">
+              Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%
+            </p>
             <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
               Réponse attendue : {{ cardStore.lastCorrection?.correction }}
             </p>
@@ -151,6 +184,15 @@ const boxCounts = computed(() => {
   return counts
 })
 
+function mcqOptClass(oiStr, opt) {
+  if (!showFeedback.value) {
+    return userAnswer.value === oiStr ? 'border-primary bg-primary/10' : 'border-gray'
+  }
+  if (opt.correct) return 'border-green-500 bg-green-50'
+  if (userAnswer.value === oiStr) return 'border-red-400 bg-red-50'
+  return 'border-gray'
+}
+
 const handleValidation = async () => {
   submitting.value = true
   const ok = await cardStore.submitResponse(currentCard.value.idCard, userAnswer.value)
@@ -169,6 +211,7 @@ const nextStep = () => {
     currentIndex.value++
     userAnswer.value = ''
     showFeedback.value = false
+    submitting.value = false
   } else {
     isFinished.value = true
   }

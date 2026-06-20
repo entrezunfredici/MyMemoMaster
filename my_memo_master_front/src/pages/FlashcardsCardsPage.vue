@@ -91,6 +91,29 @@
         </h2>
 
         <form @submit.prevent="submitForm">
+          <!-- Type de question (uniquement en création) -->
+          <div v-if="!editingCard" class="mb-4">
+            <label class="block text-sm font-semibold text-heading mb-2">Type de question</label>
+            <div class="flex gap-3">
+              <button
+                type="button"
+                class="flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg transition font-semibold text-sm"
+                :class="form.type === 'open' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500 hover:border-gray-400'"
+                @click="selectType('open')"
+              >
+                Ouverte
+              </button>
+              <button
+                type="button"
+                class="flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg transition font-semibold text-sm"
+                :class="form.type === 'mcq' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500 hover:border-gray-400'"
+                @click="selectType('mcq')"
+              >
+                QCM
+              </button>
+            </div>
+          </div>
+
           <div class="mb-4">
             <label class="block text-sm font-semibold text-heading mb-2">Question</label>
             <textarea
@@ -102,7 +125,8 @@
             />
           </div>
 
-          <div class="mb-6">
+          <!-- Champ réponse : open uniquement -->
+          <div v-if="form.type === 'open'" class="mb-6">
             <label class="block text-sm font-semibold text-heading mb-2">Réponse correcte</label>
             <textarea
               v-model="form.answer"
@@ -111,6 +135,42 @@
               rows="2"
               required
             />
+          </div>
+
+          <!-- Options MCQ -->
+          <div v-else class="mb-6">
+            <label class="block text-sm font-semibold text-heading mb-2">Options (sélectionne la bonne réponse)</label>
+            <div class="space-y-2">
+              <div v-for="(opt, oi) in form.mcqOptions" :key="oi" class="flex items-center gap-2">
+                <input
+                  type="radio"
+                  :name="`mcq-correct-card`"
+                  :checked="opt.correct"
+                  @change="setMcqCorrect(oi)"
+                  class="accent-primary shrink-0"
+                />
+                <input
+                  :value="opt.text"
+                  @input="setOptionText(oi, $event.target.value)"
+                  type="text"
+                  :placeholder="`Option ${oi + 1}...`"
+                  class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                />
+                <button
+                  v-if="form.mcqOptions.length > 2"
+                  type="button"
+                  @click="removeMcqOption(oi)"
+                  class="text-gray-400 hover:text-red-500 text-lg leading-none"
+                >✕</button>
+              </div>
+            </div>
+            <button
+              type="button"
+              @click="addMcqOption()"
+              class="mt-2 text-sm text-primary hover:underline font-medium"
+            >
+              + Ajouter une option
+            </button>
           </div>
 
           <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>
@@ -210,7 +270,12 @@ const showModal = ref(false)
 const submitting = ref(false)
 const formError = ref('')
 const editingCard = ref(null)
-const form = reactive({ statement: '', answer: '' })
+const form = reactive({
+  statement: '',
+  answer: '',
+  type: 'open',
+  mcqOptions: [{ text: '', correct: true }, { text: '', correct: false }],
+})
 
 // --- boîtes ---
 const showBoxModal = ref(false)
@@ -267,10 +332,35 @@ onMounted(async () => {
   loading.value = false
 })
 
+const selectType = (newType) => {
+  if (form.type === newType) return
+  form.type = newType
+  form.answer = ''
+  form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+}
+
+const setOptionText = (idx, value) => {
+  form.mcqOptions = form.mcqOptions.map((o, i) => i === idx ? { ...o, text: value } : o)
+}
+
+const setMcqCorrect = (correctIdx) => {
+  form.mcqOptions = form.mcqOptions.map((o, i) => ({ ...o, correct: i === correctIdx }))
+}
+
+const addMcqOption = () => {
+  form.mcqOptions = [...form.mcqOptions, { text: '', correct: false }]
+}
+
+const removeMcqOption = (idx) => {
+  form.mcqOptions = form.mcqOptions.filter((_, i) => i !== idx)
+}
+
 const openAddModal = () => {
   editingCard.value = null
   form.statement = ''
   form.answer = ''
+  form.type = 'open'
+  form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
   formError.value = ''
   showModal.value = true
 }
@@ -279,6 +369,12 @@ const openEditModal = async (card) => {
   editingCard.value = card
   form.statement = card.question?.statement || ''
   form.answer = card.correctAnswer || ''
+  form.type = card.question?.type || 'open'
+  if (form.type === 'mcq' && Array.isArray(card.question?.content?.options)) {
+    form.mcqOptions = card.question.content.options.map(o => ({ text: o.text, correct: !!o.correct }))
+  } else {
+    form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  }
   formError.value = ''
   showModal.value = true
 }
@@ -288,6 +384,8 @@ const closeModal = () => {
   editingCard.value = null
   form.statement = ''
   form.answer = ''
+  form.type = 'open'
+  form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
   formError.value = ''
 }
 
@@ -307,27 +405,45 @@ const submitForm = async () => {
 }
 
 const handleCreate = async () => {
-  // 1. Créer la question
-  const qResp = await api.post('questions', {
+  if (form.type === 'mcq') {
+    if (form.mcqOptions.some(o => !o.text.trim())) {
+      formError.value = 'Toutes les options doivent avoir un texte.'
+      return
+    }
+    if (!form.mcqOptions.some(o => o.correct)) {
+      formError.value = 'Sélectionne la bonne réponse (radio).'
+      return
+    }
+  }
+
+  // 1. Créer la question (contenu selon le type)
+  const questionPayload = {
     statement: form.statement,
     questionPosition: 0,
-    type: 'open',
-  })
+    type: form.type,
+    content: form.type === 'mcq'
+      ? { options: form.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+      : null,
+  }
+
+  const qResp = await api.post('questions', questionPayload)
   if (!qResp || qResp.status !== 201) {
     formError.value = qResp?.data?.message || 'Erreur lors de la création de la question.'
     return
   }
   const idQuestion = qResp.data.idQuestion
 
-  // 2. Créer la réponse correcte
-  const rResp = await api.post('responses', {
-    content: form.answer,
-    correction: true,
-    idQuestion,
-  })
-  if (!rResp || rResp.status !== 201) {
-    formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
-    return
+  // 2. Créer la réponse correcte (open uniquement — la correction MCQ est dans content)
+  if (form.type === 'open') {
+    const rResp = await api.post('responses', {
+      content: form.answer,
+      correction: true,
+      idQuestion,
+    })
+    if (!rResp || rResp.status !== 201) {
+      formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
+      return
+    }
   }
 
   // 3. Créer la carte
@@ -346,30 +462,42 @@ const handleCreate = async () => {
 
 const handleUpdate = async () => {
   const card = editingCard.value
+  const isMcq = card.question?.type === 'mcq'
 
-  // Mettre à jour la question
-  const qResp = await api.put(`questions/edit/${card.idQuestion}`, { statement: form.statement })
+  if (isMcq && form.mcqOptions.some(o => !o.text.trim())) {
+    formError.value = 'Toutes les options doivent avoir un texte.'
+    return
+  }
+
+  const qPayload = { statement: form.statement }
+  if (isMcq) {
+    qPayload.content = { options: form.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+  }
+
+  const qResp = await api.put(`questions/edit/${card.idQuestion}`, qPayload)
   if (!qResp || qResp.status !== 200) {
     formError.value = qResp?.data?.message || 'Erreur lors de la mise à jour de la question.'
     return
   }
 
-  // Mettre à jour la réponse si elle existe, sinon la créer (carte orpheline)
-  if (card.idResponse) {
-    const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: form.answer })
-    if (!rResp || rResp.status !== 200) {
-      formError.value = rResp?.data?.message || 'Erreur lors de la mise à jour de la réponse.'
-      return
-    }
-  } else if (form.answer.trim()) {
-    const rResp = await api.post('responses', {
-      content: form.answer,
-      correction: true,
-      idQuestion: card.idQuestion,
-    })
-    if (!rResp || rResp.status !== 201) {
-      formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
-      return
+  // Réponse uniquement pour les cartes ouvertes
+  if (!isMcq) {
+    if (card.idResponse) {
+      const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: form.answer })
+      if (!rResp || rResp.status !== 200) {
+        formError.value = rResp?.data?.message || 'Erreur lors de la mise à jour de la réponse.'
+        return
+      }
+    } else if (form.answer.trim()) {
+      const rResp = await api.post('responses', {
+        content: form.answer,
+        correction: true,
+        idQuestion: card.idQuestion,
+      })
+      if (!rResp || rResp.status !== 201) {
+        formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
+        return
+      }
     }
   }
 

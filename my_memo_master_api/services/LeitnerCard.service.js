@@ -123,20 +123,43 @@ class LeitnerCardService {
    */
   async correctResponse(cardId, studentAnswer) {
     const card = await LeitnerCard.findByPk(cardId, {
-      include: [{ model: LeitnerBox, as: 'leitnerBox' }]
+      include: [
+        { model: LeitnerBox, as: 'leitnerBox' },
+        { model: Question, as: 'question' }
+      ]
     })
 
     if (!card) return null
 
-    const correctResponses = await Response.findAll({
-      where: { idQuestion: card.idQuestion, correction: true }
-    })
+    const question = card.question
+    let isCorrect, gradeResult
 
-    if (correctResponses.length === 0) return null
+    if (question?.type === 'mcq') {
+      // Correction exacte : studentAnswer est l'index (string) de l'option choisie
+      const options = question.content?.options ?? []
+      const chosenIdx = parseInt(studentAnswer, 10)
+      isCorrect = !isNaN(chosenIdx) && options[chosenIdx]?.correct === true
+      const correctOpt = options.find((o) => o.correct)
+      gradeResult = {
+        is_correct: isCorrect,
+        score: isCorrect ? 1 : 0,
+        explanation: null,
+        decision_zone: null,
+        correction: correctOpt?.text ?? ''
+      }
+    } else {
+      // Correction sémantique IA pour les questions ouvertes
+      const correctResponses = await Response.findAll({
+        where: { idQuestion: card.idQuestion, correction: true }
+      })
 
-    const correctAnswers = correctResponses.map((r) => r.content)
-    const gradeResult = await semanticService.gradeSemantic(correctAnswers, studentAnswer)
-    const isCorrect = gradeResult.is_correct
+      if (correctResponses.length === 0) return null
+
+      const correctAnswers = correctResponses.map((r) => r.content)
+      gradeResult = await semanticService.gradeSemantic(correctAnswers, studentAnswer)
+      gradeResult.correction = correctAnswers.join(' / ')
+      isCorrect = gradeResult.is_correct
+    }
 
     const currentLevel = card.leitnerBox.level
     const systemId = card.leitnerBox.idSystem
@@ -165,7 +188,7 @@ class LeitnerCardService {
 
     return {
       success: isCorrect,
-      correction: correctAnswers.join(' / '),
+      correction: gradeResult.correction,
       score: gradeResult.score,
       explanation: gradeResult.explanation,
       decision_zone: gradeResult.decision_zone,

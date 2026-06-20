@@ -40,8 +40,13 @@ class QuestionService {
   }
 
   async create(data) {
-    const { statement, questionPosition, type, idTest, idCard } = data
-    return await Question.create({ statement, questionPosition, type, idTest, idCard })
+    const { statement, questionPosition, type, content = null, idTest } = data
+    const question = await Question.create({ statement, questionPosition, type, content })
+    if (idTest) {
+      const test = await Test.findByPk(idTest)
+      if (test) await question.addTest(test)
+    }
+    return question
   }
 
   async update(id, data) {
@@ -49,7 +54,8 @@ class QuestionService {
     if (!question) {
       throw new Error('Question not found')
     }
-    return await question.update(data)
+    const { statement, questionPosition, type, content } = data
+    return await question.update({ statement, questionPosition, type, content })
   }
 
   async delete(id) {

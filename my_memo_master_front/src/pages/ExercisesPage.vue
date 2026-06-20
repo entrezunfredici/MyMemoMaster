@@ -1,8 +1,7 @@
 <template>
   <div class="container mx-auto px-4 py-8">
-    <!-- Header -->
 
-    <!-- Search Bar and Button -->
+    <!-- Barre de recherche + bouton -->
     <div class="mb-8 flex gap-4 items-center">
       <div class="relative flex-1 max-w-2xl">
         <input
@@ -14,173 +13,299 @@
         <span class="absolute right-4 top-3.5 text-gray-400">🔍</span>
       </div>
       <button
-        @click="openModal"
+        @click="openCreateModal"
         class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 whitespace-nowrap ml-auto shadow-lg hover:shadow-xl hover:scale-105 border-2 border-blue-800"
       >
-        + Ajouter un exercice
+        + Créer un exercice
       </button>
     </div>
 
-
-    <!-- Module Filter and Counter -->
+    <!-- Filtre sujet -->
     <div class="mb-8">
-      <div class="flex gap-4 flex-wrap items-center mb-4">
-        <label class="text-sm font-semibold text-heading">Filtrer par module :</label>
+      <div class="flex gap-3 flex-wrap items-center mb-3">
+        <label class="text-sm font-semibold text-heading">Filtrer par sujet :</label>
         <button
-          v-for="mod in allModules"
-          :key="mod"
-          @click="selectedModule = selectedModule === mod ? null : mod"
-          :class="['px-4 py-2 rounded-lg font-semibold transition duration-200 border-2 hover:scale-105', selectedModule === mod ? 'bg-blue-700 text-white border-blue-900 shadow-xl scale-105 ring-2 ring-blue-400' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-lg border-gray-300']"
+          v-for="subject in subjects"
+          :key="subject.subjectId"
+          @click="selectedSubjectId = selectedSubjectId === subject.subjectId ? null : subject.subjectId"
+          :class="['px-3 py-1.5 rounded-lg font-semibold transition duration-200 border-2 text-sm', selectedSubjectId === subject.subjectId ? 'bg-blue-700 text-white border-blue-900' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200']"
         >
-          {{ mod }}
+          {{ subject.name }}
         </button>
         <button
-          v-if="selectedModule"
-          @click="selectedModule = null"
-          class="px-4 py-2 rounded-lg font-semibold transition duration-200 bg-red-600 hover:bg-red-700 text-white border-2 border-red-800 hover:scale-105 hover:shadow-lg"
+          v-if="selectedSubjectId"
+          @click="selectedSubjectId = null"
+          class="px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-100 text-red-700 border-2 border-red-300 hover:bg-red-200"
         >
-          Réinitialiser les filtres
+          Réinitialiser
         </button>
       </div>
-      <div class="text-sm text-gray-600">
-        <strong>{{ filteredExercises.length }}</strong> exercice<span v-if="filteredExercises.length !== 1">s</span> trouvé<span v-if="filteredExercises.length !== 1">s</span>
-      </div>
+      <p class="text-sm text-gray-600">
+        <strong>{{ filteredTests.length }}</strong> exercice<span v-if="filteredTests.length !== 1">s</span> trouvé<span v-if="filteredTests.length !== 1">s</span>
+      </p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- État chargement -->
+    <div v-if="loading" class="text-center text-gray-400 py-12">Chargement des exercices...</div>
+
+    <!-- Liste des exercices -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <MenuItem
-        v-for="exercise in filteredExercises"
-        :key="exercise.id"
-        :title="exercise.title"
-        :description="exercise.description"
+        v-for="test in filteredTests"
+        :key="test.testId"
+        :title="test.name"
+        :description="test.subject?.name || ''"
         action-label="Commencer l'exercice"
-        :on-action="() => navigateToExercise(exercise.id)"
-        :on-edit="() => editExercise(exercise)"
-        :on-delete="() => deleteExercise(exercise.id)"
+        :on-action="() => router.push({ name: 'exercise-detail', params: { id: test.testId } })"
+        :on-delete="() => deleteTest(test)"
       >
         <template #stats>
-          <div class="flex items-center gap-3 mt-1">
-            <p class="text-sm text-gray-500">{{ exercise.questions.length }} questions</p>
-            <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">{{ exercise.module }}</span>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">
+              {{ test.subject?.name || 'Sans sujet' }}
+            </span>
           </div>
         </template>
       </MenuItem>
     </div>
 
-    <!-- Modal Backdrop -->
+    <p v-if="!loading && filteredTests.length === 0" class="text-center text-gray-400 py-12">
+      Aucun exercice trouvé. Créez-en un !
+    </p>
+
+    <!-- Modal création exercice -->
     <div
       v-if="showModal"
-      class="fixed inset-0 bg-gray-500 flex items-center justify-center z-50"
-
+      class="fixed inset-0 flex items-center justify-center z-50"
+      style="background-color: rgba(0,0,0,0.5)"
       @click="closeModal"
     >
-      <!-- Modal Content -->
       <div
         class="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        style="background-color:white"
         @click.stop
       >
-        <h2 class="text-2xl font-bold mb-6 text-heading">{{ editingId ? 'Modifier l\'exercice' : 'Ajouter un nouvel exercice' }}</h2>
+        <h2 class="text-2xl font-bold mb-6 text-heading">Nouvel exercice</h2>
 
         <form @submit.prevent="submitExercise">
+          <!-- Nom de l'exercice -->
           <div class="mb-4">
-            <label class="block text-sm font-semibold text-heading mb-2">Titre</label>
+            <label class="block text-sm font-semibold text-heading mb-2">Titre de l'exercice</label>
             <input
-              v-model="newExercise.title"
+              v-model="form.name"
               type="text"
-              placeholder="Titre de l'exercice"
+              placeholder="Ex : Équations du second degré"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
               required
             />
           </div>
 
-          <div class="mb-4">
-            <label class="block text-sm font-semibold text-heading mb-2">Module</label>
+          <!-- Sujet -->
+          <div class="mb-6">
+            <label class="block text-sm font-semibold text-heading mb-2">Sujet</label>
             <select
-              v-model="newExercise.module"
+              v-model="form.subjectId"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
               required
             >
-              <option value="">Sélectionner un module</option>
-              <option value="Mathématiques">Mathématiques</option>
-              <option value="Physique">Physique</option>
-              <option value="Science Ingénieur">Science Ingénieur</option>
-              <option value="Anglais">Anglais</option>
-              <option value="Communication">Communication</option>
-              <option value="Informatique">Informatique</option>
+              <option value="">Sélectionner un sujet</option>
+              <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>
             </select>
           </div>
 
-          <div class="mb-4">
-            <label class="block text-sm font-semibold text-heading mb-2">Description</label>
-            <textarea
-              v-model="newExercise.description"
-              placeholder="Description de l'exercice"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              rows="3"
-              required
-            ></textarea>
-          </div>
-
+          <!-- Questions -->
           <div class="mb-6">
             <div class="flex justify-between items-center mb-4">
               <label class="block text-sm font-semibold text-heading">Questions</label>
               <button
                 type="button"
                 @click="addQuestion"
-                class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition duration-200 border-2 border-green-800 hover:scale-105 hover:shadow-lg"
+                class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition border-2 border-green-800"
               >
                 + Ajouter une question
               </button>
             </div>
 
-            <div class="space-y-4">
-              <div v-for="(q, idx) in newExercise.questions" :key="idx" class="bg-gray-100 p-4 rounded-lg">
+            <div class="space-y-6">
+              <div
+                v-for="(q, idx) in form.questions"
+                :key="idx"
+                class="bg-gray-50 border border-gray-200 p-4 rounded-lg"
+              >
+                <div class="flex justify-between items-center mb-3">
+                  <span class="font-semibold text-sm text-heading">Question {{ idx + 1 }}</span>
+                  <button
+                    v-if="form.questions.length > 1"
+                    type="button"
+                    @click="removeQuestion(idx)"
+                    class="text-red-500 hover:text-red-700 text-sm font-medium"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+
+                <!-- Type de question -->
                 <div class="mb-3">
-                  <label class="block text-sm font-semibold text-heading mb-2">Question {{ idx + 1 }}</label>
-                  <input
-                    v-model="q.text"
-                    type="text"
-                    placeholder="Entrez la question"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  <label class="block text-xs font-semibold text-gray-500 mb-1">Type</label>
+                  <select
+                    v-model="q.type"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    @change="onTypeChange(q)"
+                  >
+                    <option value="open">Question ouverte</option>
+                    <option value="mcq">QCM (choix multiple)</option>
+                    <option value="fill_blank">Texte à trou</option>
+                    <option value="reorder">Phrase à constituer</option>
+                  </select>
+                </div>
+
+                <!-- Énoncé -->
+                <div class="mb-3">
+                  <label class="block text-xs font-semibold text-gray-500 mb-1">Énoncé</label>
+                  <textarea
+                    v-model="q.statement"
+                    placeholder="Entrez l'énoncé de la question"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    rows="2"
                     required
                   />
                 </div>
 
-                <div class="mb-3">
-                  <label class="block text-sm font-semibold text-heading mb-2">Réponse/Solution</label>
-                  <textarea
-                    v-model="q.answer"
-                    placeholder="Entrez la réponse"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    rows="2"
-                    required
-                  ></textarea>
-                </div>
+                <!-- Champs spécifiques au type -->
 
-                <button
-                  v-if="newExercise.questions.length > 1"
-                  type="button"
-                  @click="removeQuestion(idx)"
-                  class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm transition duration-200 border-2 border-red-800 hover:scale-105 hover:shadow-lg"
-                >
-                  Supprimer
-                </button>
+                <!-- open -->
+                <template v-if="q.type === 'open'">
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Réponse attendue</label>
+                    <textarea
+                      v-model="q.openAnswer"
+                      placeholder="Réponse correcte (utilisée pour la correction)"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      rows="2"
+                      required
+                    />
+                  </div>
+                </template>
+
+                <!-- mcq -->
+                <template v-else-if="q.type === 'mcq'">
+                  <label class="block text-xs font-semibold text-gray-500 mb-2">Options (cocher la bonne réponse)</label>
+                  <div class="space-y-2">
+                    <div
+                      v-for="(opt, oi) in q.mcqOptions"
+                      :key="oi"
+                      class="flex items-center gap-2"
+                    >
+                      <input
+                        v-model="opt.correct"
+                        type="radio"
+                        :name="`mcq-correct-${idx}`"
+                        @change="setMcqCorrect(q, oi)"
+                        class="accent-blue-600"
+                      />
+                      <input
+                        v-model="opt.text"
+                        type="text"
+                        placeholder="Option..."
+                        class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        required
+                      />
+                      <button
+                        v-if="q.mcqOptions.length > 2"
+                        type="button"
+                        @click="q.mcqOptions.splice(oi, 1)"
+                        class="text-red-400 hover:text-red-600 text-lg leading-none"
+                      >✕</button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    @click="q.mcqOptions.push({ text: '', correct: false })"
+                    class="mt-2 text-sm text-blue-600 hover:underline font-medium"
+                  >
+                    + Ajouter une option
+                  </button>
+                </template>
+
+                <!-- fill_blank -->
+                <template v-else-if="q.type === 'fill_blank'">
+                  <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">
+                      Texte avec trous — utilise <code v-pre class="bg-gray-200 px-1 rounded">{{0}}</code>, <code v-pre class="bg-gray-200 px-1 rounded">{{1}}</code>…
+                    </label>
+                    <textarea
+                      v-model="q.fillTemplate"
+                      placeholder="La photosynthèse produit du {{0}} grâce à la lumière {{1}}."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      rows="2"
+                      required
+                      @input="syncFillBlanks(q)"
+                    />
+                  </div>
+                  <div v-if="q.fillBlanks.length" class="space-y-2">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Réponses attendues</label>
+                    <div v-for="(blank, bi) in q.fillBlanks" :key="bi" class="flex items-center gap-2">
+                      <span class="text-xs text-gray-400 w-14 shrink-0">Trou {{ bi }}</span>
+                      <input
+                        v-model="q.fillBlanks[bi]"
+                        type="text"
+                        :placeholder="`Réponse du trou ${bi}`"
+                        class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <p v-else class="text-xs text-gray-400 italic">Utilisez <code v-pre class="bg-gray-200 px-1 rounded">{{0}}</code>, <code v-pre class="bg-gray-200 px-1 rounded">{{1}}</code>… dans le texte pour créer des trous.</p>
+                </template>
+
+                <!-- reorder -->
+                <template v-else-if="q.type === 'reorder'">
+                  <label class="block text-xs font-semibold text-gray-500 mb-2">
+                    Fragments dans le bon ordre (l'étudiant devra les reconstituer)
+                  </label>
+                  <div class="space-y-2">
+                    <div v-for="(frag, fi) in q.reorderFragments" :key="fi" class="flex items-center gap-2">
+                      <span class="text-xs text-gray-400 w-5 shrink-0">{{ fi + 1 }}.</span>
+                      <input
+                        v-model="q.reorderFragments[fi]"
+                        type="text"
+                        placeholder="Fragment..."
+                        class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        required
+                      />
+                      <button
+                        v-if="q.reorderFragments.length > 2"
+                        type="button"
+                        @click="q.reorderFragments.splice(fi, 1)"
+                        class="text-red-400 hover:text-red-600 text-lg leading-none"
+                      >✕</button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    @click="q.reorderFragments.push('')"
+                    class="mt-2 text-sm text-blue-600 hover:underline font-medium"
+                  >
+                    + Ajouter un fragment
+                  </button>
+                </template>
               </div>
             </div>
           </div>
 
+          <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>
+
           <div class="flex gap-4">
             <button
               type="submit"
-              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 border-2 border-blue-800 hover:scale-105 hover:shadow-lg"
+              :disabled="submitting"
+              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition border-2 border-blue-800 disabled:opacity-50"
             >
-              {{ editingId ? 'Modifier l\'exercice' : 'Ajouter un exercice' }}
+              {{ submitting ? 'Création en cours...' : 'Créer l\'exercice' }}
             </button>
             <button
               type="button"
               @click="closeModal"
-              class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 border-2 border-gray-800 hover:scale-105 hover:shadow-lg"
+              class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition border-2 border-gray-800"
             >
               Annuler
             </button>
@@ -192,235 +317,178 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { api } from '@/helpers/api'
+import { notif } from '@/helpers/notif'
+import { useTestStore } from '@/stores/tests'
+import { useSubjectStore } from '@/stores/subjects'
 import MenuItem from '@/components/MenuItemComponent.vue'
 
 const router = useRouter()
-const showModal = ref(false)
-const nextId = ref(5)
-const editingId = ref(null)
-const selectedModule = ref(null)
+const testStore = useTestStore()
+const subjectStore = useSubjectStore()
+
+const loading = ref(true)
 const searchQuery = ref('')
+const selectedSubjectId = ref(null)
+const showModal = ref(false)
+const submitting = ref(false)
+const formError = ref('')
 
-const allModules = [
-  'Mathématiques',
-  'Physique',
-  'Science Ingénieur',
-  'Anglais',
-  'Communication',
-  'Informatique',
-]
+const subjects = computed(() => subjectStore.subjects)
+const tests = computed(() => testStore.tests)
 
-const newExercise = reactive({
-  title: '',
-  description: '',
-  module: '',
-  questions: [{ text: '', answer: '' }],
-})
-
-const defaultExercises = [
-  {
-    id: 1,
-    title: 'Équations du second degré',
-    description: 'Résoudre des équations quadratiques et trouver les racines',
-    module: 'Mathématiques',
-    questions: [
-      {
-        text: 'Résoudre l\'équation: x² - 5x + 6 = 0',
-        answer: 'Les solutions sont x = 2 et x = 3'
-      },
-      {
-        text: 'Trouver le discriminant de: 2x² + 3x - 5 = 0',
-        answer: 'Le discriminant est 49'
-      }
-    ]
-  },
-  {
-    id: 2,
-    title: 'Variables et Types en Python',
-    description: 'Comprendre les variables, les types de données et les opérations basiques en Python',
-    module: 'Informatique',
-    questions: [
-      {
-        text: 'Quelle est la différence entre int et float en Python?',
-        answer: 'int représente les nombres entiers, float représente les nombres décimaux'
-      },
-      {
-        text: 'Comment créer une variable "nom" avec la valeur "Alice"?',
-        answer: 'nom = "Alice"'
-      }
-    ]
-  },
-  {
-    id: 3,
-    title: 'Les Structures de Contrôle',
-    description: 'Maîtriser les boucles et les conditions en programmation',
-    module: 'Informatique',
-    questions: [
-      {
-        text: 'Expliquer la différence entre une boucle for et une boucle while',
-        answer: 'La boucle for itère sur une séquence connue, while répète tant qu\'une condition est vraie'
-      },
-      {
-        text: 'Écrire un code qui affiche les nombres de 1 à 5',
-        answer: 'for i in range(1, 6):\n    print(i)'
-      }
-    ]
-  },
-  {
-    id: 4,
-    title: 'Present Simple Tense',
-    description: 'Master the usage and formation of present simple tense in English',
-    module: 'Anglais',
-    questions: [
-      {
-        text: 'What is the present simple tense used for?',
-        answer: 'It is used to describe habits, general truths, and regular actions that happen repeatedly'
-      },
-      {
-        text: 'Fill in the blank: She _____ coffee every morning. (drink)',
-        answer: 'drinks (third person singular form)'
-      }
-    ]
+const filteredTests = computed(() => {
+  let list = tests.value
+  if (selectedSubjectId.value) {
+    list = list.filter(t => t.subjectId === selectedSubjectId.value)
   }
-]
-
-const exercises = reactive([...defaultExercises])
-
-// Computed property for filtered exercises
-const filteredExercises = computed(() => {
-  let filtered = exercises
-
-  // Apply module filter
-  if (selectedModule.value) {
-    filtered = filtered.filter(ex => ex.module === selectedModule.value)
-  }
-
-  // Apply search filter
   if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(ex => ex.title.toLowerCase().includes(query))
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(t => t.name.toLowerCase().includes(q))
   }
-
-  return filtered
+  return list
 })
 
-// Load exercises from sessionStorage on mount
-onMounted(() => {
-  const savedExercises = sessionStorage.getItem('exercises')
-  if (savedExercises) {
-    try {
-      const parsed = JSON.parse(savedExercises)
-      // Merge with default exercises, avoiding duplicates
-      const defaultIds = new Set(defaultExercises.map(e => e.id))
-      const additionalExercises = parsed.filter(e => !defaultIds.has(e.id))
+// ── form state ───────────────────────────────────────────────────────────────
+const defaultQuestion = () => ({
+  statement: '',
+  type: 'open',
+  openAnswer: '',
+  mcqOptions: [
+    { text: '', correct: true },
+    { text: '', correct: false },
+  ],
+  fillTemplate: '',
+  fillBlanks: [],
+  reorderFragments: ['', ''],
+})
 
-      // Clear and repopulate with defaults + additional exercises
-      exercises.splice(0, exercises.length, ...defaultExercises, ...additionalExercises)
+const form = reactive({
+  name: '',
+  subjectId: '',
+  questions: [defaultQuestion()],
+})
 
-      // Update nextId based on all exercises
-      if (exercises.length > 0) {
-        nextId.value = Math.max(...exercises.map(e => e.id)) + 1
+// ── helpers formulaire questions ─────────────────────────────────────────────
+
+function onTypeChange(q) {
+  q.openAnswer = ''
+  q.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  q.fillTemplate = ''
+  q.fillBlanks = []
+  q.reorderFragments = ['', '']
+}
+
+function setMcqCorrect(q, correctIdx) {
+  q.mcqOptions.forEach((opt, i) => { opt.correct = i === correctIdx })
+}
+
+function syncFillBlanks(q) {
+  const matches = [...q.fillTemplate.matchAll(/\{\{(\d+)\}\}/g)]
+  const count = matches.length ? Math.max(...matches.map(m => parseInt(m[1]))) + 1 : 0
+  while (q.fillBlanks.length < count) q.fillBlanks.push('')
+  if (q.fillBlanks.length > count) q.fillBlanks.splice(count)
+}
+
+function buildContent(q) {
+  switch (q.type) {
+    case 'open':
+      return { correct_answer: q.openAnswer }
+    case 'mcq':
+      return { options: q.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+    case 'fill_blank':
+      return { template: q.fillTemplate, blanks: q.fillBlanks }
+    case 'reorder':
+      return {
+        fragments: q.reorderFragments,
+        solution: q.reorderFragments.map((_, i) => i),
       }
-    } catch (e) {
-      console.error('Error parsing saved exercises:', e)
-      exercises.splice(0, exercises.length, ...defaultExercises)
-    }
-  } else {
-    exercises.splice(0, exercises.length, ...defaultExercises)
+    default:
+      return null
   }
+}
 
-  // Always save the current state to sessionStorage (ensures defaults are persisted)
-  sessionStorage.setItem('exercises', JSON.stringify(exercises))
+function addQuestion() {
+  form.questions.push(defaultQuestion())
+}
+
+function removeQuestion(idx) {
+  form.questions.splice(idx, 1)
+}
+
+// ── cycle de vie ─────────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  await Promise.all([testStore.fetchTests(), subjectStore.fetchSubjects()])
+  loading.value = false
 })
 
-const navigateToExercise = (exerciseId) => {
-  router.push({ name: 'exercise-detail', params: { id: exerciseId } })
-}
+// ── modal ────────────────────────────────────────────────────────────────────
 
-const openModal = () => {
-  editingId.value = null
-  resetForm()
+function openCreateModal() {
+  form.name = ''
+  form.subjectId = ''
+  form.questions = [defaultQuestion()]
+  formError.value = ''
   showModal.value = true
 }
 
-const editExercise = (exercise) => {
-  editingId.value = exercise.id
-  newExercise.title = exercise.title
-  newExercise.description = exercise.description
-  newExercise.module = exercise.module || ''
-  newExercise.questions = JSON.parse(JSON.stringify(exercise.questions))
-  showModal.value = true
-}
-
-const deleteExercise = (id) => {
-  if (confirm('Êtes-vous sûr de vouloir supprimer cet exercice?')) {
-    const index = exercises.findIndex(e => e.id === id)
-    if (index > -1) {
-      exercises.splice(index, 1)
-      sessionStorage.setItem('exercises', JSON.stringify(exercises))
-    }
-  }
-}
-
-const closeModal = () => {
+function closeModal() {
   showModal.value = false
-  editingId.value = null
-  resetForm()
 }
 
-const resetForm = () => {
-  newExercise.title = ''
-  newExercise.description = ''
-  newExercise.module = ''
-  newExercise.questions = [{ text: '', answer: '' }]
-}
+// ── soumission ───────────────────────────────────────────────────────────────
 
-const addQuestion = () => {
-  newExercise.questions.push({ text: '', answer: '' })
-}
+async function submitExercise() {
+  submitting.value = true
+  formError.value = ''
 
-const removeQuestion = (index) => {
-  newExercise.questions.splice(index, 1)
-}
+  try {
+    // 1. Créer le test
+    testStore.test = { name: form.name, subjectId: Number(form.subjectId) }
+    const created = await testStore.createTest()
+    if (!created) {
+      formError.value = 'Erreur lors de la création de l\'exercice.'
+      return
+    }
+    const testId = testStore.test.testId
 
-const submitExercise = () => {
-  // Validate all questions are filled
-  const allQuestionsFilled = newExercise.questions.every(q => q.text && q.answer)
-
-  if (newExercise.title && newExercise.description && newExercise.module && newExercise.questions.length > 0 && allQuestionsFilled) {
-    if (editingId.value) {
-      // Update existing exercise
-      const exerciseIndex = exercises.findIndex(e => e.id === editingId.value)
-      if (exerciseIndex > -1) {
-        exercises[exerciseIndex] = {
-          id: editingId.value,
-          title: newExercise.title,
-          description: newExercise.description,
-          module: newExercise.module,
-          questions: JSON.parse(JSON.stringify(newExercise.questions)),
-        }
+    // 2. Créer les questions
+    for (let i = 0; i < form.questions.length; i++) {
+      const q = form.questions[i]
+      const resp = await api.post('questions', {
+        statement: q.statement,
+        questionPosition: i,
+        type: q.type,
+        content: buildContent(q),
+        idTest: testId,
+      })
+      if (!resp || resp.status !== 201) {
+        formError.value = resp?.data?.message || `Erreur lors de la création de la question ${i + 1}.`
+        return
       }
-    } else {
-      // Add new exercise
-      const newEx = {
-        id: nextId.value,
-        title: newExercise.title,
-        description: newExercise.description,
-        module: newExercise.module,
-        questions: JSON.parse(JSON.stringify(newExercise.questions)),
-      }
-      exercises.push(newEx)
-      nextId.value++
     }
 
-    // Save to sessionStorage
-    sessionStorage.setItem('exercises', JSON.stringify(exercises))
-
+    notif.notify('Exercice créé avec succès !', 'success')
     closeModal()
-  } else {
-    alert('Veuillez remplir tous les champs')
+    await testStore.fetchTests()
+  } finally {
+    submitting.value = false
   }
+}
+
+// ── suppression ───────────────────────────────────────────────────────────────
+
+async function deleteTest(test) {
+  if (!confirm(`Supprimer l'exercice "${test.name}" ?`)) return
+  const resp = await api.del(`tests/${test.testId}`)
+  if (!resp || resp.status !== 204) {
+    notif.notify(resp?.data?.message || 'Erreur lors de la suppression.', 'error')
+    return
+  }
+  notif.notify('Exercice supprimé.', 'success')
+  await testStore.fetchTests()
 }
 </script>

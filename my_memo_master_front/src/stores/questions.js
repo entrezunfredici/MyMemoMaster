@@ -7,7 +7,8 @@ export const useQuestionStore = defineStore('questions', {
     question: {
       statement: '',
       questionPosition: null,
-      type: '',
+      type: 'open',
+      content: null,
       idTest: null,
       idCard: null,
     },

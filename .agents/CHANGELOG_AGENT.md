@@ -24,9 +24,9 @@
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
-| Test / Question / Response | Stable — 4 bugs corrigés (alias Sequelize, params route, champ validateur) | 2026-06-06 |
+| Test / Question / Response | Stable — M-06.01 : champ `content` JSON par type, 4 types définis, ExercisesPage branchée API | 2026-06-19 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
-| LeitnerCard — algo répétition espacée | Stable — droits résolus depuis DB (req.user.rights → service) | 2026-06-06 |
+| LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable | init |
 | LeitnerSystemsUsers | Stable | init |
 | Diagramme (mind maps) | Stable — couplage Subject déplacé vers DiagrammeService.resolveSubject() | 2026-06-06 |
@@ -64,7 +64,7 @@
 | Front — Auth (login, register) | Stable — M-05.09c : AuthFormLayout.vue composant layout partagé (4 pages auth refactorisées) | 2026-06-16 |
 | Front — HomePage | Stable | init |
 | Front — FlashcardsPage | Stable — bouton "+ Planifier" par système → crée une RevisionSession liée via idSystem | 2026-06-13 |
-| Front — ExercisesPage / ExerciseDetailPage | Stable | init |
+| Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.01 : connecté backend, formulaire 4 types, player + correction | 2026-06-19 |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
 | Front — CalendarPage | Stable — M-03.07/M-03.08 : calendrier interactif + sidebar onglets Agenda/To-do | 2026-06-13 |
@@ -1837,3 +1837,71 @@ npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-co
 - La branche "Token manquant." du middleware est théoriquement inatteignable (si authHeader est truthy, token l'est aussi) — non testée car dead code ; à nettoyer dans un futur ticket.
 - bcrypt.hash(password, 10) est testé avec le vrai algorithme (pas mocké) : les tests sont lents (~0.1s/test) mais fiables.
 - Le warning `worker process force exited` sur BullMQ est préexistant (tests deadline/reminder) — non introduit par M-05.12.
+
+---
+
+### [M-06.01b] — MCQ pour le système Leitner — 2026-06-19
+
+**Fichiers modifiés (API) :**
+- `services/LeitnerCard.service.js` — `correctResponse` : charge désormais `Question` (avec `content`) en plus de `LeitnerBox`. Branche sur `question.type` :
+  - `'mcq'` → `studentAnswer` = index (string) de l'option choisie ; comparaison exacte contre `content.options[idx].correct` ; retourne `score: 1/0`, `explanation: null`
+  - `'open'` (et tout autre type) → flux sémantique IA existant via `semanticService.gradeSemantic`
+
+**Fichiers modifiés (Front) :**
+- `src/pages/FlashcardsCardsPage.vue` — modale de création : sélecteur de type (open / mcq) affiché en création seulement ; pour `mcq` : liste d'options (radio pour marquer la correcte, bouton + option) ; `handleCreate` : si `open` → crée Question + Response comme avant ; si `mcq` → crée Question avec `content: { options }` sans Response
+- `src/pages/FlashcardsSessionPage.vue` — rendu conditionnel : `open` → textarea existante + score IA ; `mcq` → radio buttons colorés (vert = bonne option, rouge = mauvais choix) au moment du feedback ; le score IA n'est affiché que pour les questions ouvertes
+
+**Ce qui est utilisable :**
+- Créer une carte Leitner MCQ : sélectionner "QCM" dans la modale → saisir les options → la correction est exacte et instantanée (pas d'appel IA)
+- La session Leitner détecte automatiquement le type de chaque carte et adapte le rendu
+- La règle Leitner (boîte + 1 / retour boîte 1) s'applique identiquement pour les deux types
+
+**Hypothèses posées :**
+- `studentAnswer` pour MCQ = index de l'option sous forme de string (ex: `"0"`, `"1"`). Le validator existant (`trim().notEmpty()`) accepte ces valeurs.
+- L'affichage des options en mode feedback colore en vert la bonne option et en rouge l'option choisie si elle est fausse, quel que soit le résultat.
+
+**Dette / points d'attention :**
+- L'édition d'une carte MCQ existante (`openEditModal`) n'affiche pas les options actuelles — les options ne sont pas récupérées dans `loadCards`. À implémenter dans un ticket dédié si nécessaire.
+- `fill_blank` et `reorder` sont intentionnellement exclus de Leitner (décision de scope : open + mcq uniquement).
+
+---
+
+### [M-06.01] — Définition types de questions — 2026-06-19
+
+**Fichiers créés :**
+- `migrations/20260619000001-add-content-to-question.js` — ajout colonne `content` TEXT nullable sur la table Question
+
+**Fichiers modifiés (API) :**
+- `models/Question.model.js` — ajout `content: DataTypes.JSON, allowNull: true` + `type: DataTypes.STRING(20)`
+- `validators/Question.validators.js` — `type` contraint à `['open', 'mcq', 'fill_blank', 'reorder']` via `.isIn()` ; `content` validé comme objet JSON si présent
+- `services/Question.service.js` — `create` : inclusion de `content` + association testQuestions via `question.addTest(test)` quand `idTest` fourni ; `update` : inclusion de `content`
+- `services/Test.service.js` — `findAll` inclut `Subject` (name) ; `findOne` inclut `Subject` + `Question` (triées par questionPosition)
+- `routes/Question.routes.js` — Swagger JSDoc POST/PUT : type devient enum, champ `content` documenté
+
+**Fichiers modifiés (Front) :**
+- `src/stores/questions.js` — état `question` : `type: 'open'` par défaut, `content: null` ajouté
+- `src/pages/ExercisesPage.vue` — connecté au backend : `useTestStore.fetchTests()` + `useSubjectStore.fetchSubjects()` ; formulaire de création avec sélecteur de type par question et champs spécifiques par type ; suppression via `api.del`
+- `src/pages/ExerciseDetailPage.vue` — player connecté au backend : `useTestStore.fetchTestById()` ; rendu conditionnel par type (open=textarea, mcq=radios, fill_blank=inputs inline dans le template, reorder=clic pour ordonner les fragments) ; correction et score calculés côté client
+
+**Ce qui est utilisable :**
+- `POST /questions` avec `{ type: 'open'|'mcq'|'fill_blank'|'reorder', content: {...}, idTest }` → crée la question ET l'associe au test (testQuestions)
+- `GET /tests` → liste les tests avec le sujet associé
+- `GET /tests/:id` → test complet avec sujet + questions triées (incluant `content`)
+- ExercisesPage : créer un exercice multi-questions avec les 4 types depuis l'UI
+- ExerciseDetailPage : jouer un exercice avec correction immédiate
+
+**Structures JSON par type :**
+- `open` : `{ correct_answer: "..." }`
+- `mcq` : `{ options: [{ text: "...", correct: true/false }] }`
+- `fill_blank` : `{ template: "texte avec {{0}} et {{1}}", blanks: ["réponse0", "réponse1"] }`
+- `reorder` : `{ fragments: ["mot1", "mot2", "..."], solution: [0, 1, 2, ...] }`
+
+**Hypothèses posées :**
+- Pour les cartes Leitner (`FlashcardsCardsPage`), les questions sont créées avec `type: 'open'` et `content: null` — le champ `content` est nullable, la correction Leitner passe toujours par la table `Response` + moteur sémantique IA.
+- La correction `open` est une comparaison textuelle exacte (lowercase/trim). Pour une correction sémantique, brancher le même moteur IA que Leitner dans un ticket dédié.
+- `Test.service.findOne` ordonne les questions par `questionPosition ASC` via l'alias `question` (as: 'question' dans l'association).
+
+**Dette / points d'attention :**
+- Édition des questions d'un exercice existant non implémentée — pour modifier les questions, supprimer et recréer l'exercice dans le MVP.
+- `testStore.deleteTest()` vérifie `status !== 200` mais l'API retourne 204 — bug préexistant dans le store, contourné dans ExercisesPage par un appel `api.del` direct.
+- La correction `open` est exacte — une correction tolérante (fautes de frappe, synonymes) nécessiterait le moteur Grading/Semantic existant.

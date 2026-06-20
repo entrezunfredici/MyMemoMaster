@@ -19,8 +19,24 @@ module.exports = (instance) => {
         allowNull: false
       },
       type: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(20),
         allowNull: false
+      },
+      content: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        defaultValue: null,
+        get() {
+          const raw = this.getDataValue('content')
+          if (raw === null || raw === undefined) return null
+          if (typeof raw === 'string') {
+            try { return JSON.parse(raw) } catch { return null }
+          }
+          return raw
+        },
+        set(value) {
+          this.setDataValue('content', value != null ? JSON.stringify(value) : null)
+        }
       }
     },
     {

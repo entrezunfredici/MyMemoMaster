@@ -1,4 +1,4 @@
-const { Test } = require('../models/index')
+const { Test, Subject, Question } = require('../models/index')
 
 /**
  * @swagger
@@ -38,7 +38,9 @@ class TestService {
    *           description: Erreur interne du serveur
    */
   async findAll() {
-    return await Test.findAll()
+    return await Test.findAll({
+      include: [{ model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }]
+    })
   }
 
   /**
@@ -79,7 +81,13 @@ class TestService {
    *           description: Erreur interne du serveur
    */
   async findOne(id) {
-    return await Test.findByPk(id)
+    return await Test.findByPk(id, {
+      include: [
+        { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+        { model: Question, as: 'question', attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition'] }
+      ],
+      order: [[{ model: Question, as: 'question' }, 'questionPosition', 'ASC']]
+    })
   }
 
   /**

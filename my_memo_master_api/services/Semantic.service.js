@@ -121,7 +121,7 @@ class SemanticService {
    */
   tokenize(text) {
     const normalized = this.normalizeText(text)
-    return normalized.split(/\s+/)
+    return normalized.split(/[\s/\-.,:]+/).filter(Boolean)
   }
 
   /**

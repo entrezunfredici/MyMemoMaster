@@ -227,7 +227,13 @@ router.get('/correction/:id', QuestionController.getCorrectionByQuestion)
  *                 example: 1
  *               type:
  *                 type: string
- *                 example: "Type de la question"
+ *                 enum: [open, mcq, fill_blank, reorder]
+ *                 example: "open"
+ *               content:
+ *                 type: object
+ *                 nullable: true
+ *                 description: "Données spécifiques au type (null pour les cartes Leitner)"
+ *                 example: { "correct_answer": "Paris" }
  *               idTest:
  *                 type: integer
  *                 example: 1
@@ -237,9 +243,6 @@ router.get('/correction/:id', QuestionController.getCorrectionByQuestion)
  *               idSystem:
  *                 type: integer
  *                 example: 1
- *               name:
- *                 type: string
- *                 example: "Question 1"
  *     responses:
  *       201:
  *         description: Question créée avec succès
@@ -279,7 +282,12 @@ router.post('/', questionValidators.create, validate, QuestionController.create)
  *                 example: 1
  *               type:
  *                 type: string
- *                 example: "Type de la question"
+ *                 enum: [open, mcq, fill_blank, reorder]
+ *                 example: "open"
+ *               content:
+ *                 type: object
+ *                 nullable: true
+ *                 example: { "correct_answer": "Paris" }
  *               idTest:
  *                 type: integer
  *                 example: 1

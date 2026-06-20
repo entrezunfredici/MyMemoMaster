@@ -392,6 +392,23 @@ SELECT setval('"User_userId_seq"', (SELECT MAX("userId") FROM "User"));
 
 ---
 
+### [2026-06-19] Contenu des questions stocké en JSON (champ `content`) par type
+
+**Contexte** : Les 4 types de questions (ouverte, QCM, texte à trou, phrase à constituer) ont des structures de données radicalement différentes. Un modèle relationnel classique (table Response avec une réponse par question) ne couvre que le cas `open` et oblige à multiplier les tables ou à casser la normalisation pour les autres types.
+
+**Décision** : Ajouter un champ `content` (TEXT/JSON) nullable sur la table `Question`. Chaque type a son propre schéma JSON :
+- `open` : `{ correct_answer: "..." }`
+- `mcq` : `{ options: [{ text, correct }] }`
+- `fill_blank` : `{ template: "texte avec {{0}}", blanks: ["réponse"] }`
+- `reorder` : `{ fragments: ["mot1", ...], solution: [0, 1, ...] }`
+Le champ `type` est contraint côté application à ces 4 valeurs via express-validator (STRING et non ENUM SQL, cohérent avec la décision prise pour CalendarEvent).
+
+**Alternative écartée** : Tables spécialisées par type (QuestionOption, QuestionBlank…) — sur-ingénierie pour un MVP, jointures coûteuses, migration difficile si on ajoute un 5e type. / ENUM SQL pour `type` — rejeté car crée des types nommés en PostgreSQL complexes à gérer en migration, et comportement différent sur SQLite (voir décision 2026-06-10 sur CalendarEvent).
+
+**Conséquences** : La table `Response` reste utilisée uniquement pour les cartes Leitner (`type: 'open'`, `content: null`). La correction `open` dans les exercices est textuelle (exacte) — une correction sémantique nécessitera le moteur Grading/Semantic dans un ticket dédié. Migration `20260619000001` à passer.
+
+---
+
 ### [2026-06-06] Rate limiters extraits dans un middleware dédié
 **Contexte** : `authLimiter` et `registerLimiter` étaient définis inline dans `User.routes.js`. Le nouvel `apiLimiter` global nécessitait un point de centralisation.  
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  
