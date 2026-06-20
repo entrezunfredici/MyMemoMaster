@@ -1,5 +1,6 @@
 import './assets/base.css'
 import './assets/main.css'
+import './assets/modal-form.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

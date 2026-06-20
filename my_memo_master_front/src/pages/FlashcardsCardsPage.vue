@@ -76,24 +76,23 @@
     <!-- Modal ajouter / modifier -->
     <div
       v-if="showModal"
-      class="fixed inset-0 flex items-center justify-center z-50"
-      style="background-color: rgba(0,0,0,0.5)"
+      class="modal-overlay"
       @click="closeModal"
     >
-      <div class="rounded-lg shadow-xl p-8 w-full max-w-md relative" style="background-color: white" @click.stop>
+      <div class="modal-panel" @click.stop>
         <button
           @click="closeModal"
-          class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl leading-none font-bold"
+          class="modal-close"
           title="Fermer"
         >&times;</button>
-        <h2 class="text-xl font-bold mb-6 text-heading">
+        <h2 class="modal-title">
           {{ editingCard ? 'Modifier la carte' : 'Nouvelle carte' }}
         </h2>
 
         <form @submit.prevent="submitForm">
           <!-- Type de question (uniquement en création) -->
-          <div v-if="!editingCard" class="mb-4">
-            <label class="block text-sm font-semibold text-heading mb-2">Type de question</label>
+          <div v-if="!editingCard" class="form-group">
+            <label class="form-label">Type de question</label>
             <div class="flex gap-3">
               <button
                 type="button"
@@ -114,32 +113,32 @@
             </div>
           </div>
 
-          <div class="mb-4">
-            <label class="block text-sm font-semibold text-heading mb-2">Question</label>
+          <div class="form-group">
+            <label class="form-label">Question</label>
             <textarea
               v-model="form.statement"
               placeholder="Quelle est la loi d'Ohm ?"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              class="form-input"
               rows="3"
               required
             />
           </div>
 
           <!-- Champ réponse : open uniquement -->
-          <div v-if="form.type === 'open'" class="mb-6">
-            <label class="block text-sm font-semibold text-heading mb-2">Réponse correcte</label>
+          <div v-if="form.type === 'open'" class="form-group--lg">
+            <label class="form-label">Réponse correcte</label>
             <textarea
               v-model="form.answer"
               placeholder="U = R × I"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              class="form-input"
               rows="2"
               required
             />
           </div>
 
           <!-- Options MCQ -->
-          <div v-else class="mb-6">
-            <label class="block text-sm font-semibold text-heading mb-2">Options (sélectionne la bonne réponse)</label>
+          <div v-else class="form-group--lg">
+            <label class="form-label">Options (sélectionne la bonne réponse)</label>
             <div class="space-y-2">
               <div v-for="(opt, oi) in form.mcqOptions" :key="oi" class="flex items-center gap-2">
                 <input
@@ -175,18 +174,18 @@
 
           <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>
 
-          <div class="flex gap-4">
+          <div class="btn-row">
             <button
               type="submit"
               :disabled="submitting"
-              class="flex-1 bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+              class="btn-modal-submit"
             >
               {{ submitting ? 'Enregistrement...' : editingCard ? 'Modifier' : 'Ajouter' }}
             </button>
             <button
               type="button"
               @click="closeModal"
-              class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition"
+              class="btn-modal-cancel"
             >
               Annuler
             </button>
@@ -198,48 +197,47 @@
     <!-- Modal boîte -->
     <div
       v-if="showBoxModal"
-      class="fixed inset-0 flex items-center justify-center z-50"
-      style="background-color: rgba(0,0,0,0.5)"
+      class="modal-overlay"
       @click="closeBoxModal"
     >
-      <div class="rounded-lg shadow-xl p-8 w-full max-w-sm relative" style="background-color: white" @click.stop>
-        <button @click="closeBoxModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl leading-none font-bold">&times;</button>
-        <h2 class="text-xl font-bold mb-6 text-heading">
+      <div class="modal-panel modal-panel--sm" @click.stop>
+        <button @click="closeBoxModal" class="modal-close">&times;</button>
+        <h2 class="modal-title">
           {{ editingBox ? 'Modifier la boîte' : 'Nouvelle boîte' }}
         </h2>
         <form @submit.prevent="submitBoxForm">
-          <div class="mb-4">
-            <label class="block text-sm font-semibold text-heading mb-2">Niveau</label>
+          <div class="form-group">
+            <label class="form-label">Niveau</label>
             <input
               v-model="boxForm.level"
               type="number"
               min="1"
               placeholder="Ex : 2"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              class="form-input"
               required
             />
           </div>
-          <div class="mb-6">
-            <label class="block text-sm font-semibold text-heading mb-2">Intervalle (secondes)</label>
+          <div class="form-group--lg">
+            <label class="form-label">Intervalle (secondes)</label>
             <input
               v-model="boxForm.intervall"
               type="number"
               min="1"
               placeholder="Ex : 10"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              class="form-input"
               required
             />
           </div>
           <p v-if="boxFormError" class="text-red-600 text-sm mb-4">{{ boxFormError }}</p>
-          <div class="flex gap-4">
+          <div class="btn-row">
             <button
               type="submit"
               :disabled="submittingBox"
-              class="flex-1 bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+              class="btn-modal-submit"
             >
               {{ submittingBox ? 'Enregistrement...' : editingBox ? 'Modifier' : 'Ajouter' }}
             </button>
-            <button type="button" @click="closeBoxModal" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition">
+            <button type="button" @click="closeBoxModal" class="btn-modal-cancel">
               Annuler
             </button>
           </div>

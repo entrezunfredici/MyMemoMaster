@@ -76,46 +76,75 @@
     <!-- Modal création exercice -->
     <div
       v-if="showModal"
-      class="fixed inset-0 flex items-center justify-center z-50"
-      style="background-color: rgba(0,0,0,0.5)"
+      class="modal-overlay"
       @click="closeModal"
     >
       <div
-        class="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        class="modal-panel modal-panel--lg"
         @click.stop
       >
-        <h2 class="text-2xl font-bold mb-6 text-heading">Nouvel exercice</h2>
+        <h2 class="modal-title">Nouvel exercice</h2>
 
         <form @submit.prevent="submitExercise">
           <!-- Nom de l'exercice -->
-          <div class="mb-4">
-            <label class="block text-sm font-semibold text-heading mb-2">Titre de l'exercice</label>
+          <div class="form-group">
+            <label class="form-label">Titre de l'exercice</label>
             <input
               v-model="form.name"
               type="text"
               placeholder="Ex : Équations du second degré"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              class="form-input"
               required
             />
           </div>
 
           <!-- Sujet -->
-          <div class="mb-6">
-            <label class="block text-sm font-semibold text-heading mb-2">Sujet</label>
+          <div class="form-group--lg">
+            <label class="form-label">Sujet</label>
             <select
               v-model="form.subjectId"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              class="form-input"
               required
             >
               <option value="">Sélectionner un sujet</option>
               <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>
             </select>
+
+            <!-- Création inline d'un sujet -->
+            <div v-if="!showNewSubjectForm" class="mt-2">
+              <button
+                type="button"
+                @click="showNewSubjectForm = true"
+                class="text-sm text-blue-600 hover:underline font-medium"
+              >+ Créer un nouveau sujet</button>
+            </div>
+            <div v-else class="mt-2 flex gap-2 items-center">
+              <input
+                v-model="newSubjectName"
+                type="text"
+                placeholder="Nom du sujet (ex : Physique)"
+                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                @keydown.enter.prevent="createSubjectInline"
+                autofocus
+              />
+              <button
+                type="button"
+                :disabled="creatingSubject || !newSubjectName.trim()"
+                @click="createSubjectInline"
+                class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition disabled:opacity-50"
+              >{{ creatingSubject ? '...' : 'Créer' }}</button>
+              <button
+                type="button"
+                @click="showNewSubjectForm = false; newSubjectName = ''"
+                class="text-gray-500 hover:text-gray-700 text-sm px-2"
+              >Annuler</button>
+            </div>
           </div>
 
           <!-- Questions -->
           <div class="mb-6">
             <div class="flex justify-between items-center mb-4">
-              <label class="block text-sm font-semibold text-heading">Questions</label>
+              <label class="form-label">Questions</label>
               <button
                 type="button"
                 @click="addQuestion"
@@ -145,10 +174,10 @@
 
                 <!-- Type de question -->
                 <div class="mb-3">
-                  <label class="block text-xs font-semibold text-gray-500 mb-1">Type</label>
+                  <label class="form-label--xs">Type</label>
                   <select
                     v-model="q.type"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    class="form-input form-input--sm"
                     @change="onTypeChange(q)"
                   >
                     <option value="open">Question ouverte</option>
@@ -160,11 +189,11 @@
 
                 <!-- Énoncé -->
                 <div class="mb-3">
-                  <label class="block text-xs font-semibold text-gray-500 mb-1">Énoncé</label>
+                  <label class="form-label--xs">Énoncé</label>
                   <textarea
                     v-model="q.statement"
                     placeholder="Entrez l'énoncé de la question"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    class="form-input form-input--sm"
                     rows="2"
                     required
                   />
@@ -175,11 +204,11 @@
                 <!-- open -->
                 <template v-if="q.type === 'open'">
                   <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Réponse attendue</label>
+                    <label class="form-label--xs">Réponse attendue</label>
                     <textarea
                       v-model="q.openAnswer"
                       placeholder="Réponse correcte (utilisée pour la correction)"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      class="form-input form-input--sm"
                       rows="2"
                       required
                     />
@@ -229,20 +258,20 @@
                 <!-- fill_blank -->
                 <template v-else-if="q.type === 'fill_blank'">
                   <div class="mb-3">
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">
+                    <label class="form-label--xs">
                       Texte avec trous — utilise <code v-pre class="bg-gray-200 px-1 rounded">{{0}}</code>, <code v-pre class="bg-gray-200 px-1 rounded">{{1}}</code>…
                     </label>
                     <textarea
                       v-model="q.fillTemplate"
                       placeholder="La photosynthèse produit du {{0}} grâce à la lumière {{1}}."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      class="form-input form-input--sm"
                       rows="2"
                       required
                       @input="syncFillBlanks(q)"
                     />
                   </div>
                   <div v-if="q.fillBlanks.length" class="space-y-2">
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Réponses attendues</label>
+                    <label class="form-label--xs">Réponses attendues</label>
                     <div v-for="(blank, bi) in q.fillBlanks" :key="bi" class="flex items-center gap-2">
                       <span class="text-xs text-gray-400 w-14 shrink-0">Trou {{ bi }}</span>
                       <input
@@ -294,18 +323,18 @@
 
           <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>
 
-          <div class="flex gap-4">
+          <div class="btn-row">
             <button
               type="submit"
               :disabled="submitting"
-              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition border-2 border-blue-800 disabled:opacity-50"
+              class="btn-modal-submit"
             >
               {{ submitting ? 'Création en cours...' : 'Créer l\'exercice' }}
             </button>
             <button
               type="button"
               @click="closeModal"
-              class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition border-2 border-gray-800"
+              class="btn-modal-cancel"
             >
               Annuler
             </button>
@@ -335,6 +364,9 @@ const selectedSubjectId = ref(null)
 const showModal = ref(false)
 const submitting = ref(false)
 const formError = ref('')
+const showNewSubjectForm = ref(false)
+const newSubjectName = ref('')
+const creatingSubject = ref(false)
 
 const subjects = computed(() => subjectStore.subjects)
 const tests = computed(() => testStore.tests)
@@ -432,7 +464,28 @@ function openCreateModal() {
   form.subjectId = ''
   form.questions = [defaultQuestion()]
   formError.value = ''
+  showNewSubjectForm.value = false
+  newSubjectName.value = ''
   showModal.value = true
+}
+
+async function createSubjectInline() {
+  const name = newSubjectName.value.trim()
+  if (!name || creatingSubject.value) return
+  creatingSubject.value = true
+  try {
+    const resp = await api.post('subjects', { name })
+    if (!resp || resp.status !== 201) {
+      formError.value = resp?.data?.message || 'Erreur lors de la création du sujet.'
+      return
+    }
+    await subjectStore.fetchSubjects()
+    form.subjectId = resp.data.subjectId
+    showNewSubjectForm.value = false
+    newSubjectName.value = ''
+  } finally {
+    creatingSubject.value = false
+  }
 }
 
 function closeModal() {

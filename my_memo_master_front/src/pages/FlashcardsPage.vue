@@ -89,49 +89,47 @@
     <!-- Modal créer / modifier -->
     <div
       v-if="showModal"
-      class="fixed inset-0 flex items-center justify-center z-50"
-      style="background-color: rgba(0,0,0,0.5)"
+      class="modal-overlay"
       @click="closeModal"
     >
       <div
-        class="rounded-lg shadow-xl p-8 w-full max-w-md relative"
-        style="background-color: white"
+        class="modal-panel"
         @click.stop
       >
         <button
           @click="closeModal"
-          class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl leading-none font-bold"
+          class="modal-close"
           title="Fermer"
         >&times;</button>
 
-        <h2 class="text-2xl font-bold mb-6 text-heading">
+        <h2 class="modal-title">
           {{ editingId ? 'Modifier le système' : 'Nouveau système Leitner' }}
         </h2>
 
         <form @submit.prevent="submitForm">
           <div class="mb-6">
-            <label class="block text-sm font-semibold text-heading mb-2">Nom du système</label>
+            <label class="form-label">Nom du système</label>
             <input
               v-model="form.name"
               type="text"
               placeholder="Ex : Maths S1, Vocabulaire anglais..."
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              class="form-input"
               required
             />
           </div>
 
-          <div class="flex gap-4">
+          <div class="btn-row">
             <button
               type="submit"
               :disabled="submitting"
-              class="flex-1 bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+              class="btn-modal-submit"
             >
               {{ submitting ? 'Enregistrement...' : editingId ? 'Modifier' : 'Créer' }}
             </button>
             <button
               type="button"
               @click="closeModal"
-              class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition duration-200"
+              class="btn-modal-cancel"
             >
               Annuler
             </button>
@@ -143,60 +141,58 @@
   <!-- Modal planification de session -->
   <div
     v-if="showPlanModal"
-    class="fixed inset-0 flex items-center justify-center z-50"
-    style="background-color: rgba(0,0,0,0.5)"
+    class="modal-overlay"
     @click="closePlanModal"
   >
     <div
-      class="rounded-lg shadow-xl p-8 w-full max-w-md relative"
-      style="background-color: white"
+      class="modal-panel"
       @click.stop
     >
       <button
         @click="closePlanModal"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl leading-none font-bold"
+        class="modal-close"
       >&times;</button>
 
-      <h2 class="text-xl font-bold mb-1 text-heading">Planifier une session</h2>
+      <h2 class="modal-title" style="margin-bottom: 0.25rem">Planifier une session</h2>
       <p class="text-sm text-gray-500 mb-6">Système : <span class="font-semibold text-primary">{{ planningSystem?.name }}</span></p>
 
       <form @submit.prevent="submitPlanForm">
-        <div class="mb-4">
-          <label class="block text-sm font-semibold text-heading mb-2">Nom de la session</label>
+        <div class="form-group">
+          <label class="form-label">Nom de la session</label>
           <input
             v-model="planForm.name"
             type="text"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            class="form-input"
             required
           />
         </div>
 
-        <div class="mb-4">
-          <label class="block text-sm font-semibold text-heading mb-2">Date</label>
+        <div class="form-group">
+          <label class="form-label">Date</label>
           <input
             v-model="planForm.date"
             type="date"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            class="form-input"
             required
           />
         </div>
 
         <div class="flex gap-4 mb-6">
           <div class="flex-1">
-            <label class="block text-sm font-semibold text-heading mb-2">Heure de début</label>
+            <label class="form-label">Heure de début</label>
             <input
               v-model="planForm.startTime"
               type="time"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              class="form-input"
               required
             />
           </div>
           <div class="flex-1">
-            <label class="block text-sm font-semibold text-heading mb-2">Heure de fin</label>
+            <label class="form-label">Heure de fin</label>
             <input
               v-model="planForm.endTime"
               type="time"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              class="form-input"
               required
             />
           </div>
@@ -204,18 +200,18 @@
 
         <p v-if="planError" class="text-red-600 text-sm mb-4">{{ planError }}</p>
 
-        <div class="flex gap-4">
+        <div class="btn-row">
           <button
             type="submit"
             :disabled="submittingPlan"
-            class="flex-1 bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+            class="btn-modal-submit"
           >
             {{ submittingPlan ? 'Enregistrement...' : 'Planifier' }}
           </button>
           <button
             type="button"
             @click="closePlanModal"
-            class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition"
+            class="btn-modal-cancel"
           >
             Annuler
           </button>
