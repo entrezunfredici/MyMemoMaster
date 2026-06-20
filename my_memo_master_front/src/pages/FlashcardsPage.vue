@@ -19,6 +19,31 @@
       </button>
     </div>
 
+    <!-- Filtre sujet -->
+    <div class="mb-6">
+      <div class="flex gap-3 flex-wrap items-center mb-2">
+        <label class="text-sm font-semibold text-heading">Filtrer par sujet :</label>
+        <button
+          v-for="subject in subjects"
+          :key="subject.subjectId"
+          @click="selectedSubjectId = selectedSubjectId === subject.subjectId ? null : subject.subjectId"
+          :class="['px-3 py-1.5 rounded-lg font-semibold transition duration-200 border-2 text-sm', selectedSubjectId === subject.subjectId ? 'bg-primary text-white border-primary' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200']"
+        >
+          {{ subject.name }}
+        </button>
+        <button
+          v-if="selectedSubjectId"
+          @click="selectedSubjectId = null"
+          class="px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-100 text-red-700 border-2 border-red-300 hover:bg-red-200"
+        >
+          Réinitialiser
+        </button>
+      </div>
+      <p class="text-sm text-gray-600">
+        <strong>{{ filteredSystems.length }}</strong> système<span v-if="filteredSystems.length !== 1">s</span> trouvé<span v-if="filteredSystems.length !== 1">s</span>
+      </p>
+    </div>
+
     <div v-if="loading" class="text-center text-gray-light py-10">
       Chargement des systèmes...
     </div>
@@ -28,7 +53,7 @@
     </div>
 
     <div v-else-if="filteredSystems.length === 0" class="text-center text-gray-light py-10">
-      Aucun système ne correspond à "{{ searchQuery }}".
+      Aucun système ne correspond à votre recherche.
     </div>
 
     <div v-else class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -36,6 +61,7 @@
         v-for="system in filteredSystems"
         :key="system.idSystem"
         :title="system.name"
+        :description="system.subject?.name || ''"
         action-label="Lancer la session"
         :on-action="() => goToSession(system.idSystem)"
         :on-edit="() => openEditModal(system)"
@@ -43,6 +69,11 @@
       >
         <template #stats>
           <div class="mt-1">
+            <div v-if="system.subject" class="mb-2">
+              <span class="bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
+                {{ system.subject.name }}
+              </span>
+            </div>
             <div v-if="cardStore.systemStats[system.idSystem]">
               <span class="text-sm text-gray-500">
                 {{ cardStore.systemStats[system.idSystem].total }}
@@ -107,7 +138,7 @@
         </h2>
 
         <form @submit.prevent="submitForm">
-          <div class="mb-6">
+          <div class="mb-4">
             <label class="form-label">Nom du système</label>
             <input
               v-model="form.name"
@@ -116,6 +147,42 @@
               class="form-input"
               required
             />
+          </div>
+
+          <div class="mb-6">
+            <label class="form-label">Sujet <span class="text-gray-400 font-normal">(optionnel)</span></label>
+            <select v-model="form.subjectId" class="form-input">
+              <option :value="null">— Sans sujet —</option>
+              <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>
+            </select>
+            <div v-if="!showNewSubjectForm" class="mt-2">
+              <button
+                type="button"
+                @click="showNewSubjectForm = true"
+                class="text-sm text-primary hover:underline font-medium"
+              >+ Créer un nouveau sujet</button>
+            </div>
+            <div v-else class="mt-2 flex gap-2 items-center">
+              <input
+                v-model="newSubjectName"
+                type="text"
+                placeholder="Nom du sujet (ex : Physique)"
+                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                @keydown.enter.prevent="createSubjectInline"
+                autofocus
+              />
+              <button
+                type="button"
+                :disabled="creatingSubject || !newSubjectName.trim()"
+                @click="createSubjectInline"
+                class="bg-primary hover:bg-primary/90 text-white text-sm font-bold px-4 py-2 rounded-lg transition disabled:opacity-50"
+              >{{ creatingSubject ? '...' : 'Créer' }}</button>
+              <button
+                type="button"
+                @click="showNewSubjectForm = false; newSubjectName = ''"
+                class="text-gray-500 hover:text-gray-700 text-sm px-2"
+              >Annuler</button>
+            </div>
           </div>
 
           <div class="btn-row">
@@ -231,24 +298,40 @@ import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
 import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
+import { useSubjectStore } from '@/stores/subjects'
+import { api } from '@/helpers/api'
 
 const router = useRouter()
 const systemStore = useLeitnerSystemStore()
 const cardStore = useLeitnerCardStore()
 const boxStore = useLeitnerBoxStore()
 const sessionStore = useRevisionSessionStore()
+const subjectStore = useSubjectStore()
 
 const loading = ref(true)
 const searchQuery = ref('')
+const selectedSubjectId = ref(null)
 const showModal = ref(false)
 const submitting = ref(false)
 const editingId = ref(null)
-const form = reactive({ name: '' })
+const showNewSubjectForm = ref(false)
+const newSubjectName = ref('')
+const creatingSubject = ref(false)
+
+const form = reactive({ name: '', subjectId: null })
+
+const subjects = computed(() => subjectStore.subjects)
 
 const filteredSystems = computed(() => {
-  if (!searchQuery.value.trim()) return systemStore.systems
-  const q = searchQuery.value.toLowerCase()
-  return systemStore.systems.filter(s => s.name?.toLowerCase().includes(q))
+  let list = systemStore.systems
+  if (selectedSubjectId.value) {
+    list = list.filter(s => s.subjectId === selectedSubjectId.value)
+  }
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(s => s.name?.toLowerCase().includes(q))
+  }
+  return list
 })
 
 // --- Planification de session ---
@@ -295,7 +378,7 @@ const loadStats = async () => {
 }
 
 onMounted(async () => {
-  await systemStore.fetchSystems()
+  await Promise.all([systemStore.fetchSystems(), subjectStore.fetchSubjects()])
   await Promise.all([loadStats(), boxStore.fetchBoxes()])
   loading.value = false
 })
@@ -307,12 +390,18 @@ const goToSession = (systemId) => {
 const openCreateModal = () => {
   editingId.value = null
   form.name = ''
+  form.subjectId = null
+  showNewSubjectForm.value = false
+  newSubjectName.value = ''
   showModal.value = true
 }
 
 const openEditModal = (system) => {
   editingId.value = system.idSystem
   form.name = system.name
+  form.subjectId = system.subjectId || null
+  showNewSubjectForm.value = false
+  newSubjectName.value = ''
   showModal.value = true
 }
 
@@ -320,11 +409,28 @@ const closeModal = () => {
   showModal.value = false
   editingId.value = null
   form.name = ''
+  form.subjectId = null
+}
+
+async function createSubjectInline() {
+  const name = newSubjectName.value.trim()
+  if (!name || creatingSubject.value) return
+  creatingSubject.value = true
+  try {
+    const resp = await api.post('subjects', { name })
+    if (!resp || resp.status !== 201) return
+    await subjectStore.fetchSubjects()
+    form.subjectId = resp.data.subjectId
+    showNewSubjectForm.value = false
+    newSubjectName.value = ''
+  } finally {
+    creatingSubject.value = false
+  }
 }
 
 const submitForm = async () => {
   submitting.value = true
-  systemStore.system = { name: form.name }
+  systemStore.system = { name: form.name, subjectId: form.subjectId || null }
 
   const ok = editingId.value
     ? await systemStore.updateSystem(editingId.value)

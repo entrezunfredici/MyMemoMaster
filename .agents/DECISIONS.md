@@ -409,6 +409,14 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-20] LeitnerSystem → Subject : FK directe plutôt que many-to-many
+**Contexte** : Le modèle initial prévoyait plusieurs sujets par système via une table de jointure `systemSubject`. En pratique, un système Leitner correspond à un seul domaine d'étude.
+**Décision** : Remplacer `belongsToMany(Subject)` par une FK directe nullable `subjectId` sur `LeitnerSystem`, alignée sur le pattern de `Test.subjectId`. La table `systemSubject` est conservée en base mais n'est plus utilisée.
+**Alternative écartée** : Conserver le many-to-many — plus de complexité (table de jointure, upsert, `setSubjects()`) pour un cas d'usage qui n'existe pas ; le filtre par sujet sur `findAll` aurait nécessité un JOIN explicite.
+**Conséquences** : Migration `20260620000001` à passer. La table `systemSubject` est orpheline — à supprimer dans un ticket de nettoyage. `findAll` filtre désormais par `idUser` (cohérent avec la logique existante de propriété).
+
+---
+
 ### [2026-06-06] Rate limiters extraits dans un middleware dédié
 **Contexte** : `authLimiter` et `registerLimiter` étaient définis inline dans `User.routes.js`. Le nouvel `apiLimiter` global nécessitait un point de centralisation.  
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  

@@ -1,4 +1,4 @@
-const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, instance } = require('../models/index')
+const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, Subject, instance } = require('../models/index')
 
 const DEFAULT_BOXES = [
   { level: 1, intervall: 5, color: 123456 },
@@ -8,19 +8,25 @@ const DEFAULT_BOXES = [
   { level: 5, intervall: 30, color: 333333 }
 ]
 
+const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
+
 class LeitnerSystemService {
-  async findAll() {
-    return await LeitnerSystem.findAll()
+  async findAll(userId) {
+    return await LeitnerSystem.findAll({
+      where: { idUser: userId },
+      include: [SUBJECT_INCLUDE]
+    })
   }
 
-  async findBySubject(subjectId) {
+  async findBySubject(subjectId, userId) {
     return await LeitnerSystem.findAll({
-      where: { idMindMap: subjectId }
+      where: { subjectId, idUser: userId },
+      include: [SUBJECT_INCLUDE]
     })
   }
 
   async findOne(id) {
-    return await LeitnerSystem.findByPk(id)
+    return await LeitnerSystem.findByPk(id, { include: [SUBJECT_INCLUDE] })
   }
 
   async create(data) {
@@ -32,7 +38,7 @@ class LeitnerSystemService {
         { transaction: t }
       )
       await t.commit()
-      return system
+      return await LeitnerSystem.findByPk(system.idSystem, { include: [SUBJECT_INCLUDE] })
     } catch (err) {
       await t.rollback()
       throw err

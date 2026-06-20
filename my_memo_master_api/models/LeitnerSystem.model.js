@@ -28,6 +28,16 @@ module.exports = (instance) => {
         onDelete: 'SET NULL',
         onUpdate: 'CASCADE'
       },
+      subjectId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'Subject',
+          key: 'subjectId'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
+      },
       idMindMap: {
         type: DataTypes.INTEGER,
         allowNull: true
@@ -36,7 +46,7 @@ module.exports = (instance) => {
     {
       tableName: 'LeitnerSystem',
       timestamps: false,
-      indexes: [{ fields: ['idUser'] }]
+      indexes: [{ fields: ['idUser'] }, { fields: ['subjectId'] }]
     }
   )
 
@@ -45,6 +55,11 @@ module.exports = (instance) => {
     LeitnerSystem.belongsTo(models.User, {
       foreignKey: 'idUser',
       as: 'user'
+    })
+
+    LeitnerSystem.belongsTo(models.Subject, {
+      foreignKey: 'subjectId',
+      as: 'subject'
     })
 
     LeitnerSystem.hasMany(models.LeitnerBox, {
@@ -57,13 +72,6 @@ module.exports = (instance) => {
       foreignKey: 'idSystem',
       otherKey: 'idCard',
       as: 'leitnerCards'
-    })
-
-    LeitnerSystem.belongsToMany(models.Subject, {
-      through: 'systemSubject',
-      foreignKey: 'idSystem',
-      otherKey: 'subjectId',
-      as: 'subjects'
     })
 
     LeitnerSystem.hasMany(models.LeitnerSystemsUsers, {

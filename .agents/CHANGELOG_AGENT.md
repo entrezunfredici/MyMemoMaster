@@ -27,7 +27,7 @@
 | Test / Question / Response | Stable — M-06.01 : champ `content` JSON par type, 4 types définis, ExercisesPage branchée API | 2026-06-19 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
-| LeitnerSystem / LeitnerCard / LeitnerBox | Stable | init |
+| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
 | LeitnerSystemsUsers | Stable | init |
 | Diagramme (mind maps) | Stable — couplage Subject déplacé vers DiagrammeService.resolveSubject() | 2026-06-06 |
 | Fields / FieldsType | Stable | init |
@@ -63,7 +63,7 @@
 | Jobs (fifo.cron.js) | Stable | init |
 | Front — Auth (login, register) | Stable — M-05.09c : AuthFormLayout.vue composant layout partagé (4 pages auth refactorisées) | 2026-06-16 |
 | Front — HomePage | Stable | init |
-| Front — FlashcardsPage | Stable — bouton "+ Planifier" par système → crée une RevisionSession liée via idSystem | 2026-06-13 |
+| Front — FlashcardsPage | Stable — M-07.01 : filtre sujet, badge sujet, sélecteur sujet dans modal (+ création inline) | 2026-06-20 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.01 : connecté backend, formulaire 4 types, player + correction | 2026-06-19 |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
@@ -1905,3 +1905,36 @@ npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-co
 - Édition des questions d'un exercice existant non implémentée — pour modifier les questions, supprimer et recréer l'exercice dans le MVP.
 - `testStore.deleteTest()` vérifie `status !== 200` mais l'API retourne 204 — bug préexistant dans le store, contourné dans ExercisesPage par un appel `api.del` direct.
 - La correction `open` est exacte — une correction tolérante (fautes de frappe, synonymes) nécessiterait le moteur Grading/Semantic existant.
+
+---
+
+### [M-07.01] — Lien sujet → système Leitner (FK directe) — 2026-06-20
+
+**Fichiers créés :**
+- `migrations/20260620000001-add-subjectid-to-leitnersystem.js` — ajout colonne `subjectId` (INTEGER nullable, FK → Subject, ON DELETE SET NULL) + index `idx_leitnersystem_subjectid`
+
+**Fichiers modifiés (API) :**
+- `models/LeitnerSystem.model.js` — ajout champ `subjectId` + association `belongsTo(Subject, { as: 'subject' })` ; suppression de l'association `belongsToMany(Subject)` via `systemSubject` (table de jointure conservée en base mais plus utilisée)
+- `services/LeitnerSystem.service.js` — `findAll(userId)` filtre désormais par `idUser` + inclut `Subject` ; `findBySubject(subjectId, userId)` corrigé (utilisait `idMindMap` à tort) ; `findOne` inclut `Subject` ; `create` retourne le système avec le sujet chargé ; import `Subject` ajouté
+- `controllers/LeitnerSystem.controller.js` — `create`/`update` : `subjectId` extrait du body (remplace `idMindMap`/`sujet`) ; `findAll`/`findBySubject` passent `req.user.id`
+- `validators/LeitnerSystem.validators.js` — règles `idMindMap` et `sujet` supprimées, remplacées par `subjectId` optionnel entier positif
+- `routes/LeitnerSystem.routes.js` — Swagger JSDoc `POST /` et `PUT /:id` mis à jour (`subjectId` à la place de `idMindMap`/`sujet`/`idUser`)
+
+**Fichiers modifiés (Front) :**
+- `src/pages/FlashcardsPage.vue` — import `useSubjectStore` + `api` ; filtre sujet (même pattern qu'`ExercisesPage`) ; sélecteur sujet optionnel dans le modal créer/modifier avec création inline ; badge sujet dans la carte MenuItem ; `openEditModal` précharge `form.subjectId` ; `submitForm` passe `subjectId`
+
+**Ce qui est utilisable :**
+- `GET /leitnersystems` → retourne uniquement les systèmes de l'utilisateur connecté, avec `subject: { subjectId, name }` inclus
+- `GET /leitnersystems/bySubjects/:subjectid` → filtre par sujet ET par utilisateur connecté
+- `POST /leitnersystems` avec `{ name, subjectId? }` → crée le système lié au sujet
+- `PUT /leitnersystems/:id` avec `{ name, subjectId? }` → met à jour le sujet lié
+- FlashcardsPage : filtre par sujet, badge sujet sur chaque carte, sélecteur sujet + création inline dans le modal
+
+**Hypothèses posées :**
+- La table `systemSubject` (many-to-many) est conservée en base mais n'est plus utilisée — à supprimer dans un ticket de nettoyage si aucun autre usage n'est identifié.
+- `findAll` filtre désormais par `idUser` : un utilisateur ne voit que ses propres systèmes (comportement cohérent avec la logique existante, mais changement de comportement vs. l'ancienne implémentation qui retournait tous les systèmes).
+- Le champ `sujet` (JSON) et `idMindMap` restent en base (colonnes non supprimées) pour ne pas casser les données existantes.
+
+**Dette / points d'attention :**
+- La table `systemSubject` est orpheline — migration de nettoyage à créer avant la mise en prod.
+- Les champs `sujet` (JSON) et `idMindMap` sont toujours en base — à supprimer dans un ticket dédié si confirmés inutilisés.

@@ -2,7 +2,7 @@ const leitnerSystemService = require('../services/LeitnerSystem.service.js')
 const logger = require('../helpers/logger')
 exports.findAll = async (req, res) => {
   try {
-    const data = await leitnerSystemService.findAll()
+    const data = await leitnerSystemService.findAll(req.user.id)
     res.status(200).send(data)
   } catch (error) {
     logger.error(error?.message || error)
@@ -15,7 +15,7 @@ exports.findAll = async (req, res) => {
 exports.findBySubject = async (req, res) => {
   try {
     const { subjectid } = req.params
-    const data = await leitnerSystemService.findBySubject(subjectid)
+    const data = await leitnerSystemService.findBySubject(subjectid, req.user.id)
     if (!data.length) {
       res.status(404).send({ message: 'Aucun système trouvé pour ce sujet.' })
     } else {
@@ -44,18 +44,13 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, idMindMap, sujet } = req.body
+    const { name, subjectId } = req.body
     const idUser = req.user.id
-
-    if (!name) {
-      return res.status(400).json({ message: 'Le champ name est obligatoire.' })
-    }
 
     const newSystem = await leitnerSystemService.create({
       name,
       idUser,
-      idMindMap,
-      sujet
+      subjectId: subjectId || null
     })
 
     // Réponse avec le nouveau système créé
@@ -69,14 +64,14 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params
-    const { name, idMindMap } = req.body
+    const { name, subjectId } = req.body
     const idUser = req.user.id
 
     const updated = await leitnerSystemService.update({
       idSystem: id,
       idUser,
       name,
-      idMindMap
+      subjectId: subjectId !== undefined ? subjectId : undefined
     })
 
     if (!updated) {

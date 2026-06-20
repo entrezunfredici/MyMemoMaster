@@ -95,25 +95,20 @@ router.get('/:id', authMiddleware, leitnerSystem.findOne)
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [name]
  *             properties:
  *               name:
  *                 type: string
  *                 example: "Système Leitner Physique"
- *               idUser:
- *                 type: integer
- *                 example: 2
- *               idMindMap:
+ *               subjectId:
  *                 type: integer
  *                 nullable: true
- *                 example: 5
- *               sujet:
- *                 type: array
- *                 items:
- *                   type: string
- *                   example: "Chapitre 1"
+ *                 example: 3
  *     responses:
  *       201:
  *         description: Système créé avec succès
+ *       400:
+ *         description: Données invalides
  *       500:
  *         description: Erreur interne du serveur
  */
@@ -133,16 +128,10 @@ router.post('/', authMiddleware, leitnerSystemValidators.create, validate, leitn
  *           schema:
  *             type: object
  *             properties:
- *               idSystem:
- *                 type: integer
- *                 example: 1
- *               idUser:
- *                 type: integer
- *                 example: 2
  *               name:
  *                 type: string
  *                 example: "Système Leitner mis à jour"
- *               idMindMap:
+ *               subjectId:
  *                 type: integer
  *                 nullable: true
  *                 example: 3

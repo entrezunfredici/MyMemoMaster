@@ -225,14 +225,15 @@
                       class="flex items-center gap-2"
                     >
                       <input
-                        v-model="opt.correct"
                         type="radio"
                         :name="`mcq-correct-${idx}`"
-                        @change="setMcqCorrect(q, oi)"
+                        :value="oi"
+                        v-model="q.mcqCorrectIdx"
                         class="accent-blue-600"
                       />
                       <input
-                        v-model="opt.text"
+                        :value="opt.text"
+                        @input="setExerciseOptionText(q, oi, $event.target.value)"
                         type="text"
                         placeholder="Option..."
                         class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
@@ -241,14 +242,14 @@
                       <button
                         v-if="q.mcqOptions.length > 2"
                         type="button"
-                        @click="q.mcqOptions.splice(oi, 1)"
+                        @click="removeExerciseOption(q, oi)"
                         class="text-red-400 hover:text-red-600 text-lg leading-none"
                       >✕</button>
                     </div>
                   </div>
                   <button
                     type="button"
-                    @click="q.mcqOptions.push({ text: '', correct: false })"
+                    @click="addExerciseOption(q)"
                     class="mt-2 text-sm text-blue-600 hover:underline font-medium"
                   >
                     + Ajouter une option
@@ -388,10 +389,8 @@ const defaultQuestion = () => ({
   statement: '',
   type: 'open',
   openAnswer: '',
-  mcqOptions: [
-    { text: '', correct: true },
-    { text: '', correct: false },
-  ],
+  mcqOptions: [{ text: '' }, { text: '' }],
+  mcqCorrectIdx: 0,
   fillTemplate: '',
   fillBlanks: [],
   reorderFragments: ['', ''],
@@ -407,14 +406,28 @@ const form = reactive({
 
 function onTypeChange(q) {
   q.openAnswer = ''
-  q.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  q.mcqOptions = [{ text: '' }, { text: '' }]
+  q.mcqCorrectIdx = 0
   q.fillTemplate = ''
   q.fillBlanks = []
   q.reorderFragments = ['', '']
 }
 
-function setMcqCorrect(q, correctIdx) {
-  q.mcqOptions.forEach((opt, i) => { opt.correct = i === correctIdx })
+function setExerciseOptionText(q, idx, value) {
+  q.mcqOptions = q.mcqOptions.map((o, i) => i === idx ? { ...o, text: value } : o)
+}
+
+function addExerciseOption(q) {
+  q.mcqOptions = [...q.mcqOptions, { text: '' }]
+}
+
+function removeExerciseOption(q, oi) {
+  q.mcqOptions = q.mcqOptions.filter((_, i) => i !== oi)
+  if (q.mcqCorrectIdx >= q.mcqOptions.length) {
+    q.mcqCorrectIdx = q.mcqOptions.length - 1
+  } else if (oi < q.mcqCorrectIdx) {
+    q.mcqCorrectIdx--
+  }
 }
 
 function syncFillBlanks(q) {
@@ -429,7 +442,7 @@ function buildContent(q) {
     case 'open':
       return { correct_answer: q.openAnswer }
     case 'mcq':
-      return { options: q.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+      return { options: q.mcqOptions.map((o, i) => ({ text: o.text, correct: i === q.mcqCorrectIdx })) }
     case 'fill_blank':
       return { template: q.fillTemplate, blanks: q.fillBlanks }
     case 'reorder':
