@@ -1,4 +1,5 @@
 const { Test, Subject, Question, TestResult } = require('../models/index')
+const semanticService = require('./Semantic.service')
 
 /**
  * @swagger
@@ -247,51 +248,63 @@ class TestService {
     if (!test) return null
 
     const questions = test.question ?? []
-    let score = 0
-    const results = questions.map(q => {
+    const results = await Promise.all(questions.map(async q => {
       const submission = answers.find(a => a.questionId === q.idQuestion)
-      const correct = this._checkAnswer(q, submission?.answer ?? null)
-      if (correct) score++
-      return { questionId: q.idQuestion, correct, correctAnswer: this._formatCorrectAnswer(q) }
-    })
+      const { correct, explanation, semanticScore, points } = await this._checkAnswer(q, submission?.answer ?? null)
+      return {
+        questionId: q.idQuestion,
+        correct,
+        correctAnswer: this._formatCorrectAnswer(q),
+        explanation,
+        semanticScore,
+        points
+      }
+    }))
 
+    const score = parseFloat(results.reduce((acc, r) => acc + r.points, 0).toFixed(2))
     const testResult = await TestResult.create({ testId, userId, score, total: questions.length })
     return { score, total: questions.length, results, resultId: testResult.resultId }
   }
 
-  _checkAnswer(question, answer) {
+  async _checkAnswer(question, answer) {
     const content = question.content ?? {}
     switch (question.type) {
       case 'open': {
-        const user = (answer ?? '').trim().toLowerCase()
-        const correct = (content.correct_answer ?? '').trim().toLowerCase()
-        return user.length > 0 && user === correct
+        const user = (answer ?? '').trim()
+        if (!user) return { correct: false, explanation: null, semanticScore: null, points: 0 }
+        const correctAnswer = (content.correct_answer ?? '').trim()
+        if (!correctAnswer) return { correct: false, explanation: null, semanticScore: null, points: 0 }
+        const result = await semanticService.gradeSemantic(correctAnswer, user)
+        return { correct: result.is_correct, explanation: result.explanation, semanticScore: result.score, points: result.score }
       }
       case 'mcq': {
-        if (answer === null || answer === undefined) return false
+        if (answer === null || answer === undefined) return { correct: false, explanation: null, semanticScore: null, points: 0 }
         const idx = Number(answer)
         const opts = content.options ?? []
-        return !isNaN(idx) && opts[idx]?.correct === true
+        const correct = !isNaN(idx) && opts[idx]?.correct === true
+        return { correct, explanation: null, semanticScore: null, points: correct ? 1 : 0 }
       }
       case 'fill_blank': {
         const blanks = content.blanks ?? []
         const userBlanks = Array.isArray(answer) ? answer : []
-        return (
+        const correct = (
           blanks.length > 0 &&
           blanks.every((b, i) => (userBlanks[i] ?? '').trim().toLowerCase() === b.trim().toLowerCase())
         )
+        return { correct, explanation: null, semanticScore: null, points: correct ? 1 : 0 }
       }
       case 'reorder': {
         const fragments = content.fragments ?? []
         const userOrder = Array.isArray(answer) ? answer : []
-        return (
+        const correct = (
           fragments.length > 0 &&
           fragments.length === userOrder.length &&
           fragments.every((f, i) => f === userOrder[i])
         )
+        return { correct, explanation: null, semanticScore: null, points: correct ? 1 : 0 }
       }
       default:
-        return false
+        return { correct: false, explanation: null, semanticScore: null, points: 0 }
     }
   }
 

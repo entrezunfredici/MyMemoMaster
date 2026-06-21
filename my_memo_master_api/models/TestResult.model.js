@@ -21,7 +21,7 @@ module.exports = (instance) => {
         references: { model: 'User', key: 'userId' }
       },
       score: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.FLOAT,
         allowNull: false
       },
       total: {

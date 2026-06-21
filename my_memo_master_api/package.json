@@ -9,6 +9,8 @@
     "start": "node server.js",
     "build": "next build",
     "seed": "node seeder.js",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

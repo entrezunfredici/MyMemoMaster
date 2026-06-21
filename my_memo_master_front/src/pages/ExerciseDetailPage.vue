@@ -152,6 +152,12 @@
               <p class="text-gray-600 text-sm">{{ formatCorrectAnswer(question) }}</p>
             </div>
           </div>
+          <p
+            v-if="question.type === 'open' && questionResults[idx]?.explanation"
+            class="mt-3 text-xs text-gray-500 italic"
+          >
+            {{ questionResults[idx].explanation }}
+          </p>
         </div>
 
         <button
