@@ -1,5 +1,6 @@
 const express = require('express')
 const test = require('../controllers/Test.controller.js')
+const deadline = require('../controllers/Deadline.controller')
 const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
 const testValidators = require('../validators/Test.validators')
@@ -157,6 +158,28 @@ router.put('/:id', testValidators.update, validate, test.update)
 router.delete('/:id', test.delete)
 
 router.post('/:id/submit', authMiddleware, testValidators.submit, validate, test.submit)
+
+/**
+ * @swagger
+ * /tests/{id}/deadlines:
+ *   get:
+ *     summary: Lister les échéances liées à un exercice
+ *     tags: [Tests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Échéances récupérées avec succès.
+ *       401:
+ *         description: Non authentifié.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.get('/:id/deadlines', authMiddleware, deadline.findByTest)
 
 module.exports = (app) => {
   /**

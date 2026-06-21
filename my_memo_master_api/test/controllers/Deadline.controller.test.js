@@ -30,6 +30,7 @@ jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), wa
 jest.mock('../../services/Deadline.service', () => ({
   findAll: jest.fn(),
   findOne: jest.fn(),
+  findByTest: jest.fn(),
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn()

@@ -11,22 +11,19 @@ module.exports = {
     const rawPassword = process.env.ADMIN_SEED_PASSWORD || 'Admin1234!'
     const password = await bcrypt.hash(rawPassword, 10)
     const now = new Date()
-    await queryInterface.bulkInsert(
-      'User',
-      [
-        {
-          userId: 1,
-          email,
-          name: 'Admin',
-          roleId: 1,
-          password,
-          hasValidatedEmail: true,
-          createdAt: now,
-          updatedAt: now
-        }
-      ],
-      { ignoreDuplicates: true }
-    )
+    const existing = await queryInterface.rawSelect('User', { where: { email } }, ['userId'])
+    if (existing) return
+    await queryInterface.bulkInsert('User', [
+      {
+        email,
+        name: 'Admin',
+        roleId: 1,
+        password,
+        hasValidatedEmail: true,
+        createdAt: now,
+        updatedAt: now
+      }
+    ])
   },
 
   async down(queryInterface) {

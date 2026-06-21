@@ -31,6 +31,15 @@ jest.mock('../../services/Test.service', () => ({
   submitAnswers: jest.fn()
 }))
 
+jest.mock('../../services/Deadline.service', () => ({
+  findAll: jest.fn(),
+  findOne: jest.fn(),
+  findByTest: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn()
+}))
+
 process.env.AUTH_JWT_SECRET = 'test-secret'
 process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.NODE_ENV = 'test'
@@ -39,6 +48,7 @@ const request = require('supertest')
 const jwt = require('jsonwebtoken')
 const app = require('../../app')
 const testService = require('../../services/Test.service')
+const deadlineService = require('../../services/Deadline.service')
 
 const BASE = '/api/v1'
 const SECRET = 'test-secret'
@@ -293,6 +303,53 @@ describe('Test Controller', () => {
         .post(`${BASE}/tests/1/submit`)
         .set('Authorization', `Bearer ${makeToken()}`)
         .send({ answers: VALID_ANSWERS })
+
+      expect(res.status).toBe(500)
+      expect(res.body.message).toBeDefined()
+    })
+  })
+
+  // ── GET /tests/:id/deadlines ───────────────────────────────────────────────
+  describe('GET /tests/:id/deadlines', () => {
+    const mockDeadlines = [
+      { id: 1, name: 'Rendre le contrôle', dueDate: '2026-07-01', testId: 1 }
+    ]
+
+    it('200 — retourne les échéances de l\'exercice', async () => {
+      deadlineService.findByTest.mockResolvedValue(mockDeadlines)
+
+      const res = await request(app)
+        .get(`${BASE}/tests/1/deadlines`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.data).toHaveLength(1)
+      expect(deadlineService.findByTest).toHaveBeenCalledWith(1, 1)
+    })
+
+    it('200 — liste vide si aucun groupe', async () => {
+      deadlineService.findByTest.mockResolvedValue([])
+
+      const res = await request(app)
+        .get(`${BASE}/tests/99/deadlines`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.data).toEqual([])
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app).get(`${BASE}/tests/1/deadlines`)
+      expect(res.status).toBe(401)
+      expect(deadlineService.findByTest).not.toHaveBeenCalled()
+    })
+
+    it('500 — le service échoue', async () => {
+      deadlineService.findByTest.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .get(`${BASE}/tests/1/deadlines`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
       expect(res.body.message).toBeDefined()

@@ -44,6 +44,16 @@ module.exports = (instance) => {
         type: DataTypes.TIME,
         allowNull: true
       },
+      testId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'Test',
+          key: 'testId'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
+      },
       createdBy: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -58,7 +68,7 @@ module.exports = (instance) => {
     {
       tableName: 'Deadline',
       timestamps: false,
-      indexes: [{ fields: ['occurrenceId'] }, { fields: ['createdBy'] }, { fields: ['dueDate'] }]
+      indexes: [{ fields: ['occurrenceId'] }, { fields: ['createdBy'] }, { fields: ['dueDate'] }, { fields: ['testId'] }]
     }
   )
 
@@ -71,6 +81,11 @@ module.exports = (instance) => {
     Deadline.belongsTo(models.User, {
       foreignKey: 'createdBy',
       as: 'creator'
+    })
+
+    Deadline.belongsTo(models.Test, {
+      foreignKey: 'testId',
+      as: 'test'
     })
   }
 

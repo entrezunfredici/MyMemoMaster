@@ -1,4 +1,4 @@
-const { Deadline, EventOccurrence, CalendarEvent, ClassGroupUsers } = require('../models/index')
+const { Deadline, EventOccurrence, CalendarEvent, ClassGroupUsers, Test } = require('../models/index')
 
 class DeadlineService {
   /**
@@ -54,7 +54,8 @@ class DeadlineService {
               attributes: ['id', 'name', 'classGroupId']
             }
           ]
-        }
+        },
+        { model: Test, as: 'test', attributes: ['testId', 'name'], required: false }
       ],
       order: [['dueDate', 'ASC']]
     })
@@ -73,8 +74,42 @@ class DeadlineService {
           model: EventOccurrence,
           as: 'occurrence',
           include: [{ model: CalendarEvent, as: 'calendarEvent' }]
-        }
+        },
+        { model: Test, as: 'test', attributes: ['testId', 'name'], required: false }
       ]
+    })
+  }
+
+  /**
+   * Liste les échéances liées à un exercice spécifique, filtrées par les groupes de l'utilisateur.
+   *
+   * @param {number} testId
+   * @param {number} userId
+   * @returns {Promise<Deadline[]>}
+   */
+  async findByTest(testId, userId) {
+    const groupIds = await this._getUserGroupIds(userId)
+    if (groupIds.length === 0) return []
+
+    return Deadline.findAll({
+      where: { testId },
+      include: [
+        {
+          model: EventOccurrence,
+          as: 'occurrence',
+          required: true,
+          include: [
+            {
+              model: CalendarEvent,
+              as: 'calendarEvent',
+              where: { classGroupId: groupIds },
+              attributes: ['id', 'name', 'classGroupId']
+            }
+          ]
+        },
+        { model: Test, as: 'test', attributes: ['testId', 'name'], required: false }
+      ],
+      order: [['dueDate', 'ASC']]
     })
   }
 

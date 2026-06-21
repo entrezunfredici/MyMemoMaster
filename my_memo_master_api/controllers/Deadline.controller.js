@@ -53,6 +53,16 @@ exports.update = async (req, res) => {
   }
 }
 
+exports.findByTest = async (req, res) => {
+  try {
+    const data = await DeadlineService.findByTest(Number(req.params.id), req.user.id)
+    res.status(200).json({ message: 'Échéances récupérées avec succès.', data })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération des échéances de cet exercice.' })
+  }
+}
+
 exports.delete = async (req, res) => {
   try {
     const result = await DeadlineService.delete(req.params.id, req.user.id)

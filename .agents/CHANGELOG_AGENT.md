@@ -65,7 +65,7 @@
 | Front — Auth (login, register) | Stable — M-05.09c : AuthFormLayout.vue composant layout partagé (4 pages auth refactorisées) | 2026-06-16 |
 | Front — HomePage | Stable | init |
 | Front — FlashcardsPage | Stable — refactor : utilise ItemListLayout.vue, chrome dupliqué supprimé | 2026-06-21 |
-| Front — ExercisesPage / ExerciseDetailPage | Stable — refactor : utilise ItemListLayout.vue, styles harmonisés avec FlashcardsPage | 2026-06-21 |
+| Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.08 : créateur + éditeur + player + correction + scores/historique livrés, bug MCQ édition corrigé | 2026-06-21 |
 | Front — ItemListLayout.vue | Stable — composant layout partagé (recherche, filtre sujet, grille, états) | 2026-06-21 |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
@@ -2129,3 +2129,44 @@ npx sequelize-cli db:migrate --migration 20260621000001-create-test-result-table
 **Dette / points d'attention :**
 - Pas de `POST /tests/:id/submit` endpoint pour un test "en brouillon" sans question — le service retourne `null` (→ 404) si le test n'existe pas ; si le test est vide, score = 0/0 (edge case acceptable pour MVP).
 - La correction sémantique (NLP/IA) pour les questions `open` est hors-périmètre M-06.05 ("Correction IA avancée" = OUT of scope) — à connecter au moteur `Semantic.service.js` existant dans un ticket dédié.
+
+---
+
+### [M-06.08] — Éditeur d'exercice (synthèse feature M-06) — 2026-06-21
+
+**Contexte :** Entrée de synthèse pour la feature M-06.08 (Feature list ID M-06, ID source planning M-06.08, Sprint 6 Front-end MVP). La livraison a été découpée en plusieurs tickets atomiques ; cette entrée consolide leur périmètre et confirme la couverture DoD.
+
+**Périmètre livré (IN scope) :**
+
+| Fonctionnalité | Ticket | Fichiers principaux |
+|---|---|---|
+| Types de questions (open, mcq, fill_blank, reorder) | M-06.01 | `Question.model.js`, `validators/Question.validators.js` |
+| Créateur d'exercice (modal de création) | M-06.02 | `ExercisesPage.vue` → `openCreateModal()`, `submitCreate()` |
+| Éditeur d'exercice (modal édition pré-remplie) | M-06.02 | `ExercisesPage.vue` → `openEditModal()`, `submitEdit()`, `contentToFormState()` |
+| Player questionnaire (4 types de rendu interactif) | M-06.01 / M-06.02 | `ExerciseDetailPage.vue` |
+| Correction simple (server-side, 4 types) | M-06.05 | `Test.service.js` → `submitAnswers()`, `POST /tests/:id/submit` |
+| Scores et historique | M-06.02 | `TestResult.model/service/controller`, `ExerciseDetailPage.vue` |
+
+**Périmètre non livré (OUT scope — conforme) :**
+- Correction IA avancée — hors MVP
+- Banque publique d'exercices — hors MVP
+- Notation officielle établissement — hors MVP
+
+**Vérification MCQ édition :**
+- Bug antérieur "options MCQ non affichées à l'édition" : **confirmé corrigé**.
+- `Question.model.js` getter `content` auto-parse le JSON TEXT → l'API retourne `content` comme objet.
+- `Test.service.findOne()` inclut `content` dans les attributs (`attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition']`).
+- `contentToFormState()` cas `mcq` : `opts = c.options` → `mcqOptions: opts.map(o => ({ text: o.text }))` + `mcqCorrectIdx: opts.findIndex(o => o.correct)` — reconstruction correcte.
+
+**DoD :**
+- ✅ Fonctionnel sur les 6 items IN scope
+- ✅ Tests : 759 back + 138 front (M-06-REVIEW)
+- ✅ Revue de code : M-06-REVIEW
+- ✅ Changelog à jour (tickets M-06.01, M-06.01b, M-06.02, M-06.03-FIX, M-06.05, M-06-REVIEW, REF-ITEMLIST + cette entrée)
+- ✅ Aucun bug bloquant connu
+
+**Tickets contributeurs :** M-06.01, M-06.01b, M-06.02, M-06.03-FIX, M-06.05, M-06-REVIEW, REF-ITEMLIST
+
+**Dette / points d'attention :**
+- `submitEdit` exécute les mises à jour de questions séquentiellement (non parallèle) pour éviter les conflits de `questionPosition` — acceptable MVP.
+- Pas de tests Vitest pour `ItemListLayout.vue` (composant partagé Exercises + Flashcards).

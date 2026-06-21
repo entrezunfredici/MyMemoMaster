@@ -54,6 +54,11 @@ module.exports = (instance) => {
       foreignKey: 'subjectId',
       as: 'subject'
     })
+
+    Test.hasMany(models.Deadline, {
+      foreignKey: 'testId',
+      as: 'deadlines'
+    })
   }
 
   return Test

@@ -24,7 +24,11 @@ exports.create = [
   body('dueTime')
     .optional({ nullable: true })
     .matches(timeRegex)
-    .withMessage('dueTime doit être au format HH:MM.')
+    .withMessage('dueTime doit être au format HH:MM.'),
+  body('testId')
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage('testId doit être un entier positif.')
 ]
 
 exports.update = [
