@@ -83,6 +83,20 @@ exports.addMember = async (req, res) => {
   }
 }
 
+exports.getKpi = async (req, res) => {
+  try {
+    const result = await ClassGroupService.getKpi(req.params.id, req.user.id)
+    if (result === false)
+      return res.status(403).json({ message: 'Accès refusé. Seuls les admins et enseignants du groupe peuvent consulter les KPI.' })
+    if (result === null)
+      return res.status(404).json({ message: 'Groupe introuvable.' })
+    res.status(200).json({ message: 'KPI récupérés avec succès.', data: result })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors du calcul des KPI.' })
+  }
+}
+
 exports.removeMember = async (req, res) => {
   try {
     const result = await ClassGroupService.removeMember(

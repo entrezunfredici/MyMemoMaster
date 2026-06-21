@@ -1,8 +1,10 @@
 const express = require('express')
 const classGroup = require('../controllers/ClassGroup.controller')
+const invitation = require('../controllers/Invitation.controller')
 const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
 const classGroupValidators = require('../validators/ClassGroup.validators')
+const invitationValidators = require('../validators/Invitation.validators')
 
 const router = express.Router()
 
@@ -206,6 +208,89 @@ router.post(
  *         description: Erreur serveur.
  */
 router.delete('/:id/members/:userId', authMiddleware, classGroup.removeMember)
+
+/**
+ * @swagger
+ * /class-groups/{id}/kpi:
+ *   get:
+ *     summary: Indicateurs clés du groupe (admin et enseignants)
+ *     tags: [ClassGroup]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: KPI calculés.
+ *       403:
+ *         description: Accès refusé.
+ *       404:
+ *         description: Groupe introuvable.
+ */
+router.get('/:id/kpi', authMiddleware, classGroup.getKpi)
+
+/**
+ * @swagger
+ * /class-groups/{id}/invitations:
+ *   post:
+ *     summary: Inviter un utilisateur dans le groupe
+ *     tags: [ClassGroup]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [targetUserId, role]
+ *             properties:
+ *               targetUserId:
+ *                 type: integer
+ *               role:
+ *                 type: string
+ *                 enum: [teacher, student]
+ *     responses:
+ *       201:
+ *         description: Invitation envoyée.
+ *       403:
+ *         description: Accès refusé.
+ *       404:
+ *         description: Groupe introuvable.
+ */
+router.post(
+  '/:id/invitations',
+  authMiddleware,
+  invitationValidators.create,
+  validate,
+  invitation.invite
+)
+
+/**
+ * @swagger
+ * /class-groups/{id}/invitations:
+ *   get:
+ *     summary: Lister les invitations d'un groupe
+ *     tags: [ClassGroup]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Liste des invitations.
+ *       403:
+ *         description: Accès refusé.
+ */
+router.get('/:id/invitations', authMiddleware, invitation.findByGroup)
 
 module.exports = (app) => {
   /**

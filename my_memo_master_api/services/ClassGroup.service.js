@@ -1,4 +1,4 @@
-const { ClassGroup, ClassGroupUsers, User } = require('../models/index')
+const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult } = require('../models/index')
 
 class ClassGroupService {
   /**
@@ -120,6 +120,54 @@ class ClassGroupService {
     if (!membership) return null
     await membership.destroy()
     return true
+  }
+
+  /**
+   * Calcule les KPI d'un groupe.
+   * Admin et enseignants du groupe uniquement.
+   *
+   * @param {number} groupId
+   * @param {number} requesterId
+   * @returns {Promise<object|null|false>}
+   */
+  async getKpi(groupId, requesterId) {
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    const isAdmin = [1, 4].includes(requester?.roleId)
+
+    if (!isAdmin) {
+      const membership = await ClassGroupUsers.findOne({
+        where: { classGroupId: groupId, userId: requesterId, role: 'teacher' }
+      })
+      if (!membership) return false
+    }
+
+    const group = await ClassGroup.findByPk(groupId)
+    if (!group) return null
+
+    const members = await ClassGroupUsers.findAll({ where: { classGroupId: groupId } })
+    const studentIds = members.filter((m) => m.role === 'student').map((m) => m.userId)
+    const teacherCount = members.filter((m) => m.role === 'teacher').length
+
+    let avgScore = null
+    if (studentIds.length > 0) {
+      const results = await TestResult.findAll({ where: { userId: studentIds } })
+      if (results.length > 0) {
+        const pcts = results.map((r) => (r.total > 0 ? (r.score / r.total) * 100 : 0))
+        avgScore = Math.round((pcts.reduce((a, b) => a + b, 0) / pcts.length) * 10) / 10
+      }
+    }
+
+    const pendingInvitations = await Invitation.count({
+      where: { classGroupId: groupId, status: 'pending' }
+    })
+
+    return {
+      memberCount: members.length,
+      studentCount: studentIds.length,
+      teacherCount,
+      pendingInvitations,
+      avgScore
+    }
   }
 }
 

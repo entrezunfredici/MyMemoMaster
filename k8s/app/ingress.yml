@@ -1,10 +1,17 @@
 # =============================================================================
-#  Ingress MyMemoMaster — API + Frontend
+#  Ingress MyMemoMaster — API + Frontend (ingress-nginx)
 #
-#  Remplacer les domaines (API_DOMAIN, FRONT_DOMAIN) avant d'appliquer.
-#  cert-manager crée les certificats Let's Encrypt automatiquement.
+#  Prérequis sur le cluster :
+#    - ingress-nginx installé (fourni par Infomaniak)
+#    - cert-manager installé (fourni par Infomaniak)
+#    - ClusterIssuer letsencrypt-prod appliqué (k8s/cert-manager/cluster-issuer.yml)
 #
-#  Appliquer :
+#  Remplacer les domaines avant d'appliquer :
+#    bash k8s/setup.sh --email you@mail.com \
+#                      --api-domain api.yourdomain.com \
+#                      --front-domain app.yourdomain.com
+#
+#  Ou manuellement :
 #    kubectl apply -f ingress.yml -n mymemomaster
 # =============================================================================
 
@@ -15,43 +22,16 @@ metadata:
   name: mmm-api
   namespace: mymemomaster
   annotations:
-    # cert-manager crée le certificat Let's Encrypt
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    # Traefik : HSTS sur le router HTTPS
-    traefik.ingress.kubernetes.io/router.middlewares: mymemomaster-hsts@kubernetescrd
-    # Traefik : redirect HTTP → HTTPS via un router HTTP dédié
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # Redirect HTTP → HTTPS automatique
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   tls:
     - hosts:
         - api.yourdomain.com          # ← remplacer
       secretName: mmm-api-tls
-  rules:
-    - host: api.yourdomain.com        # ← remplacer
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: mmm-api         # nom du Service k8s de l'API
-                port:
-                  number: 3000
-
----
-
-# ── Ingress HTTP (redirect vers HTTPS) pour l'API ────────────────────────────
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: mmm-api-http
-  namespace: mymemomaster
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-    traefik.ingress.kubernetes.io/router.middlewares: mymemomaster-https-redirect@kubernetescrd
-spec:
-  ingressClassName: traefik
   rules:
     - host: api.yourdomain.com        # ← remplacer
       http:
@@ -74,39 +54,14 @@ metadata:
   namespace: mymemomaster
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.middlewares: mymemomaster-hsts@kubernetescrd
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   tls:
     - hosts:
         - app.yourdomain.com          # ← remplacer
       secretName: mmm-front-tls
-  rules:
-    - host: app.yourdomain.com        # ← remplacer
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: mmm-front       # nom du Service k8s du frontend
-                port:
-                  number: 80
-
----
-
-# ── Ingress HTTP (redirect vers HTTPS) pour le front ─────────────────────────
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: mmm-front-http
-  namespace: mymemomaster
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-    traefik.ingress.kubernetes.io/router.middlewares: mymemomaster-https-redirect@kubernetescrd
-spec:
-  ingressClassName: traefik
   rules:
     - host: app.yourdomain.com        # ← remplacer
       http:

@@ -2366,3 +2366,83 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 **Dette / points d'attention :**
 - Les tests BDD n'exécutent pas le vrai moteur NLP — `Semantic.service.gradeSemantic` reste mocké (NLP local ~30s au démarrage, incompatible avec les runs CI rapides).
 - Les tests composant front n'exercent pas les types `fill_blank` et `reorder` (rendu interactif) — couverture limitée aux types `open` et `mcq` pour le rendu ; tous les types sont couverts côté back BDD.
+
+---
+
+### [S-03.01] — Groupes classes et plannings de groupe — 2026-06-21
+
+**Contexte :** Feature S-03.01 (Sprint 9, Analyse/V1) — Groupes classes, membres, invitations, affectations, KPI de groupe, dashboard groupe, flux enseignant. Livraison décomposée en infrastructure existante (avant ce ticket) + éléments manquants complétés dans cette session.
+
+**Périmètre livré (IN scope) :**
+
+| Fonctionnalité | Fichiers principaux |
+|---|---|
+| **Groupes** (CRUD complet) | `ClassGroup.model.js`, `ClassGroup.service.js`, `ClassGroup.controller.js`, `ClassGroup.routes.js` |
+| **Membres** (add/remove, vérification droits) | `ClassGroupUsers.model.js`, `ClassGroup.service.js → addMember/removeMember` |
+| **Invitations** (invite, list groupe, list mine, accept/decline) | `Invitation.model.js` *(NEW)*, `Invitation.service.js` *(NEW)*, `Invitation.controller.js` *(NEW)*, `Invitation.routes.js` *(NEW)* |
+| **Affectations** (toggleStudent câblé à l'API) | `ClassroomPage.vue → toggleStudent()` → `classGroupStore.addMember/removeMember` |
+| **KPI de groupe** (memberCount, studentCount, pendingInvitations, avgScore) | `ClassGroup.service.js → getKpi()`, `GET /class-groups/:id/kpi` |
+| **Dashboard groupe** (vue prof/étudiant, calendrier, sections, ressources) | `ClassroomPage.vue` — UI complète, données groupes/membres depuis l'API |
+| **Définition flux enseignant groupes** (toggle vue, formulaire invitation, panneau invitations pending) | `ClassroomPage.vue` — stores injectés, flux complet invitation→réponse |
+
+**Périmètre non livré (OUT scope — conforme) :**
+- Annuaire ENT complet — hors MVP
+- Synchronisation institutionnelle automatique — hors MVP
+- Gestion complexe multi-campus — hors MVP
+
+**Nouveaux fichiers back :**
+- `models/Invitation.model.js` — champs : id, classGroupId, targetUserId, invitedByUserId, role, status, createdAt ; associations ClassGroup + User×2
+- `migrations/20260610000003-create-invitations-table.js`
+- `services/Invitation.service.js` — `invite()`, `findByGroup()`, `findMine()`, `respond()` (accept → ajoute ClassGroupUsers)
+- `controllers/Invitation.controller.js` — 4 handlers, gestion 403/404/500
+- `routes/Invitation.routes.js` — `GET /invitations/mine`, `PUT /invitations/:id`
+- `validators/Invitation.validators.js` — validation `create` (targetUserId, role) + `respond` (status enum)
+- `test/services/ClassGroup.service.test.js` — 19 tests : findAll, findOne, create, update, delete, addMember, removeMember, getKpi (4 cas)
+- `test/controllers/Invitation.controller.test.js` — 25 tests : invite, findByGroup, findMine, respond (201/200/400/401/403/404/500)
+
+**Fichiers back modifiés :**
+- `models/index.js` — ajout `models.Invitation`
+- `services/ClassGroup.service.js` — ajout `getKpi()` + import `Invitation`, `TestResult`
+- `controllers/ClassGroup.controller.js` — ajout `getKpi()` handler
+- `routes/ClassGroup.routes.js` — ajout `GET /:id/kpi`, `POST /:id/invitations`, `GET /:id/invitations` + import Invitation controller/validators
+- `app.js` — enregistrement `invitationRoutes(v1)`
+
+**Nouveaux fichiers front :**
+- `src/stores/invitations.js` — store Pinia `'invitations'` : state `{ mine, groupInvitations }` ; actions `fetchMine`, `fetchByGroup`, `invite`, `respond` (retire de `mine` après réponse)
+- `test/stores/classGroups.store.test.js` — 14 tests Vitest : fetchGroups, fetchGroupById, createGroup, updateGroup, deleteGroup, addMember, removeMember
+
+**Fichiers front modifiés :**
+- `src/pages/ClassroomPage.vue` :
+  - Import `useClassGroupStore` + `useInvitationStore` (remplace `api` direct)
+  - `onMounted` : `classGroupStore.fetchGroups()` + `invitationStore.fetchMine()` en parallèle
+  - `toggleStudent()` : câblé à `classGroupStore.addMember/removeMember` (plus local-only)
+  - Nouveau panneau "Invitations en attente" en haut de page (accept/decline)
+  - Nouveau panneau KPI (memberCount, studentCount, pendingInvitations, avgScore)
+  - Nouveau formulaire "Inviter un utilisateur" dans la sidebar prof
+  - `watch(selectedGroupId)` → charge KPI via `GET /class-groups/:id/kpi` à chaque changement de groupe
+
+**Endpoints disponibles :**
+- `GET /api/v1/class-groups` (auth) — liste groupes de l'utilisateur
+- `GET /api/v1/class-groups/:id` (auth) — groupe + membres
+- `POST /api/v1/class-groups` (auth, admin) — créer groupe
+- `PUT /api/v1/class-groups/:id` (auth, admin) — modifier
+- `DELETE /api/v1/class-groups/:id` (auth, admin) — supprimer
+- `POST /api/v1/class-groups/:id/members` (auth, admin) — ajouter membre direct
+- `DELETE /api/v1/class-groups/:id/members/:userId` (auth, admin) — retirer membre
+- `GET /api/v1/class-groups/:id/kpi` (auth, admin/teacher) — KPI
+- `POST /api/v1/class-groups/:id/invitations` (auth, admin/teacher du groupe) — inviter
+- `GET /api/v1/class-groups/:id/invitations` (auth, admin/teacher du groupe) — liste invitations
+- `GET /api/v1/invitations/mine` (auth) — mes invitations pending
+- `PUT /api/v1/invitations/:id` (auth, cible uniquement) — accepter/décliner
+
+**DoD :**
+- ✅ Fonctionnel sur les 7 items IN scope
+- ✅ Tests back : 19 service + 25 controller invitations + 30 controller ClassGroup = **74 tests back**
+- ✅ Tests front : 14 tests store classGroups ✅
+- ✅ Architecture corrigée : ClassroomPage utilise les stores
+- ✅ Changelog à jour
+
+**Dette / points d'attention :**
+- Sessions, événements et ressources dans `ClassroomPage.vue` restent en données mock locales (pas de modèle back dédié pour ces entités dans ce sprint).
+- `avgScore` dans les KPI est calculé sur tous les `TestResult` des étudiants du groupe (toutes matières confondues) — acceptable MVP, à affiner par sujet si besoin.
+- Pas de tests Vitest pour `ClassroomPage.vue` elle-même ni pour `invitations.js` store — les interactions UI complexes (toggle, formulaires) sont couvertes par les tests stores.

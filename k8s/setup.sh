@@ -1,21 +1,24 @@
 #!/bin/bash
 # =============================================================================
-#  setup-k8s-https.sh — Installation HTTPS sur Kubernetes (cert-manager + Traefik)
+#  setup.sh — Déploiement HTTPS MyMemoMaster sur Kubernetes Infomaniak
 #
-#  Ce script installe et configure :
-#    1. cert-manager  — gestion automatique des certificats Let's Encrypt
-#    2. Traefik        — ingress controller (reverse proxy)
-#    3. ClusterIssuer  — configuration Let's Encrypt (staging + prod)
-#    4. Middlewares    — HSTS + redirect HTTP→HTTPS
+#  Ce script configure uniquement les ressources applicatives.
+#  ingress-nginx et cert-manager sont déjà fournis par Infomaniak — ne pas
+#  les réinstaller.
+#
+#  Ce script applique dans l'ordre :
+#    1. Namespace mymemomaster
+#    2. ClusterIssuer Let's Encrypt (staging + prod)
+#    3. Ingress API + Frontend (avec TLS + HSTS)
 #
 #  Usage :
-#    bash setup.sh --email your@email.com --api-domain api.yourdomain.com \
-#                  --front-domain app.yourdomain.com
+#    bash k8s/setup.sh --email your@email.com \
+#                      --api-domain api.yourdomain.com \
+#                      --front-domain app.yourdomain.com
 #
 #  Prérequis :
-#    - kubectl configuré et connecté au cluster
-#    - helm v3 installé
-#    - DNS configurés vers l'IP du LoadBalancer du cluster
+#    - kubectl configuré et pointant vers le cluster Infomaniak
+#    - DNS api.yourdomain.com et app.yourdomain.com → 179.237.72.87
 # =============================================================================
 
 set -euo pipefail
@@ -24,8 +27,8 @@ set -euo pipefail
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-}"
 API_DOMAIN="${API_DOMAIN:-api.yourdomain.com}"
 FRONT_DOMAIN="${FRONT_DOMAIN:-app.yourdomain.com}"
-CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.14.5}"
 NAMESPACE="mymemomaster"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ── Couleurs ──────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
@@ -37,10 +40,9 @@ step()  { echo -e "\n${GREEN}══ $* ${NC}"; }
 # ── Arguments ─────────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --email)        LETSENCRYPT_EMAIL="$2";  shift 2 ;;
-    --api-domain)   API_DOMAIN="$2";          shift 2 ;;
-    --front-domain) FRONT_DOMAIN="$2";        shift 2 ;;
-    --cm-version)   CERT_MANAGER_VERSION="$2"; shift 2 ;;
+    --email)        LETSENCRYPT_EMAIL="$2"; shift 2 ;;
+    --api-domain)   API_DOMAIN="$2";        shift 2 ;;
+    --front-domain) FRONT_DOMAIN="$2";      shift 2 ;;
     *) error "Argument inconnu : $1" ;;
   esac
 done
@@ -49,8 +51,15 @@ done
 step "Vérification des prérequis"
 
 command -v kubectl >/dev/null 2>&1 || error "kubectl non trouvé."
-command -v helm    >/dev/null 2>&1 || error "helm non trouvé."
 kubectl cluster-info >/dev/null 2>&1 || error "kubectl ne peut pas joindre le cluster."
+
+# Vérifier que ingress-nginx est bien présent
+kubectl get ingressclass nginx >/dev/null 2>&1 \
+  || error "ingress-nginx introuvable sur le cluster. Vérifier avec : kubectl get ingressclass"
+
+# Vérifier que cert-manager est bien présent
+kubectl get namespace cert-manager >/dev/null 2>&1 \
+  || error "cert-manager introuvable sur le cluster. Vérifier avec : kubectl get ns"
 
 if [[ -z "$LETSENCRYPT_EMAIL" ]]; then
   echo -n "Email Let's Encrypt : "
@@ -64,94 +73,48 @@ info "Front domain : ${FRONT_DOMAIN}"
 info "Namespace    : ${NAMESPACE}"
 echo ""
 
-# ── Namespace ─────────────────────────────────────────────────────────────────
-step "1/5 — Namespace ${NAMESPACE}"
-kubectl apply -f "$(dirname "$0")/namespace.yml"
+# ── 1. Namespace ──────────────────────────────────────────────────────────────
+step "1/3 — Namespace ${NAMESPACE}"
+kubectl apply -f "${SCRIPT_DIR}/namespace.yml"
 
-# ── cert-manager ──────────────────────────────────────────────────────────────
-step "2/5 — cert-manager ${CERT_MANAGER_VERSION}"
+# ── 2. ClusterIssuer Let's Encrypt ───────────────────────────────────────────
+step "2/3 — ClusterIssuer Let's Encrypt"
 
-helm repo add jetstack https://charts.jetstack.io --force-update
-helm repo update
-
-if helm status cert-manager -n cert-manager >/dev/null 2>&1; then
-  info "cert-manager déjà installé — upgrade."
-  helm upgrade cert-manager jetstack/cert-manager \
-    --namespace cert-manager \
-    --version "${CERT_MANAGER_VERSION}" \
-    --set crds.enabled=true
-else
-  helm install cert-manager jetstack/cert-manager \
-    --namespace cert-manager \
-    --create-namespace \
-    --version "${CERT_MANAGER_VERSION}" \
-    --set crds.enabled=true
-fi
-
-info "Attente que cert-manager soit prêt..."
-kubectl rollout status deployment/cert-manager -n cert-manager --timeout=120s
-kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=120s
-
-# ── Traefik ingress controller ────────────────────────────────────────────────
-step "3/5 — Traefik ingress controller"
-
-helm repo add traefik https://traefik.github.io/charts --force-update
-helm repo update
-
-if helm status traefik -n traefik >/dev/null 2>&1; then
-  info "Traefik déjà installé — upgrade."
-  helm upgrade traefik traefik/traefik \
-    --namespace traefik \
-    -f "$(dirname "$0")/traefik/values.yml"
-else
-  helm install traefik traefik/traefik \
-    --namespace traefik \
-    --create-namespace \
-    -f "$(dirname "$0")/traefik/values.yml"
-fi
-
-info "Attente que Traefik soit prêt..."
-kubectl rollout status deployment/traefik -n traefik --timeout=120s
-
-# ── ClusterIssuer Let's Encrypt ───────────────────────────────────────────────
-step "4/5 — ClusterIssuer Let's Encrypt"
-
-# Substituer l'email dans le fichier cluster-issuer.yml
 ISSUER_TMP=$(mktemp)
 sed "s/LETSENCRYPT_EMAIL/${LETSENCRYPT_EMAIL}/g" \
-  "$(dirname "$0")/cert-manager/cluster-issuer.yml" > "${ISSUER_TMP}"
+  "${SCRIPT_DIR}/cert-manager/cluster-issuer.yml" > "${ISSUER_TMP}"
 kubectl apply -f "${ISSUER_TMP}"
 rm "${ISSUER_TMP}"
 
-# ── Middlewares HSTS + redirect ───────────────────────────────────────────────
-step "4b/5 — Middlewares HSTS + redirect HTTP→HTTPS"
-kubectl apply -f "$(dirname "$0")/traefik/middleware-hsts.yml"
+info "Attente que les ClusterIssuers soient prêts (15s)..."
+sleep 15
+kubectl get clusterissuer letsencrypt-staging letsencrypt-prod 2>/dev/null || true
 
-# ── Ingress applicatif ────────────────────────────────────────────────────────
-step "5/5 — Ingress API + Frontend"
+# ── 3. Ingress applicatif ─────────────────────────────────────────────────────
+step "3/3 — Ingress API + Frontend"
 
 INGRESS_TMP=$(mktemp)
 sed "s/api\.yourdomain\.com/${API_DOMAIN}/g; s/app\.yourdomain\.com/${FRONT_DOMAIN}/g" \
-  "$(dirname "$0")/app/ingress.yml" > "${INGRESS_TMP}"
+  "${SCRIPT_DIR}/app/ingress.yml" > "${INGRESS_TMP}"
 kubectl apply -f "${INGRESS_TMP}" -n "${NAMESPACE}"
 rm "${INGRESS_TMP}"
 
 # ── Résumé ────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}  HTTPS k8s configuré avec succès${NC}"
+echo -e "${GREEN}  Déploiement terminé${NC}"
 echo -e "${GREEN}══════════════════════════════════════════════════════${NC}"
 echo ""
 
-TRAEFIK_IP=$(kubectl get svc traefik -n traefik \
+NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "en attente...")
 
-echo "  LoadBalancer IP : ${TRAEFIK_IP}"
+echo "  LoadBalancer IP : ${NGINX_IP}"
 echo "  API             : https://${API_DOMAIN}"
 echo "  Frontend        : https://${FRONT_DOMAIN}"
 echo ""
-echo -e "${YELLOW}  DNS à configurer : ${API_DOMAIN} + ${FRONT_DOMAIN} → ${TRAEFIK_IP}${NC}"
-echo -e "${YELLOW}  Certificats générés automatiquement par cert-manager au premier accès${NC}"
+echo -e "${YELLOW}  DNS à configurer : ${API_DOMAIN} + ${FRONT_DOMAIN} → ${NGINX_IP}${NC}"
+echo -e "${YELLOW}  Certificats générés automatiquement par cert-manager au premier accès HTTPS${NC}"
 echo ""
 echo "  Vérifier les certificats :"
 echo "    kubectl get certificate -n ${NAMESPACE}"

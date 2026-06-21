@@ -1,5 +1,27 @@
 <template>
   <div class="classroom-page space-y-6 px-2 sm:px-4 lg:px-6">
+
+    <!-- Invitations en attente -->
+    <section v-if="pendingInvitations.length > 0" class="rounded-2xl border-2 border-primary/40 bg-primary/5 p-4 shadow-sm space-y-3">
+      <h2 class="text-lg font-semibold text-primary">Invitations en attente ({{ pendingInvitations.length }})</h2>
+      <div v-for="inv in pendingInvitations" :key="inv.id" class="flex items-center justify-between rounded-xl border border-gray bg-white px-4 py-3">
+        <div>
+          <p class="font-semibold text-dark">{{ inv.classGroup?.name ?? `Groupe #${inv.classGroupId}` }}</p>
+          <p class="text-xs text-dark/60">Rôle : {{ inv.role === 'teacher' ? 'Enseignant' : 'Étudiant' }} · Invité par {{ inv.invitedBy?.name ?? '—' }}</p>
+        </div>
+        <div class="flex gap-2">
+          <button @click="respondInvitation(inv.id, 'accepted')"
+            class="rounded-lg bg-success/10 px-3 py-1 text-sm font-semibold text-success hover:bg-success/20 transition">
+            Accepter
+          </button>
+          <button @click="respondInvitation(inv.id, 'declined')"
+            class="rounded-lg bg-secondary/10 px-3 py-1 text-sm font-semibold text-secondary hover:bg-secondary/20 transition">
+            Décliner
+          </button>
+        </div>
+      </div>
+    </section>
+
     <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center gap-2">
@@ -71,6 +93,28 @@
               <span class="rounded-full bg-primary/10 px-3 py-1 text-primary">{{ activeStudents.length }} étudiants actifs</span>
               <span class="rounded-full bg-secondary/10 px-3 py-1 text-secondary">{{ currentGroup.sessions.length }} sections/rendus</span>
               <span class="rounded-full bg-gray px-3 py-1 text-dark">{{ currentGroup.resources.length }} ressources</span>
+            </div>
+          </div>
+
+          <!-- KPI groupe -->
+          <div v-if="kpi" class="grid grid-cols-2 gap-2 md:grid-cols-4 text-center">
+            <div class="rounded-xl border border-gray bg-light p-3">
+              <p class="text-2xl font-bold text-primary">{{ kpi.memberCount }}</p>
+              <p class="text-xs text-dark/60 mt-1">Membres</p>
+            </div>
+            <div class="rounded-xl border border-gray bg-light p-3">
+              <p class="text-2xl font-bold text-primary">{{ kpi.studentCount }}</p>
+              <p class="text-xs text-dark/60 mt-1">Étudiants</p>
+            </div>
+            <div class="rounded-xl border border-gray bg-light p-3">
+              <p class="text-2xl font-bold text-secondary">{{ kpi.pendingInvitations }}</p>
+              <p class="text-xs text-dark/60 mt-1">Invitations en attente</p>
+            </div>
+            <div class="rounded-xl border border-gray bg-light p-3">
+              <p class="text-2xl font-bold" :class="kpi.avgScore !== null ? 'text-primary' : 'text-dark/40'">
+                {{ kpi.avgScore !== null ? kpi.avgScore + ' %' : '—' }}
+              </p>
+              <p class="text-xs text-dark/60 mt-1">Score moyen</p>
             </div>
           </div>
 
@@ -279,6 +323,25 @@
           </div>
         </div>
 
+        <!-- Formulaire d'invitation -->
+        <div v-if="viewRole === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+          <h3 class="text-lg font-semibold text-dark">Inviter un utilisateur</h3>
+          <input v-model="inviteForm.targetUserId" type="number" min="1" placeholder="ID de l'utilisateur"
+            class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+          <div class="flex gap-2">
+            <button @click="inviteForm.role = 'student'"
+              :class="[inviteForm.role === 'student' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm font-medium flex-1']">
+              Étudiant
+            </button>
+            <button @click="inviteForm.role = 'teacher'"
+              :class="[inviteForm.role === 'teacher' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm font-medium flex-1']">
+              Enseignant
+            </button>
+          </div>
+          <Button :callback="sendInvite">Envoyer l'invitation</Button>
+          <p v-if="inviteForm.message" :class="[inviteForm.status === 'error' ? 'text-secondary' : 'text-success', 'text-xs']">{{ inviteForm.message }}</p>
+        </div>
+
         <div v-if="viewRole === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
           <h3 class="text-lg font-semibold text-dark">Affecter / retirer des étudiants</h3>
           <div class="space-y-2">
@@ -311,10 +374,13 @@ import { AcademicCapIcon, CalendarDaysIcon, DocumentIcon } from '@heroicons/vue/
 import { ArrowUpOnSquareIcon, CheckCircleIcon, ChevronRightIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/solid'
 import { useAuthStore } from '@/stores/auth'
 import { useRole } from '@/composables/useRole'
-import { api } from '@/helpers/api'
+import { useClassGroupStore } from '@/stores/classGroups'
+import { useInvitationStore } from '@/stores/invitations'
 
 const authStore = useAuthStore()
 const { isEnseignant, isAdmin, canManageGroups } = useRole()
+const classGroupStore = useClassGroupStore()
+const invitationStore = useInvitationStore()
 
 const currentUserId = computed(() => authStore.user?.userId ?? null)
 
@@ -424,17 +490,22 @@ const groups = ref([
 const sessionForm = reactive({ title: '', type: 'section', dueDate: '', status: 'idle', message: '' })
 const resourceForm = reactive({ title: '', type: 'Cours', status: 'idle', message: '' })
 const eventForm = reactive({ title: '', type: 'course', date: '', time: '08:00', duration: 90, participants: [], location: '', description: '', status: 'idle', message: '', error: '' })
+const inviteForm = reactive({ targetUserId: '', role: 'student', status: 'idle', message: '' })
+const kpi = ref(null)
 
 onMounted(async () => {
   loading.value = true
-  const resp = await api.get('class-groups')
-  if (resp && resp.status === 200 && Array.isArray(resp.data?.data) && resp.data.data.length > 0) {
-    groups.value = resp.data.data.map((g) => ({
+  await Promise.all([
+    classGroupStore.fetchGroups(),
+    invitationStore.fetchMine()
+  ])
+  const apiGroups = classGroupStore.groups
+  if (apiGroups.length > 0) {
+    groups.value = apiGroups.map((g) => ({
       ...g,
       code: g.code ?? null,
       level: g.level ?? null,
       teacher: null,
-      // membres mappés au format attendu par le template
       students: (g.members ?? [])
         .filter((m) => m.role === 'student')
         .map((m) => ({ id: m.userId, name: `Étudiant #${m.userId}`, email: '', active: true })),
@@ -442,15 +513,16 @@ onMounted(async () => {
       resources: [],
       events: [],
     }))
-    // Ajuster la vue étudiant selon le rôle dans le groupe courant
     if (!isAdmin.value && !isEnseignant.value && currentUserId.value) {
-      const firstGroup = groups.value[0]
+      const firstGroup = apiGroups[0]
       const membership = firstGroup?.members?.find((m) => m.userId === currentUserId.value)
       if (membership?.role === 'teacher') manualViewOverride.value = 'prof'
     }
   }
   loading.value = false
 })
+
+const pendingInvitations = computed(() => invitationStore.mine)
 
 watch(groups, (list) => {
   if (!selectedGroupId.value && list.length) {
@@ -650,14 +722,56 @@ function detectConflict(start, end, participants) {
   })
 }
 
-function toggleStudent(id) {
+async function toggleStudent(id) {
   if (!currentGroup.value) return
   const student = currentGroup.value.students.find((s) => s.id === id)
-  if (student) {
-    student.active = !student.active
-    membershipMessage.value = student.active ? 'Etudiant affecté.' : 'Etudiant retiré.'
+  if (!student) return
+  if (student.active) {
+    const ok = await classGroupStore.removeMember(currentGroup.value.id, id)
+    if (ok) {
+      student.active = false
+      membershipMessage.value = 'Étudiant retiré.'
+    }
+  } else {
+    const ok = await classGroupStore.addMember(currentGroup.value.id, id)
+    if (ok) {
+      student.active = true
+      membershipMessage.value = 'Étudiant affecté.'
+    }
   }
 }
+
+async function sendInvite() {
+  if (!currentGroup.value || !inviteForm.targetUserId) {
+    inviteForm.status = 'error'
+    inviteForm.message = "L'identifiant utilisateur est requis."
+    return
+  }
+  const ok = await invitationStore.invite(currentGroup.value.id, {
+    targetUserId: Number(inviteForm.targetUserId),
+    role: inviteForm.role
+  })
+  inviteForm.status = ok ? 'success' : 'error'
+  inviteForm.message = ok ? 'Invitation envoyée.' : "Erreur lors de l'envoi."
+  if (ok) {
+    inviteForm.targetUserId = ''
+    await invitationStore.fetchByGroup(currentGroup.value.id)
+  }
+}
+
+async function respondInvitation(id, status) {
+  await invitationStore.respond(id, status)
+}
+
+async function loadKpi(groupId) {
+  const { api } = await import('@/helpers/api')
+  const resp = await api.get(`class-groups/${groupId}/kpi`)
+  kpi.value = resp?.status === 200 ? resp.data.data : null
+}
+
+watch(selectedGroupId, (id) => {
+  if (id && (isAdmin.value || isEnseignant.value)) loadKpi(id)
+})
 
 function warnNoBackend() {
   creationMessage.value = ''
