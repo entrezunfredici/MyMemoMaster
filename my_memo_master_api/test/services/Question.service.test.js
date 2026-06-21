@@ -11,7 +11,8 @@ jest.mock('../../models/index', () => ({
     destroy: jest.fn()
   },
   Test: {
-    findAll: jest.fn()
+    findAll: jest.fn(),
+    findByPk: jest.fn()
   },
   LeitnerCard: {
     findOne: jest.fn()
@@ -119,7 +120,7 @@ describe('QuestionService', () => {
 
     const question = await QuestionService.create(newQuestion)
 
-    expect(Question.create).toHaveBeenCalledWith(newQuestion)
+    expect(Question.create).toHaveBeenCalledWith({ statement: 'New Question', questionPosition: 1, type: 'Type 1', content: null })
     expect(question).toEqual(mockQuestion)
   })
 

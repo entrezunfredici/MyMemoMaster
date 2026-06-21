@@ -1,4 +1,4 @@
-const { Test, Subject, Question } = require('../models/index')
+const { Test, Subject, Question, TestResult } = require('../models/index')
 
 /**
  * @swagger
@@ -226,6 +226,87 @@ class TestService {
       throw new Error('Test not found')
     }
     return await test.destroy()
+  }
+
+  /**
+   * Évalue les réponses d'un utilisateur, sauvegarde le TestResult et retourne la correction.
+   * @param {number} testId
+   * @param {number} userId
+   * @param {Array<{questionId: number, answer: *}>} answers
+   * @returns {{ score, total, results, resultId }|null}
+   */
+  async submitAnswers(testId, userId, answers) {
+    const test = await Test.findByPk(testId, {
+      include: [{
+        model: Question,
+        as: 'question',
+        attributes: ['idQuestion', 'type', 'content', 'questionPosition']
+      }],
+      order: [[{ model: Question, as: 'question' }, 'questionPosition', 'ASC']]
+    })
+    if (!test) return null
+
+    const questions = test.question ?? []
+    let score = 0
+    const results = questions.map(q => {
+      const submission = answers.find(a => a.questionId === q.idQuestion)
+      const correct = this._checkAnswer(q, submission?.answer ?? null)
+      if (correct) score++
+      return { questionId: q.idQuestion, correct, correctAnswer: this._formatCorrectAnswer(q) }
+    })
+
+    const testResult = await TestResult.create({ testId, userId, score, total: questions.length })
+    return { score, total: questions.length, results, resultId: testResult.resultId }
+  }
+
+  _checkAnswer(question, answer) {
+    const content = question.content ?? {}
+    switch (question.type) {
+      case 'open': {
+        const user = (answer ?? '').trim().toLowerCase()
+        const correct = (content.correct_answer ?? '').trim().toLowerCase()
+        return user.length > 0 && user === correct
+      }
+      case 'mcq': {
+        if (answer === null || answer === undefined) return false
+        const idx = Number(answer)
+        const opts = content.options ?? []
+        return !isNaN(idx) && opts[idx]?.correct === true
+      }
+      case 'fill_blank': {
+        const blanks = content.blanks ?? []
+        const userBlanks = Array.isArray(answer) ? answer : []
+        return (
+          blanks.length > 0 &&
+          blanks.every((b, i) => (userBlanks[i] ?? '').trim().toLowerCase() === b.trim().toLowerCase())
+        )
+      }
+      case 'reorder': {
+        const fragments = content.fragments ?? []
+        const userOrder = Array.isArray(answer) ? answer : []
+        return (
+          fragments.length > 0 &&
+          fragments.length === userOrder.length &&
+          fragments.every((f, i) => f === userOrder[i])
+        )
+      }
+      default:
+        return false
+    }
+  }
+
+  _formatCorrectAnswer(question) {
+    const content = question.content ?? {}
+    switch (question.type) {
+      case 'open': return content.correct_answer ?? '—'
+      case 'mcq': {
+        const correct = (content.options ?? []).find(o => o.correct)
+        return correct?.text ?? '—'
+      }
+      case 'fill_blank': return (content.blanks ?? []).join(' / ')
+      case 'reorder': return (content.fragments ?? []).join(' ')
+      default: return '—'
+    }
   }
 }
 

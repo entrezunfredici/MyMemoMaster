@@ -176,4 +176,69 @@ describe('useTestResultStore', () => {
 
     expect(store.bestScore).toEqual(RESULT_FIXTURE)
   })
+
+  // ── submitTest ─────────────────────────────────────────────────────────────
+
+  const SUBMIT_RESPONSE = {
+    score: 7,
+    total: 10,
+    resultId: 1,
+    results: [
+      { questionId: 1, correct: true, correctAnswer: 'Paris' },
+      { questionId: 2, correct: false, correctAnswer: 'Berlin' }
+    ]
+  }
+
+  const ANSWERS = [
+    { questionId: 1, answer: 'Paris' },
+    { questionId: 2, answer: 'Rome' }
+  ]
+
+  it('submitTest - succès - retourne les données et ajoute en tête de results', async () => {
+    mockPost.mockResolvedValueOnce({ status: 200, data: SUBMIT_RESPONSE })
+
+    const store = useTestResultStore()
+    const result = await store.submitTest(1, ANSWERS)
+
+    expect(mockPost).toHaveBeenCalledWith('tests/1/submit', { answers: ANSWERS })
+    expect(result).toEqual(SUBMIT_RESPONSE)
+    expect(store.results[0].resultId).toBe(1)
+    expect(store.results[0].score).toBe(7)
+    expect(store.results[0].total).toBe(10)
+    expect(store.results[0].testId).toBe(1)
+    expect(store.results[0].completedAt).toBeDefined()
+  })
+
+  it('submitTest - réponse non-200 - retourne null, results inchangé', async () => {
+    mockPost.mockResolvedValueOnce({ status: 500, data: {} })
+
+    const store = useTestResultStore()
+    const result = await store.submitTest(1, ANSWERS)
+
+    expect(result).toBeNull()
+    expect(store.results).toEqual([])
+    expect(mockNotify).not.toHaveBeenCalled()
+  })
+
+  it('submitTest - erreur réseau - retourne null et notifie', async () => {
+    mockPost.mockRejectedValueOnce(new Error('Network error'))
+
+    const store = useTestResultStore()
+    const result = await store.submitTest(1, ANSWERS)
+
+    expect(result).toBeNull()
+    expect(mockNotify).toHaveBeenCalledWith(expect.any(String), 'error')
+  })
+
+  it('submitTest - résultats existants - ajoute en tête (unshift)', async () => {
+    const existing = { resultId: 0, testId: 1, score: 5, total: 10, completedAt: '2026-06-20T00:00:00.000Z' }
+    mockPost.mockResolvedValueOnce({ status: 200, data: SUBMIT_RESPONSE })
+
+    const store = useTestResultStore()
+    store.results = [existing]
+    await store.submitTest(1, ANSWERS)
+
+    expect(store.results[0].resultId).toBe(1)
+    expect(store.results[1]).toEqual(existing)
+  })
 })

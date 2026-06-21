@@ -1,5 +1,6 @@
 const express = require('express')
 const test = require('../controllers/Test.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
 const testValidators = require('../validators/Test.validators')
 
@@ -154,6 +155,8 @@ router.put('/:id', testValidators.update, validate, test.update)
  *         description: Erreur interne du serveur
  */
 router.delete('/:id', test.delete)
+
+router.post('/:id/submit', authMiddleware, testValidators.submit, validate, test.submit)
 
 module.exports = (app) => {
   /**

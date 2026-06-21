@@ -50,6 +50,24 @@ export const useTestResultStore = defineStore('testResults', {
         notif.notify('Erreur lors de l\'enregistrement du score.', 'error')
         return false
       }
+    },
+
+    async submitTest(testId, answers) {
+      try {
+        const resp = await api.post(`tests/${testId}/submit`, { answers })
+        if (!resp || resp.status !== 200) return null
+        this.results.unshift({
+          resultId: resp.data.resultId,
+          testId,
+          score: resp.data.score,
+          total: resp.data.total,
+          completedAt: new Date().toISOString()
+        })
+        return resp.data
+      } catch {
+        notif.notify('Erreur lors de la correction de l\'exercice.', 'error')
+        return null
+      }
     }
   }
 })

@@ -13,6 +13,15 @@ const subjectIdRules = body('subjectId')
 
 exports.create = [nameRules, subjectIdRules]
 
+exports.submit = [
+  body('answers')
+    .isArray({ min: 1 })
+    .withMessage('answers doit être un tableau non vide.'),
+  body('answers.*.questionId')
+    .isInt({ min: 1 })
+    .withMessage('Chaque réponse doit avoir un questionId valide.')
+]
+
 exports.update = [
   body('name')
     .optional()

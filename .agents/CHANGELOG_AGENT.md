@@ -24,7 +24,7 @@
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
-| Test / Question / Response | Stable — M-06.01 : champ `content` JSON par type, 4 types définis, ExercisesPage branchée API | 2026-06-19 |
+| Test / Question / Response | Stable — M-06.05 : moteur de correction server-side (POST /tests/:id/submit), 4 types, tests service (16) + controller (7) ajoutés | 2026-06-21 |
 | TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
@@ -2085,3 +2085,47 @@ npx sequelize-cli db:migrate --migration 20260621000001-create-test-result-table
 
 **Dette / points d'attention :**
 - Pas de tests Vitest pour `ItemListLayout` — à ajouter si des cas limites (filtre + recherche simultanés, sujets vides) doivent être validés.
+
+---
+
+### [M-06.05] — Moteur de correction server-side (exercices) — 2026-06-21
+
+**Contexte :** La correction des exercices était entièrement côté client dans `ExerciseDetailPage.vue` (`checkAnswer()`). Le ticket demande de la porter côté serveur comme le système Leitner (`POST /leitnercards/response`).
+
+**Fichiers modifiés (API) :**
+- `services/Test.service.js` — ajout `submitAnswers(testId, userId, answers)` : charge le test + questions (include `as: 'question'`, triées par `questionPosition`), évalue chaque réponse via `_checkAnswer()`, crée le `TestResult`, retourne `{ score, total, results, resultId }`. Ajout des helpers privés `_checkAnswer(question, answer)` et `_formatCorrectAnswer(question)`. Import `TestResult` ajouté.
+- `controllers/Test.controller.js` — ajout `exports.submit` : appelle `testService.submitAnswers()`, retourne 200 / 404 / 500.
+- `validators/Test.validators.js` — ajout `exports.submit` : `answers` tableau non vide, `answers.*.questionId` entier positif.
+- `routes/Test.routes.js` — ajout `POST /:id/submit` (authMiddleware + validator + validate). Import `authMiddleware` ajouté.
+
+**Logique de correction server-side (`_checkAnswer`) :**
+- `open` : trim + lowercase, réponse vide = incorrecte
+- `mcq` : null/undefined = incorrecte ; `Number(answer)` comme index ; `opts[idx]?.correct === true`
+- `fill_blank` : chaque blank comparé en trim/lowercase
+- `reorder` : ordre exact des fragments (texte), longueur doit correspondre
+
+**Fichiers modifiés (Front) :**
+- `src/stores/testResults.js` — ajout `submitTest(testId, answers)` : `POST tests/${testId}/submit`, ajoute le résultat en tête de `results`, retourne le data complet (incluant `results` de correction).
+- `src/pages/ExerciseDetailPage.vue` — `submitAnswers()` remplacé : construit l'array `[{ questionId, answer }]` et appelle `testResultStore.submitTest()`. Suppression de `checkAnswer()`. Résultats affichés depuis la réponse serveur (`resultMap` par questionId). La sauvegarde TestResult est désormais faite server-side (plus d'appel `saveResult()` séparé).
+
+**Fichiers modifiés (Tests) :**
+- `test/services/Test.service.test.js` — mock stale `findByPk` corrigé (`expect.objectContaining` pour `findOne`). Ajout `TestResult` au mock. 11 nouveaux tests `submitAnswers` : test introuvable, calcul score, open insensible casse, open vide, mcq correct/incorrect/null, fill_blank correct/incorrect, reorder correct/incorrect, question non répondue.
+- `test/controllers/Test.controller.test.js` — ajout `submitAnswers: jest.fn()` au mock service, `makeToken`, `jwt` import, `reminder.worker` mock. 7 nouveaux tests `POST /tests/:id/submit` : 200 nominal, 404 introuvable, 400 answers manquant/vide/questionId invalide, 401 sans token, 500 service KO.
+- `my_memo_master_front/test/stores/testResults.store.test.js` — 4 nouveaux tests `submitTest` : succès (retourne data + unshift), non-200 (null), erreur réseau (null + notif), unshift sur liste existante.
+
+**Ce qui est utilisable :**
+- `POST /api/v1/tests/:id/submit` (auth requis) — body `{ answers: [{ questionId: number, answer: any }] }` → response `{ score, total, results: [{ questionId, correct, correctAnswer }], resultId }`
+- La correction et la sauvegarde du TestResult se font en un seul appel
+- `testResultStore.submitTest(testId, answers)` côté front (remplace l'appel `checkAnswer()` + `saveResult()`)
+
+**Résultats tests :**
+- Back : 41 tests suite `Test.service` + `Test.controller` ✅ (dont 11 + 7 nouveaux)
+- Front : 18 tests `testResults.store` ✅ (dont 4 nouveaux)
+
+**Hypothèses posées :**
+- La `question.content` reste exposée dans `GET /tests/:id` (nécessaire pour l'affichage du formulaire côté client) — la sécurité de la correction est portée par le server-side, pas par l'absence des données côté client.
+- La correction `open` reste exacte (trim + lowercase) — pas de sémantique NLP, cohérent avec le scope "Correction simple" de M-06.05.
+
+**Dette / points d'attention :**
+- Pas de `POST /tests/:id/submit` endpoint pour un test "en brouillon" sans question — le service retourne `null` (→ 404) si le test n'existe pas ; si le test est vide, score = 0/0 (edge case acceptable pour MVP).
+- La correction sémantique (NLP/IA) pour les questions `open` est hors-périmètre M-06.05 ("Correction IA avancée" = OUT of scope) — à connecter au moteur `Semantic.service.js` existant dans un ticket dédié.

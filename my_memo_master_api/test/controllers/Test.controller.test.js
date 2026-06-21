@@ -19,6 +19,7 @@ jest.mock('../../models/index', () => ({
 }))
 
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
+jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
 
 jest.mock('../../services/Test.service', () => ({
@@ -26,7 +27,8 @@ jest.mock('../../services/Test.service', () => ({
   findOne: jest.fn(),
   create: jest.fn(),
   update: jest.fn(),
-  delete: jest.fn()
+  delete: jest.fn(),
+  submitAnswers: jest.fn()
 }))
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -34,12 +36,30 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.NODE_ENV = 'test'
 
 const request = require('supertest')
+const jwt = require('jsonwebtoken')
 const app = require('../../app')
 const testService = require('../../services/Test.service')
 
 const BASE = '/api/v1'
+const SECRET = 'test-secret'
+const makeToken = (payload = { id: 1 }) => jwt.sign(payload, SECRET)
 
 const mockTest = { testId: 1, name: 'Contrôle Maths', subjectId: 1 }
+
+const SUBMIT_RESULT = {
+  score: 1,
+  total: 2,
+  resultId: 10,
+  results: [
+    { questionId: 1, correct: true, correctAnswer: 'Paris' },
+    { questionId: 2, correct: false, correctAnswer: 'Berlin' }
+  ]
+}
+
+const VALID_ANSWERS = [
+  { questionId: 1, answer: 'Paris' },
+  { questionId: 2, answer: 'Rome' }
+]
 
 describe('Test Controller', () => {
   beforeEach(() => jest.clearAllMocks())
@@ -194,6 +214,88 @@ describe('Test Controller', () => {
       const res = await request(app).delete(`${BASE}/tests/1`)
 
       expect(res.status).toBe(500)
+    })
+  })
+
+  // ── POST /tests/:id/submit ─────────────────────────────────────────────────
+  describe('POST /tests/:id/submit', () => {
+    it('200 — correction effectuée, retourne score + détails', async () => {
+      testService.submitAnswers.mockResolvedValue(SUBMIT_RESULT)
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ answers: VALID_ANSWERS })
+
+      expect(res.status).toBe(200)
+      expect(res.body.score).toBe(1)
+      expect(res.body.total).toBe(2)
+      expect(res.body.resultId).toBe(10)
+      expect(res.body.results).toHaveLength(2)
+      expect(testService.submitAnswers).toHaveBeenCalledWith(1, 1, VALID_ANSWERS)
+    })
+
+    it('404 — test introuvable', async () => {
+      testService.submitAnswers.mockResolvedValue(null)
+
+      const res = await request(app)
+        .post(`${BASE}/tests/99/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ answers: VALID_ANSWERS })
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
+    })
+
+    it('400 — answers manquant', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({})
+
+      expect(res.status).toBe(400)
+      expect(testService.submitAnswers).not.toHaveBeenCalled()
+    })
+
+    it('400 — answers tableau vide', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ answers: [] })
+
+      expect(res.status).toBe(400)
+      expect(testService.submitAnswers).not.toHaveBeenCalled()
+    })
+
+    it('400 — questionId invalide dans answers', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ answers: [{ questionId: 0, answer: 'test' }] })
+
+      expect(res.status).toBe(400)
+      expect(testService.submitAnswers).not.toHaveBeenCalled()
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .send({ answers: VALID_ANSWERS })
+
+      expect(res.status).toBe(401)
+      expect(testService.submitAnswers).not.toHaveBeenCalled()
+    })
+
+    it('500 — le service échoue', async () => {
+      testService.submitAnswers.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ answers: VALID_ANSWERS })
+
+      expect(res.status).toBe(500)
+      expect(res.body.message).toBeDefined()
     })
   })
 })

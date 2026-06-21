@@ -310,52 +310,26 @@ function unselectFragment(qIdx, pos) {
 
 // ── correction ────────────────────────────────────────────────────────────────
 
-function checkAnswer(question, idx) {
-  const content = question.content ?? {}
-  switch (question.type) {
-    case 'open': {
-      const userAns = (userAnswers[idx] ?? '').trim().toLowerCase()
-      const correct = (content.correct_answer ?? '').trim().toLowerCase()
-      return userAns === correct
-    }
-    case 'mcq': {
-      const chosen = userAnswers[idx]
-      const opts = content.options ?? []
-      return chosen !== null && opts[chosen]?.correct === true
-    }
-    case 'fill_blank': {
-      const blanks = content.blanks ?? []
-      const answers = userAnswers[idx] ?? []
-      return blanks.every((b, i) =>
-        (answers[i] ?? '').trim().toLowerCase() === b.trim().toLowerCase()
-      )
-    }
-    case 'reorder': {
-      const expected = content.fragments ?? []
-      const given = userAnswers[idx] ?? []
-      return (
-        given.length === expected.length &&
-        expected.every((frag, i) => frag === given[i])
-      )
-    }
-    default:
-      return false
-  }
-}
-
 async function submitAnswers() {
+  const answers = questions.value.map((q, idx) => ({
+    questionId: q.idQuestion,
+    answer: userAnswers[idx] ?? null
+  }))
+
+  const result = await testResultStore.submitTest(test.value.testId, answers)
+  if (!result) {
+    notif.notify('Erreur lors de la correction.', 'error')
+    return
+  }
+
   questionResults.splice(0)
-  let score = 0
-  questions.value.forEach((q, idx) => {
-    const correct = checkAnswer(q, idx)
-    questionResults.push({ correct })
-    if (correct) score++
+  const resultMap = Object.fromEntries(result.results.map(r => [r.questionId, r]))
+  questions.value.forEach(q => {
+    questionResults.push(resultMap[q.idQuestion] ?? { correct: false, correctAnswer: '—' })
   })
-  correctCount.value = score
+  correctCount.value = result.score
   resultsShown.value = true
   window.scrollTo({ top: 0, behavior: 'smooth' })
-
-  await testResultStore.saveResult(test.value.testId, score, questions.value.length)
 }
 
 function resetQuiz() {

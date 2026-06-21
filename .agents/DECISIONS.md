@@ -417,6 +417,18 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-21] Correction exercices portée server-side (POST /tests/:id/submit)
+
+**Contexte** : La correction des exercices était entièrement côté client (`checkAnswer()` dans `ExerciseDetailPage.vue`). Le ticket M-06.05 demande de la porter côté serveur, comme le fait `POST /leitnercards/response` pour les cartes Leitner.
+
+**Décision** : Ajout de `POST /tests/:id/submit` (authMiddleware, validator). Le service `Test.service.submitAnswers()` charge le test + questions depuis la DB, évalue chaque réponse (`_checkAnswer()`) pour les 4 types, crée le `TestResult` en base, et retourne `{ score, total, results, resultId }`. La correction et la sauvegarde du score se font en un seul appel. Le front (`testResultStore.submitTest()`) remplace l'ancien appel `checkAnswer()` + `saveResult()` en deux étapes.
+
+**Alternative écartée** : Conserver la correction client-side (plus simple, zéro DB) — exposait les réponses correctes via `GET /tests/:id` (déjà le cas pour l'affichage du formulaire, donc pas de gain sécurité immédiat), mais surtout empêchait une vraie validation côté serveur et un futur branchement sur le moteur sémantique IA.
+
+**Conséquences** : La `question.content` reste exposée dans `GET /tests/:id` (nécessaire pour rendre les formulaires côté client). La sécurité de la note est garantie par le serveur. La correction `open` reste exacte en MVP — une correction tolérante/sémantique se branchera sur `Semantic.service.js` dans un ticket dédié ("Correction IA avancée" = OUT of scope M-06.05).
+
+---
+
 ### [2026-06-06] Rate limiters extraits dans un middleware dédié
 **Contexte** : `authLimiter` et `registerLimiter` étaient définis inline dans `User.routes.js`. Le nouvel `apiLimiter` global nécessitait un point de centralisation.  
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  
