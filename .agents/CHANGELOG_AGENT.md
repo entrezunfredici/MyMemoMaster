@@ -65,7 +65,7 @@
 | Front — Auth (login, register) | Stable — M-05.09c : AuthFormLayout.vue composant layout partagé (4 pages auth refactorisées) | 2026-06-16 |
 | Front — HomePage | Stable | init |
 | Front — FlashcardsPage | Stable — refactor : utilise ItemListLayout.vue, chrome dupliqué supprimé | 2026-06-21 |
-| Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.08 : créateur + éditeur + player + correction + scores/historique livrés, bug MCQ édition corrigé | 2026-06-21 |
+| Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.08/M-06.09 : créateur + éditeur + player (4 types) + correction server-side + scores/historique livrés | 2026-06-21 |
 | Front — ItemListLayout.vue | Stable — composant layout partagé (recherche, filtre sujet, grille, états) | 2026-06-21 |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
@@ -2170,3 +2170,199 @@ npx sequelize-cli db:migrate --migration 20260621000001-create-test-result-table
 **Dette / points d'attention :**
 - `submitEdit` exécute les mises à jour de questions séquentiellement (non parallèle) pour éviter les conflits de `questionPosition` — acceptable MVP.
 - Pas de tests Vitest pour `ItemListLayout.vue` (composant partagé Exercises + Flashcards).
+
+---
+
+### [M-06.09] — Player questionnaire (synthèse feature M-06) — 2026-06-21
+
+**Contexte :** Entrée de synthèse pour la feature M-06.09 (Feature list ID M-06, ID source planning M-06.09, Sprint 6 Front-end MVP). Le player questionnaire est entièrement implémenté dans `ExerciseDetailPage.vue`, livré dans le cadre des tickets M-06.
+
+**Périmètre livré (IN scope) :**
+
+| Fonctionnalité | Fichier / Fonction |
+|---|---|
+| Rendu interactif — question ouverte (textarea) | `ExerciseDetailPage.vue:29-36` |
+| Rendu interactif — QCM (radio stylisés, sélection visuelle) | `ExerciseDetailPage.vue:39-57` |
+| Rendu interactif — texte à trous (inline inputs dans le template) | `ExerciseDetailPage.vue:60-76` — `parsedTemplate()` |
+| Rendu interactif — phrase à constituer (fragments cliquables / désélectionnables) | `ExerciseDetailPage.vue:79-107` — `selectFragment()`, `unselectFragment()` |
+| Soumission et correction server-side | `ExerciseDetailPage.vue:319-338` → `POST /tests/:id/submit` |
+| Écran résultats (score global + détail par question) | `ExerciseDetailPage.vue:119-168` |
+| Historique des résultats passés (tableau date/score/%) | `ExerciseDetailPage.vue:172-203` |
+| Rejouer (reset complet de la session) | `ExerciseDetailPage.vue:341-345` → `resetQuiz()` |
+
+**Périmètre non livré (OUT scope — conforme) :**
+- Correction IA avancée — hors MVP
+- Banque publique d'exercices — hors MVP
+- Notation officielle établissement — hors MVP
+
+**DoD :**
+- ✅ Fonctionnel sur tous les items IN scope
+- ✅ Tests : 759 back + 138 front (M-06-REVIEW)
+- ✅ Revue de code : M-06-REVIEW
+- ✅ Changelog à jour
+- ✅ Aucun bug bloquant connu
+
+**Tickets contributeurs :** M-06.01, M-06.02, M-06.05, M-06-REVIEW
+
+**Dette / points d'attention :**
+- Fragments "reorder" mélangés côté client uniquement (pas de seed aléatoire côté serveur) — acceptable MVP.
+- Les résultats `open` affichent une explication si `questionResults[idx].explanation` est présente (champ retourné par le moteur sémantique en M-06.05).
+
+---
+
+### [M-06.10] — Écran résultats (score, correction) — 2026-06-21
+
+**Contexte :** Entrée de synthèse pour la feature M-06.10 (Sprint 6 Front-end MVP). L'écran résultats est intégré dans `ExerciseDetailPage.vue` et s'affiche après soumission du questionnaire.
+
+**Périmètre livré (IN scope) :**
+
+| Élément | Fichier / Lignes |
+|---|---|
+| Bandeau score global (X/N + %) | `ExerciseDetailPage.vue:119-125` |
+| Détail par question — badge Correct/Incorrect + bordure couleur | `ExerciseDetailPage.vue:128-161` |
+| Réponse de l'étudiant | `ExerciseDetailPage.vue:144-148` — `formatUserAnswer()` |
+| Réponse attendue | `ExerciseDetailPage.vue:149-153` — `formatCorrectAnswer()` |
+| Explication pour questions `open` (moteur sémantique) | `ExerciseDetailPage.vue:155-160` |
+| Bouton "Recommencer" → reset complet | `ExerciseDetailPage.vue:163-168` → `resetQuiz()` |
+| Formatage réponse par type (open/mcq/fill_blank/reorder) | `ExerciseDetailPage.vue:349-392` |
+
+**Correction server-side :**
+- `POST /tests/:id/submit` retourne `{ score, total, results: [{ questionId, correct, correctAnswer, explanation }] }`
+- `_formatCorrectAnswer()` dans `Test.service.js` formate la réponse attendue pour les 4 types
+- `resultMap` construit côté front depuis `result.results` pour affichage par question
+
+**Périmètre non livré (OUT scope — conforme) :**
+- Correction IA avancée — hors MVP (la correction `open` utilise la comparaison exacte trim/lowercase)
+- Banque publique, notation établissement — hors MVP
+
+**DoD :**
+- ✅ Fonctionnel sur tous les items IN scope
+- ✅ Tests : 759 back + 138 front (M-06-REVIEW)
+- ✅ Revue de code : M-06-REVIEW
+- ✅ Changelog à jour
+- ✅ Aucun bug bloquant connu
+
+**Tickets contributeurs :** M-06.01, M-06.02, M-06.05, M-06-REVIEW
+
+**Dette / points d'attention :**
+- `formatUserAnswer` pour `reorder` joint les fragments avec un espace — si un fragment contient des espaces, l'affichage peut être ambigu (acceptable MVP).
+- L'explication sémantique pour `open` dépend de `Semantic.service.js` (modèle NLP local, ~30s au premier appel) — le champ peut être `null` si le service est lent ou indisponible.
+
+---
+
+### [M-06.11] — Tests unitaires moteur correction — 2026-06-21
+
+**Contexte :** Tests unitaires du moteur de correction server-side (`submitAnswers`, `_checkAnswer`) couvrant les 4 types de questions, les cas limites et les erreurs. Livrés dans le cadre de M-06.05 et M-06-REVIEW.
+
+**Correction d'une inexactitude CHANGELOG M-06.05 :** Cette entrée indiquait que la correction `open` restait "exacte (trim + lowercase)". En réalité, `_checkAnswer` appelle `semanticService.gradeSemantic()` pour les questions `open` — la correction est **sémantique IA** (score flottant 0→1, explication). Seuls `mcq`, `fill_blank` et `reorder` utilisent une comparaison exacte. Les tests le confirment (mock de `Semantic.service.js` dans `Test.service.test.js`).
+
+**Tests back — `test/services/Test.service.test.js` :**
+
+| Test | Cas couvert |
+|---|---|
+| `retourne null si test introuvable` | cas limite |
+| `calcule le score (somme similarités) + crée TestResult` | open nominal multi-question |
+| `open — insensible casse/espaces (appel sémantique)` | open + trim avant appel NLP |
+| `open — réponse vide → incorrect` | open cas limite |
+| `mcq — bonne option sélectionnée` | mcq nominal |
+| `mcq — mauvaise option sélectionnée` | mcq erreur |
+| `mcq — null → incorrect` | mcq sans réponse |
+| `fill_blank — tous trous corrects (insensible casse/espaces)` | fill_blank nominal |
+| `fill_blank — un trou incorrect` | fill_blank erreur |
+| `reorder — ordre correct` | reorder nominal |
+| `reorder — ordre incorrect` | reorder erreur |
+| `question non répondue → incorrect` | cas limite global |
+
+12 tests `submitAnswers` + 5 tests CRUD = **17 tests service**
+
+**Tests back — `test/controllers/Test.controller.test.js` :**
+- 7 tests `POST /tests/:id/submit` : 200 nominal, 404, 400 ×3 (answers manquant/vide/questionId invalide), 401 sans token, 500 service KO
+- 21 tests CRUD (GET /tests, GET /:id, POST, PUT, DELETE)
+- Total : **28 tests controller**
+
+**Tests front — `test/stores/testResults.store.test.js` :**
+- `fetchByTest` (3) : succès, non-200, erreur réseau
+- `fetchByUser` (3) : succès, non-200, erreur réseau
+- `saveResult` (4) : succès, non-201, erreur réseau, unshift
+- `bestScore` (4) : vide, un résultat, meilleur ratio, égalité
+- `submitTest` (4) : succès + unshift, non-200, erreur réseau, unshift avec existants
+- Total : **18 tests Vitest**
+
+**Total M-06.11 :** 63 tests dédiés au moteur de correction (17 service + 28 controller + 18 store)
+
+**DoD :**
+- ✅ Tests : 63 tests dédiés, tous passants (inclus dans les 759 back + 138 front de M-06-REVIEW)
+- ✅ Couverture : 4 types × cas nominal + cas limites + erreurs
+- ✅ Revue : M-06-REVIEW
+- ✅ Changelog à jour
+
+**Tickets contributeurs :** M-06.05, M-06-REVIEW
+
+**Dette / points d'attention :**
+- `semanticService.gradeSemantic` est mocké dans les tests service — les tests vérifient la logique de routage et d'agrégation mais pas le modèle NLP lui-même (~30s au premier appel, testé en intégration manuelle uniquement).
+
+---
+
+### [M-06.12] — Tests fonctionnels parcours complet exercices — 2026-06-21
+
+**Contexte :** Tests fonctionnels (BDD-style back + composant front) couvrant le parcours complet de la feature Exercices : chargement → questionnaire → soumission → résultats → recommencer. Ajoutés pour compléter le DoD M-06.12 qui exigeait une couverture intégration end-to-end.
+
+**Fichiers créés :**
+- `my_memo_master_api/test/bdd/exercise.session.test.js` — 11 tests fonctionnels (SQLite in-memory, Semantic.service mocké, toutes les autres couches réelles)
+- `my_memo_master_front/test/components/ExerciseDetailPage.test.js` — 11 tests Vitest composant (Pinia testing, stores stubbed avec spies configurés avant montage)
+
+---
+
+**Tests BDD back — `test/bdd/exercise.session.test.js` :**
+
+Setup : `process.env.DB_STORAGE = ':memory:'` avant tout `require`, `syncModels({ force: true })` en `beforeAll`. Mocks : `Semantic.service`, `fifo.cron`, `reminder.worker`, `logger`. Données créées : Role, User, Subject, Test, 4 Questions (open/mcq/fill_blank/reorder), associations via `question.addTest(test)`.
+
+| Test | Cas couvert |
+|---|---|
+| `sans token → 401` | auth middleware |
+| `answers manquant → 400` | validation body |
+| `answers tableau vide → 400` | validation min:1 |
+| `test introuvable → 404` | test inexistant |
+| `4/4 correct — score=4, TestResult persisté en DB` | parcours nominal complet + vérification DB |
+| `0/4 correct — score=0` | tout incorrect |
+| `question non répondue → incorrect pour tous les types` | cas limite |
+| `mcq — index 1 → correct + correctAnswer="4"` | correction MCQ par type |
+| `fill_blank — insensible à la casse et aux espaces` | correction fill_blank |
+| `reorder — ordre incorrect → correct:false + correctAnswer` | correction reorder |
+| `GET /tests/:id — 4 questions, content parsé` | lecture test + désérialisation JSON |
+
+Particularité : l'appel `semanticService.gradeSemantic` est déclenché **uniquement** pour les questions `open` avec réponse non vide (early return si `user = ''`). Les autres types (mcq/fill_blank/reorder) et les réponses null/absentes ne déclenchent pas le service sémantique — chaque test concerné configure `mockResolvedValueOnce` uniquement quand nécessaire, sans fuite entre tests.
+
+**Tests composant front — `test/components/ExerciseDetailPage.test.js` :**
+
+Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResultStore()` **avant** `mount()`. Ceci est nécessaire car `ExerciseDetailPage.onMounted` destructure `const [ok] = await Promise.all([testStore.fetchTestById(...), ...])` et retourne si `!ok`. Avec `stubActions: true`, les actions retournent `undefined` (falsy) par défaut — configurer `mockResolvedValue(true)` avant le montage évite le faux-négatif "introuvable".
+
+| Test | Cas couvert |
+|---|---|
+| `affiche "Chargement" pendant onMounted puis le masque` | état loading |
+| `affiche "introuvable" et notifie si fetchTestById retourne false` | fetch échec |
+| `affiche le titre et le sujet de l'exercice` | rendu nominal |
+| `question ouverte — statement + textarea` | rendu open |
+| `question MCQ — 2 radios + options` | rendu mcq |
+| `affiche le bouton "Vérifier les résultats"` | rendu bouton |
+| `clic "Vérifier" — appelle submitTest avec les bonnes données` | soumission |
+| `après soumission — écran résultats + score "2/2"` | résultats |
+| `écran résultats — badges Correct et Incorrect` | détail par question |
+| `bouton "Recommencer" — retour au mode quiz` | reset session |
+| `affiche l'historique si results non vide` | historique |
+
+**Hypothèses posées :**
+- Le composant `ExerciseDetailPage.vue` importe `notif` depuis `@/helpers/notif` — mocké via `vi.mock('@/helpers/notif', ...)`.
+- `useRoute()` mocké pour retourner `{ params: { id: '1' } }` avec `importOriginal` pour conserver `RouterLink` etc.
+- `window.scrollTo` spié en `beforeEach` (appelé dans `initAnswers()` et `resetQuiz()`).
+
+**DoD M-06.12 :**
+- ✅ Test BDD back : 11 tests, parcours complet controller → service → model → SQLite
+- ✅ Test composant front : 11 tests, cycle complet chargement → quiz → résultats → recommencer
+- ✅ Correction des 4 types vérifiée en intégration (pas seulement en unit)
+- ✅ Persistance TestResult vérifiée directement en base (BDD test)
+- ✅ Changelog à jour
+
+**Dette / points d'attention :**
+- Les tests BDD n'exécutent pas le vrai moteur NLP — `Semantic.service.gradeSemantic` reste mocké (NLP local ~30s au démarrage, incompatible avec les runs CI rapides).
+- Les tests composant front n'exercent pas les types `fill_blank` et `reorder` (rendu interactif) — couverture limitée aux types `open` et `mcq` pour le rendu ; tous les types sont couverts côté back BDD.
