@@ -25,7 +25,7 @@
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
 | Test / Question / Response | Stable — M-06.01 : champ `content` JSON par type, 4 types définis, ExercisesPage branchée API | 2026-06-19 |
-| TestResult (scores historique exercices) | Stable — M-06.02 : model + migration + service + controller + routes, auth requise | 2026-06-21 |
+| TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
@@ -1999,9 +1999,59 @@ npx sequelize-cli db:migrate --migration 20260621000001-create-test-result-table
 ```
 
 **Dette / points d'attention :**
-- Pas de tests Supertest pour TestResult.controller ni Vitest pour testResults.js / ExercisesPage édition — à couvrir dans un ticket dédié.
+- ~~Pas de tests Supertest pour TestResult.controller ni Vitest pour testResults.js~~ — Résolu dans M-06-REVIEW.
 - `submitEdit` exécute les appels questions séquentiellement (pas en parallèle) pour éviter les conflits de `questionPosition` — acceptable pour MVP.
 - La correction `open` reste exacte (lowercase/trim) — pas de tolérance aux fautes. Pour une correction sémantique, brancher le moteur Grading existant dans un ticket dédié.
+
+---
+
+### [M-06-REVIEW] — Revue de code & tests M-06 (API CRUD exercices et questions) — 2026-06-21
+
+**Fichiers créés :**
+- `test/controllers/TestResult.controller.test.js` — 16 tests Supertest : GET /test-results (4), GET /test-results/test/:testId (4), POST /test-results (8)
+- `my_memo_master_front/test/stores/testResults.store.test.js` — 14 tests Vitest : fetchByTest (3), fetchByUser (3), saveResult (4), getter bestScore (4)
+
+**Fichiers modifiés :**
+- `controllers/TestResult.controller.js` — `res.send()` → `res.json()` sur les 3 handlers (cohérence avec la convention du projet)
+
+**Résultats tests :**
+- Back : 759 tests passants (+16 TestResult.controller) — 2 échecs préexistants dans Test.service.test.js et Question.service.test.js (non introduits par ce ticket)
+- Front : 138 tests passants (+14 testResults.store)
+
+**Revue de code — périmètre M-06 :**
+
+*Architecture et conventions :*
+- ✅ controller → service → model respecté sur tout le périmètre (Test, Question, TestResult)
+- ✅ `authMiddleware` sur les 3 routes TestResult
+- ✅ Validators branchés sur POST /test-results
+- ✅ JSDoc présent sur toutes les méthodes publiques de TestResult.service
+- ✅ Messages d'erreur en français
+
+*ExercisesPage.vue — points vérifiés :*
+- ✅ `DELETE /questions/:id` retourne 204 — la vérification `if (resp !== undefined)` dans `submitEdit` est correcte
+- ✅ `buildContent(q)` produit les structures JSON attendues par les 4 types
+- ✅ `contentToFormState(q)` reconstruit correctement l'état formulaire depuis le JSON stocké
+- ✅ `questionsToDelete` tracke les IDs des questions supprimées avant soumission
+
+*ExerciseDetailPage.vue — points vérifiés :*
+- ✅ `checkAnswer` couvre les 4 types avec la logique de correction appropriée
+- ✅ `submitAnswers` appelle `testResultStore.saveResult()` après calcul du score
+- ✅ `resetQuiz` appelle `initAnswers()` — `questionResults` est vidé dans `submitAnswers` via `splice(0)`, pas de résidu visuel
+- ✅ `userAnswers[idx] = oi` (MCQ) stocke l'index numérique, `opts[chosen]?.correct === true` est correct
+
+*TestResult.service.js — points vérifiés :*
+- ✅ `findByUser` inclut Test + Subject (nom exercice affiché dans l'historique)
+- ✅ `findByTest` filtre sur userId (isolation par utilisateur)
+- ✅ `ON DELETE CASCADE` sur testId et userId — suppression propre si test/user supprimé
+
+**Hypothèses posées :**
+- Les 2 échecs préexistants (Test.service.test.js : `findOne` appelé avec options d'include non mockées ; Question.service.test.js : même cause) sont antérieurs à M-06. Ils correspondent à une évolution du service (ajout d'includes) sans mise à jour des tests. À corriger dans un ticket dédié.
+- Le getter `bestScore` est défini dans le store mais non utilisé dans ExerciseDetailPage — disponible pour un futur widget statistiques.
+
+**Dette / points d'attention :**
+- Tests `Test.service.test.js` et `Question.service.test.js` : 2 tests stale (service étendu avec includes, mocks non mis à jour) — à corriger dans un ticket dédié.
+- Édition d'une question MCQ existante n'affiche pas les options actuelles dans le formulaire — signalé dans M-06.01b, confirmé non régressé.
+- La correction `open` reste exacte — pas de tolérance sémantique en MVP.
 
 ---
 
