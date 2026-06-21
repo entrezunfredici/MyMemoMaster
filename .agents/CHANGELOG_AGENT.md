@@ -25,6 +25,7 @@
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
 | Test / Question / Response | Stable — M-06.01 : champ `content` JSON par type, 4 types définis, ExercisesPage branchée API | 2026-06-19 |
+| TestResult (scores historique exercices) | Stable — M-06.02 : model + migration + service + controller + routes, auth requise | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
@@ -63,8 +64,9 @@
 | Jobs (fifo.cron.js) | Stable | init |
 | Front — Auth (login, register) | Stable — M-05.09c : AuthFormLayout.vue composant layout partagé (4 pages auth refactorisées) | 2026-06-16 |
 | Front — HomePage | Stable | init |
-| Front — FlashcardsPage | Stable — M-07.01 : filtre sujet, badge sujet, sélecteur sujet dans modal (+ création inline) | 2026-06-20 |
-| Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.01 : connecté backend, formulaire 4 types, player + correction | 2026-06-19 |
+| Front — FlashcardsPage | Stable — refactor : utilise ItemListLayout.vue, chrome dupliqué supprimé | 2026-06-21 |
+| Front — ExercisesPage / ExerciseDetailPage | Stable — refactor : utilise ItemListLayout.vue, styles harmonisés avec FlashcardsPage | 2026-06-21 |
+| Front — ItemListLayout.vue | Stable — composant layout partagé (recherche, filtre sujet, grille, états) | 2026-06-21 |
 | Front — MindmapsPage | Stable | init |
 | Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
 | Front — CalendarPage | Stable — M-03.07/M-03.08 : calendrier interactif + sidebar onglets Agenda/To-do | 2026-06-13 |
@@ -1954,3 +1956,82 @@ npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-co
 **Dette / points d'attention :**
 - La table `systemSubject` est orpheline — migration de nettoyage à créer avant la mise en prod.
 - Les champs `sujet` (JSON) et `idMindMap` sont toujours en base — à supprimer dans un ticket dédié si confirmés inutilisés.
+
+---
+
+### [M-06.02] — Scores, historique et édition des exercices — 2026-06-21
+
+**Fichiers créés (API) :**
+- `models/TestResult.model.js` — entité TestResult : resultId, testId (FK→Test CASCADE), userId (FK→User CASCADE), score, total, completedAt ; index sur testId, userId, (testId, userId)
+- `migrations/20260621000001-create-test-result-table.js` — migration Sequelize CLI pour la table TestResult
+- `services/TestResult.service.js` — `findByTest(testId, userId)`, `findByUser(userId)` (avec include Test + Subject), `create(data)`
+- `controllers/TestResult.controller.js` — `findByTest`, `findByUser`, `create`
+- `validators/TestResult.validators.js` — `create` : testId entier positif, score entier ≥ 0, total entier > 0
+- `routes/TestResult.routes.js` — GET /test-results, GET /test-results/test/:testId, POST /test-results (authMiddleware sur les 3 routes)
+
+**Fichiers modifiés (API) :**
+- `models/index.js` — enregistrement de TestResult
+- `app.js` — import + enregistrement `testResultRoutes`
+
+**Fichiers créés (front) :**
+- `src/stores/testResults.js` — `useTestResultStore` : `fetchByTest(testId)`, `fetchByUser()`, `saveResult(testId, score, total)` ; getter `bestScore`
+
+**Fichiers modifiés (front) :**
+- `src/pages/ExerciseDetailPage.vue` — chargement de l'historique au montage (`fetchByTest`) en parallèle du test ; `submitAnswers()` appelle `saveResult()` après calcul du score ; section historique en bas de page (tableau date / score / %)
+- `src/pages/ExercisesPage.vue` — ajout `onEdit` sur MenuItem → `openEditModal(test)` ; modal unifiée création/édition (`isEditMode`) ; `openEditModal` charge le test complet via `GET /tests/:id` et convertit le `content` JSON en état formulaire (`contentToFormState`) ; `submitEdit` : PUT test + DELETE questions supprimées + PUT questions existantes + POST nouvelles questions ; `questionsToDelete` tracke les IDs à supprimer ; chaque question porte un `_key` stable pour le rendu Vue
+
+**Ce qui est utilisable :**
+- `POST /api/v1/test-results` — enregistre le résultat d'un exercice (auth requis)
+- `GET /api/v1/test-results/test/:testId` — historique d'un exercice pour l'utilisateur connecté
+- `GET /api/v1/test-results` — historique complet de l'utilisateur (avec nom exercice + sujet)
+- ExerciseDetailPage : score sauvegardé automatiquement à chaque complétion ; tableau des résultats passés visible en bas de page
+- ExercisesPage : icône d'édition sur chaque exercice ; modal pré-remplie avec les données existantes ; ajout/modification/suppression de questions inline
+
+**Hypothèses posées :**
+- `ON DELETE CASCADE` sur TestResult (testId, userId) : la suppression d'un test ou d'un utilisateur supprime ses résultats — comportement attendu, pas de conservation d'historique orphelin.
+- `contentToFormState` reconstitue l'état formulaire depuis le JSON stocké — si le format `content` change pour un type, cette fonction doit être mise à jour en parallèle.
+- Lors d'une édition, les questions sans `idQuestion` (nouvelles) sont envoyées avec `idTest` pour l'association via `question.addTest()` du service existant.
+- La suppression d'une question appelle `DELETE /questions/:id` — si la question est partagée avec une LeitnerCard, la cascade Sequelize la supprimera aussi (comportement hérité de l'association existante).
+
+**Migration à jouer en prod :**
+```
+npx sequelize-cli db:migrate --migration 20260621000001-create-test-result-table.js
+```
+
+**Dette / points d'attention :**
+- Pas de tests Supertest pour TestResult.controller ni Vitest pour testResults.js / ExercisesPage édition — à couvrir dans un ticket dédié.
+- `submitEdit` exécute les appels questions séquentiellement (pas en parallèle) pour éviter les conflits de `questionPosition` — acceptable pour MVP.
+- La correction `open` reste exacte (lowercase/trim) — pas de tolérance aux fautes. Pour une correction sémantique, brancher le moteur Grading existant dans un ticket dédié.
+
+---
+
+### [REF-ITEMLIST] — Composant partagé ItemListLayout (FlashcardsPage + ExercisesPage) — 2026-06-21
+
+**Contexte :** FlashcardsPage et ExercisesPage partageaient le même chrome (barre de recherche, filtre sujet, compteur, états chargement/vide, grille) — refactorisé en composant partagé sur le modèle de `AuthFormLayout.vue`.
+
+**Fichiers créés :**
+- `src/components/ItemListLayout.vue` — composant layout : barre de recherche (`v-model:search`), filtre sujet (`v-model:selectedSubjectId`), compteur, état chargement, état vide, grille responsive ; slot `default` pour les items, slot `modals` pour les modals ; `@create` emit pour le bouton de création
+
+**Fichiers modifiés :**
+- `src/pages/FlashcardsPage.vue` — suppression du chrome dupliqué (≈60 lignes template) ; utilise `<ItemListLayout>` ; modals et cards en slots ; styles harmonisés avec `bg-primary`
+- `src/pages/ExercisesPage.vue` — idem ; styles `bg-blue-*` migres vers `bg-primary`/`text-primary` (cohérence projet)
+
+**Interface du composant :**
+| Prop | Type | Description |
+|---|---|---|
+| `search` | String | v-model texte recherche |
+| `selectedSubjectId` | Number\|null | v-model filtre sujet actif |
+| `subjects` | Array | liste des sujets disponibles |
+| `loading` | Boolean | état de chargement |
+| `filteredCount` | Number | nombre d'items filtrés (pour l'affichage) |
+| `searchPlaceholder` | String | placeholder de l'input |
+| `createLabel` | String | label du bouton créer |
+| `itemLabel` | String | "système", "exercice"… (singulier) |
+| `emptyMessage` | String | message si `filteredCount === 0` |
+
+**Hypothèses posées :**
+- La grille et le filtre sujet sont identiques entre les deux pages — `ItemListLayout` est le seul endroit à modifier si la grille ou le filtre évolue.
+- Les modals restent dans les pages car elles sont trop différentes pour être partagées.
+
+**Dette / points d'attention :**
+- Pas de tests Vitest pour `ItemListLayout` — à ajouter si des cas limites (filtre + recherche simultanés, sujets vides) doivent être validés.

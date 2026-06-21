@@ -39,6 +39,7 @@ const calendarEventRoutes = require('./routes/CalendarEvent.routes')
 const deadlineRoutes = require('./routes/Deadline.routes')
 const reminderRoutes = require('./routes/Reminder.routes')
 const planningRoutes = require('./routes/Planning.routes')
+const testResultRoutes = require('./routes/TestResult.routes')
 const { startFifoCron } = require('./jobs/fifo.cron')
 const { startReminderWorker } = require('./jobs/reminder.worker')
 
@@ -120,6 +121,7 @@ calendarEventRoutes(v1)
 deadlineRoutes(v1)
 reminderRoutes(v1)
 planningRoutes(v1)
+testResultRoutes(v1)
 app.use('/api/v1', v1)
 
 // ... Autres middlewares

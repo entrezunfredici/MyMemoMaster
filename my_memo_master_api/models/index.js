@@ -30,6 +30,7 @@ models.EventOccurrence = require('./EventOccurrence.model')(instance)
 models.Deadline = require('./Deadline.model')(instance)
 models.RevisionSession = require('./RevisionSession.model')(instance)
 models.Reminder = require('./Reminder.model')(instance)
+models.TestResult = require('./TestResult.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

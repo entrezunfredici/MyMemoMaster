@@ -78,7 +78,6 @@
           <!-- reorder -->
           <template v-else-if="question.type === 'reorder'">
             <p class="text-sm text-gray-500 mb-3">Clique sur les fragments dans le bon ordre :</p>
-            <!-- Fragments disponibles -->
             <div class="flex flex-wrap gap-2 mb-4">
               <button
                 v-for="(frag, fi) in shuffledFragments[idx]"
@@ -92,7 +91,6 @@
                 {{ frag }}
               </button>
             </div>
-            <!-- Réponse en cours de construction -->
             <div class="min-h-10 flex flex-wrap gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg">
               <span class="text-gray-400 text-sm italic" v-if="!selectedFragments[idx].length">Sélectionne les fragments ci-dessus...</span>
               <button
@@ -144,7 +142,6 @@
           </div>
           <p class="text-base text-body mb-4">{{ question.statement }}</p>
 
-          <!-- Réponse utilisateur + correction selon type -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-white p-4 rounded-lg border border-gray-200">
               <p class="font-semibold text-gray-700 mb-2 text-sm">Votre réponse</p>
@@ -164,6 +161,40 @@
           Recommencer
         </button>
       </div>
+
+      <!-- Historique des résultats -->
+      <div v-if="resultHistory.length" class="mt-12 border-t border-gray-200 pt-8">
+        <h2 class="text-xl font-bold text-heading mb-4">Historique de vos résultats</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm border-collapse">
+            <thead>
+              <tr class="bg-gray-100 text-left">
+                <th class="px-4 py-2 rounded-tl-lg font-semibold text-gray-600">Date</th>
+                <th class="px-4 py-2 font-semibold text-gray-600">Score</th>
+                <th class="px-4 py-2 rounded-tr-lg font-semibold text-gray-600">Résultat</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="r in resultHistory"
+                :key="r.resultId"
+                class="border-b border-gray-100 hover:bg-gray-50"
+              >
+                <td class="px-4 py-3 text-gray-600">{{ formatDate(r.completedAt) }}</td>
+                <td class="px-4 py-3 font-semibold">{{ r.score }}/{{ r.total }}</td>
+                <td class="px-4 py-3">
+                  <span
+                    class="px-2 py-1 rounded-full text-xs font-bold"
+                    :class="(r.score / r.total) >= 0.5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                  >
+                    {{ Math.round((r.score / r.total) * 100) }}%
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -172,24 +203,23 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTestStore } from '@/stores/tests'
+import { useTestResultStore } from '@/stores/testResults'
 import { notif } from '@/helpers/notif'
 
 const route = useRoute()
 const testStore = useTestStore()
+const testResultStore = useTestResultStore()
 
 const loading = ref(true)
 const resultsShown = ref(false)
 
 const test = computed(() => testStore.test?.testId ? testStore.test : null)
 const questions = computed(() => test.value?.question ?? [])
+const resultHistory = computed(() => testResultStore.results)
 
-// Réponses utilisateur (structure varie par type)
 const userAnswers = reactive([])
-// Pour reorder : indices des fragments sélectionnés dans l'ordre
 const selectedFragments = reactive([])
-// Pour reorder : fragments mélangés
 const shuffledFragments = reactive([])
-
 const questionResults = reactive([])
 const correctCount = ref(0)
 
@@ -197,7 +227,10 @@ const correctCount = ref(0)
 
 onMounted(async () => {
   const id = Number(route.params.id)
-  const ok = await testStore.fetchTestById(id)
+  const [ok] = await Promise.all([
+    testStore.fetchTestById(id),
+    testResultStore.fetchByTest(id)
+  ])
   if (!ok) {
     notif.notify('Exercice introuvable.', 'error')
     loading.value = false
@@ -223,13 +256,11 @@ function initAnswers() {
     } else if (q.type === 'reorder') {
       userAnswers.push([])
       selectedFragments.push([])
-      // mélanger les fragments
       const frags = [...(q.content?.fragments ?? [])]
       shuffled(frags)
       shuffledFragments.push(frags)
       return
     }
-    // placeholder pour les autres types (alignement d'index)
     if (q.type !== 'reorder') {
       selectedFragments.push([])
       shuffledFragments.push([])
@@ -237,7 +268,6 @@ function initAnswers() {
   })
 }
 
-// Fisher-Yates shuffle in-place
 function shuffled(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -245,7 +275,7 @@ function shuffled(arr) {
   }
 }
 
-// ── fill_blank : parsing du template ─────────────────────────────────────────
+// ── fill_blank ────────────────────────────────────────────────────────────────
 
 function parsedTemplate(question) {
   const template = question.content?.template ?? ''
@@ -266,7 +296,7 @@ function parsedTemplate(question) {
   return parts
 }
 
-// ── reorder : sélection des fragments ────────────────────────────────────────
+// ── reorder ───────────────────────────────────────────────────────────────────
 
 function selectFragment(qIdx, fragIdx) {
   selectedFragments[qIdx].push(fragIdx)
@@ -313,7 +343,7 @@ function checkAnswer(question, idx) {
   }
 }
 
-function submitAnswers() {
+async function submitAnswers() {
   questionResults.splice(0)
   let score = 0
   questions.value.forEach((q, idx) => {
@@ -324,6 +354,8 @@ function submitAnswers() {
   correctCount.value = score
   resultsShown.value = true
   window.scrollTo({ top: 0, behavior: 'smooth' })
+
+  await testResultStore.saveResult(test.value.testId, score, questions.value.length)
 }
 
 function resetQuiz() {
@@ -368,5 +400,13 @@ function formatCorrectAnswer(question) {
     default:
       return '—'
   }
+}
+
+function formatDate(isoDate) {
+  if (!isoDate) return '—'
+  return new Date(isoDate).toLocaleDateString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  })
 }
 </script>
