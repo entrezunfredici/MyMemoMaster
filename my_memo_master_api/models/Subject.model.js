@@ -34,10 +34,8 @@ module.exports = (instance) => {
   )
 
   Subject.associate = (models) => {
-    Subject.belongsToMany(models.LeitnerSystem, {
-      through: 'systemSubject',
+    Subject.hasMany(models.LeitnerSystem, {
       foreignKey: 'subjectId',
-      otherKey: 'idSystem',
       as: 'leitnerSystems'
     })
 

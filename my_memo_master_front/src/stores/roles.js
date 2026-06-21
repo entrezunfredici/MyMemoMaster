@@ -66,7 +66,8 @@ export const useRoleStore = defineStore('roles', {
         async deleteRole(id) {
             const rolePayload = this.role
             await api.del(`roles/${id}`, rolePayload).then(resp => {
-                if (resp.status !== 204) {
+                // api.del retourne undefined quand le serveur répond 204 (no content)
+                if (resp !== undefined) {
                     notif.notify(resp.data?.message || 'Erreur lors de la suppression.', 'error')
                     return false
                 }

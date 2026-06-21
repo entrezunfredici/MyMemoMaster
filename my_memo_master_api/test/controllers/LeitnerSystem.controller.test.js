@@ -86,7 +86,7 @@ describe('LeitnerSystem Controller', () => {
         .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(200)
-      expect(leitnerSystemService.findBySubject).toHaveBeenCalledWith('1')
+      expect(leitnerSystemService.findBySubject).toHaveBeenCalledWith('1', 1)
     })
 
     it('404 — aucun système pour ce sujet', async () => {

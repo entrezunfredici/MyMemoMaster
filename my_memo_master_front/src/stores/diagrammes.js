@@ -66,7 +66,8 @@ export const useDiagrammeStore = defineStore('diagrammes', {
         async deleteDiagramme(id) {
             const diagrammePayload = this.diagramme
             await api.del(`diagrammes/${id}`, diagrammePayload).then(resp => {
-                if (resp.status !== 204) {
+                // api.del retourne undefined quand le serveur répond 204 (no content)
+                if (resp !== undefined) {
                     notif.notify(resp.data?.message || 'Erreur lors de la suppression.', 'error')
                     return false
                 }

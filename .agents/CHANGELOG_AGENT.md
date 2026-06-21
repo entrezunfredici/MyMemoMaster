@@ -1903,8 +1903,24 @@ npx sequelize-cli db:migrate --migration 20260615000001-change-reset-password-co
 
 **Dette / points d'attention :**
 - Édition des questions d'un exercice existant non implémentée — pour modifier les questions, supprimer et recréer l'exercice dans le MVP.
-- `testStore.deleteTest()` vérifie `status !== 200` mais l'API retourne 204 — bug préexistant dans le store, contourné dans ExercisesPage par un appel `api.del` direct.
+- ~~`testStore.deleteTest()` vérifie `status !== 200` mais l'API retourne 204~~ — corrigé en M-06.03-FIX.
 - La correction `open` est exacte — une correction tolérante (fautes de frappe, synonymes) nécessiterait le moteur Grading/Semantic existant.
+
+---
+
+### [M-06.03-FIX] — Correction bug deleteTest store (204 vs 200) — 2026-06-21
+
+**Contexte :** `api.del` retourne `undefined` (pas `{ data, status }`) quand le serveur répond 204 No Content. Tout store vérifiant `resp.status` sur une réponse 204 reçoit `undefined.status` → TypeError → catch → fausse erreur affiché à l'utilisateur, liste non rafraîchie.
+
+**Controllers retournant 204 sur DELETE :** Test, Diagramme, Role (les autres retournent 200).
+
+**Fichiers modifiés (Front) :**
+- `src/stores/tests.js` — `deleteTest` : `resp.status !== 204` → `resp !== undefined` (pattern correct pour 204) ; `fetchTests()` passé en `await` ; message notif harmonisé
+- `src/stores/diagrammes.js` — `deleteDiagramme` : `resp.status !== 204` → `resp !== undefined`
+- `src/stores/roles.js` — `deleteRole` : `resp.status !== 204` → `resp !== undefined`
+- `src/pages/ExercisesPage.vue` — suppression du contournement `api.del` direct dans `deleteTest()` ; branchement sur `testStore.deleteTest(test.testId)`
+
+**Dette résolue :** bug signalé dans M-06.01.
 
 ---
 

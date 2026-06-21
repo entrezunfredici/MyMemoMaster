@@ -80,12 +80,13 @@ export const useTestStore = defineStore('tests', {
     async deleteTest(id) {
       try {
         const resp = await api.del(`tests/${id}`)
-        if (resp.status !== 200) {
+        // api.del retourne undefined quand le serveur répond 204 (no content)
+        if (resp !== undefined) {
           notif.notify(resp.data?.message || 'Erreur lors de la suppression', 'error')
           return false
         }
-        notif.notify('Test supprimé avec succès', 'success')
-        this.fetchTests()
+        notif.notify('Exercice supprimé.', 'success')
+        await this.fetchTests()
         return true
       } catch (err) {
         notif.notify('Erreur lors de la suppression du test', 'error')

@@ -1,7 +1,9 @@
-const { LeitnerSystem, LeitnerBox, instance } = require('../../models/index')
+const { LeitnerSystem, LeitnerBox, Subject, instance } = require('../../models/index')
 const LeitnerSystemService = require('../../services/LeitnerSystem.service')
 
 const mockTransaction = { commit: jest.fn(), rollback: jest.fn() }
+
+const mockSubject = { subjectId: 1, name: 'Maths' }
 
 jest.mock('../../models/index', () => ({
   LeitnerSystem: {
@@ -14,10 +16,14 @@ jest.mock('../../models/index', () => ({
   LeitnerBox: {
     bulkCreate: jest.fn()
   },
+  LeitnerSystemsUsers: {},
+  Subject: {},
   instance: {
     transaction: jest.fn()
   }
 }))
+
+const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
 
 describe('LeitnerSystemService', () => {
   beforeEach(() => {
@@ -26,66 +32,74 @@ describe('LeitnerSystemService', () => {
     mockTransaction.rollback.mockResolvedValue()
   })
 
-  test('should retrieve all Leitner systems', async () => {
-    const mockLeitnerSystems = [
-      { idSystem: 1, name: 'Système Leitner Mathématiques', idUser: 1 },
-      { idSystem: 2, name: 'Système Leitner Physique', idUser: 2 }
+  test('findAll - userId valide - retourne les systèmes de l\'utilisateur', async () => {
+    const mockSystems = [
+      { idSystem: 1, name: 'Système Leitner Mathématiques', idUser: 1, subject: mockSubject },
+      { idSystem: 2, name: 'Système Leitner Physique', idUser: 1, subject: null }
     ]
-    LeitnerSystem.findAll.mockResolvedValue(mockLeitnerSystems)
+    LeitnerSystem.findAll.mockResolvedValue(mockSystems)
 
-    const systems = await LeitnerSystemService.findAll()
+    const systems = await LeitnerSystemService.findAll(1)
 
-    expect(LeitnerSystem.findAll).toHaveBeenCalledTimes(1)
-    expect(systems).toEqual(mockLeitnerSystems)
+    expect(LeitnerSystem.findAll).toHaveBeenCalledWith({
+      where: { idUser: 1 },
+      include: [SUBJECT_INCLUDE]
+    })
+    expect(systems).toEqual(mockSystems)
   })
 
-  test('should retrieve a Leitner system by ID', async () => {
-    const mockLeitnerSystem = {
-      idSystem: 1,
-      name: 'Système Leitner Mathématiques'
-    }
-    LeitnerSystem.findByPk.mockResolvedValue(mockLeitnerSystem)
+  test('findBySubject - subjectId + userId valides - retourne les systèmes filtrés', async () => {
+    const mockSystems = [
+      { idSystem: 1, name: 'Système Leitner Mathématiques', idUser: 1, subject: mockSubject }
+    ]
+    LeitnerSystem.findAll.mockResolvedValue(mockSystems)
+
+    const systems = await LeitnerSystemService.findBySubject(1, 1)
+
+    expect(LeitnerSystem.findAll).toHaveBeenCalledWith({
+      where: { subjectId: 1, idUser: 1 },
+      include: [SUBJECT_INCLUDE]
+    })
+    expect(systems).toEqual(mockSystems)
+  })
+
+  test('findOne - id valide - retourne le système avec le sujet inclus', async () => {
+    const mockSystem = { idSystem: 1, name: 'Système Leitner Mathématiques', subject: mockSubject }
+    LeitnerSystem.findByPk.mockResolvedValue(mockSystem)
 
     const system = await LeitnerSystemService.findOne(1)
 
-    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1)
-    expect(system).toEqual(mockLeitnerSystem)
+    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1, { include: [SUBJECT_INCLUDE] })
+    expect(system).toEqual(mockSystem)
   })
 
-  test('should retrieve Leitner systems by subject ID', async () => {
-    const mockLeitnerSystems = [
-      { idSystem: 1, name: 'Système Leitner Mathématiques', idMindMap: 10 }
-    ]
-    LeitnerSystem.findAll.mockResolvedValue(mockLeitnerSystems)
+  test('findOne - id inexistant - retourne null', async () => {
+    LeitnerSystem.findByPk.mockResolvedValue(null)
 
-    const systems = await LeitnerSystemService.findBySubject(10)
+    const system = await LeitnerSystemService.findOne(99)
 
-    expect(LeitnerSystem.findAll).toHaveBeenCalledWith({
-      where: { idMindMap: 10 }
-    })
-    expect(systems).toEqual(mockLeitnerSystems)
+    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(99, { include: [SUBJECT_INCLUDE] })
+    expect(system).toBeNull()
   })
 
-  test('should create a new Leitner system with 5 default boxes', async () => {
-    const mockLeitnerSystem = {
-      idSystem: 3,
-      name: 'Système Leitner Chimie',
-      idUser: 3,
-      idMindMap: null
-    }
+  test('create - données valides - crée le système avec 5 boîtes par défaut et retourne avec sujet', async () => {
+    const mockCreated = { idSystem: 3, name: 'Système Leitner Chimie', idUser: 3, subjectId: 1 }
+    const mockWithSubject = { ...mockCreated, subject: mockSubject }
+
     instance.transaction.mockResolvedValue(mockTransaction)
-    LeitnerSystem.create.mockResolvedValue(mockLeitnerSystem)
+    LeitnerSystem.create.mockResolvedValue(mockCreated)
     LeitnerBox.bulkCreate.mockResolvedValue([])
+    LeitnerSystem.findByPk.mockResolvedValue(mockWithSubject)
 
     const system = await LeitnerSystemService.create({
       name: 'Système Leitner Chimie',
       idUser: 3,
-      idMindMap: null
+      subjectId: 1
     })
 
     expect(instance.transaction).toHaveBeenCalled()
     expect(LeitnerSystem.create).toHaveBeenCalledWith(
-      { name: 'Système Leitner Chimie', idUser: 3, idMindMap: null },
+      { name: 'Système Leitner Chimie', idUser: 3, subjectId: 1 },
       { transaction: mockTransaction }
     )
     expect(LeitnerBox.bulkCreate).toHaveBeenCalledWith(
@@ -97,29 +111,41 @@ describe('LeitnerSystemService', () => {
       expect.anything()
     )
     expect(mockTransaction.commit).toHaveBeenCalled()
-    expect(system).toEqual(mockLeitnerSystem)
+    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(3, { include: [SUBJECT_INCLUDE] })
+    expect(system).toEqual(mockWithSubject)
   })
 
-  test('should update a Leitner system if the user has the right', async () => {
-    const mockLeitnerSystem = { idSystem: 1, idUser: 2, update: jest.fn() }
-    LeitnerSystem.findByPk.mockResolvedValue(mockLeitnerSystem)
+  test('create - erreur DB - rollback et propage l\'erreur', async () => {
+    instance.transaction.mockResolvedValue(mockTransaction)
+    LeitnerSystem.create.mockRejectedValue(new Error('DB error'))
+
+    await expect(
+      LeitnerSystemService.create({ name: 'Test', idUser: 1, subjectId: null })
+    ).rejects.toThrow('DB error')
+
+    expect(mockTransaction.rollback).toHaveBeenCalled()
+    expect(mockTransaction.commit).not.toHaveBeenCalled()
+  })
+
+  test('update - utilisateur propriétaire - met à jour et retourne true', async () => {
+    const mockSystem = { idSystem: 1, idUser: 2, update: jest.fn() }
+    LeitnerSystem.findByPk.mockResolvedValue(mockSystem)
 
     const result = await LeitnerSystemService.update({
       idSystem: 1,
       idUser: 2,
-      name: 'Système mis à jour'
+      name: 'Système mis à jour',
+      subjectId: 1
     })
 
     expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1)
-    expect(mockLeitnerSystem.update).toHaveBeenCalledWith({
-      name: 'Système mis à jour'
-    })
+    expect(mockSystem.update).toHaveBeenCalledWith({ name: 'Système mis à jour', subjectId: 1 })
     expect(result).toBe(true)
   })
 
-  test('should not update a Leitner system if the user has no rights', async () => {
-    const mockLeitnerSystem = { idSystem: 1, idUser: 3, update: jest.fn() }
-    LeitnerSystem.findByPk.mockResolvedValue(mockLeitnerSystem)
+  test('update - utilisateur non propriétaire - ne met pas à jour et retourne false', async () => {
+    const mockSystem = { idSystem: 1, idUser: 3, update: jest.fn() }
+    LeitnerSystem.findByPk.mockResolvedValue(mockSystem)
 
     const result = await LeitnerSystemService.update({
       idSystem: 1,
@@ -128,29 +154,29 @@ describe('LeitnerSystemService', () => {
     })
 
     expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1)
-    expect(mockLeitnerSystem.update).not.toHaveBeenCalled()
+    expect(mockSystem.update).not.toHaveBeenCalled()
     expect(result).toBe(false)
   })
 
-  test('should delete a Leitner system if the user has rights', async () => {
-    const mockLeitnerSystem = { idSystem: 1, idUser: 2, destroy: jest.fn() }
-    LeitnerSystem.findByPk.mockResolvedValue(mockLeitnerSystem)
+  test('delete - utilisateur propriétaire - supprime et retourne true', async () => {
+    const mockSystem = { idSystem: 1, idUser: 2, destroy: jest.fn() }
+    LeitnerSystem.findByPk.mockResolvedValue(mockSystem)
 
     const result = await LeitnerSystemService.delete(1, 2)
 
     expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1)
-    expect(mockLeitnerSystem.destroy).toHaveBeenCalledTimes(1)
+    expect(mockSystem.destroy).toHaveBeenCalledTimes(1)
     expect(result).toBe(true)
   })
 
-  test('should not delete a Leitner system if the user has no rights', async () => {
-    const mockLeitnerSystem = { idSystem: 1, idUser: 3, destroy: jest.fn() }
-    LeitnerSystem.findByPk.mockResolvedValue(mockLeitnerSystem)
+  test('delete - utilisateur non propriétaire - ne supprime pas et retourne false', async () => {
+    const mockSystem = { idSystem: 1, idUser: 3, destroy: jest.fn() }
+    LeitnerSystem.findByPk.mockResolvedValue(mockSystem)
 
     const result = await LeitnerSystemService.delete(1, 2)
 
     expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1)
-    expect(mockLeitnerSystem.destroy).not.toHaveBeenCalled()
+    expect(mockSystem.destroy).not.toHaveBeenCalled()
     expect(result).toBe(false)
   })
 })

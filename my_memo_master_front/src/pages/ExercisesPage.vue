@@ -549,12 +549,6 @@ async function submitExercise() {
 
 async function deleteTest(test) {
   if (!confirm(`Supprimer l'exercice "${test.name}" ?`)) return
-  const resp = await api.del(`tests/${test.testId}`)
-  if (!resp || resp.status !== 204) {
-    notif.notify(resp?.data?.message || 'Erreur lors de la suppression.', 'error')
-    return
-  }
-  notif.notify('Exercice supprimé.', 'success')
-  await testStore.fetchTests()
+  await testStore.deleteTest(test.testId)
 }
 </script>
