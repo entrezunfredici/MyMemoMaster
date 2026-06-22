@@ -16,4 +16,11 @@ exports.create = [
     .withMessage('subjectId doit être un entier positif')
 ]
 
-exports.update = [mmNameRules, mindMapJsonRules]
+exports.update = [
+  mmNameRules,
+  mindMapJsonRules,
+  body('subjectId')
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage('subjectId doit être un entier positif')
+]

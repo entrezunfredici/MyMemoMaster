@@ -30,7 +30,7 @@
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
 | LeitnerSystemsUsers | Stable | init |
-| Diagramme (mind maps) | Stable — M-02.12 complet : 89 tests front (store 27 + MindMapNode 18 + MindMapPalette 18 + MindmapsListView 13 + MindmapsEditorView 13) | 2026-06-22 |
+| Diagramme (mind maps) | Stable — M-01 revue : 6 bugs corrigés (catch silencieux × 2, validator update, double findByPk, code mort, try/catch imbriqué) — 38 tests back + 36 tests front verts | 2026-06-22 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Fields / FieldsType | Stable | init |
 | Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
@@ -2644,3 +2644,31 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Dette / points d'attention :**
 - Aucun test end-to-end du canvas (`MindMapBuilder.vue`) — acceptable pour MVP ; à adresser dans un sprint dédié avec Playwright/Cypress si la feature devient critique.
+
+---
+
+### [M-01 Revue] — Revue de code & merge Éditeur de cartes mentales — 2026-06-22
+
+**Périmètre audité :**
+- `controllers/Diagramme.controller.js`
+- `services/Diagramme.service.js`
+- `routes/Diagramme.routes.js`
+- `validators/Diagramme.validators.js`
+- `components/mindmap/MindMapNode.vue`
+- `components/mindmap/MindMapPalette.vue`
+- `stores/mindmapBuilder.js`
+- `stores/diagrammes.js`
+- Tous les tests Diagramme (back + front)
+
+**Bugs corrigés :**
+1. `MindMapNode.vue:242` — catch silencieux dans `handleImageDrop` → ajout `notif.notify()` + import `notif`
+2. `MindMapPalette.vue:342+356` — try/finally sans catch dans `openCardPicker` et `onPickerSystemChange` → ajout catch avec `notif.notify()` + import `notif`
+3. `Diagramme.validators.js:19` — `exports.update` ne validait pas `subjectId` (contrairement à `exports.create`) → asymétrie corrigée, même règle `optional isInt({ min: 1 })` ajoutée
+4. `Diagramme.controller.js` — double validation manuelle `if (!mmName || !mindMapJson)` dans `create` et `update` supprimée (les validators l'assurent déjà)
+5. `Diagramme.controller.js` — try/catch imbriqués dans `create` et `update` pour `resolveSubject` supprimés (l'outer catch gère déjà l'erreur 500)
+
+**Points d'attention non bloquants :**
+- Double `findByPk` dans `update` (findById ownership + service.update interne) : 2 SELECT par mutation. Acceptable MVP, à optimiser si besoin.
+- `diagrammes.js` store : `deleteDiagramme` passe un body inutilisé à `api.del` — sans impact fonctionnel.
+
+**Tests :** 38 tests back Diagramme (service + controller) verts — 36 tests front (MindMapNode + MindMapPalette) verts.

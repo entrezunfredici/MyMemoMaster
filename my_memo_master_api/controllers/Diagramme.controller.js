@@ -38,19 +38,7 @@ exports.create = async (req, res) => {
     let { mmName, mindMapJson, subjectId } = req.body
     const userId = req.user.id
 
-    if (!mmName || !mindMapJson) {
-      return res.status(400).json({ message: 'Les champs mmName et mindMapJson sont requis.' })
-    }
-
-    try {
-      subjectId = await DiagrammeService.resolveSubject(subjectId)
-    } catch (err) {
-      logger.error(err?.message || err)
-      return res
-        .status(500)
-        .json({ message: 'Impossible de résoudre le sujet associé à la carte mentale.' })
-    }
-
+    subjectId = await DiagrammeService.resolveSubject(subjectId)
     const data = await DiagrammeService.create({ mmName, mindMapJson, userId, subjectId })
     res.status(201).json(data)
   } catch (error) {
@@ -64,10 +52,6 @@ exports.update = async (req, res) => {
     const { id } = req.params
     const { mmName, mindMapJson, subjectId } = req.body
 
-    if (!mmName || !mindMapJson) {
-      return res.status(400).json({ message: 'Les champs mmName et mindMapJson sont requis.' })
-    }
-
     const existing = await DiagrammeService.findById(id)
     if (!existing) {
       return res.status(404).json({ message: `Diagramme avec l'ID ${id} non trouvé.` })
@@ -78,12 +62,7 @@ exports.update = async (req, res) => {
 
     let resolvedSubjectId = existing.subjectId
     if (subjectId && Number(subjectId) !== existing.subjectId) {
-      try {
-        resolvedSubjectId = await DiagrammeService.resolveSubject(Number(subjectId))
-      } catch (err) {
-        logger.error(err?.message || err)
-        return res.status(500).json({ message: 'Impossible de résoudre le sujet associé.' })
-      }
+      resolvedSubjectId = await DiagrammeService.resolveSubject(Number(subjectId))
     }
 
     const updatedDiagramme = await DiagrammeService.update(id, {

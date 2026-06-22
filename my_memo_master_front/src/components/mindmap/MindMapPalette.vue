@@ -271,6 +271,7 @@ import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { masteryList, boxColorToHex, boxLevelToMastery } from '@/helpers/mindmap';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
+import { notif } from '@/helpers/notif';
 import Interpreter from '@/components/interpreter/Interpreter.vue';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
 
@@ -341,6 +342,9 @@ const openCardPicker = async () => {
   try {
     const res = await api.get('leitnersystems/');
     pickerSystems.value = res?.data || [];
+  } catch {
+    notif.notify('Impossible de charger les systèmes Leitner.', 'error');
+    showCardPicker.value = false;
   } finally {
     pickerLoading.value = false;
   }
@@ -355,6 +359,8 @@ const onPickerSystemChange = async (systemId) => {
   try {
     const res = await api.get(`leitnercards/system/${systemId}`);
     pickerCards.value = res?.data || [];
+  } catch {
+    notif.notify('Impossible de charger les cartes de ce système.', 'error');
   } finally {
     pickerLoading.value = false;
   }

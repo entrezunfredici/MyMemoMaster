@@ -127,6 +127,7 @@ import { getNodeLabel } from '@/helpers/mindmapCreation';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
+import { notif } from '@/helpers/notif';
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -239,7 +240,9 @@ const handleImageDrop = async (event) => {
       catch { imageUrl = payload.path; }
     }
     if (imageUrl) store.updateNode(props.node.id, { content: imageUrl });
-  } catch { /* silent */ }
+  } catch {
+    notif.notify("L'image n'a pas pu être téléchargée.", 'error');
+  }
 };
 
 const handlePointerDown = (event) => {
