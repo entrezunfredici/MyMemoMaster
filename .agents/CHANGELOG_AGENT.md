@@ -30,7 +30,7 @@
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
 | LeitnerSystemsUsers | Stable | init |
-| Diagramme (mind maps) | Stable — M-01 complet : panneau styles, liaison flashcard, drag-drop, formule via interpréteur, tests Vitest (63 tests) | 2026-06-22 |
+| Diagramme (mind maps) | Stable — M-02.12 complet : 89 tests front (store 27 + MindMapNode 18 + MindMapPalette 18 + MindmapsListView 13 + MindmapsEditorView 13) | 2026-06-22 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Fields / FieldsType | Stable | init |
 | Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
@@ -68,7 +68,7 @@
 | Front — FlashcardsPage | Stable — refactor : utilise ItemListLayout.vue, chrome dupliqué supprimé | 2026-06-21 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.08/M-06.09 : créateur + éditeur + player (4 types) + correction server-side + scores/historique livrés | 2026-06-21 |
 | Front — ItemListLayout.vue | Stable — composant layout partagé (recherche, filtre sujet, grille, états) | 2026-06-21 |
-| Front — MindmapsPage | Stable | init |
+| Front — MindmapsPage (+ MindmapsListView + MindmapsEditorView) | Stable — M-02.12 : MindmapsPage refactorisée en coordinateur 52 lignes + 2 vues filles testées | 2026-06-22 |
 | Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
 | Front — CalendarPage | Stable — M-03.07/M-03.08 : calendrier interactif + sidebar onglets Agenda/To-do | 2026-06-13 |
 | Front — M-03.09 Rappels in-app | Stable — Nav /calendar + /todo, NotificationBell polling 5 min | 2026-06-13 |
@@ -2497,3 +2497,150 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 **Dette / points d'attention :**
 - Aucun test pour `MindMapBoard.vue` (gestion pointer events, drag threshold, pan) — la logique est principalement de la manipulation d'événements DOM + Pinia, ce qui nécessiterait des tests d'intégration plus lourds.
 - Undo/redo : l'objet `history` existe dans le store mais les actions `undo`/`redo` ne sont pas câblées — aucun test écrit pour ces actions inexistantes.
+
+---
+
+### [M-02.09] — Navigation par matière / chapitre (mind maps) — 2026-06-22
+
+**Fichiers modifiés :**
+- `my_memo_master_api/services/Diagramme.service.js` — `findByUser(userId, { subjectId } = {})` : ajout filtre optionnel `WHERE subjectId = X` via Sequelize
+- `my_memo_master_api/controllers/Diagramme.controller.js` — `findAll` : extraction `req.query.subjectId` → `Number(subjectId)` transmis à `findByUser` ; `update` : extraction `subjectId` du body + appel `resolveSubject()` si le sujet a changé (le champ était ignoré — bug)
+- `my_memo_master_front/src/pages/MindmapsPage.vue` — ajout `showCreateModal`, `createName`, `createSubjectId` ; `createNew()` ouvre une modale au lieu d'aller directement en éditeur ; `confirmCreate()` initialise `currentDiagramMeta` avec le bon `subjectId` ; `openRenameModal()` charge `editedSubjectId` ; `confirmRename()` envoie et persiste `subjectId` ; ajout select matière dans les 3 modaux (créer, renommer, export)
+
+**Ce qui est utilisable :**
+- `GET /api/v1/diagrammes?subjectId=2` — retourne les cartes de la matière 2 uniquement
+- `PUT /api/v1/diagrammes/:id` avec `{ subjectId }` — le sujet est maintenant correctement mis à jour (était ignoré avant)
+- Modale de création avec choix de la matière
+- Modale de renommage avec modification de la matière
+- Modale d'export avec sélection de matière
+
+**Hypothèses posées :**
+- `subjectId: null` dans le body d'un PUT conserve le sujet existant (condition `if (subjectId && ...)` dans le controller).
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [M-02.10] — Sauvegarde auto et conflits (mind maps) — 2026-06-22
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/pages/MindmapsPage.vue` (avant refacto) → `src/components/mindmap/MindmapsEditorView.vue` (après refacto) :
+  - Ajout `AUTO_SAVE_RETRY_DELAY = 5000`, `AUTO_SAVE_MAX_RETRY = 3`, `autoSaveRetryCount`, `saveHasFailed`
+  - `scheduleAutoSave()` réinitialise `autoSaveRetryCount` et `saveHasFailed` à chaque nouvelle modification
+  - Catch `performAutoSave` : incrémente `autoSaveRetryCount`, toast warning au 1er échec, schedule retry (×3 max), toast error final
+  - Succès des branches PUT et POST : reset `autoSaveRetryCount` et `saveHasFailed`
+  - `handleBeforeUnload` : `event.preventDefault()` + `event.returnValue = ''` si `isDirty`
+  - `onMounted` : enregistre `beforeunload` ; `onBeforeUnmount` : retire le listener
+  - Topbar : indicateur `⚠ Connexion perdue — réessai en cours…` (rouge) affiché en cas d'erreur réseau
+
+**Ce qui est utilisable :**
+- Fermeture d'onglet avec modifications non sauvegardées → dialog native du navigateur "Quitter le site ?"
+- Échec réseau → 3 tentatives automatiques à 5 s d'intervalle, toast warning au 1er, toast error après épuisement
+- Indicateur rouge dans la topbar pendant les tentatives de rattrapage
+
+**Hypothèses posées :**
+- L'auto-save n'est pas du polling — c'est un push débounçé déclenché par `map.updatedAt` via un watcher Vue. WebSockets non retenus (mono-utilisateur, OUT du périmètre MVP).
+
+**Dette / points d'attention :**
+- Conflit multi-onglets et versioning serveur hors périmètre MVP (nécessite collaboration temps réel).
+
+---
+
+### [M-02.11] — Tests unitaires back (mind maps) — 2026-06-22
+
+**Fichiers modifiés :**
+- `my_memo_master_api/test/services/Diagramme.service.test.js` — ajout mock `Subject` (`findByPk`, `findOrCreate`) ; 5 nouveaux tests : `findByUser` sans filtre, `findByUser` avec `subjectId`, `resolveSubject` (sujet valide, null → sujet par défaut, subjectId inexistant → sujet par défaut)
+- `my_memo_master_api/test/controllers/Diagramme.controller.test.js` — correction assertion `findByUser` (signature mise à jour : `(userId, { subjectId })` depuis M-02.09) ; 4 nouveaux tests : `GET /diagrammes?subjectId=2`, `POST /diagrammes` avec `resolveSubject` KO → 500, `PUT /diagrammes/:id` avec changement de `subjectId` → `resolveSubject` appelé avec la nouvelle valeur
+
+**Résultat :** 38/38 tests passent (service : 7→12, controller : 23→27, dont 1 fix de régression)
+
+**Régression corrigée :**
+- `GET /diagrammes 200 — retourne les diagrammes de l'utilisateur` : assertion `findByUser(1)` → `findByUser(1, { subjectId: undefined })` (signature étendue en M-02.09, test non mis à jour)
+
+**Ce qui est couvert :**
+- `DiagrammeService.findByUser` : sans filtre (WHERE userId), avec filtre (WHERE userId + subjectId)
+- `DiagrammeService.resolveSubject` : cas nominal, null, subjectId inexistant
+- `Diagramme.controller.findAll` : filtrage par `?subjectId`
+- `Diagramme.controller.create` : `resolveSubject` KO → 500
+- `Diagramme.controller.update` : changement de sujet → `resolveSubject` appelé avec la nouvelle valeur
+
+**Hypothèses posées :**
+- Aucune.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [REF] — Découpage MindmapsPage en vue liste + vue éditeur — 2026-06-22
+
+**Fichiers créés :**
+- `my_memo_master_front/src/components/mindmap/MindmapsListView.vue` — vue liste : fetch diagrammes, filtrage (recherche + matière), modaux créer/renommer, suppression confirmée, émets `@open(diagram)` et `@create({ name, subjectId })`
+- `my_memo_master_front/src/components/mindmap/MindmapsEditorView.vue` — vue éditeur : topbar (nom + indicateur sauvegarde), canvas `MindMapBuilder`, auto-save complet (retry + beforeunload + saveHasFailed), modal export, émets `@back`
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/pages/MindmapsPage.vue` — réduit à 52 lignes : coordinateur léger (state `view`, `editorDiagramId/Meta/Payload`, `subjects`) ; délègue à `MindmapsListView` et `MindmapsEditorView` via événements
+
+**Résultat :**
+
+| Fichier | Lignes avant | Lignes après | Responsabilité |
+|---------|-------------|-------------|----------------|
+| `MindmapsPage.vue` | 640 | 52 | Coordinateur : navigation, sujets |
+| `MindmapsListView.vue` | — | 148 | Liste, CRUD, modaux |
+| `MindmapsEditorView.vue` | — | 210 | Topbar, canvas, auto-save |
+
+**Architecture de communication :**
+- `MindmapsListView` émet `@open(diagram)` et `@create({ name, subjectId })`
+- `MindmapsEditorView` émet `@back`
+- `MindmapsPage` passe `subjects` aux deux composants et orchestre les transitions
+- Le `v-if` sur `MindmapsListView` la détruit/recrée à chaque retour de l'éditeur → `onMounted` refetch automatiquement, liste toujours fraîche
+
+**Hypothèses posées :**
+- Les vues sont placées dans `src/components/mindmap/` (feature folder) et non dans `src/pages/` — elles ne sont pas des routes routées directement.
+
+**Dette / points d'attention :**
+- Aucun test Vitest pour `MindmapsListView` et `MindmapsEditorView` — couverture par tests existants du store + des sous-composants (`MindMapNode`, `MindMapPalette`).
+
+---
+
+### [FIX] — Positions des nœuds non sauvegardées après déplacement — 2026-06-22
+
+**Fichier modifié :**
+- `my_memo_master_front/src/stores/mindmapBuilder.js` — action `load()` : suppression de `applyRadialLayout()` appliqué inconditionnellement ; remplacé par une détection de la présence de positions sauvegardées : si au moins un nœud non-sujet a `|x| > 1` ou `|y| > 1`, les positions du JSON sont utilisées telles quelles ; sinon `applyRadialLayout()` est appliqué comme fallback (cartes sans layout, vieux format)
+
+**Cause :**
+- `load(raw)` appelait `applyRadialLayout(normalizeMindMap(raw))` systématiquement. `applyRadialLayout` recalcule toutes les positions `x/y` depuis zéro. Les positions sauvegardées via `serializeMindMap` (deep clone complet) étaient correctement persistées en base mais écrasées à la réouverture.
+
+**Ce qui est corrigé :**
+- Déplacer un nœud → auto-save 1 500 ms → position persistée en base → réouverture → position restaurée
+
+**Hypothèses posées :**
+- Le seuil `> 1` (plutôt que `!= 0`) couvre les cartes qui auraient des positions fractionnaires proches de zéro sans être intentionnellement positionnées à l'origine.
+- `applyRadialLayout` reste actif pour les cartes sans aucune position (vieux format de données, nouvelle carte vide).
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [M-02.12] — Tests fonctionnels front — Éditeur de cartes mentales — 2026-06-22
+
+**Fichiers créés :**
+- `my_memo_master_front/test/components/MindmapsListView.test.js` — 13 tests : fetch + badge matière + toast erreur + @open + modale création (ouvrir / pré-remplir / select matières / soumettre / Annuler) + modale renommage (pré-remplir / api.put / mise à jour locale) + suppression (api.del / window.confirm false)
+- `my_memo_master_front/test/components/MindmapsEditorView.test.js` — 13 tests : topbar nom / "Nouvelle carte" / "Sauvegardé ✓" isDirty=false / absence indicateur isDirty=true + @back + modale export (@export / pré-remplir nom / liste matières / Annuler / api.put carte existante / api.post nouvelle carte) + "Sauvegarde…" pendant PUT en cours + toast erreur sauvegarde manuelle
+
+**Ce qui est utilisable :**
+- Suite de tests front mind map complète : 89/89 verts
+  - `mindmapBuilder.store.test.js` : 27 tests (store, actions)
+  - `MindMapNode.test.js` : 18 tests (sous-composant nœud SVG)
+  - `MindMapPalette.test.js` : 18 tests (sous-composant palette)
+  - `MindmapsListView.test.js` : 13 tests (flux liste CRUD)
+  - `MindmapsEditorView.test.js` : 13 tests (flux éditeur, autosave indicators)
+
+**Hypothèses posées :**
+- `MindMapBuilder.vue` (canvas SVG, pointer events, drag-and-drop) n'est pas testé directement — trop couplé aux événements pointeur du navigateur. Les tests le stubbent et vérifient que le composant parent réagit correctement à ses événements (@save, @export, @new-map).
+- `window.confirm` est mocké (`vi.spyOn`) pour les tests de suppression.
+
+**Dette / points d'attention :**
+- Aucun test end-to-end du canvas (`MindMapBuilder.vue`) — acceptable pour MVP ; à adresser dans un sprint dédié avec Playwright/Cypress si la feature devient critique.

@@ -63,7 +63,18 @@ describe('Diagramme Controller', () => {
 
       expect(res.status).toBe(200)
       expect(res.body).toHaveLength(1)
-      expect(diagrammeService.findByUser).toHaveBeenCalledWith(1)
+      expect(diagrammeService.findByUser).toHaveBeenCalledWith(1, { subjectId: undefined })
+    })
+
+    it('200 — filtre par subjectId quand le paramètre est fourni', async () => {
+      diagrammeService.findByUser.mockResolvedValue([mockDiagramme])
+
+      const res = await request(app)
+        .get(`${BASE}/diagrammes?subjectId=2`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(diagrammeService.findByUser).toHaveBeenCalledWith(1, { subjectId: 2 })
     })
 
     it('200 — liste vide', async () => {
@@ -189,6 +200,17 @@ describe('Diagramme Controller', () => {
       expect(res.status).toBe(400)
     })
 
+    it('500 — resolveSubject échoue', async () => {
+      diagrammeService.resolveSubject.mockRejectedValue(new Error('Subject error'))
+
+      const res = await request(app)
+        .post(`${BASE}/diagrammes`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(validBody)
+
+      expect(res.status).toBe(500)
+    })
+
     it('401 — pas de token', async () => {
       const res = await request(app).post(`${BASE}/diagrammes`).send(validBody)
 
@@ -208,6 +230,21 @@ describe('Diagramme Controller', () => {
         .send({ mmName: 'Mis à jour', mindMapJson: '{"updated":true}' })
 
       expect(res.status).toBe(200)
+    })
+
+    it('200 — met à jour le subjectId quand il change', async () => {
+      diagrammeService.findById.mockResolvedValue({ ...mockDiagramme, userId: 1, subjectId: 1 })
+      diagrammeService.resolveSubject.mockResolvedValue(2)
+      diagrammeService.update.mockResolvedValue({ ...mockDiagramme, subjectId: 2 })
+
+      const res = await request(app)
+        .put(`${BASE}/diagrammes/1`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+        .send({ mmName: 'Mind Map Maths', mindMapJson: '{}', subjectId: 2 })
+
+      expect(res.status).toBe(200)
+      expect(diagrammeService.resolveSubject).toHaveBeenCalledWith(2)
+      expect(diagrammeService.update).toHaveBeenCalledWith('1', expect.objectContaining({ subjectId: 2 }))
     })
 
     it('403 — non propriétaire', async () => {

@@ -38,8 +38,14 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
   },
   actions: {
     load(raw) {
-      const normalized = applyRadialLayout(normalizeMindMap(raw));
-      this.map = normalized;
+      const normalized = normalizeMindMap(raw);
+      const nonSubjectNodes = Object.values(normalized.nodes).filter(
+        (n) => n.id !== normalized.subjectNodeId
+      );
+      const hasLayout = nonSubjectNodes.some(
+        (n) => Math.abs(n.layout?.x ?? 0) > 1 || Math.abs(n.layout?.y ?? 0) > 1
+      );
+      this.map = hasLayout ? normalized : applyRadialLayout(normalized);
       this.resetSelection();
       this.isDirty = false;
       this.syncCardMasteries();
