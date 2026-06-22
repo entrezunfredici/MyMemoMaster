@@ -9,8 +9,10 @@ class DiagrammeService {
     return await Diagramme.findAll()
   }
 
-  async findByUser(userId) {
-    return await Diagramme.findAll({ where: { userId } })
+  async findByUser(userId, { subjectId } = {}) {
+    const where = { userId }
+    if (subjectId) where.subjectId = subjectId
+    return await Diagramme.findAll({ where })
   }
 
   async findOne(id) {

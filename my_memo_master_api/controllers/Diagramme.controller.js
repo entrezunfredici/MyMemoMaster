@@ -4,7 +4,10 @@ const logger = require('../helpers/logger')
 
 exports.findAll = async (req, res) => {
   try {
-    const responses = await DiagrammeService.findByUser(req.user.id)
+    const { subjectId } = req.query
+    const responses = await DiagrammeService.findByUser(req.user.id, {
+      subjectId: subjectId ? Number(subjectId) : undefined,
+    })
     res.status(200).json(responses)
   } catch (error) {
     logger.error(error?.message || error)
@@ -59,7 +62,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params
-    const { mmName, mindMapJson } = req.body
+    const { mmName, mindMapJson, subjectId } = req.body
 
     if (!mmName || !mindMapJson) {
       return res.status(400).json({ message: 'Les champs mmName et mindMapJson sont requis.' })
@@ -73,7 +76,21 @@ exports.update = async (req, res) => {
       return res.status(403).json({ message: 'Accès refusé.' })
     }
 
-    const updatedDiagramme = await DiagrammeService.update(id, { mmName, mindMapJson })
+    let resolvedSubjectId = existing.subjectId
+    if (subjectId && Number(subjectId) !== existing.subjectId) {
+      try {
+        resolvedSubjectId = await DiagrammeService.resolveSubject(Number(subjectId))
+      } catch (err) {
+        logger.error(err?.message || err)
+        return res.status(500).json({ message: 'Impossible de résoudre le sujet associé.' })
+      }
+    }
+
+    const updatedDiagramme = await DiagrammeService.update(id, {
+      mmName,
+      mindMapJson,
+      subjectId: resolvedSubjectId,
+    })
     res.status(200).json(updatedDiagramme)
   } catch (error) {
     logger.error(error?.message || error)

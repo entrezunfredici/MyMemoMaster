@@ -50,9 +50,15 @@ const pendingCreate = ref(false)
 const AUTO_SAVE_DELAY = 1500
 let autoSaveTimer = null
 
+// ── Modal créer ───────────────────────────────────────────────────────────────
+const showCreateModal = ref(false)
+const createName = ref('Nouvelle carte mentale')
+const createSubjectId = ref(null)
+
 // ── Modal renommer ────────────────────────────────────────────────────────────
 const showRenameModal = ref(false)
 const editedName = ref('')
+const editedSubjectId = ref(null)
 const currentEditId = ref(null)
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -86,11 +92,19 @@ const openDiagram = (diagram) => {
 }
 
 const createNew = () => {
+  createName.value = 'Nouvelle carte mentale'
+  createSubjectId.value = subjects.value[0]?.subjectId || null
+  showCreateModal.value = true
+}
+
+const confirmCreate = () => {
+  showCreateModal.value = false
+  const name = createName.value.trim() || 'Nouvelle carte mentale'
   currentDiagramId.value = null
-  currentDiagramMeta.value = null
+  currentDiagramMeta.value = { mmName: name, subjectId: createSubjectId.value || 1 }
   currentMapPayload.value = null
-  exportName.value = ''
-  mindmapStore.new('Nouvelle carte mentale')
+  exportName.value = name
+  mindmapStore.new(name)
   view.value = 'editor'
 }
 
@@ -103,6 +117,7 @@ const backToList = () => {
 const openRenameModal = (diagram) => {
   currentEditId.value = diagram.idMindMap
   editedName.value = diagram.mmName
+  editedSubjectId.value = diagram.subjectId
   showRenameModal.value = true
 }
 
@@ -110,21 +125,24 @@ const confirmRename = async () => {
   try {
     const diagram = diagrams.value.find((d) => d.idMindMap === currentEditId.value)
     if (!diagram) return
+    const newSubjectId = editedSubjectId.value || diagram.subjectId
     const response = await api.put(`/diagrammes/${currentEditId.value}`, {
       mmName: editedName.value,
       mindMapJson: diagram.mindMapJson,
-      subjectId: diagram.subjectId,
+      subjectId: newSubjectId,
     })
     if (response) {
-      toast.success('Carte renommée.')
+      toast.success('Carte modifiée.')
       diagram.mmName = editedName.value
+      diagram.subjectId = newSubjectId
       if (currentDiagramMeta.value?.idMindMap === diagram.idMindMap) {
         currentDiagramMeta.value.mmName = editedName.value
+        currentDiagramMeta.value.subjectId = newSubjectId
       }
     }
     showRenameModal.value = false
   } catch {
-    toast.error('Erreur lors du renommage.')
+    toast.error('Erreur lors de la modification.')
   }
 }
 
@@ -370,10 +388,46 @@ onBeforeUnmount(() => {
       </MenuItem>
 
       <template #modals>
+        <!-- Modal créer -->
+        <div v-if="showCreateModal" class="modal-overlay" @click="showCreateModal = false">
+          <div class="modal-panel" @click.stop>
+            <button @click="showCreateModal = false" class="modal-close">&times;</button>
+            <h2 class="modal-title">Nouvelle carte mentale</h2>
+            <form @submit.prevent="confirmCreate">
+              <div class="mb-4">
+                <label class="form-label">Nom</label>
+                <input
+                  v-model="createName"
+                  type="text"
+                  class="form-input"
+                  required
+                  autofocus
+                />
+              </div>
+              <div class="mb-4">
+                <label class="form-label">Matière</label>
+                <select v-model="createSubjectId" class="form-input">
+                  <option :value="null">— Aucune matière —</option>
+                  <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">
+                    {{ s.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="btn-row">
+                <button type="submit" class="btn-modal-submit">Créer</button>
+                <button type="button" @click="showCreateModal = false" class="btn-modal-cancel">
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal renommer -->
         <div v-if="showRenameModal" class="modal-overlay" @click="showRenameModal = false">
           <div class="modal-panel" @click.stop>
             <button @click="showRenameModal = false" class="modal-close">&times;</button>
-            <h2 class="modal-title">Renommer la carte</h2>
+            <h2 class="modal-title">Modifier la carte</h2>
             <form @submit.prevent="confirmRename">
               <div class="mb-4">
                 <label class="form-label">Nom</label>
@@ -384,6 +438,15 @@ onBeforeUnmount(() => {
                   required
                   autofocus
                 />
+              </div>
+              <div class="mb-4">
+                <label class="form-label">Matière</label>
+                <select v-model="editedSubjectId" class="form-input">
+                  <option :value="null">— Aucune matière —</option>
+                  <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">
+                    {{ s.name }}
+                  </option>
+                </select>
               </div>
               <div class="btn-row">
                 <button type="submit" class="btn-modal-submit">Valider</button>
@@ -421,11 +484,11 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Modal nom (première création) -->
+    <!-- Modal nom (première création / export) -->
     <div v-if="showExportModal" class="modal-overlay" @click="showExportModal = false">
       <div class="modal-panel" @click.stop>
         <button @click="showExportModal = false" class="modal-close">&times;</button>
-        <h2 class="modal-title">Nom de la carte mentale</h2>
+        <h2 class="modal-title">Enregistrer la carte mentale</h2>
         <form @submit.prevent="confirmExportModal">
           <div class="mb-4">
             <label class="form-label">Nom</label>
@@ -436,6 +499,19 @@ onBeforeUnmount(() => {
               required
               autofocus
             />
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Matière</label>
+            <select
+              :value="currentDiagramMeta?.subjectId"
+              @change="currentDiagramMeta && (currentDiagramMeta.subjectId = Number($event.target.value) || null)"
+              class="form-input"
+            >
+              <option :value="null">— Aucune matière —</option>
+              <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">
+                {{ s.name }}
+              </option>
+            </select>
           </div>
           <div class="btn-row">
             <button type="submit" :disabled="isExporting" class="btn-modal-submit">
