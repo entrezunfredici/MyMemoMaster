@@ -14,6 +14,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
   state: () => ({
     map: createBlankMindMap(),
     tool: defaultTool,
+    nodeType: 'text', // 'text' | 'formula' | 'image'
     selectedNodeIds: [],
     selectedLinkId: null,
     pendingLinkSource: null,
@@ -51,6 +52,9 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       if (tool !== 'link') {
         this.pendingLinkSource = null;
       }
+    },
+    setNodeType(type) {
+      this.nodeType = type;
     },
     selectNode(id, additive = false) {
       if (!id) {

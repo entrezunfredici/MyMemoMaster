@@ -1,0 +1,83 @@
+# =============================================================================
+#  Ingress MyMemoMaster — Preprod (test)
+#
+#  Domaines : test.api.my-memo-master.com / test.app.my-memo-master.com
+#  Namespace : default (où sont déployés les services test)
+#  SSL : Let's Encrypt via cert-manager + Cloudflare DNS01
+#
+#  Prérequis :
+#    - ingress-nginx installé
+#    - cert-manager installé
+#    - cloudflare-secret.yml appliqué
+#    - cluster-issuer-cloudflare.yml appliqué
+#    - Mode SSL Cloudflare réglé sur "Full" (pas "Full strict")
+#
+#  Appliquer :
+#    kubectl apply -f k8s/app/ingress-test.yml
+#
+#  Vérifier le certificat :
+#    kubectl get certificate -n default
+#    kubectl describe certificate mymemomaster-test-api-tls -n default
+# =============================================================================
+
+# ── API ───────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mymemomaster-test-api
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - test.api.my-memo-master.com
+      secretName: mymemomaster-test-api-tls
+  rules:
+    - host: test.api.my-memo-master.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mymemomaster-test-api
+                port:
+                  number: 80
+
+---
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mymemomaster-test-front
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - test.app.my-memo-master.com
+      secretName: mymemomaster-test-front-tls
+  rules:
+    - host: test.app.my-memo-master.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mymemomaster-test-front
+                port:
+                  number: 80

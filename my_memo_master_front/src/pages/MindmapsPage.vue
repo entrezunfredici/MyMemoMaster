@@ -1,393 +1,416 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { api } from '@/helpers/api';
-import { useToast } from 'vue-toastification';
-import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue';
-import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { api } from '@/helpers/api'
+import { useToast } from 'vue-toastification'
+import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue'
+import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
+import { useSubjectStore } from '@/stores/subjects'
+import MenuItem from '@/components/MenuItemComponent.vue'
+import ItemListLayout from '@/components/ItemListLayout.vue'
 
-const toast = useToast();
-const mindmapStore = useMindMapBuilderStore();
+const toast = useToast()
+const mindmapStore = useMindMapBuilderStore()
+const subjectStore = useSubjectStore()
 
-const diagrams = ref([]);
-const currentDiagramId = ref(null);
-const currentDiagramMeta = ref(null);
-const currentMapPayload = ref(null);
-const searchQuery = ref('');
-const editMode = ref(false);
-const deleteMode = ref(false);
-const showEditModal = ref(false);
-const editedName = ref('');
-const currentEditId = ref(null);
-const subjects = ref([]);
-const selectedSubject = ref('');
-const isSaving = ref(false);
-const isExporting = ref(false);
-const showExportModal = ref(false);
-const exportName = ref('');
-const pendingPayload = ref(null);
-const pendingCreate = ref(false);
+// ── Vue active ────────────────────────────────────────────────────────────────
+const view = ref('list') // 'list' | 'editor'
 
-const AUTO_SAVE_DELAY = 1500;
-let autoSaveTimer = null;
+// ── Liste ─────────────────────────────────────────────────────────────────────
+const diagrams = ref([])
+const loading = ref(true)
+const searchQuery = ref('')
+const selectedSubjectId = ref(null)
 
-const fetchDiagrams = async () => {
-  try {
-    const response = await api.get('diagrammes');
-    diagrams.value = response?.data || [];
-    if (currentDiagramId.value) {
-      const match = diagrams.value.find((d) => d.idMindMap === currentDiagramId.value);
-      if (match) {
-        currentDiagramMeta.value = { ...match };
-      }
-    }
-    fetchFilters();
-  } catch (error) {
-    console.error('Erreur API :', error);
-  }
-};
+const subjects = computed(() => subjectStore.subjects)
 
-const fetchFilters = () => {
-  subjects.value = [...new Set(diagrams.value.map((d) => d.subjectId).filter(Boolean))];
-};
+const subjectName = (id) =>
+  subjects.value.find((s) => s.subjectId === id)?.name || ''
 
 const filteredDiagrams = computed(() => {
-  return diagrams.value.filter((diagram) => {
-    const matchSubject = selectedSubject.value ? String(diagram.subjectId) === String(selectedSubject.value) : true;
-    const matchSearch = diagram.mmName?.toLowerCase().includes(searchQuery.value.toLowerCase());
-    return matchSubject && matchSearch;
-  });
-});
+  return diagrams.value.filter((d) => {
+    const matchSubject = selectedSubjectId.value
+      ? d.subjectId === selectedSubjectId.value
+      : true
+    const matchSearch = d.mmName?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    return matchSubject && matchSearch
+  })
+})
 
-const toggleEditMode = () => {
-  editMode.value = !editMode.value;
-  toast[editMode.value ? 'success' : 'warning'](`Mode edition ${editMode.value ? 'active' : 'desactive'}`);
-};
+// ── Éditeur ───────────────────────────────────────────────────────────────────
+const currentDiagramId = ref(null)
+const currentDiagramMeta = ref(null)
+const currentMapPayload = ref(null)
+const isSaving = ref(false)
+const isExporting = ref(false)
+const showExportModal = ref(false)
+const exportName = ref('')
+const pendingPayload = ref(null)
+const pendingCreate = ref(false)
 
-const toggleDeleteMode = () => {
-  deleteMode.value = !deleteMode.value;
-  toast[deleteMode.value ? 'success' : 'warning'](`Mode suppression ${deleteMode.value ? 'active' : 'desactive'}`);
-};
+const AUTO_SAVE_DELAY = 1500
+let autoSaveTimer = null
 
-const confirmDelete = async (diagram) => {
-  const confirmed = confirm(`Supprimer la carte mentale "${diagram.mmName}" ?`);
-  if (!confirmed) return;
+// ── Modal renommer ────────────────────────────────────────────────────────────
+const showRenameModal = ref(false)
+const editedName = ref('')
+const currentEditId = ref(null)
+
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+const fetchDiagrams = async () => {
   try {
-    const response = await api.del(`diagrammes/${diagram.idMindMap}`);
-    if (response && [200, 204].includes(response.status)) {
-      toast.success('Diagramme supprime');
-      diagrams.value = diagrams.value.filter((d) => d.idMindMap !== diagram.idMindMap);
-      if (currentDiagramId.value === diagram.idMindMap) {
-        currentDiagramId.value = null;
-        currentDiagramMeta.value = null;
-        currentMapPayload.value = null;
-      }
-    } else {
-      toast.warning('Suppression impossible');
+    const response = await api.get('diagrammes')
+    diagrams.value = response?.data || []
+    if (currentDiagramId.value) {
+      const match = diagrams.value.find((d) => d.idMindMap === currentDiagramId.value)
+      if (match) currentDiagramMeta.value = { ...match }
     }
-  } catch (error) {
-    toast.error('Erreur suppression diagramme');
+  } catch {
+    toast.error('Erreur lors du chargement des cartes mentales.')
   }
-};
+}
 
-const openEditModal = (diagram) => {
-  currentEditId.value = diagram.idMindMap;
-  editedName.value = diagram.mmName;
-  showEditModal.value = true;
-};
-
-const confirmEdit = async () => {
+// ── Navigation ────────────────────────────────────────────────────────────────
+const openDiagram = (diagram) => {
   try {
-    const diagram = diagrams.value.find((d) => d.idMindMap === currentEditId.value);
-    if (!diagram) return;
-    const payload = {
+    const jsonData =
+      typeof diagram.mindMapJson === 'string'
+        ? JSON.parse(diagram.mindMapJson)
+        : diagram.mindMapJson
+    currentDiagramId.value = diagram.idMindMap
+    currentDiagramMeta.value = { ...diagram }
+    currentMapPayload.value = jsonData
+    view.value = 'editor'
+  } catch {
+    toast.error('Erreur lors du chargement de la carte.')
+  }
+}
+
+const createNew = () => {
+  currentDiagramId.value = null
+  currentDiagramMeta.value = null
+  currentMapPayload.value = null
+  exportName.value = ''
+  mindmapStore.new('Nouvelle carte mentale')
+  view.value = 'editor'
+}
+
+const backToList = () => {
+  clearAutoSaveTimer()
+  view.value = 'list'
+}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+const openRenameModal = (diagram) => {
+  currentEditId.value = diagram.idMindMap
+  editedName.value = diagram.mmName
+  showRenameModal.value = true
+}
+
+const confirmRename = async () => {
+  try {
+    const diagram = diagrams.value.find((d) => d.idMindMap === currentEditId.value)
+    if (!diagram) return
+    const response = await api.put(`/diagrammes/${currentEditId.value}`, {
       mmName: editedName.value,
       mindMapJson: diagram.mindMapJson,
       subjectId: diagram.subjectId,
-    };
-    const response = await api.put(`/diagrammes/${currentEditId.value}`, payload);
+    })
     if (response) {
-      toast.success('Nom modifie');
-      diagram.mmName = editedName.value;
-      if (currentDiagramId.value === diagram.idMindMap && currentDiagramMeta.value) {
-        currentDiagramMeta.value.mmName = editedName.value;
+      toast.success('Carte renommée.')
+      diagram.mmName = editedName.value
+      if (currentDiagramMeta.value?.idMindMap === diagram.idMindMap) {
+        currentDiagramMeta.value.mmName = editedName.value
       }
     }
-    showEditModal.value = false;
-  } catch (error) {
-    toast.error('Erreur modification nom');
+    showRenameModal.value = false
+  } catch {
+    toast.error('Erreur lors du renommage.')
   }
-};
+}
 
-const loadDiagram = (diagram) => {
-  if (editMode.value) return openEditModal(diagram);
-  if (deleteMode.value) return confirmDelete(diagram);
-
+const confirmDelete = async (diagram) => {
+  if (!confirm(`Supprimer la carte "${diagram.mmName}" ? Cette action est irréversible.`)) return
   try {
-    const jsonData = typeof diagram.mindMapJson === 'string'
-      ? JSON.parse(diagram.mindMapJson)
-      : diagram.mindMapJson;
-    currentDiagramId.value = diagram.idMindMap;
-    currentDiagramMeta.value = { ...diagram };
-    currentMapPayload.value = jsonData;
-  } catch (error) {
-    toast.error('Erreur chargement diagramme');
+    const response = await api.del(`diagrammes/${diagram.idMindMap}`)
+    if (response && [200, 204].includes(response.status)) {
+      toast.success('Carte supprimée.')
+      diagrams.value = diagrams.value.filter((d) => d.idMindMap !== diagram.idMindMap)
+    } else {
+      toast.warning('Suppression impossible.')
+    }
+  } catch {
+    toast.error('Erreur lors de la suppression.')
   }
-};
+}
 
-const ensureMeta = (payload) => {
-  const fallbackSubject = selectedSubject.value || currentDiagramMeta.value?.subjectId || 1;
-  return {
-    subjectId: Number(fallbackSubject),
-    mmName: exportName.value || payload.title || 'Carte mentale',
-  };
-};
-
-const updateDiagramsList = (entry) => {
-  if (!entry?.idMindMap) return;
-  const existingIndex = diagrams.value.findIndex((diagram) => diagram.idMindMap === entry.idMindMap);
-  if (existingIndex === -1) {
-    diagrams.value = [entry, ...diagrams.value];
-  } else {
-    diagrams.value = diagrams.value.map((diagram, index) =>
-      index === existingIndex ? { ...diagram, ...entry } : diagram
-    );
-  }
-};
-
+// ── Auto-save ─────────────────────────────────────────────────────────────────
 const clearAutoSaveTimer = () => {
   if (autoSaveTimer) {
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = null;
+    clearTimeout(autoSaveTimer)
+    autoSaveTimer = null
   }
-};
+}
 
 const scheduleAutoSave = () => {
-  clearAutoSaveTimer();
-  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY);
-};
+  clearAutoSaveTimer()
+  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY)
+}
+
+const updateDiagramsList = (entry) => {
+  if (!entry?.idMindMap) return
+  const idx = diagrams.value.findIndex((d) => d.idMindMap === entry.idMindMap)
+  if (idx === -1) {
+    diagrams.value = [entry, ...diagrams.value]
+  } else {
+    diagrams.value = diagrams.value.map((d, i) =>
+      i === idx ? { ...d, ...entry } : d
+    )
+  }
+}
+
+const ensureMeta = (payload) => ({
+  subjectId: Number(currentDiagramMeta.value?.subjectId || 1),
+  mmName: exportName.value || payload.title || 'Carte mentale',
+})
 
 const performAutoSave = async () => {
-  autoSaveTimer = null;
-  if (!mindmapStore.isDirty) return;
+  autoSaveTimer = null
+  if (!mindmapStore.isDirty) return
   if (isSaving.value || isExporting.value || showExportModal.value) {
-    scheduleAutoSave();
-    return;
+    scheduleAutoSave()
+    return
   }
 
-  const payload = mindmapStore.exportPayload();
-  if (!payload) return;
-  const saveVersion = payload?.updatedAt;
-  exportName.value = payload.title || exportName.value || 'Carte mentale';
-  const meta = ensureMeta(payload);
-  const body = {
-    mmName: meta.mmName,
-    mindMapJson: payload,
-    subjectId: meta.subjectId,
-  };
+  const payload = mindmapStore.exportPayload()
+  if (!payload) return
+  const saveVersion = payload?.updatedAt
+  exportName.value = payload.title || exportName.value || 'Carte mentale'
+  const meta = ensureMeta(payload)
+  const body = { mmName: meta.mmName, mindMapJson: payload, subjectId: meta.subjectId }
 
   try {
-    isSaving.value = true;
+    isSaving.value = true
     if (currentDiagramId.value) {
-      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body);
+      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
       if (response) {
-        const updatedMeta = { ...body, idMindMap: currentDiagramId.value };
-        currentDiagramMeta.value = { ...(currentDiagramMeta.value || {}), ...updatedMeta };
-        updateDiagramsList(updatedMeta);
-        fetchFilters();
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
-          mindmapStore.markSaved();
-        }
-        pendingPayload.value = null;
-        pendingCreate.value = false;
+        const updatedMeta = { ...body, idMindMap: currentDiagramId.value }
+        currentDiagramMeta.value = { ...(currentDiagramMeta.value || {}), ...updatedMeta }
+        updateDiagramsList(updatedMeta)
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
+        pendingPayload.value = null
+        pendingCreate.value = false
       }
     } else {
-      const response = await api.post('diagrammes', body);
-      const newId = response?.data?.id || response?.data?.idMindMap;
+      const response = await api.post('diagrammes', body)
+      const newId = response?.data?.id || response?.data?.idMindMap
       if (newId) {
-        const createdMeta = { ...body, idMindMap: newId };
-        currentDiagramId.value = newId;
-        currentDiagramMeta.value = createdMeta;
-        updateDiagramsList(createdMeta);
-        fetchFilters();
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
-          mindmapStore.markSaved();
-        }
-        pendingPayload.value = null;
-        pendingCreate.value = false;
+        const createdMeta = { ...body, idMindMap: newId }
+        currentDiagramId.value = newId
+        currentDiagramMeta.value = createdMeta
+        updateDiagramsList(createdMeta)
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
+        pendingPayload.value = null
+        pendingCreate.value = false
       }
     }
-  } catch (error) {
-    console.error('Erreur sauvegarde auto', error);
-    toast.error('Erreur sauvegarde automatique');
+  } catch {
+    toast.error('Erreur sauvegarde automatique.')
   } finally {
-    isSaving.value = false;
+    isSaving.value = false
   }
-};
+}
 
+// ── Sauvegarde manuelle / export ──────────────────────────────────────────────
 const handleSave = async (payload) => {
-  const saveVersion = payload?.updatedAt;
-  exportName.value = payload.title || exportName.value || 'Carte mentale';
+  const saveVersion = payload?.updatedAt
+  exportName.value = payload.title || exportName.value || 'Carte mentale'
   if (!currentDiagramId.value) {
-    pendingCreate.value = true;
-    pendingPayload.value = payload;
-    showExportModal.value = true;
-    return;
+    pendingCreate.value = true
+    pendingPayload.value = payload
+    showExportModal.value = true
+    return
   }
   try {
-    isSaving.value = true;
-    const meta = ensureMeta(payload);
+    isSaving.value = true
+    const meta = ensureMeta(payload)
     const response = await api.put(`/diagrammes/${currentDiagramId.value}`, {
       mmName: meta.mmName,
       mindMapJson: payload,
       subjectId: meta.subjectId,
-    });
+    })
     if (response) {
-      toast.success('Diagramme sauvegarde');
+      toast.success('Carte sauvegardée.')
       if (currentDiagramMeta.value) {
-        currentDiagramMeta.value.mmName = meta.mmName;
-        currentDiagramMeta.value.mindMapJson = payload;
+        currentDiagramMeta.value.mmName = meta.mmName
+        currentDiagramMeta.value.mindMapJson = payload
       }
-      await fetchDiagrams();
-      if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
-        mindmapStore.markSaved();
-      }
+      await fetchDiagrams()
+      if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
     }
-  } catch (error) {
-    toast.error('Erreur sauvegarde');
+  } catch {
+    toast.error('Erreur lors de la sauvegarde.')
   } finally {
-    isSaving.value = false;
+    isSaving.value = false
   }
-};
+}
 
 const handleExport = (payload) => {
-  exportName.value = payload.title || exportName.value || 'Carte mentale';
-  pendingCreate.value = !currentDiagramId.value;
-  pendingPayload.value = payload;
-  showExportModal.value = true;
-};
+  exportName.value = payload.title || exportName.value || 'Carte mentale'
+  pendingCreate.value = !currentDiagramId.value
+  pendingPayload.value = payload
+  showExportModal.value = true
+}
 
 const handleNewMap = (payload) => {
-  currentDiagramId.value = null;
-  currentDiagramMeta.value = {
-    mmName: payload.title,
-    subjectId: selectedSubject.value || 1,
-  };
-  currentMapPayload.value = payload;
-  exportName.value = payload.title;
-  toast.success('Nouvelle carte mentale');
-};
+  currentDiagramId.value = null
+  currentDiagramMeta.value = { mmName: payload.title, subjectId: 1 }
+  currentMapPayload.value = payload
+  exportName.value = payload.title
+  toast.success('Nouvelle carte mentale.')
+}
 
 const confirmExportModal = async () => {
-  if (!pendingPayload.value) return;
-  const saveVersion = pendingPayload.value?.updatedAt;
+  if (!pendingPayload.value) return
+  const saveVersion = pendingPayload.value?.updatedAt
   try {
-    isExporting.value = true;
-    const meta = ensureMeta(pendingPayload.value);
+    isExporting.value = true
+    const meta = ensureMeta(pendingPayload.value)
     const body = {
       mmName: meta.mmName,
       mindMapJson: pendingPayload.value,
       subjectId: meta.subjectId,
-    };
-
+    }
     if (!pendingCreate.value && currentDiagramId.value) {
-      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body);
+      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
       if (response) {
-        toast.success('Diagramme mis a jour');
+        toast.success('Carte mise à jour.')
         if (currentDiagramMeta.value) {
-          currentDiagramMeta.value.mmName = meta.mmName;
-          currentDiagramMeta.value.mindMapJson = pendingPayload.value;
+          currentDiagramMeta.value.mmName = meta.mmName
+          currentDiagramMeta.value.mindMapJson = pendingPayload.value
         }
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
-          mindmapStore.markSaved();
-        }
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
       }
     } else {
-      const response = await api.post('diagrammes', body);
-      const newId = response?.data?.id || response?.data?.idMindMap;
+      const response = await api.post('diagrammes', body)
+      const newId = response?.data?.id || response?.data?.idMindMap
       if (newId) {
-        currentDiagramId.value = newId;
-        currentDiagramMeta.value = { ...body, idMindMap: newId };
-        toast.success('Diagramme cree');
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) {
-          mindmapStore.markSaved();
-        }
+        currentDiagramId.value = newId
+        currentDiagramMeta.value = { ...body, idMindMap: newId }
+        toast.success('Carte créée.')
+        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
       }
     }
-    await fetchDiagrams();
-  } catch (error) {
-    toast.error('Erreur export');
+    await fetchDiagrams()
+  } catch {
+    toast.error('Erreur lors de la sauvegarde.')
   } finally {
-    isExporting.value = false;
-    showExportModal.value = false;
-    pendingPayload.value = null;
-    pendingCreate.value = false;
+    isExporting.value = false
+    showExportModal.value = false
+    pendingPayload.value = null
+    pendingCreate.value = false
   }
-};
+}
 
+// ── Watchers auto-save ────────────────────────────────────────────────────────
 watch(
   () => mindmapStore.map.updatedAt,
   () => {
-    if (mindmapStore.isDirty) {
-      scheduleAutoSave();
-    }
+    if (mindmapStore.isDirty && view.value === 'editor') scheduleAutoSave()
   }
-);
+)
 
 watch(
   () => showExportModal.value,
   (isOpen) => {
-    if (!isOpen && mindmapStore.isDirty) {
-      scheduleAutoSave();
-    }
+    if (!isOpen && mindmapStore.isDirty) scheduleAutoSave()
   }
-);
+)
 
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  await fetchDiagrams();
-});
+  await Promise.all([fetchDiagrams(), subjectStore.fetchSubjects()])
+  loading.value = false
+})
 
 onBeforeUnmount(() => {
-  clearAutoSaveTimer();
-});
+  clearAutoSaveTimer()
+})
 </script>
 
 <template>
-  <div class="mindmaps-page">
-    <header class="mindmaps-page__header">
-      <h1>Mind Maps</h1>
-    </header>
-    <div class="mindmaps-page__layout">
-      <aside class="mindmaps-page__sidebar">
-        <div class="sidebar__tools">
-          <div class="sidebar__modes">
-            <button @click="toggleEditMode" :class="{ active: editMode }">Editer</button>
-            <button @click="toggleDeleteMode" :class="{ active: deleteMode }">Supprimer</button>
-          </div>
-          <input v-model="searchQuery" placeholder="Rechercher..." />
-          <select v-model="selectedSubject">
-            <option value="">Toutes les matieres</option>
-            <option v-for="subject in subjects" :key="subject" :value="subject">Matiere {{ subject }}</option>
-          </select>
-        </div>
-        <ul class="sidebar__list">
-          <li
-            v-for="diagram in filteredDiagrams"
-            :key="diagram.idMindMap"
-            :class="['sidebar__item', { active: diagram.idMindMap === currentDiagramId }]"
-          >
-            <div class="sidebar__item-main" @click="loadDiagram(diagram)">
-              <span class="sidebar__item-title">{{ diagram.mmName }}</span>
-              <small class="sidebar__item-meta">Matiere {{ diagram.subjectId }}</small>
-            </div>
-            <div class="sidebar__item-actions">
-              <button v-if="editMode" @click.stop="openEditModal(diagram)">Renommer</button>
-              <button v-if="deleteMode" class="danger" @click.stop="confirmDelete(diagram)">Supprimer</button>
-            </div>
-          </li>
-        </ul>
-      </aside>
+  <!-- ── Vue liste ─────────────────────────────────────────────────────────── -->
+  <template v-if="view === 'list'">
+    <ItemListLayout
+      v-model:search="searchQuery"
+      v-model:selectedSubjectId="selectedSubjectId"
+      :subjects="subjects"
+      :loading="loading"
+      :filtered-count="filteredDiagrams.length"
+      search-placeholder="Rechercher une carte mentale..."
+      create-label="+ Nouvelle carte"
+      item-label="carte mentale"
+      empty-message="Aucune carte mentale trouvée. Créez-en une !"
+      @create="createNew"
+    >
+      <MenuItem
+        v-for="diagram in filteredDiagrams"
+        :key="diagram.idMindMap"
+        :title="diagram.mmName"
+        :description="subjectName(diagram.subjectId)"
+        action-label="Ouvrir l'éditeur"
+        :on-action="() => openDiagram(diagram)"
+        :on-edit="() => openRenameModal(diagram)"
+        :on-delete="() => confirmDelete(diagram)"
+      >
+        <template #stats>
+          <span v-if="subjectName(diagram.subjectId)" class="subject-badge">
+            {{ subjectName(diagram.subjectId) }}
+          </span>
+        </template>
+      </MenuItem>
 
-      <main class="mindmaps-page__content">
+      <template #modals>
+        <div v-if="showRenameModal" class="modal-overlay" @click="showRenameModal = false">
+          <div class="modal-panel" @click.stop>
+            <button @click="showRenameModal = false" class="modal-close">&times;</button>
+            <h2 class="modal-title">Renommer la carte</h2>
+            <form @submit.prevent="confirmRename">
+              <div class="mb-4">
+                <label class="form-label">Nom</label>
+                <input
+                  v-model="editedName"
+                  type="text"
+                  class="form-input"
+                  required
+                  autofocus
+                />
+              </div>
+              <div class="btn-row">
+                <button type="submit" class="btn-modal-submit">Valider</button>
+                <button type="button" @click="showRenameModal = false" class="btn-modal-cancel">
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </template>
+    </ItemListLayout>
+  </template>
+
+  <!-- ── Vue éditeur ───────────────────────────────────────────────────────── -->
+  <template v-else>
+    <div class="editor-view">
+      <div class="editor-topbar">
+        <button class="editor-back-btn" @click="backToList">← Mes cartes mentales</button>
+        <span class="editor-map-name">{{ currentDiagramMeta?.mmName || 'Nouvelle carte' }}</span>
+        <span v-if="isSaving" class="editor-save-status">Sauvegarde…</span>
+        <span v-else-if="!mindmapStore.isDirty" class="editor-save-status editor-save-status--saved">
+          Sauvegardé
+        </span>
+      </div>
+
+      <div class="editor-canvas">
         <MindMapBuilder
           :map-payload="currentMapPayload"
           :loading="isSaving || isExporting"
@@ -395,220 +418,109 @@ onBeforeUnmount(() => {
           @export="handleExport"
           @new-map="handleNewMap"
         />
-      </main>
-    </div>
-
-    <div v-if="showEditModal" class="modal">
-      <div class="modal__dialog">
-        <h2>Modifier le nom</h2>
-        <input v-model="editedName" />
-        <div class="modal__actions">
-          <button @click="showEditModal = false">Annuler</button>
-          <button class="primary" @click="confirmEdit">Valider</button>
-        </div>
       </div>
     </div>
 
-    <div v-if="showExportModal" class="modal">
-      <div class="modal__dialog">
-        <h2>Nom de la carte mentale</h2>
-        <input v-model="exportName" />
-        <div class="modal__actions">
-          <button @click="showExportModal = false">Annuler</button>
-          <button class="primary" @click="confirmExportModal" :disabled="isExporting">Valider</button>
-        </div>
+    <!-- Modal nom (première création) -->
+    <div v-if="showExportModal" class="modal-overlay" @click="showExportModal = false">
+      <div class="modal-panel" @click.stop>
+        <button @click="showExportModal = false" class="modal-close">&times;</button>
+        <h2 class="modal-title">Nom de la carte mentale</h2>
+        <form @submit.prevent="confirmExportModal">
+          <div class="mb-4">
+            <label class="form-label">Nom</label>
+            <input
+              v-model="exportName"
+              type="text"
+              class="form-input"
+              required
+              autofocus
+            />
+          </div>
+          <div class="btn-row">
+            <button type="submit" :disabled="isExporting" class="btn-modal-submit">
+              Valider
+            </button>
+            <button type="button" @click="showExportModal = false" class="btn-modal-cancel">
+              Annuler
+            </button>
+          </div>
+        </form>
       </div>
     </div>
-  </div>
+  </template>
 </template>
 
 <style scoped>
-.mindmaps-page {
+/* ── Vue éditeur ─────────────────────────────────────────────────────────────── */
+.editor-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 100vh;
+  height: 100vh;
   background: #f1f5f9;
-  padding: 16px;
 }
 
-.mindmaps-page__header {
+.editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
   background: #ffffff;
-  padding: 16px;
-  border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  flex-shrink: 0;
 }
 
-.mindmaps-page__header h1 {
-  font-size: 24px;
+.editor-back-btn {
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.editor-back-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.editor-map-name {
+  font-size: 16px;
   font-weight: 700;
   color: #1f2937;
-}
-
-.mindmaps-page__layout {
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 16px;
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.mindmaps-page__sidebar {
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.editor-save-status {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.editor-save-status--saved {
+  color: #22c55e;
 }
 
-.sidebar__tools {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.sidebar__modes {
-  display: flex;
-  gap: 8px;
-}
-
-.sidebar__modes button {
+.editor-canvas {
   flex: 1;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: none;
-  background: #e5e7eb;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.sidebar__modes button.active {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.sidebar__tools input,
-.sidebar__tools select {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  font-size: 14px;
-}
-
-.sidebar__list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-}
-
-.sidebar__item {
-  background: #f8fafc;
-  border-radius: 14px;
-  padding: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: border 0.2s ease, transform 0.2s ease;
-}
-
-.sidebar__item.active {
-  border-color: #2563eb;
-  transform: translateY(-1px);
-}
-
-.sidebar__item-main {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sidebar__item-title {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.sidebar__item-meta {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.sidebar__item-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.sidebar__item-actions button {
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  background: #e0f2fe;
-  color: #0f172a;
-}
-
-.sidebar__item-actions .danger {
-  background: #fecaca;
-  color: #b91c1c;
-}
-
-.mindmaps-page__content {
-  background: transparent;
-  border-radius: 20px;
   min-height: 0;
 }
 
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.modal__dialog {
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 16px;
-  width: 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.modal__dialog input {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
-}
-
-.modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.modal__actions button {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
+/* ── Badge sujet (vue liste) ─────────────────────────────────────────────────── */
+.subject-badge {
+  display: inline-block;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
   font-weight: 600;
-}
-
-.modal__actions .primary {
-  background: #2563eb;
-  color: #ffffff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-top: 4px;
 }
 </style>
