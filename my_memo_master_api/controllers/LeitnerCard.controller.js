@@ -1,6 +1,16 @@
 const leitnerCardService = require('../services/LeitnerCard.service')
 const logger = require('../helpers/logger')
 
+exports.getCardsBySystemId = async (req, res) => {
+  try {
+    const cards = await leitnerCardService.getCardsBySystemId(req.params.systemId)
+    res.status(200).json(cards)
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération des cartes du système.' })
+  }
+}
+
 exports.getCardsByBoxId = async (req, res) => {
   try {
     const cards = await leitnerCardService.getCardsByBoxId(req.params.leitnerboxid)

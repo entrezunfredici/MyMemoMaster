@@ -26,6 +26,8 @@ const leitnerCardValidators = require('../validators/LeitnerCard.validators')
  */
 router.get('/due/:systemId', authMiddleware, leitnerCardController.getDueCards)
 
+router.get('/system/:systemId', authMiddleware, leitnerCardController.getCardsBySystemId)
+
 /**
  * @swagger
  * /leitnercards/leitnerboxes/{leitnerboxid}:

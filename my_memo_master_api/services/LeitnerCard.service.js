@@ -232,6 +232,32 @@ class LeitnerCardService {
   }
 
   /**
+   * Retourne toutes les cartes d'un système Leitner avec leur boîte courante et l'énoncé de la question.
+   *
+   * @param {number} systemId - ID du système Leitner
+   * @returns {Promise<LeitnerCard[]>}
+   */
+  async getCardsBySystemId(systemId) {
+    return await LeitnerCard.findAll({
+      attributes: ['idCard', 'idBox', 'idQuestion'],
+      include: [
+        {
+          model: LeitnerBox,
+          as: 'leitnerBox',
+          where: { idSystem: systemId },
+          required: true,
+          attributes: ['idBox', 'level', 'color']
+        },
+        {
+          model: Question,
+          as: 'question',
+          attributes: ['idQuestion', 'statement', 'type']
+        }
+      ]
+    })
+  }
+
+  /**
    * Supprime une carte.
    *
    * @param {number} id - ID de la carte

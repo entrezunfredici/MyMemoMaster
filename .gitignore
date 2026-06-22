@@ -10,3 +10,6 @@ cadrage
 yarn.lock
 
 server_docker_compose/server_proxy/
+
+# Secrets k8s — contiennent des tokens réels, ne jamais commiter
+k8s/cert-manager/cloudflare-secret.yml

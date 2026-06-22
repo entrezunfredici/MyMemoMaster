@@ -146,6 +146,66 @@
         </div>
       </template>
 
+      <!-- Flashcard liée -->
+      <div class="palette__field">
+        <label class="palette__label">Flashcard liée</label>
+
+        <!-- Carte actuellement liée -->
+        <div v-if="selectedNode.idCard" class="palette__card-linked">
+          <span
+            class="palette__card-dot"
+            :style="{ background: linkedCardColor || '#C0C5D2' }"
+          />
+          <span class="palette__card-statement">{{ linkedCardStatement }}</span>
+          <button class="palette__card-unlink" title="Délier" @click="unlinkCard">✕</button>
+        </div>
+
+        <!-- Bouton ouvrir le picker -->
+        <button class="palette__btn palette__btn--ghost palette__btn--sm" @click="openCardPicker">
+          {{ selectedNode.idCard ? 'Changer' : 'Lier une flashcard' }}
+        </button>
+
+        <!-- Picker inline -->
+        <div v-if="showCardPicker" class="palette__card-picker">
+          <select
+            class="palette__select"
+            :value="pickerSystemId"
+            @change="onPickerSystemChange($event.target.value)"
+          >
+            <option value="">— Choisir un système —</option>
+            <option v-for="sys in pickerSystems" :key="sys.idSystem" :value="sys.idSystem">
+              {{ sys.name }}
+            </option>
+          </select>
+
+          <div v-if="pickerLoading" class="palette__hint">Chargement…</div>
+
+          <select
+            v-else-if="pickerCards.length"
+            class="palette__select"
+            v-model="pickerCardId"
+          >
+            <option value="">— Choisir une carte —</option>
+            <option v-for="card in pickerCards" :key="card.idCard" :value="card.idCard">
+              {{ card.question?.statement || `Carte #${card.idCard}` }}
+            </option>
+          </select>
+          <div v-else-if="pickerSystemId" class="palette__hint">Aucune carte dans ce système.</div>
+
+          <div class="palette__actions-row">
+            <button
+              class="palette__btn"
+              :disabled="!pickerCardId"
+              @click="confirmLinkCard"
+            >Lier</button>
+            <button
+              class="palette__btn palette__btn--ghost"
+              @click="showCardPicker = false"
+            >Annuler</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Actions nœud -->
       <div class="palette__node-actions">
         <button class="palette__btn palette__btn--ghost" @click="toggleCollapse">
@@ -208,7 +268,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { masteryList } from '@/helpers/mindmap';
+import { masteryList, boxColorToHex, boxLevelToMastery } from '@/helpers/mindmap';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
 import Interpreter from '@/components/interpreter/Interpreter.vue';
@@ -251,6 +311,87 @@ const fontSize = ref(13);
 const isBold = ref(false);
 const isItalic = ref(false);
 const isUnderline = ref(false);
+
+// ── Flashcard liée ────────────────────────────────────────────────────────────
+const showCardPicker = ref(false);
+const pickerSystems = ref([]);
+const pickerSystemId = ref(null);
+const pickerCards = ref([]);
+const pickerCardId = ref(null);
+const pickerLoading = ref(false);
+
+const linkedCardStatement = computed(() => {
+  if (!selectedNode.value?.idCard) return null;
+  const card = pickerCards.value.find((c) => c.idCard === selectedNode.value.idCard);
+  return card?.question?.statement || `Carte #${selectedNode.value.idCard}`;
+});
+
+const linkedCardColor = computed(() => {
+  if (!selectedNode.value?.idCard) return null;
+  const card = pickerCards.value.find((c) => c.idCard === selectedNode.value.idCard);
+  return card?.leitnerBox ? boxColorToHex(card.leitnerBox.color) : null;
+});
+
+const openCardPicker = async () => {
+  showCardPicker.value = true;
+  pickerLoading.value = true;
+  pickerSystems.value = [];
+  pickerCards.value = [];
+  pickerSystemId.value = null;
+  pickerCardId.value = null;
+  try {
+    const res = await api.get('leitnersystems/');
+    pickerSystems.value = res?.data || [];
+  } finally {
+    pickerLoading.value = false;
+  }
+};
+
+const onPickerSystemChange = async (systemId) => {
+  pickerSystemId.value = systemId;
+  pickerCards.value = [];
+  pickerCardId.value = null;
+  if (!systemId) return;
+  pickerLoading.value = true;
+  try {
+    const res = await api.get(`leitnercards/system/${systemId}`);
+    pickerCards.value = res?.data || [];
+  } finally {
+    pickerLoading.value = false;
+  }
+};
+
+const confirmLinkCard = () => {
+  if (!selectedNode.value || !pickerCardId.value || !pickerSystemId.value) return;
+  store.linkCard(selectedNode.value.id, Number(pickerCardId.value), Number(pickerSystemId.value));
+  const card = pickerCards.value.find((c) => c.idCard === Number(pickerCardId.value));
+  if (card?.leitnerBox) {
+    store.updateNode(selectedNode.value.id, {
+      mastery: boxLevelToMastery(card.leitnerBox.level),
+    });
+    store.updateNodeStyle(selectedNode.value.id, {
+      secondaryColor: boxColorToHex(card.leitnerBox.color),
+    });
+  }
+  showCardPicker.value = false;
+};
+
+const unlinkCard = () => {
+  if (!selectedNode.value) return;
+  store.unlinkCard(selectedNode.value.id);
+  showCardPicker.value = false;
+};
+
+watch(selectedNode, () => {
+  showCardPicker.value = false;
+  if (selectedNode.value?.idSystem && selectedNode.value?.idCard) {
+    api.get(`leitnercards/system/${selectedNode.value.idSystem}`).then((res) => {
+      if (res?.data) pickerCards.value = res.data;
+    });
+  } else {
+    pickerCards.value = [];
+  }
+});
 
 const formulaPreviewHtml = computed(() =>
   isFormulaNodeSelected.value && editableContent.value
@@ -848,6 +989,63 @@ const assignZone = (zoneId) => {
   background: #1e3a8a;
   border-color: #1e3a8a;
   color: #ffffff;
+}
+
+/* Flashcard liée */
+.palette__card-linked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+}
+
+.palette__card-dot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.12);
+}
+
+.palette__card-statement {
+  flex: 1;
+  font-size: 12px;
+  color: #166534;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__card-unlink {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #166534;
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.palette__card-unlink:hover { opacity: 1; }
+
+.palette__btn--sm {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.palette__card-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
 }
 
 /* Modale interpréteur */
