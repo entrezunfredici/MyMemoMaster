@@ -1,0 +1,239 @@
+# =============================================================================
+#  Deployments prod — MyMemoMaster
+#
+#  Prérequis sur le cluster :
+#    - Namespace mymemomaster créé (k8s/prod/namespace.yml)
+#    - Secret mmm-prod-secrets créé (voir k8s/prod/configmap.yml)
+#    - ConfigMap mmm-prod-config créée (k8s/prod/configmap.yml)
+#    - ClusterIssuer cert-manager configuré (k8s/cert-manager/)
+#
+#  Ce déploiement est activé via la variable GitHub Actions K8S_PROD_ENABLED=true.
+# =============================================================================
+
+# ── PostgreSQL (StatefulSet + PVC) ────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mmm-prod-postgres
+  namespace: mymemomaster
+spec:
+  serviceName: mmm-prod-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mmm-prod-postgres
+  template:
+    metadata:
+      labels:
+        app: mmm-prod-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mmm-prod-secrets
+                  key: PG_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mmm-prod-secrets
+                  key: PG_PASS
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: mmm-prod-config
+                  key: PG_DB
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 20Gi
+
+---
+
+# ── Redis ──────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mmm-prod-redis
+  namespace: mymemomaster
+spec:
+  serviceName: mmm-prod-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mmm-prod-redis
+  template:
+    metadata:
+      labels:
+        app: mmm-prod-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ -n "$REDIS_PASS" ]; then
+                exec redis-server --requirepass "$REDIS_PASS" --appendonly yes
+              else
+                exec redis-server --appendonly yes
+              fi
+          env:
+            - name: REDIS_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mmm-prod-secrets
+                  key: REDIS_PASS
+                  optional: true
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+
+---
+
+# ── API Node.js ────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mmm-prod-api
+  namespace: mymemomaster
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mmm-prod-api
+  template:
+    metadata:
+      labels:
+        app: mmm-prod-api
+    spec:
+      containers:
+        - name: api
+          image: fredissimo/mymemomaster_api:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: mmm-prod-config
+            - secretRef:
+                name: mmm-prod-secrets
+          env:
+            - name: PG_HOST
+              value: mmm-prod-postgres
+            - name: REDIS_HOST
+              value: mmm-prod-redis
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+---
+
+# ── Frontend Vue 3 (nginx) ────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mmm-prod-front
+  namespace: mymemomaster
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mmm-prod-front
+  template:
+    metadata:
+      labels:
+        app: mmm-prod-front
+    spec:
+      containers:
+        - name: front
+          image: fredissimo/mymemomaster_front:latest
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              cat > /usr/share/nginx/html/config.js << EOF
+              window.__APP_CONFIG__ = {
+                API_URL: "${VITE_API_URL}",
+                FRONT_URL: "${VITE_FRONT_URL}"
+              };
+              EOF
+              if ! grep -q '/config.js' /usr/share/nginx/html/index.html; then
+                sed -i '/type="module"/i \  <script src="/config.js"></script>' /usr/share/nginx/html/index.html
+              fi
+              exec nginx -g 'daemon off;'
+          envFrom:
+            - configMapRef:
+                name: mmm-prod-config
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

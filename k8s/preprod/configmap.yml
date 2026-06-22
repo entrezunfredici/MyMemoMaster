@@ -1,0 +1,59 @@
+# =============================================================================
+#  ConfigMap preprod — variables non-sensibles
+#
+#  Les variables sensibles (mots de passe, secrets JWT, SMTP...) sont dans
+#  un Secret K8s nommé mmm-preprod-secrets, créé manuellement sur le cluster :
+#
+#    kubectl create secret generic mmm-preprod-secrets \
+#      --namespace mymemomaster-preprod \
+#      --from-literal=PG_USER=postgres \
+#      --from-literal=PG_PASS=<mot_de_passe> \
+#      --from-literal=AUTH_JWT_SECRET=<secret> \
+#      --from-literal=SMTP_USER=<email> \
+#      --from-literal=SMTP_PASS=<mot_de_passe> \
+#      --from-literal=REDIS_PASS= \
+#      --from-literal=PGADMIN_DEFAULT_PASSWORD=<mot_de_passe>
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mmm-preprod-config
+  namespace: mymemomaster-preprod
+data:
+  # ── Environnement ───────────────────────────────────────────────────────────
+  NODE_ENV: "production"
+  ENVIRONMENT: "preprod"
+
+  # ── API ─────────────────────────────────────────────────────────────────────
+  API_PORT: "3000"
+  API_BYPASS_AUTH: "false"
+  AUTH_JWT_EXPIRES_IN: "1d"
+
+  # ── Base de données ──────────────────────────────────────────────────────────
+  PG_DB: "mymemomasterdb"
+  PG_PORT: "5432"
+  DB_SYNC_MAX_RETRIES: "5"
+  DB_SYNC_RETRY_DELAY: "5000"
+  PG_POOL_MAX: "10"
+  PG_POOL_MIN: "2"
+  PG_POOL_ACQUIRE: "30000"
+  PG_POOL_IDLE: "10000"
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  REDIS_PORT: "6379"
+
+  # ── Email (SMTP) ─────────────────────────────────────────────────────────────
+  SMTP_HOST: "smtp.hostinger.com"
+  SMTP_PORT: "587"
+  SMTP_SECURE: "false"
+  EMAIL_FROM: "noreply@my-memo-master.com"
+
+  # ── Domaines ─────────────────────────────────────────────────────────────────
+  API_PUBLIC_URL: "https://preprod-api.my-memo-master.com"
+  CORS_ORIGIN: "https://preprod.my-memo-master.com"
+  VITE_API_URL: "https://preprod-api.my-memo-master.com/api/v1"
+  VITE_FRONT_URL: "https://preprod.my-memo-master.com"
+
+  # ── PgAdmin ──────────────────────────────────────────────────────────────────
+  PGADMIN_DEFAULT_EMAIL: "admin@my-memo-master.com"

@@ -5,7 +5,8 @@ on:
   push:
     branches:
       - main
-      - dev
+      - preprod
+      - test
       - '*devops*'
       - 'dev_back_*'
       - 'dev_front_*'

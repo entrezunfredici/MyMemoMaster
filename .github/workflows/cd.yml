@@ -1,5 +1,6 @@
 name: CD
 
+# Déclenché quand le CI se termine sur les branches de déploiement
 on:
   workflow_run:
     workflows:
@@ -8,27 +9,59 @@ on:
       - completed
     branches:
       - main
-      - dev
+      - preprod
+      - test
 
 permissions:
   contents: read
 
+# =============================================================================
+#  Secrets GitHub requis :
+#
+#  Communs :
+#    DOCKERHUB_USERNAME      — nom d'utilisateur Docker Hub
+#    DOCKERHUB_PASSWORD      — mot de passe / token Docker Hub
+#    DISCORD_LOG             — webhook Discord pour les notifications
+#
+#  Branche test (VPS) :
+#    SSH_TEST_PRIVATE_KEY    — clé SSH privée pour le VPS test
+#    SSH_TEST_USERNAME       — utilisateur SSH du VPS test
+#    VPS_PORT                — port SSH du VPS
+#    VPS_IP                  — adresse IP du VPS
+#
+#  Branche preprod (Kubernetes) :
+#    KUBECONFIG_PREPROD      — kubeconfig base64 pour le cluster K8s preprod
+#
+#  Branche main (Kubernetes prod — activé via variable K8S_PROD_ENABLED=true) :
+#    KUBECONFIG_PROD         — kubeconfig base64 pour le cluster K8s prod
+# =============================================================================
+
 jobs:
-  push_on_docker_hub:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  1. BUILD & PUSH IMAGES DOCKER HUB
+  #     - test    : mymemomaster_test_api/front:latest
+  #     - preprod : mymemomaster_preprod_api/front:latest
+  #     - main    : mymemomaster_api/front:latest
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  push_images:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
     if: >
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      (
-        github.event.workflow_run.head_branch == 'main' ||
-        github.event.workflow_run.head_branch == 'dev'
-      )
+      github.event.workflow_run.event == 'push'
+    outputs:
+      branch: ${{ steps.vars.outputs.branch }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Export branch name
+        id: vars
+        run: echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -36,283 +69,256 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build and Push Docker Prod Images
-        if: github.event.workflow_run.head_branch == 'main'
+      - name: Build and Push — test images
+        if: github.event.workflow_run.head_branch == 'test'
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest -f my_memo_master_api/Dockerfile my_memo_master_api/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest -f my_memo_master_front/Dockerfile my_memo_master_front/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest
-
-      - name: Build and Push Docker PreProd Images
-        if: github.event.workflow_run.head_branch != 'main'
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest -f my_memo_master_api/Dockerfile my_memo_master_api/
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest \
+            -f my_memo_master_api/Dockerfile my_memo_master_api/
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest -f my_memo_master_front/Dockerfile my_memo_master_front/
+
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest \
+            -f my_memo_master_front/Dockerfile my_memo_master_front/
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest
 
-  build_and_deploy:
-    name: Deploy on Server
+      - name: Build and Push — preprod images
+        if: github.event.workflow_run.head_branch == 'preprod'
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_api:latest \
+            -f my_memo_master_api/Dockerfile my_memo_master_api/
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_api:latest
+
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_front:latest \
+            -f my_memo_master_front/Dockerfile my_memo_master_front/
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_front:latest
+
+      - name: Build and Push — prod images
+        if: github.event.workflow_run.head_branch == 'main'
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest \
+            -f my_memo_master_api/Dockerfile my_memo_master_api/
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest
+
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest \
+            -f my_memo_master_front/Dockerfile my_memo_master_front/
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  2a. DEPLOY TEST → VPS (docker compose)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  deploy_test:
+    name: Deploy to VPS (test)
     runs-on: ubuntu-latest
-    needs: push_on_docker_hub
-    if: success()
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'test'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Prepare server docker-compose env for validation
-        run: cp server_docker_compose/.env.example server_docker_compose/.env
+      - name: Validate docker-compose syntax
+        run: |
+          cp server_docker_compose/.env.example server_docker_compose/.env
+          docker compose -f server_docker_compose/docker-compose.yml \
+            --env-file server_docker_compose/.env config -q
 
-      - name: Validate server docker-compose
-        run: docker compose -f server_docker_compose/docker-compose.yml --env-file server_docker_compose/.env config -q
-
-      - name: Set up SSH PROD
-        if: github.event.workflow_run.head_branch == 'main'
+      - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PROD_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_TEST_PRIVATE_KEY }}
 
-      - name: Set up SSH PREPROD
-        if: github.event.workflow_run.head_branch != 'main'
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PREPROD_PRIVATE_KEY }}
+      - name: Add VPS to known_hosts
+        run: ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
-      - name: Prepare known_hosts
+      - name: Stop test environment
         run: |
-          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
-
-      - name: Stop PROD
-        if: github.event.workflow_run.head_branch == 'main'
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
-            mkdir -p /var/www/html/my_memo_master_prod
-            cd /var/www/html/my_memo_master_prod
+            mkdir -p /var/www/html/my_memo_master_test
+            cd /var/www/html/my_memo_master_test
             if [ -f .env ]; then
               env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env down || true
             else
-              echo "No .env found in $(pwd); skipping docker compose down."
+              echo "No .env found — skipping docker compose down."
             fi
           EOF
 
-      - name: Stop PREPROD
-        if: github.event.workflow_run.head_branch != 'main'
+      - name: Upload docker-compose
         run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            mkdir -p /var/www/html/my_memo_master_preprod
-            cd /var/www/html/my_memo_master_preprod
-            if [ -f .env ]; then
-              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env down || true
-            else
-              echo "No .env found in $(pwd); skipping docker compose down."
-            fi
-          EOF
-
-      - name: Upload docker-compose in PROD
-        if: github.event.workflow_run.head_branch == 'main'
-        run: |
-          scp -v -P ${{ secrets.VPS_PORT }} \
+          scp -P ${{ secrets.VPS_PORT }} \
             server_docker_compose/docker-compose.yml \
-            ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_prod/docker-compose.yml
+            ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_test/docker-compose.yml
 
-      - name: Upload docker-compose in PREPROD
-        if: github.event.workflow_run.head_branch != 'main'
+      - name: Validate test server env
         run: |
-          scp -v -P ${{ secrets.VPS_PORT }} \
-            server_docker_compose/docker-compose.yml \
-            ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_preprod/docker-compose.yml
-
-      - name: Validate PROD server env
-        if: github.event.workflow_run.head_branch == 'main'
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
-            cd /var/www/html/my_memo_master_prod
-
+            cd /var/www/html/my_memo_master_test
             if [ ! -f .env ]; then
-              echo "Missing /var/www/html/my_memo_master_prod/.env on the VPS."
+              echo "Missing .env on the VPS at /var/www/html/my_memo_master_test/.env"
               exit 1
             fi
-
-            if ! grep -q '^ENVIRONMENT=prod$' .env; then
-              echo "Expected ENVIRONMENT=prod in /var/www/html/my_memo_master_prod/.env."
-              echo "Current value:"
+            if ! grep -q '^ENVIRONMENT=test$' .env; then
+              echo "Expected ENVIRONMENT=test in .env — found:"
               grep '^ENVIRONMENT=' .env || true
               exit 1
             fi
-
             env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env config -q
           EOF
 
-      - name: Validate PREPROD server env
-        if: github.event.workflow_run.head_branch != 'main'
+      - name: Deploy to VPS
         run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
-            cd /var/www/html/my_memo_master_preprod
-
-            if [ ! -f .env ]; then
-              echo "Missing /var/www/html/my_memo_master_preprod/.env on the VPS."
-              exit 1
-            fi
-
-            if ! grep -q '^ENVIRONMENT=preprod$' .env; then
-              echo "Expected ENVIRONMENT=preprod in /var/www/html/my_memo_master_preprod/.env."
-              echo "Current value:"
-              grep '^ENVIRONMENT=' .env || true
-              exit 1
-            fi
-
-            env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env config -q
-          EOF
-
-      - name: Deploy to VPS in PROD
-        if: github.event.workflow_run.head_branch == 'main'
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            cd /var/www/html/my_memo_master_prod
+            cd /var/www/html/my_memo_master_test
             compose() {
               env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env "$@"
             }
 
             compose pull
-            compose up -d postgres
-            # compose run --rm db-sync
+            compose up -d postgres redis
             compose up -d pgadmin api front
             compose ps
 
             attempt=1
             max_attempts=24
-            services="postgres api front pgadmin"
+            services="postgres api front"
             all_ready=0
 
             while [ "$attempt" -le "$max_attempts" ]; do
               all_ready=1
-              echo "Verification attempt $attempt/$max_attempts"
-
+              echo "Vérification $attempt/$max_attempts"
               for service in $services; do
                 container_id=$(compose ps -q "$service")
-
                 if [ -z "$container_id" ]; then
-                  echo "Service $service has no container yet"
+                  echo "Service $service : pas encore démarré"
                   all_ready=0
                   continue
                 fi
-
                 status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")
                 echo "$service => $status"
-
                 if [ "$status" != "healthy" ] && [ "$status" != "running" ]; then
                   all_ready=0
                 fi
               done
-
               if [ "$all_ready" -eq 1 ]; then
-                echo "All services are up."
+                echo "Tous les services sont démarrés."
                 break
               fi
-
               if [ "$attempt" -lt "$max_attempts" ]; then
                 sleep 5
               fi
-
               attempt=$((attempt + 1))
             done
 
             if [ "$all_ready" -ne 1 ]; then
-              echo "Deployment verification failed."
+              echo "Échec de la vérification du déploiement."
               compose ps
               compose logs --tail=100
               exit 1
             fi
           EOF
 
-      - name: Deploy to VPS in PREPROD
-        if: github.event.workflow_run.head_branch != 'main'
-        run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_PREPROD_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            cd /var/www/html/my_memo_master_preprod
-            compose() {
-              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env "$@"
-            }
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  2b. DEPLOY PREPROD → Kubernetes (Infomaniak)
+  #      Namespace : mymemomaster-preprod
+  #      Seuls api et front sont redémarrés (postgres/redis restent en place)
+  # ═══════════════════════════════════════════════════════════════════════════
 
-            compose pull
-            compose up -d postgres
-            # compose run --rm db-sync
-            compose up -d pgadmin api front
-            compose ps
-
-            attempt=1
-            max_attempts=24
-            services="postgres api front pgadmin"
-            all_ready=0
-
-            while [ "$attempt" -le "$max_attempts" ]; do
-              all_ready=1
-              echo "Verification attempt $attempt/$max_attempts"
-
-              for service in $services; do
-                container_id=$(compose ps -q "$service")
-
-                if [ -z "$container_id" ]; then
-                  echo "Service $service has no container yet"
-                  all_ready=0
-                  continue
-                fi
-
-                status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")
-                echo "$service => $status"
-
-                if [ "$status" != "healthy" ] && [ "$status" != "running" ]; then
-                  all_ready=0
-                fi
-              done
-
-              if [ "$all_ready" -eq 1 ]; then
-                echo "All services are up."
-                break
-              fi
-
-              if [ "$attempt" -lt "$max_attempts" ]; then
-                sleep 5
-              fi
-
-              attempt=$((attempt + 1))
-            done
-
-            if [ "$all_ready" -ne 1 ]; then
-              echo "Deployment verification failed."
-              compose ps
-              compose logs --tail=100
-              exit 1
-            fi
-          EOF
-
-  build_failure:
+  deploy_preprod:
+    name: Deploy to Kubernetes (preprod)
     runs-on: ubuntu-latest
-    needs: build_and_deploy
-    if: failure()
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'preprod'
     steps:
-      - name: Notify Deployment Failure
-        run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Deployment failed on branch ${{ github.event.workflow_run.head_branch }}!\"}" \
-          ${{ secrets.DISCORD_LOG }}
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
-  build_success:
-    runs-on: ubuntu-latest
-    needs: build_and_deploy
-    if: success()
-    steps:
-      - name: Notify Deployment Success
+      - name: Set up kubectl
         run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Deployment succeeded on branch ${{ github.event.workflow_run.head_branch }}!\"}" \
-          ${{ secrets.DISCORD_LOG }}
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_PREPROD }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster connection
+        run: kubectl cluster-info
+
+      - name: Apply K8s manifests
+        run: kubectl apply -f k8s/preprod/
+
+      - name: Rollout restart (api + front uniquement)
+        run: |
+          kubectl rollout restart deployment/mmm-preprod-api   -n mymemomaster-preprod
+          kubectl rollout restart deployment/mmm-preprod-front -n mymemomaster-preprod
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/mmm-preprod-api   -n mymemomaster-preprod --timeout=180s
+          kubectl rollout status deployment/mmm-preprod-front -n mymemomaster-preprod --timeout=180s
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  2c. DEPLOY PROD → Kubernetes
+  #      Désactivé jusqu'à ce que le cluster prod soit prêt.
+  #      Pour activer : ajouter la variable GitHub Actions K8S_PROD_ENABLED=true
+  #      dans Settings → Variables → Actions de ce dépôt.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  deploy_prod:
+    name: Deploy to Kubernetes (prod)
+    runs-on: ubuntu-latest
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'main' && vars.K8S_PROD_ENABLED == 'true'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_PROD }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster connection
+        run: kubectl cluster-info
+
+      - name: Apply K8s manifests
+        run: kubectl apply -f k8s/prod/
+
+      - name: Rollout restart (api + front uniquement)
+        run: |
+          kubectl rollout restart deployment/mmm-prod-api   -n mymemomaster
+          kubectl rollout restart deployment/mmm-prod-front -n mymemomaster
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/mmm-prod-api   -n mymemomaster --timeout=300s
+          kubectl rollout status deployment/mmm-prod-front -n mymemomaster --timeout=300s
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  3. NOTIFICATIONS DISCORD
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    needs: [push_images, deploy_test, deploy_preprod, deploy_prod]
+    if: always() && needs.push_images.result == 'success'
+    steps:
+      - name: Send notification
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            STATUS="échoué"
+            EMOJI="❌"
+          else
+            STATUS="réussi"
+            EMOJI="✅"
+          fi
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \"${EMOJI} Déploiement **${BRANCH}** ${STATUS}.\"}" \
+            "${{ secrets.DISCORD_LOG }}"

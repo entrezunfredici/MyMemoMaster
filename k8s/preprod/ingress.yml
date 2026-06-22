@@ -1,41 +1,31 @@
 # =============================================================================
-#  DÉPRÉCIÉ — Ce fichier est remplacé par k8s/preprod/ingress.yml
-#
-#  Migration :
-#    1. Appliquer les nouveaux manifests : kubectl apply -f k8s/preprod/
-#    2. Vérifier que les pods sont Running dans namespace mymemomaster-preprod
-#    3. Supprimer les anciennes ressources :
-#         kubectl delete ingress mymemomaster-test-api mymemomaster-test-front -n default
-#
-#  --- ANCIEN CONTENU (conservé pour référence) ---
-#
-#  Ingress MyMemoMaster — Preprod (test)
+#  Ingress preprod — MyMemoMaster
 #
 #  Domaines : preprod-api.my-memo-master.com / preprod.my-memo-master.com
-#  Namespace : default (où sont déployés les services test)
+#  Namespace : mymemomaster-preprod
 #  SSL : Let's Encrypt via cert-manager + Cloudflare DNS01
 #
 #  Prérequis :
-#    - ingress-nginx installé
+#    - ingress-nginx installé sur le cluster
 #    - cert-manager installé
-#    - cloudflare-secret.yml appliqué
-#    - cluster-issuer-cloudflare.yml appliqué
+#    - k8s/cert-manager/cloudflare-secret.yml appliqué
+#    - k8s/cert-manager/cluster-issuer-cloudflare.yml appliqué
 #    - Mode SSL Cloudflare réglé sur "Full" (pas "Full strict")
 #
 #  Appliquer :
-#    kubectl apply -f k8s/app/ingress-test.yml
+#    kubectl apply -f k8s/preprod/
 #
-#  Vérifier le certificat :
-#    kubectl get certificate -n default
-#    kubectl describe certificate mymemomaster-test-api-tls -n default
+#  Vérifier les certificats :
+#    kubectl get certificate -n mymemomaster-preprod
+#    kubectl describe certificate mmm-preprod-api-tls -n mymemomaster-preprod
 # =============================================================================
 
 # ── API ───────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: mymemomaster-test-api
-  namespace: default
+  name: mmm-preprod-api
+  namespace: mymemomaster-preprod
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -48,7 +38,7 @@ spec:
   tls:
     - hosts:
         - preprod-api.my-memo-master.com
-      secretName: mymemomaster-test-api-tls
+      secretName: mmm-preprod-api-tls
   rules:
     - host: preprod-api.my-memo-master.com
       http:
@@ -57,7 +47,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: mymemomaster-test-api
+                name: mmm-preprod-api
                 port:
                   number: 80
 
@@ -67,8 +57,8 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: mymemomaster-test-front
-  namespace: default
+  name: mmm-preprod-front
+  namespace: mymemomaster-preprod
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -79,7 +69,7 @@ spec:
   tls:
     - hosts:
         - preprod.my-memo-master.com
-      secretName: mymemomaster-test-front-tls
+      secretName: mmm-preprod-front-tls
   rules:
     - host: preprod.my-memo-master.com
       http:
@@ -88,6 +78,36 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: mymemomaster-test-front
+                name: mmm-preprod-front
+                port:
+                  number: 80
+
+---
+
+# ── PgAdmin (accès optionnel) ──────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mmm-preprod-pgadmin
+  namespace: mymemomaster-preprod
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - preprod-pgadmin.my-memo-master.com
+      secretName: mmm-preprod-pgadmin-tls
+  rules:
+    - host: preprod-pgadmin.my-memo-master.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mmm-preprod-pgadmin
                 port:
                   number: 80

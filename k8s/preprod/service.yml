@@ -1,0 +1,83 @@
+# =============================================================================
+#  Services preprod — MyMemoMaster
+#  Tous les services sont ClusterIP (accès interne uniquement).
+#  L'accès externe passe par l'Ingress (k8s/preprod/ingress.yml).
+# =============================================================================
+
+# ── PostgreSQL ─────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mmm-preprod-postgres
+  namespace: mymemomaster-preprod
+spec:
+  type: ClusterIP
+  selector:
+    app: mmm-preprod-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+
+# ── Redis ──────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mmm-preprod-redis
+  namespace: mymemomaster-preprod
+spec:
+  type: ClusterIP
+  selector:
+    app: mmm-preprod-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+
+---
+
+# ── API Node.js ────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mmm-preprod-api
+  namespace: mymemomaster-preprod
+spec:
+  type: ClusterIP
+  selector:
+    app: mmm-preprod-api
+  ports:
+    - port: 80
+      targetPort: 3000
+
+---
+
+# ── Frontend ───────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mmm-preprod-front
+  namespace: mymemomaster-preprod
+spec:
+  type: ClusterIP
+  selector:
+    app: mmm-preprod-front
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+
+# ── PgAdmin ────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mmm-preprod-pgadmin
+  namespace: mymemomaster-preprod
+spec:
+  type: ClusterIP
+  selector:
+    app: mmm-preprod-pgadmin
+  ports:
+    - port: 80
+      targetPort: 80
