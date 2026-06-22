@@ -1,66 +1,330 @@
 <template>
-  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
-    <section class="order-2 lg:order-1 p-5 bg-light rounded-[7px]">
-      <div class="w-full">
-        <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4">
-          LS Name
-        </h4>
-
-        <Dropdown title="Sort">
-          <div v-for="item in ['One', 'Two', 'Three']" :key="item">
-            <button class="w-full p-2  rounded-lg text-left text-dark hover:bg-primary hover:text-light">
-              {{ item }}
-            </button>
+  <ItemListLayout
+    v-model:search="searchQuery"
+    v-model:selectedSubjectId="selectedSubjectId"
+    :subjects="subjects"
+    :loading="loading"
+    :filtered-count="filteredSystems.length"
+    search-placeholder="Rechercher un système..."
+    create-label="+ Nouveau système"
+    item-label="système"
+    empty-message="Aucun système ne correspond à votre recherche. Créez-en un !"
+    @create="openCreateModal"
+  >
+    <!-- Cartes -->
+    <MenuItem
+      v-for="system in filteredSystems"
+      :key="system.idSystem"
+      :title="system.name"
+      :description="system.subject?.name || ''"
+      action-label="Lancer la session"
+      :on-action="() => goToSession(system.idSystem)"
+      :on-edit="() => openEditModal(system)"
+      :on-delete="() => handleDelete(system)"
+    >
+      <template #stats>
+        <div class="mt-1">
+          <div v-if="system.subject" class="mb-2">
+            <span class="subject-badge">{{ system.subject.name }}</span>
           </div>
-        </Dropdown>
-
-        <div class="py-4">
-          <span class="text-lg font-medium text-gray-light">Question</span>
-          <input type="text" placeholder="Quelle est la loi de bernouilli ?" class="w-full p-2 rounded-lg text-dark" />
-        </div>
-
-        <div class="py-4">
-          <span class="text-lg font-medium text-gray-light">Réponse</span>
-          <textarea placeholder="Quelle est la loi de bernouilli ?" class="w-full p-2 rounded-lg text-dark" />
-        </div>
-
-        <div class="pb-4 w-full flex justify-center">
-          <Button :callback="() => { console.log('Valider') }">Valider</Button>
-        </div>
-
-        <div class="border-4 border-primary rounded-lg px-8 py-4">
-          <h4 class="text-primary text-xl neue-haas-grotesk-r font-semibold pb-4">
-            Questions récap
-          </h4>
-          <div class="flex flex-col gap-4">
-            <div v-for="index in [1, 2, 3, 4]" :key="index"
-              class="flex justify-between border-2 bg-[#FFF] border-gray rounded-lg px-4 py-2">
-              <span class="text-lg text-dark">Question {{ index }}</span>
-              <XMarkIcon class="size-6 text-dark cursor-pointer hover:brightness-50" />
+          <div v-if="cardStore.systemStats[system.idSystem]">
+            <span class="text-sm text-gray-500">
+              {{ cardStore.systemStats[system.idSystem].total }}
+              carte{{ cardStore.systemStats[system.idSystem].total !== 1 ? 's' : '' }} à réviser
+            </span>
+            <div class="flex gap-1 mt-2 w-full">
+              <div
+                v-for="level in (boxStore.levelsForSystem(system.idSystem).length ? boxStore.levelsForSystem(system.idSystem) : [1, 2, 3, 4, 5])"
+                :key="level"
+                class="flex-1 text-center bg-white border border-gray-200 rounded p-1"
+              >
+                <div class="text-[10px] text-gray-400 font-bold">B{{ level }}</div>
+                <div class="text-xs font-semibold text-primary">
+                  {{ cardStore.systemStats[system.idSystem].totalByLevel?.[level] || 0 }}
+                </div>
+                <div
+                  class="text-[10px] font-semibold"
+                  :class="(cardStore.systemStats[system.idSystem].boxes[level] || 0) > 0 ? 'text-orange-500' : 'text-gray-300'"
+                >
+                  {{ cardStore.systemStats[system.idSystem].boxes[level] || 0 }}↑
+                </div>
+              </div>
             </div>
           </div>
-          <div class="pt-4 w-full flex justify-center">
-            <Button :callback="() => { console.log('Valider') }">Valider</Button>
+          <div class="mt-3 flex gap-3">
+            <button
+              @click.stop="router.push({ name: 'flashcards.cards', params: { systemId: system.idSystem } })"
+              class="text-sm text-primary hover:underline font-medium"
+            >
+              Gérer les cartes →
+            </button>
+            <button
+              @click.stop="openPlanModal(system)"
+              class="text-sm text-green-600 hover:underline font-medium"
+            >
+              + Planifier
+            </button>
           </div>
         </div>
+      </template>
+    </MenuItem>
 
+    <!-- Modals -->
+    <template #modals>
+
+      <!-- Modal créer / modifier système -->
+      <div v-if="showModal" class="modal-overlay" @click="closeModal">
+        <div class="modal-panel" @click.stop>
+          <button @click="closeModal" class="modal-close" title="Fermer">&times;</button>
+          <h2 class="modal-title">
+            {{ editingId ? 'Modifier le système' : 'Nouveau système Leitner' }}
+          </h2>
+          <form @submit.prevent="submitForm">
+            <div class="mb-4">
+              <label class="form-label">Nom du système</label>
+              <input
+                v-model="form.name"
+                type="text"
+                placeholder="Ex : Maths S1, Vocabulaire anglais..."
+                class="form-input"
+                required
+              />
+            </div>
+            <div class="mb-6">
+              <label class="form-label">Sujet <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <select v-model="form.subjectId" class="form-input">
+                <option :value="null">— Sans sujet —</option>
+                <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>
+              </select>
+              <div v-if="!showNewSubjectForm" class="mt-2">
+                <button type="button" @click="showNewSubjectForm = true" class="subject-create-link">
+                  + Créer un nouveau sujet
+                </button>
+              </div>
+              <div v-else class="subject-inline-form">
+                <input
+                  v-model="newSubjectName"
+                  type="text"
+                  placeholder="Nom du sujet (ex : Physique)"
+                  class="subject-inline-input"
+                  @keydown.enter.prevent="createSubjectInline"
+                  autofocus
+                />
+                <button type="button" :disabled="creatingSubject || !newSubjectName.trim()" @click="createSubjectInline" class="subject-inline-btn">
+                  {{ creatingSubject ? '...' : 'Créer' }}
+                </button>
+                <button type="button" @click="showNewSubjectForm = false; newSubjectName = ''" class="subject-inline-cancel">Annuler</button>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button type="submit" :disabled="submitting" class="btn-modal-submit">
+                {{ submitting ? 'Enregistrement...' : editingId ? 'Modifier' : 'Créer' }}
+              </button>
+              <button type="button" @click="closeModal" class="btn-modal-cancel">Annuler</button>
+            </div>
+          </form>
+        </div>
       </div>
-    </section>
-    <section class="order-1 lg:order-2 p-5 bg-light rounded-[7px]">
-      <div class="w-full">
-        <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4">
-          Mindmap Name
-        </h4>
+
+      <!-- Modal planification de session -->
+      <div v-if="showPlanModal" class="modal-overlay" @click="closePlanModal">
+        <div class="modal-panel" @click.stop>
+          <button @click="closePlanModal" class="modal-close">&times;</button>
+          <h2 class="modal-title" style="margin-bottom: 0.25rem">Planifier une session</h2>
+          <p class="text-sm text-gray-500 mb-6">Système : <span class="font-semibold text-primary">{{ planningSystem?.name }}</span></p>
+          <form @submit.prevent="submitPlanForm">
+            <div class="form-group">
+              <label class="form-label">Nom de la session</label>
+              <input v-model="planForm.name" type="text" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date</label>
+              <input v-model="planForm.date" type="date" class="form-input" required />
+            </div>
+            <div class="flex gap-4 mb-6">
+              <div class="flex-1">
+                <label class="form-label">Heure de début</label>
+                <input v-model="planForm.startTime" type="time" class="form-input" required />
+              </div>
+              <div class="flex-1">
+                <label class="form-label">Heure de fin</label>
+                <input v-model="planForm.endTime" type="time" class="form-input" required />
+              </div>
+            </div>
+            <p v-if="planError" class="text-red-600 text-sm mb-4">{{ planError }}</p>
+            <div class="btn-row">
+              <button type="submit" :disabled="submittingPlan" class="btn-modal-submit">
+                {{ submittingPlan ? 'Enregistrement...' : 'Planifier' }}
+              </button>
+              <button type="button" @click="closePlanModal" class="btn-modal-cancel">Annuler</button>
+            </div>
+          </form>
+        </div>
       </div>
-      <Mindmap />
-    </section>
-  </div>
+
+    </template>
+  </ItemListLayout>
 </template>
 
 <script setup>
-import Mindmap from '@/components/MindmapComponent.vue'
-import Dropdown from '@/components/DropdownComponent.vue'
-import Button from '@/components/ButtonComponent.vue'
-import { XMarkIcon } from '@heroicons/vue/24/solid'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import MenuItem from '@/components/MenuItemComponent.vue'
+import ItemListLayout from '@/components/ItemListLayout.vue'
+import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
+import { useLeitnerCardStore } from '@/stores/leitnerCards'
+import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
+import { useRevisionSessionStore } from '@/stores/revisionSessions'
+import { useSubjectStore } from '@/stores/subjects'
+import { api } from '@/helpers/api'
 
+const router = useRouter()
+const systemStore = useLeitnerSystemStore()
+const cardStore = useLeitnerCardStore()
+const boxStore = useLeitnerBoxStore()
+const sessionStore = useRevisionSessionStore()
+const subjectStore = useSubjectStore()
+
+const loading = ref(true)
+const searchQuery = ref('')
+const selectedSubjectId = ref(null)
+const showModal = ref(false)
+const submitting = ref(false)
+const editingId = ref(null)
+const showNewSubjectForm = ref(false)
+const newSubjectName = ref('')
+const creatingSubject = ref(false)
+
+const form = reactive({ name: '', subjectId: null })
+const subjects = computed(() => subjectStore.subjects)
+
+const filteredSystems = computed(() => {
+  let list = systemStore.systems
+  if (selectedSubjectId.value) {
+    list = list.filter(s => s.subjectId === selectedSubjectId.value)
+  }
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(s => s.name?.toLowerCase().includes(q))
+  }
+  return list
+})
+
+// ── Planification ─────────────────────────────────────────────────────────────
+const showPlanModal = ref(false)
+const planningSystem = ref(null)
+const submittingPlan = ref(false)
+const planError = ref('')
+const planForm = reactive({ name: '', date: '', startTime: '', endTime: '' })
+
+const openPlanModal = (system) => {
+  planningSystem.value = system
+  planForm.name = system.name
+  planForm.date = ''
+  planForm.startTime = ''
+  planForm.endTime = ''
+  planError.value = ''
+  showPlanModal.value = true
+}
+
+const closePlanModal = () => {
+  showPlanModal.value = false
+  planningSystem.value = null
+}
+
+const submitPlanForm = async () => {
+  submittingPlan.value = true
+  planError.value = ''
+  const ok = await sessionStore.createSession({
+    name: planForm.name,
+    date: planForm.date,
+    startTime: planForm.startTime,
+    endTime: planForm.endTime,
+    idSystem: planningSystem.value.idSystem
+  })
+  submittingPlan.value = false
+  if (ok) closePlanModal()
+  else planError.value = 'Erreur lors de la création de la session.'
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+const loadStats = async () => {
+  if (systemStore.systems.length > 0) {
+    await cardStore.loadSystemStats(systemStore.systems.map(s => s.idSystem))
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([systemStore.fetchSystems(), subjectStore.fetchSubjects()])
+  await Promise.all([loadStats(), boxStore.fetchBoxes()])
+  loading.value = false
+})
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+const goToSession = (systemId) => {
+  router.push({ name: 'flashcardssession', params: { systemId } })
+}
+
+// ── Modal système ─────────────────────────────────────────────────────────────
+const openCreateModal = () => {
+  editingId.value = null
+  form.name = ''
+  form.subjectId = null
+  showNewSubjectForm.value = false
+  newSubjectName.value = ''
+  showModal.value = true
+}
+
+const openEditModal = (system) => {
+  editingId.value = system.idSystem
+  form.name = system.name
+  form.subjectId = system.subjectId || null
+  showNewSubjectForm.value = false
+  newSubjectName.value = ''
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  editingId.value = null
+  form.name = ''
+  form.subjectId = null
+}
+
+async function createSubjectInline() {
+  const name = newSubjectName.value.trim()
+  if (!name || creatingSubject.value) return
+  creatingSubject.value = true
+  try {
+    const resp = await api.post('subjects', { name })
+    if (!resp || resp.status !== 201) return
+    await subjectStore.fetchSubjects()
+    form.subjectId = resp.data.subjectId
+    showNewSubjectForm.value = false
+    newSubjectName.value = ''
+  } finally {
+    creatingSubject.value = false
+  }
+}
+
+const submitForm = async () => {
+  submitting.value = true
+  systemStore.system = { name: form.name, subjectId: form.subjectId || null }
+  const ok = editingId.value
+    ? await systemStore.updateSystem(editingId.value)
+    : await systemStore.createSystem()
+  submitting.value = false
+  if (ok) {
+    closeModal()
+    await loadStats()
+  }
+}
+
+const handleDelete = async (system) => {
+  if (!confirm(`Supprimer le système "${system.name}" ? Cette action est irréversible.`)) return
+  const ok = await systemStore.deleteSystem(system.idSystem)
+  if (ok) {
+    delete cardStore.systemStats[system.idSystem]
+  }
+}
 </script>

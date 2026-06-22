@@ -1,34 +1,34 @@
-"use strict";
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("questionSubject", {
+    await queryInterface.createTable('questionSubject', {
       idQuestion: {
         type: Sequelize.INTEGER,
         allowNull: false,
         primaryKey: true,
         references: {
-          model: "Question",
-          key: "idQuestion",
+          model: 'Question',
+          key: 'idQuestion'
         },
-        onDelete: "CASCADE",
-        onUpdate: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       subjectId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         primaryKey: true,
         references: {
-          model: "Subject",
-          key: "subjectId",
+          model: 'Subject',
+          key: 'subjectId'
         },
-        onDelete: "CASCADE",
-        onUpdate: "CASCADE",
-      },
-    });
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
+      }
+    })
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("questionSubject");
-  },
-};
+    await queryInterface.dropTable('questionSubject')
+  }
+}

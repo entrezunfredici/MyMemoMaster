@@ -1,11 +1,14 @@
-const express = require("express");
-const leitnerSystem = require("../controllers/LeitnerSystem.controller.js");
+const express = require('express')
+const leitnerSystem = require('../controllers/LeitnerSystem.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const leitnerSystemValidators = require('../validators/LeitnerSystem.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /leitnersystems/all:
+ * /leitnersystems:
  *   get:
  *     summary: Récupère tous les systèmes de Leitner
  *     tags:
@@ -29,7 +32,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", leitnerSystem.findAll);
+router.get('/', authMiddleware, leitnerSystem.findAll)
 
 /**
  * @swagger
@@ -53,7 +56,7 @@ router.get("/all", leitnerSystem.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/bySubjects/:subjectid", leitnerSystem.findBySubject);
+router.get('/bySubjects/:subjectid', authMiddleware, leitnerSystem.findBySubject)
 
 /**
  * @swagger
@@ -77,11 +80,11 @@ router.get("/bySubjects/:subjectid", leitnerSystem.findBySubject);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", leitnerSystem.findOne);
+router.get('/:id', authMiddleware, leitnerSystem.findOne)
 
 /**
  * @swagger
- * /leitnersystems/add:
+ * /leitnersystems:
  *   post:
  *     summary: Ajoute un nouveau système de Leitner
  *     tags:
@@ -92,33 +95,28 @@ router.get("/:id", leitnerSystem.findOne);
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [name]
  *             properties:
  *               name:
  *                 type: string
  *                 example: "Système Leitner Physique"
- *               idUser:
- *                 type: integer
- *                 example: 2
- *               idMindMap:
+ *               subjectId:
  *                 type: integer
  *                 nullable: true
- *                 example: 5
- *               sujet:
- *                 type: array
- *                 items:
- *                   type: string
- *                   example: "Chapitre 1"
+ *                 example: 3
  *     responses:
  *       201:
  *         description: Système créé avec succès
+ *       400:
+ *         description: Données invalides
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", leitnerSystem.create);
+router.post('/', authMiddleware, leitnerSystemValidators.create, validate, leitnerSystem.create)
 
 /**
  * @swagger
- * /leitnesystem/{id}:
+ * /leitnersystems/{id}:
  *   put:
  *     summary: Modifie un système de Leitner existant
  *     tags:
@@ -130,16 +128,10 @@ router.post("/add", leitnerSystem.create);
  *           schema:
  *             type: object
  *             properties:
- *               idSystem:
- *                 type: integer
- *                 example: 1
- *               idUser:
- *                 type: integer
- *                 example: 2
  *               name:
  *                 type: string
  *                 example: "Système Leitner mis à jour"
- *               idMindMap:
+ *               subjectId:
  *                 type: integer
  *                 nullable: true
  *                 example: 3
@@ -151,7 +143,7 @@ router.post("/add", leitnerSystem.create);
  *       500:
  *         description: Erreur serveur
  */
-router.put("/:id", leitnerSystem.update);
+router.put('/:id', authMiddleware, leitnerSystemValidators.update, validate, leitnerSystem.update)
 
 /**
  * @swagger
@@ -219,7 +211,7 @@ router.put("/:id", leitnerSystem.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/share", leitnerSystem.share);
+router.post('/share', authMiddleware, leitnerSystemValidators.share, validate, leitnerSystem.share)
 
 /**
  * @swagger
@@ -249,7 +241,7 @@ router.post("/share", leitnerSystem.share);
  *       500:
  *         description: Erreur serveur
  */
-router.delete("/:id", leitnerSystem.delete);
+router.delete('/:id', authMiddleware, leitnerSystem.delete)
 
 module.exports = (app) => {
   /**
@@ -258,5 +250,5 @@ module.exports = (app) => {
    *   name: LeitnerSystems
    *   description: Gestion des Systèmes de Leitner
    */
-  app.use("/leitnersystems", router);
-};
+  app.use('/leitnersystems', router)
+}

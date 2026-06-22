@@ -5,8 +5,8 @@ const routes = [
     component: () => import('../pages/HomePage.vue'),
     meta: {
       title: 'Accueil',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/exercises',
@@ -18,13 +18,22 @@ const routes = [
     },
   },
   {
+    path: '/exercises/:id',
+    name: 'exercise-detail',
+    component: () => import('../pages/ExerciseDetailPage.vue'),
+    meta: {
+      title: 'Exercise Detail',
+      private: true,
+    },
+  },
+  {
     path: '/onboarding',
     name: 'onboarding',
     component: () => import('../pages/OnboardingPage.vue'),
     meta: {
       title: 'Onboarding',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/tutorials',
@@ -32,8 +41,8 @@ const routes = [
     component: () => import('../pages/TutorialsPage.vue'),
     meta: {
       title: 'Tutoriels',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/credits',
@@ -41,8 +50,8 @@ const routes = [
     component: () => import('../pages/CreditsPage.vue'),
     meta: {
       title: 'Credits',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/flashcards',
@@ -50,8 +59,26 @@ const routes = [
     component: () => import('../pages/FlashcardsPage.vue'),
     meta: {
       title: 'Flashcards',
-      private: true,
-    },
+      private: true
+    }
+  },
+  {
+    path: '/flashcards/:systemId/cards',
+    name: 'flashcards.cards',
+    component: () => import('../pages/FlashcardsCardsPage.vue'),
+    meta: {
+      title: 'Gestion des cartes',
+      private: true
+    }
+  },
+  {
+    path: '/flashcardssession/:systemId',
+    name: 'flashcardssession',
+    component: () => import('../pages/FlashcardsSessionPage.vue'),
+    meta: {
+      title: 'Session de Flashcards',
+      private: true
+    }
   },
   {
     path: '/mindmaps',
@@ -59,8 +86,26 @@ const routes = [
     component: () => import('../pages/MindmapsPage.vue'),
     meta: {
       title: 'Mindmaps',
-      private: true,
-    },
+      private: true
+    }
+  },
+  {
+    path: '/calendar',
+    name: 'calendar',
+    component: () => import('../pages/CalendarPage.vue'),
+    meta: {
+      title: 'Calendar',
+      private: true
+    }
+  },
+  {
+    path: '/todo',
+    name: 'todo',
+    component: () => import('../pages/TodoPage.vue'),
+    meta: {
+      title: 'To-do',
+      private: true
+    }
   },
   {
     path: '/profile',
@@ -68,8 +113,8 @@ const routes = [
     component: () => import('../pages/ProfilePage.vue'),
     meta: {
       title: 'Profile',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/settings',
@@ -77,8 +122,8 @@ const routes = [
     component: () => import('../pages/SettingsPage.vue'),
     meta: {
       title: 'Settings',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/create-test',
@@ -86,17 +131,17 @@ const routes = [
     component: () => import('../pages/CreateTestPage.vue'),
     meta: {
       title: 'Create Test',
-      private: true,
-    },
+      private: true
+    }
   },
   {
     path: '/classroom',
     name: 'classroom',
     component: () => import('../pages/ClassroomPage.vue'),
     meta: {
-      title: 'Class Gropup',
-      private: true,
-    },
+      title: 'Class Group',
+      private: true
+    }
   },
   // ==================== AUTH & ACCOUNT ====================
   {
@@ -105,8 +150,26 @@ const routes = [
     component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
       title: 'Authentification',
-      private: false,
-    },
+      private: false
+    }
+  },
+  {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('../pages/ForgotPasswordPage.vue'),
+    meta: {
+      title: 'Mot de passe oublié',
+      private: false
+    }
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('../pages/ResetPasswordPage.vue'),
+    meta: {
+      title: 'Réinitialiser le mot de passe',
+      private: false
+    }
   },
   {
     path: '/register',
@@ -114,8 +177,8 @@ const routes = [
     component: () => import('../pages/register/InscriptionPage.vue'),
     meta: {
       title: 'register',
-      private: false,
-    },
+      private: false
+    }
   },
   {
     path: '/account',
@@ -123,8 +186,8 @@ const routes = [
     component: () => import('../pages/AccountPage.vue'),
     meta: {
       title: 'Mon compte',
-      private: true,
-    },
+      private: true
+    }
   },
   // ==================== CATCH ====================
   {
@@ -132,18 +195,17 @@ const routes = [
     name: 'error.server',
     component: () => import('../pages/error/ErrorServerPage.vue'),
     meta: {
-      title: 'Error',
-    },
+      title: 'Error'
+    }
   },
   {
     path: '/:catchAll(.*)*',
     name: 'error.routing',
     component: () => import('../pages/error/ErrorRoutingPage.vue'),
     meta: {
-      title: 'Error',
-    },
+      title: 'Error'
+    }
   }
-
 ]
 
 export default routes

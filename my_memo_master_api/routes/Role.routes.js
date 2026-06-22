@@ -1,12 +1,15 @@
-const express = require("express");
-const role = require("../controllers/Role.controller.js");
-const authMiddleware = require("../middlewares/Auth.middleware.js");
+const express = require('express')
+const role = require('../controllers/Role.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware.js')
+const requireRole = require('../middlewares/requireRole.middleware')
+const validate = require('../middlewares/validate.middleware')
+const roleValidators = require('../validators/Role.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /roles/all:
+ * /roles:
  *   get:
  *     summary: Récupère tous les rôles
  *     tags:
@@ -30,7 +33,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", role.findAll);
+router.get('/', authMiddleware, role.findAll)
 
 /**
  * @swagger
@@ -65,11 +68,11 @@ router.get("/all", role.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", role.findOne);
+router.get('/:id', authMiddleware, role.findOne)
 
 /**
  * @swagger
- * /roles/add:
+ * /roles:
  *   post:
  *     summary: Ajoute un nouveau rôle
  *     tags:
@@ -92,7 +95,7 @@ router.get("/:id", role.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", role.create);
+router.post('/', authMiddleware, requireRole(1), roleValidators.create, validate, role.create)
 
 /**
  * @swagger
@@ -125,7 +128,7 @@ router.post("/add", role.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", authMiddleware, role.update);
+router.put('/:id', authMiddleware, requireRole(1), roleValidators.update, validate, role.update)
 
 /**
  * @swagger
@@ -148,7 +151,7 @@ router.put("/:id", authMiddleware, role.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:id", authMiddleware, role.delete);
+router.delete('/:id', authMiddleware, requireRole(1), role.delete)
 
 module.exports = (app) => {
   /**
@@ -157,5 +160,5 @@ module.exports = (app) => {
    *   - name: Roles
    *     description: Gestion des rôles
    */
-  app.use("/roles", router);
-};
+  app.use('/roles', router)
+}

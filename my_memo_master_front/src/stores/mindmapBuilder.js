@@ -6,7 +6,10 @@ import {
   createId,
   serializeMindMap,
   ensureSecondaryColor,
+  boxColorToHex,
+  boxLevelToMastery,
 } from '@/helpers/mindmap';
+import { api } from '@/helpers/api';
 
 const defaultTool = 'select';
 
@@ -14,10 +17,12 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
   state: () => ({
     map: createBlankMindMap(),
     tool: defaultTool,
+    nodeType: 'text', // 'text' | 'formula' | 'image'
     selectedNodeIds: [],
     selectedLinkId: null,
     pendingLinkSource: null,
     isDirty: false,
+    interpreterOpen: false,
   }),
   getters: {
     nodesArray: (state) => Object.values(state.map.nodes),
@@ -33,10 +38,17 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
   },
   actions: {
     load(raw) {
-      const normalized = applyRadialLayout(normalizeMindMap(raw));
-      this.map = normalized;
+      const normalized = normalizeMindMap(raw);
+      const nonSubjectNodes = Object.values(normalized.nodes).filter(
+        (n) => n.id !== normalized.subjectNodeId
+      );
+      const hasLayout = nonSubjectNodes.some(
+        (n) => Math.abs(n.layout?.x ?? 0) > 1 || Math.abs(n.layout?.y ?? 0) > 1
+      );
+      this.map = hasLayout ? normalized : applyRadialLayout(normalized);
       this.resetSelection();
       this.isDirty = false;
+      this.syncCardMasteries();
     },
     new(title) {
       this.map = createBlankMindMap(title);
@@ -51,6 +63,9 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       if (tool !== 'link') {
         this.pendingLinkSource = null;
       }
+    },
+    setNodeType(type) {
+      this.nodeType = type;
     },
     selectNode(id, additive = false) {
       if (!id) {
@@ -118,6 +133,8 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
         type,
         content: nodeContent,
         mastery: 'undefined',
+        idCard: null,
+        idSystem: null,
         zoneId: null,
         style: {
           primaryColor: parent?.style?.primaryColor || '#1E3A8A',
@@ -293,10 +310,54 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       this.addLink({ from: this.pendingLinkSource, to: targetId, type });
       this.pendingLinkSource = null;
     },
+    openInterpreter() {
+      this.interpreterOpen = true;
+    },
+    closeInterpreter() {
+      this.interpreterOpen = false;
+    },
+    linkCard(nodeId, idCard, idSystem) {
+      const node = this.map.nodes[nodeId];
+      if (!node) return;
+      node.idCard = idCard;
+      node.idSystem = idSystem;
+      this.touch();
+    },
+    unlinkCard(nodeId) {
+      const node = this.map.nodes[nodeId];
+      if (!node) return;
+      node.idCard = null;
+      node.idSystem = null;
+      node.mastery = 'undefined';
+      ensureSecondaryColor(node);
+      this.touch();
+    },
+    async syncCardMasteries() {
+      const nodes = Object.values(this.map.nodes);
+      const systemGroups = {};
+      for (const node of nodes) {
+        if (node.idCard && node.idSystem) {
+          if (!systemGroups[node.idSystem]) systemGroups[node.idSystem] = [];
+          systemGroups[node.idSystem].push(node);
+        }
+      }
+      for (const systemId of Object.keys(systemGroups)) {
+        const res = await api.get(`leitnercards/system/${systemId}`);
+        if (!res?.data) continue;
+        for (const node of systemGroups[systemId]) {
+          const card = res.data.find((c) => c.idCard === node.idCard);
+          if (!card?.leitnerBox) continue;
+          node.mastery = boxLevelToMastery(card.leitnerBox.level);
+          node.style.secondaryColor = boxColorToHex(card.leitnerBox.color);
+        }
+      }
+    },
     touch() {
       this.isDirty = true;
       this.map.updatedAt = new Date().toISOString();
     },
+    markSaved() {
+      this.isDirty = false;
+    },
   },
 });
-

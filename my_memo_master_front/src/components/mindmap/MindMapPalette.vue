@@ -1,197 +1,263 @@
 <template>
-  <div class="mindmap-palette">
-    <header class="mindmap-palette__header">
-      <h3>Outils</h3>
-      <span class="mindmap-palette__tool">Mode: {{ activeToolLabel }}</span>
-    </header>
+  <div class="palette">
 
-    <div class="mindmap-palette__section">
-      <div class="mindmap-palette__buttons">
+    <!-- ── Créer ──────────────────────────────────────────────────────────── -->
+    <section class="palette__section">
+      <h4 class="palette__section-title">Créer</h4>
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type par défaut</label>
+        <select class="palette__select palette__select--inline" :value="store.nodeType" @change="store.setNodeType($event.target.value)">
+          <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
+        </select>
+      </div>
+      <p class="palette__hint">
+        <kbd>⇧</kbd>&thinsp;+ clic sur le canvas ou un nœud pour créer. Bouton <strong>+</strong> sur un nœud pour ajouter un enfant.
+      </p>
+    </section>
+
+    <!-- ── Modes ──────────────────────────────────────────────────────────── -->
+    <section class="palette__section">
+      <h4 class="palette__section-title">Mode</h4>
+      <div class="palette__mode-row">
         <button
-          v-for="tool in tools"
-          :key="tool.id"
-          :class="['mindmap-palette__button', { 'mindmap-palette__button--active': store.tool === tool.id }]"
-          @click="store.setTool(tool.id)"
+          :class="['palette__mode-btn', { 'palette__mode-btn--active': store.tool === 'link' }]"
+          @click="store.setTool(store.tool === 'link' ? 'select' : 'link')"
         >
-          <span class="mindmap-palette__icon">{{ tool.icon }}</span>
-          <span>{{ tool.label }}</span>
+          <span>→</span> Lien
+        </button>
+        <button
+          :class="['palette__mode-btn', { 'palette__mode-btn--active': store.tool === 'zone' }]"
+          @click="store.setTool(store.tool === 'zone' ? 'select' : 'zone')"
+        >
+          <span>□</span> Zone
         </button>
       </div>
-    </div>
+      <p v-if="store.tool === 'link'" class="palette__hint palette__hint--info">
+        Mode lien actif — cliquez sur un nœud source, puis sur la cible.
+      </p>
+    </section>
 
-    <div class="mindmap-palette__section">
-      <h4>Creer des items</h4>
-      <div class="mindmap-palette__actions">
-        <button @click="createSubjectItem">{{ subjectCreationLabel }}</button>
-        <button @click="addChild" :disabled="!selectedNode">{{ childCreationLabel }}</button>
-      </div>
-      <p class="mindmap-palette__hint">{{ creationHint }}</p>
-    </div>
+    <!-- ── Item sélectionné ───────────────────────────────────────────────── -->
+    <section class="palette__section palette__section--selected" v-if="selectedNode">
+      <h4 class="palette__section-title">
+        Options
+        <span class="palette__node-label">{{ selectedNode.label }}</span>
+      </h4>
 
-    <div class="mindmap-palette__section" v-if="selectedNode">
-      <h4>Item selectionne</h4>
-      <div class="mindmap-palette__field">
-        <label>Titre</label>
-        <input v-model="editableLabel" @change="updateLabel" />
+      <!-- Type du nœud -->
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type</label>
+        <select class="palette__select palette__select--inline" :value="selectedNode.type" @change="updateNodeType($event.target.value)">
+          <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
+        </select>
       </div>
-      <div v-if="isTextNodeSelected" class="mindmap-palette__text-style">
-        <div class="mindmap-palette__text-toolbar">
-          <button type="button" :class="{ active: isBold }" @click="toggleBold">
-            <span class="mindmap-palette__text-icon mindmap-palette__text-icon--bold">G</span>
-          </button>
-          <button type="button" :class="{ active: isItalic }" @click="toggleItalic">
-            <span class="mindmap-palette__text-icon mindmap-palette__text-icon--italic">I</span>
-          </button>
-          <button type="button" :class="{ active: isUnderline }" @click="toggleUnderline">
-            <span class="mindmap-palette__text-icon mindmap-palette__text-icon--underline">U</span>
-          </button>
+
+      <!-- Maîtrise -->
+      <div class="palette__field">
+        <label class="palette__label">Maîtrise</label>
+        <select class="palette__select" :value="selectedNode.mastery" @change="updateMastery($event.target.value)">
+          <option v-for="level in masteryLevels" :key="level.id" :value="level.id">{{ level.label }}</option>
+        </select>
+      </div>
+
+      <!-- Couleur de fond + forme -->
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Fond</label>
+        <input type="color" class="palette__color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
+      </div>
+
+      <div class="palette__field">
+        <label class="palette__label">Forme</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="s in shapes"
+            :key="s.id"
+            :class="['palette__shape-btn', { 'palette__shape-btn--active': (selectedNode.style?.shape || 'bubble') === s.id }]"
+            @click="updateShape(s.id)"
+          >{{ s.label }}</button>
         </div>
-        <div class="mindmap-palette__field mindmap-palette__field--inline">
-          <label>Couleur du texte</label>
-          <input type="color" :value="textColor" @input="updateTextColor($event.target.value)" />
+      </div>
+
+      <!-- Options texte -->
+      <template v-if="isTextNodeSelected">
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Couleur texte</label>
+          <input type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
         </div>
-        <div class="mindmap-palette__field mindmap-palette__field--inline">
-          <label>Taille (px)</label>
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Taille (px)</label>
           <input
             type="number"
-            min="10"
-            max="48"
+            class="palette__number"
+            min="10" max="48"
             :value="fontSize"
             @change="updateFontSize($event.target.value)"
           />
         </div>
-      </div>
-      <div class="mindmap-palette__field">
-        <label>Contenu</label>
-        <template v-if="isImageNodeSelected">
-          <input
-            ref="imageInputRef"
-            class="mindmap-palette__file-input"
-            type="file"
-            accept="image/*"
-            @change="handleImageSelection"
-          />
-          <div class="mindmap-palette__image-actions">
-            <button type="button" @click="triggerImageSelection" :disabled="isUploadingImage">
-              {{ isUploadingImage ? 'Envoi en cours…' : 'Choisir une image' }}
-            </button>
-            <button
-              v-if="selectedNode && selectedNode.content"
-              type="button"
-              class="secondary"
-              @click="removeImageFromNode"
-              :disabled="isUploadingImage"
-            >
-              Retirer l'image
-            </button>
-          </div>
-          <p v-if="imageUploadError" class="mindmap-palette__error">{{ imageUploadError }}</p>
-          <div v-if="selectedNode && selectedNode.content" class="mindmap-palette__preview">
-            <img :src="selectedNode.content" :alt="selectedNode.label" />
-            <span class="mindmap-palette__preview-url">{{ selectedNode.content }}</span>
-          </div>
-          <p class="mindmap-palette__hint">Formats acceptés: JPG, PNG, GIF, WEBP ou SVG (max. 5 Mo).</p>
-        </template>
-        <template v-else-if="isFormulaNodeSelected">
-          <textarea
-            v-model="editableContent"
-            rows="5"
-            placeholder="Utilise la syntaxe de l'interpr�teur (ex: frac(a,b))"
-            @change="updateContent"
-          ></textarea>
-          <div
-            v-if="editableContent"
-            class="mindmap-palette__formula-preview"
-            v-html="formulaPreviewHtml"
-          ></div>
-          <div class="mindmap-palette__formula-actions">
-            <button type="button" @click="openInterpreter">Ouvrir l'interpr�teur</button>
-            <button
-              v-if="editableContent"
-              type="button"
-              class="secondary"
-              @click="clearFormulaContent"
-            >
-              Effacer
-            </button>
-          </div>
-          <p class="mindmap-palette__hint">
-            Ouvre l'interpr�teur pour Ins�rer des symboles (ex:
-            <code>frac(a,b)</code>, <code>sqrt(x)</code>,
-            <code>&lt;text bold color:red&gt;Important&lt;/text&gt;</code>).
-          </p>
-        </template>
-        <template v-else>
-          <textarea
-            v-model="editableContent"
-            rows="4"
-            @change="updateContent"
-          ></textarea>
-        </template>
-      </div>
-      <div class="mindmap-palette__field">
-        <label>Niveau de maîtrise</label>
-        <select :value="selectedNode.mastery" @change="updateMastery($event.target.value)">
-          <option v-for="level in masteryLevels" :key="level.id" :value="level.id">{{ level.label }}</option>
-        </select>
-      </div>
-      <div class="mindmap-palette__colors">
-        <label>Couleur principale</label>
-        <input type="color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
-      </div>
-      <div class="mindmap-palette__actions">
-        <button @click="toggleCollapse">{{ selectedNode.collapsed ? 'Reafficher' : 'Masquer' }}</button>
-        <button class="danger" @click="removeNode">Supprimer</button>
-      </div>
-    </div>
+        <div class="palette__toolbar">
+          <button type="button" :class="['palette__toolbar-btn', { active: isBold }]" @click="toggleBold">
+            <strong>G</strong>
+          </button>
+          <button type="button" :class="['palette__toolbar-btn', { active: isItalic }]" @click="toggleItalic">
+            <em>I</em>
+          </button>
+          <button type="button" :class="['palette__toolbar-btn', { active: isUnderline }]" @click="toggleUnderline">
+            <u>S</u>
+          </button>
+        </div>
+      </template>
 
-    <div class="mindmap-palette__section">
-      <h4>Zones</h4>
-      <div class="mindmap-palette__field">
-        <label>Nom</label>
-        <input v-model="zoneName" placeholder="Nom de la zone" />
+      <!-- Formule -->
+      <template v-if="isFormulaNodeSelected">
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Couleur texte</label>
+          <input type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
+        </div>
+        <div class="palette__field">
+          <label class="palette__label">Formule</label>
+          <div v-if="editableContent" class="palette__formula-preview" v-html="formulaPreviewHtml" />
+          <p v-else class="palette__hint">Aucune formule — ouvrez l'interpréteur pour en saisir une.</p>
+          <div class="palette__actions-row">
+            <button class="palette__btn" type="button" @click="openInterpreter">Saisir avec l'interpréteur</button>
+            <button v-if="editableContent" class="palette__btn palette__btn--ghost" type="button" @click="clearFormulaContent">Effacer</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Image -->
+      <template v-if="isImageNodeSelected">
+        <div class="palette__field">
+          <label class="palette__label">Image</label>
+          <input ref="imageInputRef" type="file" accept="image/*" class="palette__file-hidden" @change="handleImageSelection" />
+          <div class="palette__actions-row">
+            <button class="palette__btn" type="button" @click="triggerImageSelection" :disabled="isUploadingImage">
+              {{ isUploadingImage ? 'Envoi…' : 'Choisir une image' }}
+            </button>
+            <button v-if="selectedNode.content" class="palette__btn palette__btn--ghost" type="button" @click="removeImageFromNode" :disabled="isUploadingImage">
+              Retirer
+            </button>
+          </div>
+          <p v-if="imageUploadError" class="palette__error">{{ imageUploadError }}</p>
+          <div v-if="selectedNode.content" class="palette__image-preview">
+            <img :src="selectedNode.content" :alt="selectedNode.label" />
+          </div>
+        </div>
+      </template>
+
+      <!-- Flashcard liée -->
+      <div class="palette__field">
+        <label class="palette__label">Flashcard liée</label>
+
+        <!-- Carte actuellement liée -->
+        <div v-if="selectedNode.idCard" class="palette__card-linked">
+          <span
+            class="palette__card-dot"
+            :style="{ background: linkedCardColor || '#C0C5D2' }"
+          />
+          <span class="palette__card-statement">{{ linkedCardStatement }}</span>
+          <button class="palette__card-unlink" title="Délier" @click="unlinkCard">✕</button>
+        </div>
+
+        <!-- Bouton ouvrir le picker -->
+        <button class="palette__btn palette__btn--ghost palette__btn--sm" @click="openCardPicker">
+          {{ selectedNode.idCard ? 'Changer' : 'Lier une flashcard' }}
+        </button>
+
+        <!-- Picker inline -->
+        <div v-if="showCardPicker" class="palette__card-picker">
+          <select
+            class="palette__select"
+            :value="pickerSystemId"
+            @change="onPickerSystemChange($event.target.value)"
+          >
+            <option value="">— Choisir un système —</option>
+            <option v-for="sys in pickerSystems" :key="sys.idSystem" :value="sys.idSystem">
+              {{ sys.name }}
+            </option>
+          </select>
+
+          <div v-if="pickerLoading" class="palette__hint">Chargement…</div>
+
+          <select
+            v-else-if="pickerCards.length"
+            class="palette__select"
+            v-model="pickerCardId"
+          >
+            <option value="">— Choisir une carte —</option>
+            <option v-for="card in pickerCards" :key="card.idCard" :value="card.idCard">
+              {{ card.question?.statement || `Carte #${card.idCard}` }}
+            </option>
+          </select>
+          <div v-else-if="pickerSystemId" class="palette__hint">Aucune carte dans ce système.</div>
+
+          <div class="palette__actions-row">
+            <button
+              class="palette__btn"
+              :disabled="!pickerCardId"
+              @click="confirmLinkCard"
+            >Lier</button>
+            <button
+              class="palette__btn palette__btn--ghost"
+              @click="showCardPicker = false"
+            >Annuler</button>
+          </div>
+        </div>
       </div>
-      <div class="mindmap-palette__colors">
-        <label>Couleur</label>
-        <input type="color" v-model="zoneColor" />
+
+      <!-- Actions nœud -->
+      <div class="palette__node-actions">
+        <button class="palette__btn palette__btn--ghost" @click="toggleCollapse">
+          {{ selectedNode.collapsed ? 'Réafficher' : 'Masquer' }}
+        </button>
+        <button class="palette__btn palette__btn--danger" @click="removeNode">Supprimer</button>
       </div>
-      <div class="mindmap-palette__actions">
-        <button @click="createZone">Creer une zone</button>
+    </section>
+
+    <section class="palette__section palette__section--empty" v-else>
+      <p class="palette__hint">Sélectionnez un item pour modifier ses options.</p>
+    </section>
+
+    <!-- ── Zones ──────────────────────────────────────────────────────────── -->
+    <section class="palette__section">
+      <h4 class="palette__section-title">Zones</h4>
+      <div class="palette__field">
+        <input class="palette__input" v-model="zoneName" placeholder="Nom de la zone" />
       </div>
-      <div v-if="zones.length" class="mindmap-palette__zones">
-        <span>Assigner a une zone</span>
-        <div class="mindmap-palette__zone-list">
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Couleur</label>
+        <input type="color" class="palette__color" v-model="zoneColor" />
+      </div>
+      <button class="palette__btn" @click="createZone">Créer une zone</button>
+      <div v-if="zones.length && selectedNode" class="palette__zone-assign">
+        <label class="palette__label">Assigner à</label>
+        <div class="palette__zone-chips">
           <button
             v-for="zone in zones"
             :key="zone.id"
-            :class="['mindmap-palette__zone-chip', { active: selectedNodeZone === zone.id }]"
+            :class="['palette__zone-chip', { active: selectedNodeZone === zone.id }]"
             @click="assignZone(zone.id)"
-          >
-            {{ zone.name }}
-          </button>
-          <button class="mindmap-palette__zone-chip" @click="assignZone(null)">Aucune</button>
+          >{{ zone.name }}</button>
+          <button class="palette__zone-chip" @click="assignZone(null)">Aucune</button>
         </div>
       </div>
-    </div>
-
-    <div class="mindmap-palette__section" v-if="!selectedNode">
-      <p>Selectionne un item pour modifier son contenu.</p>
-    </div>
+    </section>
   </div>
+
+  <!-- ── Modale interpréteur ────────────────────────────────────────────── -->
   <teleport to="body">
-    <div v-if="showInterpreter" class="mindmap-interpreter-modal">
-      <div class="mindmap-interpreter-modal__backdrop" @click="closeInterpreter"></div>
-      <div class="mindmap-interpreter-modal__dialog">
-        <div class="mindmap-interpreter-modal__header">
-          <h3>interpr�teur de formules</h3>
-          <button type="button" class="mindmap-interpreter-modal__close" @click="closeInterpreter">
-            &times;
-          </button>
+    <div v-if="store.interpreterOpen" class="interp-modal">
+      <div class="interp-modal__backdrop" @click="closeInterpreter" />
+      <div class="interp-modal__dialog">
+        <div class="interp-modal__header">
+          <h3>Interpréteur de formules</h3>
+          <button type="button" class="interp-modal__close" @click="closeInterpreter">&times;</button>
         </div>
         <Interpreter
           v-model="interpreterValue"
           :show-apply="true"
-          apply-label="Ins�rer dans l'item"
+          apply-label="Insérer dans l'item"
+          :bg-color="selectedNode?.style?.primaryColor || ''"
+          :text-color="selectedNode?.style?.textColor || ''"
           @apply="applyInterpreter"
         />
       </div>
@@ -202,27 +268,24 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { masteryList } from '@/helpers/mindmap';
+import { masteryList, boxColorToHex, boxLevelToMastery } from '@/helpers/mindmap';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
 import Interpreter from '@/components/interpreter/Interpreter.vue';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
-import {
-  normalizeCreationType,
-  getNodeLabel,
-  getSubjectActionLabel,
-  getChildActionLabel,
-} from '@/helpers/mindmapCreation';
 
 const store = useMindMapBuilderStore();
 
-const tools = [
-  { id: 'select', label: 'Selection', icon: 'Sel' },
-  { id: 'text', label: 'Texte', icon: 'Txt' },
+const nodeTypes = [
+  { id: 'text', label: 'Texte', icon: 'T' },
   { id: 'formula', label: 'Formule', icon: 'Fx' },
-  { id: 'image', label: 'Image', icon: 'Img' },
-  { id: 'link', label: 'Lien', icon: '->' },
-  { id: 'zone', label: 'Zone', icon: '[]' },
+  { id: 'image', label: 'Image', icon: '🖼' },
+];
+
+const shapes = [
+  { id: 'bubble', label: 'Bulle' },
+  { id: 'rect', label: 'Rect' },
+  { id: 'pill', label: 'Pilule' },
 ];
 
 const masteryLevels = masteryList;
@@ -230,211 +293,146 @@ const masteryLevels = masteryList;
 const selectedNode = computed(() => store.selectedNode);
 const selectedNodeZone = computed(() => selectedNode.value?.zoneId || null);
 const zones = computed(() => store.map.zones || []);
-const creationType = computed(() => normalizeCreationType(store.tool));
-const subjectCreationLabel = computed(() => getSubjectActionLabel(creationType.value));
-const childCreationLabel = computed(() => getChildActionLabel(creationType.value));
-const creationHint = computed(() => {
-  if (selectedNode.value) {
-    return `Le prochain element sera relie a "${selectedNode.value.label}".`;
-  }
-  return 'Selectionne un item pour lui ajouter un enfant, sinon un item sera relie au sujet principal.';
-});
 
-const editableLabel = ref('');
+const isImageNodeSelected = computed(() => selectedNode.value?.type === 'image');
+const isFormulaNodeSelected = computed(() => selectedNode.value?.type === 'formula');
+const isTextNodeSelected = computed(() => selectedNode.value?.type === 'text');
+
 const editableContent = ref('');
 const zoneName = ref('Zone');
 const zoneColor = ref('#BFDBFE');
 const imageInputRef = ref(null);
 const isUploadingImage = ref(false);
 const imageUploadError = ref('');
-const isImageNodeSelected = computed(() => selectedNode.value?.type === 'image');
-const isFormulaNodeSelected = computed(() => selectedNode.value?.type === 'formula');
-const isTextNodeSelected = computed(() => selectedNode.value?.type === 'text');
-const showInterpreter = ref(false);
 const interpreterValue = ref('');
 const textColor = ref('#eef2ff');
-const fontSize = ref(14);
+const fontSize = ref(13);
 const isBold = ref(false);
 const isItalic = ref(false);
 const isUnderline = ref(false);
+
+// ── Flashcard liée ────────────────────────────────────────────────────────────
+const showCardPicker = ref(false);
+const pickerSystems = ref([]);
+const pickerSystemId = ref(null);
+const pickerCards = ref([]);
+const pickerCardId = ref(null);
+const pickerLoading = ref(false);
+
+const linkedCardStatement = computed(() => {
+  if (!selectedNode.value?.idCard) return null;
+  const card = pickerCards.value.find((c) => c.idCard === selectedNode.value.idCard);
+  return card?.question?.statement || `Carte #${selectedNode.value.idCard}`;
+});
+
+const linkedCardColor = computed(() => {
+  if (!selectedNode.value?.idCard) return null;
+  const card = pickerCards.value.find((c) => c.idCard === selectedNode.value.idCard);
+  return card?.leitnerBox ? boxColorToHex(card.leitnerBox.color) : null;
+});
+
+const openCardPicker = async () => {
+  showCardPicker.value = true;
+  pickerLoading.value = true;
+  pickerSystems.value = [];
+  pickerCards.value = [];
+  pickerSystemId.value = null;
+  pickerCardId.value = null;
+  try {
+    const res = await api.get('leitnersystems/');
+    pickerSystems.value = res?.data || [];
+  } finally {
+    pickerLoading.value = false;
+  }
+};
+
+const onPickerSystemChange = async (systemId) => {
+  pickerSystemId.value = systemId;
+  pickerCards.value = [];
+  pickerCardId.value = null;
+  if (!systemId) return;
+  pickerLoading.value = true;
+  try {
+    const res = await api.get(`leitnercards/system/${systemId}`);
+    pickerCards.value = res?.data || [];
+  } finally {
+    pickerLoading.value = false;
+  }
+};
+
+const confirmLinkCard = () => {
+  if (!selectedNode.value || !pickerCardId.value || !pickerSystemId.value) return;
+  store.linkCard(selectedNode.value.id, Number(pickerCardId.value), Number(pickerSystemId.value));
+  const card = pickerCards.value.find((c) => c.idCard === Number(pickerCardId.value));
+  if (card?.leitnerBox) {
+    store.updateNode(selectedNode.value.id, {
+      mastery: boxLevelToMastery(card.leitnerBox.level),
+    });
+    store.updateNodeStyle(selectedNode.value.id, {
+      secondaryColor: boxColorToHex(card.leitnerBox.color),
+    });
+  }
+  showCardPicker.value = false;
+};
+
+const unlinkCard = () => {
+  if (!selectedNode.value) return;
+  store.unlinkCard(selectedNode.value.id);
+  showCardPicker.value = false;
+};
+
+watch(() => store.interpreterOpen, (open) => {
+  if (open && isFormulaNodeSelected.value) {
+    interpreterValue.value = editableContent.value || selectedNode.value?.content || '';
+  }
+});
+
+watch(selectedNode, () => {
+  showCardPicker.value = false;
+  if (selectedNode.value?.idSystem && selectedNode.value?.idCard) {
+    api.get(`leitnercards/system/${selectedNode.value.idSystem}`).then((res) => {
+      if (res?.data) pickerCards.value = res.data;
+    });
+  } else {
+    pickerCards.value = [];
+  }
+});
+
 const formulaPreviewHtml = computed(() =>
   isFormulaNodeSelected.value && editableContent.value
     ? renderMathMultiline(editableContent.value)
     : ''
 );
 
-const resolveImageUrl = (payload = {}) => {
-  if (!payload) return '';
-  if (payload.url) return payload.url;
-  if (payload.path) {
-    try {
-      return new URL(payload.path, VITE_API_URL).toString();
-    } catch (error) {
-      return payload.path;
-    }
-  }
-  return '';
-};
-
 watch(
   selectedNode,
   (node) => {
-    editableLabel.value = node?.label || '';
     editableContent.value = node?.content || '';
     imageUploadError.value = '';
-    if (imageInputRef.value) {
-      imageInputRef.value.value = '';
-    }
+    if (imageInputRef.value) imageInputRef.value.value = '';
     textColor.value = node?.style?.textColor || '#eef2ff';
-    fontSize.value = Number.parseInt(node?.style?.fontSize, 10) || 14;
+    fontSize.value = Number.parseInt(node?.style?.fontSize, 10) || 13;
     isBold.value = (node?.style?.fontWeight || 'normal') !== 'normal';
     isItalic.value = (node?.style?.fontStyle || 'normal') !== 'normal';
     isUnderline.value = (node?.style?.textDecoration || 'none').includes('underline');
-    if (isFormulaNodeSelected.value) {
-      interpreterValue.value = node?.content || '';
-    } else {
-      interpreterValue.value = '';
-    }
-    showInterpreter.value = false;
+    if (isFormulaNodeSelected.value) interpreterValue.value = node?.content || '';
+    else interpreterValue.value = '';
+    store.closeInterpreter();
   },
   { immediate: true }
 );
-
-const activeToolLabel = computed(() => {
-  const match = tools.find((tool) => tool.id === store.tool);
-  return match ? match.label : 'Selection';
-});
-
-const updateLabel = () => {
-  if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { label: editableLabel.value });
-};
 
 const updateContent = () => {
   if (!selectedNode.value) return;
   store.updateNode(selectedNode.value.id, { content: editableContent.value });
 };
 
-const openInterpreter = () => {
+const updateNodeType = (type) => {
   if (!selectedNode.value) return;
-  interpreterValue.value = editableContent.value || '';
-  showInterpreter.value = true;
-};
-
-const closeInterpreter = () => {
-  showInterpreter.value = false;
-};
-
-const applyInterpreter = (value) => {
-  if (!selectedNode.value) return;
-  const nextValue =
-    typeof value === 'string' ? value : interpreterValue.value ?? editableContent.value ?? '';
-  interpreterValue.value = nextValue;
-  editableContent.value = nextValue;
-  store.updateNode(selectedNode.value.id, { content: nextValue });
-  showInterpreter.value = false;
-};
-
-const clearFormulaContent = () => {
-  if (!selectedNode.value) return;
-  editableContent.value = '';
-  store.updateNode(selectedNode.value.id, { content: '' });
-};
-
-const updateTextColor = (value) => {
-  if (!selectedNode.value) return;
-  textColor.value = value;
-  store.updateNodeStyle(selectedNode.value.id, { textColor: value });
-};
-
-const updateFontSize = (value) => {
-  if (!selectedNode.value) return;
-  const numeric = Number.parseInt(value, 10);
-  const safeValue = Number.isFinite(numeric) ? Math.min(48, Math.max(10, numeric)) : 14;
-  fontSize.value = safeValue;
-  store.updateNodeStyle(selectedNode.value.id, { fontSize: safeValue });
-};
-
-const toggleBold = () => {
-  if (!selectedNode.value) return;
-  const next = isBold.value ? 'normal' : 'bold';
-  isBold.value = !isBold.value;
-  store.updateNodeStyle(selectedNode.value.id, { fontWeight: next });
-};
-
-const toggleItalic = () => {
-  if (!selectedNode.value) return;
-  const next = isItalic.value ? 'normal' : 'italic';
-  isItalic.value = !isItalic.value;
-  store.updateNodeStyle(selectedNode.value.id, { fontStyle: next });
-};
-
-const toggleUnderline = () => {
-  if (!selectedNode.value) return;
-  const next = isUnderline.value ? 'none' : 'underline';
-  isUnderline.value = !isUnderline.value;
-  store.updateNodeStyle(selectedNode.value.id, { textDecoration: next });
-};
-
-const triggerImageSelection = () => {
-  if (!selectedNode.value) return;
-  imageUploadError.value = '';
-  imageInputRef.value?.click();
-};
-
-const handleImageSelection = async (event) => {
-  if (!selectedNode.value) return;
-  const file = event?.target?.files?.[0];
-  if (!file) return;
-
-  imageUploadError.value = '';
-
-  if (file.size > 5 * 1024 * 1024) {
-    imageUploadError.value = "L'image dépasse la taille maximale de 5 Mo.";
-    if (event.target) {
-      event.target.value = '';
-    }
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append('image', file);
-
-  isUploadingImage.value = true;
-
-  try {
-    const response = await api.post('diagrammes/upload-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-
-    if (!response || !response.data) {
-      throw new Error('UPLOAD_FAILED');
-    }
-
-    const imageUrl = resolveImageUrl(response.data);
-    if (!imageUrl) {
-      throw new Error('INVALID_IMAGE_URL');
-    }
-
-    store.updateNode(selectedNode.value.id, { content: imageUrl });
-    editableContent.value = imageUrl;
-  } catch (error) {
-    console.error("Erreur lors de l'upload de l'image de carte mentale :", error);
-    imageUploadError.value =
-      "L'image n'a pas pu être téléchargée. Vérifie le format et réessaie.";
-  } finally {
-    isUploadingImage.value = false;
-    if (event?.target) {
-      event.target.value = '';
-    }
-  }
-};
-
-const removeImageFromNode = () => {
-  if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { content: '' });
-  editableContent.value = '';
-  imageUploadError.value = '';
+  store.updateNode(selectedNode.value.id, {
+    type,
+    content: type === 'text' ? (selectedNode.value.content || '') : '',
+  });
 };
 
 const updateMastery = (value) => {
@@ -447,34 +445,117 @@ const updateColor = (value) => {
   store.updateNodeStyle(selectedNode.value.id, { primaryColor: value });
 };
 
-const createSubjectItem = () => {
-  if (!store.map.subjectNodeId) return;
-  const type = creationType.value;
-  const nodeLabel = getNodeLabel(type);
-  const payload = {
-    label: nodeLabel,
-    type,
-    parentId: store.map.subjectNodeId,
-  };
-  if (type !== 'text') {
-    payload.content = '';
-  }
-  store.addNode(payload);
+const updateShape = (value) => {
+  if (!selectedNode.value) return;
+  store.updateNodeStyle(selectedNode.value.id, { shape: value });
 };
 
-const addChild = () => {
+const updateTextColor = (value) => {
   if (!selectedNode.value) return;
-  const type = creationType.value;
-  const nodeLabel = getNodeLabel(type);
-  const payload = {
-    label: nodeLabel,
-    type,
-    parentId: selectedNode.value.id,
-  };
-  if (type !== 'text') {
-    payload.content = '';
+  textColor.value = value;
+  store.updateNodeStyle(selectedNode.value.id, { textColor: value });
+};
+
+const updateFontSize = (value) => {
+  if (!selectedNode.value) return;
+  const numeric = Number.parseInt(value, 10);
+  const safeValue = Number.isFinite(numeric) ? Math.min(48, Math.max(10, numeric)) : 13;
+  fontSize.value = safeValue;
+  store.updateNodeStyle(selectedNode.value.id, { fontSize: safeValue });
+};
+
+const toggleBold = () => {
+  if (!selectedNode.value) return;
+  isBold.value = !isBold.value;
+  store.updateNodeStyle(selectedNode.value.id, { fontWeight: isBold.value ? 'bold' : 'normal' });
+};
+
+const toggleItalic = () => {
+  if (!selectedNode.value) return;
+  isItalic.value = !isItalic.value;
+  store.updateNodeStyle(selectedNode.value.id, { fontStyle: isItalic.value ? 'italic' : 'normal' });
+};
+
+const toggleUnderline = () => {
+  if (!selectedNode.value) return;
+  isUnderline.value = !isUnderline.value;
+  store.updateNodeStyle(selectedNode.value.id, { textDecoration: isUnderline.value ? 'underline' : 'none' });
+};
+
+const openInterpreter = () => {
+  if (!selectedNode.value) return;
+  interpreterValue.value = editableContent.value || '';
+  store.openInterpreter();
+};
+
+const closeInterpreter = () => { store.closeInterpreter(); };
+
+const applyInterpreter = (value) => {
+  if (!selectedNode.value) return;
+  const nextValue = typeof value === 'string' ? value : interpreterValue.value ?? editableContent.value ?? '';
+  interpreterValue.value = nextValue;
+  editableContent.value = nextValue;
+  store.updateNode(selectedNode.value.id, { content: nextValue });
+  store.closeInterpreter();
+};
+
+const clearFormulaContent = () => {
+  if (!selectedNode.value) return;
+  editableContent.value = '';
+  store.updateNode(selectedNode.value.id, { content: '' });
+};
+
+const resolveImageUrl = (payload = {}) => {
+  if (!payload) return '';
+  if (payload.url) return payload.url;
+  if (payload.path) {
+    try { return new URL(payload.path, VITE_API_URL).toString(); }
+    catch { return payload.path; }
   }
-  store.addNode(payload);
+  return '';
+};
+
+const triggerImageSelection = () => {
+  if (!selectedNode.value) return;
+  imageUploadError.value = '';
+  imageInputRef.value?.click();
+};
+
+const handleImageSelection = async (event) => {
+  if (!selectedNode.value) return;
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  imageUploadError.value = '';
+  if (file.size > 5 * 1024 * 1024) {
+    imageUploadError.value = "L'image dépasse 5 Mo.";
+    if (event.target) event.target.value = '';
+    return;
+  }
+  const formData = new FormData();
+  formData.append('image', file);
+  isUploadingImage.value = true;
+  try {
+    const response = await api.post('diagrammes/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    if (!response?.data) throw new Error('UPLOAD_FAILED');
+    const imageUrl = resolveImageUrl(response.data);
+    if (!imageUrl) throw new Error('INVALID_IMAGE_URL');
+    store.updateNode(selectedNode.value.id, { content: imageUrl });
+    editableContent.value = imageUrl;
+  } catch {
+    imageUploadError.value = "L'image n'a pas pu être téléchargée.";
+  } finally {
+    isUploadingImage.value = false;
+    if (event?.target) event.target.value = '';
+  }
+};
+
+const removeImageFromNode = () => {
+  if (!selectedNode.value) return;
+  store.updateNode(selectedNode.value.id, { content: '' });
+  editableContent.value = '';
+  imageUploadError.value = '';
 };
 
 const toggleCollapse = () => {
@@ -488,10 +569,9 @@ const removeNode = () => {
 };
 
 const createZone = () => {
-  const id = store.addZone({ name: zoneName.value.trim() || 'Zone', color: zoneColor.value });
+  store.addZone({ name: zoneName.value.trim() || 'Zone', color: zoneColor.value });
   zoneName.value = 'Zone';
   zoneColor.value = '#BFDBFE';
-  return id;
 };
 
 const assignZone = (zoneId) => {
@@ -501,367 +581,448 @@ const assignZone = (zoneId) => {
 </script>
 
 <style scoped>
-.mindmap-palette {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background: #ffffff;
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  height: 100%;
-}
-
-.mindmap-palette__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.mindmap-palette__tool {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.mindmap-palette__section {
+.palette {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.mindmap-palette__buttons {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.mindmap-palette__button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #f3f4f6;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  color: #1f2937;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.mindmap-palette__button:hover {
-  background: #e0f2fe;
-  transform: translateY(-1px);
-}
-
-.mindmap-palette__button--active {
-  background: #1d4ed8;
-  color: #ffffff;
-}
-
-.mindmap-palette__icon {
-  font-size: 18px;
-}
-
-.mindmap-palette__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.mindmap-palette__field label {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #475569;
-}
-
-.mindmap-palette__field input,
-.mindmap-palette__field textarea,
-.mindmap-palette__field select {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  font-size: 14px;
-  color: #0f172a;
-  background: #f8fafc;
-}
-
-.mindmap-palette__file-input {
-  display: none;
-}
-
-.mindmap-palette__image-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.mindmap-palette__image-actions button {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  background: #38bdf8;
-  color: #0f172a;
-  transition: background 0.2s ease;
-}
-
-.mindmap-palette__image-actions button:hover {
-  background: #0ea5e9;
-}
-
-.mindmap-palette__image-actions button.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.mindmap-palette__image-actions button.secondary:hover {
-  background: #cbd5f5;
-}
-
-.mindmap-palette__image-actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.mindmap-palette__error {
-  margin: 6px 0 0;
-  color: #b91c1c;
-  font-size: 12px;
-}
-
-.mindmap-palette__preview {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.mindmap-palette__preview img {
-  max-width: 100%;
-  border-radius: 8px;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
-}
-
-.mindmap-palette__preview-url {
-  font-size: 12px;
-  word-break: break-all;
-  color: #1f2937;
-}
-
-.mindmap-palette__formula-preview {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
   background: #ffffff;
-  max-height: 180px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+  height: 100%;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #e2e8f0 transparent;
 }
 
-.mindmap-palette__formula-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.mindmap-palette__formula-actions button {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  background: #2563eb;
-  color: #ffffff;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.mindmap-palette__formula-actions button:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
-}
-
-.mindmap-palette__formula-actions button.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.mindmap-palette__formula-actions button.secondary:hover {
-  background: #cbd5f5;
-}
-
-.mindmap-palette__text-style {
+.palette__section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.mindmap-palette__text-toolbar {
+.palette__section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.palette__section--selected {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.palette__section--empty {
+  border-bottom: none;
+}
+
+.palette__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.palette__node-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e3a8a;
+  background: #dbeafe;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #94a3b8;
+}
+
+.palette__hint {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.palette__hint kbd {
+  font-family: monospace;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 11px;
+  color: #0f172a;
+}
+
+.palette__hint--info {
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+}
+
+/* Mode buttons */
+.palette__mode-row {
   display: flex;
   gap: 8px;
 }
 
-.mindmap-palette__text-toolbar button {
-  width: 36px;
-  height: 36px;
+.palette__mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
   border-radius: 10px;
-  border: 1px solid #cbd5f5;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+
+.palette__mode-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.palette__mode-btn--active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Fields */
+.palette__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.palette__field--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.palette__select--inline {
+  width: auto;
+  min-width: 100px;
+}
+
+.palette__input,
+.palette__select {
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #0f172a;
   background: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.palette__textarea {
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #0f172a;
+  background: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: 'Fira Code', monospace;
+}
+
+.palette__input:focus,
+.palette__select:focus,
+.palette__textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.palette__number {
+  width: 68px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  text-align: center;
+  background: #ffffff;
+}
+
+.palette__color {
+  width: 34px;
+  height: 26px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 7px;
+  cursor: pointer;
+  padding: 2px;
+  background: transparent;
+}
+
+/* Shape */
+.palette__shape-row {
+  display: flex;
+  gap: 6px;
+}
+
+.palette__shape-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+
+.palette__shape-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.palette__shape-btn--active {
+  background: #1e3a8a;
+  border-color: #1e3a8a;
+  color: #ffffff;
+}
+
+/* Toolbar text style */
+.palette__toolbar {
+  display: flex;
+  gap: 6px;
+}
+
+.palette__toolbar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.mindmap-palette__text-toolbar button:hover {
-  background: #dbeafe;
-  transform: translateY(-1px);
-}
-
-.mindmap-palette__text-toolbar button.active {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #1d4ed8;
-}
-
-.mindmap-palette__text-icon {
-  font-weight: 700;
-}
-
-.mindmap-palette__text-icon--italic {
-  font-style: italic;
-}
-
-.mindmap-palette__text-icon--underline {
-  text-decoration: underline;
-}
-
-.mindmap-palette__field--inline {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.mindmap-palette__field--inline label {
-  margin: 0;
-}
-
-.mindmap-palette__field--inline input[type='number'] {
-  width: 90px;
-}
-
-.mindmap-palette__colors {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.mindmap-palette__colors label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 13px;
   color: #475569;
+  transition: all 0.15s ease;
 }
 
-.mindmap-palette__actions {
+.palette__toolbar-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.palette__toolbar-btn.active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+/* Buttons */
+.palette__actions-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
-.mindmap-palette__actions button {
-  padding: 8px 12px;
-  border-radius: 10px;
+.palette__btn {
+  flex: 1;
+  padding: 7px 8px;
+  border-radius: 9px;
   border: none;
   cursor: pointer;
+  font-size: 12px;
   font-weight: 600;
-  background: #38bdf8;
-  color: #0f172a;
-  transition: background 0.2s ease;
+  background: #1d4ed8;
+  color: #ffffff;
+  transition: background 0.15s ease;
 }
 
-.mindmap-palette__actions button:hover {
-  background: #0ea5e9;
-}
+.palette__btn:hover { background: #1e40af; }
 
-.mindmap-palette__actions button:disabled {
+.palette__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: #94a3b8;
-  color: #f1f5f9;
 }
 
-.mindmap-palette__actions .danger {
-  background: #f87171;
-  color: #fff;
+.palette__btn--ghost {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
 }
 
-.mindmap-palette__actions .danger:hover {
+.palette__btn--ghost:hover { background: #e2e8f0; }
+
+.palette__btn--danger {
   background: #ef4444;
-}
-
-.mindmap-palette__zones {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mindmap-palette__zone-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.mindmap-palette__zone-chip {
-  padding: 6px 12px;
-  border-radius: 9999px;
-  border: none;
-  background: #e2e8f0;
-  color: #1f2937;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.mindmap-palette__zone-chip.active {
-  background: #2563eb;
   color: #ffffff;
 }
 
-.mindmap-palette__hint {
-  font-size: 12px;
-  color: #64748b;
+.palette__btn--danger:hover { background: #dc2626; }
+
+.palette__node-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* Formula */
+.palette__formula-preview {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  max-height: 140px;
+  overflow-y: auto;
   margin-top: 4px;
-  line-height: 1.4;
-
-.mindmap-palette__hint code {
-  background: #e2e8f0;
-  color: #1f2937;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-family: 'Fira Code', monospace;
-}
 }
 
-.mindmap-interpreter-modal {
+/* Image */
+.palette__error {
+  font-size: 11px;
+  color: #b91c1c;
+  margin: 4px 0 0;
+}
+
+.palette__file-hidden { display: none; }
+
+.palette__image-preview {
+  margin-top: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.palette__image-preview img {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+
+/* Zones */
+.palette__zone-assign {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.palette__zone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.palette__zone-chip {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.palette__zone-chip:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.palette__zone-chip.active {
+  background: #1e3a8a;
+  border-color: #1e3a8a;
+  color: #ffffff;
+}
+
+/* Flashcard liée */
+.palette__card-linked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+}
+
+.palette__card-dot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.12);
+}
+
+.palette__card-statement {
+  flex: 1;
+  font-size: 12px;
+  color: #166534;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__card-unlink {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #166534;
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.palette__card-unlink:hover { opacity: 1; }
+
+.palette__btn--sm {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.palette__card-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+/* Modale interpréteur */
+.interp-modal {
   position: fixed;
   inset: 0;
   display: flex;
@@ -871,14 +1032,14 @@ const assignZone = (zoneId) => {
   z-index: 2000;
 }
 
-.mindmap-interpreter-modal__backdrop {
+.interp-modal__backdrop {
   position: absolute;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(2px);
 }
 
-.mindmap-interpreter-modal__dialog {
+.interp-modal__dialog {
   position: relative;
   width: min(960px, 100%);
   max-height: 80vh;
@@ -890,7 +1051,7 @@ const assignZone = (zoneId) => {
   z-index: 1;
 }
 
-.mindmap-interpreter-modal__header {
+.interp-modal__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -898,19 +1059,15 @@ const assignZone = (zoneId) => {
   color: #0f172a;
 }
 
-.mindmap-interpreter-modal__close {
+.interp-modal__close {
   border: none;
   background: transparent;
   font-size: 24px;
   cursor: pointer;
-  line-height: 1;
   color: #0f172a;
-  transition: transform 0.2s ease, color 0.2s ease;
+  line-height: 1;
+  transition: color 0.15s ease;
 }
 
-.mindmap-interpreter-modal__close:hover {
-  color: #2563eb;
-  transform: scale(1.1);
-}
+.interp-modal__close:hover { color: #2563eb; }
 </style>
-

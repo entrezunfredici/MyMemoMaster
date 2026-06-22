@@ -13,6 +13,12 @@ export default defineConfig(({ mode }) => {
       vue(),
       VitePWA({
         registerType: 'autoUpdate',
+        workbox: {
+          // Aucun asset pré-caché : évite le cache multi-Mo par défaut.
+          // Les assets sont toujours servis depuis le réseau.
+          globPatterns: [],
+          cleanupOutdatedCaches: true,
+        },
         manifest: {
           name: env.VITE_APP_NAME,
           short_name: env.VITE_APP_SHORT_NAME,

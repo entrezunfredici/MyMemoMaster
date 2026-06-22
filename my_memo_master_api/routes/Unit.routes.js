@@ -1,11 +1,14 @@
-const express = require("express");
-const unitController = require("../controllers/Unit.controller");
+const express = require('express')
+const unitController = require('../controllers/Unit.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const unitValidators = require('../validators/Unit.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /units/all:
+ * /units:
  *   get:
  *     summary: Obtenir toutes les unités
  *     tags: [Units]
@@ -15,7 +18,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/all", unitController.getAllUnits);
+router.get('/', authMiddleware, unitController.getAllUnits)
 //router.get("/all", subject.findAll);
 
 /**
@@ -37,11 +40,11 @@ router.get("/all", unitController.getAllUnits);
  *       404:
  *         description: Unité non trouvée.
  */
-router.get("/:id", unitController.getUnitById);
+router.get('/:id', authMiddleware, unitController.getUnitById)
 
 /**
  * @swagger
- * /units/add:
+ * /units:
  *   post:
  *     summary: Ajouter une nouvelle unité
  *     tags: [Units]
@@ -65,7 +68,7 @@ router.get("/:id", unitController.getUnitById);
  *       201:
  *         description: Unité ajoutée avec succès.
  */
-router.post("/add", unitController.addUnit);
+router.post('/', authMiddleware, unitValidators.create, validate, unitController.addUnit)
 
 /**
  * @swagger
@@ -95,7 +98,7 @@ router.post("/add", unitController.addUnit);
  *       200:
  *         description: Unité mise à jour avec succès.
  */
-router.put("/:id", unitController.updateUnit);
+router.put('/:id', authMiddleware, unitValidators.update, validate, unitController.updateUnit)
 
 /**
  * @swagger
@@ -114,14 +117,14 @@ router.put("/:id", unitController.updateUnit);
  *       200:
  *         description: Unité supprimée avec succès.
  */
-router.delete("/:id", unitController.deleteUnit);
+router.delete('/:id', authMiddleware, unitController.deleteUnit)
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   name: Units
-     *   description: Gestion des unités
-     */
-    app.use("/units", router);
-};
+  /**
+   * @swagger
+   * tags:
+   *   name: Units
+   *   description: Gestion des unités
+   */
+  app.use('/units', router)
+}

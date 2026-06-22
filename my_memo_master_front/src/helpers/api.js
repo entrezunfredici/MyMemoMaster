@@ -216,6 +216,30 @@ const axiosApi = axios.create({
   },
 })
 
+let _isRefreshing = false
+
+async function _tryRefreshToken() {
+  const authStore = useAuthStore()
+  if (!authStore.refreshToken || _isRefreshing) return false
+
+  _isRefreshing = true
+  try {
+    const resp = await axiosApi.post('users/refresh-token', {
+      refreshToken: authStore.refreshToken
+    })
+    if (resp?.status === 200 && resp.data?.token) {
+      authStore.token = resp.data.token
+      authStore.refreshToken = resp.data.refreshToken ?? null
+      return true
+    }
+    return false
+  } catch {
+    return false
+  } finally {
+    _isRefreshing = false
+  }
+}
+
 axiosApi.interceptors.request.use(async (config) => {
   config.headers = config.headers || {};
   const headers = config.headers;
@@ -250,99 +274,124 @@ axiosApi.interceptors.request.use(async (config) => {
   return config;
 });
 
-function isStatusOk(status) {
-  if (!status) return false
+axiosApi.interceptors.response.use(async (response) => {
+  if (response.status === 401 && !response.config._retried) {
+    const refreshed = await _tryRefreshToken()
+    if (refreshed) {
+      response.config._retried = true
+      removeHeader(response.config.headers, 'Authorization')
+      return axiosApi(response.config)
+    }
+  }
+  return response
+})
 
-  // 401: Unauthorized
+function handleSpecialStatus(status) {
   if (status === 401) {
     useAuthStore().logout()
-    return false
+    return true
   }
-
-  // 204: No Content (ex: user not found)
-  if (status === 204) {
-    return false
-  }
-
-  return status >= 200 && status < 300;
+  return false
 }
 
+function toResponse(response) {
+  return { data: response.data, status: response.status }
+}
+
+/**
+ * Effectue une requête GET vers l'API.
+ *
+ * @param {string} endpoint - Chemin de l'endpoint (ex: "users/1")
+ * @param {object} [params={}] - Paramètres de query string
+ * @returns {Promise<{data: *, status: number}|undefined>} Réponse API ou undefined si 204 / 401 / erreur réseau
+ * @throws {Error} Si l'endpoint est absent ou n'est pas une chaîne
+ */
 async function get(endpoint, params = {}) {
-  if (!endpoint) throw new Error('Please provide an endpoint for the API call')
-  if (typeof endpoint !== 'string') throw new Error('Endpoint must be a string')
-  if (typeof params !== 'object') throw new Error('Params must be an object')
+  if (!endpoint) throw new Error("Un endpoint est requis pour l'appel API")
+  if (typeof endpoint !== 'string') throw new Error("L'endpoint doit être une chaîne de caractères")
+  if (typeof params !== 'object') throw new Error('Les paramètres doivent être un objet')
 
   try {
     const response = await axiosApi.get(endpoint, { params })
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });
   }
 }
 
+/**
+ * Effectue une requête POST vers l'API.
+ *
+ * @param {string} endpoint - Chemin de l'endpoint
+ * @param {object|FormData} [data={}] - Corps de la requête
+ * @param {object} [config={}] - Configuration Axios additionnelle
+ * @returns {Promise<{data: *, status: number}|undefined>} Réponse API ou undefined si 204 / 401 / erreur réseau
+ * @throws {Error} Si l'endpoint est absent ou invalide
+ */
 async function post(endpoint, data = {}, config = {}) {
-  if (!endpoint) throw new Error('Please provide an endpoint for the API call')
-  if (typeof endpoint !== 'string') throw new Error('Endpoint must be a string')
-  if (typeof data !== 'object') throw new Error('Data must be an object')
-  if (typeof config !== 'object') throw new Error('Config must be an object')
+  if (!endpoint) throw new Error("Un endpoint est requis pour l'appel API")
+  if (typeof endpoint !== 'string') throw new Error("L'endpoint doit être une chaîne de caractères")
+  if (typeof data !== 'object') throw new Error('Les données doivent être un objet')
+  if (typeof config !== 'object') throw new Error('La configuration doit être un objet')
 
   try {
     const response = await axiosApi.post(endpoint, data, config)
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });
   }
 }
 
+/**
+ * Effectue une requête PUT vers l'API.
+ *
+ * @param {string} endpoint - Chemin de l'endpoint
+ * @param {object} [data={}] - Corps de la requête
+ * @param {object} [config={}] - Configuration Axios additionnelle
+ * @returns {Promise<{data: *, status: number}|undefined>} Réponse API ou undefined si 204 / 401 / erreur réseau
+ * @throws {Error} Si l'endpoint est absent ou invalide
+ */
 async function put(endpoint, data = {}, config = {}) {
-  if (!endpoint) throw new Error('Please provide an endpoint for the API call')
-  if (typeof endpoint !== 'string') throw new Error('Endpoint must be a string')
-  if (typeof data !== 'object') throw new Error('Data must be an object')
-  if (typeof config !== 'object') throw new Error('Config must be an object')
+  if (!endpoint) throw new Error("Un endpoint est requis pour l'appel API")
+  if (typeof endpoint !== 'string') throw new Error("L'endpoint doit être une chaîne de caractères")
+  if (typeof data !== 'object') throw new Error('Les données doivent être un objet')
+  if (typeof config !== 'object') throw new Error('La configuration doit être un objet')
 
   try {
     const response = await axiosApi.put(endpoint, data, config)
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });
   }
 }
 
+/**
+ * Effectue une requête DELETE vers l'API.
+ *
+ * @param {string} endpoint - Chemin de l'endpoint
+ * @param {object} [data={}] - Corps optionnel de la requête
+ * @returns {Promise<{data: *, status: number}|undefined>} Réponse API ou undefined si 204 / 401 / erreur réseau
+ * @throws {Error} Si l'endpoint est absent ou invalide
+ */
 async function del(endpoint, data = {}) {
-  if (!endpoint) throw new Error('Please provide an endpoint for the API call')
-  if (typeof endpoint !== 'string') throw new Error('Endpoint must be a string')
-  if (typeof data !== 'object') throw new Error('Data must be an object')
+  if (!endpoint) throw new Error("Un endpoint est requis pour l'appel API")
+  if (typeof endpoint !== 'string') throw new Error("L'endpoint doit être une chaîne de caractères")
+  if (typeof data !== 'object') throw new Error('Les données doivent être un objet')
 
   try {
     const response = await axiosApi.delete(endpoint, { data })
-
-    if (!isStatusOk(response?.status)) return
-
-    return {
-      data: response.data,
-      status: response.status,
-    }
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
   } catch (error) {
     console.error('Error during API call using api.js:', error.stack)
     router.push({ path: '/error-server' });

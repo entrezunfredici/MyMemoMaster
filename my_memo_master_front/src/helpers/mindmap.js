@@ -27,6 +27,20 @@ const masteryList = [
   { id: 'high', label: 'Bonne maitrise' },
 ];
 
+const boxColorToHex = (bigintColor) => {
+  const n = Number(bigintColor);
+  if (!Number.isFinite(n) || n < 0) return '#C0C5D2';
+  return '#' + n.toString(16).padStart(6, '0');
+};
+
+const boxLevelToMastery = (level) => {
+  const n = Number(level);
+  if (!n || n <= 0) return 'undefined';
+  if (n === 1) return 'low';
+  if (n <= 3) return 'medium';
+  return 'high';
+};
+
 const createId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -289,6 +303,8 @@ export {
   masteryList,
   defaultBranchTypes,
   defaultShapes,
+  boxColorToHex,
+  boxLevelToMastery,
   createId,
   createBlankMindMap,
   normalizeMindMap,

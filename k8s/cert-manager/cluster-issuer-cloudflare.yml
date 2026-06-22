@@ -1,0 +1,52 @@
+# =============================================================================
+#  ClusterIssuer Let's Encrypt — DNS01 via Cloudflare
+#
+#  Remplace l'issuer Infomaniak maintenant que le DNS est géré par Cloudflare.
+#
+#  Prérequis :
+#    - cert-manager installé
+#    - Secret cloudflare-api-token dans le namespace cert-manager
+#      (voir k8s/cert-manager/cloudflare-secret.yml)
+#
+#  Appliquer dans l'ordre :
+#    kubectl apply -f k8s/cert-manager/cloudflare-secret.yml
+#    kubectl apply -f k8s/cert-manager/cluster-issuer-cloudflare.yml
+# =============================================================================
+
+# ── Staging (tests de cert — sans limite de taux) ─────────────────────────────
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging-cloudflare
+spec:
+  acme:
+    email: superfred2468@gmail.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-cloudflare-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+
+---
+
+# ── Production ────────────────────────────────────────────────────────────────
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod-cloudflare
+spec:
+  acme:
+    email: superfred2468@gmail.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-cloudflare-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token

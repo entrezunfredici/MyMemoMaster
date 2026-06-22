@@ -1,10 +1,12 @@
-const express = require("express");
-const fieldTypeController = require("../controllers/FieldsType.controller.js");
+const express = require('express')
+const fieldTypeController = require('../controllers/FieldsType.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const fieldsTypeValidators = require('../validators/FieldsType.validators')
 
-const router = express.Router();
+const router = express.Router()
 /**
  * @swagger
- * /fieldstypes/all:
+ * /fieldstypes:
  *   get:
  *     summary: Récupère tous les types de champs
  *     tags:
@@ -31,7 +33,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", fieldTypeController.findAll);
+router.get('/', fieldTypeController.findAll)
 
 /**
  * @swagger
@@ -55,11 +57,11 @@ router.get("/all", fieldTypeController.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", fieldTypeController.findOne);
+router.get('/:id', fieldTypeController.findOne)
 
 /**
  * @swagger
- * /fieldstypes/add:
+ * /fieldstypes:
  *   post:
  *     summary: Ajoute un nouveau type de champ
  *     tags:
@@ -85,7 +87,44 @@ router.get("/:id", fieldTypeController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", fieldTypeController.create);
+router.post('/', fieldsTypeValidators.create, validate, fieldTypeController.create)
+
+/**
+ * @swagger
+ * /fieldstypes/{id}:
+ *   put:
+ *     summary: Met à jour un type de champ existant
+ *     tags:
+ *       - FieldsType
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID du type de champ
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Nombre décimal"
+ *               allowUnit:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Type de champ mis à jour avec succès
+ *       404:
+ *         description: Type de champ non trouvé
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.put('/:id', fieldsTypeValidators.update, validate, fieldTypeController.update)
 
 module.exports = (app) => {
   /**
@@ -94,5 +133,5 @@ module.exports = (app) => {
    *   name: FieldsType
    *   description: Gestion des types de champs
    */
-  app.use("/fieldstypes", router);
-};
+  app.use('/fieldstypes', router)
+}

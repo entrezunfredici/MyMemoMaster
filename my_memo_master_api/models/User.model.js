@@ -1,91 +1,135 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (instance) => {
   const User = instance.define(
-    "User",
+    'User',
     {
       userId: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false,
+        allowNull: false
       },
       email: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique: true,
+        unique: true
       },
       name: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: false
       },
       roleId: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        defaultValue: 2,
         references: {
-          model: "Role",
-          key: "roleId",
+          model: 'Role',
+          key: 'roleId'
         },
-        onDelete: "CASCADE",
-        onUpdate: "CASCADE",
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       password: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: false
       },
       validEmailCode: {
         type: DataTypes.STRING,
-        allowNull: true,
+        allowNull: true
       },
       resetPasswordCode: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
+        type: DataTypes.STRING(64),
+        allowNull: true
+      },
+      resetPasswordCodeExpiresAt: {
+        type: DataTypes.DATE,
+        allowNull: true
       },
       hasValidatedEmail: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
-        defaultValue: false,
+        defaultValue: false
       },
       lastLogin: {
         type: DataTypes.DATE,
-        allowNull: true,
+        allowNull: true
+      },
+      refreshToken: {
+        type: DataTypes.STRING(128),
+        allowNull: true
+      },
+      refreshTokenExpiresAt: {
+        type: DataTypes.DATE,
+        allowNull: true
       },
       updatedAt: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
+        defaultValue: DataTypes.NOW
       },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-      },
+        defaultValue: DataTypes.NOW
+      }
     },
     {
-      tableName: "User",
-      updatedAt: "updatedAt",
-      createdAt: "createdAt",
+      tableName: 'User',
+      updatedAt: 'updatedAt',
+      createdAt: 'createdAt',
       timestamps: false,
+      indexes: [{ fields: ['roleId'] }]
     }
-  );
+  )
 
   // Associations
   User.associate = (models) => {
     User.hasMany(models.LeitnerSystem, {
-      foreignKey: "idUser",
-      as: "leitnerSystems",
-    });
+      foreignKey: 'idUser',
+      as: 'leitnerSystems'
+    })
 
     User.hasMany(models.LeitnerSystemsUsers, {
-      foreignKey: "idUser",
-      as: "leitnerSystemsUsers",
-    });
+      foreignKey: 'idUser',
+      as: 'leitnerSystemsUsers'
+    })
 
     User.hasOne(models.UserOnboardingState, {
-      foreignKey: "userId",
-      as: "onboardingState",
-    });
-  };
+      foreignKey: 'userId',
+      as: 'onboardingState'
+    })
 
-  return User;
-};
+    User.hasMany(models.ClassGroup, {
+      foreignKey: 'createdBy',
+      as: 'classGroups'
+    })
+
+    User.hasMany(models.ClassGroupUsers, {
+      foreignKey: 'userId',
+      as: 'classGroupMemberships'
+    })
+
+    User.hasMany(models.CalendarEvent, {
+      foreignKey: 'createdBy',
+      as: 'calendarEvents'
+    })
+
+    User.hasMany(models.Deadline, {
+      foreignKey: 'createdBy',
+      as: 'deadlines'
+    })
+
+    User.hasMany(models.RevisionSession, {
+      foreignKey: 'userId',
+      as: 'revisionSessions'
+    })
+
+    User.hasMany(models.Reminder, {
+      foreignKey: 'userId',
+      as: 'reminders'
+    })
+  }
+
+  return User
+}

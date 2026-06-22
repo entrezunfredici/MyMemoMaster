@@ -1,11 +1,13 @@
-const express = require("express");
-const QuestionController = require("../controllers/Question.controller.js");
+const express = require('express')
+const QuestionController = require('../controllers/Question.controller.js')
+const validate = require('../middlewares/validate.middleware')
+const questionValidators = require('../validators/Question.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /questions/all:
+ * /questions:
  *   get:
  *     summary: Récupère toutes les questions
  *     tags:
@@ -35,7 +37,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", QuestionController.getAllQuestions);
+router.get('/', QuestionController.getAllQuestions)
 
 /**
  * @swagger
@@ -78,7 +80,7 @@ router.get("/all", QuestionController.getAllQuestions);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/tests/:testId", QuestionController.getQuestionsByTest);
+router.get('/tests/:testId', QuestionController.getQuestionsByTest)
 
 /**
  * @swagger
@@ -119,7 +121,7 @@ router.get("/tests/:testId", QuestionController.getQuestionsByTest);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/card/:cardId", QuestionController.getQuestionByCard);
+router.get('/card/:cardId', QuestionController.getQuestionByCard)
 
 /**
  * @swagger
@@ -160,7 +162,7 @@ router.get("/card/:cardId", QuestionController.getQuestionByCard);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", QuestionController.findOne);
+router.get('/:id', QuestionController.findOne)
 
 /**
  * @swagger
@@ -201,11 +203,11 @@ router.get("/:id", QuestionController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
+router.get('/correction/:id', QuestionController.getCorrectionByQuestion)
 
 /**
  * @swagger
- * /questions/add:
+ * /questions:
  *   post:
  *     summary: Ajoute une nouvelle question
  *     tags:
@@ -225,7 +227,13 @@ router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
  *                 example: 1
  *               type:
  *                 type: string
- *                 example: "Type de la question"
+ *                 enum: [open, mcq, fill_blank, reorder]
+ *                 example: "open"
+ *               content:
+ *                 type: object
+ *                 nullable: true
+ *                 description: "Données spécifiques au type (null pour les cartes Leitner)"
+ *                 example: { "correct_answer": "Paris" }
  *               idTest:
  *                 type: integer
  *                 example: 1
@@ -235,9 +243,6 @@ router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
  *               idSystem:
  *                 type: integer
  *                 example: 1
- *               name:
- *                 type: string
- *                 example: "Question 1"
  *     responses:
  *       201:
  *         description: Question créée avec succès
@@ -246,7 +251,7 @@ router.get("/correction/:id", QuestionController.getCorrectionByQuestion);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", QuestionController.create);
+router.post('/', questionValidators.create, validate, QuestionController.create)
 
 /**
  * @swagger
@@ -277,7 +282,12 @@ router.post("/add", QuestionController.create);
  *                 example: 1
  *               type:
  *                 type: string
- *                 example: "Type de la question"
+ *                 enum: [open, mcq, fill_blank, reorder]
+ *                 example: "open"
+ *               content:
+ *                 type: object
+ *                 nullable: true
+ *                 example: { "correct_answer": "Paris" }
  *               idTest:
  *                 type: integer
  *                 example: 1
@@ -294,7 +304,7 @@ router.post("/add", QuestionController.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/edit/:id", QuestionController.update);
+router.put('/edit/:id', questionValidators.update, validate, QuestionController.update)
 
 /**
  * @swagger
@@ -318,7 +328,7 @@ router.put("/edit/:id", QuestionController.update);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", QuestionController.delete);
+router.delete('/:id', QuestionController.delete)
 
 module.exports = (app) => {
   /**
@@ -327,5 +337,5 @@ module.exports = (app) => {
    *   - name: Questions
    *     description: Gestion des questions
    */
-  app.use("/questions", router);
-};
+  app.use('/questions', router)
+}

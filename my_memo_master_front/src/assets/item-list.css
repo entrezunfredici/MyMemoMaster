@@ -1,0 +1,74 @@
+/* Styles partagés pour les pages liste (FlashcardsPage, ExercisesPage) */
+
+/* Badge sujet affiché sur les cartes */
+.subject-badge {
+  display: inline-block;
+  background-color: rgb(var(--primary) / 0.1);
+  color: rgb(var(--primary));
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+}
+
+/* Lien "Créer un nouveau sujet" (dans les modals) */
+.subject-create-link {
+  font-size: 0.875rem;
+  color: rgb(var(--primary));
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.subject-create-link:hover { text-decoration: underline; }
+
+/* Formulaire inline de création de sujet (wrapper) */
+.subject-inline-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+/* Input texte du formulaire inline */
+.subject-inline-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  outline: none;
+  background: white;
+}
+.subject-inline-input:focus {
+  border-color: rgb(var(--primary));
+  box-shadow: 0 0 0 2px rgb(var(--primary) / 0.2);
+}
+
+/* Bouton confirmer la création */
+.subject-inline-btn {
+  background-color: rgb(var(--primary));
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+.subject-inline-btn:hover:not(:disabled) { background-color: rgb(var(--primary) / 0.85); }
+.subject-inline-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Bouton annuler */
+.subject-inline-cancel {
+  font-size: 0.875rem;
+  color: #6B7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.5rem;
+}
+.subject-inline-cancel:hover { color: #374151; }

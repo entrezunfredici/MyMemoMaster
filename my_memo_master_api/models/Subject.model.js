@@ -1,49 +1,51 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (instance) => {
-    const Subject = instance.define('Subject', {
-        subjectId: {
-            type: DataTypes.INTEGER,
-            autoIncrement: true,
-            allowNull: false,
-            primaryKey: true,
-        },
-        name: {
-            type: DataTypes.STRING(50),
-            allowNull: false,
-        },
-        updatedAt: {
-            type: DataTypes.DATE,
-            allowNull: false,
-            defaultValue: DataTypes.NOW,
-        },
-        createdAt: {
-            type: DataTypes.DATE,
-            allowNull: false,
-            defaultValue: DataTypes.NOW,
-        },
-    }, {
-        tableName: 'Subject',
-        updatedAt: 'updatedAt',
-        createdAt: 'createdAt',
-        timestamps: true,
-    });
+  const Subject = instance.define(
+    'Subject',
+    {
+      subjectId: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        allowNull: false,
+        primaryKey: true
+      },
+      name: {
+        type: DataTypes.STRING(50),
+        allowNull: false
+      },
+      updatedAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW
+      },
+      createdAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW
+      }
+    },
+    {
+      tableName: 'Subject',
+      updatedAt: 'updatedAt',
+      createdAt: 'createdAt',
+      timestamps: true
+    }
+  )
 
   Subject.associate = (models) => {
-    Subject.belongsToMany(models.LeitnerSystem, {
-      through: "systemSubject",
-      foreignKey: "subjectId",
-      otherKey: "idSystem",
-      as: "leitnerSystems",
-    });
+    Subject.hasMany(models.LeitnerSystem, {
+      foreignKey: 'subjectId',
+      as: 'leitnerSystems'
+    })
 
     Subject.belongsToMany(models.Question, {
-      through: "questionSubject",
-      foreignKey: "subjectId",
-      otherKey: "idQuestion",
-      as: "question",
-    });
-  };
+      through: 'questionSubject',
+      foreignKey: 'subjectId',
+      otherKey: 'idQuestion',
+      as: 'question'
+    })
+  }
 
-  return Subject;
-};
+  return Subject
+}

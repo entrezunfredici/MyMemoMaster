@@ -1,59 +1,70 @@
-const { Question, Test, Response, LeitnerCard } = require("../models/index");
+const { Question, Test, Response, LeitnerCard } = require('../models/index')
 
 class QuestionService {
-
   async getAllQuestions() {
-    return await Question.findAll();
+    return await Question.findAll()
   }
 
   async getQuestionsByTest(testId) {
     return await Question.findAll({
-      include: [{
-        model: Test,
-        where: { idTest: testId }
-      }]
-    });
+      include: [
+        {
+          model: Test,
+          as: 'test',
+          where: { testId }
+        }
+      ]
+    })
   }
 
   async getQuestionByCard(cardId) {
     return await Question.findOne({
-      include: [{
-        model: LeitnerCard,
-        where: { idCard: cardId }
-      }]
-    });
+      include: [
+        {
+          model: LeitnerCard,
+          as: 'leitnerCard',
+          where: { idCard: cardId }
+        }
+      ]
+    })
   }
 
   async findOne(id) {
-    return await Question.findByPk(id);
+    return await Question.findByPk(id)
   }
 
   async getCorrectionByQuestion(idQuestion) {
     return await Response.findOne({
-      where: { idQuestion, correction: true },
-    });
+      where: { idQuestion, correction: true }
+    })
   }
 
   async create(data) {
-    const { statement, questionPosition, type, idTest, idCard } = data;
-    return await Question.create({ statement, questionPosition, type, idTest, idCard });
+    const { statement, questionPosition, type, content = null, idTest } = data
+    const question = await Question.create({ statement, questionPosition, type, content })
+    if (idTest) {
+      const test = await Test.findByPk(idTest)
+      if (test) await question.addTest(test)
+    }
+    return question
   }
 
   async update(id, data) {
-    const question = await Question.findByPk(id);
+    const question = await Question.findByPk(id)
     if (!question) {
-      throw new Error("Question not found");
+      throw new Error('Question not found')
     }
-    return await question.update(data);
+    const { statement, questionPosition, type, content } = data
+    return await question.update({ statement, questionPosition, type, content })
   }
 
   async delete(id) {
-    const question = await Question.findByPk(id);
+    const question = await Question.findByPk(id)
     if (!question) {
-      throw new Error("Question not found");
+      throw new Error('Question not found')
     }
-    return await question.destroy();
+    return await question.destroy()
   }
 }
 
-module.exports = new QuestionService();
+module.exports = new QuestionService()

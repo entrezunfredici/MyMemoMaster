@@ -1,57 +1,58 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (sequelize) => {
   const MindMap = sequelize.define(
-    "MindMap",
+    'MindMap',
     {
       idMindMap: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false,
+        allowNull: false
       },
       mmName: {
         type: DataTypes.STRING(50),
-        allowNull: false,
+        allowNull: false
       },
       mindMapJson: {
         type: DataTypes.JSON, // `TEXT` est plus approprié pour du JSON volumineux.
-        allowNull: false,
+        allowNull: false
       },
       userId: {
         type: DataTypes.INTEGER,
         allowNull: false, // Assurez-vous que cette clé étrangère ne peut pas être nulle.
         references: {
-          model: "User", // Nom de la table cible.
-          key: "userId", // Clé primaire dans la table cible.
-        },
+          model: 'User', // Nom de la table cible.
+          key: 'userId' // Clé primaire dans la table cible.
+        }
       },
       subjectId: {
         type: DataTypes.INTEGER,
         allowNull: false, // Assurez-vous que cette clé étrangère ne peut pas être nulle.
         references: {
-          model: "Subject", // Nom de la table cible.
-          key: "subjectId", // Clé primaire dans la table cible.
-        },
-      },
+          model: 'Subject', // Nom de la table cible.
+          key: 'subjectId' // Clé primaire dans la table cible.
+        }
+      }
     },
     {
-      tableName: "MindMap",
+      tableName: 'MindMap',
       timestamps: false,
+      indexes: [{ fields: ['userId'] }, { fields: ['subjectId'] }]
     }
-  );
+  )
 
   // Définir les associations
   MindMap.associate = (models) => {
     MindMap.belongsTo(models.User, {
-      foreignKey: "userId",
-      as: "user", // Alias pour la relation.
-    });
+      foreignKey: 'userId',
+      as: 'user' // Alias pour la relation.
+    })
     MindMap.belongsTo(models.Subject, {
-      foreignKey: "subjectId",
-      as: "subject", // Alias pour la relation.
-    });
-  };
+      foreignKey: 'subjectId',
+      as: 'subject' // Alias pour la relation.
+    })
+  }
 
-  return MindMap;
-};
+  return MindMap
+}

@@ -1,0 +1,90 @@
+name: CI
+
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - '*devops*'
+      - 'dev_back_*'
+      - 'dev_front_*'
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          BRANCH="${GITHUB_REF##*/}"
+          if [[ "$BRANCH" == dev_front_* ]]; then
+            echo 'matrix={"include":[{"service":"front","path":"my_memo_master_front"}]}' >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == dev_back_* ]]; then
+            echo 'matrix={"include":[{"service":"api","path":"my_memo_master_api"}]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"include":[{"service":"api","path":"my_memo_master_api"},{"service":"front","path":"my_memo_master_front"}]}' >> $GITHUB_OUTPUT
+          fi
+
+  test_and_lint:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm ci
+
+      - name: Run Tests
+        working-directory: ${{ matrix.path }}
+        run: npm run test
+
+      - name: Run Lint
+        working-directory: ${{ matrix.path }}
+        run: npm run lint
+
+      - name: Build
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run build
+
+  # sonar_analysis:
+  #   name: Run SonarQube Analysis
+  #   runs-on: ubuntu-latest
+  #   needs: [test, lint]
+  #   if: success()
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+
+  #     - name: Run SonarQube Prod Scan
+  #       if: github.ref == 'refs/heads/main'
+  #       uses: sonarsource/sonarqube-scan-action@v3
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_PROD_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  #     - name: Run SonarQube PreProd Scan
+  #       if: github.ref != 'refs/heads/main'
+  #       uses: sonarsource/sonarqube-scan-action@v3
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_PREPROD_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

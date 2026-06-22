@@ -1,6 +1,6 @@
 <template>
   <!-- NO LAYOUT -->
-  <div v-if="route?.name?.includes?.('auth')">
+  <div v-if="route?.name?.includes?.('auth') || route?.name === 'register' || route?.name === 'forgot-password' || route?.name === 'reset-password'">
     <main>
       <RouterView />
     </main>
@@ -38,10 +38,16 @@
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
-          <!-- <router-link to="/credits"
-            :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-            <CreditsIcon class="size-8" />
-          </router-link> -->
+          <router-link to="/calendar"
+            :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+            title="Calendrier & rappels">
+            <CalendarIcon class="size-8" />
+          </router-link>
+          <router-link to="/todo"
+            :class="[route?.name === 'todo' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+            title="To-do">
+            <CheckCircleIcon class="size-8" />
+          </router-link>
         </div>
         <div class="flex flex-col items-center gap-3 justify-center">
           <router-link to="/profile"
@@ -57,9 +63,10 @@
     </aside>
 
     <div class="flex-1">
-      <header class="mt-20 lg:mt-16 xl:mt-12 mb-3">
+      <header class="mt-20 lg:mt-16 xl:mt-12 mb-3 flex items-start justify-between pr-4">
         <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
           route.meta.title }}</h1>
+        <NotificationBell class="mt-3" />
       </header>
       <main class="mb-8 mr-4">
         <RouterView />
@@ -68,9 +75,10 @@
   </div>
   <!-- MOBIL LAYOUT -->
   <div v-else-if="isMobile()" class="min-h-screen">
-    <header class="m-4">
+    <header class="m-4 flex items-start justify-between">
       <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
         route.meta.title }}</h1>
+      <NotificationBell class="mt-3" />
     </header>
     <main class="m-4 pb-[75px]">
       <RouterView />
@@ -101,10 +109,16 @@
         :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
-      <!-- <router-link to="/credits"
-        :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <ExercisesIcon class="size-8" />
-      </router-link> -->
+      <router-link to="/calendar"
+        :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+        title="Calendrier & rappels">
+        <CalendarIcon class="size-8" />
+      </router-link>
+      <router-link to="/todo"
+        :class="[route?.name === 'todo' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+        title="To-do">
+        <CheckCircleIcon class="size-8" />
+      </router-link>
       <router-link to="/profile"
         :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ProfileIcon class="size-8" />
@@ -127,10 +141,11 @@ import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
 import ClassroomIcon from '@/icons/ClassroomIcon.vue'
-import { HomeIcon } from '@heroicons/vue/24/outline'
+import { HomeIcon, CalendarIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
 import { isMobile } from '@/helpers/functions';
+import NotificationBell from '@/components/NotificationBellComponent.vue'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 

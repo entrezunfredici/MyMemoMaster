@@ -1,0 +1,75 @@
+# =============================================================================
+#  Ingress MyMemoMaster — API + Frontend (ingress-nginx)
+#
+#  Prérequis sur le cluster :
+#    - ingress-nginx installé (fourni par Infomaniak)
+#    - cert-manager installé (fourni par Infomaniak)
+#    - ClusterIssuer letsencrypt-prod appliqué (k8s/cert-manager/cluster-issuer.yml)
+#
+#  Remplacer les domaines avant d'appliquer :
+#    bash k8s/setup.sh --email you@mail.com \
+#                      --api-domain api.yourdomain.com \
+#                      --front-domain app.yourdomain.com
+#
+#  Ou manuellement :
+#    kubectl apply -f ingress.yml -n mymemomaster
+# =============================================================================
+
+# ── API ───────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mmm-api
+  namespace: mymemomaster
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Redirect HTTP → HTTPS automatique
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.yourdomain.com          # ← remplacer
+      secretName: mmm-api-tls
+  rules:
+    - host: api.yourdomain.com        # ← remplacer
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mmm-api
+                port:
+                  number: 3000
+
+---
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mmm-front
+  namespace: mymemomaster
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - app.yourdomain.com          # ← remplacer
+      secretName: mmm-front-tls
+  rules:
+    - host: app.yourdomain.com        # ← remplacer
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mmm-front
+                port:
+                  number: 80

@@ -1,11 +1,14 @@
-const express = require("express");
-const diagramme = require("../controllers/Diagramme.controller.js");
-const mindmapImageUpload = require("../middlewares/mindmapImageUpload");
-const router = express.Router();
+const express = require('express')
+const diagramme = require('../controllers/Diagramme.controller.js')
+const mindmapImageUpload = require('../middlewares/mindmapImageUpload')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const diagrammeValidators = require('../validators/Diagramme.validators')
+const router = express.Router()
 
 /**
  * @swagger
- * /diagrammes/all:
+ * /diagrammes:
  *   get:
  *     summary: Récupère tous les diagrammes
  *     tags:
@@ -32,7 +35,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", diagramme.findAll);
+router.get('/', authMiddleware, diagramme.findAll)
 
 /**
  * @swagger
@@ -70,11 +73,11 @@ router.get("/all", diagramme.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", diagramme.findOne);
+router.get('/:id', authMiddleware, diagramme.findOne)
 
 /**
  * @swagger
- * /diagrammes/add:
+ * /diagrammes:
  *   post:
  *     summary: Ajoute un nouveau diagramme
  *     tags:
@@ -93,7 +96,7 @@ router.get("/:id", diagramme.findOne);
  *                 type: object
  *                 example: {"nodes": [5, 6, 7],"edges": [8, 9, 10]}
  *               userId:
- *                type: integer 
+ *                type: integer
  *                example: 1
  *     responses:
  *       201:
@@ -103,7 +106,7 @@ router.get("/:id", diagramme.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", diagramme.create);
+router.post('/', authMiddleware, diagrammeValidators.create, validate, diagramme.create)
 
 /**
  * @swagger
@@ -140,7 +143,7 @@ router.post("/add", diagramme.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", diagramme.update);
+router.put('/:id', authMiddleware, diagrammeValidators.update, validate, diagramme.update)
 
 /**
  * @swagger
@@ -164,7 +167,7 @@ router.put("/:id", diagramme.update);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", diagramme.delete);
+router.delete('/:id', authMiddleware, diagramme.delete)
 
 /**
  * @swagger
@@ -205,28 +208,27 @@ router.delete("/:id", diagramme.delete);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/upload-image", (req, res) => {
-  mindmapImageUpload.single("image")(req, res, (error) => {
-    if (error && error.code === "LIMIT_FILE_SIZE") {
+router.post('/upload-image', authMiddleware, (req, res) => {
+  mindmapImageUpload.single('image')(req, res, (error) => {
+    if (error && error.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({
-        message: "L'image dépasse la taille maximale autorisée de 5 Mo.",
-      });
+        message: "L'image dépasse la taille maximale autorisée de 5 Mo."
+      })
     }
-    if (error && error.code === "INVALID_FILE_TYPE") {
+    if (error && error.code === 'INVALID_FILE_TYPE') {
       return res.status(400).json({
-        message: "Format d'image non supporté. Formats acceptés : JPG, PNG, GIF, WEBP et SVG.",
-      });
+        message: "Format d'image non supporté. Formats acceptés : JPG, PNG, GIF, WEBP."
+      })
     }
     if (error) {
       return res.status(500).json({
-        message: "Une erreur est survenue lors de l'upload de l'image.",
-        error: error.message,
-      });
+        message: "Une erreur est survenue lors de l'upload de l'image."
+      })
     }
 
-    return diagramme.uploadImage(req, res);
-  });
-});
+    return diagramme.uploadImage(req, res)
+  })
+})
 
 module.exports = (app) => {
   /**
@@ -235,5 +237,5 @@ module.exports = (app) => {
    *   - name: diagrammes
    *     description: Gestion des diagrammes
    */
-  app.use("/diagrammes", router);
-};
+  app.use('/diagrammes', router)
+}

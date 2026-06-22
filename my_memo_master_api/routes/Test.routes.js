@@ -1,11 +1,15 @@
-const express = require("express");
-const test = require("../controllers/Test.controller.js");
+const express = require('express')
+const test = require('../controllers/Test.controller.js')
+const deadline = require('../controllers/Deadline.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const testValidators = require('../validators/Test.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /tests/all:
+ * /tests:
  *   get:
  *     summary: Récupère la liste complète des tests.
  *     tags:
@@ -19,7 +23,7 @@ const router = express.Router();
  *         description: Erreur interne du serveur
  *
  */
-router.get("/all", test.findAll);
+router.get('/', test.findAll)
 
 /**
  * @swagger
@@ -57,11 +61,11 @@ router.get("/all", test.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", test.findOne);
+router.get('/:id', test.findOne)
 
 /**
  * @swagger
- * /tests/add:
+ * /tests:
  *   post:
  *     summary: Ajoute un nouveau test
  *     tags:
@@ -88,7 +92,7 @@ router.get("/:id", test.findOne);
  *         description: Erreur interne du serveur
  *
  */
-router.post("/add", test.create);
+router.post('/', testValidators.create, validate, test.create)
 
 /**
  * @swagger
@@ -127,7 +131,7 @@ router.post("/add", test.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", test.update);
+router.put('/:id', testValidators.update, validate, test.update)
 
 /**
  * @swagger
@@ -151,14 +155,38 @@ router.put("/:id", test.update);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", test.delete);
+router.delete('/:id', test.delete)
+
+router.post('/:id/submit', authMiddleware, testValidators.submit, validate, test.submit)
+
+/**
+ * @swagger
+ * /tests/{id}/deadlines:
+ *   get:
+ *     summary: Lister les échéances liées à un exercice
+ *     tags: [Tests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Échéances récupérées avec succès.
+ *       401:
+ *         description: Non authentifié.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.get('/:id/deadlines', authMiddleware, deadline.findByTest)
 
 module.exports = (app) => {
-    /**
-     * @swagger
-     * tags:
-     *   - name: Tests
-     *     description: Gestion des tests
-     */
-    app.use("/tests", router);
-};
+  /**
+   * @swagger
+   * tags:
+   *   - name: Tests
+   *     description: Gestion des tests
+   */
+  app.use('/tests', router)
+}

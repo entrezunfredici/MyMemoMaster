@@ -1,22 +1,16 @@
-module.exports = (subject = '', text = '', to = '', from = process.env.EMAIL_FROM) => {
-    if (!subject || !text || !to || !from) return;
+const nodemailer = require('nodemailer')
 
-    const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+})
 
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    });
-
-    const mailOptions = { from, to, subject, text };
-
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            console.error(`An error occurred: ${error}`);
-            return false;
-        } else {
-            console.log('Email sent: ' + info.response, 'info');
-            return true;
-        }
-    });
+module.exports = async (subject = '', text = '', to = '', from = process.env.EMAIL_FROM) => {
+  if (!subject || !text || !to || !from) throw new Error('Missing email parameters')
+  await transporter.sendMail({ from, to, subject, text })
 }
