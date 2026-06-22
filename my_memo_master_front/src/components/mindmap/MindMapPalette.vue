@@ -4,19 +4,11 @@
     <!-- ── Créer ──────────────────────────────────────────────────────────── -->
     <section class="palette__section">
       <h4 class="palette__section-title">Créer</h4>
-      <div class="palette__type-row">
-        <label class="palette__label">Type</label>
-        <div class="palette__type-buttons">
-          <button
-            v-for="nt in nodeTypes"
-            :key="nt.id"
-            :class="['palette__type-btn', { 'palette__type-btn--active': store.nodeType === nt.id }]"
-            @click="store.setNodeType(nt.id)"
-          >
-            <span class="palette__type-icon">{{ nt.icon }}</span>
-            {{ nt.label }}
-          </button>
-        </div>
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type par défaut</label>
+        <select class="palette__select palette__select--inline" :value="store.nodeType" @change="store.setNodeType($event.target.value)">
+          <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
+        </select>
       </div>
       <p class="palette__hint">
         <kbd>⇧</kbd>&thinsp;+ clic sur le canvas ou un nœud pour créer. Bouton <strong>+</strong> sur un nœud pour ajouter un enfant.
@@ -51,6 +43,14 @@
         Options
         <span class="palette__node-label">{{ selectedNode.label }}</span>
       </h4>
+
+      <!-- Type du nœud -->
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type</label>
+        <select class="palette__select palette__select--inline" :value="selectedNode.type" @change="updateNodeType($event.target.value)">
+          <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
+        </select>
+      </div>
 
       <!-- Maîtrise -->
       <div class="palette__field">
@@ -111,16 +111,10 @@
       <template v-if="isFormulaNodeSelected">
         <div class="palette__field">
           <label class="palette__label">Formule</label>
-          <textarea
-            class="palette__textarea"
-            v-model="editableContent"
-            rows="4"
-            placeholder="Syntaxe interpréteur (ex: frac(a,b))"
-            @change="updateContent"
-          />
           <div v-if="editableContent" class="palette__formula-preview" v-html="formulaPreviewHtml" />
+          <p v-else class="palette__hint">Aucune formule — ouvrez l'interpréteur pour en saisir une.</p>
           <div class="palette__actions-row">
-            <button class="palette__btn" type="button" @click="openInterpreter">Ouvrir l'interpréteur</button>
+            <button class="palette__btn" type="button" @click="openInterpreter">Saisir avec l'interpréteur</button>
             <button v-if="editableContent" class="palette__btn palette__btn--ghost" type="button" @click="clearFormulaContent">Effacer</button>
           </div>
         </div>
@@ -422,6 +416,14 @@ const updateContent = () => {
   store.updateNode(selectedNode.value.id, { content: editableContent.value });
 };
 
+const updateNodeType = (type) => {
+  if (!selectedNode.value) return;
+  store.updateNode(selectedNode.value.id, {
+    type,
+    content: type === 'text' ? (selectedNode.value.content || '') : '',
+  });
+};
+
 const updateMastery = (value) => {
   if (!selectedNode.value) return;
   store.updateNode(selectedNode.value.id, { mastery: value });
@@ -667,51 +669,6 @@ const assignZone = (zoneId) => {
   border: 1px solid #bfdbfe;
 }
 
-/* Type selector */
-.palette__type-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.palette__type-buttons {
-  display: flex;
-  gap: 6px;
-}
-
-.palette__type-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 8px 4px;
-  border-radius: 10px;
-  border: 1.5px solid #e2e8f0;
-  background: #f8fafc;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-  color: #475569;
-  transition: all 0.15s ease;
-}
-
-.palette__type-btn:hover {
-  background: #eff6ff;
-  border-color: #93c5fd;
-  color: #1d4ed8;
-}
-
-.palette__type-btn--active {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  color: #ffffff;
-}
-
-.palette__type-icon {
-  font-size: 15px;
-}
-
 /* Mode buttons */
 .palette__mode-row {
   display: flex;
@@ -757,6 +714,11 @@ const assignZone = (zoneId) => {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+}
+
+.palette__select--inline {
+  width: auto;
+  min-width: 100px;
 }
 
 .palette__input,

@@ -1,7 +1,7 @@
 # =============================================================================
 #  Ingress MyMemoMaster — Preprod (test)
 #
-#  Domaines : test.api.my-memo-master.com / test.app.my-memo-master.com
+#  Domaines : preprod-api.my-memo-master.com / preprod.my-memo-master.com
 #  Namespace : default (où sont déployés les services test)
 #  SSL : Let's Encrypt via cert-manager + Cloudflare DNS01
 #
@@ -37,10 +37,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - test.api.my-memo-master.com
+        - preprod-api.my-memo-master.com
       secretName: mymemomaster-test-api-tls
   rules:
-    - host: test.api.my-memo-master.com
+    - host: preprod-api.my-memo-master.com
       http:
         paths:
           - path: /
@@ -68,10 +68,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - test.app.my-memo-master.com
+        - preprod.my-memo-master.com
       secretName: mymemomaster-test-front-tls
   rules:
-    - host: test.app.my-memo-master.com
+    - host: preprod.my-memo-master.com
       http:
         paths:
           - path: /

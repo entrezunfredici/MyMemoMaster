@@ -40,9 +40,18 @@
         >{{ node.label }}</div>
 
         <!-- Image -->
-        <div v-if="isImageNode" class="mindmap-node__image">
+        <div
+          v-if="isImageNode"
+          class="mindmap-node__image"
+          :class="{ 'mindmap-node__image--drag': isDragOver }"
+          @dragover.prevent.stop="isDragOver = true"
+          @dragleave.stop="isDragOver = false"
+          @drop.prevent.stop="handleImageDrop"
+        >
           <img v-if="imageSrc" :src="imageSrc" :alt="node.label" />
-          <span v-else class="mindmap-node__image-placeholder">Ajoutez une image depuis le panneau</span>
+          <span v-else class="mindmap-node__image-placeholder">
+            {{ isDragOver ? 'Déposer ici' : 'Glissez une image ici' }}
+          </span>
         </div>
         <!-- Formule -->
         <div v-else-if="isFormulaNode" class="mindmap-node__formula" v-html="formulaHtml"></div>
@@ -110,6 +119,8 @@ import { computed, ref, nextTick } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { getNodeLabel } from '@/helpers/mindmapCreation';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
+import { api } from '@/helpers/api';
+import { VITE_API_URL } from '@/config';
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -198,6 +209,31 @@ const commitContent = () => {
 
 const cancelEdit = () => {
   editingField.value = null;
+};
+
+// ── Drag & drop image ─────────────────────────────────────────────────────────
+const isDragOver = ref(false);
+
+const handleImageDrop = async (event) => {
+  isDragOver.value = false;
+  const file = event.dataTransfer?.files?.[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  if (file.size > 5 * 1024 * 1024) return;
+  const formData = new FormData();
+  formData.append('image', file);
+  try {
+    const response = await api.post('diagrammes/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    if (!response?.data) return;
+    const payload = response.data;
+    let imageUrl = payload.url || '';
+    if (!imageUrl && payload.path) {
+      try { imageUrl = new URL(payload.path, VITE_API_URL).toString(); }
+      catch { imageUrl = payload.path; }
+    }
+    if (imageUrl) store.updateNode(props.node.id, { content: imageUrl });
+  } catch { /* silent */ }
 };
 
 const handlePointerDown = (event) => {
@@ -300,6 +336,12 @@ const createChildNode = () => {
   align-items: center;
   justify-content: center;
   padding: 2px;
+}
+
+.mindmap-node__image--drag {
+  border: 2px dashed #38bdf8;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.08);
 }
 
 .mindmap-node__image img {
