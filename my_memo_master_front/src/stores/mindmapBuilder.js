@@ -22,6 +22,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     selectedLinkId: null,
     pendingLinkSource: null,
     isDirty: false,
+    interpreterOpen: false,
   }),
   getters: {
     nodesArray: (state) => Object.values(state.map.nodes),
@@ -302,6 +303,12 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       if (!this.pendingLinkSource || !targetId || this.pendingLinkSource === targetId) return;
       this.addLink({ from: this.pendingLinkSource, to: targetId, type });
       this.pendingLinkSource = null;
+    },
+    openInterpreter() {
+      this.interpreterOpen = true;
+    },
+    closeInterpreter() {
+      this.interpreterOpen = false;
     },
     linkCard(nodeId, idCard, idSystem) {
       const node = this.map.nodes[nodeId];

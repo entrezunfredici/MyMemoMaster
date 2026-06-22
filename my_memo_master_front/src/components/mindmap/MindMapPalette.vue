@@ -109,6 +109,10 @@
 
       <!-- Formule -->
       <template v-if="isFormulaNodeSelected">
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Couleur texte</label>
+          <input type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
+        </div>
         <div class="palette__field">
           <label class="palette__label">Formule</label>
           <div v-if="editableContent" class="palette__formula-preview" v-html="formulaPreviewHtml" />
@@ -241,7 +245,7 @@
 
   <!-- ── Modale interpréteur ────────────────────────────────────────────── -->
   <teleport to="body">
-    <div v-if="showInterpreter" class="interp-modal">
+    <div v-if="store.interpreterOpen" class="interp-modal">
       <div class="interp-modal__backdrop" @click="closeInterpreter" />
       <div class="interp-modal__dialog">
         <div class="interp-modal__header">
@@ -252,6 +256,8 @@
           v-model="interpreterValue"
           :show-apply="true"
           apply-label="Insérer dans l'item"
+          :bg-color="selectedNode?.style?.primaryColor || ''"
+          :text-color="selectedNode?.style?.textColor || ''"
           @apply="applyInterpreter"
         />
       </div>
@@ -298,7 +304,6 @@ const zoneColor = ref('#BFDBFE');
 const imageInputRef = ref(null);
 const isUploadingImage = ref(false);
 const imageUploadError = ref('');
-const showInterpreter = ref(false);
 const interpreterValue = ref('');
 const textColor = ref('#eef2ff');
 const fontSize = ref(13);
@@ -376,6 +381,12 @@ const unlinkCard = () => {
   showCardPicker.value = false;
 };
 
+watch(() => store.interpreterOpen, (open) => {
+  if (open && isFormulaNodeSelected.value) {
+    interpreterValue.value = editableContent.value || selectedNode.value?.content || '';
+  }
+});
+
 watch(selectedNode, () => {
   showCardPicker.value = false;
   if (selectedNode.value?.idSystem && selectedNode.value?.idCard) {
@@ -406,7 +417,7 @@ watch(
     isUnderline.value = (node?.style?.textDecoration || 'none').includes('underline');
     if (isFormulaNodeSelected.value) interpreterValue.value = node?.content || '';
     else interpreterValue.value = '';
-    showInterpreter.value = false;
+    store.closeInterpreter();
   },
   { immediate: true }
 );
@@ -474,10 +485,10 @@ const toggleUnderline = () => {
 const openInterpreter = () => {
   if (!selectedNode.value) return;
   interpreterValue.value = editableContent.value || '';
-  showInterpreter.value = true;
+  store.openInterpreter();
 };
 
-const closeInterpreter = () => { showInterpreter.value = false; };
+const closeInterpreter = () => { store.closeInterpreter(); };
 
 const applyInterpreter = (value) => {
   if (!selectedNode.value) return;
@@ -485,7 +496,7 @@ const applyInterpreter = (value) => {
   interpreterValue.value = nextValue;
   editableContent.value = nextValue;
   store.updateNode(selectedNode.value.id, { content: nextValue });
-  showInterpreter.value = false;
+  store.closeInterpreter();
 };
 
 const clearFormulaContent = () => {

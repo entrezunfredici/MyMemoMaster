@@ -59,7 +59,14 @@
     ></textarea>
 
     <h3>Résultat</h3>
-    <div class="interpreter__preview" v-html="renderedContent"></div>
+    <div
+      class="interpreter__preview"
+      :style="{
+        ...(props.bgColor ? { background: props.bgColor, borderColor: props.bgColor } : {}),
+        ...(props.textColor ? { color: props.textColor } : {}),
+      }"
+      v-html="renderedContent"
+    />
     <div v-if="unitsError" style="margin-bottom:8px; padding:8px 12px; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:8px; font-weight:600;">
       {{ unitsError }}
     </div>
@@ -86,6 +93,14 @@ const props = defineProps({
   applyLabel: {
     type: String,
     default: 'Appliquer',
+  },
+  bgColor: {
+    type: String,
+    default: '',
+  },
+  textColor: {
+    type: String,
+    default: '',
   },
 })
 

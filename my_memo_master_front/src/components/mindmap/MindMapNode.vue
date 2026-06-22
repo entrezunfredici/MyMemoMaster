@@ -54,7 +54,13 @@
           </span>
         </div>
         <!-- Formule -->
-        <div v-else-if="isFormulaNode" class="mindmap-node__formula" v-html="formulaHtml"></div>
+        <div
+          v-else-if="isFormulaNode"
+          class="mindmap-node__formula"
+          :style="{ color: node.style?.textColor || '#dbeafe' }"
+          v-html="formulaHtml || '<span class=&quot;mindmap-node__placeholder&quot;>Double-clic pour saisir…</span>'"
+          @dblclick.stop="store.openInterpreter()"
+        />
         <!-- Texte inline -->
         <template v-else>
           <textarea
