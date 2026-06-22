@@ -26,6 +26,10 @@ spec:
       - http01:
           ingress:
             ingressClassName: nginx
+            ingressTemplate:
+              metadata:
+                annotations:
+                  nginx.ingress.kubernetes.io/use-regex: "true"
 
 ---
 
@@ -44,3 +48,7 @@ spec:
       - http01:
           ingress:
             ingressClassName: nginx
+            ingressTemplate:
+              metadata:
+                annotations:
+                  nginx.ingress.kubernetes.io/use-regex: "true"

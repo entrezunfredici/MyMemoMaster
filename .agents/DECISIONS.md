@@ -434,3 +434,19 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Créer `middlewares/rateLimit.middleware.js` qui exporte les trois limiteurs. `User.routes.js` importe depuis ce fichier.  
 **Alternative écartée** : Garder les limiteurs inline et dupliquer `apiLimiter` dans `app.js` — DRY violation, tests plus complexes.  
 **Conséquences** : Les trois limiteurs sont configurables via env vars (`AUTH_RATE_MAX`, `REGISTER_RATE_MAX`, `API_RATE_MAX`, etc.). En prod multi-instance, un `RedisStore` partagé sera nécessaire (MemoryStore par défaut non partagé).
+
+---
+
+### [2026-06-22] MindMap — structure JSON stockée en blob plutôt que normalisée
+**Contexte** : L'éditeur de cartes mentales gère un graphe (nœuds + liens + zones + styles) dont la structure varie selon l'utilisateur. Une normalisation relationnelle impliquerait des tables `MindMapNode`, `MindMapLink`, `MindMapZone` avec de nombreuses colonnes JSON ou des jointures complexes à chaque lecture.
+**Décision** : Stocker l'intégralité de la carte dans un champ `mindMapJson` (type JSON Sequelize). Le back ne parse jamais ce JSON — il le passe de bout en bout entre le client et la base. La logique de graphe vit exclusivement dans le front (`mindmapBuilder.js` store).
+**Alternative écartée** : Tables normalisées (`MindMapNode`, `MindMapLink`…) — surcoût de migration et d'API pour un graphe dont la structure change souvent en cours de conception UI. Pas de requête SQL ciblant les nœuds individuels justifiant une normalisation en MVP.
+**Conséquences** : Pas de validation du contenu JSON côté serveur (seule la présence du champ est validée). La cohérence interne du graphe est sous la responsabilité du front. La migration vers une structure normalisée nécessitera un script de conversion des JSON existants.
+
+---
+
+### [2026-06-22] MindMap — resolveSubject : fallback "Sujet par défaut" plutôt que 400
+**Contexte** : La carte mentale doit être rattachée à un sujet (`subjectId FK NOT NULL`). Le `subjectId` fourni par le client peut être absent, nul ou pointer vers un sujet supprimé.
+**Décision** : `DiagrammeService.resolveSubject(subjectId)` crée ou réutilise un sujet nommé `"Sujet par défaut"` via `findOrCreate` quand le subjectId est absent ou invalide. Aucune erreur 400 n'est retournée pour ce champ — le client ne peut pas provoquer un échec de création par un subjectId manquant.
+**Alternative écartée** : Rendre `subjectId` obligatoire et retourner 400 si absent — oblige l'utilisateur à choisir une matière avant toute création de carte, ce qui freine l'usage en contexte d'exploration rapide.
+**Conséquences** : Le sujet par défaut peut s'accumuler des cartes sans lien sémantique clair. En prod, le nombre de cartes rattachées à "Sujet par défaut" sera un indicateur de l'usage réel de la matière optionnelle.

@@ -116,9 +116,29 @@ describe('Diagramme Controller', () => {
       expect(res.status).toBe(404)
     })
 
+    it('403 — non propriétaire', async () => {
+      diagrammeService.findOne.mockResolvedValue({ ...mockDiagramme, userId: 2 })
+
+      const res = await request(app)
+        .get(`${BASE}/diagrammes/1`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+
+      expect(res.status).toBe(403)
+    })
+
     it('401 — pas de token', async () => {
       const res = await request(app).get(`${BASE}/diagrammes/1`)
       expect(res.status).toBe(401)
+    })
+
+    it('500 — le service échoue', async () => {
+      diagrammeService.findOne.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .get(`${BASE}/diagrammes/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(500)
     })
   })
 

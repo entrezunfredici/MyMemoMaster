@@ -20,6 +20,9 @@ exports.findOne = async (req, res) => {
         .status(404)
         .json({ message: `Diagramme introuvable pour l'identifiant ${req.params.id}.` })
     }
+    if (String(response.userId) !== String(req.user.id)) {
+      return res.status(403).json({ message: 'Accès refusé.' })
+    }
     res.status(200).json(response)
   } catch (error) {
     logger.error(error?.message || error)

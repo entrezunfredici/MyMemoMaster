@@ -30,7 +30,8 @@
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
 | LeitnerSystemsUsers | Stable | init |
-| Diagramme (mind maps) | Stable — couplage Subject déplacé vers DiagrammeService.resolveSubject() | 2026-06-06 |
+| Diagramme (mind maps) | Stable — ownership vérifié sur GET /:id (bug corrigé) | 2026-06-22 |
+| Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Fields / FieldsType | Stable | init |
 | Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
@@ -2446,3 +2447,28 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Sessions, événements et ressources dans `ClassroomPage.vue` restent en données mock locales (pas de modèle back dédié pour ces entités dans ce sprint).
 - `avgScore` dans les KPI est calculé sur tous les `TestResult` des étudiants du groupe (toutes matières confondues) — acceptable MVP, à affiner par sujet si besoin.
 - Pas de tests Vitest pour `ClassroomPage.vue` elle-même ni pour `invitations.js` store — les interactions UI complexes (toggle, formulaires) sont couvertes par les tests stores.
+
+---
+
+### [M-01/M-02.01] — Analyse fonctionnelle éditeur de cartes mentales — 2026-06-22
+
+**Fichiers créés :**
+- `diagrams/mindmap_rules.md` — analyse fonctionnelle complète de la fonctionnalité Mind Maps
+
+**Ce qui est couvert :**
+- Vue d'ensemble de l'entité `MindMap` (table BDD + JSON embarqué)
+- Structure détaillée du `mindMapJson` : nœuds, liens, zones, métadonnées
+- Acteurs et permissions (ownership sur PUT/DELETE, absence de vérif sur GET /:id)
+- Règles métier : `resolveSubject`, auto-save 1 500 ms, cycle de vie `isDirty`, nommage, contraintes nœuds/liens/zones
+- Règles upload image (local, 5 Mo, formats JPEG/PNG/GIF/WEBP)
+- Tableau des endpoints API avec codes de retour
+- Cas limites documentés (subjectId invalide, auto-save concurrente, nœud racine, lien vers nœud supprimé…)
+- Dette technique identifiée (ownership GET /:id, images locales, risque de doublon sur POST)
+- Périmètre OUT du MVP
+
+**Hypothèses posées :**
+- Le document décrit l'implémentation telle qu'elle existe au 2026-06-22 — à mettre à jour si les règles évoluent.
+- L'absence de vérification d'ownership sur `GET /diagrammes/:id` est un bug connu, documenté comme dette haute priorité.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite (document d'analyse uniquement).
