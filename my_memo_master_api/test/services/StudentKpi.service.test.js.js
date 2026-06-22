@@ -100,4 +100,78 @@ describe("StudentKpiService", () => {
       });
     });
   });
+
+  describe("getAlerts", () => {
+    test("INACTIVE si aucun enregistrement", async () => {
+      StudentKpi.findOne.mockResolvedValue(null);
+      StudentKpi.findAll.mockResolvedValue([]);
+
+      const alerts = await StudentKpiService.getAlerts(1);
+
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].type).toBe("INACTIVE");
+      expect(alerts[0].severity).toBe("warning");
+    });
+
+    test("INACTIVE si dernière session il y a plus de 3 jours", async () => {
+      const old = new Date();
+      old.setDate(old.getDate() - 5);
+      StudentKpi.findOne.mockResolvedValue({ createdAt: old });
+      StudentKpi.findAll.mockResolvedValue([]);
+
+      const alerts = await StudentKpiService.getAlerts(1);
+
+      expect(alerts.some((a) => a.type === "INACTIVE")).toBe(true);
+    });
+
+    test("aucune alerte INACTIVE si session récente", async () => {
+      const recent = new Date();
+      StudentKpi.findOne.mockResolvedValue({ createdAt: recent });
+      StudentKpi.findAll.mockResolvedValue([]);
+
+      const alerts = await StudentKpiService.getAlerts(1);
+
+      expect(alerts.some((a) => a.type === "INACTIVE")).toBe(false);
+    });
+
+    test("LOW_MASTERY si masteryAvg < 25", async () => {
+      const recent = new Date();
+      StudentKpi.findOne.mockResolvedValue({ createdAt: recent });
+      // Toutes les cartes en boîte 1 → score 0
+      StudentKpi.findAll.mockResolvedValue([
+        makeRecord(1),
+        makeRecord(1),
+      ]);
+
+      const alerts = await StudentKpiService.getAlerts(1);
+
+      expect(alerts.some((a) => a.type === "LOW_MASTERY")).toBe(true);
+      expect(alerts.find((a) => a.type === "LOW_MASTERY").severity).toBe("danger");
+    });
+
+    test("aucune alerte si révisions récentes et bonne maîtrise", async () => {
+      const recent = new Date();
+      StudentKpi.findOne.mockResolvedValue({ createdAt: recent });
+      // Cartes en boîte 5 → score 100
+      StudentKpi.findAll.mockResolvedValue([
+        makeRecord(5),
+        makeRecord(4),
+      ]);
+
+      const alerts = await StudentKpiService.getAlerts(1);
+
+      expect(alerts).toHaveLength(0);
+    });
+
+    test("filtre par subjectId si fourni", async () => {
+      const recent = new Date();
+      StudentKpi.findOne.mockResolvedValue({ createdAt: recent });
+      StudentKpi.findAll.mockResolvedValue([]);
+
+      await StudentKpiService.getAlerts(1, "3");
+
+      const findOneWhere = StudentKpi.findOne.mock.calls[0][0].where;
+      expect(findOneWhere.subjectId).toBe(3);
+    });
+  });
 });

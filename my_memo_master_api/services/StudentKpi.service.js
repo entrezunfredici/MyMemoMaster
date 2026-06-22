@@ -5,6 +5,8 @@ const { Op } = require("sequelize");
 // Box level → score normalisé sur 100
 const BOX_SCORE_MAP = { 1: 0, 2: 25, 3: 50, 4: 75, 5: 100 };
 const MAX_RANGE_DAYS = 90;
+const INACTIVITY_THRESHOLD_DAYS = 3;
+const LOW_MASTERY_THRESHOLD = 25;
 
 class StudentKpiService {
 
@@ -145,6 +147,63 @@ class StudentKpiService {
         return StudentKpi.destroy({
             where: { studentKpiId, userId },
         });
+    }
+
+    /**
+     * Calcule les alertes de régularité pour un étudiant.
+     * Deux types : INACTIVE (pas de session depuis N jours) et LOW_MASTERY (score < seuil).
+     *
+     * @param {number} userId - ID de l'utilisateur
+     * @param {string|null} subjectId - Filtre matière optionnel
+     * @returns {{ type: string, severity: string, message: string }[]}
+     */
+    async getAlerts(userId, subjectId = null) {
+        const alerts = [];
+        const where = { userId };
+        if (subjectId) where.subjectId = parseInt(subjectId);
+
+        const lastRecord = await StudentKpi.findOne({
+            where,
+            order: [["createdAt", "DESC"]],
+        });
+
+        if (!lastRecord) {
+            alerts.push({
+                type: "INACTIVE",
+                severity: "warning",
+                message: "Aucune session de révision enregistrée. Commencez à réviser !",
+            });
+        } else {
+            const daysSince = Math.floor(
+                (Date.now() - new Date(lastRecord.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+            );
+            if (daysSince >= INACTIVITY_THRESHOLD_DAYS) {
+                alerts.push({
+                    type: "INACTIVE",
+                    severity: "warning",
+                    message: `Aucune révision depuis ${daysSince} jour(s). Reprenez vos révisions !`,
+                });
+            }
+        }
+
+        const stop = new Date();
+        const start = new Date();
+        start.setDate(start.getDate() - 30);
+        const kpi = await this.compute(userId, {
+            subjectId,
+            startdate: start.toISOString(),
+            stopdate: stop.toISOString(),
+        });
+
+        if (kpi.sessionsCount > 0 && kpi.masteryAvg < LOW_MASTERY_THRESHOLD) {
+            alerts.push({
+                type: "LOW_MASTERY",
+                severity: "danger",
+                message: `Taux de maîtrise faible (${kpi.masteryAvg}%). Concentrez-vous sur les cartes en boîte 1 et 2.`,
+            });
+        }
+
+        return alerts;
     }
 }
 

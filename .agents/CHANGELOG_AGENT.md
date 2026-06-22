@@ -35,7 +35,7 @@
 | Fields / FieldsType | Stable | init |
 | Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
-| Kpi | Stable (lecture seule) | init |
+| Kpi (StudentKpi) | Stable — M-04.01 : compute + getAlerts (INACTIVE/LOW_MASTERY) + dashboard KpiPage.vue | 2026-06-22 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -2644,3 +2644,44 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Dette / points d'attention :**
 - Aucun test end-to-end du canvas (`MindMapBuilder.vue`) — acceptable pour MVP ; à adresser dans un sprint dédié avec Playwright/Cypress si la feature devient critique.
+
+---
+
+### [M-04.01] — Définition indicateurs KPI étudiant — 2026-06-22
+
+**Contexte :** Branche `dev_back_student_kpi` — KPI personnels, MVP. Complète le module StudentKpi avec les alertes de régularité et le dashboard étudiant.
+
+**Fichiers créés (API) :**
+- `models/StudentKpi.model.js` — modèle `StudentKpi` (leitnerCardId, subjectId, userId, timestamps)
+- `services/StudentKpi.service.js` — `compute()` (masteryAvg, distribution 1-5, sessionsCount, timeseries par jour), `getAlerts()` (INACTIVE si > 3 jours sans session, LOW_MASTERY si masteryAvg < 25), CRUD complet
+- `controllers/StudentKpi.controller.js` — handlers HTTP : `getKpi`, `findAll`, `create`, `update`, `delete`, `getAlerts`
+- `routes/StudentKpi.routes.js` — `GET /summary`, `GET /alerts`, `GET /`, `POST /`, `PUT /:id`, `DELETE /:id` (tous auth requis) + Swagger JSDoc complet
+- `test/services/StudentKpi.service.test.js.js` — 9 tests : compute (4 cas : nominal, vide, filtre subjectId, injection userId), create, findOne, getAlerts (5 cas : aucun enregistrement, inactivité, session récente, low mastery, bonne maîtrise)
+
+**Fichiers créés (front) :**
+- `src/pages/KpiPage.vue` — dashboard étudiant : taux de maîtrise (barre de progression), distribution par boîte Leitner (1-5, barres colorées), alertes de régularité (warning/danger), historique timeseries inversé
+- `src/router/routes.js` — ajout route `/kpi` (private: true)
+
+**Ce qui est utilisable :**
+- `GET /api/v1/student_kpi/summary?subjectId=&startdate=&stopdate=` — KPI agrégés (masteryAvg, distribution, sessionsCount, timeseries)
+- `GET /api/v1/student_kpi/alerts?subjectId=` — alertes actives (`[{ type, severity, message }]`)
+- `POST /api/v1/student_kpi` — enregistre une session KPI (`{ leitnerCardId, subjectId? }`)
+- `/kpi` — dashboard étudiant Vue 3 (filtre par matière, alertes, maîtrise, historique)
+
+**Indicateurs définis (périmètre M-04.01) :**
+| Indicateur | Implémentation |
+|---|---|
+| Taux de maîtrise | `masteryAvg` — score moyen normalisé sur 100 (boîte 1→0%, boîte 5→100%) |
+| Historique de progression | `timeseries` — agrégation journalière, fenêtre 30j par défaut (max 90j) |
+| Alertes de régularité | `INACTIVE` (> 3j sans session) + `LOW_MASTERY` (masteryAvg < 25%) |
+| Dashboard étudiant | `KpiPage.vue` — toutes les métriques avec filtrage par matière |
+
+**Hypothèses posées :**
+- Le score par boîte (BOX_SCORE_MAP: 1→0, 2→25, 3→50, 4→75, 5→100) reflète le niveau de maîtrise Leitner — à ajuster si une autre pondération est souhaitée.
+- Seuil d'inactivité à 3 jours et seuil LOW_MASTERY à 25% — constants nommés `INACTIVITY_THRESHOLD_DAYS` et `LOW_MASTERY_THRESHOLD` dans le service pour faciliter l'ajustement.
+- La création d'un enregistrement KPI (`POST /student_kpi`) est à déclencher depuis le moteur de correction Leitner (`LeitnerCard.service.correctResponse`) — non implémenté dans ce ticket (hors périmètre M-04.01).
+
+**Dette / points d'attention :**
+- `StudentKpi` n'est pas alimenté automatiquement après correction d'une carte — les données KPI sont vides tant que le lien avec `LeitnerCard.service.correctResponse` n'est pas ajouté (ticket séparé).
+- Pas de test Vitest pour `KpiPage.vue` — à couvrir dans un ticket de tests front dédié.
+- Nom du fichier de test : `StudentKpi.service.test.js.js` (double extension `.js`) — hérité de la branche, à renommer.

@@ -62,3 +62,14 @@ exports.delete = async (req, res) => {
         res.status(500).json({ message: "Erreur interne du serveur" });
     }
 };
+
+exports.getAlerts = async (req, res) => {
+    try {
+        const { subjectId } = req.query;
+        const alerts = await StudentKpiService.getAlerts(req.user.id, subjectId ?? null);
+        res.status(200).json(alerts);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Erreur interne du serveur" });
+    }
+};

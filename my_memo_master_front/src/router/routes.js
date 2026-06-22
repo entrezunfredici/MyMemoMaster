@@ -143,6 +143,15 @@ const routes = [
       private: true
     }
   },
+  {
+    path: '/kpi',
+    name: 'kpi',
+    component: () => import('../pages/KpiPage.vue'),
+    meta: {
+      title: 'Mes KPI',
+      private: true
+    }
+  },
   // ==================== AUTH & ACCOUNT ====================
   {
     path: '/auth',

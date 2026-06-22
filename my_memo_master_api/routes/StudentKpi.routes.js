@@ -72,6 +72,46 @@ router.get("/summary", authMiddleware, studentKpi.getKpi);
 
 /**
  * @swagger
+ * /student_kpi/alerts:
+ *   get:
+ *     summary: Retourne les alertes de régularité de l'étudiant connecté
+ *     tags:
+ *       - StudentKpi
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: subjectId
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Liste des alertes actives
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   type:
+ *                     type: string
+ *                     example: INACTIVE
+ *                   severity:
+ *                     type: string
+ *                     enum: [warning, danger]
+ *                   message:
+ *                     type: string
+ *       401:
+ *         description: Non authentifié
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.get("/alerts", authMiddleware, studentKpi.getAlerts);
+
+/**
+ * @swagger
  * /student_kpi:
  *   get:
  *     summary: Récupère les enregistrements KPI bruts de l'étudiant connecté
