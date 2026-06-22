@@ -513,11 +513,11 @@ const clearFormulaContent = () => {
 
 const resolveImageUrl = (payload = {}) => {
   if (!payload) return '';
-  if (payload.url) return payload.url;
   if (payload.path) {
     try { return new URL(payload.path, VITE_API_URL).toString(); }
     catch { return payload.path; }
   }
+  if (payload.url) return payload.url;
   return '';
 };
 

@@ -234,11 +234,12 @@ const handleImageDrop = async (event) => {
     });
     if (!response?.data) return;
     const payload = response.data;
-    let imageUrl = payload.url || '';
-    if (!imageUrl && payload.path) {
+    let imageUrl = '';
+    if (payload.path) {
       try { imageUrl = new URL(payload.path, VITE_API_URL).toString(); }
       catch { imageUrl = payload.path; }
     }
+    if (!imageUrl) imageUrl = payload.url || '';
     if (imageUrl) store.updateNode(props.node.id, { content: imageUrl });
   } catch {
     notif.notify("L'image n'a pas pu être téléchargée.", 'error');

@@ -100,7 +100,7 @@ exports.uploadImage = (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "Aucune image n'a été envoyée." })
     }
-    const relativePath = path.join('uploads', 'mindmaps', req.file.filename).replace(/\\/g, '/')
+    const relativePath = path.join('api', 'uploads', 'mindmaps', req.file.filename).replace(/\\/g, '/')
     const baseUrl = process.env.API_PUBLIC_URL || `${req.protocol}://${req.get('host')}`
     const url = `${baseUrl}/${relativePath}`
     return res.status(201).json({

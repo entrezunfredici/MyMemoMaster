@@ -87,8 +87,8 @@ app.use(sanitize)
 // Middleware for favicon
 app.use(favicon(__dirname + '/public/favicon.ico'))
 
-// Static files for uploaded assets
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')))
+// Static files for uploaded assets — doit être sous /api/ pour passer Traefik (règle PathPrefix `/api`)
+app.use('/api/uploads', express.static(path.join(__dirname, 'public', 'uploads')))
 
 // Middleware pour servir la documentation Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
