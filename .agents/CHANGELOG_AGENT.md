@@ -30,7 +30,7 @@
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
 | LeitnerSystemsUsers | Stable | init |
-| Diagramme (mind maps) | Stable — ownership vérifié sur GET /:id (bug corrigé) | 2026-06-22 |
+| Diagramme (mind maps) | Stable — M-01 complet : panneau styles, liaison flashcard, drag-drop, formule via interpréteur, tests Vitest (63 tests) | 2026-06-22 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Fields / FieldsType | Stable | init |
 | Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
@@ -2472,3 +2472,28 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Dette / points d'attention :**
 - Aucune dette nouvelle introduite (document d'analyse uniquement).
+
+---
+
+### [M-01] — Tests Vitest éditeur de cartes mentales — 2026-06-22
+
+**Fichiers créés :**
+- `test/stores/mindmapBuilder.store.test.js` — 27 tests unitaires du store Pinia
+- `test/components/MindMapNode.test.js` — 18 tests du composant nœud (SVG + foreignObject)
+- `test/components/MindMapPalette.test.js` — 18 tests du panneau de configuration (styles)
+
+**Ce qui est couvert :**
+- Store : `new`, `addNode` (idCard/idSystem null par défaut), `updateNode` (couleurs de maîtrise high/low/medium), `updateNodeStyle` (fusion sans écrasement), `selectNode` (simple + additif + désélection), `resetSelection`, `removeNode` (nœud + liens), `moveNode`, `toggleCollapse`, `linkCard`, `unlinkCard` (reset mastery + couleur), `openInterpreter`/`closeInterpreter`, `syncCardMasteries` (API + mastery + secondaryColor), `exportPayload`, getter `selectedNode` (null si 0 ou N>1 sélectionnés)
+- MindMapNode : rendu label, contenu texte, div formule (renderMathMultiline appelé), div image (placeholder + img), émission `node-pointerdown`, émission `toggle-collapse`, bouton repliage conditionnel, symboles +/−, classe `--selected`, édition inline label (dblclick), édition inline contenu (dblclick), appel `store.openInterpreter` au dblclick sur formule, drag-over image
+- MindMapPalette : état vide (message d'aide), section Options avec nœud sélectionné, sélecteur type (valeur + changement → store.updateNode), sélecteur maîtrise (valeur + changement → store.updateNode), options texte visibles pour type=text, absentes pour type=formula, section formule pour type=formula, bouton interpréteur → store.openInterpreter, couleurs texte pour formule, section image pour type=image, boutons de forme (3 boutons, classe --active), bouton Supprimer → store.removeNode, picker flashcard (ouverture + appel API leitnersystems)
+
+**Résultat :** 63 tests, 0 échec. La suite existante (229 tests) est inchangée.
+
+**Hypothèses posées :**
+- Les composants SVG (`<g>`, `<foreignObject>`) sont montés dans jsdom sans contexte SVG — les éléments HTML à l'intérieur du `foreignObject` sont correctement queryables par @vue/test-utils.
+- `renderMathMultiline` est mocké (`vi.mock`) dans les deux suites pour éviter la dépendance à KaTeX en test.
+- Le composant `Interpreter` est stubbed dans MindMapPalette pour isoler le panneau des dépendances KaTeX.
+
+**Dette / points d'attention :**
+- Aucun test pour `MindMapBoard.vue` (gestion pointer events, drag threshold, pan) — la logique est principalement de la manipulation d'événements DOM + Pinia, ce qui nécessiterait des tests d'intégration plus lourds.
+- Undo/redo : l'objet `history` existe dans le store mais les actions `undo`/`redo` ne sont pas câblées — aucun test écrit pour ces actions inexistantes.

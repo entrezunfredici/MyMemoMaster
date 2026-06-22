@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
 import MindMapNode from '@/components/mindmap/MindMapNode.vue'
+import { renderMathMultiline } from '@/components/interpreter/interpreter.js'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +79,6 @@ describe('MindMapNode', () => {
   })
 
   it('appelle renderMathMultiline avec le contenu de la formule', () => {
-    const { renderMathMultiline } = require('@/components/interpreter/interpreter.js')
     mountNode({ node: makeNode({ type: 'formula', content: 'E=mc^2' }) })
     expect(renderMathMultiline).toHaveBeenCalledWith('E=mc^2')
   })
