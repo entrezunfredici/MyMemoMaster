@@ -13,7 +13,7 @@ exports.findAll = async (req, res) => {
 
 exports.findOne = async (req, res) => {
   try {
-    const event = await CalendarEventService.findOne(req.params.id)
+    const event = await CalendarEventService.findOne(req.params.id, req.user.id)
     if (!event) return res.status(404).json({ message: 'Événement introuvable.' })
     res.status(200).json({ message: 'Événement récupéré avec succès.', data: event })
   } catch (error) {

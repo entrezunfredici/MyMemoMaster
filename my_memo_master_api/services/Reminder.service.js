@@ -1,5 +1,5 @@
 const dayjs = require('dayjs')
-const { Reminder, Deadline, RevisionSession } = require('../models')
+const { Reminder, Deadline, RevisionSession, EventOccurrence, CalendarEvent, ClassGroupUsers } = require('../models')
 const { getReminderQueue } = require('../jobs/reminder.queue')
 
 class ReminderService {
@@ -58,8 +58,15 @@ class ReminderService {
       message: message || null
     })
 
-    const jobId = await this._scheduleJob(reminder.id, reminderAt.toDate())
-    await reminder.update({ jobId })
+    let jobId
+    try {
+      jobId = await this._scheduleJob(reminder.id, reminderAt.toDate())
+      await reminder.update({ jobId })
+    } catch (err) {
+      if (jobId) await this._cancelJob(jobId)
+      await reminder.destroy()
+      throw err
+    }
 
     return reminder
   }
@@ -130,7 +137,9 @@ class ReminderService {
   // ──────────────────────────────────────────────────────────
 
   /**
-   * Résout l'entité liée (Deadline ou RevisionSession) avec vérification propriétaire.
+   * Résout l'entité liée (Deadline ou RevisionSession) avec vérification d'accès.
+   * Pour les deadlines : vérifie l'appartenance au groupe (tous les membres peuvent poser un rappel).
+   * Pour les révisions : vérifie que l'utilisateur est le propriétaire.
    *
    * @param {string} entityType
    * @param {number} entityId
@@ -139,7 +148,19 @@ class ReminderService {
    */
   async _resolveEntity(entityType, entityId, userId) {
     if (entityType === 'deadline') {
-      return Deadline.findOne({ where: { id: entityId, createdBy: userId } })
+      const deadline = await Deadline.findByPk(entityId, {
+        include: [{
+          model: EventOccurrence,
+          as: 'occurrence',
+          required: true,
+          include: [{ model: CalendarEvent, as: 'calendarEvent', attributes: ['classGroupId'] }]
+        }]
+      })
+      if (!deadline) return null
+      const classGroupId = deadline.occurrence?.calendarEvent?.classGroupId
+      if (!classGroupId) return null
+      const membership = await ClassGroupUsers.findOne({ where: { classGroupId, userId } })
+      return membership ? deadline : null
     }
     if (entityType === 'revision_session') {
       return RevisionSession.findOne({ where: { id: entityId, userId } })

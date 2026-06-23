@@ -38,23 +38,29 @@ class CalendarEventService {
     const targetDays = (days || [])
       .map((d) => DAY_MAP[d.toLowerCase()])
       .filter((d) => d !== undefined)
-    // Pour biweekly : référence = début de semaine de startDate
-    const refWeekStart = start.startOf('week')
     let cur = start
 
-    while (!cur.isAfter(end)) {
-      if (targetDays.includes(cur.day())) {
-        if (frequency === 'weekly') {
+    if (frequency === 'weekly') {
+      while (!cur.isAfter(end)) {
+        if (targetDays.includes(cur.day())) {
           result.push({ date: cur.format('YYYY-MM-DD'), startTime, endTime })
-        } else {
-          // biweekly : inclure uniquement les semaines paires (0, 2, 4...) par rapport à refWeekStart
+        }
+        cur = cur.add(1, 'day')
+      }
+    } else {
+      // biweekly : référence = début de semaine de la PREMIÈRE occurrence trouvée
+      // (pas de startDate) pour éviter le saut quand un targetDay précède startDate dans sa semaine
+      let refWeekStart = null
+      while (!cur.isAfter(end)) {
+        if (targetDays.includes(cur.day())) {
+          if (refWeekStart === null) refWeekStart = cur.startOf('week')
           const weekDiff = cur.startOf('week').diff(refWeekStart, 'week')
           if (weekDiff % 2 === 0) {
             result.push({ date: cur.format('YYYY-MM-DD'), startTime, endTime })
           }
         }
+        cur = cur.add(1, 'day')
       }
-      cur = cur.add(1, 'day')
     }
 
     return result
@@ -103,15 +109,22 @@ class CalendarEventService {
   }
 
   /**
-   * Récupère un événement avec ses occurrences.
+   * Récupère un événement avec ses occurrences (triées par date ASC).
+   * Si userId est fourni, vérifie que l'utilisateur appartient au groupe de l'événement.
    *
    * @param {number} id
-   * @returns {Promise<CalendarEvent|null>}
+   * @param {number|null} userId - null pour les appels internes (admin déjà vérifié)
+   * @returns {Promise<CalendarEvent|null>} null si introuvable ou accès refusé
    */
-  async findOne(id) {
-    return CalendarEvent.findByPk(id, {
-      include: [{ model: EventOccurrence, as: 'occurrences', order: [['date', 'ASC']] }]
+  async findOne(id, userId = null) {
+    const event = await CalendarEvent.findByPk(id, {
+      include: [{ model: EventOccurrence, as: 'occurrences' }],
+      order: [[{ model: EventOccurrence, as: 'occurrences' }, 'date', 'ASC']]
     })
+    if (!event || !userId) return event
+    if (await this._isAdmin(userId)) return event
+    const groupIds = await this._getUserGroupIds(userId)
+    return groupIds.includes(event.classGroupId) ? event : null
   }
 
   /**

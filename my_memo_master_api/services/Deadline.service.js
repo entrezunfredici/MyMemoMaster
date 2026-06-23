@@ -63,12 +63,14 @@ class DeadlineService {
 
   /**
    * Récupère une échéance par ID.
+   * Si userId est fourni, vérifie que l'utilisateur appartient au groupe de l'échéance.
    *
    * @param {number} id
-   * @returns {Promise<Deadline|null>}
+   * @param {number|null} userId - null pour les appels internes (droits déjà vérifiés)
+   * @returns {Promise<Deadline|null>} null si introuvable ou accès refusé
    */
-  async findOne(id) {
-    return Deadline.findByPk(id, {
+  async findOne(id, userId = null) {
+    const deadline = await Deadline.findByPk(id, {
       include: [
         {
           model: EventOccurrence,
@@ -78,6 +80,11 @@ class DeadlineService {
         { model: Test, as: 'test', attributes: ['testId', 'name'], required: false }
       ]
     })
+    if (!deadline || !userId) return deadline
+    const classGroupId = deadline.occurrence?.calendarEvent?.classGroupId
+    if (!classGroupId) return null
+    const groupIds = await this._getUserGroupIds(userId)
+    return groupIds.includes(classGroupId) ? deadline : null
   }
 
   /**

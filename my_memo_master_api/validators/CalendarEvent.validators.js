@@ -33,8 +33,12 @@ exports.create = [
       if (!VALID_FREQUENCIES.includes(rule.frequency)) {
         throw new Error(`frequency doit être : ${VALID_FREQUENCIES.join(', ')}.`)
       }
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
       if (!rule.startDate || !rule.endDate) {
         throw new Error('recurrenceRule doit contenir startDate et endDate.')
+      }
+      if (!ISO_DATE.test(rule.startDate) || !ISO_DATE.test(rule.endDate)) {
+        throw new Error('startDate et endDate doivent être au format YYYY-MM-DD.')
       }
       if (rule.frequency !== 'monthly' && (!Array.isArray(rule.days) || rule.days.length === 0)) {
         throw new Error('recurrenceRule.days est requis pour les fréquences weekly et biweekly.')
@@ -45,6 +49,9 @@ exports.create = [
       }
       if (!rule.startTime || !rule.endTime) {
         throw new Error('recurrenceRule doit contenir startTime et endTime.')
+      }
+      if (!timeRegex.test(rule.startTime) || !timeRegex.test(rule.endTime)) {
+        throw new Error('startTime et endTime de recurrenceRule doivent être au format HH:MM.')
       }
       if (rule.startDate >= rule.endDate) {
         throw new Error('startDate doit être antérieure à endDate dans recurrenceRule.')

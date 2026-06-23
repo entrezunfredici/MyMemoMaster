@@ -66,7 +66,11 @@ import { useDeadlineStore } from '@/stores/deadlines'
 const revisionStore = useRevisionSessionStore()
 const deadlineStore = useDeadlineStore()
 
-const todayStr = new Date().toISOString().slice(0, 10)
+function getLocalToday() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const todayStr = ref(getLocalToday())
 
 const TABS = [
   { id: 'todo', label: 'À faire' },
@@ -108,14 +112,14 @@ function sortByDateTime(items) {
 /* ── Filtres par onglet ── */
 const filteredItems = computed(() => {
   if (activeTab.value === 'today') {
-    const sessions = allSessions.value.filter((s) => s._date === todayStr)
-    const deadlines = allDeadlines.value.filter((d) => d._date === todayStr)
+    const sessions = allSessions.value.filter((s) => s._date === todayStr.value)
+    const deadlines = allDeadlines.value.filter((d) => d._date === todayStr.value)
     return sortByDateTime([...sessions, ...deadlines])
   }
 
   if (activeTab.value === 'upcoming') {
-    const sessions = allSessions.value.filter((s) => s._date > todayStr && !s.isDone)
-    const deadlines = allDeadlines.value.filter((d) => d._date > todayStr)
+    const sessions = allSessions.value.filter((s) => s._date > todayStr.value && !s.isDone)
+    const deadlines = allDeadlines.value.filter((d) => d._date > todayStr.value)
     return sortByDateTime([...sessions, ...deadlines])
   }
 
@@ -125,7 +129,7 @@ const filteredItems = computed(() => {
 
   // 'todo' : séances non terminées (toutes dates) + deadlines du jour ou à venir
   const sessions = allSessions.value.filter((s) => !s.isDone)
-  const deadlines = allDeadlines.value.filter((d) => d._date >= todayStr)
+  const deadlines = allDeadlines.value.filter((d) => d._date >= todayStr.value)
   return sortByDateTime([...sessions, ...deadlines])
 })
 
@@ -133,14 +137,14 @@ const filteredItems = computed(() => {
 function tabCount(tabId) {
   if (tabId === 'today') {
     return (
-      allSessions.value.filter((s) => s._date === todayStr).length +
-      allDeadlines.value.filter((d) => d._date === todayStr).length
+      allSessions.value.filter((s) => s._date === todayStr.value).length +
+      allDeadlines.value.filter((d) => d._date === todayStr.value).length
     )
   }
   if (tabId === 'upcoming') {
     return (
-      allSessions.value.filter((s) => s._date > todayStr && !s.isDone).length +
-      allDeadlines.value.filter((d) => d._date > todayStr).length
+      allSessions.value.filter((s) => s._date > todayStr.value && !s.isDone).length +
+      allDeadlines.value.filter((d) => d._date > todayStr.value).length
     )
   }
   if (tabId === 'done') {
@@ -149,7 +153,7 @@ function tabCount(tabId) {
   // 'todo'
   return (
     allSessions.value.filter((s) => !s.isDone).length +
-    allDeadlines.value.filter((d) => d._date >= todayStr).length
+    allDeadlines.value.filter((d) => d._date >= todayStr.value).length
   )
 }
 

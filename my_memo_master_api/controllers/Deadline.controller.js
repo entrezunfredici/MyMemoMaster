@@ -13,7 +13,7 @@ exports.findAll = async (req, res) => {
 
 exports.findOne = async (req, res) => {
   try {
-    const deadline = await DeadlineService.findOne(req.params.id)
+    const deadline = await DeadlineService.findOne(req.params.id, req.user.id)
     if (!deadline) return res.status(404).json({ message: 'Échéance introuvable.' })
     res.status(200).json({ message: 'Échéance récupérée avec succès.', data: deadline })
   } catch (error) {
