@@ -26,6 +26,10 @@ exports.login = async (req, res) => {
     const isPasswordValid = await userService.verifyPassword(user.userId, password)
     if (!isPasswordValid) return res.status(401).send({ message: 'Identifiants invalides.' })
 
+    if (!user.hasValidatedEmail) {
+      return res.status(403).send({ message: 'Veuillez vérifier votre adresse email avant de vous connecter.' })
+    }
+
     const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '15m'
     const token = jwt.sign({ id: user.userId }, process.env.AUTH_JWT_SECRET, { expiresIn })
 
@@ -84,7 +88,7 @@ exports.verifyEmail = async (req, res) => {
   try {
     const user = await userService.findByEmail(email)
 
-    if (!user) return res.status(404).send({ message: 'Utilisateur introuvable.' })
+    if (!user) return res.status(401).send({ message: 'Code invalide.' })
     if (!(await userService.verifyValidEmailCode(user.userId, code)))
       return res.status(401).send({ message: 'Code invalide.' })
 
@@ -99,9 +103,10 @@ exports.verifyEmail = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body
+  const genericMessage = { message: 'Si cet email existe, un code de réinitialisation vous a été envoyé.' }
   try {
     const user = await userService.findByEmail(email)
-    if (!user) return res.status(404).send({ message: 'Utilisateur introuvable.' })
+    if (!user) return res.status(200).send(genericMessage)
 
     const code = await userService.setResetPasswordCode(user.userId)
     await sendEmail(
@@ -110,7 +115,7 @@ exports.forgotPassword = async (req, res) => {
       email
     )
 
-    res.status(201).send({ message: 'Code de réinitialisation envoyé avec succès.' })
+    res.status(200).send(genericMessage)
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).send({ message: "Erreur lors de l'envoi du code de réinitialisation." })

@@ -125,7 +125,7 @@ describe('User Controller', () => {
   // ── POST /users/login ──────────────────────────────────────────────────────
   describe('POST /users/login', () => {
     it('200 — retourne un token JWT et un refresh token', async () => {
-      const mockUser = { userId: 1, name: 'Bob', email: 'bob@example.com', role: 'user' }
+      const mockUser = { userId: 1, name: 'Bob', email: 'bob@example.com', role: 'user', hasValidatedEmail: true }
       userService.findByEmail.mockResolvedValue(mockUser)
       userService.verifyPassword.mockResolvedValue(true)
       userService.setRefreshToken.mockResolvedValue()
@@ -159,6 +159,18 @@ describe('User Controller', () => {
         .send({ email: 'bob@example.com', password: 'WrongPass1' })
 
       expect(res.status).toBe(401)
+    })
+
+    it('403 — email non vérifié', async () => {
+      userService.findByEmail.mockResolvedValue({ userId: 1, hasValidatedEmail: false })
+      userService.verifyPassword.mockResolvedValue(true)
+
+      const res = await request(app)
+        .post('/api/v1/users/login')
+        .send({ email: 'bob@example.com', password: 'Password123' })
+
+      expect(res.status).toBe(403)
+      expect(res.body.message).toMatch(/email/i)
     })
 
     it('400 — mot de passe manquant', async () => {
@@ -311,7 +323,7 @@ describe('User Controller', () => {
   describe('POST /users/forgot-password', () => {
     const FAKE_TOKEN = 'a'.repeat(64)
 
-    it("201 — envoie l'email avec le token", async () => {
+    it("200 — envoie l'email avec le token (réponse générique)", async () => {
       userService.findByEmail.mockResolvedValue({ userId: 1, email: 'bob@example.com' })
       userService.setResetPasswordCode.mockResolvedValue(FAKE_TOKEN)
       sendEmail.mockResolvedValue()
@@ -320,7 +332,7 @@ describe('User Controller', () => {
         .post('/api/v1/users/forgot-password')
         .send({ email: 'bob@example.com' })
 
-      expect(res.status).toBe(201)
+      expect(res.status).toBe(200)
       expect(sendEmail).toHaveBeenCalledWith(
         expect.any(String),
         expect.stringContaining(FAKE_TOKEN),
@@ -328,14 +340,15 @@ describe('User Controller', () => {
       )
     })
 
-    it('404 — utilisateur introuvable', async () => {
+    it('200 — réponse générique si utilisateur introuvable (anti-énumération)', async () => {
       userService.findByEmail.mockResolvedValue(null)
 
       const res = await request(app)
         .post('/api/v1/users/forgot-password')
         .send({ email: 'unknown@example.com' })
 
-      expect(res.status).toBe(404)
+      expect(res.status).toBe(200)
+      expect(sendEmail).not.toHaveBeenCalled()
     })
 
     it('400 — email invalide', async () => {

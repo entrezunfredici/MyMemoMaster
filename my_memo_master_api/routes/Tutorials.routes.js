@@ -1,5 +1,6 @@
 const express = require('express')
 const tutorials = require('../controllers/Tutorials.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
 const tutorialsValidators = require('../validators/Tutorials.validators')
 
@@ -95,7 +96,7 @@ router.get('/:id', tutorials.findOne)
  *       500:
  *         description: Erreur serveur.
  */
-router.post('/', tutorialsValidators.create, validate, tutorials.create)
+router.post('/', authMiddleware, tutorialsValidators.create, validate, tutorials.create)
 
 /**
  * @swagger
@@ -133,7 +134,7 @@ router.post('/', tutorialsValidators.create, validate, tutorials.create)
  *       500:
  *         description: Erreur serveur.
  */
-router.put('/:id', tutorialsValidators.update, validate, tutorials.update)
+router.put('/:id', authMiddleware, tutorialsValidators.update, validate, tutorials.update)
 
 /**
  * @swagger
@@ -156,7 +157,7 @@ router.put('/:id', tutorialsValidators.update, validate, tutorials.update)
  *       500:
  *         description: Erreur serveur.
  */
-router.delete('/:id', tutorials.delete)
+router.delete('/:id', authMiddleware, tutorials.delete)
 
 module.exports = (app) => {
   /**

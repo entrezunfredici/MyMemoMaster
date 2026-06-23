@@ -321,6 +321,134 @@ describe('UserService', () => {
     })
   })
 
+  // ── Refresh token — hachage SHA-256 ────────────────────────────────────────
+
+  describe('setRefreshToken', () => {
+    it('stocke le hash SHA-256 du token (pas le token brut)', async () => {
+      const crypto = require('crypto')
+      User.update.mockResolvedValue([1])
+      const rawToken = crypto.randomBytes(64).toString('hex')
+
+      await UserService.setRefreshToken(1, rawToken, new Date(Date.now() + 86400000))
+
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.refreshToken).not.toBe(rawToken)
+      expect(fields.refreshToken).toHaveLength(64) // SHA-256 hex = 64 chars
+      expect(/^[0-9a-f]+$/.test(fields.refreshToken)).toBe(true)
+    })
+  })
+
+  describe('verifyRefreshToken', () => {
+    it("retrouve l'utilisateur en hachant le token brut avant la requete DB", async () => {
+      const crypto = require('crypto')
+      const rawToken = crypto.randomBytes(64).toString('hex')
+      const hash = crypto.createHash('sha256').update(rawToken).digest('hex')
+      const future = new Date(Date.now() + 86400000)
+
+      User.findOne.mockResolvedValue({ userId: 1, refreshTokenExpiresAt: future })
+
+      const result = await UserService.verifyRefreshToken(rawToken)
+
+      expect(User.findOne).toHaveBeenCalledWith({ where: { refreshToken: hash } })
+      expect(result).not.toBeNull()
+    })
+
+    it('retourne null si le token est expiré', async () => {
+      const crypto = require('crypto')
+      const rawToken = crypto.randomBytes(64).toString('hex')
+      const past = new Date(Date.now() - 1000)
+
+      User.findOne.mockResolvedValue({ userId: 1, refreshTokenExpiresAt: past })
+
+      const result = await UserService.verifyRefreshToken(rawToken)
+
+      expect(result).toBeNull()
+    })
+
+    it('retourne null si token absent', async () => {
+      const result = await UserService.verifyRefreshToken(null)
+      expect(User.findOne).not.toHaveBeenCalled()
+      expect(result).toBeNull()
+    })
+  })
+
+  // ── validEmailCode — expiration ────────────────────────────────────────────
+
+  describe('setValidEmailCode', () => {
+    it("stocke un code et une date d'expiration (30 min)", async () => {
+      User.update.mockResolvedValue([1])
+
+      await UserService.setValidEmailCode(1)
+
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.validEmailCode).toBeDefined()
+      expect(fields.validEmailCodeExpiresAt).toBeInstanceOf(Date)
+      const diffMs = fields.validEmailCodeExpiresAt - Date.now()
+      expect(diffMs).toBeGreaterThan(29 * 60 * 1000)
+      expect(diffMs).toBeLessThanOrEqual(30 * 60 * 1000 + 100)
+    })
+  })
+
+  describe('verifyValidEmailCode', () => {
+    it('retourne true si le code est correct et non expiré', async () => {
+      const future = new Date(Date.now() + 10 * 60 * 1000)
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: future,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '123456')
+
+      expect(result).toBe(true)
+      expect(mockUser.validEmailCode).toBeNull()
+      expect(mockUser.validEmailCodeExpiresAt).toBeNull()
+      expect(mockUser.save).toHaveBeenCalled()
+    })
+
+    it('retourne false si le code est incorrect', async () => {
+      const future = new Date(Date.now() + 10 * 60 * 1000)
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: future,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '999999')
+
+      expect(result).toBe(false)
+    })
+
+    it('retourne false si le code est expiré', async () => {
+      const past = new Date(Date.now() - 1000)
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: past,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '123456')
+
+      expect(result).toBe(false)
+    })
+
+    it("retourne false si pas de date d'expiration", async () => {
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: null,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '123456')
+
+      expect(result).toBe(false)
+    })
+  })
+
   // ── Bcrypt — create (hachage au moment de la persistance) ─────────────────
 
   describe('create — hachage du mot de passe', () => {

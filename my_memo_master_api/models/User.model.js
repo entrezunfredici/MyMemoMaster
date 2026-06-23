@@ -38,6 +38,10 @@ module.exports = (instance) => {
         type: DataTypes.STRING,
         allowNull: true
       },
+      validEmailCodeExpiresAt: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
       resetPasswordCode: {
         type: DataTypes.STRING(64),
         allowNull: true

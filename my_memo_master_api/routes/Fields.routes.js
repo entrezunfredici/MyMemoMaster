@@ -1,5 +1,6 @@
 const express = require('express')
 const fieldController = require('../controllers/Fields.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
 const fieldsValidators = require('../validators/Fields.validators')
 
@@ -94,7 +95,7 @@ router.get('/:id', fieldController.findOne)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post('/', fieldsValidators.create, validate, fieldController.create)
+router.post('/', authMiddleware, fieldsValidators.create, validate, fieldController.create)
 
 /**
  * @swagger
@@ -134,7 +135,7 @@ router.post('/', fieldsValidators.create, validate, fieldController.create)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put('/:id', fieldsValidators.update, validate, fieldController.update)
+router.put('/:id', authMiddleware, fieldsValidators.update, validate, fieldController.update)
 
 /**
  * @swagger
@@ -158,7 +159,7 @@ router.put('/:id', fieldsValidators.update, validate, fieldController.update)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete('/:id', fieldController.delete)
+router.delete('/:id', authMiddleware, fieldController.delete)
 
 module.exports = (app) => {
   /**

@@ -48,6 +48,11 @@
             title="To-do">
             <CheckCircleIcon class="size-8" />
           </router-link>
+          <router-link to="/kpi"
+            :class="[route?.name === 'kpi' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+            title="Ma Progression">
+            <KpiIcon class="size-8" />
+          </router-link>
         </div>
         <div class="flex flex-col items-center gap-3 justify-center">
           <router-link to="/profile"
@@ -119,6 +124,11 @@
         title="To-do">
         <CheckCircleIcon class="size-8" />
       </router-link>
+      <router-link to="/kpi"
+        :class="[route?.name === 'kpi' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+        title="Ma Progression">
+        <KpiIcon class="size-8" />
+      </router-link>
       <router-link to="/profile"
         :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ProfileIcon class="size-8" />
@@ -141,6 +151,7 @@ import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
 import ClassroomIcon from '@/icons/ClassroomIcon.vue'
+import KpiIcon from '@/icons/KpiIcon.vue'
 import { HomeIcon, CalendarIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';

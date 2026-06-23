@@ -139,21 +139,35 @@ describe('Test Controller', () => {
 
       const res = await request(app)
         .post(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Contrôle Maths', subjectId: 1 })
 
       expect(res.status).toBe(201)
       expect(testService.create).toHaveBeenCalledTimes(1)
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests`)
+        .send({ name: 'Contrôle Maths', subjectId: 1 })
+      expect(res.status).toBe(401)
+    })
+
     it('400 — name manquant', async () => {
-      const res = await request(app).post(`${BASE}/tests`).send({ subjectId: 1 })
+      const res = await request(app)
+        .post(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ subjectId: 1 })
 
       expect(res.status).toBe(400)
       expect(res.body.errors).toBeDefined()
     })
 
     it('400 — subjectId manquant', async () => {
-      const res = await request(app).post(`${BASE}/tests`).send({ name: 'Contrôle Maths' })
+      const res = await request(app)
+        .post(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Contrôle Maths' })
 
       expect(res.status).toBe(400)
     })
@@ -161,13 +175,17 @@ describe('Test Controller', () => {
     it('400 — subjectId invalide (non entier)', async () => {
       const res = await request(app)
         .post(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Contrôle Maths', subjectId: 'abc' })
 
       expect(res.status).toBe(400)
     })
 
     it('400 — name trop court (< 2 chars)', async () => {
-      const res = await request(app).post(`${BASE}/tests`).send({ name: 'A', subjectId: 1 })
+      const res = await request(app)
+        .post(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'A', subjectId: 1 })
 
       expect(res.status).toBe(400)
     })
@@ -177,6 +195,7 @@ describe('Test Controller', () => {
 
       const res = await request(app)
         .post(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Contrôle Maths', subjectId: 1 })
 
       expect(res.status).toBe(500)
@@ -188,13 +207,24 @@ describe('Test Controller', () => {
     it('200 — met à jour le test', async () => {
       testService.update.mockResolvedValue({ ...mockTest, name: 'Contrôle Maths v2' })
 
-      const res = await request(app).put(`${BASE}/tests/1`).send({ name: 'Contrôle Maths v2' })
+      const res = await request(app)
+        .put(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Contrôle Maths v2' })
 
       expect(res.status).toBe(200)
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).put(`${BASE}/tests/1`).send({ name: 'Contrôle Maths v2' })
+      expect(res.status).toBe(401)
+    })
+
     it('400 — subjectId invalide', async () => {
-      const res = await request(app).put(`${BASE}/tests/1`).send({ subjectId: -1 })
+      const res = await request(app)
+        .put(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ subjectId: -1 })
 
       expect(res.status).toBe(400)
     })
@@ -202,7 +232,10 @@ describe('Test Controller', () => {
     it('500 — le service échoue', async () => {
       testService.update.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).put(`${BASE}/tests/1`).send({ name: 'Contrôle Maths v2' })
+      const res = await request(app)
+        .put(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Contrôle Maths v2' })
 
       expect(res.status).toBe(500)
     })
@@ -213,15 +246,24 @@ describe('Test Controller', () => {
     it('204 — supprime le test', async () => {
       testService.delete.mockResolvedValue(true)
 
-      const res = await request(app).delete(`${BASE}/tests/1`)
+      const res = await request(app)
+        .delete(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(204)
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app).delete(`${BASE}/tests/1`)
+      expect(res.status).toBe(401)
     })
 
     it('500 — le service échoue', async () => {
       testService.delete.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).delete(`${BASE}/tests/1`)
+      const res = await request(app)
+        .delete(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
     })

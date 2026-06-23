@@ -43,7 +43,12 @@ exports.delete = async (req, res) => {
     if (!key) {
       return res.status(400).send({ message: "Paramètre 'key' manquant." })
     }
-    await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: decodeURIComponent(key) }))
+    const decodedKey = decodeURIComponent(key)
+    const expectedPrefix = `uploads/${req.user.id}/`
+    if (!decodedKey.startsWith(expectedPrefix)) {
+      return res.status(403).send({ message: 'Accès refusé.' })
+    }
+    await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: decodedKey }))
     return res.status(200).send({ message: 'Fichier supprimé avec succès.' })
   } catch (error) {
     logger.error(error?.message || error)

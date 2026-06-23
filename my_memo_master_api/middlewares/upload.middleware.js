@@ -26,10 +26,11 @@ const storage = bucket
       s3: s3Client,
       bucket,
       contentType: multerS3.AUTO_CONTENT_TYPE,
-      key: (_req, file, cb) => {
+      key: (req, file, cb) => {
+        const userId = req.user?.id || 'anon'
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
         const ext = path.extname(file.originalname).toLowerCase()
-        cb(null, `uploads/${uniqueSuffix}${ext}`)
+        cb(null, `uploads/${userId}/${uniqueSuffix}${ext}`)
       }
     })
   : multer.diskStorage({

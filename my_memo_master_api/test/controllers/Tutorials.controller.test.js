@@ -35,8 +35,11 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.NODE_ENV = 'test'
 
 const request = require('supertest')
+const jwt = require('jsonwebtoken')
 const app = require('../../app')
 const tutorialsService = require('../../services/Tutorials.service')
+
+const makeToken = (payload = { id: 1 }) => jwt.sign(payload, 'test-secret', { expiresIn: '1d' })
 
 const BASE = '/api/v1'
 
@@ -124,22 +127,36 @@ describe('Tutorials Controller', () => {
     it('201 — crée un tutoriel', async () => {
       tutorialsService.create.mockResolvedValue(mockTutorial)
 
-      const res = await request(app).post(`${BASE}/tutorials`).send(validBody)
+      const res = await request(app)
+        .post(`${BASE}/tutorials`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(validBody)
 
       expect(res.status).toBe(201)
       expect(res.body.status).toBe('success')
       expect(tutorialsService.create).toHaveBeenCalledTimes(1)
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).post(`${BASE}/tutorials`).send(validBody)
+      expect(res.status).toBe(401)
+    })
+
     it('400 — name manquant', async () => {
-      const res = await request(app).post(`${BASE}/tutorials`).send({ link: 'https://react.dev' })
+      const res = await request(app)
+        .post(`${BASE}/tutorials`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ link: 'https://react.dev' })
 
       expect(res.status).toBe(400)
       expect(res.body.errors).toBeDefined()
     })
 
     it('400 — link manquant', async () => {
-      const res = await request(app).post(`${BASE}/tutorials`).send({ name: 'Intro à React' })
+      const res = await request(app)
+        .post(`${BASE}/tutorials`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Intro à React' })
 
       expect(res.status).toBe(400)
     })
@@ -147,6 +164,7 @@ describe('Tutorials Controller', () => {
     it("400 — link n'est pas une URL valide", async () => {
       const res = await request(app)
         .post(`${BASE}/tutorials`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Intro à React', link: 'pas-une-url' })
 
       expect(res.status).toBe(400)
@@ -155,6 +173,7 @@ describe('Tutorials Controller', () => {
     it("400 — revision_tips n'est pas un booléen", async () => {
       const res = await request(app)
         .post(`${BASE}/tutorials`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ ...validBody, revision_tips: 'maybe' })
 
       expect(res.status).toBe(400)
@@ -163,7 +182,10 @@ describe('Tutorials Controller', () => {
     it('500 — le service échoue', async () => {
       tutorialsService.create.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).post(`${BASE}/tutorials`).send(validBody)
+      const res = await request(app)
+        .post(`${BASE}/tutorials`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(validBody)
 
       expect(res.status).toBe(500)
     })
@@ -174,22 +196,36 @@ describe('Tutorials Controller', () => {
     it('200 — met à jour le tutoriel', async () => {
       tutorialsService.update.mockResolvedValue({ ...mockTutorial, name: 'React avancé' })
 
-      const res = await request(app).put(`${BASE}/tutorials/1`).send({ name: 'React avancé' })
+      const res = await request(app)
+        .put(`${BASE}/tutorials/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'React avancé' })
 
       expect(res.status).toBe(200)
       expect(res.body.status).toBe('success')
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).put(`${BASE}/tutorials/1`).send({ name: 'React avancé' })
+      expect(res.status).toBe(401)
+    })
+
     it('404 — tutoriel introuvable', async () => {
       tutorialsService.update.mockResolvedValue(null)
 
-      const res = await request(app).put(`${BASE}/tutorials/99`).send({ name: 'React avancé' })
+      const res = await request(app)
+        .put(`${BASE}/tutorials/99`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'React avancé' })
 
       expect(res.status).toBe(404)
     })
 
     it('400 — link invalide (si fourni)', async () => {
-      const res = await request(app).put(`${BASE}/tutorials/1`).send({ link: 'pas-une-url' })
+      const res = await request(app)
+        .put(`${BASE}/tutorials/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ link: 'pas-une-url' })
 
       expect(res.status).toBe(400)
     })
@@ -197,7 +233,10 @@ describe('Tutorials Controller', () => {
     it('500 — le service échoue', async () => {
       tutorialsService.update.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).put(`${BASE}/tutorials/1`).send({ name: 'React avancé' })
+      const res = await request(app)
+        .put(`${BASE}/tutorials/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'React avancé' })
 
       expect(res.status).toBe(500)
     })
@@ -208,16 +247,25 @@ describe('Tutorials Controller', () => {
     it('200 — supprime le tutoriel', async () => {
       tutorialsService.delete.mockResolvedValue(true)
 
-      const res = await request(app).delete(`${BASE}/tutorials/1`)
+      const res = await request(app)
+        .delete(`${BASE}/tutorials/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(200)
       expect(res.body.status).toBe('success')
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).delete(`${BASE}/tutorials/1`)
+      expect(res.status).toBe(401)
+    })
+
     it('404 — tutoriel introuvable', async () => {
       tutorialsService.delete.mockResolvedValue(null)
 
-      const res = await request(app).delete(`${BASE}/tutorials/99`)
+      const res = await request(app)
+        .delete(`${BASE}/tutorials/99`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(404)
     })
@@ -225,7 +273,9 @@ describe('Tutorials Controller', () => {
     it('500 — le service échoue', async () => {
       tutorialsService.delete.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).delete(`${BASE}/tutorials/1`)
+      const res = await request(app)
+        .delete(`${BASE}/tutorials/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
     })

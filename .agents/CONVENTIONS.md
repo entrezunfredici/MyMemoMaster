@@ -193,6 +193,7 @@ router.get("/", authMiddleware, entity.findAll);
 | HTTP client front | axios |
 | Notifications front | vue-toastification |
 | Math front | KaTeX / MathJax |
+| Graphiques front | chart.js + vue-chartjs |
 
 ---
 

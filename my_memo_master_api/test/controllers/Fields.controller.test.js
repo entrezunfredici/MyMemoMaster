@@ -34,8 +34,11 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.NODE_ENV = 'test'
 
 const request = require('supertest')
+const jwt = require('jsonwebtoken')
 const app = require('../../app')
 const fieldService = require('../../services/Fields.service')
+
+const makeToken = (payload = { id: 1 }) => jwt.sign(payload, 'test-secret', { expiresIn: '1d' })
 
 const BASE = '/api/v1'
 
@@ -108,14 +111,25 @@ describe('Fields Controller', () => {
     it('201 — crée un champ', async () => {
       fieldService.create.mockResolvedValue(mockField)
 
-      const res = await request(app).post(`${BASE}/fields`).send(validBody)
+      const res = await request(app)
+        .post(`${BASE}/fields`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(validBody)
 
       expect(res.status).toBe(201)
       expect(fieldService.create).toHaveBeenCalledTimes(1)
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).post(`${BASE}/fields`).send(validBody)
+      expect(res.status).toBe(401)
+    })
+
     it('400 — fieldletter manquant (validator)', async () => {
-      const res = await request(app).post(`${BASE}/fields`).send({ idType: 1, data: 'Données' })
+      const res = await request(app)
+        .post(`${BASE}/fields`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ idType: 1, data: 'Données' })
 
       expect(res.status).toBe(400)
       expect(res.body.errors).toBeDefined()
@@ -124,13 +138,17 @@ describe('Fields Controller', () => {
     it('400 — idType manquant (validator)', async () => {
       const res = await request(app)
         .post(`${BASE}/fields`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ fieldletter: 'B', data: 'Données' })
 
       expect(res.status).toBe(400)
     })
 
     it('400 — data manquant (validator)', async () => {
-      const res = await request(app).post(`${BASE}/fields`).send({ fieldletter: 'B', idType: 1 })
+      const res = await request(app)
+        .post(`${BASE}/fields`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ fieldletter: 'B', idType: 1 })
 
       expect(res.status).toBe(400)
     })
@@ -138,6 +156,7 @@ describe('Fields Controller', () => {
     it('400 — fieldletter dépasse 5 caractères', async () => {
       const res = await request(app)
         .post(`${BASE}/fields`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ fieldletter: 'TOOLONG', idType: 1, data: 'Données' })
 
       expect(res.status).toBe(400)
@@ -146,6 +165,7 @@ describe('Fields Controller', () => {
     it('400 — idType invalide (non entier positif)', async () => {
       const res = await request(app)
         .post(`${BASE}/fields`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ fieldletter: 'B', idType: 0, data: 'Données' })
 
       expect(res.status).toBe(400)
@@ -154,7 +174,10 @@ describe('Fields Controller', () => {
     it('500 — le service échoue', async () => {
       fieldService.create.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).post(`${BASE}/fields`).send(validBody)
+      const res = await request(app)
+        .post(`${BASE}/fields`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(validBody)
 
       expect(res.status).toBe(500)
     })
@@ -165,21 +188,35 @@ describe('Fields Controller', () => {
     it('200 — met à jour le champ', async () => {
       fieldService.update.mockResolvedValue({ ...mockField, fieldletter: 'C' })
 
-      const res = await request(app).put(`${BASE}/fields/1`).send({ fieldletter: 'C' })
+      const res = await request(app)
+        .put(`${BASE}/fields/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ fieldletter: 'C' })
 
       expect(res.status).toBe(200)
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app).put(`${BASE}/fields/1`).send({ fieldletter: 'C' })
+      expect(res.status).toBe(401)
     })
 
     it('404 — champ introuvable', async () => {
       fieldService.update.mockResolvedValue(null)
 
-      const res = await request(app).put(`${BASE}/fields/99`).send({ fieldletter: 'C' })
+      const res = await request(app)
+        .put(`${BASE}/fields/99`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ fieldletter: 'C' })
 
       expect(res.status).toBe(404)
     })
 
     it('400 — fieldletter dépasse 5 caractères (si fourni)', async () => {
-      const res = await request(app).put(`${BASE}/fields/1`).send({ fieldletter: 'TOOLONG' })
+      const res = await request(app)
+        .put(`${BASE}/fields/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ fieldletter: 'TOOLONG' })
 
       expect(res.status).toBe(400)
     })
@@ -187,7 +224,10 @@ describe('Fields Controller', () => {
     it('500 — le service échoue', async () => {
       fieldService.update.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).put(`${BASE}/fields/1`).send({ fieldletter: 'C' })
+      const res = await request(app)
+        .put(`${BASE}/fields/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ fieldletter: 'C' })
 
       expect(res.status).toBe(500)
     })
@@ -198,15 +238,24 @@ describe('Fields Controller', () => {
     it('204 — supprime le champ', async () => {
       fieldService.delete.mockResolvedValue(true)
 
-      const res = await request(app).delete(`${BASE}/fields/1`)
+      const res = await request(app)
+        .delete(`${BASE}/fields/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(204)
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app).delete(`${BASE}/fields/1`)
+      expect(res.status).toBe(401)
     })
 
     it('404 — champ introuvable', async () => {
       fieldService.delete.mockResolvedValue(null)
 
-      const res = await request(app).delete(`${BASE}/fields/99`)
+      const res = await request(app)
+        .delete(`${BASE}/fields/99`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(404)
     })
@@ -214,7 +263,9 @@ describe('Fields Controller', () => {
     it('500 — le service échoue', async () => {
       fieldService.delete.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).delete(`${BASE}/fields/1`)
+      const res = await request(app)
+        .delete(`${BASE}/fields/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
     })

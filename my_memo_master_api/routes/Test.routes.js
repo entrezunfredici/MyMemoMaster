@@ -92,7 +92,7 @@ router.get('/:id', test.findOne)
  *         description: Erreur interne du serveur
  *
  */
-router.post('/', testValidators.create, validate, test.create)
+router.post('/', authMiddleware, testValidators.create, validate, test.create)
 
 /**
  * @swagger
@@ -131,7 +131,7 @@ router.post('/', testValidators.create, validate, test.create)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put('/:id', testValidators.update, validate, test.update)
+router.put('/:id', authMiddleware, testValidators.update, validate, test.update)
 
 /**
  * @swagger
@@ -155,7 +155,7 @@ router.put('/:id', testValidators.update, validate, test.update)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete('/:id', test.delete)
+router.delete('/:id', authMiddleware, test.delete)
 
 router.post('/:id/submit', authMiddleware, testValidators.submit, validate, test.submit)
 

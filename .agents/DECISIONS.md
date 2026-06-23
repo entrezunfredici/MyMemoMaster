@@ -466,3 +466,43 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : `DiagrammeService.resolveSubject(subjectId)` crée ou réutilise un sujet nommé `"Sujet par défaut"` via `findOrCreate` quand le subjectId est absent ou invalide. Aucune erreur 400 n'est retournée pour ce champ — le client ne peut pas provoquer un échec de création par un subjectId manquant.
 **Alternative écartée** : Rendre `subjectId` obligatoire et retourner 400 si absent — oblige l'utilisateur à choisir une matière avant toute création de carte, ce qui freine l'usage en contexte d'exploration rapide.
 **Conséquences** : Le sujet par défaut peut s'accumuler des cartes sans lien sémantique clair. En prod, le nombre de cartes rattachées à "Sujet par défaut" sera un indicateur de l'usage réel de la matière optionnelle.
+
+---
+
+### [2026-06-23] Sécurité — Routes Fields/Test/Tutorials : GET intentionnellement publics (lecture)
+**Contexte** : Audit OWASP M-00b.07. Les routes GET `/fields`, `/tests`, `/tutorials` ne filtraient pas par userId et n'utilisaient pas authMiddleware. Après analyse, les controllers ne font aucune référence à `req.user`.
+**Décision** : Seules les routes d'écriture (POST/PUT/DELETE) ont reçu `authMiddleware`. Les GET restent publics : ces ressources sont des contenus pédagogiques consultables sans connexion (référentiels, tutoriels, tests disponibles). Si le besoin métier évolue vers du contenu privé par utilisateur, il faudra ajouter authMiddleware ET un filtre userId dans le service.
+**Alternative écartée** : Protéger toutes les routes (GET inclus) — bloque l'accès non authentifié à du contenu potentiellement public et nécessite un refactor des controllers pour filtrer par userId.
+**Conséquences** : Les données de ces trois modules sont visibles anonymement. Aucune donnée utilisateur personnelle n'est exposée (ces entités ne contiennent pas de PII).
+
+---
+
+### [2026-06-23] Sécurité — forgotPassword : réponse générique 200 (anti-énumération)
+**Contexte** : Audit OWASP A04. `forgotPassword` retournait 404 si l'email n'existait pas, permettant l'énumération des comptes.
+**Décision** : Retourner systématiquement `200` avec le message "Si cet email existe, un code vous a été envoyé." — que l'utilisateur existe ou non. Identique pour `verifyEmail` : si l'email est inconnu, retourne `401 "Code invalide"` (même réponse que code incorrect).
+**Alternative écartée** : Conserver le 404 avec un rate limiting agressif — la surface d'énumération reste entière, le rate limit est contournable par rotation d'IP.
+**Conséquences** : L'UX côté client est légèrement dégradée (l'utilisateur ne sait pas s'il a une typo dans son email), ce qui est le comportement attendu et recommandé OWASP. À documenter dans les specs front.
+
+---
+
+### [2026-06-23] Sécurité — Login bloque si email non vérifié (hasValidatedEmail = false)
+**Contexte** : Audit OWASP A01. Le champ `hasValidatedEmail` existait mais n'était jamais vérifié lors du login. Un compte pouvait être créé avec une adresse email usurpée et utilisé immédiatement.
+**Décision** : Ajouter une vérification `if (!user.hasValidatedEmail)` dans `User.controller.login`, retournant 403 avec un message explicite invitant à vérifier l'email.
+**Alternative écartée** : Laisser la connexion possible avec un avertissement — offre moins de garantie sur l'ownership de l'adresse email.
+**Conséquences** : Les comptes créés avant cette modification mais avec `hasValidatedEmail = false` ne peuvent plus se connecter sans vérifier leur email. Les fixtures et seeds de test doivent avoir `hasValidatedEmail: true` pour que les tests de connexion continuent de fonctionner.
+
+---
+
+### [2026-06-23] KPI — Graphiques en pur CSS/Tailwind, pas de bibliothèque de charts
+**Contexte** : La page KPI nécessite des visualisations (activité hebdomadaire, répartition Leitner, historique des scores). Chart.js et les alternatives auraient fourni des courbes et graphiques interactifs plus élaborés.
+**Décision** : Utiliser uniquement des barres CSS (hauteur proportionnelle calculée en JS) sans dépendance externe. Tailwind CSS suffit pour colorer et dimensionner les barres.
+**Alternative écartée** : Chart.js — fonctionnalités riches, mais nécessite validation CONVENTIONS.md + poids de la lib (~200 Ko). ECharts / Recharts — même raison.
+**Conséquences** : Les graphiques sont statiques (pas de survol/tooltip interactif). Si des graphiques interactifs ou des courbes d'évolution (line chart) sont requis à l'avenir, il faudra soumettre Chart.js à validation dans CONVENTIONS.md.
+
+---
+
+### [2026-06-23] KPI — Endpoint unique GET /kpi/my (agrégation serveur, pas de requêtes multiples côté front)
+**Contexte** : Les KPIs agrègent des données de 4 sources (RevisionSession, TestResult, LeitnerSystem/Box/Card, Subject). Le frontend aurait pu appeler 4 endpoints séparés ou 1 endpoint omnibus.
+**Décision** : Un seul endpoint `GET /kpi/my` qui fait 3 requêtes Sequelize en `Promise.all` et calcule tout dans le service. Le front reçoit un objet `{ revision, exercises, leitner, subjects, discipline, badges }` en un seul appel.
+**Alternative écartée** : 4 endpoints séparés — plus modulaire mais oblige le front à gérer 4 chargements parallèles et à agréger les données pour les badges (cross-cutting).
+**Conséquences** : L'endpoint peut retourner beaucoup de données pour un utilisateur très actif (des centaines de sessions, de cartes). Acceptable MVP. Si la latence devient un problème, les données Leitner (la plus volumineuse) pourraient être paginées ou mises en cache.

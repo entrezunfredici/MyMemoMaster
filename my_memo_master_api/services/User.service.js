@@ -124,28 +124,30 @@ class UserService {
 
   async setValidEmailCode(userId, code = '') {
     if (!code) code = crypto.randomInt(100000, 1000000).toString()
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
     await User.update(
-      { validEmailCode: code },
-      {
-        where: { userId: userId }
-      }
+      { validEmailCode: code, validEmailCodeExpiresAt: expiresAt },
+      { where: { userId: userId } }
     )
   }
 
   async verifyValidEmailCode(userId, code) {
     const user = await User.findByPk(userId)
-    const isValid = user.validEmailCode === code
+    const now = new Date()
+    const isValid =
+      user.validEmailCode === code &&
+      user.validEmailCodeExpiresAt !== null &&
+      user.validEmailCodeExpiresAt > now
     user.validEmailCode = null
+    user.validEmailCodeExpiresAt = null
     await user.save()
     return isValid
   }
 
   async clearValidEmailCode(userId) {
     await User.update(
-      { validEmailCode: null },
-      {
-        where: { userId: userId }
-      }
+      { validEmailCode: null, validEmailCodeExpiresAt: null },
+      { where: { userId: userId } }
     )
   }
 
@@ -209,21 +211,24 @@ class UserService {
    * @param {Date} expiresAt - Date d'expiration du token
    */
   async setRefreshToken(userId, token, expiresAt) {
+    const hash = crypto.createHash('sha256').update(token).digest('hex')
     await User.update(
-      { refreshToken: token, refreshTokenExpiresAt: expiresAt },
+      { refreshToken: hash, refreshTokenExpiresAt: expiresAt },
       { where: { userId } }
     )
   }
 
   /**
    * Vérifie un refresh token et retourne l'utilisateur associé s'il est valide.
+   * Le token reçu est haché SHA-256 avant comparaison avec la valeur en base.
    *
-   * @param {string} token - Refresh token à vérifier
+   * @param {string} token - Refresh token brut reçu du client
    * @returns {Promise<User|null>} L'utilisateur si le token est valide, null sinon
    */
   async verifyRefreshToken(token) {
     if (!token) return null
-    const user = await User.findOne({ where: { refreshToken: token } })
+    const hash = crypto.createHash('sha256').update(token).digest('hex')
+    const user = await User.findOne({ where: { refreshToken: hash } })
     if (!user) return null
     if (!user.refreshTokenExpiresAt || user.refreshTokenExpiresAt < new Date()) return null
     return user

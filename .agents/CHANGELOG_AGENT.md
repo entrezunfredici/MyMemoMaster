@@ -33,10 +33,10 @@
 | Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
-| Fields / FieldsType | Stable | init |
-| Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
+| Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
+| Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
-| Kpi | Stable (lecture seule) | init |
+| Kpi | Stable — KPI-01 : GET /kpi/my + KpiPage.vue + 7 badges + graphiques CSS | 2026-06-23 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -58,8 +58,8 @@
 | Tests fonctionnels Deadline + Reminder (front) | Stable — M-03.10 : 19 tests TodoWidget + 33 tests NotificationBellComponent (Vitest) | 2026-06-13 |
 | Tests fonctionnels ProfilePage (front) | Stable — M-05.10 : 17 tests Vitest (rendu, saveProfile, changePassword, logout, deleteAccount) | 2026-06-17 |
 | Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
-| Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00.09 implémenté | 2026-06-06 |
-| Storage (upload S3, mindmap local) | Stable — fuite error.message corrigée, console.warn → logger | 2026-06-05 |
+| Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00b.07 : audit OWASP complet, 12 vulns traitées (H1–H4 corrigées), rapport SECURITY_AUDIT_OWASP.md | 2026-06-23 |
+| Storage (upload S3, mindmap local) | Stable — M-00b.07 H3 : clé S3 inclut userId (uploads/{userId}/…), vérification préfixe à la suppression | 2026-06-23 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
 | Migrations Sequelize CLI | Stable — 23 migrations + migration index FK | 2026-06-05 |
 | Seeders Sequelize CLI | Stable — Roles + User admin | 2026-06-05 |
@@ -78,7 +78,7 @@
 | Front — RBAC (useRole, router guard) | Stable — M-05.11 : 2 bugs corrigés (connectionToken mort + /calendar private:false) + 12+20 tests Vitest | 2026-06-17 |
 | Rôle par défaut inscription | Stable — roleId=2 (Étudiant) par défaut dans modèle + service | 2026-06-14 |
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
-| Refresh token (rotation, révocation) | Stable — M-05.03 : opaque 128-char hex, rotation à chaque refresh, intercepteur Axios front | 2026-06-14 |
+| Refresh token (rotation, révocation) | Stable — M-00b.07 H1 : hash SHA-256 stocké en base (même pattern reset password), brut envoyé au client | 2026-06-23 |
 | Reset mot de passe (token hashé) | Stable — M-05.06 : token 64-char hex brut envoyé par email, hash SHA-256 stocké en base | 2026-06-15 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
 | Front — Stores Pinia Rappels | Stable — reminders.js : CRUD complet, pendingReminders, remindersByEntity | 2026-06-12 |
@@ -2735,3 +2735,145 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - `diagrammes.js` store : `deleteDiagramme` passe un body inutilisé à `api.del` — sans impact fonctionnel.
 
 **Tests :** 38 tests back Diagramme (service + controller) verts — 36 tests front (MindMapNode + MindMapPalette) verts.
+
+---
+
+### [M-00b.07] — Audit sécurité initial OWASP — 2026-06-23
+
+**Fichiers créés :**
+- `.agents/SECURITY_AUDIT_OWASP.md` — rapport complet OWASP Top 10 avec vulns, sévérités, correctifs et dette
+
+**Fichiers modifiés :**
+- `my_memo_master_api/routes/Fields.routes.js` — import authMiddleware + appliqué sur POST, PUT, DELETE
+- `my_memo_master_api/routes/Tutorials.routes.js` — import authMiddleware + appliqué sur POST, PUT, DELETE
+- `my_memo_master_api/routes/Test.routes.js` — authMiddleware appliqué sur POST, PUT, DELETE (GET intentionnellement publics)
+- `my_memo_master_api/controllers/User.controller.js` — login bloque si `!hasValidatedEmail` (403), forgotPassword retourne 200 générique (anti-enum), verifyEmail retourne 401 générique si email inconnu (anti-enum)
+- `my_memo_master_api/helpers/generateToken.js` — Math.random() remplacé par crypto.randomBytes(32)
+- `my_memo_master_api/app.js` — Swagger UI désactivé si NODE_ENV === 'production'
+
+**Ce qui est utilisable :**
+- Routes Fields/Tutorials/Test : toutes les mutations (POST/PUT/DELETE) exigent désormais un JWT valide
+- Login : un compte non vérifié par email reçoit 403 au lieu de se connecter normalement
+- forgotPassword : ne révèle plus si l'email existe (réponse générique 200 dans tous les cas)
+- generateToken : entropie cryptographique garantie (32 bytes = 256 bits)
+- Swagger : inaccessible en production (NODE_ENV=production)
+
+**Vulnérabilités corrigées (8) :**
+1. [Critique] Routes Fields POST/PUT/DELETE sans auth
+2. [Critique] Routes Tutorials POST/PUT/DELETE sans auth
+3. [Critique] Routes Test POST/PUT/DELETE sans auth
+4. [Moyenne] Login acceptait les comptes avec email non vérifié
+5. [Moyenne] Énumération d'emails via forgotPassword (404 → 200 générique)
+6. [Moyenne] Énumération d'emails via verifyEmail (404 → 401 générique)
+7. [Faible] generateToken.js utilisait Math.random() (non-crypto)
+8. [Moyenne] Swagger UI exposé en production
+
+**Dette / points d'attention :**
+- ~~Refresh token stocké en clair en base~~ — Résolu en M-00b.07b (hash SHA-256)
+- ~~AUTH_JWT_EXPIRES_IN = 1d trop long~~ — Résolu en M-00b.07b (15m)
+- ~~Storage.delete sans vérification de propriétaire~~ — Résolu en M-00b.07b (préfixe userId)
+- ~~validEmailCode sans expiration~~ — Résolu en M-00b.07b (30 min)
+- Tests cassés par hasValidatedEmail → résolus en M-00b.07b
+
+---
+
+### [KPI-01] — Page KPI personnels (Ma Progression) — 2026-06-23
+
+**Fichiers créés (API) :**
+- `my_memo_master_api/services/Kpi.service.js` — service `KpiService.getMyKpis(userId)` : calcul de tous les KPIs en un seul appel Promise.all (révision, exercices, Leitner, sujets, discipline, badges)
+- `my_memo_master_api/controllers/Kpi.controller.js` — handler `exports.getMyKpis` (GET /kpi/my)
+
+**Fichiers modifiés (API) :**
+- `my_memo_master_api/routes/Kpi.routes.js` — placeholder remplacé par `GET /kpi/my` protégé par authMiddleware + Swagger JSDoc
+
+**Fichiers créés (Front) :**
+- `my_memo_master_front/src/icons/KpiIcon.vue` — icône SVG courbe de progression pour la navbar
+- `my_memo_master_front/src/stores/kpi.js` — store Pinia `useKpiStore` : `fetchMyKpis()` → appelle `GET /kpi/my`
+- `my_memo_master_front/src/pages/KpiPage.vue` — page complète avec 6 sections + graphiques Chart.js (Bar, Line) interactifs
+
+**Fichiers modifiés (Front) :**
+- `my_memo_master_front/src/router/routes.js` — ajout route `/kpi` (name: 'kpi', private: true, title: 'Ma Progression')
+- `my_memo_master_front/src/App.vue` — ajout lien KPI dans nav desktop et nav mobile (après todo, avant profil)
+- `my_memo_master_front/package.json` — ajout `chart.js@^4.5.1` + `vue-chartjs@^5.3.3` (KPI-01b)
+
+**Ce qui est utilisable :**
+- `GET /api/v1/kpi/my` (auth requis) — retourne `{ revision, exercises, leitner, subjects, discipline, badges }`
+- Page `/kpi` accessible depuis la barre de navigation (icône courbe)
+- 7 KPI couverts : révision/régularité, discipline, scores exercices, répartition Leitner, diversité matières, badges/succès
+- 3 graphiques Chart.js interactifs : activité hebdomadaire (Bar), évolution des scores (Line avec fill), répartition Leitner (Bar coloré B1-B5)
+- Badges : streak 7j, streak 30j, score parfait, 10 exercices, 5 matières, maîtrise Leitner (B4-B5 ≥ 50%), régularité 20 sessions/30j
+
+**Sources de données utilisées :**
+- `RevisionSession` (userId, date, isDone, startTime, endTime) → révision + discipline
+- `TestResult` + `Test` + `Subject` (via include) → scores + diversité
+- `LeitnerSystem` + `LeitnerBox` + `LeitnerCard` (via include chain) → répartition boîtes + taux de réussite
+
+**Hypothèses posées :**
+- Le streak ne compte que les sessions avec `isDone = true`. Un streak commence si la session la plus récente est aujourd'hui ou hier (tolérance d'un jour de marge).
+- Le temps total de révision (minutes) est calculé depuis `startTime`/`endTime` de chaque session complétée. Les sessions qui traversent minuit ne sont pas gérées (cas MVP marginal).
+- La tendance des scores (`recentTrend`) compare la première moitié des résultats à la seconde moitié (ordre chronologique ASC). Pertinente dès 4 résultats.
+- La diversité des sujets agrège les sujets des TestResults et des LeitnerSystems (via Subject FK).
+- Les badges sont calculés côté serveur dans le service, pas côté frontend.
+
+**Dette / points d'attention :**
+- Chart.js + vue-chartjs approuvés et installés (KPI-01b) — utilisables sur toutes les futures pages nécessitant des graphiques.
+- `KpiIcon.vue` est un SVG custom simplifié — peut être amélioré visuellement.
+- ~~Pas de tests unitaires~~ — 54 tests ajoutés : `test/services/Kpi.service.test.js` (50 tests, toutes les méthodes) + `test/controllers/Kpi.controller.test.js` (4 tests). Tous verts.
+- Revue de code effectuée : aucune correction bloquante. 2 observations cosmétiques non-bloquantes : (a) `weeklyActivity` initialise 8 semaines mais sessions filtrées à 30 j → 3 premières barres toujours à 0 ; (b) `isSame` dans `_computeLeitner` redondant (peut être simplifié en `!isAfter`).
+- L'endpoint `/kpi/my` fait 3 requêtes Sequelize en parallèle (Promise.all) + potentiellement beaucoup de données pour un utilisateur très actif. Acceptable en MVP, à optimiser avec du cache ou de la pagination si nécessaire.
+
+---
+
+### [M-00b.07b] — Correctifs sécurité H1–H4 (suite audit OWASP) — 2026-06-23
+
+**Contexte :** Suite de l'audit OWASP M-00b.07. Les 4 vulnérabilités de priorité haute restantes ont été corrigées, et les tests cassés par les nouvelles contraintes d'auth ont été mis à jour.
+
+**Fichiers modifiés (API) :**
+- `my_memo_master_api/services/User.service.js`
+  - `setRefreshToken` : hash SHA-256 avant stockage (même pattern que `setResetPasswordCode`)
+  - `verifyRefreshToken` : hash du token entrant avant lookup DB ; check expiry `refreshTokenExpiresAt`
+  - `setValidEmailCode` : génère et stocke `validEmailCodeExpiresAt` (30 min)
+  - `verifyValidEmailCode` : vérifie l'expiry avant de valider le code
+  - `clearValidEmailCode` : efface aussi `validEmailCodeExpiresAt`
+- `my_memo_master_api/models/User.model.js` — ajout champ `validEmailCodeExpiresAt: DataTypes.DATE`
+- `my_memo_master_api/middlewares/upload.middleware.js` — clé S3 inclut `userId` : `uploads/{userId}/{timestamp}-{random}{ext}`
+- `my_memo_master_api/controllers/Storage.controller.js` — `delete` vérifie que la clé débute par `uploads/{req.user.id}/` avant suppression (403 sinon)
+- `.env` — `AUTH_JWT_EXPIRES_IN=15m` (était `1d`)
+
+**Fichiers modifiés (Tests) :**
+- `my_memo_master_api/test/services/User.service.test.js`
+  - Ajout describes : `setRefreshToken` (hash SHA-256, not raw), `verifyRefreshToken` (hash lookup, expiry, null token), `setValidEmailCode` (expiry 30 min), `verifyValidEmailCode` (correct, wrong, expired, no expiry)
+  - 77 tests total — tous verts
+- `my_memo_master_api/test/controllers/User.controller.test.js`
+  - Login 200 mock : ajout `hasValidatedEmail: true`
+  - Ajout test "403 — email non vérifié" pour login
+  - forgotPassword "201 → 200" + "404 → 200 générique anti-énumération" (`sendEmail` non appelé)
+- `my_memo_master_api/test/controllers/Fields.controller.test.js`
+  - Import `jwt` + helper `makeToken`
+  - `.set('Authorization', Bearer ...)` sur tous les POST/PUT/DELETE
+  - Ajout test "401 — sans token" sur chaque mutation
+- `my_memo_master_api/test/controllers/Tutorials.controller.test.js`
+  - Même pattern que Fields — auth ajoutée sur POST/PUT/DELETE + tests "401 — sans token"
+- `my_memo_master_api/test/controllers/Test.controller.test.js`
+  - Auth ajoutée sur POST/PUT/DELETE + tests "401 — sans token" (makeToken était déjà présent)
+
+**Vulnérabilités corrigées (H1–H4) :**
+- [H1 — Haute] Refresh token stocké en clair → haché SHA-256 (même pattern que resetPasswordCode)
+- [H2 — Haute] JWT access token valable 1 jour → réduit à 15 minutes
+- [H3 — Haute] Storage.delete sans vérification propriétaire → validation préfixe `uploads/{userId}/`
+- [H4 — Haute] validEmailCode sans expiration → expiry 30 min (même pattern que resetPasswordCode)
+
+**État tests :**
+- Controller tests (Fields, Test, Tutorials, User) : 100% verts
+- User.service tests : 77/77 verts
+- `Reminder.service.test.js` : 4 échecs **pré-existants** (Deadline.findByPk — non lié à ce ticket)
+- `deadline.reminder.test.js` (BDD) : passe en isolation ; instabilité en run parallèle (contention SQLite — pré-existant)
+
+**Hypothèses posées :**
+- Les uploads existants avec l'ancienne clé (`uploads/{timestamp}/`) deviennent indélétables via l'API après ce changement (clé sans userId → 403). Les données en S3 ne sont pas migrées — à traiter si besoin en prod.
+- `verifyRefreshToken` retourne `null` si `refreshTokenExpiresAt` est null (aucun token stocké) — comportement safe.
+
+**Dette / points d'attention :**
+- Migration Sequelize pour `validEmailCodeExpiresAt` à créer avant déploiement prod (`ALTER TABLE Users ADD COLUMN validEmailCodeExpiresAt DATETIME`).
+- ~~Anciens uploads S3 sans `userId` dans la clé indélétables via l'API~~ — Résolu : script `scripts/cleanup-s3-legacy-keys.js` (dry-run par défaut)
+- `Reminder.service.test.js` : 4 tests en échec pré-existants (hors périmètre).
