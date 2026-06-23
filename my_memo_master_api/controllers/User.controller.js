@@ -104,7 +104,7 @@ exports.verifyEmail = async (req, res) => {
     if (!(await userService.verifyValidEmailCode(user.userId, code)))
       return res.status(401).send({ message: 'Code invalide.' })
 
-    await userService.update(user.userId, { hasValidatedEmail: true })
+    await userService.setEmailValidated(user.userId)
 
     res.status(201).send({ message: 'Email vérifié avec succès.' })
   } catch (error) {

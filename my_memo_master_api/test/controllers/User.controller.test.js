@@ -39,7 +39,8 @@ jest.mock('../../services/User.service', () => ({
   setRole: jest.fn(),
   deleteRole: jest.fn(),
   verifyValidEmailCode: jest.fn(),
-  verifyResetPasswordCode: jest.fn()
+  verifyResetPasswordCode: jest.fn(),
+  setEmailValidated: jest.fn().mockResolvedValue(true)
 }))
 
 jest.mock('../../services/Role.service', () => ({ findOne: jest.fn() }))

@@ -48,7 +48,7 @@ async function submit() {
   submitting.value = true
   try {
     const resp = await api.post('users/forgot-password', { email: email.value.trim() })
-    if (!resp || resp.status !== 201) {
+    if (!resp || resp.status !== 200) {
       errorMessage.value = resp?.data?.message || 'Erreur lors de l\'envoi.'
       return
     }

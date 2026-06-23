@@ -145,6 +145,13 @@ class UserService {
     return isValid
   }
 
+  async setEmailValidated(userId) {
+    await User.update(
+      { hasValidatedEmail: true },
+      { where: { userId } }
+    )
+  }
+
   async clearValidEmailCode(userId) {
     await User.update(
       { validEmailCode: null, validEmailCodeExpiresAt: null },
