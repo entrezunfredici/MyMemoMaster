@@ -105,7 +105,7 @@ export const useAuthStore = defineStore('auth', {
       return true
     },
 
-    async register(user, redirect = '/auth') {
+    async register(user, redirect = null) {
       this.logout(false, null)
 
       try {
@@ -116,11 +116,10 @@ export const useAuthStore = defineStore('auth', {
           throw new Error(message)
         }
 
-        notif.notify('Inscription réussie !', 'success')
+        notif.notify('Inscription réussie ! Vérifiez votre email pour activer votre compte.', 'success')
 
-        if (redirect) {
-          router.push(redirect)
-        }
+        const target = redirect || { path: '/verify-email', query: { email: user.email } }
+        router.push(target)
 
         return true
       } catch (error) {

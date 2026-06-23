@@ -20,7 +20,7 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
-| Auth (register, login, reset password) | Stable — M-05.06 : reset token hashé SHA-256, migration colonne STRING(64) | 2026-06-15 |
+| Auth (register, login, reset password) | Stable — 2026-06-23 : envoi email vérification à l'inscription (lien cliquable + code), page VerifyEmailPage.vue | 2026-06-23 |
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable | init |
@@ -96,6 +96,7 @@
 - Système d'exercices / tests
 - Docker Compose (API + Front + PostgreSQL + PgAdmin + Traefik)
 - Infrastructure Docker server compose + CI Node 22 + backup + runbook — M-00b.01 — 2026-06-11
+- Sauvegardes auto pg_dump (service Docker backup, schedule configurable, rétention) — M-00b.09 — 2026-06-23
 - Système de rappels BullMQ (Redis) pour Deadline et RevisionSession — M-03.05 — 2026-06-12
 - CalendarPage connectée au backend avec stores Pinia + agenda latéral coloré par type — 2026-06-12
 - Traefik HTTPS + HSTS + redirect HTTP→HTTPS via labels Docker Compose — M-00b.03 — 2026-06-12
@@ -2940,3 +2941,75 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Le cron utilise `node-cron` (déjà en place via `fifo.cron.js`) — pas de Redis/BullMQ car le digest n'a pas besoin de retry fiable (si le serveur est down à 18h, la notification est simplement manquée ce jour).
 - `classGroups.store.test.js` : 1 test en échec **pré-existant** (`addMember — succès`) — hors périmètre.
 - `MindmapsEditorView.test.js` : échec de suite **pré-existant** — hors périmètre.
+
+---
+
+### [M-00b.09] — Sauvegardes auto (pg_dump) — 2026-06-23
+
+**Contexte :** Le ticket M-00b.01 avait livré `scripts/backup.sh` (script manuel VPS) et un runbook documentant la configuration crontab. M-00b.09 rend les sauvegardes automatiques sans intervention manuelle de l'opérateur.
+
+**Fichiers modifiés :**
+- `server_docker_compose/docker-compose.yml` — ajout service `backup` + volume `backup-data` :
+  - Image `postgres:17-alpine` (pg_dump inclus, aucune nouvelle dépendance)
+  - Script inline dans `command:` (même pattern que le service `front`) — auto-suffisant, pas de fichier externe à déployer
+  - Dump au démarrage du conteneur (vérification immédiate de la config) puis cycle quotidien à `BACKUP_HOUR`h00 UTC
+  - Rétention configurable via `BACKUP_RETENTION_DAYS` (défaut 7 jours)
+  - Dumps stockés dans le volume `backup-data` (`/backups` dans le conteneur)
+  - `restart: unless-stopped` — redémarre automatiquement sans intervention
+  - `depends_on: postgres: condition: service_healthy` — ne démarre qu'une fois PG prêt
+- `server_docker_compose/.env.example` — ajout section "Sauvegardes automatiques" : `BACKUP_HOUR`, `BACKUP_RETENTION_DAYS`, limites de ressources
+- `.github/workflows/cd.yml` — ajout `backup` dans le `compose up -d pgadmin api front backup` du job `deploy_test` : le service démarre à chaque déploiement
+- `docs/RUNBOOK.md` — section "Sauvegarde et restauration" réécrite : service auto, commandes de monitoring/dump manuel/extract/restauration, variables
+
+**Ce qui est utilisable :**
+- `docker compose up -d backup` — démarrer le service sur un VPS existant
+- `docker compose logs backup` — consulter les logs de sauvegarde
+- `docker compose exec backup ls -lh /backups/` — lister les dumps disponibles
+- `BACKUP_HOUR=3` (défaut) — sauvegarde à 3h00 UTC
+- `BACKUP_RETENTION_DAYS=7` (défaut) — 7 jours de rétention
+
+**Hypothèses posées :**
+- `postgres:17-alpine` inclut busybox avec `find`, `du`, `date`, `sleep` — toutes les commandes utilisées dans le script sont disponibles sans installation.
+- L'arithmétique `10#${VAR}` est utilisée pour forcer l'interprétation décimale des heures (évite `08`/`09` traités comme octal par certains shells POSIX).
+- En cas d'échec du dump (PG indisponible, erreur réseau), le dump partiel est supprimé, le service log l'erreur et attend le prochain cycle — il ne s'arrête pas.
+- Le `$$VAR` dans le YAML docker-compose est l'escape pour un `$VAR` shell (docker-compose retire un `$`) ; les valeurs sensibles (`PG_PASS`) passent par le bloc `environment:` et ne sont jamais embarquées dans la chaîne de commande.
+
+**Dette / points d'attention :**
+- Les dumps sont dans un volume Docker — si le volume est perdu (rm -v), les sauvegardes sont perdues. Pour une redondance, copier régulièrement vers S3 ou un stockage externe (hors scope MVP).
+- `scripts/backup.sh` (host crontab) reste utilisable en complément pour un backup off-container. Les deux approches coexistent.
+- Si `BACKUP_HOUR` est modifié dans `.env`, le service doit être recréé (`docker compose up -d --force-recreate backup`) pour prendre en compte la nouvelle valeur (la variable est lue au démarrage du conteneur).
+
+---
+
+### [AUTH-VERIFY-EMAIL] — Envoi email de vérification à l'inscription — 2026-06-23
+
+**Fichiers modifiés (API) :**
+- `services/User.service.js` — `setValidEmailCode` retourne maintenant le code généré (break: la méthode retournait `undefined` avant)
+- `controllers/User.controller.js` — `register` : capture le retour de `userService.create`, génère le code via `setValidEmailCode`, envoie l'email avec un lien cliquable `APP_FRONT_URL/verify-email?email=...&code=...` ; si l'envoi email échoue, l'utilisateur créé est supprimé (rollback manuel) avant de retourner 500
+
+**Fichiers créés (Front) :**
+- `my_memo_master_front/src/pages/VerifyEmailPage.vue` — page de vérification email : auto-vérification si `?email=&code=` présents dans l'URL (lien cliquable), formulaire manuel sinon ; utilise `AuthFormLayout` + `authStore.verifyEmail()`
+
+**Fichiers modifiés (Front) :**
+- `my_memo_master_front/src/router/routes.js` — ajout route `/verify-email` (public, `private: false`)
+- `my_memo_master_front/src/stores/auth.js` — action `register` : redirige vers `/verify-email?email=<email>` après inscription (au lieu de `/auth`) ; message de toast mis à jour
+
+**Fichiers modifiés (.env) :**
+- `.env.example` — ajout `APP_FRONT_URL=http://localhost` (variable backend pour construire le lien email)
+- `server_docker_compose/.env.example` — ajout `APP_FRONT_URL=https://test.my-memo-master.com`
+
+**Ce qui est utilisable :**
+- À l'inscription, l'utilisateur reçoit un email avec un lien `APP_FRONT_URL/verify-email?email=...&code=...`
+- Le clic sur le lien auto-vérifie l'email et affiche un écran de succès
+- Si le lien est expiré (30 min), l'utilisateur peut saisir son email + code manuellement sur la même page
+- Après vérification réussie, redirection vers `/auth` (connexion)
+- `hasValidatedEmail = false` empêche toujours la connexion jusqu'à vérification (comportement inchangé)
+
+**Hypothèses posées :**
+- `APP_FRONT_URL` est une variable backend (Node.js) distincte de `VITE_FRONT_URL` (variable Vite). Les deux ont la même valeur en pratique mais servent des contextes différents (backend vs build front).
+- Le rollback manuel (delete user si email échoue) couvre le cas SMTP mal configuré. Si `userService.delete` échoue aussi, l'erreur est loguée — l'utilisateur reste en base avec `hasValidatedEmail = false` et ne peut pas se connecter.
+
+**Dette / points d'attention :**
+- Pas d'endpoint "renvoyer l'email de vérification" — si un utilisateur perd l'email ou si le délai expire, il ne peut pas se débloquer sans contact support. À implémenter dans un ticket dédié (`POST /users/resend-verification`).
+- Le code de vérification est un entier 6 chiffres stocké en clair (décision antérieure). Il est passé en query param dans l'URL — acceptable pour MVP, passer au pattern token+hash SHA-256 (comme reset-password) dans un ticket de sécurité si nécessaire.
+- Les tests Supertest de `User.controller.register` qui mocquent le service devront être mis à jour pour inclure `setValidEmailCode` et `sendEmail` dans les mocks.

@@ -141,35 +141,80 @@ docker compose --env-file .env logs --tail=100 api
 
 ## Sauvegarde et restauration PostgreSQL
 
-### Lancer une sauvegarde manuelle
+### Service de sauvegarde automatique
+
+Le service `backup` est inclus dans le `docker-compose.yml` et démarre automatiquement avec le pipeline CD.
+Il exécute un `pg_dump` en format custom (`-Fc`) :
+- **Au démarrage du conteneur** (vérification de config immédiate)
+- **Quotidiennement à `BACKUP_HOUR`h00 UTC** (défaut : 3h00)
+
+Les dumps sont stockés dans le volume Docker `backup-data` (`/backups` dans le conteneur).
 
 ```sh
-cd /var/www/html/my_memo_master_prod
-ENVIRONMENT=prod PG_USER=postgres PG_DB=mymemomasterdb bash /chemin/vers/scripts/backup.sh
+# Vérifier que le service backup tourne
+docker compose --env-file .env ps backup
+
+# Consulter les logs du service backup
+docker compose --env-file .env logs backup
+docker compose --env-file .env logs --tail=50 backup
+
+# Lancer un dump manuel immédiat (sans attendre le cycle planifié)
+docker compose --env-file .env exec backup /bin/sh -c '
+  PGPASSWORD="${PG_PASS}" pg_dump -h postgres -U "${PG_USER}" -Fc "${PG_DB}" \
+    > /backups/mymemomaster_${ENVIRONMENT}_manual_$(date +"%Y%m%d_%H%M%S").dump
+'
+
+# Lister les dumps disponibles dans le volume
+docker compose --env-file .env exec backup ls -lh /backups/
 ```
 
-Le dump est créé dans `/var/backups/my_memo_master/` au format pg_dump custom (`-Fc`).
+### Variables de configuration backup (dans `.env`)
 
-### Planifier les sauvegardes automatiques (cron)
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `BACKUP_HOUR` | `3` | Heure UTC du dump quotidien (0–23) |
+| `BACKUP_RETENTION_DAYS` | `7` | Nombre de jours de rétention |
+
+### Extraire un dump du volume vers le système hôte
 
 ```sh
-crontab -e
-# Sauvegarde quotidienne à 3h00, rétention 7 jours
-0 3 * * * ENVIRONMENT=prod PG_USER=postgres PG_DB=mymemomasterdb bash /var/www/html/my_memo_master_prod/scripts/backup.sh >> /var/log/mmm_backup.log 2>&1
+# Identifier le conteneur backup
+BACKUP_CONTAINER=$(docker compose --env-file .env ps -q backup)
+
+# Copier tous les dumps vers /var/backups/my_memo_master/ sur le VPS
+docker cp "${BACKUP_CONTAINER}:/backups/." /var/backups/my_memo_master/
+
+# Ou copier un dump spécifique
+docker cp "${BACKUP_CONTAINER}:/backups/mymemomaster_test_20260101_030000.dump" \
+  /var/backups/mymemomaster_test_20260101_030000.dump
 ```
 
 ### Restaurer une sauvegarde
 
 ```sh
-# Identifier le fichier de dump à restaurer
-ls /var/backups/my_memo_master/
+# Lister les dumps disponibles
+docker compose --env-file .env exec backup ls -lh /backups/
 
 # Restaurer (la base doit exister, les données actuelles seront écrasées)
-DUMP_FILE=/var/backups/my_memo_master/mymemomaster_prod_20260101_030000.dump
-PG_CONTAINER=$(docker ps --filter "network=my_memo_master_prod_network" --filter "name=postgres" --format "{{.Names}}" | head -1)
+DUMP_FILE=mymemomaster_test_20260101_030000.dump
+PG_CONTAINER=$(docker compose --env-file .env ps -q postgres)
 
-cat "${DUMP_FILE}" | docker exec -i "${PG_CONTAINER}" pg_restore -U postgres -d mymemomasterdb --clean --if-exists
+docker compose --env-file .env exec backup sh -c \
+  "PGPASSWORD=\"\${PG_PASS}\" pg_restore -h postgres -U \"\${PG_USER}\" \
+   -d \"\${PG_DB}\" --clean --if-exists /backups/${DUMP_FILE}"
 ```
+
+### Sauvegarde manuelle hors Docker (script host)
+
+Le script `scripts/backup.sh` permet un dump depuis le VPS host (hors Docker Compose) :
+
+```sh
+cd /var/www/html/my_memo_master_test
+ENVIRONMENT=test PG_USER=postgres PG_DB=mymemomasterdb \
+  bash /chemin/vers/scripts/backup.sh
+```
+
+Le dump est créé dans `/var/backups/my_memo_master/` au format pg_dump custom (`-Fc`).
 
 ---
 

@@ -179,6 +179,79 @@ services:
     restart: unless-stopped
 
   # ═══════════════════════════════════════════════════════════════════════════
+  #  Sauvegarde automatique PostgreSQL — pg_dump quotidien vers volume Docker
+  #  Logs : docker compose logs backup
+  #  Dump manuel : docker compose exec backup /usr/local/bin/backup.sh
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  backup:
+    image: postgres:17-alpine
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /backups
+
+        do_backup() {
+          TS=$$(date +"%Y%m%d_%H%M%S")
+          FILE="/backups/mymemomaster_$${ENVIRONMENT}_$${TS}.dump"
+          echo "[backup] $$(date '+%Y-%m-%d %H:%M:%S') — dump $${PG_DB}@$${PG_HOST}..."
+          PGPASSWORD="$${PG_PASS}" pg_dump \
+            -h "$${PG_HOST}" -p "$${PG_PORT}" \
+            -U "$${PG_USER}" -Fc "$${PG_DB}" > "$${FILE}" \
+            || { echo "[backup] ERREUR pg_dump — dump partiel supprimé"; rm -f "$${FILE}"; return 1; }
+          echo "[backup] OK : $$(basename "$${FILE}") ($$(du -sh "$${FILE}" | cut -f1))"
+          find /backups -name "mymemomaster_$${ENVIRONMENT}_*.dump" \
+            -mtime "+$${BACKUP_RETENTION_DAYS}" -delete
+          echo "[backup] Rétention $${BACKUP_RETENTION_DAYS}j appliquée"
+        }
+
+        echo "[backup] Service démarré — sauvegarde quotidienne à $${BACKUP_HOUR}h00 UTC"
+        echo "[backup] Volume : /backups | Rétention : $${BACKUP_RETENTION_DAYS}j"
+        echo "[backup] Sauvegarde initiale au démarrage..."
+        do_backup || echo "[backup] AVERTISSEMENT : sauvegarde initiale échouée"
+
+        while true; do
+          NOW_H=$$(date -u +%H); NOW_M=$$(date -u +%M); NOW_S=$$(date -u +%S)
+          NOW_SECS=$$(( 10#$${NOW_H} * 3600 + 10#$${NOW_M} * 60 + 10#$${NOW_S} ))
+          TGT_SECS=$$(( 10#$${BACKUP_HOUR} * 3600 ))
+          if [ "$${NOW_SECS}" -lt "$${TGT_SECS}" ]; then
+            WAIT=$$(( TGT_SECS - NOW_SECS ))
+          else
+            WAIT=$$(( 86400 - NOW_SECS + TGT_SECS ))
+          fi
+          echo "[backup] Prochain dump dans $${WAIT}s (~$${BACKUP_HOUR}h00 UTC)"
+          sleep "$${WAIT}"
+          do_backup || echo "[backup] ERREUR : sauvegarde échouée — nouvelle tentative au prochain cycle"
+        done
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      PG_HOST: postgres
+      PG_PORT: ${PG_PORT:-5432}
+      PG_USER: ${PG_USER}
+      PG_PASS: ${PG_PASS}
+      PG_DB: ${PG_DB}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - backup-data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: ${BACKUP_LIMIT_CPUS:-0.10}
+          memory: ${BACKUP_LIMIT_MEMORY:-128M}
+        reservations:
+          cpus: ${BACKUP_RESERVE_CPUS:-0.05}
+          memory: ${BACKUP_RESERVE_MEMORY:-32M}
+    networks:
+      - mmm_network
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════════════════════════════════════
   #  Frontend Vue 3 — image nginx tirée de DockerHub
   #  La commande injecte window.__APP_CONFIG__ au runtime pour permettre
   #  de déployer la même image sur plusieurs environnements sans rebuild.
@@ -254,3 +327,4 @@ volumes:
   pgadmin-data:
   api-data:
   redis-data:
+  backup-data:

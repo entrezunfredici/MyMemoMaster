@@ -9,8 +9,11 @@ jest.mock('../../models/index', () => ({
     create: jest.fn(),
     update: jest.fn()
   },
-  Deadline: { findOne: jest.fn() },
-  RevisionSession: { findOne: jest.fn() }
+  Deadline: { findOne: jest.fn(), findByPk: jest.fn() },
+  RevisionSession: { findOne: jest.fn() },
+  EventOccurrence: {},
+  CalendarEvent: {},
+  ClassGroupUsers: { findOne: jest.fn() }
 }))
 
 jest.mock('../../jobs/reminder.queue', () => ({
@@ -20,7 +23,7 @@ jest.mock('../../jobs/reminder.queue', () => ({
   }))
 }))
 
-const { Reminder, Deadline, RevisionSession } = require('../../models/index')
+const { Reminder, Deadline, RevisionSession, ClassGroupUsers } = require('../../models/index')
 const { getReminderQueue } = require('../../jobs/reminder.queue')
 const reminderService = require('../../services/Reminder.service')
 
@@ -32,6 +35,9 @@ const makeDeadline = (overrides = {}) => ({
   dueDate: FUTURE_DATE,
   dueTime: '14:00:00',
   createdBy: 1,
+  occurrence: {
+    calendarEvent: { classGroupId: 42 }
+  },
   ...overrides
 })
 
@@ -87,7 +93,8 @@ describe('ReminderService.create', () => {
   })
 
   test('create - deadline valide - crée le rappel et planifie le job', async () => {
-    Deadline.findOne.mockResolvedValue(makeDeadline())
+    Deadline.findByPk.mockResolvedValue(makeDeadline())
+    ClassGroupUsers.findOne.mockResolvedValue({ classGroupId: 42, userId: 1 })
     const mockReminder = makeReminder()
     Reminder.create.mockResolvedValue(mockReminder)
 
@@ -130,14 +137,15 @@ describe('ReminderService.create', () => {
   })
 
   test('create - entité introuvable - lève une erreur 404', async () => {
-    Deadline.findOne.mockResolvedValue(null)
+    Deadline.findByPk.mockResolvedValue(null)
     await expect(
       reminderService.create(1, { entityType: 'deadline', entityId: 999, delayMinutes: 60 })
     ).rejects.toMatchObject({ status: 404 })
   })
 
   test('create - date de rappel passée - lève une erreur 400', async () => {
-    Deadline.findOne.mockResolvedValue(makeDeadline({ dueDate: PAST_DATE, dueTime: '08:00:00' }))
+    Deadline.findByPk.mockResolvedValue(makeDeadline({ dueDate: PAST_DATE, dueTime: '08:00:00' }))
+    ClassGroupUsers.findOne.mockResolvedValue({ classGroupId: 42, userId: 1 })
     await expect(
       reminderService.create(1, { entityType: 'deadline', entityId: 5, delayMinutes: 60 })
     ).rejects.toMatchObject({ status: 400 })
@@ -156,7 +164,8 @@ describe('ReminderService.update', () => {
   test('update - délai modifié - replanifie le job', async () => {
     const mockReminder = makeReminder()
     Reminder.findOne.mockResolvedValue(mockReminder)
-    Deadline.findOne.mockResolvedValue(makeDeadline())
+    Deadline.findByPk.mockResolvedValue(makeDeadline())
+    ClassGroupUsers.findOne.mockResolvedValue({ classGroupId: 42, userId: 1 })
 
     const result = await reminderService.update(1, 1, { delayMinutes: 30 })
 

@@ -129,6 +129,7 @@ class UserService {
       { validEmailCode: code, validEmailCodeExpiresAt: expiresAt },
       { where: { userId: userId } }
     )
+    return code
   }
 
   async verifyValidEmailCode(userId, code) {

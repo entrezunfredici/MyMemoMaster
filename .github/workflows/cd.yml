@@ -178,7 +178,7 @@ jobs:
 
             compose pull
             compose up -d postgres redis
-            compose up -d pgadmin api front
+            compose up -d pgadmin api front backup
             compose ps
 
             attempt=1

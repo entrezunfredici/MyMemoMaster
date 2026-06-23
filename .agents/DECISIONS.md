@@ -517,6 +517,22 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-23] Sauvegardes auto — service Docker dédié avec script inline plutôt que crontab VPS
+**Contexte** : M-00b.01 avait livré un `scripts/backup.sh` lancé manuellement ou via crontab hôte. Pour rendre les sauvegardes réellement automatiques (démarrage sans intervention lors du déploiement), deux approches ont été évaluées.
+**Décision** : Service Docker Compose `backup` avec le script de dump embarqué en `command:` inline. Même pattern que le service `front` (qui injecte `window.__APP_CONFIG__` au runtime). Le service démarre avec `compose up -d backup` et redémarre automatiquement. Le script calcule la prochaine heure cible (BACKUP_HOUR) et dort jusqu'à elle, puis loop 24h.
+**Alternative écartée** : Crontab hôte (déjà documenté dans RUNBOOK) — requiert une intervention manuelle sur le VPS. Busybox crond dans le conteneur — nécessite de gérer la non-transmission des variables d'environnement Docker aux jobs crond (problème classique), plus complexe sans bénéfice. Supercronic — nouvelle dépendance non justifiée.
+**Conséquences** : Le script inline est plus verbeux dans le `docker-compose.yml` mais entièrement auto-suffisant (pas de fichier externe à déployer). Le `$$VAR` (YAML) → `$VAR` (shell) est la convention à respecter dans tous les blocs `command:` qui utilisent des variables de l'environnement conteneur.
+
+---
+
+### [2026-06-23] Email vérification — lien cliquable avec code en query param (pas de token hashé)
+**Contexte** : L'inscription génère un code de vérification 6 chiffres (`validEmailCode`) stocké en clair. Pour l'UX, un lien cliquable est préférable à un copier-coller de code.
+**Décision** : Le lien contient `?email=<email>&code=<code>` en query params. `VerifyEmailPage.vue` lit ces params à l'`onMounted` et appelle auto. `authStore.verifyEmail()`. Le code 6 chiffres reste inchangé (stockage en clair, validité 30 min).
+**Alternative écartée** : Token opaque + SHA-256 (pattern reset-password) — plus sécurisé mais aurait nécessité une migration du modèle `User` (colonne `validEmailCode` est STRING, pas STRING(64)). Différé à un ticket sécurité dédié si l'exigence évolue.
+**Conséquences** : Le code est exposé dans l'URL (historique navigateur, logs serveur). Risque faible pour MVP car le token expire en 30 min et n'est valable qu'une fois.
+
+---
+
 ### [2026-06-23] KPI — Endpoint unique GET /kpi/my (agrégation serveur, pas de requêtes multiples côté front)
 **Contexte** : Les KPIs agrègent des données de 4 sources (RevisionSession, TestResult, LeitnerSystem/Box/Card, Subject). Le frontend aurait pu appeler 4 endpoints séparés ou 1 endpoint omnibus.
 **Décision** : Un seul endpoint `GET /kpi/my` qui fait 3 requêtes Sequelize en `Promise.all` et calcule tout dans le service. Le front reçoit un objet `{ revision, exercises, leitner, subjects, discipline, badges }` en un seul appel.

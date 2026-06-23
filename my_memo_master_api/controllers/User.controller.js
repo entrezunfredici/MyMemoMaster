@@ -6,12 +6,24 @@ const sendEmail = require('../helpers/sendEmail')
 const logger = require('../helpers/logger')
 
 exports.register = async (req, res) => {
+  let newUser = null
   try {
     const { name, password, email } = req.body
-    await userService.create({ name, email, password })
-    res.status(201).send({ message: 'Utilisateur inscrit avec succès.' })
+    newUser = await userService.create({ name, email, password })
+    const code = await userService.setValidEmailCode(newUser.userId)
+    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
+    const verifyLink = `${frontUrl}/verify-email?email=${encodeURIComponent(email)}&code=${code}`
+    await sendEmail(
+      'Vérifiez votre adresse email - MyMemoMaster',
+      `Bonjour ${name},\n\nMerci de vous être inscrit sur MyMemoMaster !\n\nCliquez sur le lien ci-dessous pour vérifier votre adresse email :\n\n${verifyLink}\n\nCe lien est valable 30 minutes.\n\nSi vous n'avez pas créé de compte, ignorez cet email.`,
+      email
+    )
+    res.status(201).send({ message: 'Inscription réussie ! Vérifiez votre email pour activer votre compte.' })
   } catch (error) {
     logger.error(error?.message || error)
+    if (newUser) {
+      await userService.delete(newUser.userId).catch((e) => logger.error(e?.message || e))
+    }
     res.status(500).send({ message: "Erreur lors de l'inscription." })
   }
 }

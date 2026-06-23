@@ -181,6 +181,15 @@ const routes = [
     }
   },
   {
+    path: '/verify-email',
+    name: 'verify-email',
+    component: () => import('../pages/VerifyEmailPage.vue'),
+    meta: {
+      title: 'Vérification email',
+      private: false
+    }
+  },
+  {
     path: '/register',
     name: 'register',
     component: () => import('../pages/register/InscriptionPage.vue'),
