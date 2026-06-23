@@ -67,21 +67,38 @@
                     'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
                     reminder.entityType === 'deadline'
                       ? 'bg-red-100 text-red-700'
-                      : 'bg-blue-100 text-blue-700'
+                      : reminder.entityType === 'kpi_digest'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-blue-100 text-blue-700'
                   ]"
                 >
                   {{ entityLabel(reminder.entityType) }}
                 </span>
               </div>
 
-              <!-- Contenu -->
-              <div class="flex-1 min-w-0">
+              <!-- Contenu standard -->
+              <div v-if="reminder.entityType !== 'kpi_digest'" class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-800 truncate">
                   {{ reminder.message || 'Rappel programmé' }}
                 </p>
                 <p class="text-xs text-gray-500 mt-0.5">
                   {{ formatReminderAt(reminder.reminderAt) }}
                 </p>
+              </div>
+
+              <!-- Contenu digest KPI -->
+              <div v-else class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-gray-800 mb-1">Bilan de progression</p>
+                <ul class="space-y-1">
+                  <li
+                    v-for="(item, i) in parseDigest(reminder.message)"
+                    :key="i"
+                    class="text-xs text-gray-600 flex gap-1"
+                  >
+                    <span>{{ item.icon }}</span>
+                    <span>{{ item.text }}</span>
+                  </li>
+                </ul>
               </div>
 
               <!-- Supprimer -->
@@ -126,7 +143,13 @@ const sentCount = computed(() =>
 )
 
 function entityLabel(type) {
-  return type === 'deadline' ? 'Échéance' : 'Révision'
+  if (type === 'deadline') return 'Échéance'
+  if (type === 'kpi_digest') return 'Progression'
+  return 'Révision'
+}
+
+function parseDigest(message) {
+  try { return JSON.parse(message) } catch { return [] }
 }
 
 function formatReminderAt(dateStr) {

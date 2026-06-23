@@ -269,4 +269,69 @@ describe('NotificationBellComponent', () => {
 
     expect(clearSpy).toHaveBeenCalled()
   })
+
+  // ── Digest KPI (kpi_digest) ───────────────────────────────────────────────
+
+  it("affiche le badge 'Progression' pour entityType = kpi_digest", async () => {
+    const digestReminder = makePendingReminder({
+      entityType: 'kpi_digest',
+      message: JSON.stringify([{ icon: '🔥', text: 'Streak en danger : révise avant minuit !' }])
+    })
+    const wrapper = mountBell({ reminders: [digestReminder] })
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.text()).toContain('Progression')
+  })
+
+  it('affiche le badge kpi_digest en violet (bg-purple-100)', async () => {
+    const digestReminder = makePendingReminder({
+      entityType: 'kpi_digest',
+      message: JSON.stringify([])
+    })
+    const wrapper = mountBell({ reminders: [digestReminder] })
+    await wrapper.find('button').trigger('click')
+
+    const badge = wrapper.find('.bg-purple-100')
+    expect(badge.exists()).toBe(true)
+  })
+
+  it('affiche les items du digest dans la liste', async () => {
+    const items = [
+      { icon: '🔥', text: 'Streak en danger : révise avant minuit !' },
+      { icon: '📉', text: 'Discipline basse : 32 % ce mois-ci.' }
+    ]
+    const digestReminder = makePendingReminder({
+      entityType: 'kpi_digest',
+      message: JSON.stringify(items)
+    })
+    const wrapper = mountBell({ reminders: [digestReminder] })
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.text()).toContain('Streak en danger')
+    expect(wrapper.text()).toContain('Discipline basse')
+  })
+
+  it('affiche le titre "Bilan de progression" pour kpi_digest', async () => {
+    const digestReminder = makePendingReminder({
+      entityType: 'kpi_digest',
+      message: JSON.stringify([{ icon: '🔥', text: 'Test' }])
+    })
+    const wrapper = mountBell({ reminders: [digestReminder] })
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.text()).toContain('Bilan de progression')
+  })
+
+  it('ne plante pas si le message du digest est un JSON invalide', async () => {
+    const digestReminder = makePendingReminder({
+      entityType: 'kpi_digest',
+      message: 'NOT_JSON'
+    })
+    const wrapper = mountBell({ reminders: [digestReminder] })
+    await wrapper.find('button').trigger('click')
+
+    // Doit rendre sans erreur — la liste des items sera vide
+    expect(wrapper.find('li').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Progression')
+  })
 })

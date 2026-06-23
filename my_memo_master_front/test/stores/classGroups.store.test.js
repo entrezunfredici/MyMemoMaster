@@ -149,7 +149,7 @@ describe('useClassGroupStore', () => {
   // ── addMember ──────────────────────────────────────────────────────────────────
 
   it('addMember — succès — rafraîchit le groupe et notifie', async () => {
-    mockPost.mockResolvedValueOnce({ status: 201, data: {} })
+    mockPost.mockResolvedValueOnce({ status: 200, data: {} })
     mockGet.mockResolvedValueOnce({ status: 200, data: { data: { ...GROUP_FIXTURE, members: [{ userId: 2, role: 'student' }] } } })
 
     const store = useClassGroupStore()

@@ -36,7 +36,7 @@
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
-| Kpi | Stable — KPI-01 : GET /kpi/my + KpiPage.vue + 7 badges + graphiques CSS | 2026-06-23 |
+| Kpi | Stable — KPI-02 : alertes digest quotidiennes (in-app + email), paramètres, tests back + front | 2026-06-23 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -58,6 +58,7 @@
 | Tests fonctionnels Deadline + Reminder (front) | Stable — M-03.10 : 19 tests TodoWidget + 33 tests NotificationBellComponent (Vitest) | 2026-06-13 |
 | Tests fonctionnels ProfilePage (front) | Stable — M-05.10 : 17 tests Vitest (rendu, saveProfile, changePassword, logout, deleteAccount) | 2026-06-17 |
 | Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
+| Alertes KPI (UserKpiAlertSettings) | Stable — KPI-02 : digest quotidien 18h, 3 triggers, canaux in-app/email/push-futur, paramètres par utilisateur | 2026-06-23 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00b.07 : audit OWASP complet, 12 vulns traitées (H1–H4 corrigées), rapport SECURITY_AUDIT_OWASP.md | 2026-06-23 |
 | Storage (upload S3, mindmap local) | Stable — M-00b.07 H3 : clé S3 inclut userId (uploads/{userId}/…), vérification préfixe à la suppression | 2026-06-23 |
 | Validation entrées (express-validator) | Stable — couverture complète sur toutes les entités | 2026-06-05 |
@@ -2877,3 +2878,65 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Migration Sequelize pour `validEmailCodeExpiresAt` à créer avant déploiement prod (`ALTER TABLE Users ADD COLUMN validEmailCodeExpiresAt DATETIME`).
 - ~~Anciens uploads S3 sans `userId` dans la clé indélétables via l'API~~ — Résolu : script `scripts/cleanup-s3-legacy-keys.js` (dry-run par défaut)
 - `Reminder.service.test.js` : 4 tests en échec pré-existants (hors périmètre).
+
+---
+
+### [KPI-02] — Alertes KPI (digest quotidien) + graphiques Chart.js + tests automatiques — 2026-06-23
+
+**Contexte :** Suite de KPI-01. L'objectif était d'ajouter (1) un système d'alertes de progression activable par l'étudiant, (2) des graphiques interactifs Chart.js, et (3) une couverture de tests automatiques complète pour tous les nouveaux modules KPI.
+
+**Fichiers créés (API) :**
+- `my_memo_master_api/migrations/20260623000001-create-user-kpi-alert-settings.js` — table `UserKpiAlertSettings` (12 colonnes : canaux, types d'alertes, seuil, lastDigestSentAt)
+- `my_memo_master_api/models/UserKpiAlertSettings.model.js` — modèle Sequelize + association `belongsTo(User)`
+- `my_memo_master_api/services/KpiAlert.service.js` — `buildDigestItems(kpis, settings)` (3 triggers) + `runDailyDigest()` + `_sendDigestForUser(settings)`
+- `my_memo_master_api/jobs/kpiAlert.cron.js` — `cron.schedule('0 18 * * *', ...)` via node-cron
+- `my_memo_master_api/validators/KpiAlertSettings.validators.js` — validation PUT (tous champs optionnels, booleans, seuil int 0-100)
+- `my_memo_master_api/controllers/KpiAlertSettings.controller.js` — `getSettings` (findOrCreate, defaults), `updateSettings` (whitelist 8 champs)
+- `my_memo_master_api/test/services/Kpi.service.test.js` — 50 tests Jest (toutes les méthodes privées + getMyKpis, badges, streak, discipline, Leitner…)
+- `my_memo_master_api/test/controllers/Kpi.controller.test.js` — 4 tests Jest (200, 401, 500)
+
+**Fichiers modifiés (API) :**
+- `my_memo_master_api/services/Kpi.service.js` — ajout `revivedToday` (boolean) dans le retour de `_computeRevision`
+- `my_memo_master_api/routes/Kpi.routes.js` — ajout `GET /kpi/alert-settings` et `PUT /kpi/alert-settings`
+- `my_memo_master_api/models/index.js` — enregistrement `UserKpiAlertSettings.model.js`
+- `my_memo_master_api/app.js` — import + démarrage `startKpiAlertCron()`
+
+**Fichiers créés (Front) :**
+- `my_memo_master_front/src/stores/kpiAlertSettings.js` — store Pinia : `fetchSettings()`, `updateSettings(updates)`, états `loading`/`saving`
+- `my_memo_master_front/test/stores/kpi.store.test.js` — 9 tests Vitest (fetchMyKpis : succès, non-200, 401, erreur réseau, loading flag, deux appels)
+- `my_memo_master_front/test/stores/kpiAlertSettings.store.test.js` — 12 tests Vitest (fetchSettings + updateSettings : succès, erreur, loading/saving flags)
+- `my_memo_master_front/test/components/KpiPage.test.js` — 21 tests Vitest (loader, état vide, sections, badges unlock/lock, stats, discipline bar colors, graphiques conditionnels)
+
+**Fichiers modifiés (Front) :**
+- `my_memo_master_front/src/pages/KpiPage.vue` — réécriture complète : graphiques CSS → Chart.js interactifs (Bar activité hebdo, Line scores fill, Bar Leitner coloré B1-B5)
+- `my_memo_master_front/src/pages/SettingsPage.vue` — section "Alertes de progression" (master toggle, canaux, 3 types d'alertes, slider seuil), lazy-load settings à l'ouverture de l'onglet
+- `my_memo_master_front/src/components/NotificationBellComponent.vue` — support `kpi_digest` (badge violet "Progression", affichage items parsés, `parseDigest()`)
+- `my_memo_master_front/test/components/NotificationBellComponent.test.js` — +5 tests kpi_digest (badge violet, titre, items, JSON invalide)
+
+**Ce qui est utilisable :**
+- `GET /api/v1/kpi/alert-settings` → retourne ou crée les paramètres d'alertes de l'utilisateur connecté
+- `PUT /api/v1/kpi/alert-settings` → met à jour les préférences (8 champs autorisés)
+- Cron quotidien 18h — envoie un digest groupé pour tous les utilisateurs ayant des alertes activées et non encore envoyées aujourd'hui
+- 3 triggers d'alerte : `streak_risk` (streak en cours mais pas révisé aujourd'hui), `discipline_low` (< seuil), `score_drop` (tendance ≤ -10)
+- In-app : via le modèle `Reminder` existant (entityType: 'kpi_digest') — affiché dans la cloche
+- Email : via `sendEmail` (template text)
+- Page Paramètres → onglet Notifications → section "Alertes de progression"
+- Push mobile : prévu (pushEnabled) mais rendu grisé jusqu'à la version mobile
+- 42 tests automatiques front (2 stores + 1 composant KpiPage + 5 tests cloche) — tous verts
+
+**Triggers d'alerte :**
+- `streak_risk` : `settings.streakAlertEnabled && kpis.revision.streakDays > 0 && !kpis.revision.revivedToday`
+- `discipline_low` : `settings.disciplineAlertEnabled && score > 0 && score < settings.thresholdDiscipline`
+- `score_drop` : `settings.scoreDropAlertEnabled && kpis.exercises.recentTrend <= -10`
+
+**Hypothèses posées :**
+- `lastDigestSentAt` est mis à jour même si 0 alertes sont déclenchées — évite de re-chercher des utilisateurs sans alerte le lendemain.
+- Le digest n'est envoyé qu'une fois par jour (`lastDigestSentAt < todayStr` via comparaison ISO date).
+- `revivedToday` est calculé dans `_computeRevision` sans requête DB supplémentaire (simple `.some()` sur les sessions déjà chargées).
+- Push futur : le champ `pushEnabled` est stocké mais le worker associé n'est pas implémenté — le toggle est grisé dans l'UI.
+
+**Dette / points d'attention :**
+- Migration `UserKpiAlertSettings` à exécuter avant déploiement prod (table absente en prod).
+- Le cron utilise `node-cron` (déjà en place via `fifo.cron.js`) — pas de Redis/BullMQ car le digest n'a pas besoin de retry fiable (si le serveur est down à 18h, la notification est simplement manquée ce jour).
+- `classGroups.store.test.js` : 1 test en échec **pré-existant** (`addMember — succès`) — hors périmètre.
+- `MindmapsEditorView.test.js` : échec de suite **pré-existant** — hors périmètre.

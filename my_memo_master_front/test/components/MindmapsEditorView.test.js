@@ -6,16 +6,16 @@ import MindmapsEditorView from '@/components/mindmap/MindmapsEditorView.vue'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const { mockPut, mockPost } = vi.hoisted(() => ({
+const { mockPut, mockPost, mockToast } = vi.hoisted(() => ({
   mockPut: vi.fn(),
   mockPost: vi.fn(),
+  mockToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() }
 }))
 
 vi.mock('@/helpers/api', () => ({
   api: { put: mockPut, post: mockPost },
 }))
 
-const mockToast = { success: vi.fn(), error: vi.fn(), warning: vi.fn() }
 vi.mock('vue-toastification', () => ({ useToast: () => mockToast }))
 
 // ── Données ───────────────────────────────────────────────────────────────────

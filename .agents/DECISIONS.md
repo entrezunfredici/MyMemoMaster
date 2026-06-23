@@ -493,11 +493,27 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
-### [2026-06-23] KPI — Graphiques en pur CSS/Tailwind, pas de bibliothèque de charts
-**Contexte** : La page KPI nécessite des visualisations (activité hebdomadaire, répartition Leitner, historique des scores). Chart.js et les alternatives auraient fourni des courbes et graphiques interactifs plus élaborés.
-**Décision** : Utiliser uniquement des barres CSS (hauteur proportionnelle calculée en JS) sans dépendance externe. Tailwind CSS suffit pour colorer et dimensionner les barres.
-**Alternative écartée** : Chart.js — fonctionnalités riches, mais nécessite validation CONVENTIONS.md + poids de la lib (~200 Ko). ECharts / Recharts — même raison.
-**Conséquences** : Les graphiques sont statiques (pas de survol/tooltip interactif). Si des graphiques interactifs ou des courbes d'évolution (line chart) sont requis à l'avenir, il faudra soumettre Chart.js à validation dans CONVENTIONS.md.
+### [2026-06-23] KPI — Graphiques CSS remplacés par Chart.js + vue-chartjs (KPI-02)
+**Contexte** : KPI-01 avait livré des graphiques en pur CSS (barres proportionnelles). Lors de la revue, l'utilisateur a demandé des graphiques interactifs (tooltip, hover, fill). Chart.js a été soumis à validation : licence MIT, gratuit y compris en déploiement public.
+**Décision** : Adopter `chart.js@^4.5.1` + `vue-chartjs@^5.3.3`. Trois graphiques interactifs : `<Bar>` activité hebdomadaire, `<Line>` évolution scores (fill), `<Bar>` répartition Leitner (couleurs B1-B5). `ChartJS.register()` appelé une seule fois au niveau module dans `KpiPage.vue`.
+**Alternative écartée** : ECharts — plus lourd, API complexe. Recharts — React uniquement. Barres CSS — pas de tooltip ni de courbe.
+**Conséquences** : Dans les tests Vitest (jsdom), `chart.js` et `vue-chartjs` sont mockés (`vi.mock`) car jsdom n'implémente pas le contexte canvas. Les composants `Bar` et `Line` sont stubbed avec `<canvas />` simples. Pattern à reproduire pour tous les futurs tests de pages avec charts.
+
+---
+
+### [2026-06-23] KPI Alertes — Digest via modèle Reminder existant (entityType: 'kpi_digest'), pas de nouveau modèle
+**Contexte** : Le système d'alertes KPI doit envoyer des notifications in-app. Deux options : nouveau modèle `KpiNotification` ou réutiliser `Reminder` (déjà utilisé pour deadlines et révisions, déjà affiché dans la cloche).
+**Décision** : Réutiliser `Reminder` avec `entityType: 'kpi_digest'`, `channel: 'in_app'`, `message: JSON.stringify(items)`. Le `NotificationBellComponent` filtre déjà par `status: 'pending'` et affiche le contenu selon `entityType`. Une branche `kpi_digest` a été ajoutée : badge violet "Progression", titre "Bilan de progression", liste des items parsés.
+**Alternative écartée** : Nouveau modèle `KpiDigest` — duplication de la logique de polling/affichage déjà présente dans la cloche. Nouvelle table en base pour un cas d'usage couvert par l'existant.
+**Conséquences** : Le `message` d'un rappel `kpi_digest` est du JSON (tableau d'items `{icon, text}`), pas une string libre. Tout code qui lit `reminder.message` pour un digest doit passer par `parseDigest()`. Les `Reminder` kpi_digest ne sont pas liés à une entité applicative (entityId = userId, pas un ID de session/deadline).
+
+---
+
+### [2026-06-23] KPI Alertes — Anti-spam : lastDigestSentAt mis à jour même si 0 alertes déclenchées
+**Contexte** : Le cron vérifie `lastDigestSentAt < today` avant d'envoyer un digest. Si le digest est "vide" (aucun trigger), faut-il quand même mettre à jour la date ?
+**Décision** : Oui — `lastDigestSentAt` est mis à jour même quand `items.length === 0`. Le calcul des KPIs a déjà été fait ; recalculer demain est inutile si l'utilisateur est dans un bon état.
+**Alternative écartée** : Ne mettre à jour que si items > 0 — relance le calcul complet chaque jour pour les utilisateurs sans problème, coût inutile en I/O.
+**Conséquences** : Un utilisateur qui avait des alertes hier et n'en a plus aujourd'hui reçoit quand même un "tick" silencieux. Comportement invisible pour l'utilisateur, avantageux pour les perfs.
 
 ---
 

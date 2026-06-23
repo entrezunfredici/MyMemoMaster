@@ -32,6 +32,7 @@ models.RevisionSession = require('./RevisionSession.model')(instance)
 models.Reminder = require('./Reminder.model')(instance)
 models.TestResult = require('./TestResult.model')(instance)
 models.Invitation = require('./Invitation.model')(instance)
+models.UserKpiAlertSettings = require('./UserKpiAlertSettings.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

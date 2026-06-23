@@ -111,7 +111,9 @@ class KpiService {
       }
     }
 
-    return { totalPlanned: total, totalCompleted, completionRate, streakDays, sessionsLast30Days: sessionsLast30.length, completedLast30Days: completedLast30.length, weeklyActivity, totalMinutes }
+    const revivedToday = completed.some((s) => s.date === today)
+
+    return { totalPlanned: total, totalCompleted, completionRate, streakDays, sessionsLast30Days: sessionsLast30.length, completedLast30Days: completedLast30.length, weeklyActivity, totalMinutes, revivedToday }
   }
 
   /**

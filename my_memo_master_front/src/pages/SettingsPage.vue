@@ -40,13 +40,133 @@
       <!-- Notifications -->
       <template v-if="activeSection === 'notifications'">
         <h2 class="settings__title">Notifications</h2>
-        <div class="settings__info-box">
+
+        <div class="settings__info-box mb-6">
           <p>
-            Les rappels sont gérés directement depuis la page
+            Les rappels de calendrier sont gérés depuis la page
             <router-link to="/calendar" class="settings__link">Calendrier</router-link>.
-            Vous pouvez y créer, modifier et supprimer des rappels liés à vos échéances et sessions de révision.
           </p>
         </div>
+
+        <!-- Alertes KPI -->
+        <template v-if="alertStore.loading">
+          <p class="text-sm text-gray-400">Chargement des préférences…</p>
+        </template>
+
+        <template v-else-if="alertStore.settings">
+          <h3 class="settings__subtitle">Alertes de progression (bilan quotidien)</h3>
+          <p class="settings__section-hint mb-4">
+            Un résumé quotidien est envoyé à 18h si des alertes sont déclenchées.
+            Toutes les alertes du jour sont regroupées en une seule notification.
+          </p>
+
+          <!-- Activer/désactiver tout -->
+          <div class="settings__row">
+            <div>
+              <p class="settings__row-label">Activer les alertes de progression</p>
+              <p class="settings__row-hint">Active ou désactive toutes les alertes KPI d'un coup.</p>
+            </div>
+            <ToggleButton
+              :modelValue="alertStore.settings.enabled"
+              @update:modelValue="save({ enabled: $event })"
+            />
+          </div>
+
+          <template v-if="alertStore.settings.enabled">
+            <!-- Canaux -->
+            <p class="settings__group-label mt-4 mb-2">Canaux de notification</p>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">Notification dans l'appli</p>
+                <p class="settings__row-hint">Affichée dans la cloche en haut à droite.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.inAppEnabled"
+                @update:modelValue="save({ inAppEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">Notification par e-mail</p>
+                <p class="settings__row-hint">Envoyée à l'adresse liée à ton compte.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.emailEnabled"
+                @update:modelValue="save({ emailEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row settings__row--disabled">
+              <div>
+                <p class="settings__row-label">Notification mobile (push)</p>
+                <p class="settings__row-hint">Disponible quand l'application mobile sera publiée.</p>
+              </div>
+              <ToggleButton :modelValue="false" :disabled="true" />
+            </div>
+
+            <!-- Types d'alertes -->
+            <p class="settings__group-label mt-6 mb-2">Types d'alertes</p>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">🔥 Streak en danger</p>
+                <p class="settings__row-hint">Alerte si tu n'as pas encore révisé aujourd'hui et que ton streak est en cours.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.streakAlertEnabled"
+                @update:modelValue="save({ streakAlertEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">📉 Discipline basse</p>
+                <p class="settings__row-hint">
+                  Alerte si le score de discipline (30 j) passe sous
+                  <strong>{{ alertStore.settings.thresholdDiscipline }} %</strong>.
+                </p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.disciplineAlertEnabled"
+                @update:modelValue="save({ disciplineAlertEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row" v-if="alertStore.settings.disciplineAlertEnabled">
+              <div>
+                <p class="settings__row-label">Seuil de discipline</p>
+                <p class="settings__row-hint">En dessous de ce pourcentage, une alerte est envoyée.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="10"
+                  max="80"
+                  step="5"
+                  :value="alertStore.settings.thresholdDiscipline"
+                  @change="save({ thresholdDiscipline: Number($event.target.value) })"
+                  class="w-28 accent-primary"
+                />
+                <span class="text-sm font-medium text-primary w-10 text-right">
+                  {{ alertStore.settings.thresholdDiscipline }} %
+                </span>
+              </div>
+            </div>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">📚 Baisse des scores</p>
+                <p class="settings__row-hint">Alerte si tes scores récents baissent de plus de 10 points.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.scoreDropAlertEnabled"
+                @update:modelValue="save({ scoreDropAlertEnabled: $event })"
+              />
+            </div>
+          </template>
+        </template>
       </template>
 
       <!-- Accessibilité -->
@@ -64,21 +184,29 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import ToggleButton from '@/components/ToggleButton.vue'
+import { useKpiAlertSettingsStore } from '@/stores/kpiAlertSettings'
 
 const DARK_MODE_KEY = 'mmm_dark_mode'
 
 const appSections = [
   { id: 'apparence', label: 'Apparence' },
   { id: 'notifications', label: 'Notifications' },
-  { id: 'accessibilite', label: 'Accessibilité' },
+  { id: 'accessibilite', label: 'Accessibilité' }
 ]
 
 const activeSection = ref('apparence')
 const darkMode = ref(false)
+const alertStore = useKpiAlertSettingsStore()
 
 onMounted(() => {
   darkMode.value = localStorage.getItem(DARK_MODE_KEY) === 'true'
   applyDarkMode(darkMode.value)
+})
+
+watch(activeSection, (val) => {
+  if (val === 'notifications' && !alertStore.settings) {
+    alertStore.fetchSettings()
+  }
 })
 
 watch(darkMode, (val) => {
@@ -88,6 +216,10 @@ watch(darkMode, (val) => {
 
 function applyDarkMode(enabled) {
   document.documentElement.classList.toggle('dark-mode', enabled)
+}
+
+function save(updates) {
+  alertStore.updateSettings(updates)
 }
 </script>
 
@@ -163,6 +295,27 @@ function applyDarkMode(enabled) {
   margin-bottom: 24px;
 }
 
+.settings__subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.settings__section-hint {
+  font-size: 0.82rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.settings__group-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+}
+
 .settings__row {
   display: flex;
   align-items: center;
@@ -170,6 +323,11 @@ function applyDarkMode(enabled) {
   gap: 16px;
   padding: 16px 0;
   border-bottom: 1px solid #f3f4f6;
+}
+
+.settings__row--disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .settings__row-label {

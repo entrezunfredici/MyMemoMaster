@@ -43,6 +43,7 @@ const planningRoutes = require('./routes/Planning.routes')
 const testResultRoutes = require('./routes/TestResult.routes')
 const { startFifoCron } = require('./jobs/fifo.cron')
 const { startReminderWorker } = require('./jobs/reminder.worker')
+const { startKpiAlertCron } = require('./jobs/kpiAlert.cron')
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') }) // .env is placed in the root directory of the project
 
@@ -130,6 +131,7 @@ app.use('/api/v1', v1)
 // ... Autres middlewares
 startFifoCron()
 startReminderWorker()
+startKpiAlertCron()
 
 // Si rien n'est trouvé
 app.use((_req, res) => {
