@@ -48,7 +48,7 @@
           @dragleave.stop="isDragOver = false"
           @drop.prevent.stop="handleImageDrop"
         >
-          <img v-if="imageSrc" :src="imageSrc" :alt="node.label" />
+          <img v-if="imageSrc" :src="imageSrc" :alt="node.label" @load="handleImageLoad" />
           <span v-else class="mindmap-node__image-placeholder">
             {{ isDragOver ? 'Déposer ici' : 'Glissez une image ici' }}
           </span>
@@ -216,6 +216,24 @@ const commitContent = () => {
 
 const cancelEdit = () => {
   editingField.value = null;
+};
+
+// ── Redimensionnement automatique selon les proportions de l'image ────────────
+const handleImageLoad = (event) => {
+  const img = event.target;
+  const naturalW = img.naturalWidth;
+  const naturalH = img.naturalHeight;
+  if (!naturalW || !naturalH) return;
+
+  const TITLE_H = 30;
+  const targetW = Math.max(180, Math.min(400, width.value));
+  const imgAreaW = targetW - 24;
+  const imgH = Math.round(imgAreaW * naturalH / naturalW);
+  const targetH = Math.max(120, TITLE_H + imgH + 20);
+
+  if (Math.abs(targetH - height.value) > 2 || Math.abs(targetW - width.value) > 2) {
+    store.updateNodeStyle(props.node.id, { width: targetW, height: targetH });
+  }
 };
 
 // ── Drag & drop image ─────────────────────────────────────────────────────────

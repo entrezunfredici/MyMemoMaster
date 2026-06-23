@@ -30,8 +30,9 @@
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
 | LeitnerSystemsUsers | Stable | init |
-| Diagramme (mind maps) | Stable — M-01 revue : 6 bugs corrigés (catch silencieux × 2, validator update, double findByPk, code mort, try/catch imbriqué) — 38 tests back + 36 tests front verts | 2026-06-22 |
+| Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
+| Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
 | Fields / FieldsType | Stable | init |
 | Tutorials | Stable — bug create corrigé (subjectId + revision_tips ignorés) | 2026-06-06 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
@@ -2644,6 +2645,68 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Dette / points d'attention :**
 - Aucun test end-to-end du canvas (`MindMapBuilder.vue`) — acceptable pour MVP ; à adresser dans un sprint dédié avec Playwright/Cypress si la feature devient critique.
+
+---
+
+### [M-02.14] — Documentation technique composants — Éditeur de cartes mentales + migration S3 images — 2026-06-23
+
+**Fichiers créés :**
+- `.agents/DOC_mindmap_editor.md` — documentation technique complète : architecture, format mindMapJson (schéma annoté), back-end (modèle/service/controller/routes/middleware), front-end (9 composants détaillés + store Pinia + helpers), couverture de tests, points d'attention et dette
+
+**Fichiers modifiés :**
+- `my_memo_master_api/middlewares/mindmapImageUpload.js` — migration S3 : sélection dynamique du backend selon `S3_BUCKET` (multerS3 si configuré, diskStorage sinon) ; clé S3 préfixée `mindmaps/`, taille max 5 Mo, 4 types MIME acceptés
+- `my_memo_master_api/controllers/Diagramme.controller.js` — `uploadImage` retourne `req.file.location` (S3) ou URL locale `/api/uploads/mindmaps/…` selon le mode ; import `publicUrl` depuis `storage.config.js`
+- `.agents/CHANGELOG_AGENT.md` — ce fichier
+- `.agents/DECISIONS.md` — décisions S3 upload mind maps
+
+**Ce qui est utilisable :**
+- Documentation technique accessible dans `.agents/DOC_mindmap_editor.md` — référence pour tout développeur reprenant la feature
+- Upload d'images dans les nœuds de carte mentale : stockage S3 Infomaniak en prod (bucket `MyMemoMasterCloud`, préfixe `mindmaps/`) ; fallback disque local (`public/uploads/mindmaps/`) en dev sans `S3_BUCKET`
+- Front résout l'URL image indifféremment du mode (S3 → `url` direct, local → `path` + `VITE_API_URL`)
+- Auto-resize du nœud aux proportions naturelles de l'image (seuil 2 px pour éviter les boucles)
+
+**Hypothèses posées :**
+- Le bucket Infomaniak doit avoir une politique de lecture publique sur le préfixe `mindmaps/` pour que les URLs S3 soient accessibles depuis le front sans authentification.
+- Les images déjà stockées localement (avant migration) ont une URL `http://localhost/api/uploads/…` dans `mindMapJson` — elles deviendront invalides en prod si le disque local n'est pas monté.
+
+**Dette / points d'attention :**
+- Pas d'URLs présignées S3 : images exposées en URL publique permanente. Si une politique de bucket plus restrictive est appliquée, prévoir la génération d'URLs présignées (TTL) côté serveur.
+- Undo/Redo non implémenté (`map.history.stack` présent en structure mais non alimenté).
+- `MindMapBoard.vue` (canvas SVG, pointer events) sans tests unitaires — acceptable MVP.
+
+---
+
+### [M-00b.05] — Clôture ticket Déploiement automatisé — 2026-06-23
+
+**Contexte :** Vérification de complétude du ticket M-00b.05 (Infrastructure, CI/CD et exploitation — MVP Sprint 3). Tous les éléments du périmètre IN étaient déjà livrés en plusieurs sous-tickets (M-00b.01, M-00b.03, M-00b.04). Cette entrée consolide la liste des fichiers et acte la clôture du ticket.
+
+**Fichiers livrés (récapitulatif) :**
+- `my_memo_master_api/Dockerfile` + `my_memo_master_front/Dockerfile` — images Docker multi-stage
+- `docker-compose.yml` — stack dev locale (build + Traefik local)
+- `server_docker_compose/docker-compose.yml` — stack VPS (images DockerHub, Traefik HTTPS Let's Encrypt)
+- `server_docker_compose/.env.example` — template variables d'environnement VPS
+- `traefik/docker-compose.yml` + `traefik/.env.example` — Traefik standalone avec HTTPS + HSTS + redirect HTTP→HTTPS
+- `.github/workflows/ci.yml` — pipeline CI : Node 22, matrix api/front dynamique selon branche, lint + tests + build front
+- `.github/workflows/cd.yml` — pipeline CD : build & push DockerHub → déploiement SSH VPS (test) + kubectl (preprod/prod) + notifications Discord
+- `scripts/backup.sh` — pg_dump vers disque local VPS, rétention configurable, recherche dynamique du conteneur
+- `docs/RUNBOOK.md` — guide d'exploitation : premier déploiement, mise à jour, rollback, backup/restore, logs
+- `.env.example` racine — variables communes
+
+**Ce qui est utilisable :**
+- Push sur `test` → CI → build images Docker Hub → déploiement SSH automatique sur le VPS (docker compose pull + up + healthcheck)
+- Push sur `preprod` → CI → build images → déploiement kubectl namespace `mymemomaster-preprod`
+- Push sur `main` → CI → build images → déploiement kubectl prod (activable via `K8S_PROD_ENABLED=true`)
+- `bash scripts/backup.sh` sur le VPS pour un dump pg_dump local avec rétention 7 jours (configurable)
+- `docs/RUNBOOK.md` comme référence opérationnelle pour tout intervenant
+
+**Périmètre OUT respecté :**
+- Kubernetes non imposé en production (activable via variable, désactivé par défaut)
+- Haute disponibilité multi-région et SRE avancé : hors scope, non implémentés
+
+**Dette / points d'attention :**
+- `scripts/backup.sh` sauvegarde uniquement en local sur le VPS — pas de copie vers S3 ou stockage externe. En cas de perte du VPS, les dumps sont perdus. À compléter avant production critique.
+- Séquences PostgreSQL non avancées par les seeders : reset manuel nécessaire après `db:seed:all` (documenté dans DECISIONS.md).
+- `K8S_PROD_ENABLED` doit être positionné manuellement dans les variables GitHub Actions avant la mise en prod Kubernetes.
 
 ---
 

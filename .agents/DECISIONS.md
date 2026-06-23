@@ -445,6 +445,22 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-23] MindMap — upload images : multerS3 (backend dynamique, fallback disque local)
+**Contexte** : L'upload d'images dans les nœuds de carte mentale utilisait `multer.diskStorage` vers `public/uploads/mindmaps/`. En prod Docker, les fichiers sont éphémères (conteneur recréé = perte des images). Le projet dispose déjà d'un client S3 Infomaniak configuré dans `storage.config.js`.
+**Décision** : `mindmapImageUpload.js` sélectionne dynamiquement le backend au démarrage : `multerS3` vers le bucket `S3_BUCKET` si la variable est définie, `diskStorage` vers `public/uploads/mindmaps/` sinon. Le contrôleur `uploadImage` détecte le mode via `process.env.S3_BUCKET && req.file.key` pour construire l'URL de réponse correcte. Le middleware existant `upload.middleware.js` n'est pas réutilisé ici car il sauvegarde vers `os.tmpdir()` en fallback (non servi par Express), ce qui briserait le dev sans S3.
+**Alternative écartée** : Réutiliser `upload.middleware.js` directement — son fallback local écrit dans `os.tmpdir()`, inaccessible via le serveur HTTP statique. Dédier un middleware par domaine (mindmaps vs storage général) permet un fallback correct dans chaque contexte.
+**Conséquences** : Clé S3 préfixée `mindmaps/` (distinct du préfixe `uploads/` de `Storage.middleware.js`). Les images locales dev restent servies via `app.use('/api/uploads', express.static(...))`. Les images S3 prod nécessitent une politique de bucket public sur `mindmaps/*`. Les URLs stockées dans `mindMapJson` diffèrent selon le mode (chemin relatif vs URL absolue S3) — voir décision suivante pour la résolution côté front.
+
+---
+
+### [2026-06-23] MindMap — résolution URL image front : priorité `path` (local) sur `url` (S3)
+**Contexte** : Le contrôleur retourne `{ url, path? }` : `path` = chemin relatif (local, ex. `/api/uploads/mindmaps/foo.jpg`) ; `url` = URL publique directe (S3). Le front doit construire une URL affichable dans les deux cas.
+**Décision** : `resolveImageUrl(payload)` (MindMapPalette) et la logique de `handleImageDrop` (MindMapNode) appliquent : si `payload.path` → `new URL(path, VITE_API_URL).toString()` (reconstitue l'URL publique depuis l'origine de l'API) ; sinon `payload.url` tel quel (S3). En S3, seul `url` est présent (`path` est `null`) — le fallback s'active naturellement.
+**Alternative écartée** : Stocker uniquement `url` dans les deux modes (construire l'URL locale côté serveur) — perdrait l'information de chemin relatif utile pour les re-calculs si `VITE_API_URL` change entre dev/prod, et couplait le serveur au format public de l'URL.
+**Conséquences** : Les cartes sauvegardées en dev local contiennent des URLs `http://localhost/api/uploads/…` dans `mindMapJson`. Si rechargées en prod S3, ces URLs pointent vers un serveur local inexistant — les images apparaîtront cassées. À documenter dans la procédure de migration dev → prod.
+
+---
+
 ### [2026-06-22] MindMap — resolveSubject : fallback "Sujet par défaut" plutôt que 400
 **Contexte** : La carte mentale doit être rattachée à un sujet (`subjectId FK NOT NULL`). Le `subjectId` fourni par le client peut être absent, nul ou pointer vers un sujet supprimé.
 **Décision** : `DiagrammeService.resolveSubject(subjectId)` crée ou réutilise un sujet nommé `"Sujet par défaut"` via `findOrCreate` quand le subjectId est absent ou invalide. Aucune erreur 400 n'est retournée pour ce champ — le client ne peut pas provoquer un échec de création par un subjectId manquant.

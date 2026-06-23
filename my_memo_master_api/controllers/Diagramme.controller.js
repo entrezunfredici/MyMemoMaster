@@ -1,6 +1,9 @@
 const path = require('path')
+const { Readable } = require('stream')
+const { GetObjectCommand } = require('@aws-sdk/client-s3')
 const DiagrammeService = require('../services/Diagramme.service.js')
 const logger = require('../helpers/logger')
+const { s3Client, bucket: s3Bucket } = require('../config/storage.config')
 
 exports.findAll = async (req, res) => {
   try {
@@ -100,19 +103,53 @@ exports.uploadImage = (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "Aucune image n'a été envoyée." })
     }
-    const relativePath = path.join('api', 'uploads', 'mindmaps', req.file.filename).replace(/\\/g, '/')
-    const baseUrl = process.env.API_PUBLIC_URL || `${req.protocol}://${req.get('host')}`
-    const url = `${baseUrl}/${relativePath}`
+
+    let filePath
+    if (s3Bucket && req.file.key) {
+      // S3 : proxy via l'API (Infomaniak Swiss Backup ne supporte pas l'accès public direct)
+      filePath = `/api/v1/diagrammes/image/${req.file.key}`
+    } else {
+      // Local (dev sans S3) : servi par express.static sous /api/uploads
+      const relativePath = path.join('api', 'uploads', 'mindmaps', req.file.filename).replace(/\\/g, '/')
+      filePath = `/${relativePath}`
+    }
+
     return res.status(201).json({
       message: 'Image téléchargée avec succès.',
-      url,
-      path: `/${relativePath}`,
-      filename: req.file.filename,
+      path: filePath,
+      key: req.file.key || req.file.filename,
       size: req.file.size,
       mimetype: req.file.mimetype
     })
   } catch (error) {
     logger.error(error?.message || error)
     return res.status(500).json({ message: "Erreur lors de l'upload de l'image." })
+  }
+}
+
+exports.getImage = async (req, res) => {
+  if (!s3Bucket) {
+    return res.status(404).json({ message: 'Stockage S3 non configuré.' })
+  }
+  try {
+    const key = req.params[0]
+    if (!key) return res.status(400).json({ message: 'Clé image manquante.' })
+
+    const command = new GetObjectCommand({ Bucket: s3Bucket, Key: key })
+    const s3Response = await s3Client.send(command)
+
+    res.setHeader('Content-Type', s3Response.ContentType || 'image/jpeg')
+    res.setHeader('Cache-Control', 'public, max-age=31536000')
+    if (s3Response.ContentLength) {
+      res.setHeader('Content-Length', s3Response.ContentLength)
+    }
+
+    Readable.from(s3Response.Body).pipe(res)
+  } catch (error) {
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ message: 'Image introuvable.' })
+    }
+    logger.error(error?.message || error)
+    return res.status(500).json({ message: "Erreur lors de la récupération de l'image." })
   }
 }

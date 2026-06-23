@@ -39,6 +39,30 @@ router.get('/', authMiddleware, diagramme.findAll)
 
 /**
  * @swagger
+ * /diagrammes/image/{key}:
+ *   get:
+ *     summary: Proxy d'image S3 — sert une image stockée dans le bucket S3 sans exposer les credentials
+ *     tags:
+ *       - diagrammes
+ *     parameters:
+ *       - name: key
+ *         in: path
+ *         required: true
+ *         description: Clé S3 de l'image (ex. mindmaps/timestamp-random.jpg)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Image retournée en flux binaire
+ *       404:
+ *         description: Image introuvable
+ *       500:
+ *         description: Erreur serveur
+ */
+router.get('/image/*', diagramme.getImage)
+
+/**
+ * @swagger
  * /diagrammes/{id}:
  *   get:
  *     summary: Récupère un diagramme par son ID
