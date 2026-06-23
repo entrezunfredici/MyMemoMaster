@@ -9,6 +9,9 @@
         </template>
       </Grid>
     </section>
+    <section class="home__alerts">
+      <KpiAlertWidgetComponent />
+    </section>
     <section class="home__interpreter">
       <Interpreter />
     </section>
@@ -20,6 +23,7 @@ import { useRouter } from 'vue-router'
 import Button from '@/components/ButtonComponent.vue'
 import Grid from '@/components/GridComponent.vue'
 import Interpreter from '@/components/interpreter/Interpreter.vue'
+import KpiAlertWidgetComponent from '@/components/KpiAlertWidgetComponent.vue'
 
 const router = useRouter()
 
@@ -44,6 +48,11 @@ function goTo(path) {
   max-width: 960px;
   margin: 0 auto 24px;
   align-items: center;
+}
+
+.home__alerts {
+  max-width: 960px;
+  margin: 0 auto 24px;
 }
 
 .home__interpreter {

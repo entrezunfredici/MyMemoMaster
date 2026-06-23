@@ -36,7 +36,7 @@
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
-| Kpi | Stable — KPI-02 : alertes digest quotidiennes (in-app + email), paramètres, tests back + front | 2026-06-23 |
+| Kpi | Stable — M-04.06 : widget alertes & suggestions révision intégré au dashboard étudiant | 2026-06-23 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -2978,6 +2978,34 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Les dumps sont dans un volume Docker — si le volume est perdu (rm -v), les sauvegardes sont perdues. Pour une redondance, copier régulièrement vers S3 ou un stockage externe (hors scope MVP).
 - `scripts/backup.sh` (host crontab) reste utilisable en complément pour un backup off-container. Les deux approches coexistent.
 - Si `BACKUP_HOUR` est modifié dans `.env`, le service doit être recréé (`docker compose up -d --force-recreate backup`) pour prendre en compte la nouvelle valeur (la variable est lue au démarrage du conteneur).
+
+---
+
+### [M-04.06] — Widget alertes & suggestions révision (dashboard étudiant) — 2026-06-23
+
+**Contexte :** Suite de KPI-01 et KPI-02. KPI-01 avait livré la page `/kpi` et KPI-02 le système de digest quotidien (cron + NotificationBell). Il manquait le widget proactif intégré au dashboard étudiant (M-04.06 — US-12).
+
+**Fichiers créés (Front) :**
+- `my_memo_master_front/src/components/KpiAlertWidgetComponent.vue` — widget autonome : charge KPIs + settings en parallèle au montage, calcule les alertes client-side (même logique que `KpiAlert.service.js/buildDigestItems`), affiche suggestion Leitner (cartes dues) toujours visible + 3 alertes conditionnelles (streak_risk, discipline_low, score_drop), lien vers `/kpi`, état chargement, état vide "Tout va bien 🎉"
+- `my_memo_master_front/test/components/KpiAlertWidgetComponent.test.js` — 14 tests Vitest (loader, état vide, streak alerte/no-alerte, discipline alerte/no-alerte, score_drop alerte/no-alerte, suggestion Leitner, settings.enabled=false, streakAlertEnabled=false, lien /kpi)
+
+**Fichiers modifiés (Front) :**
+- `my_memo_master_front/src/pages/HomePage.vue` — ajout section `home__alerts` avec `<KpiAlertWidgetComponent />` entre la grille de navigation et l'interpréteur
+
+**Ce qui est utilisable :**
+- Dashboard (`/`) affiche le widget "Alertes & Suggestions" avec les alertes en temps réel (pas de délai cron)
+- Suggestion Leitner toujours visible si `kpis.leitner.cardsDue > 0` (indépendante des préférences d'alertes)
+- 3 alertes conditionnelles si `settings.enabled` : streak en danger (🔥), discipline faible (📉), scores en baisse (📚)
+- Lien "Voir mes stats →" vers `/kpi` pour la page complète
+- 14 tests Vitest passants
+
+**Hypothèses posées :**
+- Le widget appelle `fetchMyKpis()` et `fetchSettings()` à chaque montage — acceptable car la HomePage est le point d'entrée principal et les données changent quotidiennement. Les stores ne font pas de cache, donc chaque visite recharge les données.
+- La suggestion Leitner est délibérément hors du système de `settings.enabled` : c'est une information d'action immédiate (cartes dues maintenant), pas une alerte de progression.
+- Le calcul des alertes est répliqué côté client (même logique que `buildDigestItems`) pour éviter un endpoint supplémentaire — les KPIs sont déjà chargés, la duplication est justifiée.
+
+**Dette / points d'attention :**
+- Si `fetchMyKpis()` est déjà appelé ailleurs sur la page (ex. si une future page dashboard charge le store), les deux appels se superposent — à gérer avec un flag ou un TTL si la performance devient un problème.
 
 ---
 
