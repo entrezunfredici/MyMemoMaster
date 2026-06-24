@@ -3,7 +3,7 @@ const { createLogger, format, transports } = require('winston')
 const isProd = process.env.NODE_ENV === 'production'
 
 const logger = createLogger({
-  level: isProd ? 'warn' : 'info',
+  level: isProd ? 'warn' : 'http',
   format: isProd
     ? format.combine(format.timestamp(), format.json())
     : format.combine(

@@ -1,23 +1,9 @@
-const { UserKpiAlertSettings } = require('../models')
+const kpiAlertSettingsService = require('../services/KpiAlertSettings.service')
 const logger = require('../helpers/logger')
-
-const DEFAULTS = {
-  enabled: true,
-  inAppEnabled: true,
-  emailEnabled: false,
-  pushEnabled: false,
-  streakAlertEnabled: true,
-  disciplineAlertEnabled: true,
-  scoreDropAlertEnabled: true,
-  thresholdDiscipline: 40
-}
 
 exports.getSettings = async (req, res) => {
   try {
-    const [settings] = await UserKpiAlertSettings.findOrCreate({
-      where: { userId: req.user.id },
-      defaults: { ...DEFAULTS, userId: req.user.id }
-    })
+    const settings = await kpiAlertSettingsService.getOrCreate(req.user.id)
     res.status(200).json(settings)
   } catch (error) {
     logger.error(error?.message || error)
@@ -27,22 +13,7 @@ exports.getSettings = async (req, res) => {
 
 exports.updateSettings = async (req, res) => {
   try {
-    const [settings] = await UserKpiAlertSettings.findOrCreate({
-      where: { userId: req.user.id },
-      defaults: { ...DEFAULTS, userId: req.user.id }
-    })
-
-    const allowed = [
-      'enabled', 'inAppEnabled', 'emailEnabled', 'pushEnabled',
-      'streakAlertEnabled', 'disciplineAlertEnabled', 'scoreDropAlertEnabled',
-      'thresholdDiscipline'
-    ]
-    const updates = {}
-    for (const key of allowed) {
-      if (req.body[key] !== undefined) updates[key] = req.body[key]
-    }
-
-    await settings.update(updates)
+    const settings = await kpiAlertSettingsService.update(req.user.id, req.body)
     res.status(200).json(settings)
   } catch (error) {
     logger.error(error?.message || error)

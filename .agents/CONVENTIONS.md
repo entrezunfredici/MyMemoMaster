@@ -183,7 +183,7 @@ router.get("/", authMiddleware, entity.findAll);
 
 | Usage | Librairie |
 |-------|-----------|
-| Logs | winston |
+| Logs | winston + morgan |
 | Dates | dayjs |
 | Validation | express-validator |
 | Auth | jsonwebtoken + bcryptjs |

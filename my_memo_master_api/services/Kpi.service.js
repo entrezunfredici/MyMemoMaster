@@ -94,7 +94,7 @@ class KpiService {
       const ws = isoWeekStart(dayjs().subtract(i, 'week').format('YYYY-MM-DD'))
       weeklyMap[ws] = 0
     }
-    for (const s of sessions.filter((s) => s.date >= thirtyAgo)) {
+    for (const s of sessions) {
       const ws = isoWeekStart(s.date)
       if (ws in weeklyMap) weeklyMap[ws] += s.isDone ? 1 : 0
     }

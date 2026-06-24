@@ -36,7 +36,8 @@
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
-| Kpi | Stable — M-04.07 : tests fonctionnels KPI complets (controller alert-settings + service KpiAlert) | 2026-06-24 |
+| Kpi | Stable — M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-06-24 |
+| Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -2978,6 +2979,47 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Les dumps sont dans un volume Docker — si le volume est perdu (rm -v), les sauvegardes sont perdues. Pour une redondance, copier régulièrement vers S3 ou un stockage externe (hors scope MVP).
 - `scripts/backup.sh` (host crontab) reste utilisable en complément pour un backup off-container. Les deux approches coexistent.
 - Si `BACKUP_HOUR` est modifié dans `.env`, le service doit être recréé (`docker compose up -d --force-recreate backup`) pour prendre en compte la nouvelle valeur (la variable est lue au démarrage du conteneur).
+
+---
+
+### [M-00b.10] — Logs applicatifs (Winston + Morgan) — 2026-06-24
+
+**Contexte :** Tâche infrastructure — Winston était en place mais Morgan (access logs HTTP) manquait.
+
+**Fichiers modifiés :**
+- `my_memo_master_api/helpers/logger.js` — niveau dev `'info'` → `'http'` (winston levels : http=3, info=2 ; le niveau http couvre les access logs Morgan)
+- `my_memo_master_api/app.js` — ajout de Morgan pipé dans Winston via `morganStream` ; format `'dev'` en dev, `'combined'` en prod ; guard `NODE_ENV !== 'test'` pour ne pas polluer Jest
+
+**Package ajouté :** `morgan ^1.11.0`
+
+**Comportement :**
+- Dev : chaque requête → `logger.http()` → visible en console (GET /api/v1/users 200 12.345 ms - 150)
+- Prod : niveau logger `'warn'` → logs Morgan filtrés (Traefik gère les access logs côté reverse proxy)
+- Test : Morgan non chargé, 957 tests verts sans régression
+
+---
+
+### [M-04.08] — Revue de code & correctifs KPI — 2026-06-24
+
+**Contexte :** Revue de code du périmètre KPI personnels (M-04) suite aux tickets KPI-01, KPI-02, M-04.06, M-04.07. 3 correctifs appliqués après revue.
+
+**Fichiers créés :**
+- `my_memo_master_api/services/KpiAlertSettings.service.js` — service `getOrCreate(userId)` + `update(userId, data)` avec whitelist des champs autorisés (ALLOWED_FIELDS), extrait du controller pour respecter l'architecture controller → service → model
+
+**Fichiers modifiés :**
+- `my_memo_master_api/models/UserKpiAlertSettings.model.js` — suppression de `indexes: [{ fields: ['userId'], unique: true }]` (doublon avec `unique: true` sur la colonne, créait deux index identiques en base)
+- `my_memo_master_api/controllers/KpiAlertSettings.controller.js` — refactoré pour déléguer toute la logique à `KpiAlertSettings.service.js` (30 lignes → 14 lignes)
+- `my_memo_master_api/services/Kpi.service.js` — `_computeRevision` : boucle weeklyActivity maintenant itère `sessions` sans filtre `thirtyAgo` ; le `if (ws in weeklyMap)` seul garantit que seules les semaines du graphique (8 semaines) sont comptées — les sessions de J-30 à J-56 apparaissent désormais correctement
+- `my_memo_master_api/test/controllers/KpiAlertSettings.controller.test.js` — mis à jour pour mocker `../../services/KpiAlertSettings.service` (au lieu du modèle directement)
+
+**Résultat :** 957 tests back — tous verts, 56 suites, aucune régression.
+
+**Dettes restantes (non bloquantes, acceptées pour MVP) :**
+- `dayjs(nra).isSame(now)` dans `_computeLeitner` — dead code pratiquement (comparaison milliseconde)
+- `getMyKpis` charge toutes les LeitnerCards sans projection d'attributs
+- Pas d'état d'erreur distinct dans `KpiPage.vue` (erreur réseau ≡ état vide)
+- `kpiAlertSettings.js` store — catch sans `return false`
+- Double appel `fetchMyKpis` si HomePage visitée après KpiPage (pas de TTL store)
 
 ---
 

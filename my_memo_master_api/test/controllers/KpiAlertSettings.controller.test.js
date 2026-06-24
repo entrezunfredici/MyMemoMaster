@@ -1,9 +1,6 @@
 const request = require('supertest')
 const jwt = require('jsonwebtoken')
 
-const mockUpdate = jest.fn()
-const mockFindOrCreate = jest.fn()
-
 jest.mock('../../models/index', () => ({
   Role: {},
   Subject: {},
@@ -29,9 +26,10 @@ jest.mock('../../models/index', () => ({
   RevisionSession: {},
   Reminder: {},
   TestResult: {},
-  UserKpiAlertSettings: { findOrCreate: mockFindOrCreate }
+  UserKpiAlertSettings: {}
 }))
 
+jest.mock('../../services/KpiAlertSettings.service')
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }))
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
 jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
@@ -41,6 +39,7 @@ process.env.AUTH_JWT_SECRET = 'test-secret'
 process.env.NODE_ENV = 'test'
 
 const app = require('../../app')
+const kpiAlertSettingsService = require('../../services/KpiAlertSettings.service')
 
 const BASE = '/api/v1'
 const makeToken = (payload = { id: 1 }) => jwt.sign(payload, 'test-secret')
@@ -55,8 +54,8 @@ const SETTINGS_FIXTURE = {
 describe('KpiAlertSettings Controller', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    mockUpdate.mockResolvedValue(SETTINGS_FIXTURE)
-    mockFindOrCreate.mockResolvedValue([{ ...SETTINGS_FIXTURE, update: mockUpdate }])
+    kpiAlertSettingsService.getOrCreate.mockResolvedValue(SETTINGS_FIXTURE)
+    kpiAlertSettingsService.update.mockResolvedValue(SETTINGS_FIXTURE)
   })
 
   // ── GET /kpi/alert-settings ────────────────────────────────────────────────
@@ -71,33 +70,23 @@ describe('KpiAlertSettings Controller', () => {
       expect(res.body).toHaveProperty('enabled')
       expect(res.body).toHaveProperty('streakAlertEnabled')
       expect(res.body).toHaveProperty('thresholdDiscipline')
-      expect(mockFindOrCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userId: 3 } })
-      )
+      expect(kpiAlertSettingsService.getOrCreate).toHaveBeenCalledWith(3)
     })
 
-    it('200 — crée les paramètres avec les valeurs par défaut si absents (findOrCreate)', async () => {
+    it('200 — délègue la création avec defaults au service', async () => {
       const res = await request(app)
         .get(`${BASE}/kpi/alert-settings`)
-        .set('Authorization', `Bearer ${makeToken()}`)
+        .set('Authorization', `Bearer ${makeToken({ id: 7 })}`)
 
       expect(res.status).toBe(200)
-      expect(mockFindOrCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          defaults: expect.objectContaining({
-            enabled: true,
-            streakAlertEnabled: true,
-            thresholdDiscipline: 40
-          })
-        })
-      )
+      expect(kpiAlertSettingsService.getOrCreate).toHaveBeenCalledWith(7)
     })
 
     it('401 — sans token', async () => {
       const res = await request(app).get(`${BASE}/kpi/alert-settings`)
 
       expect(res.status).toBe(401)
-      expect(mockFindOrCreate).not.toHaveBeenCalled()
+      expect(kpiAlertSettingsService.getOrCreate).not.toHaveBeenCalled()
     })
 
     it('401 — token invalide', async () => {
@@ -106,11 +95,11 @@ describe('KpiAlertSettings Controller', () => {
         .set('Authorization', 'Bearer invalid.token.here')
 
       expect(res.status).toBe(401)
-      expect(mockFindOrCreate).not.toHaveBeenCalled()
+      expect(kpiAlertSettingsService.getOrCreate).not.toHaveBeenCalled()
     })
 
-    it('500 — retourne une erreur si findOrCreate échoue', async () => {
-      mockFindOrCreate.mockRejectedValueOnce(new Error('DB error'))
+    it('500 — retourne une erreur si le service échoue', async () => {
+      kpiAlertSettingsService.getOrCreate.mockRejectedValueOnce(new Error('DB error'))
 
       const res = await request(app)
         .get(`${BASE}/kpi/alert-settings`)
@@ -124,14 +113,15 @@ describe('KpiAlertSettings Controller', () => {
   // ── PUT /kpi/alert-settings ────────────────────────────────────────────────
 
   describe('PUT /kpi/alert-settings', () => {
-    it('200 — met à jour plusieurs champs avec un payload valide', async () => {
+    it('200 — délègue la mise à jour au service avec le body et l\'userId', async () => {
       const res = await request(app)
         .put(`${BASE}/kpi/alert-settings`)
-        .set('Authorization', `Bearer ${makeToken()}`)
+        .set('Authorization', `Bearer ${makeToken({ id: 5 })}`)
         .send({ enabled: false, thresholdDiscipline: 60 })
 
       expect(res.status).toBe(200)
-      expect(mockUpdate).toHaveBeenCalledWith(
+      expect(kpiAlertSettingsService.update).toHaveBeenCalledWith(
+        5,
         expect.objectContaining({ enabled: false, thresholdDiscipline: 60 })
       )
     })
@@ -143,27 +133,17 @@ describe('KpiAlertSettings Controller', () => {
         .send({ streakAlertEnabled: false })
 
       expect(res.status).toBe(200)
-      expect(mockUpdate).toHaveBeenCalledWith({ streakAlertEnabled: false })
+      expect(kpiAlertSettingsService.update).toHaveBeenCalled()
     })
 
-    it('200 — payload vide — appelle update avec {}', async () => {
+    it('200 — payload vide', async () => {
       const res = await request(app)
         .put(`${BASE}/kpi/alert-settings`)
         .set('Authorization', `Bearer ${makeToken()}`)
         .send({})
 
       expect(res.status).toBe(200)
-      expect(mockUpdate).toHaveBeenCalledWith({})
-    })
-
-    it('200 — ignore les champs non autorisés (whitelist)', async () => {
-      const res = await request(app)
-        .put(`${BASE}/kpi/alert-settings`)
-        .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ enabled: false, userId: 999, lastDigestSentAt: '2026-01-01' })
-
-      expect(res.status).toBe(200)
-      expect(mockUpdate).toHaveBeenCalledWith({ enabled: false })
+      expect(kpiAlertSettingsService.update).toHaveBeenCalled()
     })
 
     it('400 — enabled n\'est pas un booléen', async () => {
@@ -173,7 +153,7 @@ describe('KpiAlertSettings Controller', () => {
         .send({ enabled: 'oui' })
 
       expect(res.status).toBe(400)
-      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(kpiAlertSettingsService.update).not.toHaveBeenCalled()
     })
 
     it('400 — thresholdDiscipline supérieur à 100', async () => {
@@ -183,7 +163,7 @@ describe('KpiAlertSettings Controller', () => {
         .send({ thresholdDiscipline: 150 })
 
       expect(res.status).toBe(400)
-      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(kpiAlertSettingsService.update).not.toHaveBeenCalled()
     })
 
     it('400 — thresholdDiscipline négatif', async () => {
@@ -193,7 +173,7 @@ describe('KpiAlertSettings Controller', () => {
         .send({ thresholdDiscipline: -1 })
 
       expect(res.status).toBe(400)
-      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(kpiAlertSettingsService.update).not.toHaveBeenCalled()
     })
 
     it('400 — scoreDropAlertEnabled n\'est pas un booléen (chaîne invalide)', async () => {
@@ -203,6 +183,7 @@ describe('KpiAlertSettings Controller', () => {
         .send({ scoreDropAlertEnabled: 'oui' })
 
       expect(res.status).toBe(400)
+      expect(kpiAlertSettingsService.update).not.toHaveBeenCalled()
     })
 
     it('401 — sans token', async () => {
@@ -211,23 +192,11 @@ describe('KpiAlertSettings Controller', () => {
         .send({ enabled: false })
 
       expect(res.status).toBe(401)
-      expect(mockFindOrCreate).not.toHaveBeenCalled()
+      expect(kpiAlertSettingsService.update).not.toHaveBeenCalled()
     })
 
-    it('500 — retourne une erreur si findOrCreate échoue', async () => {
-      mockFindOrCreate.mockRejectedValueOnce(new Error('DB error'))
-
-      const res = await request(app)
-        .put(`${BASE}/kpi/alert-settings`)
-        .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ enabled: false })
-
-      expect(res.status).toBe(500)
-      expect(res.body.message).toBeDefined()
-    })
-
-    it('500 — retourne une erreur si update échoue', async () => {
-      mockUpdate.mockRejectedValueOnce(new Error('Update failed'))
+    it('500 — retourne une erreur si le service échoue', async () => {
+      kpiAlertSettingsService.update.mockRejectedValueOnce(new Error('DB error'))
 
       const res = await request(app)
         .put(`${BASE}/kpi/alert-settings`)

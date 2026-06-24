@@ -8,6 +8,8 @@ const swaggerJsdoc = require('swagger-jsdoc')
 const cors = require('cors')
 const bodyParser = require('body-parser')
 const swaggerSpec = swaggerJsdoc(require('./config/swagger.config.js'))
+const morgan = require('morgan')
+const logger = require('./helpers/logger')
 const sanitize = require('./middlewares/sanitize.middleware')
 const errorHandler = require('./middlewares/errorHandler.middleware')
 const { apiLimiter } = require('./middlewares/rateLimit.middleware')
@@ -52,6 +54,13 @@ const app = express()
 // CHOIX: trust proxy activé pour que req.ip reflète le vrai client derrière Traefik
 // RAISON: sans ça, tous les clients partagent l'IP de Traefik — rate limiting inefficace en prod
 app.set('trust proxy', 1)
+
+// HTTP access logs — Morgan piped into Winston (désactivé en test pour éviter le bruit)
+if (process.env.NODE_ENV !== 'test') {
+  const isProd = process.env.NODE_ENV === 'production'
+  const morganStream = { write: (msg) => logger.http(msg.trim()) }
+  app.use(morgan(isProd ? 'combined' : 'dev', { stream: morganStream }))
+}
 
 // Security headers
 app.use(helmet())

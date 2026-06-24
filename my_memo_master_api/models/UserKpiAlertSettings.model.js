@@ -30,8 +30,7 @@ module.exports = (instance) => {
     },
     {
       tableName: 'UserKpiAlertSettings',
-      timestamps: false,
-      indexes: [{ fields: ['userId'], unique: true }]
+      timestamps: false
     }
   )
 
