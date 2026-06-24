@@ -36,7 +36,7 @@
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
-| Kpi | Stable — M-04.06 : widget alertes & suggestions révision intégré au dashboard étudiant | 2026-06-23 |
+| Kpi | Stable — M-04.07 : tests fonctionnels KPI complets (controller alert-settings + service KpiAlert) | 2026-06-24 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -2978,6 +2978,28 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Les dumps sont dans un volume Docker — si le volume est perdu (rm -v), les sauvegardes sont perdues. Pour une redondance, copier régulièrement vers S3 ou un stockage externe (hors scope MVP).
 - `scripts/backup.sh` (host crontab) reste utilisable en complément pour un backup off-container. Les deux approches coexistent.
 - Si `BACKUP_HOUR` est modifié dans `.env`, le service doit être recréé (`docker compose up -d --force-recreate backup`) pour prendre en compte la nouvelle valeur (la variable est lue au démarrage du conteneur).
+
+---
+
+### [M-04.07] — Tests fonctionnels KPI (couverture complète) — 2026-06-24
+
+**Contexte :** M-04.07 complète la couverture de tests du périmètre KPI. KPI-01/KPI-02 avaient livré 50 tests service + 4 controller + 9+12 stores + 21 composant KpiPage. Il manquait les tests de `KpiAlertSettings.controller.js` (GET/PUT `/kpi/alert-settings`) et de `KpiAlert.service.js` (`buildDigestItems`).
+
+**Fichiers créés (API) :**
+- `my_memo_master_api/test/controllers/KpiAlertSettings.controller.test.js` — 16 tests Supertest : `GET /kpi/alert-settings` (200 nominal, 200 findOrCreate avec defaults, 401 sans token, 401 token invalide, 500 DB) + `PUT /kpi/alert-settings` (200 payload complet, 200 partiel, 200 vide, 200 whitelist champs non autorisés, 400 booléen invalide, 400 seuil > 100, 400 seuil négatif, 400 chaîne invalide, 401, 500 findOrCreate, 500 update)
+- `my_memo_master_api/test/services/KpiAlert.service.test.js` — 19 tests Jest : `buildDigestItems` — tableau vide, `streak_risk` (déclenché/non-déclenché × 4 conditions, pluriel/singulier), `discipline_low` (déclenché/non-déclenché × 4 conditions, seuil personnalisé), `score_drop` (déclenché/non-déclenché × 4 conditions), déclenchement multiple (3 items dans l'ordre), filtrage par settings
+
+**Point d'attention :** `isBoolean()` d'express-validator sans option `{ strict: true }` accepte `1` et `0` (JSON number) comme booléens valides. Le test 400 utilise une chaîne `'oui'` comme valeur clairement invalide.
+
+**Ce qui est utilisable :**
+- 35 nouveaux tests back — tous verts
+- Couverture totale KPI : 50 (Kpi.service) + 4 (Kpi.controller) + 16 (KpiAlertSettings.controller) + 19 (KpiAlert.service) + 9 (kpi.store) + 12 (kpiAlertSettings.store) + 21 (KpiPage) + 14 (KpiAlertWidgetComponent) = **145 tests**
+
+**Hypothèses posées :**
+- `buildDigestItems` ne teste pas `runDailyDigest` ni `_sendDigestForUser` (flux complet cron) — ces méthodes nécessiteraient un test BDD in-memory. Acceptable car toute la logique de déclenchement est dans `buildDigestItems` qui est maintenant entièrement couverte.
+
+**Dette / points d'attention :**
+- Pas de test BDD KPI (intégration SQLite in-memory) — non prévu en MVP vu la couverture unitaire profonde.
 
 ---
 
