@@ -92,6 +92,7 @@
 | Search API (cross-contenu) | Stable — S-05.05 : GET /search?subjectId&q — service + controller + validators + routes + 11 tests | 2026-06-25 |
 | Navigation arborescente par sujet | Stable — S-05.06 : stores/search.js + pages/SubjectsPage.vue (/subjects) + route | 2026-06-25 |
 | SubjectSelectorComponent | Stable — S-05.07 : composant réutilisable select + création inline, remplace code dupliqué FlashcardsPage + ExercisesPage | 2026-06-25 |
+| KPI pédagogiques enseignant | Stable — S-01.01→S-01.06 : API kpi/students, maquettes UI, section analytics ClassroomPage.vue, composable useTeacherAnalytics (22 tests Vitest) | 2026-06-25 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -3334,3 +3335,110 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Dette / points d'attention :**
 - MindmapsListView a son propre sélecteur de sujet dans la modal "créer une carte" — peut être migré vers SubjectSelectorComponent dans un refactor futur.
+
+---
+
+### [S-01.01] — Définition indicateurs pédagogiques (KPI enseignant) — 2026-06-25
+
+**Contexte :** Feature S-01 (Sprint 8, Analyse/V1) — Définir et implémenter les indicateurs pédagogiques pour les enseignants : agrégats de groupe, tendances hebdomadaires, détection de décrochage, détail par étudiant.
+
+**Fichiers créés :**
+- `diagrams/kpi_pedagogiques.md` — document de définition complet : indicateurs, règles de calcul, seuils d'alerte, droits d'accès, endpoint, sources de données, limites
+
+**Fichiers modifiés (API) :**
+- `services/ClassGroup.service.js` — ajout `getStudentAnalytics(groupId, requesterId)` + helper privé `_computeGroupWeeklyTrend(results)` ; ajout imports `dayjs` + `RevisionSession` ; constantes `AT_RISK_INACTIVE_DAYS=7`, `AT_RISK_SCORE_DROP_PCT=20`, `AT_RISK_NO_EXERCISE_DAYS=14`
+- `controllers/ClassGroup.controller.js` — ajout handler `exports.getStudentAnalytics`
+- `routes/ClassGroup.routes.js` — ajout `GET /class-groups/:id/kpi/students` (authMiddleware, Swagger JSDoc)
+- `test/services/ClassGroup.service.test.js` — ajout mock `RevisionSession` + `User.findAll` + `FIXED_NOW` + `jest.useFakeTimers()` ; 9 nouveaux tests `getStudentAnalytics` (28 tests total, tous verts)
+
+**Endpoint livré :**
+- `GET /api/v1/class-groups/:id/kpi/students` (auth requis, admin roleId 1/4 ou enseignant du groupe)
+- Retourne : `{ activeStudentsCount, atRiskCount, scoreWeeklyTrend[4 semaines ISO], students[] }`
+- Chaque étudiant : `userId, name, email, lastActivityAt, daysInactive, avgScore, scoreTrend[4], atRisk, atRiskReasons[]`
+
+**Critères de décrochage implémentés :**
+- Inactivité > 7 jours (basé sur `RevisionSession.date`)
+- Aucune session de révision enregistrée
+- Baisse de score > 20 % entre les 2 derniers résultats (`TestResult`)
+- Aucun exercice complété depuis 14 jours
+
+**DoD :**
+- ✅ Document de définition `diagrams/kpi_pedagogiques.md`
+- ✅ Endpoint fonctionnel conforme à la définition
+- ✅ 28 tests service — tous verts (19 existants + 9 nouveaux)
+- ✅ Architecture controller → service → model respectée
+- ✅ JSDoc sur les méthodes publiques
+- ✅ Messages HTTP en français
+- ✅ Swagger JSDoc sur la route
+
+**Hypothèses posées :**
+- `lastActivityAt` = date de la dernière `RevisionSession` uniquement (pas les sessions Leitner ni les exercices).
+- `avgScore` toutes matières confondues — acceptable MVP.
+- La tendance hebdomadaire est calculée à la volée (pas de cache).
+
+**Dette / points d'attention :**
+- Pas de front-end pour l'affichage (dashboard enseignant à câbler dans ClassroomPage.vue — ticket suivant).
+- `avgScore` non filtré par sujet — à affiner si l'enseignant veut voir par matière.
+- Pas de test BDD (intégration SQLite) — couverture unitaire jugée suffisante pour le MVP.
+
+---
+
+### [S-01.02] — Maquettes UI dashboard enseignant — 2026-06-25
+
+**Fichiers créés :**
+- `diagrams/dashboard_enseignant_ui.md` — maquettes ASCII complètes : hiérarchie sections, vue globale, détail des composants UI (agrégats, tendance, alertes, tableau accordéon), codes couleur, états, comportement, responsive, hors périmètre
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/pages/ClassroomPage.vue` :
+  - Ajout état : `analytics` (ref), `analyticsLoading` (ref), `expandedAnalyticsStudents` (reactive)
+  - Ajout computed : `currentWeekScore` (score dernière semaine ISO), `atRiskStudents` (filtre étudiants à risque)
+  - Ajout fonctions : `loadStudentAnalytics(groupId)`, `scoreTextClass(score)`, `formatShortDate(dateStr)`, `toggleStudentDetail(userId)`
+  - Watcher `selectedGroupId` mis à jour : appelle `loadStudentAnalytics` en plus de `loadKpi`
+  - Template : nouvelle section "Analyse pédagogique" entre la fiche groupe et le calendrier, visible uniquement `v-if="viewRole === 'prof'"`
+
+**Ce qui est utilisable :**
+- Section analytics visible automatiquement pour les enseignants/admins dès qu'un groupe est sélectionné
+- Bouton "Actualiser" pour forcer un rechargement de `GET /class-groups/:id/kpi/students`
+- Agrégats : étudiants actifs (7j), nombre à risque, score de la semaine courante
+- Tendance 4 semaines ISO : 4 tuiles colorées (vert/orange/rouge selon score)
+- Alertes décrochage : liste des étudiants avec leurs raisons en badges
+- Tableau accordéon : tous les étudiants avec badge statut, score, inactivité, expandable (email, dernière activité, derniers résultats)
+
+**Hypothèses posées :**
+- La section analytics reste masquée pour les étudiants (`viewRole !== 'prof'`), même s'ils consultent la page.
+- Pas de lib graphique (chart.js, d3...) — la tendance est représentée par des tuiles numériques colorées, conforme au design system existant.
+- Les `expandedAnalyticsStudents` sont indépendants des `expandedSessions` existants (pas de collision de clés car l'un utilise des sessionIds string, l'autre des userId integer).
+
+**Dette / points d'attention :**
+- Pas de tests Vitest front pour la section analytics — structure identique aux sections existantes, priorité basse.
+- `loadStudentAnalytics` utilise `try/catch` mais ne notifie pas l'utilisateur d'un éventuel 403 (l'enseignant ne devrait jamais voir d'erreur s'il accède à son propre groupe).
+- Pas de filtre par matière sur le tableau — acceptable MVP.
+
+---
+
+### [S-01.06] — Dashboard KPI enseignant (front-end) — 2026-06-25
+
+**Fichiers créés :**
+- `src/composables/useTeacherAnalytics.js` — composable Vue 3 : `analytics`, `analyticsLoading`, `expandedAnalyticsStudents` (état), `currentWeekScore` + `atRiskStudents` (computed), `scoreTextClass`, `formatShortDate`, `toggleStudentDetail`, `loadStudentAnalytics` (fonctions + appel API)
+- `test/composables/useTeacherAnalytics.test.js` — 22 tests Vitest : scoreTextClass (3), formatShortDate (4), atRiskStudents (3), currentWeekScore (4), toggleStudentDetail (3), loadStudentAnalytics (5)
+
+**Fichiers modifiés :**
+- `src/pages/ClassroomPage.vue` :
+  - Ajout `import { useTeacherAnalytics }` 
+  - Remplacement des 4 fonctions + 2 computed + 3 refs inline par `const { ... } = useTeacherAnalytics()`
+  - Suppression du code dupliqué (analytics state était en double après refactor S-01.02)
+
+**Ce qui est utilisable :**
+- `useTeacherAnalytics()` — composable réutilisable pour tout composant qui doit afficher les KPI pédagogiques d'un groupe
+- Dashboard visible automatiquement pour les enseignants/admins dans `/classroom`
+- 22 tests unitaires Vitest couvrent les cas nominaux, limites et erreurs réseau
+
+**Hypothèses posées :**
+- Le composable est stateful (une instance par composant) — adapté à ClassroomPage où un seul groupe est affiché à la fois.
+- `loadStudentAnalytics` efface `analytics` avant chaque appel pour éviter d'afficher des données périmées pendant le chargement.
+
+**Dette / points d'attention :**
+- Pas de test de montage composant (mount) pour ClassroomPage — le composable est testé isolément, priorité basse.
+- Pas de filtre par matière — acceptable MVP.
+
+

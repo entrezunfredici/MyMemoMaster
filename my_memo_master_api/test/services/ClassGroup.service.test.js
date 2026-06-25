@@ -1,4 +1,4 @@
-const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult } = require('../../models/index')
+const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline } = require('../../models/index')
 const ClassGroupService = require('../../services/ClassGroup.service')
 
 jest.mock('../../models/index', () => ({
@@ -14,23 +14,42 @@ jest.mock('../../models/index', () => ({
     count: jest.fn()
   },
   User: {
-    findByPk: jest.fn()
+    findByPk: jest.fn(),
+    findAll: jest.fn()
   },
   Invitation: {
     count: jest.fn()
   },
   TestResult: {
     findAll: jest.fn()
+  },
+  RevisionSession: {
+    findAll: jest.fn()
+  },
+  Deadline: {
+    findAll: jest.fn()
   }
 }))
 
+// Date fixe pour les tests de décrochage : 2026-06-25
+const FIXED_NOW = new Date('2026-06-25T12:00:00.000Z')
+
 const adminUser    = { roleId: 1 }
-const teacherUser  = { roleId: 2 }
-const studentUser  = { roleId: 3 }
+const studentUser  = { roleId: 2 }
+const teacherUser  = { roleId: 3 }
 const mockGroup    = { id: 1, name: 'Terminale S1', update: jest.fn(), destroy: jest.fn() }
 
 describe('ClassGroupService', () => {
   beforeEach(() => jest.clearAllMocks())
+
+  beforeAll(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(FIXED_NOW)
+  })
+
+  afterAll(() => {
+    jest.useRealTimers()
+  })
 
   // ── findAll ──────────────────────────────────────────────────────────────────
 
@@ -182,7 +201,7 @@ describe('ClassGroupService', () => {
     expect(result).toBe(mockMembership)
   })
 
-  it('addMember — non-admin (roleId 2) — retourne false', async () => {
+  it('addMember — non-admin (enseignant, roleId 3) — retourne false', async () => {
     User.findByPk.mockResolvedValue(teacherUser)
 
     const result = await ClassGroupService.addMember(1, 2, { userId: 5, role: 'student' })
@@ -274,5 +293,142 @@ describe('ClassGroupService', () => {
     const result = await ClassGroupService.getKpi(1, 2)
 
     expect(result).toBe(false)
+  })
+
+  // ── getStudentAnalytics ───────────────────────────────────────────────────────
+
+  it('getStudentAnalytics — admin — retourne structure complète avec 2 étudiants', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
+    ClassGroup.findByPk.mockResolvedValue(mockGroup)
+    ClassGroupUsers.findAll.mockResolvedValue([
+      { classGroupId: 1, userId: 1, role: 'teacher' },
+      { classGroupId: 1, userId: 2, role: 'student' },
+      { classGroupId: 1, userId: 3, role: 'student' }
+    ])
+    Deadline.findAll.mockResolvedValue([{ testId: 10 }])
+    User.findAll.mockResolvedValue([
+      { userId: 2, name: 'Alice', email: 'alice@test.com' },
+      { userId: 3, name: 'Bob', email: 'bob@test.com' }
+    ])
+    RevisionSession.findAll.mockResolvedValue([
+      { userId: 2, date: '2026-06-23' },
+      { userId: 3, date: '2026-06-10' }
+    ])
+    TestResult.findAll.mockResolvedValue([
+      { userId: 2, testId: 10, score: 8, total: 10, completedAt: new Date('2026-06-20') },
+      { userId: 3, testId: 10, score: 5, total: 10, completedAt: new Date('2026-06-05') }
+    ])
+
+    const result = await ClassGroupService.getStudentAnalytics(1, 1)
+
+    expect(result).toHaveProperty('students')
+    expect(result.students).toHaveLength(2)
+    expect(result).toHaveProperty('activeStudentsCount')
+    expect(result).toHaveProperty('atRiskCount')
+    expect(result.scoreWeeklyTrend).toHaveLength(4)
+    const alice = result.students.find((s) => s.userId === 2)
+    expect(alice.name).toBe('Alice')
+    expect(alice.avgScore).toBe(80)
+    expect(alice.atRisk).toBe(false)
+  })
+
+  it('getStudentAnalytics — étudiant inactif > 7j — atRisk = true avec raison inactivité', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
+    ClassGroup.findByPk.mockResolvedValue(mockGroup)
+    ClassGroupUsers.findAll.mockResolvedValue([
+      { classGroupId: 1, userId: 1, role: 'teacher' },
+      { classGroupId: 1, userId: 2, role: 'student' }
+    ])
+    Deadline.findAll.mockResolvedValue([])
+    User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
+    // Dernière session il y a 15 jours (NOW fixe = 2026-06-25)
+    RevisionSession.findAll.mockResolvedValue([{ userId: 2, date: '2026-06-10' }])
+
+    const result = await ClassGroupService.getStudentAnalytics(1, 1)
+
+    const student = result.students[0]
+    expect(student.daysInactive).toBe(15)
+    expect(student.atRisk).toBe(true)
+    expect(student.atRiskReasons.some((r) => r.includes('Inactif depuis'))).toBe(true)
+  })
+
+  it('getStudentAnalytics — aucune session — atRisk = true avec raison "Aucune session"', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
+    ClassGroup.findByPk.mockResolvedValue(mockGroup)
+    ClassGroupUsers.findAll.mockResolvedValue([
+      { classGroupId: 1, userId: 1, role: 'teacher' },
+      { classGroupId: 1, userId: 2, role: 'student' }
+    ])
+    Deadline.findAll.mockResolvedValue([])
+    User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
+    RevisionSession.findAll.mockResolvedValue([])
+
+    const result = await ClassGroupService.getStudentAnalytics(1, 1)
+
+    const student = result.students[0]
+    expect(student.lastActivityAt).toBeNull()
+    expect(student.atRisk).toBe(true)
+    expect(student.atRiskReasons[0]).toMatch(/Aucune session/)
+  })
+
+  it('getStudentAnalytics — baisse de score > 20% — atRisk = true avec raison baisse', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
+    ClassGroup.findByPk.mockResolvedValue(mockGroup)
+    ClassGroupUsers.findAll.mockResolvedValue([
+      { classGroupId: 1, userId: 1, role: 'teacher' },
+      { classGroupId: 1, userId: 2, role: 'student' }
+    ])
+    Deadline.findAll.mockResolvedValue([{ testId: 10 }])
+    User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
+    RevisionSession.findAll.mockResolvedValue([{ userId: 2, date: '2026-06-24' }])
+    // Score : 80 % → 56 % (baisse de 30%)
+    TestResult.findAll.mockResolvedValue([
+      { userId: 2, testId: 10, score: 8, total: 10, completedAt: new Date('2026-06-15') },
+      { userId: 2, testId: 10, score: 5.6, total: 10, completedAt: new Date('2026-06-22') }
+    ])
+
+    const result = await ClassGroupService.getStudentAnalytics(1, 1)
+
+    const student = result.students[0]
+    expect(student.atRisk).toBe(true)
+    expect(student.atRiskReasons.some((r) => r.includes('Baisse de score'))).toBe(true)
+  })
+
+  it('getStudentAnalytics — aucun test enseignant assigné — avgScore null et résultats vides', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
+    ClassGroup.findByPk.mockResolvedValue(mockGroup)
+    ClassGroupUsers.findAll.mockResolvedValue([
+      { classGroupId: 1, userId: 1, role: 'teacher' },
+      { classGroupId: 1, userId: 2, role: 'student' }
+    ])
+    // Pas de deadline avec testId → teacherTestIds vide → TestResult non appelé
+    Deadline.findAll.mockResolvedValue([])
+    User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
+    RevisionSession.findAll.mockResolvedValue([{ userId: 2, date: '2026-06-24' }])
+
+    const result = await ClassGroupService.getStudentAnalytics(1, 1)
+
+    expect(TestResult.findAll).not.toHaveBeenCalled()
+    const student = result.students[0]
+    expect(student.avgScore).toBeNull()
+    expect(student.scoreTrend).toHaveLength(0)
+  })
+
+  it('getStudentAnalytics — non autorisé (étudiant non enseignant) — retourne false', async () => {
+    User.findByPk.mockResolvedValue(studentUser)
+    ClassGroupUsers.findOne.mockResolvedValue(null)
+
+    const result = await ClassGroupService.getStudentAnalytics(1, 2)
+
+    expect(result).toBe(false)
+  })
+
+  it('getStudentAnalytics — groupe inexistant — retourne null', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
+    ClassGroup.findByPk.mockResolvedValue(null)
+
+    const result = await ClassGroupService.getStudentAnalytics(99, 1)
+
+    expect(result).toBeNull()
   })
 })

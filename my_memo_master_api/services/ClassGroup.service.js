@@ -1,4 +1,17 @@
-const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult } = require('../models/index')
+const dayjs = require('dayjs')
+const { Op } = require('sequelize')
+const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline } = require('../models/index')
+
+const AT_RISK_INACTIVE_DAYS = 7
+const AT_RISK_SCORE_DROP_PCT = 20
+const AT_RISK_NO_EXERCISE_DAYS = 14
+
+function isoWeekStart(date) {
+  const d = dayjs(date)
+  const day = d.day()
+  const offset = day === 0 ? 6 : day - 1
+  return d.subtract(offset, 'day').format('YYYY-MM-DD')
+}
 
 class ClassGroupService {
   /**
@@ -168,6 +181,149 @@ class ClassGroupService {
       pendingInvitations,
       avgScore
     }
+  }
+
+  /**
+   * Calcule l'analyse pédagogique détaillée d'un groupe : activité par étudiant,
+   * scores, tendances hebdomadaires et détection de décrochage.
+   * Admin et enseignants du groupe uniquement.
+   *
+   * @param {number} groupId
+   * @param {number} requesterId
+   * @returns {Promise<object|null|false>}
+   */
+  async getStudentAnalytics(groupId, requesterId) {
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    const isAdmin = [1, 4].includes(requester?.roleId)
+
+    if (!isAdmin) {
+      const membership = await ClassGroupUsers.findOne({
+        where: { classGroupId: groupId, userId: requesterId, role: 'teacher' }
+      })
+      if (!membership) return false
+    }
+
+    const group = await ClassGroup.findByPk(groupId)
+    if (!group) return null
+
+    const allMembers = await ClassGroupUsers.findAll({ where: { classGroupId: groupId } })
+    const studentIds = allMembers.filter((m) => m.role === 'student').map((m) => m.userId)
+    const teacherIds = allMembers.filter((m) => m.role === 'teacher').map((m) => m.userId)
+
+    if (studentIds.length === 0) {
+      return { activeStudentsCount: 0, atRiskCount: 0, scoreWeeklyTrend: this._computeGroupWeeklyTrend([]), students: [] }
+    }
+
+    // Exercices assignés comme devoir par les enseignants du groupe
+    const deadlines = teacherIds.length > 0
+      ? await Deadline.findAll({
+          where: { createdBy: teacherIds, testId: { [Op.not]: null } },
+          attributes: ['testId']
+        })
+      : []
+    const teacherTestIds = [...new Set(deadlines.map((d) => d.testId).filter(Boolean))]
+
+    const [users, sessions, results] = await Promise.all([
+      User.findAll({ where: { userId: studentIds }, attributes: ['userId', 'name', 'email'] }),
+      RevisionSession.findAll({ where: { userId: studentIds } }),
+      teacherTestIds.length > 0
+        ? TestResult.findAll({ where: { userId: studentIds, testId: teacherTestIds }, order: [['completedAt', 'ASC']] })
+        : Promise.resolve([])
+    ])
+
+    const now = new Date()
+    const cutoff14 = new Date(now - AT_RISK_NO_EXERCISE_DAYS * 24 * 60 * 60 * 1000)
+
+    const students = studentIds.map((userId) => {
+      const user = users.find((u) => u.userId === userId)
+      const userSessions = sessions.filter((s) => s.userId === userId)
+      const userResults = results.filter((r) => r.userId === userId)
+
+      const lastSession = [...userSessions].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+      const lastActivityAt = lastSession ? lastSession.date : null
+      const daysInactive = lastActivityAt
+        ? Math.floor((now - new Date(lastActivityAt)) / (1000 * 60 * 60 * 24))
+        : null
+
+      const avgScore =
+        userResults.length > 0
+          ? Math.round(
+              (userResults.reduce((sum, r) => sum + (r.total > 0 ? (r.score / r.total) * 100 : 0), 0) /
+                userResults.length) *
+                10
+            ) / 10
+          : null
+
+      const scoreTrend = userResults.slice(-4).map((r) => ({
+        score: Math.round((r.total > 0 ? (r.score / r.total) * 100 : 0) * 10) / 10,
+        completedAt: r.completedAt
+      }))
+
+      const atRiskReasons = []
+      if (daysInactive === null) {
+        atRiskReasons.push('Aucune session de révision enregistrée')
+      } else if (daysInactive > AT_RISK_INACTIVE_DAYS) {
+        atRiskReasons.push(`Inactif depuis ${daysInactive} jours`)
+      }
+      if (scoreTrend.length >= 2) {
+        const prev = scoreTrend[scoreTrend.length - 2].score
+        const last = scoreTrend[scoreTrend.length - 1].score
+        if (prev > 0 && (prev - last) / prev >= AT_RISK_SCORE_DROP_PCT / 100) {
+          atRiskReasons.push(`Baisse de score de ${Math.round(((prev - last) / prev) * 100)}%`)
+        }
+      }
+      if (userResults.length > 0 && !userResults.some((r) => new Date(r.completedAt) > cutoff14)) {
+        atRiskReasons.push(`Aucun exercice complété depuis ${AT_RISK_NO_EXERCISE_DAYS} jours`)
+      }
+
+      return {
+        userId,
+        name: user?.name ?? null,
+        email: user?.email ?? null,
+        lastActivityAt,
+        daysInactive,
+        avgScore,
+        scoreTrend,
+        atRisk: atRiskReasons.length > 0,
+        atRiskReasons
+      }
+    })
+
+    return {
+      activeStudentsCount: students.filter((s) => s.daysInactive !== null && s.daysInactive <= AT_RISK_INACTIVE_DAYS).length,
+      atRiskCount: students.filter((s) => s.atRisk).length,
+      scoreWeeklyTrend: this._computeGroupWeeklyTrend(results),
+      students
+    }
+  }
+
+  /**
+   * Calcule l'évolution du score moyen du groupe sur les 4 dernières semaines ISO.
+   *
+   * @param {TestResult[]} results
+   * @returns {{ weekStart: string, avgScore: number|null }[]}
+   */
+  _computeGroupWeeklyTrend(results) {
+    const now = dayjs()
+    const weekMap = {}
+    for (let i = 3; i >= 0; i--) {
+      weekMap[isoWeekStart(now.subtract(i * 7, 'day').toDate())] = []
+    }
+    for (const r of results) {
+      const ws = isoWeekStart(r.completedAt)
+      if (ws in weekMap) {
+        weekMap[ws].push(r.total > 0 ? (r.score / r.total) * 100 : 0)
+      }
+    }
+    return Object.entries(weekMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([weekStart, scores]) => ({
+        weekStart,
+        avgScore:
+          scores.length > 0
+            ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+            : null
+      }))
   }
 }
 

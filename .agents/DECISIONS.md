@@ -541,6 +541,14 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-25] KPI pédagogiques — décrochage basé sur RevisionSession uniquement (pas LeitnerCard ni TestResult pour l'activité)
+**Contexte** : Le calcul de `lastActivityAt` et `daysInactive` pour la détection de décrochage nécessite de choisir une source d'activité. Trois sources disponibles : `RevisionSession`, `LeitnerCard.last_review_at`, `TestResult.completedAt`.
+**Décision** : Utiliser uniquement `RevisionSession.date` comme proxy d'activité générale. C'est la source la plus représentative d'une intention de travail planifiée, et la plus simple à requêter (un seul `findAll` par groupe).
+**Alternative écartée** : Agréger les 3 sources (MAX de RevisionSession.date, LeitnerCard.last_review_at, TestResult.completedAt) — plus complet mais nécessite 3 requêtes supplémentaires et une logique de max par utilisateur. Différé si le besoin de précision augmente.
+**Conséquences** : Un étudiant qui fait des exercices mais ne crée pas de RevisionSession apparaît comme inactif. Documenté dans `diagrams/kpi_pedagogiques.md` section Limites.
+
+---
+
 ### [2026-06-24] Tags — M2M global (non scopé utilisateur) avec tables junction dédiées
 **Contexte** : Le ticket S-05.01 demande un système de tags applicable aux mind maps, systèmes Leitner et exercices. Deux options : tags scopés par utilisateur (chaque user a ses propres tags), ou tags globaux partagés.
 **Décision** : Tags globaux (pas de `userId` dans `Tag`). 3 tables junction dédiées (`MindMapTag`, `LeitnerSystemTag`, `TestTag`) avec Sequelize `belongsToMany`. L'opération de mise à jour des tags utilise `entity.setTags(tags)` (Sequelize helper qui fait un replace atomique). Guard vide : `tagIds.length ? Tag.findAll(IN) : []` pour éviter `IN ()` SQL invalide.

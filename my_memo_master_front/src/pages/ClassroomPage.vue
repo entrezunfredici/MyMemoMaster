@@ -211,6 +211,113 @@
           </div>
         </div>
 
+        <!-- Analyse pédagogique — vue enseignant uniquement -->
+        <div v-if="viewRole === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-dark">Analyse pédagogique</h3>
+            <button @click="loadStudentAnalytics(selectedGroupId)"
+              class="rounded-lg border border-gray px-2 py-1 text-xs text-primary hover:bg-light transition">
+              Actualiser
+            </button>
+          </div>
+
+          <div v-if="analyticsLoading" class="py-4 text-center text-sm text-dark/60">Chargement...</div>
+
+          <template v-else-if="analytics">
+            <!-- Agrégats -->
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="rounded-xl border border-gray bg-light p-3">
+                <p class="text-2xl font-bold text-success">{{ analytics.activeStudentsCount }}</p>
+                <p class="mt-1 text-xs text-dark/60">Actifs (7 jours)</p>
+              </div>
+              <div :class="['rounded-xl border p-3', analytics.atRiskCount > 0 ? 'border-secondary/40 bg-secondary/5' : 'border-gray bg-light']">
+                <p class="text-2xl font-bold" :class="analytics.atRiskCount > 0 ? 'text-secondary' : 'text-success'">
+                  {{ analytics.atRiskCount }}
+                </p>
+                <p class="mt-1 text-xs text-dark/60">À risque</p>
+              </div>
+              <div class="rounded-xl border border-gray bg-light p-3">
+                <p class="text-2xl font-bold" :class="currentWeekScore !== null ? scoreTextClass(currentWeekScore) : 'text-dark/40'">
+                  {{ currentWeekScore !== null ? currentWeekScore + ' %' : '—' }}
+                </p>
+                <p class="mt-1 text-xs text-dark/60">Score cette semaine</p>
+              </div>
+            </div>
+
+            <!-- Tendance hebdo -->
+            <div>
+              <p class="mb-2 text-sm font-medium text-dark/80">Tendance des 4 dernières semaines</p>
+              <div class="grid grid-cols-4 gap-2 text-center">
+                <div v-for="week in analytics.scoreWeeklyTrend" :key="week.weekStart"
+                  :class="['rounded-xl border p-2', week.avgScore !== null ? 'border-gray bg-light' : 'border-gray/40 bg-gray/20']">
+                  <p class="text-[10px] text-dark/60">{{ formatShortDate(week.weekStart) }}</p>
+                  <p class="mt-1 text-lg font-bold" :class="week.avgScore !== null ? scoreTextClass(week.avgScore) : 'text-dark/30'">
+                    {{ week.avgScore !== null ? week.avgScore + ' %' : '—' }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alertes décrochage -->
+            <div v-if="atRiskStudents.length > 0">
+              <p class="mb-2 text-sm font-medium text-secondary">Alertes décrochage ({{ atRiskStudents.length }})</p>
+              <div class="space-y-2">
+                <div v-for="student in atRiskStudents" :key="student.userId"
+                  class="rounded-xl border border-secondary/30 bg-secondary/5 px-3 py-2">
+                  <p class="text-sm font-semibold text-dark">{{ student.name }}</p>
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    <span v-for="reason in student.atRiskReasons" :key="reason"
+                      class="rounded-full bg-secondary/10 px-2 py-0.5 text-xs text-secondary">{{ reason }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tableau étudiants -->
+            <div v-if="analytics.students.length > 0">
+              <p class="mb-2 text-sm font-medium text-dark/80">Tous les étudiants ({{ analytics.students.length }})</p>
+              <div class="space-y-2">
+                <div v-for="student in analytics.students" :key="student.userId"
+                  :class="['rounded-xl border transition', expandedAnalyticsStudents[student.userId] ? 'border-primary bg-light/50' : 'border-gray bg-white']">
+                  <button class="flex w-full items-center justify-between px-3 py-2"
+                    @click="toggleStudentDetail(student.userId)">
+                    <div class="flex items-center gap-2">
+                      <span :class="['rounded-full px-2 py-0.5 text-xs font-semibold', student.atRisk ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success']">
+                        {{ student.atRisk ? '⚠ Risque' : '✓ OK' }}
+                      </span>
+                      <span class="text-sm font-semibold text-dark">{{ student.name }}</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs text-dark/60">
+                      <span :class="student.avgScore !== null ? scoreTextClass(student.avgScore) : ''">
+                        {{ student.avgScore !== null ? student.avgScore + ' %' : '—' }}
+                      </span>
+                      <span>{{ student.lastActivityAt ? 'il y a ' + student.daysInactive + 'j' : 'jamais actif' }}</span>
+                      <ChevronRightIcon :class="['size-4 text-primary transition', expandedAnalyticsStudents[student.userId] ? 'rotate-90' : '']" />
+                    </div>
+                  </button>
+                  <div v-if="expandedAnalyticsStudents[student.userId]" class="space-y-1 border-t border-gray/80 px-3 pb-2 pt-2 text-xs text-dark/60">
+                    <p>Email : {{ student.email || '—' }}</p>
+                    <p>Dernière activité : {{ student.lastActivityAt ?? 'aucune' }}</p>
+                    <div v-if="student.scoreTrend.length > 0">
+                      <p class="mb-1">Derniers résultats :</p>
+                      <div class="flex flex-wrap gap-1">
+                        <span v-for="(entry, idx) in student.scoreTrend" :key="idx"
+                          :class="['rounded-full bg-gray/30 px-2 py-0.5 font-semibold', scoreTextClass(entry.score)]">
+                          {{ entry.score }} %
+                        </span>
+                      </div>
+                    </div>
+                    <p v-else class="text-dark/40">Aucun exercice enseignant enregistré.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-else class="py-2 text-center text-sm text-dark/60">Aucun étudiant dans ce groupe.</p>
+          </template>
+
+          <p v-else class="py-4 text-center text-sm text-dark/60">Analyse non disponible pour ce groupe.</p>
+        </div>
+
         <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold text-dark">Calendrier du groupe</h3>
@@ -374,6 +481,7 @@ import { AcademicCapIcon, CalendarDaysIcon, DocumentIcon } from '@heroicons/vue/
 import { ArrowUpOnSquareIcon, CheckCircleIcon, ChevronRightIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/solid'
 import { useAuthStore } from '@/stores/auth'
 import { useRole } from '@/composables/useRole'
+import { useTeacherAnalytics } from '@/composables/useTeacherAnalytics'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useInvitationStore } from '@/stores/invitations'
 
@@ -492,6 +600,11 @@ const resourceForm = reactive({ title: '', type: 'Cours', status: 'idle', messag
 const eventForm = reactive({ title: '', type: 'course', date: '', time: '08:00', duration: 90, participants: [], location: '', description: '', status: 'idle', message: '', error: '' })
 const inviteForm = reactive({ targetUserId: '', role: 'student', status: 'idle', message: '' })
 const kpi = ref(null)
+const {
+  analytics, analyticsLoading, expandedAnalyticsStudents,
+  currentWeekScore, atRiskStudents,
+  scoreTextClass, formatShortDate, toggleStudentDetail, loadStudentAnalytics
+} = useTeacherAnalytics()
 
 onMounted(async () => {
   loading.value = true
@@ -770,7 +883,10 @@ async function loadKpi(groupId) {
 }
 
 watch(selectedGroupId, (id) => {
-  if (id && (isAdmin.value || isEnseignant.value)) loadKpi(id)
+  if (id && (isAdmin.value || isEnseignant.value)) {
+    loadKpi(id)
+    loadStudentAnalytics(id)
+  }
 })
 
 function warnNoBackend() {
