@@ -1,4 +1,6 @@
-const { Diagramme, Subject } = require('../models/index')
+const { Diagramme, Subject, Tag } = require('../models/index')
+
+const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
 
 class DiagrammeService {
   async findById(id) {
@@ -12,11 +14,11 @@ class DiagrammeService {
   async findByUser(userId, { subjectId } = {}) {
     const where = { userId }
     if (subjectId) where.subjectId = subjectId
-    return await Diagramme.findAll({ where })
+    return await Diagramme.findAll({ where, include: [TAG_INCLUDE] })
   }
 
   async findOne(id) {
-    return await Diagramme.findByPk(id)
+    return await Diagramme.findByPk(id, { include: [TAG_INCLUDE] })
   }
 
   async create(data) {

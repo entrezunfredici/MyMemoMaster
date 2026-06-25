@@ -4,12 +4,15 @@ import { api } from '@/helpers/api'
 import { useToast } from 'vue-toastification'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
+import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
+import { useTagStore } from '@/stores/tags'
 
 const props = defineProps({
   subjects: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['open', 'create'])
 const toast = useToast()
+const tagStore = useTagStore()
 
 // ── Liste ─────────────────────────────────────────────────────────────────────
 const diagrams = ref([])
@@ -62,12 +65,14 @@ const confirmCreate = () => {
 const showRenameModal = ref(false)
 const editedName = ref('')
 const editedSubjectId = ref(null)
+const editedTagIds = ref([])
 const currentEditId = ref(null)
 
 const openRenameModal = (diagram) => {
   currentEditId.value = diagram.idMindMap
   editedName.value = diagram.mmName
   editedSubjectId.value = diagram.subjectId
+  editedTagIds.value = (diagram.tags || []).map((t) => t.tagId)
   showRenameModal.value = true
 }
 
@@ -82,9 +87,11 @@ const confirmRename = async () => {
       subjectId: newSubjectId,
     })
     if (response) {
+      await tagStore.setEntityTags('mindmap', currentEditId.value, editedTagIds.value)
       toast.success('Carte modifiée.')
       diagram.mmName = editedName.value
       diagram.subjectId = newSubjectId
+      diagram.tags = tagStore.tags.filter((t) => editedTagIds.value.includes(t.tagId))
       showRenameModal.value = false
     }
   } catch {
@@ -138,6 +145,15 @@ onMounted(fetchDiagrams)
         <span v-if="subjectName(diagram.subjectId)" class="subject-badge">
           {{ subjectName(diagram.subjectId) }}
         </span>
+        <div v-if="diagram.tags && diagram.tags.length" class="flex flex-wrap gap-1 mt-1">
+          <span
+            v-for="tag in diagram.tags"
+            :key="tag.tagId"
+            class="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700 border border-purple-200"
+          >
+            {{ tag.name }}
+          </span>
+        </div>
       </template>
     </MenuItem>
 
@@ -189,6 +205,10 @@ onMounted(fetchDiagrams)
                   {{ s.name }}
                 </option>
               </select>
+            </div>
+            <div class="mb-4">
+              <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <TagSelectorComponent v-model="editedTagIds" />
             </div>
             <div class="btn-row">
               <button type="submit" class="btn-modal-submit">Valider</button>

@@ -1,4 +1,6 @@
-const { Test, Subject, Question, TestResult } = require('../models/index')
+const { Test, Subject, Question, TestResult, Tag } = require('../models/index')
+
+const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
 const semanticService = require('./Semantic.service')
 
 /**
@@ -40,7 +42,7 @@ class TestService {
    */
   async findAll() {
     return await Test.findAll({
-      include: [{ model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }]
+      include: [{ model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }, TAG_INCLUDE]
     })
   }
 
@@ -85,7 +87,8 @@ class TestService {
     return await Test.findByPk(id, {
       include: [
         { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
-        { model: Question, as: 'question', attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition'] }
+        { model: Question, as: 'question', attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition'] },
+        TAG_INCLUDE
       ],
       order: [[{ model: Question, as: 'question' }, 'questionPosition', 'ASC']]
     })

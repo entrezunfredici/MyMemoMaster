@@ -538,3 +538,11 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Un seul endpoint `GET /kpi/my` qui fait 3 requêtes Sequelize en `Promise.all` et calcule tout dans le service. Le front reçoit un objet `{ revision, exercises, leitner, subjects, discipline, badges }` en un seul appel.
 **Alternative écartée** : 4 endpoints séparés — plus modulaire mais oblige le front à gérer 4 chargements parallèles et à agréger les données pour les badges (cross-cutting).
 **Conséquences** : L'endpoint peut retourner beaucoup de données pour un utilisateur très actif (des centaines de sessions, de cartes). Acceptable MVP. Si la latence devient un problème, les données Leitner (la plus volumineuse) pourraient être paginées ou mises en cache.
+
+---
+
+### [2026-06-24] Tags — M2M global (non scopé utilisateur) avec tables junction dédiées
+**Contexte** : Le ticket S-05.01 demande un système de tags applicable aux mind maps, systèmes Leitner et exercices. Deux options : tags scopés par utilisateur (chaque user a ses propres tags), ou tags globaux partagés.
+**Décision** : Tags globaux (pas de `userId` dans `Tag`). 3 tables junction dédiées (`MindMapTag`, `LeitnerSystemTag`, `TestTag`) avec Sequelize `belongsToMany`. L'opération de mise à jour des tags utilise `entity.setTags(tags)` (Sequelize helper qui fait un replace atomique). Guard vide : `tagIds.length ? Tag.findAll(IN) : []` pour éviter `IN ()` SQL invalide.
+**Alternative écartée** : Tags scopés par user — plus isolant mais complexifie les requêtes (nécessite un `userId` dans Tag + filtre dans chaque include). Différé si la segmentation devient une exigence produit.
+**Conséquences** : Un tag créé par un utilisateur est visible et utilisable par tous les utilisateurs. Si deux utilisateurs créent "Maths", il n'y a qu'une seule entrée (contrainte `UNIQUE` sur `name`). La création inline dans `TagSelectorComponent` peut échouer avec un conflit 409 si le tag existe déjà — le composant doit gérer ce cas (actuellement il affiche une erreur toast, le tag existant reste disponible dans la liste).

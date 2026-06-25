@@ -1,4 +1,4 @@
-const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, Subject, instance } = require('../models/index')
+const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, Subject, Tag, instance } = require('../models/index')
 
 const DEFAULT_BOXES = [
   { level: 1, intervall: 5, color: 123456 },
@@ -9,24 +9,25 @@ const DEFAULT_BOXES = [
 ]
 
 const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
+const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
 
 class LeitnerSystemService {
   async findAll(userId) {
     return await LeitnerSystem.findAll({
       where: { idUser: userId },
-      include: [SUBJECT_INCLUDE]
+      include: [SUBJECT_INCLUDE, TAG_INCLUDE]
     })
   }
 
   async findBySubject(subjectId, userId) {
     return await LeitnerSystem.findAll({
       where: { subjectId, idUser: userId },
-      include: [SUBJECT_INCLUDE]
+      include: [SUBJECT_INCLUDE, TAG_INCLUDE]
     })
   }
 
   async findOne(id) {
-    return await LeitnerSystem.findByPk(id, { include: [SUBJECT_INCLUDE] })
+    return await LeitnerSystem.findByPk(id, { include: [SUBJECT_INCLUDE, TAG_INCLUDE] })
   }
 
   async create(data) {
@@ -38,7 +39,7 @@ class LeitnerSystemService {
         { transaction: t }
       )
       await t.commit()
-      return await LeitnerSystem.findByPk(system.idSystem, { include: [SUBJECT_INCLUDE] })
+      return await LeitnerSystem.findByPk(system.idSystem, { include: [SUBJECT_INCLUDE, TAG_INCLUDE] })
     } catch (err) {
       await t.rollback()
       throw err

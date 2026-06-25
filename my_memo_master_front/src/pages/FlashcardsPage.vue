@@ -90,7 +90,7 @@
                 required
               />
             </div>
-            <div class="mb-6">
+            <div class="mb-4">
               <label class="form-label">Sujet <span class="text-gray-400 font-normal">(optionnel)</span></label>
               <select v-model="form.subjectId" class="form-input">
                 <option :value="null">— Sans sujet —</option>
@@ -115,6 +115,10 @@
                 </button>
                 <button type="button" @click="showNewSubjectForm = false; newSubjectName = ''" class="subject-inline-cancel">Annuler</button>
               </div>
+            </div>
+            <div class="mb-6">
+              <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <TagSelectorComponent v-model="form.tagIds" />
             </div>
             <div class="btn-row">
               <button type="submit" :disabled="submitting" class="btn-modal-submit">
@@ -176,7 +180,9 @@ import { useLeitnerCardStore } from '@/stores/leitnerCards'
 import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useSubjectStore } from '@/stores/subjects'
+import { useTagStore } from '@/stores/tags'
 import { api } from '@/helpers/api'
+import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 
 const router = useRouter()
 const systemStore = useLeitnerSystemStore()
@@ -184,6 +190,7 @@ const cardStore = useLeitnerCardStore()
 const boxStore = useLeitnerBoxStore()
 const sessionStore = useRevisionSessionStore()
 const subjectStore = useSubjectStore()
+const tagStore = useTagStore()
 
 const loading = ref(true)
 const searchQuery = ref('')
@@ -195,7 +202,7 @@ const showNewSubjectForm = ref(false)
 const newSubjectName = ref('')
 const creatingSubject = ref(false)
 
-const form = reactive({ name: '', subjectId: null })
+const form = reactive({ name: '', subjectId: null, tagIds: [] })
 const subjects = computed(() => subjectStore.subjects)
 
 const filteredSystems = computed(() => {
@@ -270,6 +277,7 @@ const openCreateModal = () => {
   editingId.value = null
   form.name = ''
   form.subjectId = null
+  form.tagIds = []
   showNewSubjectForm.value = false
   newSubjectName.value = ''
   showModal.value = true
@@ -279,6 +287,7 @@ const openEditModal = (system) => {
   editingId.value = system.idSystem
   form.name = system.name
   form.subjectId = system.subjectId || null
+  form.tagIds = (system.tags || []).map((t) => t.tagId)
   showNewSubjectForm.value = false
   newSubjectName.value = ''
   showModal.value = true
@@ -289,6 +298,7 @@ const closeModal = () => {
   editingId.value = null
   form.name = ''
   form.subjectId = null
+  form.tagIds = []
 }
 
 async function createSubjectInline() {
@@ -313,11 +323,14 @@ const submitForm = async () => {
   const ok = editingId.value
     ? await systemStore.updateSystem(editingId.value)
     : await systemStore.createSystem()
-  submitting.value = false
   if (ok) {
+    const systemId = editingId.value || systemStore.system.idSystem
+    await tagStore.setEntityTags('leitnersystem', systemId, form.tagIds)
     closeModal()
+    await systemStore.fetchSystems()
     await loadStats()
   }
+  submitting.value = false
 }
 
 const handleDelete = async (system) => {

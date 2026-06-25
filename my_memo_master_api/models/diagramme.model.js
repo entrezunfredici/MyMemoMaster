@@ -46,11 +46,17 @@ module.exports = (sequelize) => {
   MindMap.associate = (models) => {
     MindMap.belongsTo(models.User, {
       foreignKey: 'userId',
-      as: 'user' // Alias pour la relation.
+      as: 'user'
     })
     MindMap.belongsTo(models.Subject, {
       foreignKey: 'subjectId',
-      as: 'subject' // Alias pour la relation.
+      as: 'subject'
+    })
+    MindMap.belongsToMany(models.Tag, {
+      through: 'MindMapTag',
+      foreignKey: 'idMindMap',
+      otherKey: 'tagId',
+      as: 'tags'
     })
   }
 

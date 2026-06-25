@@ -87,6 +87,7 @@
 | Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
 | Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
+| Tags (système de tags M2M) | Stable — S-05.01 : Tag model + 4 migrations + service/controller/validators/routes + TagSelector Vue + intégration MindmapsListView/FlashcardsPage/ExercisesPage + 39 tests controller | 2026-06-24 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -3105,3 +3106,85 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Pas d'endpoint "renvoyer l'email de vérification" — si un utilisateur perd l'email ou si le délai expire, il ne peut pas se débloquer sans contact support. À implémenter dans un ticket dédié (`POST /users/resend-verification`).
 - Le code de vérification est un entier 6 chiffres stocké en clair (décision antérieure). Il est passé en query param dans l'URL — acceptable pour MVP, passer au pattern token+hash SHA-256 (comme reset-password) dans un ticket de sécurité si nécessaire.
 - Les tests Supertest de `User.controller.register` qui mocquent le service devront être mis à jour pour inclure `setValidEmailCode` et `sendEmail` dans les mocks.
+
+---
+
+### [S-05.01] — Système de tags (M2M) pour MindMaps, LeitnerSystem et Test — 2026-06-24
+
+**Fichiers créés (API) :**
+- `models/Tag.model.js` — modèle Sequelize (`tagId` PK, `name` STRING(50) unique) + associations `belongsToMany` vers Diagramme, LeitnerSystem, Test
+- `migrations/20260624000001-create-tag-table.js` — table `Tag`
+- `migrations/20260624000002-create-mindmaptag-table.js` — table junction `MindMapTag` (idMindMap + tagId, PKs composites, FK CASCADE)
+- `migrations/20260624000003-create-leitnersystemtag-table.js` — table junction `LeitnerSystemTag` (idSystem + tagId)
+- `migrations/20260624000004-create-testtag-table.js` — table junction `TestTag` (testId + tagId)
+- `services/Tag.service.js` — CRUD tag + setTagsForMindMap / setTagsForLeitnerSystem / setTagsForTest (pattern : findAll avec guard vide + setTags Sequelize)
+- `controllers/Tag.controller.js` — try/catch + appels service + HTTP
+- `validators/Tag.validators.js` — règles create/update (name requis, max 50) + setTags (tagIds tableau d'entiers)
+- `routes/Tag.routes.js` — 8 routes (PUT /diagrammes/:id, PUT /leitnersystems/:id, PUT /tests/:id avant le générique PUT /:id)
+
+**Fichiers créés (Front) :**
+- `src/stores/tags.js` — Pinia store : fetchTags, createTag, deleteTag, setEntityTags(entityType, entityId, tagIds)
+- `src/components/TagSelectorComponent.vue` — composant réutilisable : chips sélectionnés + dropdown checkbox + création inline de tag
+
+**Fichiers modifiés (API) :**
+- `models/diagramme.model.js` — `MindMap.belongsToMany(Tag, { through: 'MindMapTag', as: 'tags' })`
+- `models/LeitnerSystem.model.js` — `LeitnerSystem.belongsToMany(Tag, { through: 'LeitnerSystemTag', as: 'tags' })`
+- `models/Test.model.js` — `Test.belongsToMany(Tag, { through: 'TestTag', as: 'tags' })`
+- `models/index.js` — enregistrement `Tag.model.js`
+- `app.js` — enregistrement `Tag.routes.js`
+- `services/Diagramme.service.js` — TAG_INCLUDE dans findByUser et findOne
+- `services/LeitnerSystem.service.js` — TAG_INCLUDE dans findAll, findBySubject, findOne, create
+- `services/Test.service.js` — TAG_INCLUDE dans findAll et findOne
+
+**Fichiers modifiés (Front) :**
+- `src/components/mindmap/MindmapsListView.vue` — TagSelectorComponent dans modal renommer + chips tags dans #stats
+- `src/pages/FlashcardsPage.vue` — TagSelectorComponent dans modal créer/modifier + setEntityTags après submitForm + chips tags dans #stats
+- `src/pages/ExercisesPage.vue` — TagSelectorComponent dans modal créer/modifier + setEntityTags après submitCreate/submitEdit + chips tags dans #stats
+
+**Ce qui est utilisable :**
+- `GET /api/v1/tags` — liste tous les tags
+- `POST /api/v1/tags` — crée un tag
+- `PUT /api/v1/tags/:id` — renomme un tag
+- `DELETE /api/v1/tags/:id` — supprime un tag (CASCADE sur les junctions)
+- `PUT /api/v1/tags/diagrammes/:id` — remplace les tags d'une mind map
+- `PUT /api/v1/tags/leitnersystems/:id` — remplace les tags d'un système Leitner
+- `PUT /api/v1/tags/tests/:id` — remplace les tags d'un exercice
+- Tous les GET retournent les tags associés : `diagrammes`, `leitnersystems`, `tests`
+- TagSelectorComponent : sélection multiple par checkboxes, création inline, suppression par chip
+
+**Hypothèses posées :**
+- Les tags sont globaux (non scopés par utilisateur) — un tag créé par un user est visible par tous. Si la segmentation par user est nécessaire, il faudra ajouter `userId` au modèle Tag.
+- Pas de route PUT /tags/:id côté frontend car la gestion des tags se fait directement via le TagSelectorComponent (création inline). L'update de nom existe en API mais n'est pas exposé dans l'UI.
+
+**Dette / points d'attention :**
+- Les 4 migrations de tags (`20260624000001` à `20260624000004`) doivent être passées avant de démarrer l'API. En dev (SQLite), le `sync: { alter: true }` de `models/index.js` peut les créer automatiquement mais les migrations doivent être à jour pour la prod.
+- ~~Aucun test Supertest ni Vitest n'a été créé pour le module Tags~~ — résolu dans le ticket suivant (voir entrée ci-dessous).
+- Le mind map create flow ne permet pas d'assigner des tags à la création (pas d'ID DB avant le premier auto-save dans l'éditeur). Les tags sont disponibles uniquement dans le modal de renommage/édition.
+
+---
+
+### [S-05.03-TESTS] — Tests controller Tags — 2026-06-24
+
+**Fichiers créés :**
+- `test/controllers/Tag.controller.test.js` — 39 tests Supertest couvrant les 8 endpoints du module Tags
+
+**Couverture :**
+- `GET /tags` — 200 (liste), 200 (vide), 401, 500
+- `GET /tags/:id` — 200, 404, 401, 500
+- `POST /tags` — 201, 400 (name manquant), 400 (name > 50 chars), 401, 500
+- `PUT /tags/:id` — 200, 404, 400 (name manquant), 401, 500
+- `DELETE /tags/:id` — 200, 404, 401, 500
+- `PUT /tags/diagrammes/:id` — 200, 200 (tableau vide), 404, 400 (tagIds manquant), 400 (non-entiers), 401, 500
+- `PUT /tags/leitnersystems/:id` — 200, 404, 400, 401, 500
+- `PUT /tags/tests/:id` — 200, 404, 400, 401, 500
+
+**Ce qui est utilisable :**
+- 39/39 tests passants : `npx jest test/controllers/Tag.controller.test.js`
+- Suite globale : 996 tests (988 avant), 3 suites en échec préexistantes non liées aux tags
+
+**Hypothèses posées :**
+- Pattern identique aux autres tests controllers : mock `models/index`, mock service, `makeToken()` JWT.
+- Les 3 suites préexistantes en échec (`LeitnerSystem.service`, `Diagramme.service`, `exercise.session.bdd`) ne sont pas liées au module Tags.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.

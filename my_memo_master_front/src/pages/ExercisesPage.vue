@@ -23,8 +23,15 @@
       :on-delete="() => deleteTest(test)"
     >
       <template #stats>
-        <div class="flex items-center gap-2 mt-1">
+        <div class="flex flex-wrap items-center gap-2 mt-1">
           <span class="subject-badge">{{ test.subject?.name || 'Sans sujet' }}</span>
+          <span
+            v-for="tag in test.tags"
+            :key="tag.tagId"
+            class="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700 border border-purple-200"
+          >
+            {{ tag.name }}
+          </span>
         </div>
       </template>
     </MenuItem>
@@ -68,6 +75,12 @@
                 </button>
                 <button type="button" @click="showNewSubjectForm = false; newSubjectName = ''" class="subject-inline-cancel">Annuler</button>
               </div>
+            </div>
+
+            <!-- Tags -->
+            <div class="form-group--lg">
+              <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <TagSelectorComponent v-model="form.tagIds" />
             </div>
 
             <!-- Questions -->
@@ -180,12 +193,15 @@ import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
 import { useTestStore } from '@/stores/tests'
 import { useSubjectStore } from '@/stores/subjects'
+import { useTagStore } from '@/stores/tags'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
+import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 
 const router = useRouter()
 const testStore = useTestStore()
 const subjectStore = useSubjectStore()
+const tagStore = useTagStore()
 
 const loading = ref(true)
 const searchQuery = ref('')
@@ -232,7 +248,7 @@ const defaultQuestion = () => ({
   reorderFragments: ['', ''],
 })
 
-const form = reactive({ name: '', subjectId: '', questions: [defaultQuestion()] })
+const form = reactive({ name: '', subjectId: '', tagIds: [], questions: [defaultQuestion()] })
 
 // ── helpers questions ─────────────────────────────────────────────────────────
 
@@ -316,6 +332,7 @@ function openCreateModal() {
   questionsToDelete.value = []
   form.name = ''
   form.subjectId = ''
+  form.tagIds = []
   form.questions = [defaultQuestion()]
   formError.value = ''
   showNewSubjectForm.value = false
@@ -340,6 +357,7 @@ async function openEditModal(test) {
   const fullTest = resp.data
   form.name = fullTest.name
   form.subjectId = fullTest.subjectId
+  form.tagIds = (fullTest.tags || []).map((t) => t.tagId)
   form.questions = (fullTest.question ?? []).map(q => ({
     _key: nextKey(),
     idQuestion: q.idQuestion,
@@ -394,6 +412,7 @@ async function submitCreate() {
       if (!resp || resp.status !== 201) { formError.value = resp?.data?.message || `Erreur question ${i + 1}.`; return }
     }
 
+    await tagStore.setEntityTags('test', testId, form.tagIds)
     notif.notify('Exercice créé avec succès !', 'success')
     closeModal()
     await testStore.fetchTests()
@@ -426,6 +445,7 @@ async function submitEdit() {
       }
     }
 
+    await tagStore.setEntityTags('test', editTestId.value, form.tagIds)
     notif.notify('Exercice modifié avec succès !', 'success')
     closeModal()
     await testStore.fetchTests()

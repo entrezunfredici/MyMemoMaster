@@ -78,6 +78,13 @@ module.exports = (instance) => {
       foreignKey: 'idSystem',
       as: 'leitnerSystemsUsers'
     })
+
+    LeitnerSystem.belongsToMany(models.Tag, {
+      through: 'LeitnerSystemTag',
+      foreignKey: 'idSystem',
+      otherKey: 'tagId',
+      as: 'tags'
+    })
   }
 
   return LeitnerSystem
