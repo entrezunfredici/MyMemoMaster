@@ -14,8 +14,16 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-          model: 'Subject', // nom du modèle référencé
+          model: 'Subject',
           key: 'subjectId'
+        }
+      },
+      userId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'User',
+          key: 'userId'
         }
       },
       name: {

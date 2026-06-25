@@ -34,7 +34,7 @@ exports.findOne = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { subjectId, name } = req.body
-    const data = await testService.create({ subjectId, name })
+    const data = await testService.create({ subjectId, name, userId: req.user.id })
     res.status(201).send(data)
   } catch (error) {
     logger.error(error?.message || error)

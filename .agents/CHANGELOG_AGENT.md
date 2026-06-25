@@ -3499,3 +3499,76 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 **Dette / points d'attention :**
 - Bug découvert lors des tests : surcharger mockGet avec newTag dès le montage rendait canCreate=false (corrigé en n'overridant pas mockGet, createTag pousse directement dans le store).
 - TagSelectorComponent : `<Transition>` nécessite un `$nextTick()` supplémentaire avant de trouver le bouton "Créer" dans le DOM de test JSDOM.
+
+---
+
+### [S-05.09] — Revue de code & merge — 2026-06-25
+
+**Périmètre de la revue :** Ticket S-05 complet (Tags, Sujets, Recherche, SubjectSelectorComponent, TagSelectorComponent — ~50 fichiers diff).
+
+**Méthode :** 8 angles de recherche en parallèle (A-H) × 6 candidats max chacun → déduplification → 9 vérificateurs indépendants.
+
+**Résultats :** 8 findings (7 CONFIRMED + 1 PLAUSIBLE), 2 REFUTED (crédit : TagSelectorComponent creating.value protégé par catch dans tagStore, modelValue null jamais passé depuis les pages parentes).
+
+---
+
+**Findings — à corriger avant merge :**
+
+| # | Sévérité | Fichier | Problème |
+|---|----------|---------|---------|
+| 1 | 🔴 Critique | `Tag.service.js:66` | IDOR : setTagsForMindMap/LeitnerSystem/Test sans vérification de propriété |
+| 2 | 🔴 Haute | `Search.service.js:30` | Fuite données : Test.findAll sans filtre userId |
+| 3 | 🔴 Haute | `test/services/Diagramme.service.test.js:31` | CI cassé : 2 assertions findByUser stales (include non présent) |
+| 4 | 🔴 Haute | `migrations/` | systemSubject non migré après passage belongsToMany → hasMany |
+| 5 | 🟠 Moyenne | `Diagramme.service.js:56` | resolveSubject crée 'Sujet par défaut' sans userId (sujet global partagé) |
+| 6 | 🟠 Moyenne | `Search.service.js:16` | Op.like insensible/sensible à la casse SQLite vs PostgreSQL |
+| 7 | 🟡 Faible | `Diagramme.service.js:4` | TAG_INCLUDE sans 'color' (incohérent avec Search.service.js) |
+| 8 | 🟡 Faible | `SubjectSelectorComponent.vue:163` | Exception réseau non attrapée → pas de notification utilisateur |
+
+**Points non-bloquants signalés :**
+- `focusInput` mort dans TagSelectorComponent.vue (jamais appelé)
+- setTagsForMindMap/LeitnerSystem/Test : 3 méthodes quasi-identiques (candidat refactor futur)
+
+**Décision de merge :** Merge suspendu jusqu'à correction des findings #1 (sécurité IDOR) et #2 (fuite données) au minimum. #3 (CI) bloque aussi techniquement. #4 (migration) doit être évalué : risque données en prod si historique systemSubject existe.
+
+---
+
+### [S-05.09b] — Corrections post-revue — 2026-06-25
+
+**Findings corrigés (8/8) :**
+
+**#1 IDOR — Tag.service.js / Tag.controller.js**
+- `setTagsForMindMap(mindMapId, tagIds, userId)` : check `mindMap.userId !== Number(userId)` → null si non propriétaire
+- `setTagsForLeitnerSystem(systemId, tagIds, userId)` : check `system.idUser !== Number(userId)` → null si non propriétaire
+- `setTagsForTest` : inchangé (Test n'a pas de userId — ressource globale par design)
+- Controller : passage de `req.user.id` aux deux méthodes protégées
+
+**#2 Fuite données Test — Search.service.js / Test.model.js / Test.controller.js + migration**
+- Migration `20260625000003-add-userid-to-test.js` : colonne `userId` nullable sur `Test`
+- `Test.model.js` : champ userId ajouté (nullable, FK→User.userId)
+- `Test.controller.js::create` : passe `userId: req.user.id` à la création
+- `Search.service.js` : `Test.findAll({ where: { userId, ... } })` — les exercices legacy (userId=null) n'apparaissent plus dans la recherche
+
+**#3 CI cassé — Diagramme.service.test.js**
+- 2 assertions `toHaveBeenCalledWith({ where: { userId: 1 } })` → `expect.objectContaining(...)` (corrige aussi `findOne` pre-existing)
+- `Tag: {}` ajouté au mock pour que `TAG_INCLUDE` ne crashe pas
+
+**#4 Migration systemSubject**
+- `20260625000002-drop-systemsubject-table.js` : `up` drop la table, `down` la recrée
+
+**#5 resolveSubject**
+- Commentaire ajouté : Subject est un modèle global (sans userId) — sujet par défaut partagé = comportement correct par design
+
+**#6 Op.like → dialect-aware**
+- `Search.service.js` : `const likeOp = sequelize.getDialect() === 'postgres' ? Op.iLike : Op.like` (évalué à chaque appel)
+- `Search.service.test.js` : mock `instance: { getDialect: jest.fn().mockReturnValue('sqlite') }` ajouté
+
+**#7 TAG_INCLUDE color manquante**
+- `Diagramme.service.js` : `attributes: ['tagId', 'name']` → `['tagId', 'name', 'color']`
+
+**#8 SubjectSelectorComponent exception réseau silencieuse**
+- `SubjectSelectorComponent.vue` : bloc `catch` ajouté → `notif.notify('Erreur lors de la création du sujet.', 'error')`
+
+**Tests après corrections :**
+- Backend : 44/44 (Tag.service + Diagramme.service + Search.service)
+- Frontend : 17/17 (SubjectSelectorComponent)

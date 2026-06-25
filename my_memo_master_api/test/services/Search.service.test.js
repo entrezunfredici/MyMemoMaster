@@ -7,7 +7,8 @@ jest.mock('../../models/index', () => ({
   LeitnerSystem: { findAll: jest.fn() },
   Test:          { findAll: jest.fn() },
   Subject:       {},
-  Tag:           {}
+  Tag:           {},
+  instance:      { getDialect: jest.fn().mockReturnValue('sqlite') }
 }))
 
 const MIND_MAP     = { idMindMap: 1, mmName: 'Algèbre', subjectId: 1 }
@@ -34,7 +35,7 @@ describe('SearchService', () => {
       })
     })
 
-    it('passe userId dans le where de Diagramme et LeitnerSystem', async () => {
+    it('passe userId dans le where de Diagramme, LeitnerSystem et Test', async () => {
       Diagramme.findAll.mockResolvedValue([])
       LeitnerSystem.findAll.mockResolvedValue([])
       Test.findAll.mockResolvedValue([])
@@ -46,6 +47,9 @@ describe('SearchService', () => {
       )
       expect(LeitnerSystem.findAll).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ idUser: 7 }) })
+      )
+      expect(Test.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ userId: 7 }) })
       )
     })
 

@@ -139,11 +139,11 @@ describe('TagService', () => {
   describe('setTagsForMindMap', () => {
     it('associe les tags à la carte mentale et retourne les tags', async () => {
       const mockTags = [{ tagId: 1 }, { tagId: 2 }]
-      const mockMindMap = { setTags: jest.fn().mockResolvedValue(undefined) }
+      const mockMindMap = { userId: 1, setTags: jest.fn().mockResolvedValue(undefined) }
       Diagramme.findByPk.mockResolvedValue(mockMindMap)
       Tag.findAll.mockResolvedValue(mockTags)
 
-      const result = await tagService.setTagsForMindMap(1, [1, 2])
+      const result = await tagService.setTagsForMindMap(1, [1, 2], 1)
 
       expect(Diagramme.findByPk).toHaveBeenCalledWith(1)
       expect(mockMindMap.setTags).toHaveBeenCalledWith(mockTags)
@@ -151,10 +151,10 @@ describe('TagService', () => {
     })
 
     it('retire tous les tags si tagIds est vide (sans appel findAll)', async () => {
-      const mockMindMap = { setTags: jest.fn().mockResolvedValue(undefined) }
+      const mockMindMap = { userId: 1, setTags: jest.fn().mockResolvedValue(undefined) }
       Diagramme.findByPk.mockResolvedValue(mockMindMap)
 
-      const result = await tagService.setTagsForMindMap(1, [])
+      const result = await tagService.setTagsForMindMap(1, [], 1)
 
       expect(Tag.findAll).not.toHaveBeenCalled()
       expect(mockMindMap.setTags).toHaveBeenCalledWith([])
@@ -163,7 +163,13 @@ describe('TagService', () => {
 
     it('retourne null si la carte mentale n\'existe pas', async () => {
       Diagramme.findByPk.mockResolvedValue(null)
-      expect(await tagService.setTagsForMindMap(99, [1])).toBeNull()
+      expect(await tagService.setTagsForMindMap(99, [1], 1)).toBeNull()
+    })
+
+    it('retourne null si l\'utilisateur n\'est pas propriétaire', async () => {
+      const mockMindMap = { userId: 2, setTags: jest.fn() }
+      Diagramme.findByPk.mockResolvedValue(mockMindMap)
+      expect(await tagService.setTagsForMindMap(1, [1], 1)).toBeNull()
     })
   })
 
@@ -172,11 +178,11 @@ describe('TagService', () => {
   describe('setTagsForLeitnerSystem', () => {
     it('associe les tags au système Leitner et retourne les tags', async () => {
       const mockTags = [{ tagId: 1 }]
-      const mockSystem = { setTags: jest.fn().mockResolvedValue(undefined) }
+      const mockSystem = { idUser: 1, setTags: jest.fn().mockResolvedValue(undefined) }
       LeitnerSystem.findByPk.mockResolvedValue(mockSystem)
       Tag.findAll.mockResolvedValue(mockTags)
 
-      const result = await tagService.setTagsForLeitnerSystem(1, [1])
+      const result = await tagService.setTagsForLeitnerSystem(1, [1], 1)
 
       expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1)
       expect(mockSystem.setTags).toHaveBeenCalledWith(mockTags)
@@ -185,7 +191,13 @@ describe('TagService', () => {
 
     it('retourne null si le système n\'existe pas', async () => {
       LeitnerSystem.findByPk.mockResolvedValue(null)
-      expect(await tagService.setTagsForLeitnerSystem(99, [1])).toBeNull()
+      expect(await tagService.setTagsForLeitnerSystem(99, [1], 1)).toBeNull()
+    })
+
+    it('retourne null si l\'utilisateur n\'est pas propriétaire', async () => {
+      const mockSystem = { idUser: 2, setTags: jest.fn() }
+      LeitnerSystem.findByPk.mockResolvedValue(mockSystem)
+      expect(await tagService.setTagsForLeitnerSystem(1, [1], 1)).toBeNull()
     })
   })
 

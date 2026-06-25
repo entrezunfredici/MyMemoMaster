@@ -61,11 +61,12 @@ class TagService {
    * Remplace les tags associés à une carte mentale.
    * @param {number} mindMapId
    * @param {number[]} tagIds
-   * @returns {Tag[]|null} null si la carte n'existe pas
+   * @param {number} userId - ID de l'utilisateur authentifié (vérification de propriété)
+   * @returns {Tag[]|null} null si la carte n'existe pas ou n'appartient pas à l'utilisateur
    */
-  async setTagsForMindMap(mindMapId, tagIds) {
+  async setTagsForMindMap(mindMapId, tagIds, userId) {
     const mindMap = await Diagramme.findByPk(mindMapId)
-    if (!mindMap) return null
+    if (!mindMap || mindMap.userId !== Number(userId)) return null
     const tags = tagIds.length ? await Tag.findAll({ where: { tagId: tagIds } }) : []
     await mindMap.setTags(tags)
     return tags
@@ -75,11 +76,12 @@ class TagService {
    * Remplace les tags associés à un système Leitner.
    * @param {number} systemId
    * @param {number[]} tagIds
-   * @returns {Tag[]|null} null si le système n'existe pas
+   * @param {number} userId - ID de l'utilisateur authentifié (vérification de propriété)
+   * @returns {Tag[]|null} null si le système n'existe pas ou n'appartient pas à l'utilisateur
    */
-  async setTagsForLeitnerSystem(systemId, tagIds) {
+  async setTagsForLeitnerSystem(systemId, tagIds, userId) {
     const system = await LeitnerSystem.findByPk(systemId)
-    if (!system) return null
+    if (!system || system.idUser !== Number(userId)) return null
     const tags = tagIds.length ? await Tag.findAll({ where: { tagId: tagIds } }) : []
     await system.setTags(tags)
     return tags

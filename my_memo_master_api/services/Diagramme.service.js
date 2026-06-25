@@ -1,6 +1,6 @@
 const { Diagramme, Subject, Tag } = require('../models/index')
 
-const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
+const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name', 'color'], through: { attributes: [] } }
 const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
 
 class DiagrammeService {
@@ -43,7 +43,9 @@ class DiagrammeService {
   }
 
   /**
-   * Résout le subjectId : vérifie l'existant ou crée le sujet par défaut.
+   * Résout le subjectId : vérifie l'existant ou retourne le sujet par défaut.
+   * Note : Subject est un modèle global (sans userId) — le sujet par défaut est partagé
+   * entre tous les utilisateurs, ce qui est cohérent avec la conception globale des sujets.
    *
    * @param {number|null} subjectId - ID du sujet fourni par le client
    * @returns {number} ID du sujet résolu

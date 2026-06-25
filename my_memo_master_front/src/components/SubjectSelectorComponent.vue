@@ -97,6 +97,8 @@ async function create() {
     await subjectStore.fetchSubjects()
     emit('update:modelValue', resp.data.subjectId)
     cancel()
+  } catch {
+    notif.notify('Erreur lors de la création du sujet.', 'error')
   } finally {
     creating.value = false
   }

@@ -57,7 +57,7 @@ exports.delete = async (req, res) => {
 exports.setForMindMap = async (req, res) => {
   try {
     const { tagIds } = req.body
-    const data = await tagService.setTagsForMindMap(req.params.id, tagIds || [])
+    const data = await tagService.setTagsForMindMap(req.params.id, tagIds || [], req.user.id)
     if (data === null) return res.status(404).json({ message: 'Carte mentale introuvable.' })
     res.status(200).json({ message: 'Tags mis à jour avec succès.', data })
   } catch (error) {
@@ -69,7 +69,7 @@ exports.setForMindMap = async (req, res) => {
 exports.setForLeitnerSystem = async (req, res) => {
   try {
     const { tagIds } = req.body
-    const data = await tagService.setTagsForLeitnerSystem(req.params.id, tagIds || [])
+    const data = await tagService.setTagsForLeitnerSystem(req.params.id, tagIds || [], req.user.id)
     if (data === null) return res.status(404).json({ message: 'Système Leitner introuvable.' })
     res.status(200).json({ message: 'Tags mis à jour avec succès.', data })
   } catch (error) {

@@ -14,7 +14,8 @@ jest.mock('../../models/index', () => ({
   Subject: {
     findByPk: jest.fn(),
     findOrCreate: jest.fn()
-  }
+  },
+  Tag: {}
 }))
 
 describe('DiagrammeService', () => {
@@ -28,7 +29,7 @@ describe('DiagrammeService', () => {
 
     const result = await DiagrammeService.findByUser(1)
 
-    expect(Diagramme.findAll).toHaveBeenCalledWith({ where: { userId: 1 } })
+    expect(Diagramme.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 1 } }))
     expect(result).toEqual(mockDiagrammes)
   })
 
@@ -38,7 +39,7 @@ describe('DiagrammeService', () => {
 
     const result = await DiagrammeService.findByUser(1, { subjectId: 3 })
 
-    expect(Diagramme.findAll).toHaveBeenCalledWith({ where: { userId: 1, subjectId: 3 } })
+    expect(Diagramme.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 1, subjectId: 3 } }))
     expect(result).toEqual(mockDiagrammes)
   })
 
@@ -61,7 +62,7 @@ describe('DiagrammeService', () => {
 
     const diagramme = await DiagrammeService.findOne(1)
 
-    expect(Diagramme.findByPk).toHaveBeenCalledWith(1)
+    expect(Diagramme.findByPk).toHaveBeenCalledWith(1, expect.objectContaining({ include: expect.any(Array) }))
     expect(diagramme).toEqual(mockDiagramme)
   })
 
