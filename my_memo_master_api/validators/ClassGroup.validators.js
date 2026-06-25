@@ -11,7 +11,21 @@ exports.create = [
     .optional({ nullable: true })
     .trim()
     .isLength({ max: 500 })
-    .withMessage('La description ne peut pas dépasser 500 caractères.')
+    .withMessage('La description ne peut pas dépasser 500 caractères.'),
+  body('level')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Le niveau ne peut pas dépasser 50 caractères.'),
+  body('code')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Le code ne peut pas dépasser 50 caractères.'),
+  body('score')
+    .optional({ nullable: true })
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Le score doit être un nombre entre 0 et 100.')
 ]
 
 exports.update = [
@@ -24,7 +38,21 @@ exports.update = [
     .optional({ nullable: true })
     .trim()
     .isLength({ max: 500 })
-    .withMessage('La description ne peut pas dépasser 500 caractères.')
+    .withMessage('La description ne peut pas dépasser 500 caractères.'),
+  body('level')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Le niveau ne peut pas dépasser 50 caractères.'),
+  body('code')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Le code ne peut pas dépasser 50 caractères.'),
+  body('score')
+    .optional({ nullable: true })
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Le score doit être un nombre entre 0 et 100.')
 ]
 
 exports.addMember = [

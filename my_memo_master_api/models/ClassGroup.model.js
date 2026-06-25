@@ -28,6 +28,18 @@ module.exports = (instance) => {
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE'
       },
+      level: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+      },
+      code: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+      },
+      score: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+      },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,

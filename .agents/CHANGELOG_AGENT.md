@@ -3572,3 +3572,120 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 **Tests après corrections :**
 - Backend : 44/44 (Tag.service + Diagramme.service + Search.service)
 - Frontend : 17/17 (SubjectSelectorComponent)
+
+---
+
+### [S-03.02] — Maquettes UI tableau de bord groupe + tests front — 2026-06-25
+
+**Contexte :** Feature S-03.02 (Sprint 9, Analyse/V1) — L'UI du tableau de bord groupe avait été livrée dans S-03.01 mais sans entrée de changelog distincte ni tests front pour le store `invitations.js` et le composant `ClassroomPage.vue`. Cette session complète la couverture de tests manquante et acte formellement la livraison.
+
+**Périmètre livré (IN scope) :**
+
+| Fonctionnalité | Statut | Fichiers principaux |
+|---|---|---|
+| **Groupes** (liste, filtres, sélection) | ✅ existant S-03.01 | `ClassroomPage.vue` |
+| **Membres** (toggle affectation API) | ✅ existant S-03.01 | `ClassroomPage.vue → toggleStudent()` |
+| **Invitations** (panneau pending + formulaire + réponse) | ✅ existant S-03.01 | `ClassroomPage.vue`, `invitations.js` |
+| **Affectations** (add/remove câblé store) | ✅ existant S-03.01 | `ClassroomPage.vue → toggleStudent()` |
+| **KPI de groupe** (4 indicateurs) | ✅ existant S-03.01 | `ClassroomPage.vue → loadKpi()` |
+| **Dashboard groupe** (vue prof/étudiant, calendrier, sections, ressources, analyse pédagogique) | ✅ existant S-03.01 | `ClassroomPage.vue` |
+| **Maquettes UI tableau de bord groupe** | ✅ existant S-03.01 | `ClassroomPage.vue` (implémentation fonctionnelle complète) |
+| **Tests store invitations** | ✅ NEW | `test/stores/invitations.store.test.js` |
+| **Tests composant ClassroomPage** | ✅ NEW | `test/components/ClassroomPage.test.js` |
+
+**Nouveaux fichiers front :**
+- `test/stores/invitations.store.test.js` — 14 tests Vitest : `fetchMine` (3 cas), `fetchByGroup` (3 cas), `invite` (4 cas : 201/200/non-2xx/réseau), `respond` (4 cas : accepted/declined/non-200/réseau)
+- `test/components/ClassroomPage.test.js` — 12 tests Vitest : `onMounted` (fetchGroups + fetchMine), rendu initial (premier groupe affiché), section invitations (absente/présente), interactions invitations (Accepter/Décliner → `respond`), toggle de rôle (visible admin / absent étudiant), `sendInvite` (email vide / email valide), `createSession` (titre vide / titre valide)
+
+**DoD :**
+- ✅ Fonctionnel sur les 7 items IN scope (livraison S-03.01 confirmée)
+- ✅ Tests store invitations : 14/14
+- ✅ Tests composant ClassroomPage : 12/12
+- ✅ Total nouveaux tests front : **26 tests verts**
+- ✅ Changelog à jour
+
+**Périmètre non livré (OUT scope — conforme) :**
+- Annuaire ENT complet — hors MVP
+- Synchronisation institutionnelle automatique — hors MVP
+- Gestion complexe multi-campus — hors MVP
+
+**Dette / points d'attention :**
+- `sessions`, `resources`, `events` dans `ClassroomPage.vue` restent en données mock locales (pas de modèle back dédié pour ces entités dans ce sprint) — comportement conforme MVP.
+- Pas de tests Vitest sur les formulaires `createEvent` et `shareResource` (couverture limitée aux flux prioritaires ; interactions locales sans appel API).
+
+---
+
+### [S-03.03] — Modèle de données (groupes, membres) — 2026-06-25
+
+**Contexte :** Feature S-03.03 (Sprint 9, Conception/V1) — Modèle de données complet pour les groupes classes et leurs membres. L'infrastructure de base (ClassGroup, ClassGroupUsers, Invitation) était déjà livrée dans S-03.01. Cette session ajoute les champs `level`, `code` et `score` manquants sur `ClassGroup`, identifiés lors de la vérification S-03.02 comme écart entre le modèle API et l'usage front.
+
+**Fichiers modifiés :**
+- `models/ClassGroup.model.js` — ajout des champs `level` (STRING 50, nullable), `code` (STRING 50, nullable), `score` (FLOAT, nullable)
+- `validators/ClassGroup.validators.js` — ajout des règles `level` / `code` / `score` dans `create` et `update` (tous optionnels/nullable ; `score` contraint 0–100)
+
+**Fichiers créés :**
+- `migrations/20260625000004-add-level-code-score-to-classgroup.js` — `up` : `addColumn` level + code + score sur `ClassGroup` ; `down` : `removeColumn` des 3 colonnes
+
+**État du modèle de données final :**
+
+| Entité | Champs | Migrations |
+|---|---|---|
+| **ClassGroup** | id, name, description, **level**, **code**, **score**, createdBy, createdAt | `000001` (création) + `000004` (level/code/score) |
+| **ClassGroupUsers** | classGroupId (PK), userId (PK), role | `000002` |
+| **Invitation** | id, classGroupId, targetUserId (nullable), targetEmail, invitedByUserId, role, status, createdAt | `000003` (création) + `20260625000001` (targetEmail + targetUserId nullable) |
+
+**Associations définies :**
+- `ClassGroup → User` (creator), `ClassGroup → ClassGroupUsers` (members), `ClassGroup → CalendarEvent`
+- `ClassGroupUsers → ClassGroup`, `ClassGroupUsers → User`
+- `Invitation → ClassGroup`, `Invitation → User×2` (targetUser, invitedBy)
+
+**DoD :**
+- ✅ Modèles Sequelize conformes avec associations
+- ✅ Migrations complètes (up + down) pour les 3 tables + les 3 nouveaux champs
+- ✅ Validators mis à jour (level, code, score acceptés en create et update)
+- ✅ Tests back existants : 62/62 sans régression
+- ✅ Changelog à jour
+
+**Périmètre non livré (OUT scope — conforme) :**
+- Annuaire ENT complet, synchronisation institutionnelle, multi-campus — hors MVP
+
+**Dette / points d'attention :**
+- `score` est un champ libre (FLOAT nullable) mis à jour manuellement ou via un processus externe ; il n'est pas automatiquement synchronisé avec `avgScore` calculé dans `getKpi()`. Si une mise à jour automatique est souhaitée, prévoir un hook Sequelize ou une tâche planifiée.
+- La migration `000004` utilise `after:` (clause MySQL) — sans effet sous PostgreSQL mais inoffensif.
+
+---
+
+### [S-03.04] — API CRUD groupes classe — 2026-06-25
+
+**Contexte :** Feature S-03.04 (Sprint 9, Back-end/V1) — L'API CRUD complète des groupes classes était déjà livrée dans S-03.01. Cette session acte la clôture formelle et corrige deux écarts détectés à la vérification : le controller `create` ignorait les nouveaux champs `level`/`code`/`score` (ajoutés en S-03.03), et les endpoints `getKpi` / `getStudentAnalytics` n'avaient pas de tests controller.
+
+**Fichiers modifiés :**
+- `controllers/ClassGroup.controller.js` — `create` : destructuration étendue à `{ name, description, level, code, score }` et transmission complète au service
+- `test/controllers/ClassGroup.controller.test.js` — ajout `getKpi` et `getStudentAnalytics` dans le mock du service + 10 nouveaux tests : `GET /:id/kpi` (200/403/404/401/500) et `GET /:id/kpi/students` (200/403/404/401/500)
+
+**Endpoints disponibles (périmètre complet S-03.04) :**
+
+| Méthode | Route | Auth | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/class-groups` | ✅ | Liste groupes visibles |
+| `GET` | `/api/v1/class-groups/:id` | ✅ | Détail + membres |
+| `POST` | `/api/v1/class-groups` | ✅ admin | Créer groupe |
+| `PUT` | `/api/v1/class-groups/:id` | ✅ admin | Modifier groupe |
+| `DELETE` | `/api/v1/class-groups/:id` | ✅ admin | Supprimer groupe |
+| `POST` | `/api/v1/class-groups/:id/members` | ✅ admin | Ajouter membre |
+| `DELETE` | `/api/v1/class-groups/:id/members/:userId` | ✅ admin | Retirer membre |
+| `GET` | `/api/v1/class-groups/:id/kpi` | ✅ admin/teacher | KPI groupe |
+| `GET` | `/api/v1/class-groups/:id/kpi/students` | ✅ admin/teacher | Analyse pédagogique |
+| `POST` | `/api/v1/class-groups/:id/invitations` | ✅ admin/teacher | Inviter |
+| `GET` | `/api/v1/class-groups/:id/invitations` | ✅ admin/teacher | Lister invitations |
+
+**DoD :**
+- ✅ CRUD complet conforme au périmètre IN
+- ✅ Tous les endpoints protégés par `authMiddleware`
+- ✅ Validation `express-validator` sur les mutations (create, update, addMember)
+- ✅ Swagger JSDoc sur toutes les routes
+- ✅ Tests controller : **43/43** (30 existants + 10 nouveaux kpi/analytics + correction mock)
+- ✅ Changelog à jour
+
+**Périmètre non livré (OUT scope — conforme) :**
+- Annuaire ENT complet, synchronisation institutionnelle, multi-campus — hors MVP

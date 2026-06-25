@@ -34,7 +34,9 @@ jest.mock('../../services/ClassGroup.service', () => ({
   update: jest.fn(),
   delete: jest.fn(),
   addMember: jest.fn(),
-  removeMember: jest.fn()
+  removeMember: jest.fn(),
+  getKpi: jest.fn(),
+  getStudentAnalytics: jest.fn()
 }))
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -404,6 +406,114 @@ describe('ClassGroup Controller', () => {
 
       const res = await request(app)
         .delete(`${BASE}/class-groups/1/members/2`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(500)
+    })
+  })
+
+  // ── GET /class-groups/:id/kpi ──────────────────────────────────────────────
+  describe('GET /class-groups/:id/kpi', () => {
+    const mockKpi = { memberCount: 10, studentCount: 8, teacherCount: 2, pendingInvitations: 1, avgScore: 74.5 }
+
+    it('200 — retourne les KPI du groupe', async () => {
+      classGroupService.getKpi.mockResolvedValue(mockKpi)
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/1/kpi`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.data).toEqual(mockKpi)
+    })
+
+    it('403 — accès refusé (non enseignant du groupe)', async () => {
+      classGroupService.getKpi.mockResolvedValue(false)
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/1/kpi`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+    })
+
+    it('404 — groupe introuvable', async () => {
+      classGroupService.getKpi.mockResolvedValue(null)
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/99/kpi`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(404)
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app).get(`${BASE}/class-groups/1/kpi`)
+      expect(res.status).toBe(401)
+    })
+
+    it('500 — le service échoue', async () => {
+      classGroupService.getKpi.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/1/kpi`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(500)
+    })
+  })
+
+  // ── GET /class-groups/:id/kpi/students ─────────────────────────────────────
+  describe('GET /class-groups/:id/kpi/students', () => {
+    const mockAnalytics = {
+      activeStudentsCount: 5,
+      atRiskCount: 1,
+      scoreWeeklyTrend: [],
+      students: []
+    }
+
+    it('200 — retourne l\'analyse pédagogique', async () => {
+      classGroupService.getStudentAnalytics.mockResolvedValue(mockAnalytics)
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/1/kpi/students`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.data.activeStudentsCount).toBe(5)
+      expect(res.body.data.atRiskCount).toBe(1)
+    })
+
+    it('403 — accès refusé (non enseignant du groupe)', async () => {
+      classGroupService.getStudentAnalytics.mockResolvedValue(false)
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/1/kpi/students`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+    })
+
+    it('404 — groupe introuvable', async () => {
+      classGroupService.getStudentAnalytics.mockResolvedValue(null)
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/99/kpi/students`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(404)
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app).get(`${BASE}/class-groups/1/kpi/students`)
+      expect(res.status).toBe(401)
+    })
+
+    it('500 — le service échoue', async () => {
+      classGroupService.getStudentAnalytics.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .get(`${BASE}/class-groups/1/kpi/students`)
         .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)

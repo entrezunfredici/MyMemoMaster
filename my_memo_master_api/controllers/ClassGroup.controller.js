@@ -24,8 +24,8 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, description } = req.body
-    const result = await ClassGroupService.create(req.user.id, { name, description })
+    const { name, description, level, code, score } = req.body
+    const result = await ClassGroupService.create(req.user.id, { name, description, level, code, score })
     if (result === false)
       return res
         .status(403)
