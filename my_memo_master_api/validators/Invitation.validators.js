@@ -1,11 +1,11 @@
 const { body, param } = require('express-validator')
 
 exports.create = [
-  body('targetUserId')
+  body('targetEmail')
     .notEmpty()
-    .withMessage("L'identifiant de l'utilisateur cible est requis.")
-    .isInt({ min: 1 })
-    .withMessage('targetUserId doit être un entier positif.'),
+    .withMessage("L'adresse email de l'utilisateur cible est requise.")
+    .isEmail()
+    .withMessage("L'adresse email est invalide."),
   body('role')
     .notEmpty()
     .withMessage('Le rôle est requis.')

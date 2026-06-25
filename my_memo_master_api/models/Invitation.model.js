@@ -19,10 +19,14 @@ module.exports = (instance) => {
       },
       targetUserId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true, // null pour les invitations externes (utilisateur sans compte)
         references: { model: 'User', key: 'userId' },
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE'
+      },
+      targetEmail: {
+        type: DataTypes.STRING(255),
+        allowNull: true // renseigné pour les invitations par email (compte existant ou non)
       },
       invitedByUserId: {
         type: DataTypes.INTEGER,

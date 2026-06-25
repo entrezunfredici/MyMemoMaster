@@ -42,12 +42,15 @@ export const useInvitationStore = defineStore('invitations', {
     async invite(groupId, payload) {
       try {
         const resp = await api.post(`class-groups/${groupId}/invitations`, payload)
-        if (resp?.status !== 201) {
+        if (resp?.status !== 200 && resp?.status !== 201) {
           notif.notify(resp?.data?.message || "Erreur lors de l'envoi de l'invitation.", 'error')
           return false
         }
-        this.groupInvitations.unshift(resp.data.data)
-        notif.notify('Invitation envoyée.', 'success')
+        // 201 = invitation email créée (ajout dans la liste), 200 = ajout direct (pas d'invitation record)
+        if (resp.status === 201 && resp.data?.data) {
+          this.groupInvitations.unshift(resp.data.data)
+        }
+        notif.notify(resp.data?.message || "Invitation envoyée.", 'success')
         return true
       } catch {
         notif.notify("Erreur lors de l'envoi de l'invitation.", 'error')

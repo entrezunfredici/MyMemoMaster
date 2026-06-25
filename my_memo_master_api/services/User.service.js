@@ -1,4 +1,4 @@
-const { User, Role, UserOnboardingState } = require('../models/index')
+const { User, Role, UserOnboardingState, Invitation, ClassGroupUsers } = require('../models/index')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 
@@ -49,6 +49,9 @@ class UserService {
         first_action: false
       }
     })
+
+    // Traite les invitations email en attente pour cette adresse
+    await this._processPendingEmailInvitations(newUser.userId, user.email)
 
     // eslint-disable-next-line no-unused-vars
     const { password, ...userWithoutPassword } = newUser?.dataValues || newUser
@@ -252,6 +255,19 @@ class UserService {
       { refreshToken: null, refreshTokenExpiresAt: null },
       { where: { userId } }
     )
+  }
+
+  async _processPendingEmailInvitations(userId, email) {
+    const pending = await Invitation.findAll({
+      where: { targetEmail: email.toLowerCase(), status: 'pending' }
+    })
+    for (const inv of pending) {
+      await ClassGroupUsers.findOrCreate({
+        where: { classGroupId: inv.classGroupId, userId },
+        defaults: { role: inv.role }
+      })
+      await inv.update({ status: 'accepted', targetUserId: userId })
+    }
   }
 }
 

@@ -1,16 +1,21 @@
 const { Invitation, ClassGroup, ClassGroupUsers, User } = require('../models/index')
+const sendEmail = require('../helpers/sendEmail')
 
 class InvitationService {
   /**
-   * Envoie une invitation à rejoindre un groupe.
-   * Réservé aux admins (roleId 1 ou 4) ou aux enseignants du groupe.
+   * Invite un utilisateur à rejoindre un groupe par email.
+   *
+   * - Si l'email correspond à un compte existant → ajout direct dans ClassGroupUsers.
+   * - Sinon → création d'une invitation par email + envoi d'un email d'inscription.
    *
    * @param {number} groupId
    * @param {number} requesterId
-   * @param {{ targetUserId: number, role: string }} data
-   * @returns {Promise<Invitation|null|false>} null si groupe introuvable, false si droits insuffisants
+   * @param {{ targetEmail: string, role: string }} data
+   * @returns {Promise<{directlyAdded: boolean, ...}|null|false>}
    */
   async invite(groupId, requesterId, data) {
+    const { targetEmail, role } = data
+
     const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
     const isAdmin = [1, 4].includes(requester?.roleId)
 
@@ -24,12 +29,38 @@ class InvitationService {
     const group = await ClassGroup.findByPk(groupId)
     if (!group) return null
 
-    // Évite les doublons : si une invitation pending existe déjà, on la retourne
-    const [invitation] = await Invitation.findOrCreate({
-      where: { classGroupId: groupId, targetUserId: data.targetUserId, status: 'pending' },
-      defaults: { role: data.role, invitedByUserId: requesterId }
+    const email = targetEmail.trim().toLowerCase()
+
+    // Cas 1 : l'utilisateur a déjà un compte → ajout direct au groupe
+    const existingUser = await User.findOne({
+      where: { email },
+      attributes: ['userId', 'name', 'email']
     })
-    return invitation
+
+    if (existingUser) {
+      await ClassGroupUsers.findOrCreate({
+        where: { classGroupId: groupId, userId: existingUser.userId },
+        defaults: { role }
+      })
+      return { directlyAdded: true, user: { name: existingUser.name, email: existingUser.email } }
+    }
+
+    // Cas 2 : pas de compte → invitation email
+    const [invitation] = await Invitation.findOrCreate({
+      where: { classGroupId: groupId, targetEmail: email, status: 'pending' },
+      defaults: { role, invitedByUserId: requesterId, targetUserId: null, targetEmail: email }
+    })
+
+    const roleLabel = role === 'teacher' ? 'enseignant' : 'étudiant'
+    const frontUrl = process.env.FRONT_URL || 'http://localhost:5173'
+
+    await sendEmail(
+      `Invitation au groupe "${group.name}" sur MyMemoMaster`,
+      `Bonjour,\n\nVous avez été invité à rejoindre le groupe "${group.name}" en tant que ${roleLabel} sur MyMemoMaster.\n\nCréez votre compte sur ${frontUrl}/inscription pour accepter automatiquement cette invitation.\n\nUtilisez l'adresse email ${email} lors de votre inscription.\n\nCe message a été envoyé par un membre de la plateforme.`,
+      email
+    )
+
+    return { directlyAdded: false, invitation }
   }
 
   /**
@@ -84,7 +115,7 @@ class InvitationService {
    * @param {number} invitationId
    * @param {number} userId
    * @param {'accepted'|'declined'} status
-   * @returns {Promise<Invitation|null|false>} null si introuvable, false si droits insuffisants
+   * @returns {Promise<Invitation|null|false>}
    */
   async respond(invitationId, userId, status) {
     const invitation = await Invitation.findByPk(invitationId)
@@ -94,7 +125,6 @@ class InvitationService {
 
     await invitation.update({ status })
 
-    // Si acceptée, ajouter le membre au groupe
     if (status === 'accepted') {
       await ClassGroupUsers.findOrCreate({
         where: { classGroupId: invitation.classGroupId, userId },
@@ -103,6 +133,26 @@ class InvitationService {
     }
 
     return invitation
+  }
+
+  /**
+   * Traite les invitations email en attente pour un utilisateur qui vient de s'inscrire.
+   * À appeler après la création d'un compte.
+   *
+   * @param {number} userId
+   * @param {string} email
+   */
+  async processPendingEmailInvitations(userId, email) {
+    const pending = await Invitation.findAll({
+      where: { targetEmail: email.toLowerCase(), status: 'pending' }
+    })
+    for (const inv of pending) {
+      await ClassGroupUsers.findOrCreate({
+        where: { classGroupId: inv.classGroupId, userId },
+        defaults: { role: inv.role }
+      })
+      await inv.update({ status: 'accepted', targetUserId: userId })
+    }
   }
 }
 

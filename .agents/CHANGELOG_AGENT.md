@@ -93,6 +93,7 @@
 | Navigation arborescente par sujet | Stable — S-05.06 : stores/search.js + pages/SubjectsPage.vue (/subjects) + route | 2026-06-25 |
 | SubjectSelectorComponent | Stable — S-05.07 : composant réutilisable select + création inline, remplace code dupliqué FlashcardsPage + ExercisesPage | 2026-06-25 |
 | KPI pédagogiques enseignant | Stable — S-01.01→S-01.06 : API kpi/students, maquettes UI, section analytics ClassroomPage.vue, composable useTeacherAnalytics (22 tests Vitest) | 2026-06-25 |
+| Invitation (système d'invitation groupe) | Stable — S-01.07 : invitation par email (2 branches : ajout direct si compte existant, email sinon), hook post-inscription pour traiter les invitations en attente | 2026-06-25 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -3442,3 +3443,59 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 - Pas de filtre par matière — acceptable MVP.
 
 
+
+---
+
+### [2026-06-25] S-01.07 — Invitation par email (deux branches : ajout direct / email)
+
+**Fichiers modifiés (API) :**
+- `models/Invitation.model.js` : `targetUserId` → `allowNull: true`, ajout champ `targetEmail` (STRING(255), nullable)
+- `migrations/20260625000001-invitation-email-invite.js` : `changeColumn` targetUserId + `addColumn` targetEmail
+- `services/Invitation.service.js` : réécriture `invite()` — cherche user par email, ajout direct (200) ou invitation email (201) ; ajout méthode `processPendingEmailInvitations` déplacée dans User.service
+- `services/User.service.js` : import `Invitation` + `ClassGroupUsers`, appel `_processPendingEmailInvitations` après `User.create`, méthode privée `_processPendingEmailInvitations`
+- `validators/Invitation.validators.js` : `targetUserId` (integer) → `targetEmail` (email)
+- `controllers/Invitation.controller.js` : `{ targetUserId }` → `{ targetEmail }`, gestion des deux codes retour (200 ajout direct / 201 invitation)
+
+**Fichiers modifiés (Front) :**
+- `src/stores/invitations.js` : `invite()` accepte 200 ET 201 comme succès, notification dynamique depuis `resp.data.message`
+- `src/pages/ClassroomPage.vue` : `inviteForm.targetUserId` → `inviteForm.targetEmail`, input type number → type email, validation et reset du champ mis à jour
+
+**Ce qui est utilisable :**
+- `POST /class-groups/:id/invitations` accepte `{ targetEmail, role }` — si le compte existe, l'utilisateur est ajouté immédiatement (200) ; sinon un email est envoyé (201)
+- À l'inscription, les invitations pendantes par email sont automatiquement honorées
+- Le formulaire d'invitation dans ClassroomPage utilise un champ email standard
+
+**Hypothèses posées :**
+- L'email envoyé aux non-inscrits est informatif (pas de magic-link) : l'utilisateur doit s'inscrire avec l'adresse email invitée.
+- `targetEmail` est normalisé en minuscule dans le service (`.trim().toLowerCase()`).
+
+**Dette / points d'attention :**
+- Pas de magic-link dans l'email d'invitation — l'UX est moins fluide pour les nouveaux utilisateurs (ils doivent s'inscrire manuellement avec la bonne adresse). Un ticket futur peut ajouter un token d'invitation dans l'URL.
+- La migration `changeColumn` sur SQLite en dev peut être capricieuse — Sequelize CLI utilise une stratégie de recréation de table. En cas de problème, `db.sync({ alter: true })` dans le server.js suffit pour dev.
+
+---
+
+### [S-05.08] — Tests fonctionnels catégorisation — 2026-06-25
+
+**Fichiers créés (7) :**
+
+*Backend (Jest) :*
+- `test/services/Tag.service.test.js` — 18 tests : findAll, findOne, create (couleur par défaut), update (partiel), delete, setTagsForMindMap/LeitnerSystem/Test (cas nominal + tagIds vide + entité introuvable)
+- `test/services/Search.service.test.js` — 12 tests : sans filtre (structure, userId transmis, listes vides), subjectId (transmis à toutes les requêtes, omis si null), q (Op.like sur mmName/name, omis si null), combiné
+
+*Frontend (Vitest) :*
+- `test/stores/tags.store.test.js` — 20 tests : fetchTags, createTag (tri + couleur défaut), updateTagColor, deleteTag, setEntityTags (3 types + type inconnu + erreurs)
+- `test/stores/subjects.store.test.js` — 15 tests : fetchSubjects, fetchSubjectById, addSubject, updateSubject, deleteSubject (succès + erreurs + erreur réseau)
+- `test/stores/search.store.test.js` — 10 tests : searchAll (sans filtre, subjectId, q, combiné, params falsy omis, erreurs, loading)
+- `test/components/TagSelectorComponent.test.js` — 15 tests : init, chips, dropdown, sélection/bascule, retrait chip ×, Backspace, filtre recherche, création inline
+- `test/components/SubjectSelectorComponent.test.js` — 17 tests : init, required/optionnel, select, formulaire inline (ouvrir/fermer/Entrée/erreur/reset watch)
+
+**Résultats :**
+- Backend : 30/30 (Tag.service + Search.service)
+- Frontend stores : 45/45 (tags + subjects + search)
+- Frontend composants : 32/32 (TagSelector + SubjectSelector)
+- **Total S-05.08 : 107 tests, 107 passent**
+
+**Dette / points d'attention :**
+- Bug découvert lors des tests : surcharger mockGet avec newTag dès le montage rendait canCreate=false (corrigé en n'overridant pas mockGet, createTag pousse directement dans le store).
+- TagSelectorComponent : `<Transition>` nécessite un `$nextTick()` supplémentaire avant de trouver le bouton "Créer" dans le DOM de test JSDOM.

@@ -433,7 +433,7 @@
         <!-- Formulaire d'invitation -->
         <div v-if="viewRole === 'prof'" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
           <h3 class="text-lg font-semibold text-dark">Inviter un utilisateur</h3>
-          <input v-model="inviteForm.targetUserId" type="number" min="1" placeholder="ID de l'utilisateur"
+          <input v-model="inviteForm.targetEmail" type="email" placeholder="Email de l'utilisateur"
             class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
           <div class="flex gap-2">
             <button @click="inviteForm.role = 'student'"
@@ -598,7 +598,7 @@ const groups = ref([
 const sessionForm = reactive({ title: '', type: 'section', dueDate: '', status: 'idle', message: '' })
 const resourceForm = reactive({ title: '', type: 'Cours', status: 'idle', message: '' })
 const eventForm = reactive({ title: '', type: 'course', date: '', time: '08:00', duration: 90, participants: [], location: '', description: '', status: 'idle', message: '', error: '' })
-const inviteForm = reactive({ targetUserId: '', role: 'student', status: 'idle', message: '' })
+const inviteForm = reactive({ targetEmail: '', role: 'student', status: 'idle', message: '' })
 const kpi = ref(null)
 const {
   analytics, analyticsLoading, expandedAnalyticsStudents,
@@ -855,19 +855,19 @@ async function toggleStudent(id) {
 }
 
 async function sendInvite() {
-  if (!currentGroup.value || !inviteForm.targetUserId) {
+  if (!currentGroup.value || !inviteForm.targetEmail) {
     inviteForm.status = 'error'
-    inviteForm.message = "L'identifiant utilisateur est requis."
+    inviteForm.message = "L'adresse email est requise."
     return
   }
   const ok = await invitationStore.invite(currentGroup.value.id, {
-    targetUserId: Number(inviteForm.targetUserId),
+    targetEmail: inviteForm.targetEmail,
     role: inviteForm.role
   })
   inviteForm.status = ok ? 'success' : 'error'
-  inviteForm.message = ok ? 'Invitation envoyée.' : "Erreur lors de l'envoi."
+  inviteForm.message = ok ? 'Envoi réussi.' : "Erreur lors de l'envoi."
   if (ok) {
-    inviteForm.targetUserId = ''
+    inviteForm.targetEmail = ''
     await invitationStore.fetchByGroup(currentGroup.value.id)
   }
 }
