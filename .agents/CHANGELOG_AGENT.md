@@ -23,7 +23,7 @@
 | Auth (register, login, reset password) | Stable — 2026-06-23 : envoi email vérification à l'inscription (lien cliquable + code), page VerifyEmailPage.vue | 2026-06-23 |
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
-| Subject / Unit | Stable | init |
+| Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
 | Test / Question / Response | Stable — M-06.05 : moteur de correction server-side (POST /tests/:id/submit), 4 types, tests service (16) + controller (7) ajoutés | 2026-06-21 |
 | TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
@@ -88,6 +88,10 @@
 | Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
 | Tags (système de tags M2M) | Stable — S-05.01 : Tag model + 4 migrations + service/controller/validators/routes + TagSelector Vue + intégration MindmapsListView/FlashcardsPage/ExercisesPage + 39 tests controller | 2026-06-24 |
+| Documentation UI navigation par sujet | Stable — S-05.02 : diagrams/ui_navigation_sujet.md — maquettes ASCII, patterns ItemListLayout / TagSelectorComponent / MenuItemComponent, API props, flux utilisateur | 2026-06-25 |
+| Search API (cross-contenu) | Stable — S-05.05 : GET /search?subjectId&q — service + controller + validators + routes + 11 tests | 2026-06-25 |
+| Navigation arborescente par sujet | Stable — S-05.06 : stores/search.js + pages/SubjectsPage.vue (/subjects) + route | 2026-06-25 |
+| SubjectSelectorComponent | Stable — S-05.07 : composant réutilisable select + création inline, remplace code dupliqué FlashcardsPage + ExercisesPage | 2026-06-25 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -3188,3 +3192,145 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Dette / points d'attention :**
 - Aucune dette nouvelle introduite.
+
+---
+
+### [S-05.02] — Maquettes UI navigation par sujet — 2026-06-25
+
+**Fichiers créés :**
+- `diagrams/ui_navigation_sujet.md` — document de maquettes et patterns UI pour la catégorisation par sujets et tags
+
+**Contenu du document :**
+- Maquette ASCII de la page liste avec filtre sujet (`ItemListLayout`)
+- Maquette de la card item (`MenuItemComponent`) avec badge sujet et chips tags
+- Maquette complète du `TagSelectorComponent` : état vide, sélection, dropdown, palette couleurs
+- Maquette du sélecteur sujet dans les modals de création/édition
+- API props de `ItemListLayout` documentée (8 props, 2 slots, 3 événements)
+- Tableau périmètre V1 (IN / OUT)
+- Flux utilisateur typique (4 étapes)
+
+**Ce qui est utilisable :**
+- Document de référence pour toute évolution des pages liste ou du sélecteur de tags
+- Sert de spécification rétroactive pour la fonctionnalité S-05 (catégorisation)
+
+**Hypothèses posées :**
+- Document rédigé rétrospectivement depuis l'implémentation existante (l'analyse a été sautée au profit d'une implémentation directe).
+- La "recherche cross-contenu" par tag (filtre global toutes pages) est documentée comme V2 — hors périmètre V1.
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [S-05.04] — Association sujets aux entités (Back-end) — 2026-06-25
+
+**Fichiers modifiés :**
+- `models/Subject.model.js` — ajout `Subject.hasMany(Diagramme, { as: 'mindMaps' })` et `Subject.hasMany(Test, { as: 'tests' })` — associations inverses manquantes (permet eager loading depuis Subject vers MindMap et Test)
+- `services/Diagramme.service.js` — ajout constante `SUBJECT_INCLUDE` + inclusion dans `findByUser` : les MindMaps retournées incluent désormais `{ subjectId, name }` comme LeitnerSystem et Test
+- `test/controllers/Subject.controller.test.js` — ajout 6 tests (400 name manquant POST/PUT, 400 name trop court POST/PUT, 401 POST, 401 PUT) → 21 tests au total (était 15)
+
+**Ce qui est utilisable :**
+- `Subject.findAll({ include: [Diagramme, Test] })` désormais possible sans erreur Sequelize
+- `GET /diagrammes` retourne le Subject dans chaque MindMap (cohérent avec LeitnerSystem et Test)
+- 21/21 tests Subject.controller passants
+
+**Hypothèses posées :**
+- Les associations `hasMany` inverses (Subject → Diagramme, Subject → Test) n'étaient pas nécessaires au fonctionnement des FK mais sont requises pour des queries futures depuis le Subject.
+- `Diagramme.service.findByUser` est la seule méthode publique exposée au controller — `findAll` (interne) n'est pas corrigée car non exposée dans les routes.
+
+**Ce qui était déjà livré avant ce ticket :**
+- Subject CRUD complet (model, service, controller, routes, validators) depuis l'init du projet
+- FK `subjectId` sur MindMap (init), Test (init), LeitnerSystem (migration 20260620000001)
+- Subject inclus dans LeitnerSystem.service et Test.service
+- Filtre par sujet : `Diagramme.service.findByUser({ subjectId })`, endpoint `GET /leitnersystems/bySubjects/:id`
+- Filtre côté front via `ItemListLayout` (toutes les pages liste)
+
+**Dette / points d'attention :**
+- Aucune dette nouvelle introduite.
+
+---
+
+### [S-05.05] — API recherche cross-contenu par sujet — 2026-06-25
+
+**Fichiers créés :**
+- `services/Search.service.js` — `searchAll(userId, { subjectId, q })` : requêtes parallèles (`Promise.all`) sur Diagramme, LeitnerSystem, Test avec filtres `Op.like` sur le nom + filtre `subjectId` optionnel ; retourne `{ mindMaps, leitnerSystems, tests }`
+- `controllers/Search.controller.js` — extraction `subjectId` (Number) et `q` (trim) depuis `req.query` ; appel service ; 200/500
+- `validators/Search.validators.js` — `subjectId` : entier ≥ 1 optionnel ; `q` : max 200 chars optionnel
+- `routes/Search.routes.js` — `GET /search` avec authMiddleware + validators + validate
+- `test/controllers/Search.controller.test.js` — 11 tests : sans filtre (200 plein, 200 vide, 401, 500), filtre subjectId (200, 400 non-entier, 400 = 0), filtre q (200, 400 > 200 chars), filtre combiné (200 plein, 200 vide)
+
+**Fichiers modifiés :**
+- `app.js` — import `searchRoutes` + `searchRoutes(v1)` enregistré
+
+**Ce qui est utilisable :**
+- `GET /api/v1/search` — accessible immédiatement, auth JWT requise
+- `GET /api/v1/search?subjectId=1` — filtre par sujet
+- `GET /api/v1/search?q=algèbre` — recherche textuelle sur les noms (case-insensitive SQLite, case-sensitive PostgreSQL)
+- `GET /api/v1/search?subjectId=1&q=algèbre` — filtre combiné
+- 11/11 tests passants
+
+**Hypothèses posées :**
+- Tests ne filtrent pas par `userId` — Tests sont partagés entre utilisateurs (pas de `userId` sur le modèle Test).
+- `Op.like` est case-insensitive en SQLite (dev) et case-sensitive en PostgreSQL (prod) — acceptable V1, migrer vers `Op.iLike` en PostgreSQL si nécessaire.
+- Les Tags et le Subject sont inclus dans chaque résultat pour éviter des allers-retours supplémentaires côté front.
+
+**Dette / points d'attention :**
+- PostgreSQL prod : `Op.like` est case-sensitive — utiliser `Op.iLike` (PostgreSQL uniquement) ou `Sequelize.fn('LOWER', ...)` pour une recherche uniforme.
+
+---
+
+### [S-05.06] — Navigation arborescente par sujet (Front-end) — 2026-06-25
+
+**Fichiers créés :**
+- `src/stores/search.js` — `useSearchStore` : état `{ results, loading }` ; action `searchAll({ subjectId, q })` → `GET /search`
+- `src/pages/SubjectsPage.vue` — page `/subjects` : barre de recherche (debounce 300ms), accordéon par sujet, 3 sections par sujet (Mind Maps / Flashcards / Exercices), chips tags, navigation vers les pages détail
+
+**Fichiers modifiés :**
+- `src/router/routes.js` — route `/subjects` ajoutée (privée)
+
+**Ce qui est utilisable :**
+- `/subjects` accessible depuis n'importe quel lien interne ou navigation directe
+- Recherche temps réel (debounce 300ms) cross-contenu — appelle `GET /api/v1/search?q=X`
+- Sujets sans contenu affichés (grille, accordéon fermé par défaut)
+- Sujets avec contenu auto-dépliés au chargement
+- Clic sur un item : navigate vers la page détail (mindmaps, flashcards.cards, exercise-detail)
+
+**Comportement par type de contenu :**
+| Type | Navigation au clic |
+|---|---|
+| Carte mentale | `/mindmaps` (pas de page detail individuelle) |
+| Flashcard (Leitner) | `/flashcards/:systemId/cards` |
+| Exercice | `/exercises/:id` |
+
+**Hypothèses posées :**
+- Pas de page détail individuelle pour les Mind Maps dans le routeur V1 — le clic navigue vers `/mindmaps` (liste).
+- `ContentSection` implémenté comme composant interne via `defineComponent` + `h()` pour éviter un fichier séparé (petit composant, usage unique).
+- Les tags sont affichés jusqu'à 3 max par item pour ne pas surcharger la vue liste.
+
+**Dette / points d'attention :**
+- Pas de lien vers `/subjects` dans la navbar — à ajouter quand la navigation principale évolue.
+- Les Mind Maps pourraient avoir leur propre page détail à terme → le clic devra être mis à jour.
+
+---
+
+### [S-05.07] — Composant sélection sujet réutilisable — 2026-06-25
+
+**Fichiers créés :**
+- `src/components/SubjectSelectorComponent.vue` — composant `v-model:modelValue` (Number|null) + prop `required` (Boolean) ; select liste des sujets ; création inline avec auto-focus ; auto-chargement des sujets si store vide ; reset automatique du formulaire inline quand le parent réinitialise la valeur à null
+
+**Fichiers modifiés :**
+- `src/pages/FlashcardsPage.vue` — suppression de `showNewSubjectForm`, `newSubjectName`, `creatingSubject`, `createSubjectInline()` ; template : bloc select+form remplacé par `<SubjectSelectorComponent v-model="form.subjectId" />`
+- `src/pages/ExercisesPage.vue` — même suppression ; template : bloc remplacé par `<SubjectSelectorComponent v-model="form.subjectId" required />` ; `form.subjectId` init changé de `''` à `null`
+
+**Ce qui est utilisable :**
+- `<SubjectSelectorComponent v-model="val" />` — sélecteur optionnel (option "— Sans sujet —")
+- `<SubjectSelectorComponent v-model="val" required />` — sélecteur requis (placeholder "Sélectionner un sujet")
+- Création inline : clic "+ Créer un nouveau sujet" → input → Entrée ou bouton → sélection automatique du sujet créé
+- Erreur de création : notification toast (pattern cohérent avec TagSelectorComponent)
+
+**Hypothèses posées :**
+- Le reset du formulaire inline est déclenché par watch sur `modelValue` : quand le parent remet `null`, le composant ferme son formulaire inline.
+- MindmapsListView gère le sujet via un pattern différent (emit `{ name, subjectId }` vers MindmapsPage) — non inclus dans ce ticket.
+
+**Dette / points d'attention :**
+- MindmapsListView a son propre sélecteur de sujet dans la modal "créer une carte" — peut être migré vers SubjectSelectorComponent dans un refactor futur.

@@ -92,29 +92,7 @@
             </div>
             <div class="mb-4">
               <label class="form-label">Sujet <span class="text-gray-400 font-normal">(optionnel)</span></label>
-              <select v-model="form.subjectId" class="form-input">
-                <option :value="null">— Sans sujet —</option>
-                <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>
-              </select>
-              <div v-if="!showNewSubjectForm" class="mt-2">
-                <button type="button" @click="showNewSubjectForm = true" class="subject-create-link">
-                  + Créer un nouveau sujet
-                </button>
-              </div>
-              <div v-else class="subject-inline-form">
-                <input
-                  v-model="newSubjectName"
-                  type="text"
-                  placeholder="Nom du sujet (ex : Physique)"
-                  class="subject-inline-input"
-                  @keydown.enter.prevent="createSubjectInline"
-                  autofocus
-                />
-                <button type="button" :disabled="creatingSubject || !newSubjectName.trim()" @click="createSubjectInline" class="subject-inline-btn">
-                  {{ creatingSubject ? '...' : 'Créer' }}
-                </button>
-                <button type="button" @click="showNewSubjectForm = false; newSubjectName = ''" class="subject-inline-cancel">Annuler</button>
-              </div>
+              <SubjectSelectorComponent v-model="form.subjectId" />
             </div>
             <div class="mb-6">
               <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
@@ -181,8 +159,8 @@ import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useSubjectStore } from '@/stores/subjects'
 import { useTagStore } from '@/stores/tags'
-import { api } from '@/helpers/api'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
+import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 
 const router = useRouter()
 const systemStore = useLeitnerSystemStore()
@@ -198,9 +176,6 @@ const selectedSubjectId = ref(null)
 const showModal = ref(false)
 const submitting = ref(false)
 const editingId = ref(null)
-const showNewSubjectForm = ref(false)
-const newSubjectName = ref('')
-const creatingSubject = ref(false)
 
 const form = reactive({ name: '', subjectId: null, tagIds: [] })
 const subjects = computed(() => subjectStore.subjects)
@@ -278,8 +253,6 @@ const openCreateModal = () => {
   form.name = ''
   form.subjectId = null
   form.tagIds = []
-  showNewSubjectForm.value = false
-  newSubjectName.value = ''
   showModal.value = true
 }
 
@@ -288,8 +261,6 @@ const openEditModal = (system) => {
   form.name = system.name
   form.subjectId = system.subjectId || null
   form.tagIds = (system.tags || []).map((t) => t.tagId)
-  showNewSubjectForm.value = false
-  newSubjectName.value = ''
   showModal.value = true
 }
 
@@ -299,22 +270,6 @@ const closeModal = () => {
   form.name = ''
   form.subjectId = null
   form.tagIds = []
-}
-
-async function createSubjectInline() {
-  const name = newSubjectName.value.trim()
-  if (!name || creatingSubject.value) return
-  creatingSubject.value = true
-  try {
-    const resp = await api.post('subjects', { name })
-    if (!resp || resp.status !== 201) return
-    await subjectStore.fetchSubjects()
-    form.subjectId = resp.data.subjectId
-    showNewSubjectForm.value = false
-    newSubjectName.value = ''
-  } finally {
-    creatingSubject.value = false
-  }
 }
 
 const submitForm = async () => {

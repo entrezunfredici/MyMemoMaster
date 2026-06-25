@@ -152,6 +152,15 @@ const routes = [
       private: true
     }
   },
+  {
+    path: '/subjects',
+    name: 'subjects',
+    component: () => import('../pages/SubjectsPage.vue'),
+    meta: {
+      title: 'Mes contenus par sujet',
+      private: true
+    }
+  },
   // ==================== AUTH & ACCOUNT ====================
   {
     path: '/auth',

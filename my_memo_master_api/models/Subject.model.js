@@ -39,6 +39,16 @@ module.exports = (instance) => {
       as: 'leitnerSystems'
     })
 
+    Subject.hasMany(models.Diagramme, {
+      foreignKey: 'subjectId',
+      as: 'mindMaps'
+    })
+
+    Subject.hasMany(models.Test, {
+      foreignKey: 'subjectId',
+      as: 'tests'
+    })
+
     Subject.belongsToMany(models.Question, {
       through: 'questionSubject',
       foreignKey: 'subjectId',

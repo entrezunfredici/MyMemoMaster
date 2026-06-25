@@ -52,29 +52,7 @@
             <!-- Sujet -->
             <div class="form-group--lg">
               <label class="form-label">Sujet</label>
-              <select v-model="form.subjectId" class="form-input" required>
-                <option value="">Sélectionner un sujet</option>
-                <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>
-              </select>
-              <div v-if="!showNewSubjectForm" class="mt-2">
-                <button type="button" @click="showNewSubjectForm = true" class="subject-create-link">
-                  + Créer un nouveau sujet
-                </button>
-              </div>
-              <div v-else class="subject-inline-form">
-                <input
-                  v-model="newSubjectName"
-                  type="text"
-                  placeholder="Nom du sujet (ex : Physique)"
-                  class="subject-inline-input"
-                  @keydown.enter.prevent="createSubjectInline"
-                  autofocus
-                />
-                <button type="button" :disabled="creatingSubject || !newSubjectName.trim()" @click="createSubjectInline" class="subject-inline-btn">
-                  {{ creatingSubject ? '...' : 'Créer' }}
-                </button>
-                <button type="button" @click="showNewSubjectForm = false; newSubjectName = ''" class="subject-inline-cancel">Annuler</button>
-              </div>
+              <SubjectSelectorComponent v-model="form.subjectId" required />
             </div>
 
             <!-- Tags -->
@@ -197,6 +175,7 @@ import { useTagStore } from '@/stores/tags'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
+import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 
 const router = useRouter()
 const testStore = useTestStore()
@@ -211,9 +190,6 @@ const isEditMode = ref(false)
 const editTestId = ref(null)
 const submitting = ref(false)
 const formError = ref('')
-const showNewSubjectForm = ref(false)
-const newSubjectName = ref('')
-const creatingSubject = ref(false)
 const questionsToDelete = ref([])
 
 const subjects = computed(() => subjectStore.subjects)
@@ -331,12 +307,10 @@ function openCreateModal() {
   editTestId.value = null
   questionsToDelete.value = []
   form.name = ''
-  form.subjectId = ''
+  form.subjectId = null
   form.tagIds = []
   form.questions = [defaultQuestion()]
   formError.value = ''
-  showNewSubjectForm.value = false
-  newSubjectName.value = ''
   showModal.value = true
 }
 
@@ -345,8 +319,6 @@ async function openEditModal(test) {
   editTestId.value = test.testId
   questionsToDelete.value = []
   formError.value = ''
-  showNewSubjectForm.value = false
-  newSubjectName.value = ''
 
   const resp = await api.get(`tests/${test.testId}`)
   if (!resp || resp.status !== 200) {
@@ -368,25 +340,6 @@ async function openEditModal(test) {
 
   if (!form.questions.length) form.questions = [defaultQuestion()]
   showModal.value = true
-}
-
-async function createSubjectInline() {
-  const name = newSubjectName.value.trim()
-  if (!name || creatingSubject.value) return
-  creatingSubject.value = true
-  try {
-    const resp = await api.post('subjects', { name })
-    if (!resp || resp.status !== 201) {
-      formError.value = resp?.data?.message || 'Erreur lors de la création du sujet.'
-      return
-    }
-    await subjectStore.fetchSubjects()
-    form.subjectId = resp.data.subjectId
-    showNewSubjectForm.value = false
-    newSubjectName.value = ''
-  } finally {
-    creatingSubject.value = false
-  }
 }
 
 function closeModal() { showModal.value = false }

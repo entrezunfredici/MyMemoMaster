@@ -135,6 +135,32 @@ describe('Subject Controller', () => {
       expect(res.body.name).toBe('Chimie')
     })
 
+    it('400 — name manquant', async () => {
+      const res = await request(app)
+        .post('/api/v1/subjects')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({})
+
+      expect(res.status).toBe(400)
+    })
+
+    it('400 — name trop court (1 caractère)', async () => {
+      const res = await request(app)
+        .post('/api/v1/subjects')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'A' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app)
+        .post('/api/v1/subjects')
+        .send({ name: 'Chimie' })
+
+      expect(res.status).toBe(401)
+    })
+
     it('500 — le service échoue', async () => {
       subjectService.create.mockRejectedValue(new Error('DB error'))
 
@@ -159,6 +185,32 @@ describe('Subject Controller', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.name).toBe('Maths avancées')
+    })
+
+    it('400 — name manquant', async () => {
+      const res = await request(app)
+        .put('/api/v1/subjects/1')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({})
+
+      expect(res.status).toBe(400)
+    })
+
+    it('400 — name trop court (1 caractère)', async () => {
+      const res = await request(app)
+        .put('/api/v1/subjects/1')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'X' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app)
+        .put('/api/v1/subjects/1')
+        .send({ name: 'Maths avancées' })
+
+      expect(res.status).toBe(401)
     })
 
     it('404 — sujet introuvable', async () => {
