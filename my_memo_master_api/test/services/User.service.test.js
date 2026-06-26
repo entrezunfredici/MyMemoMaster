@@ -14,10 +14,16 @@ jest.mock('../../models/index', () => ({
     create: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn()
+  },
+  Invitation: {
+    findAll: jest.fn()
+  },
+  ClassGroupUsers: {
+    findOrCreate: jest.fn()
   }
 }))
 
-const { User, Role, UserOnboardingState } = require('../../models/index')
+const { User, Role, UserOnboardingState, Invitation } = require('../../models/index')
 const bcrypt = require('bcryptjs')
 const UserService = require('../../services/User.service')
 
@@ -105,6 +111,7 @@ describe('UserService', () => {
         tourSeen: false,
         checklist: {}
       })
+      Invitation.findAll.mockResolvedValue([])
 
       const user = await UserService.create({
         email: 'test@example.com',
@@ -461,6 +468,7 @@ describe('UserService', () => {
         dataValues: { ...data, userId: 1 },
       }))
       UserOnboardingState.create.mockResolvedValue({})
+      Invitation.findAll.mockResolvedValue([])
 
       await UserService.create({ email: 'test@example.com', name: 'Test', password: plain })
 

@@ -67,7 +67,7 @@ describe('Invitation Controller', () => {
     const validBody = { targetUserId: 2, role: 'student' }
 
     it('201 — envoie une invitation', async () => {
-      invitationService.invite.mockResolvedValue(mockInvitation)
+      invitationService.invite.mockResolvedValue({ directlyAdded: false, invitation: mockInvitation })
 
       const res = await request(app)
         .post(`${BASE}/class-groups/1/invitations`)

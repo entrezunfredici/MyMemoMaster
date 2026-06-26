@@ -3,8 +3,7 @@ const logger = require('../helpers/logger')
 
 exports.invite = async (req, res) => {
   try {
-    const { targetEmail, role } = req.body
-    const result = await InvitationService.invite(req.params.id, req.user.id, { targetEmail, role })
+    const result = await InvitationService.invite(req.params.id, req.user.id, req.body)
     if (result === false)
       return res.status(403).json({ message: 'Accès refusé. Seuls les admins et enseignants du groupe peuvent inviter.' })
     if (result === null)

@@ -348,7 +348,7 @@ describe('Tag Controller', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.data).toHaveLength(2)
-      expect(tagService.setTagsForMindMap).toHaveBeenCalledWith('1', [1, 2])
+      expect(tagService.setTagsForMindMap).toHaveBeenCalledWith('1', [1, 2], 1)
     })
 
     it('200 — accepte un tableau vide (suppression de tous les tags)', async () => {
@@ -424,7 +424,7 @@ describe('Tag Controller', () => {
         .send({ tagIds: [1, 2] })
 
       expect(res.status).toBe(200)
-      expect(tagService.setTagsForLeitnerSystem).toHaveBeenCalledWith('1', [1, 2])
+      expect(tagService.setTagsForLeitnerSystem).toHaveBeenCalledWith('1', [1, 2], 1)
     })
 
     it('404 — système Leitner introuvable', async () => {

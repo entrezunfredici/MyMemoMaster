@@ -1,4 +1,4 @@
-const { LeitnerSystem, LeitnerBox, Subject, instance } = require('../../models/index')
+const { LeitnerSystem, LeitnerBox, Subject, Tag, instance } = require('../../models/index')
 const LeitnerSystemService = require('../../services/LeitnerSystem.service')
 
 const mockTransaction = { commit: jest.fn(), rollback: jest.fn() }
@@ -18,12 +18,14 @@ jest.mock('../../models/index', () => ({
   },
   LeitnerSystemsUsers: {},
   Subject: {},
+  Tag: {},
   instance: {
     transaction: jest.fn()
   }
 }))
 
 const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
+const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
 
 describe('LeitnerSystemService', () => {
   beforeEach(() => {
@@ -43,7 +45,7 @@ describe('LeitnerSystemService', () => {
 
     expect(LeitnerSystem.findAll).toHaveBeenCalledWith({
       where: { idUser: 1 },
-      include: [SUBJECT_INCLUDE]
+      include: [SUBJECT_INCLUDE, TAG_INCLUDE]
     })
     expect(systems).toEqual(mockSystems)
   })
@@ -58,7 +60,7 @@ describe('LeitnerSystemService', () => {
 
     expect(LeitnerSystem.findAll).toHaveBeenCalledWith({
       where: { subjectId: 1, idUser: 1 },
-      include: [SUBJECT_INCLUDE]
+      include: [SUBJECT_INCLUDE, TAG_INCLUDE]
     })
     expect(systems).toEqual(mockSystems)
   })
@@ -69,7 +71,7 @@ describe('LeitnerSystemService', () => {
 
     const system = await LeitnerSystemService.findOne(1)
 
-    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1, { include: [SUBJECT_INCLUDE] })
+    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1, { include: [SUBJECT_INCLUDE, TAG_INCLUDE] })
     expect(system).toEqual(mockSystem)
   })
 
@@ -78,7 +80,7 @@ describe('LeitnerSystemService', () => {
 
     const system = await LeitnerSystemService.findOne(99)
 
-    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(99, { include: [SUBJECT_INCLUDE] })
+    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(99, { include: [SUBJECT_INCLUDE, TAG_INCLUDE] })
     expect(system).toBeNull()
   })
 
@@ -111,7 +113,7 @@ describe('LeitnerSystemService', () => {
       expect.anything()
     )
     expect(mockTransaction.commit).toHaveBeenCalled()
-    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(3, { include: [SUBJECT_INCLUDE] })
+    expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(3, { include: [SUBJECT_INCLUDE, TAG_INCLUDE] })
     expect(system).toEqual(mockWithSubject)
   })
 
