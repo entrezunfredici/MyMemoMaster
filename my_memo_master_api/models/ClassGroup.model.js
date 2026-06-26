@@ -68,6 +68,21 @@ module.exports = (instance) => {
       foreignKey: 'classGroupId',
       as: 'calendarEvents'
     })
+
+    ClassGroup.hasMany(models.ClassGroupSection, {
+      foreignKey: 'classGroupId',
+      as: 'sections'
+    })
+
+    ClassGroup.hasMany(models.ClassGroupResource, {
+      foreignKey: 'classGroupId',
+      as: 'resources'
+    })
+
+    ClassGroup.hasMany(models.ClassGroupSubmission, {
+      foreignKey: 'classGroupId',
+      as: 'submissions'
+    })
   }
 
   return ClassGroup

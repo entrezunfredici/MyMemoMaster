@@ -92,8 +92,11 @@
 | Search API (cross-contenu) | Stable — S-05.05 : GET /search?subjectId&q — service + controller + validators + routes + 11 tests | 2026-06-25 |
 | Navigation arborescente par sujet | Stable — S-05.06 : stores/search.js + pages/SubjectsPage.vue (/subjects) + route | 2026-06-25 |
 | SubjectSelectorComponent | Stable — S-05.07 : composant réutilisable select + création inline, remplace code dupliqué FlashcardsPage + ExercisesPage | 2026-06-25 |
-| KPI pédagogiques enseignant | Stable — S-01.01→S-01.06 : API kpi/students, maquettes UI, section analytics ClassroomPage.vue, composable useTeacherAnalytics (22 tests Vitest) | 2026-06-25 |
+| KPI pédagogiques enseignant | Stable — S-01.01→S-01.07 : API kpi/students, maquettes UI, section analytics ClassroomEnseignantView.vue, composable useTeacherAnalytics, vue détail étudiant (scoreTrend + alertes + inactivité) — StudentDetailComponent.vue (18 tests Vitest) | 2026-06-26 |
+| Storage (accès fichiers S3 privés) | Stable — BUG-FIX : route `/storage/stream` remplacée par `/storage/presign` (presigned URL 15 min via `@aws-sdk/s3-request-presigner`), boutons Voir/Télécharger fonctionnels dans ClassroomEtudiantView + ClassroomEnseignantView | 2026-06-26 |
 | Invitation (système d'invitation groupe) | Stable — S-01.07 : invitation par email (2 branches : ajout direct si compte existant, email sinon), hook post-inscription pour traiter les invitations en attente | 2026-06-25 |
+| ClassGroupSection / ClassGroupResource | Stable — S-03.08 : 2 modèles + 2 migrations + CRUD complet (service/controller/validators/routes), sections & rendus + ressources pédagogiques par groupe | 2026-06-26 |
+| Front — ClassroomPage (3 vues) | Stable — S-03.08 : ClassroomPage.vue coordinateur + ClassroomEtablissementView / ClassroomEnseignantView / ClassroomEtudiantView ; stores classGroupSections + classGroupResources + fetchByGroup sur calendarEvents/deadlines | 2026-06-26 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -3689,3 +3692,110 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Périmètre non livré (OUT scope — conforme) :**
 - Annuaire ENT complet, synchronisation institutionnelle, multi-campus — hors MVP
+
+---
+
+### [2026-06-26] S-03.08 — Scission ClassroomPage en 3 vues + sections/ressources pédagogiques
+
+**Fichiers créés (API) :**
+- `models/ClassGroupSection.model.js` — section ou rendu (type: 'section'|'rendu', title, dueDate, createdBy FK)
+- `models/ClassGroupResource.model.js` — ressource pédagogique partagée (type: 'cours'|'carte_mentale'|'sujet'|'autre', url, createdBy FK)
+- `migrations/20260626000001-create-classgroupsection-table.js`
+- `migrations/20260626000002-create-classgroupresource-table.js`
+- `services/ClassGroupSection.service.js` — `_canWrite` (roleId 1/4 ou teacher), findAll/create/update/delete
+- `services/ClassGroupResource.service.js` — même pattern
+- `controllers/ClassGroupSection.controller.js` / `ClassGroupResource.controller.js`
+- `validators/ClassGroupSection.validators.js` / `ClassGroupResource.validators.js`
+
+**Fichiers modifiés (API) :**
+- `models/index.js` — ClassGroupSection + ClassGroupResource enregistrés
+- `models/ClassGroup.model.js` — hasMany sections + resources
+- `routes/ClassGroup.routes.js` — 8 nouvelles routes (sections CRUD, resources CRUD) + GET /events + GET /deadlines par groupe + PUT /members/:userId
+- `controllers/ClassGroup.controller.js` — updateMember, findGroupEvents, findGroupDeadlines
+- `services/ClassGroup.service.js` — updateMemberRole, droits élargis à roleId 4 pour addMember/removeMember
+- `validators/ClassGroup.validators.js` — updateMember validator
+- `validators/Invitation.validators.js` — targetEmail (était targetUserId) + test 400 email invalide
+
+**Fichiers créés (Front) :**
+- `pages/ClassroomEtablissementView.vue` — CRUD groupes, emploi du temps récurrent (weekly/biweekly/monthly + day selector + plage dates), invitations, gestion membres + rôles
+- `pages/ClassroomEnseignantView.vue` — KPI étudiants (useTeacherAnalytics), sections/rendus CRUD, ressources CRUD, création échéances liées aux occurrences
+- `pages/ClassroomEtudiantView.vue` — prochaines séances, échéances urgentes (badge rouge ≤3j), ressources partagées
+- `stores/classGroupSections.js` — CRUD sections via class-groups/:id/sections
+- `stores/classGroupResources.js` — CRUD resources via class-groups/:id/resources
+
+**Fichiers modifiés (Front) :**
+- `pages/ClassroomPage.vue` — réécrit en coordinateur (30 lignes) : route selon rôle (isAdmin→Établissement, isEnseignant→Enseignant, sinon→Étudiant) + bandeau invitations en attente + sélecteur de vue pour admins
+- `stores/classGroups.js` — addMember passe `role`, status 201, updateMemberRole NEW
+- `stores/calendarEvents.js` — `groupEvents: []` + `fetchByGroup(groupId)` NEW
+- `stores/deadlines.js` — `groupDeadlines: []` + `fetchByGroup(groupId)` NEW
+
+**Ce qui est utilisable :**
+- Côté back : sections, ressources, events par groupe, deadlines par groupe, changement de rôle membre
+- Côté front : 3 vues indépendantes, navigation par groupe, formulaires de création inline, gestion membres
+
+**Dette éventuelle :**
+- Tests des nouveaux controllers (ClassGroupSection, ClassGroupResource, nouvelles actions ClassGroup) non écrits dans ce ticket
+- La vue Enseignant filtre les groupes par `m.role === 'teacher'` côté front — si un admin crée un groupe, il doit explicitement avoir le rôle teacher dans ce groupe pour voir la vue enseignant
+- `deleteEvent` dans calendarStore ne purge pas `groupEvents` — contourné avec un re-fetch local dans la vue
+
+---
+
+### [S-01.07] — Vue détail étudiant (historique) — 2026-06-26
+
+**Contexte :** Feature S-01 (Sprint 9, Front-end/V1) — Le composable `useTeacherAnalytics` retourne pour chaque étudiant un `scoreTrend` (4 derniers scores avec dates) et `daysInactive`, mais l'accordion de la liste enseignant n'affichait que email + lastActivityAt. Cette session livre la vue détail complète.
+
+**Fichiers créés :**
+- `src/components/StudentDetailComponent.vue` — composant d'affichage pur : email, dernière activité (date + jours d'inactivité), score moyen (coloré), alertes décrochage (tags orange), historique des 4 derniers scores du scoreTrend (date + badge coloré)
+- `test/components/StudentDetailComponent.test.js` — 18 tests Vitest : informations de base (7), couleur du score moyen (3), alertes décrochage (3), historique des scores (5)
+
+**Fichiers modifiés :**
+- `src/pages/ClassroomEnseignantView.vue` — remplacement de l'accordion inline (2 lignes : email + lastActivityAt) par `<StudentDetailComponent :student="s" />` + import du composant
+
+**Ce qui est utilisable :**
+- `StudentDetailComponent` est un composant réutilisable (prop `student` typé Object) — utilisable dans tout autre contexte affichant un étudiant analytique
+- L'accordion dans la vue enseignant affiche désormais : email, date de dernière activité avec jours d'inactivité, score moyen coloré, alertes décrochage (si présentes), historique des 4 derniers exercices avec date + score coloré
+- Aucun appel API supplémentaire — toutes les données viennent du `scoreTrend` déjà inclus dans `GET /class-groups/:id/kpi/students`
+
+**Hypothèses posées :**
+- `formatDate` extrait la partie date `YYYY-MM-DD` par `substring(0,10)` pour gérer sans risque timezone les deux formats possibles : date pure (`lastActivityAt`) et timestamp ISO (`completedAt` du scoreTrend)
+- Seuils de couleur identiques à `useTeacherAnalytics.scoreTextClass` : ≥70 → vert, 50-69 → neutre, <50 → orange
+
+**DoD :**
+- ✅ Fonctionnel — vue détail complète avec historique scores
+- ✅ 18 tests Vitest verts (StudentDetailComponent.test.js)
+- ✅ Zéro régression sur les 438 tests front déjà verts
+- ✅ Changelog à jour
+
+**Dette / points d'attention :**
+- `ClassroomPage.test.js` (7 tests) et `classGroups.store.test.js` (2 tests) et `MindmapsListView.test.js` (1 suite) sont en échec avant ce ticket — dettes préexistantes non liées à S-01.07, à corriger dans un ticket dédié
+
+---
+
+### [BUG-FIX] — Boutons Voir/Télécharger (fichiers S3 privés) — 2026-06-26
+
+**Contexte :** Les boutons "Voir" et "Télécharger" dans ClassroomEtudiantView et "Ouvrir" dans ClassroomEnseignantView ne faisaient rien. Racine du problème : l'endpoint proxy `/storage/stream` utilisait `s3Response.Body.pipe(res)` (AWS SDK v3) qui peut échouer silencieusement avec les fournisseurs S3-compatibles non-AWS (Infomaniak Swiss Backup). Le front utilisait ensuite un blob URL via `URL.createObjectURL()` — complexité inutile source de bugs (blocage popup, mauvais Content-Type).
+
+**Fichiers modifiés (API) :**
+- `controllers/Storage.controller.js` — suppression de `streamFile`, ajout de `presignFile` : génère une presigned URL valide 15 min via `getSignedUrl` de `@aws-sdk/s3-request-presigner` ; paramètre `disposition=inline|attachment` contrôle `ResponseContentDisposition` ; retourne `{ url }` ; validation `key.startsWith('uploads/')` inchangée
+- `routes/Storage.routes.js` — route `GET /stream` → `GET /presign` (même authMiddleware) ; JSDoc Swagger mis à jour
+
+**Fichiers modifiés (Front) :**
+- `src/pages/ClassroomEtudiantView.vue` — `openFile` : appelle `api.get('storage/presign', { key })` puis `newWindow.location.href = url` (fenêtre ouverte synchroniquement pour éviter popup blocker) ; `downloadFile` : appelle `api.get('storage/presign', { key, disposition: 'attachment' })` puis `window.location.href = url` (Content-Disposition attachment → téléchargement sans navigation) ; bouton "Télécharger" des documents partagés corrigé pour appeler `downloadFile` (cohérence avec l'étiquette)
+- `src/pages/ClassroomEnseignantView.vue` — `openFile` : même pattern presigned URL
+
+**Dépendance ajoutée :**
+- `@aws-sdk/s3-request-presigner` — paquet officiel AWS SDK v3, même éditeur que `@aws-sdk/client-s3` déjà installé
+
+**Ce qui est utilisable :**
+- "Voir" (rendu soumis) → ouvre le fichier dans un nouvel onglet via presigned URL S3
+- "Télécharger" (rendu soumis) → télécharge le fichier (`Content-Disposition: attachment`)
+- "Ouvrir" (ressource pédagogique, vue enseignant) → ouvre le fichier dans un nouvel onglet
+- "Télécharger" (document partagé, vue étudiant) → télécharge le fichier
+
+**Hypothèses posées :**
+- `window.location.href = presignedUrl` avec `Content-Disposition: attachment` déclenche un téléchargement sans naviguer hors de l'app — comportement standard pour les navigateurs modernes
+- La presigned URL expire après 15 min — acceptable pour un usage interactif (l'utilisateur clique, le fichier s'ouvre immédiatement)
+- Infomaniak Swiss Backup respecte les paramètres de requête `ResponseContentDisposition` de S3 — à vérifier si un fournisseur futur ne les supporte pas
+
+**Dette / points d'attention :**
+- `api.getBlob()` reste dans `api.js` mais n'est plus utilisé dans les vues — à supprimer dans un ticket de nettoyage si aucun autre usage n'émerge

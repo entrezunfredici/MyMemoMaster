@@ -1,10 +1,15 @@
 const express = require('express')
 const classGroup = require('../controllers/ClassGroup.controller')
 const invitation = require('../controllers/Invitation.controller')
+const section = require('../controllers/ClassGroupSection.controller')
+const resource = require('../controllers/ClassGroupResource.controller')
+const submission = require('../controllers/ClassGroupSubmission.controller')
 const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
 const classGroupValidators = require('../validators/ClassGroup.validators')
 const invitationValidators = require('../validators/Invitation.validators')
+const sectionValidators = require('../validators/ClassGroupSection.validators')
+const resourceValidators = require('../validators/ClassGroupResource.validators')
 
 const router = express.Router()
 
@@ -207,6 +212,50 @@ router.post(
  *       500:
  *         description: Erreur serveur.
  */
+/**
+ * @swagger
+ * /class-groups/{id}/members/{userId}:
+ *   put:
+ *     summary: Modifier le rôle d'un membre (admin uniquement)
+ *     tags: [ClassGroup]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [role]
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [teacher, student]
+ *     responses:
+ *       200:
+ *         description: Rôle mis à jour.
+ *       403:
+ *         description: Accès refusé.
+ *       404:
+ *         description: Membre introuvable.
+ */
+router.put(
+  '/:id/members/:userId',
+  authMiddleware,
+  classGroupValidators.updateMember,
+  validate,
+  classGroup.updateMember
+)
+
 router.delete('/:id/members/:userId', authMiddleware, classGroup.removeMember)
 
 /**
@@ -273,10 +322,11 @@ router.get('/:id/kpi/students', authMiddleware, classGroup.getStudentAnalytics)
  *         application/json:
  *           schema:
  *             type: object
- *             required: [targetUserId, role]
+ *             required: [targetEmail, role]
  *             properties:
- *               targetUserId:
- *                 type: integer
+ *               targetEmail:
+ *                 type: string
+ *                 format: email
  *               role:
  *                 type: string
  *                 enum: [teacher, student]
@@ -315,6 +365,29 @@ router.post(
  *         description: Accès refusé.
  */
 router.get('/:id/invitations', authMiddleware, invitation.findByGroup)
+
+// ── Sections / Rendus ─────────────────────────────────────────────────────────
+router.get('/:id/sections', authMiddleware, section.findAll)
+router.post('/:id/sections', authMiddleware, sectionValidators.create, validate, section.create)
+router.put('/:id/sections/:sectionId', authMiddleware, sectionValidators.update, validate, section.update)
+router.delete('/:id/sections/:sectionId', authMiddleware, section.delete)
+
+// ── Ressources pédagogiques ───────────────────────────────────────────────────
+router.get('/:id/resources', authMiddleware, resource.findAll)
+router.post('/:id/resources', authMiddleware, resourceValidators.create, validate, resource.create)
+router.put('/:id/resources/:resourceId', authMiddleware, resourceValidators.update, validate, resource.update)
+router.delete('/:id/resources/:resourceId', authMiddleware, resource.delete)
+
+// ── Soumissions de rendus (étudiant → rendu d'un section type 'rendu') ────────
+router.get('/:id/sections/:sectionId/submissions', authMiddleware, submission.findBySection)
+router.post('/:id/sections/:sectionId/submissions', authMiddleware, submission.upsert)
+router.delete('/:id/sections/:sectionId/submissions/:submissionId', authMiddleware, submission.delete)
+
+// ── Événements de calendrier du groupe ────────────────────────────────────────
+router.get('/:id/events', authMiddleware, classGroup.findGroupEvents)
+
+// ── Échéances du groupe ────────────────────────────────────────────────────────
+router.get('/:id/deadlines', authMiddleware, classGroup.findGroupDeadlines)
 
 module.exports = (app) => {
   /**

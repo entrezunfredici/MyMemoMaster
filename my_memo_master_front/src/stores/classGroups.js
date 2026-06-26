@@ -6,6 +6,7 @@ export const useClassGroupStore = defineStore('classGroups', {
   state: () => ({
     groups: [],
     group: null,
+    kpi: null,
   }),
 
   actions: {
@@ -39,6 +40,21 @@ export const useClassGroupStore = defineStore('classGroups', {
       }
     },
 
+    async fetchKpi(groupId) {
+      try {
+        const resp = await api.get(`class-groups/${groupId}/kpi`)
+        if (resp?.status !== 200) {
+          this.kpi = null
+          return false
+        }
+        this.kpi = resp.data.data
+        return true
+      } catch {
+        this.kpi = null
+        return false
+      }
+    },
+
     async createGroup(payload) {
       try {
         const resp = await api.post('class-groups', payload)
@@ -48,7 +64,7 @@ export const useClassGroupStore = defineStore('classGroups', {
         }
         this.groups.push(resp.data.data)
         notif.notify('Groupe créé.', 'success')
-        return true
+        return resp.data.data
       } catch {
         notif.notify('Erreur lors de la création.', 'error')
         return false
@@ -88,15 +104,15 @@ export const useClassGroupStore = defineStore('classGroups', {
       }
     },
 
-    async addMember(id, userId) {
+    async addMember(groupId, userId, role = 'student') {
       try {
-        const resp = await api.post(`class-groups/${id}/members`, { userId })
-        if (resp?.status !== 200) {
+        const resp = await api.post(`class-groups/${groupId}/members`, { userId, role })
+        if (resp?.status !== 201) {
           notif.notify(resp?.data?.message || "Erreur lors de l'ajout du membre.", 'error')
           return false
         }
-        await this.fetchGroupById(id)
-        const idx = this.groups.findIndex((g) => g.id === id)
+        await this.fetchGroupById(groupId)
+        const idx = this.groups.findIndex((g) => g.id === groupId)
         if (idx !== -1 && this.group) this.groups[idx] = this.group
         notif.notify('Membre ajouté.', 'success')
         return true
@@ -106,15 +122,33 @@ export const useClassGroupStore = defineStore('classGroups', {
       }
     },
 
-    async removeMember(id, userId) {
+    async updateMemberRole(groupId, userId, role) {
       try {
-        const resp = await api.del(`class-groups/${id}/members/${userId}`)
+        const resp = await api.put(`class-groups/${groupId}/members/${userId}`, { role })
+        if (resp?.status !== 200) {
+          notif.notify(resp?.data?.message || 'Erreur lors du changement de rôle.', 'error')
+          return false
+        }
+        await this.fetchGroupById(groupId)
+        const idx = this.groups.findIndex((g) => g.id === groupId)
+        if (idx !== -1 && this.group) this.groups[idx] = this.group
+        notif.notify('Rôle mis à jour.', 'success')
+        return true
+      } catch {
+        notif.notify('Erreur lors du changement de rôle.', 'error')
+        return false
+      }
+    },
+
+    async removeMember(groupId, userId) {
+      try {
+        const resp = await api.del(`class-groups/${groupId}/members/${userId}`)
         if (resp?.status !== 200) {
           notif.notify(resp?.data?.message || 'Erreur lors de la suppression du membre.', 'error')
           return false
         }
-        await this.fetchGroupById(id)
-        const idx = this.groups.findIndex((g) => g.id === id)
+        await this.fetchGroupById(groupId)
+        const idx = this.groups.findIndex((g) => g.id === groupId)
         if (idx !== -1 && this.group) this.groups[idx] = this.group
         notif.notify('Membre retiré.', 'success')
         return true

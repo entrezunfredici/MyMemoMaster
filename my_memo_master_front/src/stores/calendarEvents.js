@@ -6,9 +6,25 @@ export const useCalendarEventStore = defineStore('calendarEvents', {
   state: () => ({
     events: [],
     event: null,
+    groupEvents: [],
   }),
 
   actions: {
+    async fetchByGroup(groupId) {
+      try {
+        const resp = await api.get(`class-groups/${groupId}/events`)
+        if (resp?.status !== 200) {
+          notif.notify(resp?.data?.message || 'Erreur lors du chargement des événements.', 'error')
+          return false
+        }
+        this.groupEvents = resp.data.data
+        return true
+      } catch {
+        notif.notify('Erreur lors du chargement des événements.', 'error')
+        return false
+      }
+    },
+
     async fetchEvents() {
       try {
         const resp = await api.get('calendar-events')

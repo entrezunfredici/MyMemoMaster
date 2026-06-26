@@ -55,6 +55,14 @@ exports.update = [
     .withMessage('Le score doit être un nombre entre 0 et 100.')
 ]
 
+exports.updateMember = [
+  body('role')
+    .notEmpty()
+    .withMessage('Le rôle est requis.')
+    .isIn(['teacher', 'student'])
+    .withMessage("Le rôle doit être 'teacher' ou 'student'.")
+]
+
 exports.addMember = [
   body('userId')
     .notEmpty()

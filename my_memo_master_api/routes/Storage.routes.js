@@ -69,6 +69,44 @@ const handleUpload = (multerMiddleware) => (req, res, next) => {
  *       500:
  *         description: Erreur interne du serveur.
  */
+/**
+ * @swagger
+ * /storage/presign:
+ *   get:
+ *     summary: Génère une URL signée temporaire (15 min) pour accéder à un fichier S3
+ *     tags: [Storage]
+ *     parameters:
+ *       - in: query
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Clé S3 du fichier (ex. "uploads/1/timestamp-random.gif")
+ *       - in: query
+ *         name: disposition
+ *         schema:
+ *           type: string
+ *           enum: [inline, attachment]
+ *         description: "inline (affichage) ou attachment (téléchargement)"
+ *     responses:
+ *       200:
+ *         description: URL signée générée.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 url:
+ *                   type: string
+ *       400:
+ *         description: Clé de fichier invalide.
+ *       401:
+ *         description: Non authentifié.
+ *       404:
+ *         description: Fichier introuvable.
+ */
+router.get('/presign', authMiddleware, storage.presignFile)
+
 router.post('/upload', authMiddleware, handleUpload(upload.single('file')), storage.upload)
 
 /**

@@ -34,6 +34,9 @@ models.TestResult = require('./TestResult.model')(instance)
 models.Invitation = require('./Invitation.model')(instance)
 models.UserKpiAlertSettings = require('./UserKpiAlertSettings.model')(instance)
 models.Tag = require('./Tag.model')(instance)
+models.ClassGroupSection = require('./ClassGroupSection.model')(instance)
+models.ClassGroupResource = require('./ClassGroupResource.model')(instance)
+models.ClassGroupSubmission = require('./ClassGroupSubmission.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

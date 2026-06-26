@@ -1,4 +1,5 @@
 const ClassGroupService = require('../services/ClassGroup.service')
+const { CalendarEvent, EventOccurrence, Deadline, ClassGroupUsers, User, Test } = require('../models/index')
 const logger = require('../helpers/logger')
 
 exports.findAll = async (req, res) => {
@@ -108,6 +109,77 @@ exports.getStudentAnalytics = async (req, res) => {
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).json({ message: 'Erreur lors du calcul de l\'analyse pédagogique.' })
+  }
+}
+
+exports.updateMember = async (req, res) => {
+  try {
+    const { role } = req.body
+    const result = await ClassGroupService.updateMemberRole(req.params.id, req.params.userId, req.user.id, role)
+    if (result === false)
+      return res.status(403).json({ message: 'Accès refusé. Seuls les administrateurs peuvent modifier les membres.' })
+    if (result === null)
+      return res.status(404).json({ message: 'Membre introuvable dans ce groupe.' })
+    res.status(200).json({ message: 'Rôle du membre mis à jour.', data: result })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la mise à jour du membre.' })
+  }
+}
+
+exports.findGroupEvents = async (req, res) => {
+  try {
+    const groupId = req.params.id
+    const userId = req.user.id
+    const user = await User.findByPk(userId, { attributes: ['roleId'] })
+    const isAdmin = [1, 4].includes(user?.roleId)
+    if (!isAdmin) {
+      const membership = await ClassGroupUsers.findOne({ where: { classGroupId: groupId, userId } })
+      if (!membership) return res.status(403).json({ message: 'Accès refusé.' })
+    }
+    const events = await CalendarEvent.findAll({
+      where: { classGroupId: groupId },
+      include: [{ model: EventOccurrence, as: 'occurrences', order: [['date', 'ASC']] }],
+      order: [['createdAt', 'ASC']]
+    })
+    res.status(200).json({ message: 'Événements récupérés.', data: events })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération des événements.' })
+  }
+}
+
+exports.findGroupDeadlines = async (req, res) => {
+  try {
+    const groupId = req.params.id
+    const userId = req.user.id
+    const user = await User.findByPk(userId, { attributes: ['roleId'] })
+    const isAdmin = [1, 4].includes(user?.roleId)
+    if (!isAdmin) {
+      const membership = await ClassGroupUsers.findOne({ where: { classGroupId: groupId, userId } })
+      if (!membership) return res.status(403).json({ message: 'Accès refusé.' })
+    }
+    const deadlines = await Deadline.findAll({
+      include: [
+        {
+          model: EventOccurrence,
+          as: 'occurrence',
+          required: true,
+          include: [{
+            model: CalendarEvent,
+            as: 'calendarEvent',
+            where: { classGroupId: groupId },
+            attributes: ['id', 'name', 'type', 'classGroupId']
+          }]
+        },
+        { model: Test, as: 'test', attributes: ['testId', 'name'], required: false }
+      ],
+      order: [['dueDate', 'ASC']]
+    })
+    res.status(200).json({ message: 'Échéances récupérées.', data: deadlines })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération des échéances.' })
   }
 }
 

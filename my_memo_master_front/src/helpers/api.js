@@ -398,9 +398,27 @@ async function del(endpoint, data = {}) {
   }
 }
 
+/**
+ * Télécharge un fichier depuis l'API avec authentification — retourne un Blob.
+ *
+ * @param {string} endpoint - Chemin de l'endpoint (ex: "storage/stream?key=...")
+ * @returns {Promise<{data: Blob, status: number}|undefined>}
+ */
+async function getBlob(endpoint) {
+  if (!endpoint) throw new Error("Un endpoint est requis pour l'appel API")
+  try {
+    const response = await axiosApi.get(endpoint, { responseType: 'blob' })
+    if (handleSpecialStatus(response?.status)) return undefined
+    return { data: response.data, status: response.status }
+  } catch (error) {
+    console.error('Error during blob API call using api.js:', error.stack)
+  }
+}
+
 export const api = {
   get,
   post,
   put,
   del,
+  getBlob,
 }

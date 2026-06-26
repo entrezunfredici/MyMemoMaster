@@ -1,4 +1,5 @@
-const { DeleteObjectCommand } = require('@aws-sdk/client-s3')
+const { DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3')
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 const { s3Client, bucket, publicUrl } = require('../config/storage.config')
 const logger = require('../helpers/logger')
 
@@ -34,6 +35,27 @@ exports.uploadMultiple = async (req, res) => {
   } catch (error) {
     logger.error(error?.message || error)
     return res.status(500).send({ message: "Erreur lors de l'upload des fichiers." })
+  }
+}
+
+exports.presignFile = async (req, res) => {
+  const key = decodeURIComponent(req.query.key || '')
+  const disposition = req.query.disposition === 'attachment' ? 'attachment' : 'inline'
+  if (!key || !key.startsWith('uploads/')) {
+    return res.status(400).send({ message: 'Clé de fichier invalide.' })
+  }
+  try {
+    const filename = key.split('/').pop()
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ResponseContentDisposition: `${disposition}; filename="${filename}"`
+    })
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 900 })
+    return res.status(200).send({ url })
+  } catch (err) {
+    logger.error(`[storage/presign] ${err?.message || err}`)
+    return res.status(404).send({ message: 'Fichier introuvable.' })
   }
 }
 

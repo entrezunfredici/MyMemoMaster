@@ -6,9 +6,25 @@ export const useDeadlineStore = defineStore('deadlines', {
   state: () => ({
     deadlines: [],
     deadline: null,
+    groupDeadlines: [],
   }),
 
   actions: {
+    async fetchByGroup(groupId) {
+      try {
+        const resp = await api.get(`class-groups/${groupId}/deadlines`)
+        if (resp?.status !== 200) {
+          notif.notify(resp?.data?.message || 'Erreur lors du chargement des échéances.', 'error')
+          return false
+        }
+        this.groupDeadlines = resp.data.data
+        return true
+      } catch {
+        notif.notify('Erreur lors du chargement des échéances.', 'error')
+        return false
+      }
+    },
+
     async fetchDeadlines() {
       try {
         const resp = await api.get('deadlines')

@@ -64,7 +64,7 @@ describe('Invitation Controller', () => {
   // ── POST /class-groups/:id/invitations ────────────────────────────────────────
 
   describe('POST /class-groups/:id/invitations', () => {
-    const validBody = { targetUserId: 2, role: 'student' }
+    const validBody = { targetEmail: 'eleve@example.com', role: 'student' }
 
     it('201 — envoie une invitation', async () => {
       invitationService.invite.mockResolvedValue({ directlyAdded: false, invitation: mockInvitation })
@@ -101,7 +101,7 @@ describe('Invitation Controller', () => {
       expect(res.status).toBe(404)
     })
 
-    it('400 — targetUserId manquant', async () => {
+    it('400 — targetEmail manquant', async () => {
       const res = await request(app)
         .post(`${BASE}/class-groups/1/invitations`)
         .set('Authorization', `Bearer ${makeToken()}`)
@@ -111,11 +111,21 @@ describe('Invitation Controller', () => {
       expect(invitationService.invite).not.toHaveBeenCalled()
     })
 
+    it('400 — targetEmail invalide', async () => {
+      const res = await request(app)
+        .post(`${BASE}/class-groups/1/invitations`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ targetEmail: 'pas-un-email', role: 'student' })
+
+      expect(res.status).toBe(400)
+      expect(invitationService.invite).not.toHaveBeenCalled()
+    })
+
     it('400 — rôle invalide', async () => {
       const res = await request(app)
         .post(`${BASE}/class-groups/1/invitations`)
         .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ targetUserId: 2, role: 'admin' })
+        .send({ targetEmail: 'eleve@example.com', role: 'admin' })
 
       expect(res.status).toBe(400)
     })

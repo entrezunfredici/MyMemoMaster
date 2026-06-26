@@ -12,7 +12,7 @@
 * Cartes mentales : schemat servant à itentifier les différentes notions (définitions, formules, grandeurs physiques ect..) et les liens entre elles.
 * Séries d’exercices: séries d’exercices permettant de s’entrainer
 * Calendier et todolist : outils d’organisation permettant de planifier les seances de révisions et visualiser les échéances (ds, exams ect...)
-* Kpi personnels : Ensemble de données permettant de voir son niveaux, ces points forts et ces points faibles, l’apllication mesure les kpi suivants : score aux séries d’exercices, niveaux de maitrise des questions dans les systèmes de leitner, nombre questions répondues, régularitée, diversitée des sujets etudiés, discipline (rapport entre ce qui est prévu et ce qui est réellement fait)
+* Kpi personnels : Ensemble de données permettant de voir son niveaux, ces points forts et ces points faibles, l’application mesure les kpi suivants : nombe de jours de révision consécutifs, activité hebdomadaire sur 8 semaines, taux de maîtrise Leitner, répartition par sujet, discipline, badges (gamification)
 
 La plateforme propose aussi des fonctionnalitées pour faciliter le suivi étudiant :
 
@@ -26,7 +26,10 @@ Il y a egalement des fonctionnalitées d’IA. Un système de correction via sim
 En contexte de production, plusieurs étudiants peuvent utiliser simultanément la plateforme (pics pendant les periode scolaires, avant les examens). En sacahtn que la disponibilitée de l'application est critique, par rapport à la responsabilitée qu'elle a (garantir aux etudiants des revisions dans de bonnes conditions/indispensable pour leur reussite profetionnelle future). L'objectif est donc de garantir **disponibilité**, **performance** et **résilience** face à cette charge variable en adaptant l'infra en conséquence.
 
 **Stack technique :** Node.js 22 · Express.js v4 · Sequelize v6 · PostgreSQL ·
-Vue 3 + Vite + Pinia · JWT + bcryptjs · Docker Compose · Traefik · Redis (BullMQ)
+Vue 3 + Vite + Pinia · JWT + bcryptjs · Redis (BullMQ)
+**Dev :** Docker Compose · Traefik · **Prod :** Kubernetes · nginx Ingress
+
+![Architecture MyMemoMaster](8366f8a1-4838-475e-a18b-f9805595e2de.png)
 
 ---
 
@@ -36,8 +39,8 @@ Vue 3 + Vite + Pinia · JWT + bcryptjs · Docker Compose · Traefik · Redis (Bu
 
 #### `GET /api/v1/kpi/me` — Calcul KPI pédagogique
 
-C'est le point chaud principal. À chaque appel, `KpiService.getMyKpis()` déclenche
-**3 requêtes SQL parallèles** avec plusieurs JOINs :
+À chaque appel, l'endpoint `KpiService.getMyKpis()` déclenche
+**3 requêtes SQL parallèles** avec plusieurs jointures :
 
 ```js
 const [sessions, testResults, leitnerSystems] = await Promise.all([
@@ -53,14 +56,13 @@ const [sessions, testResults, leitnerSystems] = await Promise.all([
 ])
 ```
 
-Puis calcule 6 métriques côté serveur : streak de révision, activité hebdomadaire
-sur 8 semaines, taux de maîtrise Leitner, répartition par sujet, discipline, badges.
+Puis calcule 6 métriques côté serveur : nombe de jours de révision consécutifs, activité hebdomadaire sur 8 semaines, taux de maîtrise Leitner, répartition par sujet, discipline, badges (gamification).
 Pour un utilisateur actif (100+ cartes, 50+ sessions), cela représente plusieurs
 centaines de lignes agrégées **à chaque chargement de page**.
 
 #### `POST /grading/semantic` — Correction sémantique par modèle IA local
 
-Ce endpoint utilise le modèle d'embeddings **`Xenova/all-mpnet-base-v2`** (110M paramètres,
+Cet endpoint utilise le modèle d'embeddings **`Xenova/all-mpnet-base-v2`** (110M paramètres,
 ~86 Mo quantifié ONNX), qui tourne **entièrement dans le conteneur Docker** sans appel
 à une API externe.
 
@@ -114,32 +116,41 @@ requête depuis la base, sans cache.
 
 ## 3. Stratégie de Load Balancing
 
-### 3.1 Traefik déjà présent dans l'infrastructure
+### 3.1 Deux environnements, deux reverse proxies
 
-L'infrastructure Docker Compose existante intègre déjà **Traefik** comme reverse proxy
-avec terminaison HTTPS, HSTS et redirect HTTP → HTTPS. Traefik supporte nativement le
-load balancing round-robin sur plusieurs réplicas Docker via le Docker socket.
-**Aucun changement de configuration Traefik n'est nécessaire.**
+Le projet distingue deux environnements avec des reverse proxies différents :
+
+- **Dev (Docker Compose) :** **Traefik** assure le reverse proxy avec terminaison HTTPS, HSTS et redirect HTTP → HTTPS. Il détecte les conteneurs via le Docker socket et équilibre le trafic automatiquement entre les réplicas.
+- **Prod (Kubernetes) :** **nginx Ingress Controller** remplace Traefik. L'Ingress K8s expose les services avec les mêmes règles de routage, et le Service de type `ClusterIP` répartit le trafic entre les Pods via kube-proxy.
 
 ### 3.2 Passage en multi-instance
+
+**Dev — Docker Compose :**
 
 ```bash
 docker compose up --scale api=3
 ```
 
-Traefik détecte automatiquement les 3 réplicas et répartit le trafic entre eux en
-temps réel.
+Traefik détecte automatiquement les 3 réplicas et répartit le trafic entre eux en temps réel.
+
+**Prod — Kubernetes :**
+
+```bash
+kubectl scale deployment api --replicas=3
+```
+
+Le Service K8s reroute le trafic vers les nouveaux Pods dès qu'ils passent `Ready`.
 
 ### 3.3 Algorithme de répartition choisi : Round-Robin
 
-**Round-robin** (défaut Traefik) est adapté pour des requêtes de durée homogène (CRUD
-standard). Les JWT étant stateless, **aucune sticky session n'est nécessaire** : chaque
-réplica peut traiter n'importe quelle requête authentifiée sans état local partagé.
+**Round-robin** est adapté pour des requêtes de durée homogène (CRUD standard) — c'est le comportement par défaut aussi bien de Traefik (dev) que du Service K8s via kube-proxy (prod). Les JWT étant stateless, **aucune sticky session n'est nécessaire** : chaque réplica peut traiter n'importe quelle requête authentifiée sans état local partagé.
 
 Pour l'endpoint IA (`/grading/semantic`), CPU-bound et très long (~30s), la stratégie
-retenue est de le déporter dans une **queue BullMQ** avec un worker dédié (voir §6).
+retenue est de le déporter dans une **queue BullMQ** avec un worker dédié (voir paragraphe 6).
 
 ### 3.4 Health checks et retrait automatique des instances défaillantes
+
+**Dev — Docker Compose + Traefik :**
 
 ```yaml
 # docker-compose.yml
@@ -150,15 +161,33 @@ healthcheck:
   retries: 3
 ```
 
-Traefik retire automatiquement du pool un réplica dont le health check échoue et le
-réintègre dès qu'il repasse healthy — circuit breaker implicite sans configuration
-supplémentaire.
+Traefik retire automatiquement du pool un réplica dont le health check échoue.
+
+**Prod — Kubernetes :**
+
+```yaml
+# deployment.yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+```
+
+K8s exclut automatiquement du Service tout Pod dont la `readinessProbe` échoue, et redémarre celui dont la `livenessProbe` ne répond plus.
 
 ---
 
 ## 4. Schémas d'architecture
 
-### 4.1 Architecture actuelle (mono-instance)
+### 4.1 Architecture actuelle — Dev mono-instance (Docker Compose + Traefik)
 
 ```
 ┌─────────────┐     HTTPS      ┌──────────────────────┐
@@ -188,34 +217,34 @@ Limites identifiées :
   ❌ Modèle IA chargé à froid au premier appel (~30s de latence)
 ```
 
-### 4.2 Architecture cible (haute disponibilité)
+### 4.2 Architecture cible — Prod haute disponibilité (Kubernetes + nginx Ingress)
 
 ```
 ┌─────────────┐     HTTPS      ┌──────────────────────────────────────┐
-│  Navigateur │ ─────────────► │               Traefik                │
+│  Navigateur │ ─────────────► │          nginx Ingress (K8s)         │
 │  Vue 3 SPA  │                │     Load Balancer — Round-Robin      │
-└─────────────┘                │         HTTPS + Health checks        │
+└─────────────┘                │     HTTPS + Readiness/Liveness       │
                                └──────┬─────────────────┬─────────────┘
                                       │                 │
                                ┌──────▼──────┐  ┌───────▼──────────────────────┐
-                               │  front:80   │  │         API Cluster          │
-                               │  nginx+SPA  │  │  ┌────────┐ ┌────────┐       │
-                               └─────────────┘  │  │ api-1  │ │ api-2  │       │
-                                                │  └───┬────┘ └───┬────┘       │
+                               │  front      │  │         API Cluster          │
+                               │  Service    │  │  ┌────────┐ ┌────────┐       │
+                               │  nginx+SPA  │  │  │ api-1  │ │ api-2  │       │
+                               └─────────────┘  │  └───┬────┘ └───┬────┘       │
                                                 │      └─── api-3 ┘            │
                                                 └──────────────┬───────────────┘
                                                                │
                               ┌────────────────────────────────┤
                               │                                │
-               ┌──────────────▼────────────────┐   ┌──────────▼──────────────┐
-               │             Redis             │   │       PostgreSQL         │
-               │  ┌────────────────────────┐  │   │  ┌─────────────────────┐ │
-               │  │ Cache KPI  TTL 5 min   │  │   │  │  Primary (R/W)      │ │
-               │  │ Cache Planning TTL 2mn │  │   │  └──────────┬──────────┘ │
-               │  │ Rate Limit Store       │  │   │             │ streaming  │
-               │  │ BullMQ — rappels       │  │   │  ┌──────────▼──────────┐ │
-               │  │ BullMQ — correction IA │  │   │  │  Replica (Read Only)│ │
-               │  └────────────────────────┘  │   │  └─────────────────────┘ │
+               ┌──────────────▼────────────────┐   ┌───────────▼─────────────┐
+               │             Redis             │   │       PostgreSQL        │
+               │  ┌────────────────────────┐   │   │ ┌─────────────────────┐ │
+               │  │ Cache KPI  TTL 5 min   │   │   │ │  Primary (R/W)      │ │
+               │  │ Cache Planning TTL 2mn │   │   │ └──────────┬──────────┘ │
+               │  │ Rate Limit Store       │   │   │            │ streaming  │
+               │  │ BullMQ — rappels       │   │   │ ┌──────────▼──────────┐ │
+               │  │ BullMQ — correction IA │   │   │ │  Replica (Read Only)│ │
+               │  └────────────────────────┘   │   │ └─────────────────────┘ │
                └───────────────────────────────┘   └─────────────────────────┘
 ```
 
@@ -228,11 +257,21 @@ Limites identifiées :
 Chaque réplica `api` est **stateless** (JWT côté client, état en Redis ou PG).
 On peut ajouter des instances sans downtime ni reconfiguration :
 
+**Dev :**
+
 ```bash
 docker compose up --scale api=5 --no-recreate
 ```
 
 Traefik met à jour son pool de backends en temps réel via le Docker socket.
+
+**Prod :**
+
+```bash
+kubectl scale deployment api --replicas=5
+```
+
+Le Service K8s reroute le trafic dès que les nouveaux Pods passent la `readinessProbe`.
 
 ### 5.2 Profils de charge identifiés
 
@@ -354,28 +393,81 @@ worker.on('completed', (job, result) => {
 ```
 
 Le controller répond `202 Accepted` immédiatement. Le résultat est récupéré
-par le client via polling ou WebSocket une fois le worker terminé.
+par le client via polling une fois le worker terminé.
 
-### 6.5 Récapitulatif des clés Redis
+### 6.5 Queue BullMQ — Génération IA (OCR + LLM) asynchrone
 
-| Clé                         | Type         | TTL    | Invalidation                       |
-| ---------------------------- | ------------ | ------ | ---------------------------------- |
-| `kpi:{userId}`             | JSON         | 5 min  | Submit exercice / réponse Leitner |
-| `planning:{userId}:{days}` | JSON         | 2 min  | Ajout session / deadline           |
-| `ratelimit:auth:{ip}`      | counter      | 15 min | Sliding window automatique         |
-| `bull:reminders:*`         | BullMQ queue | —     | Dépilé par worker emails         |
-| `bull:semantic:*`          | BullMQ queue | —     | Dépilé par worker IA dédié     |
+L'intégration de la génération de systèmes de leitner et de séries d'exercices à partir des cours implique deux appels API externes séquentiels : une **API OCR** (extraction du texte) puis une **API LLM** (génération du contenu). Ces appels peuvent durer plusieurs dizaines de secondes et dépendent de services tiers — ils ne peuvent pas bloquer un thread Node.
+
+**Flux complet :**
+
+```
+Utilisateur uploade un cours (PDF/image)
+        │
+        ▼
+POST /courses/:id/generate
+  → stocke le fichier
+  → enfile un job dans BullMQ
+  → répond 202 Accepted immédiatement
+        │
+        ▼
+Worker "generation" (dédié)
+  1. Appel API OCR  → texte brut extrait
+  2. Appel API LLM  → cartes Leitner / exercices générés
+  3. Sauvegarde en base
+  4. Notifie le client (polling ou WebSocket)
+```
+
+**Stratégie par appel :**
+
+- **API OCR** — résultat déterministe pour un même fichier : le hash du contenu est stocké en base. Si le même fichier est soumis deux fois, le worker saute l'appel OCR et réutilise le texte déjà extrait, évitant un appel payant redondant.
+- **API LLM** — appel long et coûteux : timeout explicite côté worker (ex. 60s), retry avec exponential backoff sur les erreurs 429 et 5xx (max 3 tentatives), abandon propre avec message d'erreur utilisateur au-delà.
+
+```js
+// Worker génération
+const generationWorker = new Worker('generation', async (job) => {
+  const { courseId, fileHash, filePath } = job.data
+
+  // Cache OCR : évite de re-payer si même fichier
+  let text = await CourseText.findOne({ where: { fileHash } })
+  if (!text) {
+    text = await callOcrApi(filePath)          // appel externe OCR
+    await CourseText.create({ fileHash, text })
+  }
+
+  // Appel LLM avec timeout et retry gérés par BullMQ
+  const generated = await callLlmApi(text)    // appel externe LLM
+  await saveGeneratedContent(courseId, generated)
+}, {
+  concurrency: 2   // limite les appels LLM simultanés (coût + quotas)
+})
+```
+
+La `concurrency: 2` du worker évite de saturer le quota de l'API LLM en cas de pic de soumissions simultanées.
+
+### 6.6 Récapitulatif des clés Redis
+
+| Clé                         | Type         | TTL    | Invalidation                           |
+| ---------------------------- | ------------ | ------ | -------------------------------------- |
+| `kpi:{userId}`             | JSON         | 5 min  | Submit exercice / réponse Leitner     |
+| `planning:{userId}:{days}` | JSON         | 2 min  | Ajout session / deadline               |
+| `ratelimit:auth:{ip}`      | counter      | 15 min | Sliding window automatique             |
+| `bull:reminders:*`         | BullMQ queue | —     | Dépilé par worker emails             |
+| `bull:semantic:*`          | BullMQ queue | —     | Dépilé par worker IA locale          |
+| `bull:ocr:*`               | BullMQ queue | —     | Dépilé par worker génération       |
+| `bull:generation:*`        | BullMQ queue | —     | Dépilé par worker génération (LLM) |
 
 ---
 
 ## Synthèse des choix architecturaux
 
-| Décision                   | Justification                                                                      |
-| --------------------------- | ---------------------------------------------------------------------------------- |
-| Traefik comme load balancer | Déjà présent dans l'infra, zéro config supplémentaire pour Docker scale       |
-| Round-robin stateless       | JWT stateless → pas de sticky sessions nécessaires                               |
-| Cache Redis KPI TTL 5 min   | 3 JOINs + 6 métriques à chaque appel, données stables à la minute              |
-| Redis store pour rate-limit | Garantie du quota global en multi-instance, corrige dette M-00.09                  |
-| PG Streaming Replication    | Décharge les lectures sur le replica, résilience failover, zéro changement code |
-| Worker BullMQ dédié IA    | Modèle chargé une seule fois (~86 Mo), appel non-bloquant, latence absorbée     |
-| Health checks Docker        | Retrait et réintégration automatiques des instances défaillantes par Traefik    |
+| Décision                            | Justification                                                                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Traefik (dev) / nginx Ingress (prod) | Traefik en Docker Compose pour le dev ; nginx Ingress Controller en K8s pour la prod                                                                    |
+| Round-robin stateless                | JWT stateless → pas de sticky sessions nécessaires                                                                                                    |
+| Cache Redis KPI TTL 5 min            | 3 JOINs + 6 métriques à chaque appel, données stables à la minute                                                                                   |
+| Redis store pour rate-limit          | Garantie du quota global en multi-instance, corrige dette M-00.09                                                                                       |
+| PG Streaming Replication             | Décharge les lectures sur le replica, résilience failover, zéro changement code                                                                      |
+| Worker BullMQ dédié IA locale      | Modèle chargé une seule fois (~86 Mo), appel non-bloquant, latence absorbée                                                                          |
+| Worker BullMQ génération (OCR+LLM) | Appels externes longs et coûteux déportés en queue ; cache OCR par hash fichier ; retry backoff LLM ; concurrency limitée pour respecter les quotas |
+| Health checks Docker / K8s probes    | Dev : Traefik retire les conteneurs KO ; Prod : readiness/liveness probes K8s excluent les Pods défaillants                                            |

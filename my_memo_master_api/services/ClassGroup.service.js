@@ -23,15 +23,20 @@ class ClassGroupService {
    */
   async findAll(userId) {
     const user = await User.findByPk(userId, { attributes: ['roleId'] })
+    const memberInclude = {
+      model: ClassGroupUsers,
+      as: 'members',
+      include: [{ model: User, as: 'user', attributes: ['userId', 'name', 'email'] }]
+    }
     if ([1, 4].includes(user?.roleId)) {
-      return ClassGroup.findAll({ include: [{ model: ClassGroupUsers, as: 'members' }] })
+      return ClassGroup.findAll({ include: [memberInclude] })
     }
     const memberships = await ClassGroupUsers.findAll({ where: { userId } })
     const groupIds = memberships.map((m) => m.classGroupId)
     if (groupIds.length === 0) return []
     return ClassGroup.findAll({
       where: { id: groupIds },
-      include: [{ model: ClassGroupUsers, as: 'members' }]
+      include: [memberInclude]
     })
   }
 
@@ -43,7 +48,11 @@ class ClassGroupService {
    */
   async findOne(id) {
     return ClassGroup.findByPk(id, {
-      include: [{ model: ClassGroupUsers, as: 'members' }]
+      include: [{
+        model: ClassGroupUsers,
+        as: 'members',
+        include: [{ model: User, as: 'user', attributes: ['userId', 'name', 'email'] }]
+      }]
     })
   }
 
@@ -103,7 +112,7 @@ class ClassGroupService {
    */
   async addMember(groupId, requesterId, memberData) {
     const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
-    if (requester?.roleId !== 1) return false
+    if (![1, 4].includes(requester?.roleId)) return false
     const group = await ClassGroup.findByPk(groupId)
     if (!group) return null
     const [membership] = await ClassGroupUsers.findOrCreate({
@@ -124,9 +133,20 @@ class ClassGroupService {
    * @param {number} requesterId
    * @returns {Promise<boolean|null|false>}
    */
+  async updateMemberRole(groupId, targetUserId, requesterId, role) {
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    if (![1, 4].includes(requester?.roleId)) return false
+    const membership = await ClassGroupUsers.findOne({
+      where: { classGroupId: groupId, userId: targetUserId }
+    })
+    if (!membership) return null
+    await membership.update({ role })
+    return membership
+  }
+
   async removeMember(groupId, targetUserId, requesterId) {
     const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
-    if (requester?.roleId !== 1) return false
+    if (![1, 4].includes(requester?.roleId)) return false
     const membership = await ClassGroupUsers.findOne({
       where: { classGroupId: groupId, userId: targetUserId }
     })

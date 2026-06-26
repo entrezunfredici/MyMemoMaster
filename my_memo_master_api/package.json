@@ -18,6 +18,7 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.1075.0",
     "@xenova/transformers": "^2.0.1",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.7.0",
