@@ -1,6 +1,6 @@
 const dayjs = require('dayjs')
 const { Op } = require('sequelize')
-const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline } = require('../models/index')
+const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline, EventOccurrence, CalendarEvent, Test } = require('../models/index')
 
 const AT_RISK_INACTIVE_DAYS = 7
 const AT_RISK_SCORE_DROP_PCT = 20
@@ -234,18 +234,30 @@ class ClassGroupService {
       return { activeStudentsCount: 0, atRiskCount: 0, scoreWeeklyTrend: this._computeGroupWeeklyTrend([]), students: [] }
     }
 
-    // Exercices assignés comme devoir par les enseignants du groupe
+    // Exercices assignés comme devoir dans CE groupe par les enseignants du groupe
     const deadlines = teacherIds.length > 0
       ? await Deadline.findAll({
           where: { createdBy: teacherIds, testId: { [Op.not]: null } },
-          attributes: ['testId']
+          attributes: ['testId'],
+          include: [{
+            model: EventOccurrence,
+            as: 'occurrence',
+            required: true,
+            attributes: [],
+            include: [{
+              model: CalendarEvent,
+              as: 'calendarEvent',
+              where: { classGroupId: Number(groupId) },
+              attributes: []
+            }]
+          }]
         })
       : []
     const teacherTestIds = [...new Set(deadlines.map((d) => d.testId).filter(Boolean))]
 
     const [users, sessions, results] = await Promise.all([
       User.findAll({ where: { userId: studentIds }, attributes: ['userId', 'name', 'email'] }),
-      RevisionSession.findAll({ where: { userId: studentIds } }),
+      RevisionSession.findAll({ where: { userId: studentIds, isDone: true } }),
       teacherTestIds.length > 0
         ? TestResult.findAll({ where: { userId: studentIds, testId: teacherTestIds }, order: [['completedAt', 'ASC']] })
         : Promise.resolve([])
@@ -261,8 +273,9 @@ class ClassGroupService {
 
       const lastSession = [...userSessions].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
       const lastActivityAt = lastSession ? lastSession.date : null
+      // CHOIX: dayjs.diff plutôt que new Date() pour éviter le décalage UTC sur les champs DATEONLY
       const daysInactive = lastActivityAt
-        ? Math.floor((now - new Date(lastActivityAt)) / (1000 * 60 * 60 * 24))
+        ? dayjs().startOf('day').diff(dayjs(lastActivityAt), 'day')
         : null
 
       const avgScore =
@@ -315,6 +328,66 @@ class ClassGroupService {
       scoreWeeklyTrend: this._computeGroupWeeklyTrend(results),
       students
     }
+  }
+
+  /**
+   * Retourne les événements de calendrier d'un groupe avec leurs occurrences.
+   * Accessible à tout membre du groupe (enseignants et étudiants) ainsi qu'aux admins.
+   *
+   * @param {number} groupId
+   * @param {number} requesterId
+   * @returns {Promise<CalendarEvent[]|false>} false si non membre
+   */
+  async getGroupEvents(groupId, requesterId) {
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    const isAdmin = [1, 4].includes(requester?.roleId)
+    if (!isAdmin) {
+      const membership = await ClassGroupUsers.findOne({
+        where: { classGroupId: Number(groupId), userId: requesterId }
+      })
+      if (!membership) return false
+    }
+    return CalendarEvent.findAll({
+      where: { classGroupId: Number(groupId) },
+      include: [{ model: EventOccurrence, as: 'occurrences', order: [['date', 'ASC']] }],
+      order: [['createdAt', 'ASC']]
+    })
+  }
+
+  /**
+   * Retourne les échéances d'un groupe (via ses séances de calendrier).
+   * Accessible à tout membre du groupe ainsi qu'aux admins.
+   *
+   * @param {number} groupId
+   * @param {number} requesterId
+   * @returns {Promise<Deadline[]|false>} false si non membre
+   */
+  async getGroupDeadlines(groupId, requesterId) {
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    const isAdmin = [1, 4].includes(requester?.roleId)
+    if (!isAdmin) {
+      const membership = await ClassGroupUsers.findOne({
+        where: { classGroupId: Number(groupId), userId: requesterId }
+      })
+      if (!membership) return false
+    }
+    return Deadline.findAll({
+      include: [
+        {
+          model: EventOccurrence,
+          as: 'occurrence',
+          required: true,
+          include: [{
+            model: CalendarEvent,
+            as: 'calendarEvent',
+            where: { classGroupId: Number(groupId) },
+            attributes: ['id', 'name', 'type', 'classGroupId']
+          }]
+        },
+        { model: Test, as: 'test', attributes: ['testId', 'name'], required: false }
+      ],
+      order: [['dueDate', 'ASC']]
+    })
   }
 
   /**

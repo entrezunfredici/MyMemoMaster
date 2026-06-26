@@ -1,4 +1,10 @@
-const { body } = require('express-validator')
+const { body, param } = require('express-validator')
+
+exports.findById = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage("L'identifiant du groupe doit être un entier positif.")
+]
 
 exports.create = [
   body('name')

@@ -384,10 +384,10 @@ router.post('/:id/sections/:sectionId/submissions', authMiddleware, submission.u
 router.delete('/:id/sections/:sectionId/submissions/:submissionId', authMiddleware, submission.delete)
 
 // ── Événements de calendrier du groupe ────────────────────────────────────────
-router.get('/:id/events', authMiddleware, classGroup.findGroupEvents)
+router.get('/:id/events', authMiddleware, classGroupValidators.findById, validate, classGroup.findGroupEvents)
 
 // ── Échéances du groupe ────────────────────────────────────────────────────────
-router.get('/:id/deadlines', authMiddleware, classGroup.findGroupDeadlines)
+router.get('/:id/deadlines', authMiddleware, classGroupValidators.findById, validate, classGroup.findGroupDeadlines)
 
 module.exports = (app) => {
   /**

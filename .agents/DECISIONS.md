@@ -569,6 +569,25 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : Invitation token unique dans l'email (lien magic-link) — plus user-friendly mais nécessite un endpoint public `GET /invitations/accept?token=…`, une colonne token supplémentaire et une gestion d'expiration. Différé à un ticket UX dédié.
 **Conséquences** : `Invitation.targetUserId` est maintenant nullable (migration `20260625000001`). `Invitation.targetEmail` ajouté (STRING(255), nullable). `User.service.js` importe `Invitation` et `ClassGroupUsers` (couplage acceptable : le hook est localisé dans `_processPendingEmailInvitations`). L'email envoyé aux non-inscrits est informatif (pas de lien magic-link) ; l'utilisateur doit s'inscrire avec l'email invité.
 
+### [2026-06-26] KPI pédagogiques — corrections post-revue S-01.09
+
+**Contexte** : La revue de code S-01.09 a identifié 8 bugs dont 3 de données critiques.
+
+**Décision** :
+- `Deadline.findAll` scopé au groupe via join `EventOccurrence → CalendarEvent.classGroupId` (évite la contamination cross-groupe quand un enseignant appartient à plusieurs groupes).
+- `RevisionSession.findAll` filtré sur `isDone: true` (évite que les sessions planifiées/futures faussent le calcul de `lastActivityAt`).
+- `daysInactive` calculé via `dayjs().startOf('day').diff(dayjs(lastActivityAt), 'day')` au lieu de `new Date()` brut (évite le décalage UTC sur les champs DATEONLY).
+- `atRiskStudents` computed : `?.students?.filter(...)` avec double chaînage optionnel (évite le crash TypeError si la clé `students` est absente de la réponse API).
+- `expandedAnalyticsStudents` réinitialisé à chaque `loadStudentAnalytics` (évite l'état expand persistant cross-groupe).
+- `findGroupEvents` et `findGroupDeadlines` déplacés du controller vers le service (`getGroupEvents` / `getGroupDeadlines`) — respecte l'architecture `controller → service → model`.
+- Validator `findById` (`param('id').isInt`) ajouté sur `GET /:id/events` et `GET /:id/deadlines` pour éviter les 500 PostgreSQL sur un `:id` non entier.
+
+**Alternative écartée** : Garder la logique inline dans le controller pour les deux handlers events/deadlines — plus rapide à écrire mais viole CLAUDE.md et duplique la logique d'auth.
+
+**Conséquences** : `ClassGroup.service.js` importe désormais `EventOccurrence, CalendarEvent, Test`. Le controller `ClassGroup.controller.js` n'importe plus de modèles directement. Le validator `ClassGroup.validators.js` utilise `param` en plus de `body`.
+
+---
+
 ### [2026-06-26] Accès aux fichiers S3 privés — presigned URL vs. proxy streaming
 **Contexte** : Les fichiers uploadés sur Infomaniak Swiss Backup (bucket privé) ne sont pas accessibles via leur URL publique. Une première approche utilisait un endpoint proxy backend (`GET /storage/stream`) qui récupérait le fichier avec `GetObjectCommand` et le pipe-ait vers la réponse Express. Cette approche échouait silencieusement avec Infomaniak (le `Body.pipe(res)` d'AWS SDK v3 est moins fiable hors AWS) et complexifiait le front (blob URL + popup blocker).
 **Décision** : Utiliser `@aws-sdk/s3-request-presigner` pour générer une URL signée temporaire (15 min) côté serveur. Le backend retourne `{ url }`, le front redirige directement vers cette URL. Pour les téléchargements, `disposition=attachment` passe via `ResponseContentDisposition` qui force `Content-Disposition: attachment` dans la réponse S3.

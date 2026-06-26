@@ -92,7 +92,7 @@
 | Search API (cross-contenu) | Stable — S-05.05 : GET /search?subjectId&q — service + controller + validators + routes + 11 tests | 2026-06-25 |
 | Navigation arborescente par sujet | Stable — S-05.06 : stores/search.js + pages/SubjectsPage.vue (/subjects) + route | 2026-06-25 |
 | SubjectSelectorComponent | Stable — S-05.07 : composant réutilisable select + création inline, remplace code dupliqué FlashcardsPage + ExercisesPage | 2026-06-25 |
-| KPI pédagogiques enseignant | Stable — S-01.01→S-01.07 : API kpi/students, maquettes UI, section analytics ClassroomEnseignantView.vue, composable useTeacherAnalytics, vue détail étudiant (scoreTrend + alertes + inactivité) — StudentDetailComponent.vue (18 tests Vitest) | 2026-06-26 |
+| KPI pédagogiques enseignant | Stable — S-01.09 revue corrigée : 8 bugs (cross-groupe Deadline, isDone RevisionSession, crash atRiskStudents, logique métier controller, expanded state, validators routes, string groupId PostgreSQL, timezone DATEONLY) | 2026-06-26 |
 | Storage (accès fichiers S3 privés) | Stable — BUG-FIX : route `/storage/stream` remplacée par `/storage/presign` (presigned URL 15 min via `@aws-sdk/s3-request-presigner`), boutons Voir/Télécharger fonctionnels dans ClassroomEtudiantView + ClassroomEnseignantView | 2026-06-26 |
 | Invitation (système d'invitation groupe) | Stable — S-01.07 : invitation par email (2 branches : ajout direct si compte existant, email sinon), hook post-inscription pour traiter les invitations en attente | 2026-06-25 |
 | ClassGroupSection / ClassGroupResource | Stable — S-03.08 : 2 modèles + 2 migrations + CRUD complet (service/controller/validators/routes), sections & rendus + ressources pédagogiques par groupe | 2026-06-26 |

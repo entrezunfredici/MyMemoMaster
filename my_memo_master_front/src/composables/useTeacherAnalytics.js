@@ -17,7 +17,7 @@ export function useTeacherAnalytics() {
     return trend[trend.length - 1].avgScore
   })
 
-  const atRiskStudents = computed(() => analytics.value?.students.filter((s) => s.atRisk) ?? [])
+  const atRiskStudents = computed(() => analytics.value?.students?.filter((s) => s.atRisk) ?? [])
 
   function scoreTextClass(score) {
     if (score >= 70) return 'text-success'
@@ -39,6 +39,7 @@ export function useTeacherAnalytics() {
     if (!groupId) return
     analyticsLoading.value = true
     analytics.value = null
+    Object.keys(expandedAnalyticsStudents).forEach((k) => delete expandedAnalyticsStudents[k])
     try {
       const { api } = await import('@/helpers/api')
       const resp = await api.get(`class-groups/${groupId}/kpi/students`)
