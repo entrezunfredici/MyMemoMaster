@@ -8,6 +8,7 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.DB_STORAGE = ':memory:'
 
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
+jest.mock('../../jobs/kpiAlert.cron', () => ({ startKpiAlertCron: jest.fn() }))
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
 
 // Mock BullMQ : aucune connexion Redis requise

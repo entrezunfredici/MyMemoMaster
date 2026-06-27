@@ -6,10 +6,13 @@ export const useClassGroupSectionStore = defineStore('classGroupSections', {
   state: () => ({
     sections: [],
     currentGroupId: null,
+    _cache: {}, // { [groupId]: timestamp } — TTL 5 min
   }),
 
   actions: {
-    async fetchByGroup(groupId) {
+    async fetchByGroup(groupId, force = false) {
+      const TTL = 5 * 60 * 1000
+      if (!force && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
       try {
         const resp = await api.get(`class-groups/${groupId}/sections`)
         if (resp?.status !== 200) {
@@ -18,6 +21,7 @@ export const useClassGroupSectionStore = defineStore('classGroupSections', {
         }
         this.sections = resp.data.data
         this.currentGroupId = groupId
+        this._cache[groupId] = Date.now()
         return true
       } catch {
         notif.notify('Erreur lors du chargement des sections.', 'error')

@@ -7,10 +7,13 @@ export const useCalendarEventStore = defineStore('calendarEvents', {
     events: [],
     event: null,
     groupEvents: [],
+    _cache: {}, // { [groupId]: timestamp } — TTL 5 min
   }),
 
   actions: {
-    async fetchByGroup(groupId) {
+    async fetchByGroup(groupId, force = false) {
+      const TTL = 5 * 60 * 1000
+      if (!force && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
       try {
         const resp = await api.get(`class-groups/${groupId}/events`)
         if (resp?.status !== 200) {
@@ -18,6 +21,7 @@ export const useCalendarEventStore = defineStore('calendarEvents', {
           return false
         }
         this.groupEvents = resp.data.data
+        this._cache[groupId] = Date.now()
         return true
       } catch {
         notif.notify('Erreur lors du chargement des événements.', 'error')

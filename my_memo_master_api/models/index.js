@@ -37,6 +37,7 @@ models.Tag = require('./Tag.model')(instance)
 models.ClassGroupSection = require('./ClassGroupSection.model')(instance)
 models.ClassGroupResource = require('./ClassGroupResource.model')(instance)
 models.ClassGroupSubmission = require('./ClassGroupSubmission.model')(instance)
+models.KpiConsent = require('./KpiConsent.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

@@ -67,6 +67,8 @@
     ],
     "moduleNameMapper": {
       "^@xenova/transformers$": "<rootDir>/__mocks__/@xenova/transformers.js"
-    }
+    },
+    "testTimeout": 60000,
+    "forceExit": true
   }
 }

@@ -59,6 +59,55 @@ class KpiService {
   }
 
   /**
+   * Calcule les KPI personnels filtrés par matières consenties.
+   * Leitner et exercices sont filtrés par subjectIds.
+   * Révision et discipline sont partagées telles quelles (données générales non liées à une matière).
+   *
+   * @param {number} userId
+   * @param {number[]} subjectIds - Liste des subjectId consentis
+   * @returns {object} KPI filtrés
+   */
+  async getPersonalKpisForSubjects(userId, subjectIds) {
+    const [sessions, testResults, leitnerSystems] = await Promise.all([
+      RevisionSession.findAll({ where: { userId }, order: [['date', 'DESC']] }),
+      TestResult.findAll({
+        where: { userId },
+        include: [
+          {
+            model: Test,
+            as: 'test',
+            attributes: ['testId', 'name', 'subjectId'],
+            where: { subjectId: subjectIds },
+            required: true,
+            include: [{ model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }]
+          }
+        ],
+        order: [['completedAt', 'ASC']]
+      }),
+      LeitnerSystem.findAll({
+        where: { idUser: userId, subjectId: subjectIds },
+        include: [
+          {
+            model: LeitnerBox,
+            as: 'leitnerBoxes',
+            include: [{ model: LeitnerCard, as: 'leitnerCards' }]
+          },
+          { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
+        ]
+      })
+    ])
+
+    const revisionKpi = this._computeRevision(sessions)
+    const exercisesKpi = this._computeExercises(testResults)
+    const leitnerKpi = this._computeLeitner(leitnerSystems)
+    const subjectsKpi = this._computeSubjects(testResults, leitnerSystems)
+    const disciplineKpi = this._computeDiscipline(sessions)
+    const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
+
+    return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, badges }
+  }
+
+  /**
    * @private
    */
   _computeRevision(sessions) {

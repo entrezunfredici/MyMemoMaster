@@ -7,10 +7,13 @@ export const useDeadlineStore = defineStore('deadlines', {
     deadlines: [],
     deadline: null,
     groupDeadlines: [],
+    _cache: {}, // { [groupId]: timestamp } — TTL 5 min
   }),
 
   actions: {
-    async fetchByGroup(groupId) {
+    async fetchByGroup(groupId, force = false) {
+      const TTL = 5 * 60 * 1000
+      if (!force && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
       try {
         const resp = await api.get(`class-groups/${groupId}/deadlines`)
         if (resp?.status !== 200) {
@@ -18,6 +21,7 @@ export const useDeadlineStore = defineStore('deadlines', {
           return false
         }
         this.groupDeadlines = resp.data.data
+        this._cache[groupId] = Date.now()
         return true
       } catch {
         notif.notify('Erreur lors du chargement des échéances.', 'error')
@@ -63,6 +67,7 @@ export const useDeadlineStore = defineStore('deadlines', {
           return false
         }
         this.deadlines.push(resp.data.data)
+        this._cache = {} // invalide le cache — la vue appellera fetchByGroup ensuite
         notif.notify('Échéance créée.', 'success')
         return true
       } catch {
@@ -96,6 +101,7 @@ export const useDeadlineStore = defineStore('deadlines', {
           return false
         }
         this.deadlines = this.deadlines.filter((d) => d.id !== id)
+        this._cache = {} // invalide le cache — la vue appellera fetchByGroup ensuite
         notif.notify('Échéance supprimée.', 'success')
         return true
       } catch {

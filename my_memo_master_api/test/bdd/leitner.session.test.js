@@ -10,6 +10,9 @@ process.env.DB_STORAGE = ':memory:'
 
 jest.mock('../../services/Semantic.service', () => ({ gradeSemantic: jest.fn() }))
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
+jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
+jest.mock('../../jobs/reminder.queue', () => ({ getReminderQueue: jest.fn(), closeReminderQueue: jest.fn() }))
+jest.mock('../../jobs/kpiAlert.cron', () => ({ startKpiAlertCron: jest.fn() }))
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
 
 const request = require('supertest')
@@ -313,4 +316,9 @@ describe('Leitner — session complète (tests fonctionnels)', () => {
 
     expect(res.status).toBe(400)
   })
+})
+
+afterAll(async () => {
+  const { instance } = require('../../models')
+  await instance.close()
 })

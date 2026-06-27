@@ -11,6 +11,8 @@ process.env.DB_STORAGE = ':memory:'
 jest.mock('../../services/Semantic.service', () => ({ gradeSemantic: jest.fn() }))
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
 jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
+jest.mock('../../jobs/reminder.queue', () => ({ getReminderQueue: jest.fn(), closeReminderQueue: jest.fn() }))
+jest.mock('../../jobs/kpiAlert.cron', () => ({ startKpiAlertCron: jest.fn() }))
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
 
 const request = require('supertest')
@@ -263,4 +265,9 @@ describe('Exercices — parcours complet (tests fonctionnels)', () => {
     expect(mcqQ.content.options).toHaveLength(2)
     expect(mcqQ.content.options[1].correct).toBe(true)
   })
+})
+
+afterAll(async () => {
+  const { instance } = require('../../models')
+  await instance.close()
 })

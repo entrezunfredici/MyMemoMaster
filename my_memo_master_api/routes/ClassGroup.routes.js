@@ -10,6 +10,7 @@ const classGroupValidators = require('../validators/ClassGroup.validators')
 const invitationValidators = require('../validators/Invitation.validators')
 const sectionValidators = require('../validators/ClassGroupSection.validators')
 const resourceValidators = require('../validators/ClassGroupResource.validators')
+const submissionValidators = require('../validators/ClassGroupSubmission.validators')
 
 const router = express.Router()
 
@@ -380,7 +381,7 @@ router.delete('/:id/resources/:resourceId', authMiddleware, resource.delete)
 
 // ── Soumissions de rendus (étudiant → rendu d'un section type 'rendu') ────────
 router.get('/:id/sections/:sectionId/submissions', authMiddleware, submission.findBySection)
-router.post('/:id/sections/:sectionId/submissions', authMiddleware, submission.upsert)
+router.post('/:id/sections/:sectionId/submissions', authMiddleware, submissionValidators.upsert, validate, submission.upsert)
 router.delete('/:id/sections/:sectionId/submissions/:submissionId', authMiddleware, submission.delete)
 
 // ── Événements de calendrier du groupe ────────────────────────────────────────

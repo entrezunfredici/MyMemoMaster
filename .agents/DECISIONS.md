@@ -588,6 +588,22 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-27] KpiConsent — consentement par quadruplet (étudiant, enseignant, groupe, matière)
+**Contexte** : L'étudiant doit pouvoir accorder l'accès à ses KPI à un enseignant — potentiellement filtré par matière (ex. partager ses KPI de physique uniquement avec le prof de physique).
+**Décision** : Consentement par quadruplet `(studentId, teacherId, classGroupId, subjectId)` où `subjectId` est nullable (null = accès global tous sujets, entier = filtré par matière). Contrainte unique sur ce quadruplet. Un étudiant peut avoir plusieurs consentements pour le même (teacher, group) si chaque entrée concerne une matière différente.
+**Alternative écartée** : Triplet sans subjectId (global uniquement) — plus simple, mais ne permet pas la granularité par matière demandée. / Consentement global par liste de subjects (colonne JSON) — difficile à indexer et à contraindre en SQL.
+**Conséquences** : L'UI front doit proposer un sélecteur de matière lors de l'accord. La gestion de l'idempotence pour subjectId=null est faite au niveau applicatif (`findOrCreate`) car SQL traite NULL comme distinct dans les indexes uniques (SQLite et PostgreSQL <15). La migration `20260627000001` inclut le champ `subjectId` dès la création de la table.
+
+---
+
+### [2026-06-27] KpiConsent — pas de bypass admin sur les KPI personnels
+**Contexte** : Par convention dans ce projet, les admins (roleId 1 et 4) ont accès total à la gestion des groupes et des ressources pédagogiques. La question était d'appliquer ou non ce bypass aux KPI personnels des étudiants.
+**Décision** : Aucun bypass admin. Seul un membre avec `role='teacher'` dans le groupe ET disposant d'un consentement explicite de l'étudiant peut consulter ses KPI personnels. `_isTeacherInGroup` dans `KpiConsent.service.js` ne consulte pas `User.roleId`.
+**Alternative écartée** : Bypass admin comme dans `ClassGroupResource._canWrite` — rejeté car les KPI personnels sont des données privées de l'étudiant (révision, scores, streaks). Le bypass admin est justifié pour la gestion opérationnelle des groupes, pas pour l'accès aux données personnelles sans accord.
+**Conséquences** : Un admin qui veut voir les KPI d'un étudiant doit demander son consentement comme n'importe quel enseignant. Cohérent avec la valeur utilisateur : "l'étudiant conserve le contrôle sur ses données".
+
+---
+
 ### [2026-06-26] Accès aux fichiers S3 privés — presigned URL vs. proxy streaming
 **Contexte** : Les fichiers uploadés sur Infomaniak Swiss Backup (bucket privé) ne sont pas accessibles via leur URL publique. Une première approche utilisait un endpoint proxy backend (`GET /storage/stream`) qui récupérait le fichier avec `GetObjectCommand` et le pipe-ait vers la réponse Express. Cette approche échouait silencieusement avec Infomaniak (le `Body.pipe(res)` d'AWS SDK v3 est moins fiable hors AWS) et complexifiait le front (blob URL + popup blocker).
 **Décision** : Utiliser `@aws-sdk/s3-request-presigner` pour générer une URL signée temporaire (15 min) côté serveur. Le backend retourne `{ url }`, le front redirige directement vers cette URL. Pour les téléchargements, `disposition=attachment` passe via `ResponseContentDisposition` qui force `Content-Disposition: attachment` dans la réponse S3.

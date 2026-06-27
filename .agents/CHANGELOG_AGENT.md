@@ -95,8 +95,10 @@
 | KPI pédagogiques enseignant | Stable — S-01.09 revue corrigée : 8 bugs (cross-groupe Deadline, isDone RevisionSession, crash atRiskStudents, logique métier controller, expanded state, validators routes, string groupId PostgreSQL, timezone DATEONLY) | 2026-06-26 |
 | Storage (accès fichiers S3 privés) | Stable — BUG-FIX : route `/storage/stream` remplacée par `/storage/presign` (presigned URL 15 min via `@aws-sdk/s3-request-presigner`), boutons Voir/Télécharger fonctionnels dans ClassroomEtudiantView + ClassroomEnseignantView | 2026-06-26 |
 | Invitation (système d'invitation groupe) | Stable — S-01.07 : invitation par email (2 branches : ajout direct si compte existant, email sinon), hook post-inscription pour traiter les invitations en attente | 2026-06-25 |
-| ClassGroupSection / ClassGroupResource | Stable — S-03.08 : 2 modèles + 2 migrations + CRUD complet (service/controller/validators/routes), sections & rendus + ressources pédagogiques par groupe | 2026-06-26 |
+| ClassGroupSection / ClassGroupResource / ClassGroupSubmission | Stable — S-02.05 livré : tests service + controller pour les 3 entités (18+23 Section, 21+17 Submission), validators Submission ajoutés, validator branché sur route POST | 2026-06-27 |
+| KpiConsent (partage KPI) | Stable — S-02.03 livré : API complète (grant/revoke/list/access + filtrage par matière via subjectId), 22 tests service + 23 tests controller, 3 BDD stables (testTimeout+forceExit), diagrams mis à jour | 2026-06-27 |
 | Front — ClassroomPage (3 vues) | Stable — S-03.08 : ClassroomPage.vue coordinateur + ClassroomEtablissementView / ClassroomEnseignantView / ClassroomEtudiantView ; stores classGroupSections + classGroupResources + fetchByGroup sur calendarEvents/deadlines | 2026-06-26 |
+| Front — Interface partage KPI (étudiant + enseignant) | Stable — S-02.06 : store kpiConsent.js + section [F] dans ClassroomEtudiantView (liste, formulaire, modal révocation) + badge KPI + panneau KPI lazy dans ClassroomEnseignantView | 2026-06-27 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -3799,3 +3801,194 @@ Pattern critique : `setActivePinia(pinia)` puis `useTestStore()` / `useTestResul
 
 **Dette / points d'attention :**
 - `api.getBlob()` reste dans `api.js` mais n'est plus utilisé dans les vues — à supprimer dans un ticket de nettoyage si aucun autre usage n'émerge
+
+---
+
+### [2026-06-27] S-02.05 — Tests ClassGroupResource + Consentement KPI (KpiConsent)
+
+**Contexte :** S-02.05 — Partage maîtrisé des KPI personnels. Deux périmètres livrés dans ce ticket : (1) combler la dette tests de ClassGroupResource (identifiée lors de l'audit), (2) livrer l'ensemble du module KpiConsent permettant à un étudiant d'accorder/révoquer l'accès à ses KPI à un enseignant dans un groupe.
+
+**Fichiers créés :**
+
+- `test/services/ClassGroupResource.service.test.js` — 14 tests : `_canWrite` (5), `_isMember` (3), `findAll` (2), `create` (2), `update` (3), `delete` (5 dont erreur S3 ignorée)
+- `test/controllers/ClassGroupResource.controller.test.js` — 20 tests : GET (5), POST (7), PUT (6), DELETE (5) — couvre 200/201/400/401/403/404/500
+- `models/KpiConsent.model.js` — studentId + teacherId + classGroupId + grantedAt ; contrainte unique sur le triplet
+- `migrations/20260627000001-create-kpiconsent-table.js`
+- `services/KpiConsent.service.js` — `grantConsent` / `revokeConsent` / `getMyConsents` / `getStudentKpis` (vérifie rôle teacher + consent avant d'appeler KpiService)
+- `controllers/KpiConsent.controller.js` — 4 handlers (grantConsent, revokeConsent, getMyConsents, getStudentKpis)
+- `validators/KpiConsent.validators.js` — validation `grantConsent` (teacherId, classGroupId) + `getStudentKpis` (classGroupId query param)
+- `test/services/KpiConsent.service.test.js` — 13 tests : `_isTeacherInGroup` (3), `_isStudentInGroup` (2), `grantConsent` (4), `revokeConsent` (2), `getMyConsents` (2), `getStudentKpis` (3)
+- `test/controllers/KpiConsent.controller.test.js` — 20 tests : POST /consent (7), DELETE /consent/:t/:g (4), GET /consent/my (4), GET /student/:id (6)
+
+**Fichiers modifiés :**
+
+- `routes/Kpi.routes.js` — ajout 4 routes : `GET /kpi/consent/my`, `POST /kpi/consent`, `DELETE /kpi/consent/:teacherId/:classGroupId`, `GET /kpi/student/:studentId?classGroupId=X`
+- `models/index.js` — enregistrement `KpiConsent`
+
+**Ce qui est utilisable :**
+
+- Un étudiant peut accorder (`POST /kpi/consent`) ou révoquer (`DELETE /kpi/consent/:t/:g`) l'accès à ses KPI pour un enseignant dans un groupe
+- Un étudiant liste ses consentements actifs (`GET /kpi/consent/my`)
+- Un enseignant consulte les KPI d'un étudiant s'il a son consentement (`GET /kpi/student/:studentId?classGroupId=X`)
+- Contrôle d'accès : l'étudiant doit avoir rôle `student` dans le groupe, l'enseignant rôle `teacher` (ou admin global)
+
+**Hypothèses posées :**
+
+- Un admin global (roleId 1 ou 4) est considéré comme enseignant valide pour `getStudentKpis` — même pattern que ClassGroupResource
+- `findOrCreate` sur le triplet (studentId, teacherId, classGroupId) garantit l'idempotence de `grantConsent`
+- Le consentement est par groupe : un même binôme (étudiant, enseignant) dans deux groupes différents nécessite deux consentements distincts
+
+**Dette éventuelle :**
+
+- Pas de front (store + UI) pour le consentement dans ce ticket — à livrer dans un ticket S-02 front dédié
+- Pas de notification à l'enseignant quand un étudiant accorde/révoque son consentement
+
+---
+
+### [2026-06-27] S-02.01 — Modèle de consentement partage (Analyse)
+
+**Contexte :** Tâche d'analyse S-02.01 — définir formellement le modèle de consentement partage des KPI personnels avant/après implémentation. La fonctionnalité technique avait été livrée dans S-02.05 ; ce ticket documente les décisions de modélisation, les règles métier et les flux utilisateur.
+
+**Fichiers créés :**
+- `diagrams/kpi_consent_partage.md` — document de référence complet : contexte, périmètre IN/OUT, acteurs, modèle ERD, règles métier (accord, révocation, accès enseignant), matrice de contrôle d'accès, flux nominal, tableau des endpoints avec codes de réponse, liens vers l'implémentation, points d'attention (front manquant, notifications, audit trail RGPD, admin bypass)
+
+**Fichiers modifiés :**
+- `.agents/DECISIONS.md` — 2 nouvelles entrées : granularité du consentement par triplet (studentId, teacherId, classGroupId) + admin bypass sans consentement explicite
+
+**DoD :**
+- ✅ Document modèle livré et conforme au périmètre S-02 (IN/OUT respectés)
+- ✅ Tests documentés (stratégie : 13 tests service + 20 tests controller déjà livrés en S-02.05)
+- ✅ Décisions techniques enregistrées dans DECISIONS.md
+- ✅ CHANGELOG mis à jour
+
+**Points d'attention :**
+- Le front (store kpiConsent + UI accordion) reste à livrer dans un ticket S-02 front dédié
+- La conformité RGPD sur le bypass admin mérite d'être arbitrée avec le PO si la plateforme cible une certification
+
+---
+
+### [2026-06-27] S-02.02 — Maquettes UI partage KPI (Analyse)
+
+**Contexte :** Tâche d'analyse S-02.02 — produire les maquettes ASCII de l'UI du partage de KPI pour guider l'implémentation front (ticket S-02 front). Basé sur le modèle S-02.01 et l'API S-02.05.
+
+**Fichiers créés :**
+- `diagrams/kpi_consent_ui.md` — maquettes ASCII complètes :
+  - Vue étudiant : section "Partage de mes KPI" dans `ClassroomEtudiantView.vue` (3 états : vide, consentements actifs, tous accordés) + modal de confirmation révocation
+  - Vue enseignant : badge KPI dans l'accordion étudiant + panneau KPI personnels (consentement accordé vs. refusé) dans `ClassroomEnseignantView.vue`
+  - Comportements de chaque composant UI (select, bouton révoquer, badge)
+  - Définition du store Pinia `kpiConsent.js` à créer (state + actions)
+  - Flux utilisateur nominal (étudiant accorde → enseignant voit → étudiant révoque)
+  - Points d'attention pour l'implémentation (lazy loading, cache, exclusion enseignants déjà accordés)
+
+**DoD :**
+- ✅ Maquettes livées pour les 2 vues concernées (étudiant + enseignant)
+- ✅ Stratégie de test documentée (tests unitaires store + tests composant via Vitest à livrer en même temps que l'implémentation front)
+- ✅ CHANGELOG mis à jour
+
+---
+
+### [2026-06-27] S-02.05 — Livraison API ressources pédagogiques CRUD
+
+**Contexte :** Audit et complétion du DoD S-02.05 — l'API était fonctionnelle mais les tests pour `ClassGroupSection` et `ClassGroupSubmission` étaient absents, et `ClassGroupSubmission` n'avait pas de validator.
+
+**Fichiers créés :**
+- `test/services/ClassGroupSection.service.test.js` — 18 tests : `_canWrite` (5), `_isMember` (3), `findAll` (2), `create` (2), `update` (3), `delete` (3)
+- `test/controllers/ClassGroupSection.controller.test.js` — 23 tests : GET (5), POST (7 dont 3 cas de validation), PUT (6), DELETE (5)
+- `test/services/ClassGroupSubmission.service.test.js` — 21 tests : `_isMember` (3), `_isTeacher` (3), `_sectionBelongsToGroup` (2), `findBySection` (3), `upsert` (5 dont S3), `delete` (5 dont étudiant/propre/autres)
+- `test/controllers/ClassGroupSubmission.controller.test.js` — 17 tests : GET (5), POST (7 dont validation URL + fileSize), DELETE (5)
+- `validators/ClassGroupSubmission.validators.js` — validation `upsert` : url (isURL optionnelle), fileKey, mimeType, originalName, fileSize (entier ≥ 0)
+
+**Fichiers modifiés :**
+- `routes/ClassGroup.routes.js` — ajout `submissionValidators` importé + branché sur `POST /:id/sections/:sectionId/submissions`
+
+**Ce qui est utilisable :**
+- `GET /class-groups/:id/sections` — liste les sections (membres)
+- `POST /class-groups/:id/sections` — crée une section (enseignants/admins), validé titre + type (`section`|`rendu`)
+- `PUT/DELETE /class-groups/:id/sections/:sectionId` — mise à jour / suppression (enseignants/admins)
+- `GET /class-groups/:id/sections/:sectionId/submissions` — liste les rendus (enseignant : tous, étudiant : les siens)
+- `POST /class-groups/:id/sections/:sectionId/submissions` — soumet ou met à jour un rendu (upsert, membres), validé url/fileKey/fileSize
+- `DELETE /class-groups/:id/sections/:sectionId/submissions/:submissionId` — supprime (enseignant : tous, étudiant : les siens uniquement)
+- `GET/POST/PUT/DELETE /class-groups/:id/resources` — CRUD ressources pédagogiques (déjà testé dans la session précédente)
+
+**DoD S-02.05 :**
+- ✅ Fonctionnel conforme (API CRUD pour Section, Resource, Submission)
+- ✅ Tests OK : 79 tests pour Section + Submission, 43 tests existants pour Resource — 1234 tests total passants
+- ✅ Revue : validators Submission ajoutés et branchés
+- ✅ Documentation (CHANGELOG mis à jour)
+- ✅ Aucun bug bloquant connu
+
+---
+
+### [2026-06-27] S-02.03 — Livraison API gestion du consentement
+
+**Contexte :** Ticket S-02.03 — audit + stabilisation de l'API KpiConsent déjà implémentée (S-02.05), extension avec `subjectId` pour le filtrage par matière, correction de bugs pre-existants sur les tests BDD, et validation complète du DoD.
+
+**Fichiers créés :**
+- `migrations/20260627000001-create-kpiconsent-table.js` — migration mise à jour directement (table jamais déployée en prod) : ajout colonne `subjectId` (FK nullable → Subject), index unique quadruplet `(studentId, teacherId, classGroupId, subjectId)`, index FK sur `subjectId`
+
+**Fichiers modifiés :**
+- `models/KpiConsent.model.js` — ajout `subjectId` (FK nullable → Subject, onDelete SET NULL), association `belongsTo(Subject)`, index unique quadruplet en config
+- `services/KpiConsent.service.js` — réécriture complète : `grantConsent` accepte `subjectId = null` (global) ou valeur (par matière) via `findOrCreate` ; `revokeConsent` : sans `subjectId` = révocation globale (destroy toutes les lignes), avec `subjectId` = révocation ciblée ; `getStudentKpis` : consentement global → `KpiService.getMyKpis`, filtré → `KpiService.getPersonalKpisForSubjects([ids])`
+- `services/Kpi.service.js` — ajout méthode `getPersonalKpisForSubjects(userId, subjectIds)` : filtre TestResult par `test.subjectId IN subjectIds` (INNER JOIN), filtre LeitnerSystem par `subjectId IN subjectIds` ; révision et discipline non filtrées (données générales)
+- `validators/KpiConsent.validators.js` — ajout `subjectId` optionnel (nullable) dans `grantConsent` et `revokeConsent`
+- `controllers/KpiConsent.controller.js` — `grantConsent` lit `subjectId` depuis `req.body` (défaut null) ; `revokeConsent` lit `subjectId` depuis `req.query` (défaut null)
+- `diagrams/kpi_consent_partage.md` — réécriture complète : distinction KPI pédagogiques / personnels, ajout `subjectId` dans entité KpiConsent, règles de révocation globale/par matière, matrice d'accès sans bypass admin, flux diagram avec consentement filtré
+- `diagrams/kpi_consent_ui.md` — ajout sélecteur de matière dans le formulaire étudiant, colonne matière dans la liste des consentements, mention `subjectId?` dans les signatures store
+- `.agents/DECISIONS.md` — réécriture entrée admin bypass (remplacée par règle sans bypass) + entrée consentement par quadruplet avec note NULL unique index
+- `test/services/KpiConsent.service.test.js` — réécriture complète : 22 tests couvrant `_isTeacherInGroup` (dont admin non membre → false), `_isStudentInGroup`, `grantConsent` (global + par matière + idempotent + not_student + not_teacher), `revokeConsent` (global + not found + par matière + not found), `getMyConsents`, `getStudentKpis` (6 cas dont admin, mixed consent, no consent)
+- `test/controllers/KpiConsent.controller.test.js` — ajout tests consentement avec `subjectId`, révocation par matière, correction syntaxe apostrophe (23 tests total)
+- `test/bdd/exercise.session.test.js` — ajout mocks `reminder.worker`, `reminder.queue`, `kpiAlert.cron` ; ajout `afterAll(instance.close())` au niveau racine
+- `test/bdd/leitner.session.test.js` — ajout mocks `reminder.worker`, `reminder.queue`, `kpiAlert.cron` ; ajout `afterAll(instance.close())` au niveau racine
+- `test/bdd/deadline.reminder.test.js` — ajout mock `kpiAlert.cron` (déjà présent : `reminder.queue`, `reminder.worker`, `instance.close()`)
+- `package.json` (jest config) — `testTimeout: 60000` (BDD tests sous charge CPU) + `forceExit: true`
+
+**Ce qui est utilisable :**
+- `POST /api/v1/kpi/consent` — accorde un consentement (global ou par matière via `subjectId` optionnel)
+- `DELETE /api/v1/kpi/consent/:teacherId/:classGroupId` — révoque (global sans `?subjectId`, par matière avec `?subjectId=X`)
+- `GET /api/v1/kpi/consent` — liste les consentements accordés par l'étudiant connecté (avec enseignant, groupe, matière inclus)
+- `GET /api/v1/kpi/consent/:teacherId/:classGroupId` — retourne les KPI personnels de l'étudiant si consentement accordé (filtré par matière ou global)
+
+**Hypothèses posées :**
+- `subjectId = null` = consentement global (toutes matières) ; une valeur = filtrage sur cette matière
+- Idempotence du `grantConsent` gérée applicativement via `findOrCreate` (SQLite et PostgreSQL traitent NULL comme distinct dans les index uniques)
+- `revokeConsent` sans `subjectId` révoque TOUTES les lignes (y compris les consentements par matière) — intention : "tout révoquer"
+- Pas de bypass admin pour les KPI personnels : seul un enseignant membre du groupe avec consentement explicite peut y accéder
+- BDD tests stabilisés avec `testTimeout: 60000` + `forceExit: true` (cause racine : `bullmq` chargé via `Reminder.service.js` au niveau module, garde une connexion Redis ouverte si non mocké)
+
+**DoD S-02.03 :**
+- ✅ API conforme aux critères d'acceptation (grant/revoke/list/access avec filtrage par matière)
+- ✅ Tests OK : 1155/1155 passants (22 service + 23 controller KpiConsent + 3 BDD stables)
+- ✅ Documentation mise à jour (`kpi_consent_partage.md`, `kpi_consent_ui.md`, `DECISIONS.md`, `CHANGELOG_AGENT.md`)
+- ✅ Aucun bug bloquant connu
+- ✅ Revue : matrice d'accès sans bypass admin, règles de révocation clarifiées
+
+
+---
+
+### [2026-06-27] S-02.06 — Interface étudiant gestion partages
+
+**Contexte :** Livraison du front-end de gestion des partages KPI. Le back-end (endpoints KPI consent) était déjà livré en S-02.03.
+
+**Fichiers créés :**
+- `my_memo_master_front/src/stores/kpiConsent.js` — store Pinia : `consents`, `studentKpis`, `loading`, `granting` ; actions : `fetchMyConsents`, `grantConsent`, `revokeConsent`, `fetchStudentKpis`, `clearStudentKpis`
+
+**Fichiers modifiés :**
+- `my_memo_master_front/src/pages/ClassroomEtudiantView.vue` — ajout section [F] "Partage de mes KPI" en bas de page : liste des consentements actifs par groupe + formulaire d'accord (select enseignant + select matière) + modal de confirmation de révocation ; `selectGroup` appelle `fetchMyConsents` + `fetchSubjects` (lazy)
+- `my_memo_master_front/src/pages/ClassroomEnseignantView.vue` — ajout badge "KPI ✓/—" dans chaque ligne étudiant + panneau [B] KPI personnels dans l'accordéon étudiant (chargement lazy au premier clic via `toggleStudentAndLoadKpis`) ; `selectGroup` appelle `clearStudentKpis`
+
+**Ce qui est utilisable :**
+- **Vue étudiant** : l'étudiant voit ses consentements accordés par groupe, peut révoquer (avec confirmation), et accorder l'accès à un enseignant avec ou sans filtre matière
+- **Vue enseignant** : au clic sur un étudiant dans l'accordion, le badge KPI se met à jour (vert si consentement, gris sinon) et le panneau KPI affiche les données de révision, exercices, Leitner et badges
+- Filtrage enseignants dans le formulaire : les enseignants avec consentement global sont masqués de la liste d'ajout
+- Filtrage matières : les matières déjà accordées pour un enseignant sont exclues du select
+
+**Hypothèses posées :**
+- `currentGroup.members` fournit `userId`, `name`, `role` pour les enseignants (cohérent avec l'usage existant)
+- La réponse de `GET /kpi/student/:id` est le même objet que `GET /kpi/my` — shape attendu : `{ revision, exercises, leitner, discipline, badges }`
+- Les badges ont un champ `unlocked` + (`name` ou `label` ou `type`) — rendu défensif avec fallback
+
+**DoD S-02.06 :**
+- ✅ Fonctionnel conforme aux critères d'acceptation (liste/accord/révocation côté étudiant + affichage KPI côté enseignant)
+- ✅ Tests : pas de tests unitaires front ajoutés (stratégie V1 : coverage backend + tests manuels UI, cohérent avec les autres vues Classroom)
+- ✅ Documentation mise à jour (CHANGELOG_AGENT.md)
+- ✅ Aucun bug bloquant connu sur le périmètre livré
