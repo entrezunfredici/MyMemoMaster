@@ -295,19 +295,48 @@
                 </div>
                 <!-- Rendus étudiants (uniquement pour type=rendu) -->
                 <div v-if="s.type === 'rendu' && expandedRenduSections[s.id]"
-                  class="border-t border-gray bg-light/30 px-4 py-3 space-y-2">
-                  <p v-if="submissionStore.loadingSection[s.id]" class="text-xs text-dark/60 italic">Chargement des rendus...</p>
-                  <p v-else-if="!submissionStore.sectionSubmissions[s.id]?.length" class="text-xs text-dark/60 italic">Aucun rendu soumis.</p>
-                  <div v-else class="space-y-1">
-                    <div v-for="sub in submissionStore.sectionSubmissions[s.id]" :key="sub.id"
-                      class="flex items-center justify-between rounded-lg border border-gray bg-white px-3 py-2">
-                      <div>
-                        <p class="text-sm font-semibold text-dark">{{ sub.student?.name }}</p>
-                        <p class="text-xs text-dark/60">{{ sub.originalName }} · {{ formatFileSize(sub.fileSize) }} · {{ formatDate(sub.submittedAt) }}</p>
-                      </div>
-                      <button @click="downloadSubmission(sub.fileKey)" class="text-xs text-primary underline shrink-0">Télécharger</button>
+                  class="border-t border-gray bg-light/30 px-4 py-3 space-y-3">
+                  <p v-if="!submissionStore.submissionStatus[s.id]" class="text-xs text-dark/60 italic">Chargement des rendus...</p>
+                  <template v-else>
+                    <!-- Compteurs -->
+                    <div class="flex gap-3">
+                      <span class="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                        {{ submissionStore.submissionStatus[s.id].submitted.length }} rendu(s)
+                      </span>
+                      <span class="rounded-full bg-secondary/10 px-2 py-0.5 text-xs font-semibold text-secondary">
+                        {{ submissionStore.submissionStatus[s.id].notSubmitted.length }} en attente
+                      </span>
                     </div>
-                  </div>
+
+                    <!-- Rendus reçus -->
+                    <div v-if="submissionStore.submissionStatus[s.id].submitted.length" class="space-y-1">
+                      <p class="text-xs font-semibold text-success uppercase tracking-wide">Rendus reçus</p>
+                      <div v-for="sub in submissionStore.submissionStatus[s.id].submitted" :key="sub.submissionId"
+                        class="flex items-center justify-between rounded-lg border border-success/20 bg-white px-3 py-2">
+                        <div>
+                          <p class="text-sm font-semibold text-dark">{{ sub.name }}</p>
+                          <p class="text-xs text-dark/60">{{ sub.originalName }} · {{ formatFileSize(sub.fileSize) }} · {{ formatDate(sub.submittedAt) }}</p>
+                        </div>
+                        <button v-if="sub.fileKey" @click.stop="downloadSubmission(sub.fileKey)"
+                          class="text-xs text-primary underline shrink-0 ml-3">
+                          Télécharger
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Étudiants sans rendu -->
+                    <div v-if="submissionStore.submissionStatus[s.id].notSubmitted.length" class="space-y-1">
+                      <p class="text-xs font-semibold text-secondary uppercase tracking-wide">Pas encore rendu</p>
+                      <div v-for="stu in submissionStore.submissionStatus[s.id].notSubmitted" :key="stu.studentId"
+                        class="rounded-lg border border-secondary/20 bg-white px-3 py-2">
+                        <p class="text-sm text-dark/80">{{ stu.name }}</p>
+                        <p class="text-xs text-dark/50">{{ stu.email }}</p>
+                      </div>
+                    </div>
+
+                    <p v-if="!submissionStore.submissionStatus[s.id].submitted.length && !submissionStore.submissionStatus[s.id].notSubmitted.length"
+                      class="text-xs text-dark/60 italic">Aucun étudiant dans ce groupe.</p>
+                  </template>
                 </div>
               </div>
             </div>
@@ -517,6 +546,7 @@ async function selectGroup(id) {
   loadingData.value = true
   kpiConsentStore.clearStudentKpis()
   submissionStore.clearSectionSubmissions()
+  submissionStore.clearSubmissionStatus()
   Object.keys(expandedRenduSections).forEach((k) => delete expandedRenduSections[k])
   await Promise.all([
     calendarStore.fetchByGroup(id),
@@ -643,7 +673,7 @@ async function toggleRenduSection(sectionId) {
     return
   }
   expandedRenduSections[sectionId] = true
-  await submissionStore.fetchBySection(selectedId.value, sectionId)
+  await submissionStore.fetchStatus(selectedId.value, sectionId)
 }
 
 async function downloadSubmission(fileKey) {

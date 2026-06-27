@@ -613,6 +613,14 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-27] Suivi rendus enseignant — endpoint /status séparé plutôt que jointure dans findBySection
+**Contexte** : Le prof veut voir, pour chaque section "rendu", qui a soumis et qui n'a pas encore soumis. `findBySection` ne retourne que les soumissions existantes — les étudiants sans soumission sont invisibles.
+**Décision** : Nouvel endpoint `GET /class-groups/:id/sections/:sectionId/submissions/status` qui croise `ClassGroupUsers` (rôle=student) avec `ClassGroupSubmission`. Retourne `{ submitted: [...], notSubmitted: [...] }`. `findBySection` est conservé inchangé (utilisé en interne / vue étudiant).
+**Alternative écartée** : Enrichir `findBySection` avec un JOIN OUTER sur ClassGroupUsers — change l'interface publique existante, casse les consumers et mélange deux usages distincts (liste de rendus vs statut de participation).
+**Conséquences** : La route `/status` est déclarée avant `/submissions` dans le router Express pour éviter un conflit de chemin. `ClassGroupUsers` doit avoir un `include: [User]` pour transmettre nom/email — une requête DB supplémentaire par appel, acceptable car c'est une action enseignant ponctuelle.
+
+---
+
 ### [2026-06-27] Cache TTL Pinia — condition groupId actif obligatoire
 **Contexte** : Les stores `calendarEvents`, `deadlines`, `classGroupSections`, `classGroupResources` utilisent un cache TTL par `groupId` pour éviter des appels API redondants lors de la navigation. L'implémentation initiale stockait `_cache[groupId] = timestamp` sans tracker le groupe actif. Bug : après `fetchByGroup(A)` puis `fetchByGroup(B)`, revenir sur A dans les 5 min retournait `true` immédiatement (cache A valide) mais le tableau de données (`groupEvents`, etc.) contenait encore les données de B.
 **Décision** : Ajouter `_currentGroupId` dans le state de chaque store. La garde TTL inclut `this._currentGroupId === groupId`. Le cache n'est utilisé que si c'est le même groupe qu'au dernier fetch. Si l'utilisateur change de groupe, on refetche toujours.

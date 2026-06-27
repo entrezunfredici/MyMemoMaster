@@ -95,12 +95,13 @@
 | KPI pédagogiques enseignant | Stable — S-01.09 revue corrigée : 8 bugs (cross-groupe Deadline, isDone RevisionSession, crash atRiskStudents, logique métier controller, expanded state, validators routes, string groupId PostgreSQL, timezone DATEONLY) | 2026-06-26 |
 | Storage (accès fichiers S3 privés) | Stable — BUG-FIX : route `/storage/stream` remplacée par `/storage/presign` (presigned URL 15 min via `@aws-sdk/s3-request-presigner`), boutons Voir/Télécharger fonctionnels dans ClassroomEtudiantView + ClassroomEnseignantView | 2026-06-26 |
 | Invitation (système d'invitation groupe) | Stable — S-01.07 : invitation par email (2 branches : ajout direct si compte existant, email sinon), hook post-inscription pour traiter les invitations en attente | 2026-06-25 |
-| ClassGroupSection / ClassGroupResource / ClassGroupSubmission | Stable — S-02.05 livré : tests service + controller pour les 3 entités (18+23 Section, 21+17 Submission), validators Submission ajoutés, validator branché sur route POST | 2026-06-27 |
+| ClassGroupSection / ClassGroupResource / ClassGroupSubmission | Stable — S-02.05 + [IMP] : getSubmissionStatus (liste étudiants rendu/pas rendu), route GET /status, store fetchStatus, panneau enseignant compteurs + téléchargement | 2026-06-27 |
 | KpiConsent (partage KPI) | Stable — S-02.03 livré : API complète (grant/revoke/list/access + filtrage par matière via subjectId), 22 tests service + 23 tests controller, 3 BDD stables (testTimeout+forceExit), diagrams mis à jour | 2026-06-27 |
 | Front — ClassroomPage (3 vues) | Stable — S-03.08 : ClassroomPage.vue coordinateur + ClassroomEtablissementView / ClassroomEnseignantView / ClassroomEtudiantView ; stores classGroupSections + classGroupResources + fetchByGroup sur calendarEvents/deadlines | 2026-06-26 |
 | Front — Interface partage KPI (étudiant + enseignant) | Stable — S-02.07 : panneau KPI enseignant enrichi (barre synthèse + Révision + Exercices + Leitner + Matières + Discipline + Badges) ; helpers studentKpi / disciplineScoreClass / weeklyBarHeight | 2026-06-27 |
 | Tests fonctionnels consentement (front) | Stable — S-02.08 : 32 tests Vitest kpiConsent.store (état initial, TTL cache, grantConsent/revokeConsent/fetchStudentKpis/clearStudentKpis — cas nominal + limites + erreurs) | 2026-06-27 |
 | Revue de code & merge S-02 | Stable — S-02.09 : 1 bug critique cache TTL (4 stores), notification fetchMyConsents, 13 erreurs ESLint corrigées, 3 fichiers tests réécrits, 490/490 tests verts | 2026-06-27 |
+| Suivi des rendus enseignant | Stable — [IMP] 2026-06-27 : vue enseignant — panneau "rendu reçu / pas encore rendu" par section rendu, avec téléchargement. Route GET /status + service getSubmissionStatus + store fetchStatus | 2026-06-27 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)

@@ -1,5 +1,17 @@
 const submissionService = require('../services/ClassGroupSubmission.service')
 
+exports.getStatus = async (req, res) => {
+  try {
+    const { id: groupId, sectionId } = req.params
+    const result = await submissionService.getSubmissionStatus(Number(sectionId), Number(groupId), req.user.id)
+    if (result === false) return res.status(403).send({ message: 'Accès refusé.' })
+    if (result === null) return res.status(404).send({ message: 'Section de type rendu introuvable.' })
+    return res.status(200).send({ data: result })
+  } catch (_err) {
+    return res.status(500).send({ message: 'Erreur serveur.' })
+  }
+}
+
 exports.findBySection = async (req, res) => {
   try {
     const { id: groupId, sectionId } = req.params

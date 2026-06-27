@@ -8,12 +8,29 @@ export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions',
     mySubmissions: {},
     // Map sectionId → Submission[] (tous, vue enseignant)
     sectionSubmissions: {},
+    // Map sectionId → { submitted: [], notSubmitted: [] } (enseignant)
+    submissionStatus: {},
     // Map sectionId → boolean (chargement en cours)
     loadingSection: {},
     uploading: false,
   }),
 
   actions: {
+    async fetchStatus(groupId, sectionId) {
+      try {
+        const resp = await api.get(`class-groups/${groupId}/sections/${sectionId}/submissions/status`)
+        if (resp?.status !== 200) return false
+        this.submissionStatus[sectionId] = resp.data.data
+        return true
+      } catch {
+        return false
+      }
+    },
+
+    clearSubmissionStatus() {
+      this.submissionStatus = {}
+    },
+
     async fetchMine(groupId, sectionId) {
       try {
         const resp = await api.get(`class-groups/${groupId}/sections/${sectionId}/submissions`)

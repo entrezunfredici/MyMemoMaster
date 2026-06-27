@@ -380,6 +380,34 @@ router.put('/:id/resources/:resourceId', authMiddleware, resourceValidators.upda
 router.delete('/:id/resources/:resourceId', authMiddleware, resource.delete)
 
 // ── Soumissions de rendus (étudiant → rendu d'un section type 'rendu') ────────
+/**
+ * @swagger
+ * /class-groups/{id}/sections/{sectionId}/submissions/status:
+ *   get:
+ *     summary: Statut de soumission par étudiant pour une section rendu (enseignant uniquement)
+ *     tags: [ClassGroup]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: sectionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: "{ data: { submitted: [], notSubmitted: [] } }"
+ *       403:
+ *         description: Accès refusé (non enseignant).
+ *       404:
+ *         description: Section rendu introuvable.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.get('/:id/sections/:sectionId/submissions/status', authMiddleware, submission.getStatus)
 router.get('/:id/sections/:sectionId/submissions', authMiddleware, submission.findBySection)
 router.post('/:id/sections/:sectionId/submissions', authMiddleware, submissionValidators.upsert, validate, submission.upsert)
 router.delete('/:id/sections/:sectionId/submissions/:submissionId', authMiddleware, submission.delete)
