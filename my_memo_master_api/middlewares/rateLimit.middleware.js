@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit')
+const { ipKeyGenerator } = require('express-rate-limit')
 
 // CHOIX: skipInTest comme fonction (pas booléen) pour être réévalué à chaque requête
 // RAISON: permet de modifier NODE_ENV en cours de test sans recréer le middleware
@@ -6,12 +7,13 @@ const skipInTest = () => process.env.NODE_ENV === 'test'
 
 // Extrait l'userId du JWT sans vérifier la signature — usage exclusif : clé de rate limiting.
 // Vérifie le type de l'id et l'expiration pour limiter le bucket poisoning (DoS ciblé par userId).
+// CHOIX: fallback via ipKeyGenerator (pas req.ip direct) — requis par express-rate-limit v7+ pour IPv6.
 function userKeyFromJwt(req) {
   const auth = req.headers.authorization
   if (auth?.startsWith('Bearer ')) {
     try {
       const b64 = auth.slice(7).split('.')[1]
-      if (!b64 || b64.length > 512) return req.ip
+      if (!b64 || b64.length > 512) return ipKeyGenerator(req)
       const payload = JSON.parse(Buffer.from(b64, 'base64url').toString())
       const now = Math.floor(Date.now() / 1000)
       if (
@@ -20,7 +22,7 @@ function userKeyFromJwt(req) {
       ) return `uid_${payload.id}`
     } catch {}
   }
-  return req.ip
+  return ipKeyGenerator(req)
 }
 
 /**
