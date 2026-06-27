@@ -4,15 +4,20 @@ const rateLimit = require('express-rate-limit')
 // RAISON: permet de modifier NODE_ENV en cours de test sans recréer le middleware
 const skipInTest = () => process.env.NODE_ENV === 'test'
 
-// Extrait l'ID utilisateur du JWT sans vérifier la signature.
-// Usage exclusif : clé de rate limiting (pas d'autorisation).
-// Un JWT forgé ne donne accès à rien — il augmente seulement son propre compteur.
+// Extrait l'userId du JWT sans vérifier la signature — usage exclusif : clé de rate limiting.
+// Vérifie le type de l'id et l'expiration pour limiter le bucket poisoning (DoS ciblé par userId).
 function userKeyFromJwt(req) {
   const auth = req.headers.authorization
   if (auth?.startsWith('Bearer ')) {
     try {
-      const payload = JSON.parse(Buffer.from(auth.slice(7).split('.')[1], 'base64url').toString())
-      if (payload?.id) return `uid_${payload.id}`
+      const b64 = auth.slice(7).split('.')[1]
+      if (!b64 || b64.length > 512) return req.ip
+      const payload = JSON.parse(Buffer.from(b64, 'base64url').toString())
+      const now = Math.floor(Date.now() / 1000)
+      if (
+        Number.isInteger(payload?.id) && payload.id > 0 &&
+        Number.isInteger(payload?.exp) && payload.exp > now
+      ) return `uid_${payload.id}`
     } catch {}
   }
   return req.ip
@@ -58,11 +63,9 @@ const registerLimiter = rateLimit({
  */
 const apiLimiter = rateLimit({
   windowMs: parseInt(process.env.API_RATE_WINDOW_MS, 10) || 15 * 60 * 1000,
-  // CHOIX: 500 req/15min par utilisateur (≈33/min) — marge pour 20-30 navigations + requêtes parallèles
-  // RAISON: 200/IP trop bas pour un SPA multi-requêtes ; clé par userId évite le problème NAT scolaire
+  // CHOIX: 500 req/15min par userId (≈33/min) — marge pour 20-30 navigations + requêtes parallèles
+  // RAISON: keying par userId évite le problème NAT scolaire (plusieurs élèves derrière la même IP)
   max: parseInt(process.env.API_RATE_MAX, 10) || 500,
-  // CHOIX: keyGenerator sur userId JWT plutôt que IP
-  // RAISON: plusieurs utilisateurs derrière le même NAT (lycée, famille) ne partagent plus leur quota
   keyGenerator: userKeyFromJwt,
   skip: skipInTest,
   message: { message: 'Trop de requêtes, réessayez plus tard.' },
