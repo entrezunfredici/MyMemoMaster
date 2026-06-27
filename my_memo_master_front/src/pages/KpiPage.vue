@@ -278,7 +278,7 @@ const lineOptions = {
       ticks: {
         color: '#9ca3af',
         maxTicksLimit: 5,
-        callback: function(val, idx) {
+        callback: function(val) {
           const label = this.getLabelForValue(val)
           return label.split(' — ')[0]
         }

@@ -7,12 +7,8 @@ import { useClassGroupStore } from '@/stores/classGroups'
 
 // ── Mocks globaux ──────────────────────────────────────────────────────────────
 
-const { mockGet } = vi.hoisted(() => ({
-  mockGet: vi.fn().mockResolvedValue({ status: 200, data: { data: null } })
-}))
-
 vi.mock('@/helpers/api', () => ({
-  api: { get: mockGet, post: vi.fn(), put: vi.fn(), del: vi.fn() }
+  api: { get: vi.fn().mockResolvedValue({ status: 200, data: { data: null } }), post: vi.fn(), put: vi.fn(), del: vi.fn() }
 }))
 
 vi.mock('@/helpers/notif', () => ({ notif: { notify: vi.fn() } }))
@@ -21,6 +17,7 @@ vi.mock('@/helpers/notif', () => ({ notif: { notify: vi.fn() } }))
 
 const ADMIN_USER = { userId: 1, roleId: 1, name: 'Admin' }
 const STUDENT_USER = { userId: 2, roleId: 2, name: 'Étudiant' }
+const TEACHER_USER = { userId: 3, roleId: 3, name: 'Prof' }
 
 const PENDING_INV = {
   id: 10,
@@ -32,6 +29,7 @@ const PENDING_INV = {
 }
 
 // ── Helper de montage ─────────────────────────────────────────────────────────
+// Les vues enfants sont stubbed pour isoler ClassroomPage de leur onMounted.
 
 function mountPage({ user = ADMIN_USER, mine = [] } = {}) {
   return mount(ClassroomPage, {
@@ -47,7 +45,13 @@ function mountPage({ user = ADMIN_USER, mine = [] } = {}) {
           }
         })
       ],
-      stubs: { RouterLink: true, RouterView: true }
+      stubs: {
+        RouterLink: true,
+        RouterView: true,
+        ClassroomEtablissementView: true,
+        ClassroomEnseignantView: true,
+        ClassroomEtudiantView: true
+      }
     }
   })
 }
@@ -68,13 +72,7 @@ describe('ClassroomPage', () => {
     expect(invStore.fetchMine).toHaveBeenCalledOnce()
   })
 
-  // ── Rendu initial ──────────────────────────────────────────────────────────
-
-  it('affiche le premier groupe par défaut (données mock locales)', async () => {
-    const wrapper = mountPage()
-    await flushPromises()
-    expect(wrapper.text()).toContain('MP2I A')
-  })
+  // ── Invitations ────────────────────────────────────────────────────────────
 
   it('section invitations absente si mine est vide', async () => {
     const wrapper = mountPage({ mine: [] })
@@ -88,8 +86,6 @@ describe('ClassroomPage', () => {
     expect(wrapper.text()).toContain('Invitations en attente (1)')
     expect(wrapper.text()).toContain('MP2I A')
   })
-
-  // ── Invitations ────────────────────────────────────────────────────────────
 
   it('clic Accepter — appelle invitationStore.respond(id, "accepted")', async () => {
     const wrapper = mountPage({ mine: [PENDING_INV] })
@@ -115,75 +111,47 @@ describe('ClassroomPage', () => {
     expect(invStore.respond).toHaveBeenCalledWith(10, 'declined')
   })
 
-  // ── Rôle / vue ─────────────────────────────────────────────────────────────
+  it('clic Accepter accepté — recharge les groupes', async () => {
+    const wrapper = mountPage({ mine: [PENDING_INV] })
+    await flushPromises()
+    const invStore = useInvitationStore()
+    const classStore = useClassGroupStore()
+    invStore.respond.mockResolvedValueOnce(true)
 
-  it('toggle Professeur/Etudiant — visible pour un admin', async () => {
+    const btn = wrapper.findAll('button').find((b) => b.text() === 'Accepter')
+    await btn.trigger('click')
+    await flushPromises()
+
+    // onMounted = 1 appel + respond accepted = 1 appel supplémentaire
+    expect(classStore.fetchGroups).toHaveBeenCalledTimes(2)
+  })
+
+  // ── Toggle vue (admin seulement) ───────────────────────────────────────────
+
+  it('toggle Vue — visible pour un admin plateforme (roleId 1)', async () => {
     const wrapper = mountPage({ user: ADMIN_USER })
     await flushPromises()
-    expect(wrapper.text()).toContain('Prévisualiser :')
+    expect(wrapper.text()).toContain('Vue :')
+    expect(wrapper.text()).toContain('Établissement')
+    expect(wrapper.text()).toContain('Enseignant')
+    expect(wrapper.text()).toContain('Étudiant')
   })
 
-  it('toggle Professeur/Etudiant — absent pour un étudiant', async () => {
+  it('toggle Vue — visible pour un admin établissement (roleId 4)', async () => {
+    const wrapper = mountPage({ user: { userId: 4, roleId: 4, name: 'Dir' } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Vue :')
+  })
+
+  it('toggle Vue — absent pour un étudiant', async () => {
     const wrapper = mountPage({ user: STUDENT_USER })
     await flushPromises()
-    expect(wrapper.text()).not.toContain('Prévisualiser :')
+    expect(wrapper.text()).not.toContain('Vue :')
   })
 
-  // ── sendInvite ─────────────────────────────────────────────────────────────
-
-  it('sendInvite — email vide → message erreur, invite non appelé', async () => {
-    const wrapper = mountPage()
+  it('toggle Vue — absent pour un enseignant', async () => {
+    const wrapper = mountPage({ user: TEACHER_USER })
     await flushPromises()
-    const invStore = useInvitationStore()
-
-    const btn = wrapper.findAll('button').find((b) => b.text() === "Envoyer l'invitation")
-    await btn.trigger('click')
-    await flushPromises()
-
-    expect(invStore.invite).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain("L'adresse email est requise.")
-  })
-
-  it('sendInvite — email valide → appelle invitationStore.invite avec les bons paramètres', async () => {
-    const wrapper = mountPage()
-    await flushPromises()
-    const invStore = useInvitationStore()
-    invStore.invite.mockResolvedValueOnce(true)
-
-    await wrapper.find('input[type="email"]').setValue('test@test.com')
-    const btn = wrapper.findAll('button').find((b) => b.text() === "Envoyer l'invitation")
-    await btn.trigger('click')
-    await flushPromises()
-
-    expect(invStore.invite).toHaveBeenCalledWith('grp-mp2i', {
-      targetEmail: 'test@test.com',
-      role: 'student'
-    })
-  })
-
-  // ── createSession ──────────────────────────────────────────────────────────
-
-  it('createSession — titre vide → message erreur', async () => {
-    const wrapper = mountPage()
-    await flushPromises()
-
-    const btn = wrapper.findAll('button').find((b) => b.text() === 'Créer')
-    await btn.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Le nom est requis.')
-  })
-
-  it('createSession — titre valide → section créée et ajoutée dans la liste', async () => {
-    const wrapper = mountPage()
-    await flushPromises()
-
-    await wrapper.find('input[placeholder="Nom de section"]').setValue('Chapitre 1')
-    const btn = wrapper.findAll('button').find((b) => b.text() === 'Créer')
-    await btn.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Section créée.')
-    expect(wrapper.text()).toContain('Chapitre 1')
+    expect(wrapper.text()).not.toContain('Vue :')
   })
 })

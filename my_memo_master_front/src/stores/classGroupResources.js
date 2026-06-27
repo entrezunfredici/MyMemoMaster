@@ -13,7 +13,7 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
   actions: {
     async fetchByGroup(groupId, force = false) {
       const TTL = 5 * 60 * 1000
-      if (!force && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
+      if (!force && this.currentGroupId === groupId && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
       try {
         const resp = await api.get(`class-groups/${groupId}/resources`)
         if (resp?.status !== 200) {

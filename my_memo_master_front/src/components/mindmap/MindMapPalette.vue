@@ -428,11 +428,6 @@ watch(
   { immediate: true }
 );
 
-const updateContent = () => {
-  if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { content: editableContent.value });
-};
-
 const updateNodeType = (type) => {
   if (!selectedNode.value) return;
   store.updateNode(selectedNode.value.id, {

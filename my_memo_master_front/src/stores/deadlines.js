@@ -7,13 +7,14 @@ export const useDeadlineStore = defineStore('deadlines', {
     deadlines: [],
     deadline: null,
     groupDeadlines: [],
-    _cache: {}, // { [groupId]: timestamp } — TTL 5 min
+    _currentGroupId: null,
+    _cache: {}, // { [groupId]: timestamp } — TTL 5 min, valide uniquement pour le groupe actif
   }),
 
   actions: {
     async fetchByGroup(groupId, force = false) {
       const TTL = 5 * 60 * 1000
-      if (!force && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
+      if (!force && this._currentGroupId === groupId && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
       try {
         const resp = await api.get(`class-groups/${groupId}/deadlines`)
         if (resp?.status !== 200) {
@@ -21,6 +22,7 @@ export const useDeadlineStore = defineStore('deadlines', {
           return false
         }
         this.groupDeadlines = resp.data.data
+        this._currentGroupId = groupId
         this._cache[groupId] = Date.now()
         return true
       } catch {

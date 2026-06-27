@@ -1,20 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createTestingPinia } from '@pinia/testing'
 import MindmapsListView from '@/components/mindmap/MindmapsListView.vue'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const { mockGet, mockPut, mockDel } = vi.hoisted(() => ({
+const { mockGet, mockPut, mockDel, mockToast } = vi.hoisted(() => ({
   mockGet: vi.fn(),
   mockPut: vi.fn(),
   mockDel: vi.fn(),
+  mockToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
 vi.mock('@/helpers/api', () => ({
   api: { get: mockGet, put: mockPut, del: mockDel },
 }))
 
-const mockToast = { success: vi.fn(), error: vi.fn(), warning: vi.fn() }
 vi.mock('vue-toastification', () => ({ useToast: () => mockToast }))
 
 // ── Données ───────────────────────────────────────────────────────────────────
@@ -59,9 +60,11 @@ const mountListView = (props = {}) =>
     props: { subjects, ...props },
     attachTo: document.body,
     global: {
+      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: true })],
       stubs: {
         ItemListLayout: ItemListLayoutStub,
         MenuItem: MenuItemStub,
+        TagSelectorComponent: true,
       },
     },
   })

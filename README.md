@@ -53,7 +53,6 @@ SSH:
 
 ```sh
 git clone git@github.com:entrezunfredici/MyMemoMaster.git
-
 ```
 
 3. Copiez `.env.example` en `.env` et remplissez les variables d'environnement.
@@ -67,15 +66,19 @@ docker-compose down ; docker-compose up --build
 ```
 
 A noter, le docker compose dispose d'un reverseproxy (traefik), lorsque vous demmarez le projet avec docker, le font est accéssible à l'adresse :
+
 ```
  http://localhost/
 ```
+
 L'api a l'adresse :
+
 ```
   http://localhost/api
 ```
 
 et le traefik a l'adresse:
+
 ```
  http://localhost:8080/dashboard/#/
 ```
@@ -97,11 +100,13 @@ npm run dev
 5. Lancer le seed de la base de données:
 
 avec docker (dans un terminal classique)
+
 ```sh
 docker compose exec api sh -c "npm run seed"
 ```
 
-sans docker ou dans le terminal docker 
+sans docker ou dans le terminal docker
+
 ```sh
 cd MyMemoMaster/my_memo_master_api
 npm run seed
@@ -207,6 +212,7 @@ main         →  mymemomaster_api/front:latest              →  Kubernetes Inf
 ```
 
 Le pipeline CI/CD fonctionne en deux temps :
+
 1. **CI** (`.github/workflows/ci.yml`) — tests + lint + build, déclenché sur toutes les branches
 2. **CD** (`.github/workflows/cd.yml`) — build Docker + déploiement, déclenché quand le CI passe sur `test`, `preprod` ou `main`
 
@@ -216,17 +222,17 @@ Le pipeline CI/CD fonctionne en deux temps :
 
 > **Settings → Secrets and variables → Actions → Secrets**
 
-| Secret | Description |
-|--------|-------------|
-| `DOCKERHUB_USERNAME` | Nom d'utilisateur Docker Hub |
-| `DOCKERHUB_PASSWORD` | Mot de passe ou token Docker Hub |
-| `DISCORD_LOG` | URL du webhook Discord pour les notifications CI/CD |
-| `SSH_TEST_PRIVATE_KEY` | Clé SSH privée pour accéder au VPS test |
-| `SSH_TEST_USERNAME` | Utilisateur SSH du VPS test |
-| `VPS_PORT` | Port SSH du VPS |
-| `VPS_IP` | Adresse IP du VPS |
-| `KUBECONFIG_PREPROD` | Kubeconfig Infomaniak preprod encodé en base64 (voir ci-dessous) |
-| `KUBECONFIG_PROD` | Kubeconfig Infomaniak prod encodé en base64 (à ajouter quand le cluster prod est prêt) |
+| Secret                   | Description                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `DOCKERHUB_USERNAME`   | Nom d'utilisateur Docker Hub                                                              |
+| `DOCKERHUB_PASSWORD`   | Mot de passe ou token Docker Hub                                                          |
+| `DISCORD_LOG`          | URL du webhook Discord pour les notifications CI/CD                                       |
+| `SSH_TEST_PRIVATE_KEY` | Clé SSH privée pour accéder au VPS test                                                |
+| `SSH_TEST_USERNAME`    | Utilisateur SSH du VPS test                                                               |
+| `VPS_PORT`             | Port SSH du VPS                                                                           |
+| `VPS_IP`               | Adresse IP du VPS                                                                         |
+| `KUBECONFIG_PREPROD`   | Kubeconfig Infomaniak preprod encodé en base64 (voir ci-dessous)                         |
+| `KUBECONFIG_PROD`      | Kubeconfig Infomaniak prod encodé en base64 (à ajouter quand le cluster prod est prêt) |
 
 **Où trouver le kubeconfig Infomaniak :**
 
@@ -237,17 +243,20 @@ Le pipeline CI/CD fonctionne en deux temps :
 5. Sauvegarder le fichier (ex : `config-infomaniak-preprod`)
 
 **Vérifier que le fichier fonctionne :**
+
 ```bash
 kubectl --kubeconfig=config-infomaniak-preprod cluster-info
 ```
 
 **Encoder en base64 pour GitHub (Linux/macOS) :**
+
 ```bash
 base64 -w0 config-infomaniak-preprod
 # Copier la sortie dans le secret KUBECONFIG_PREPROD
 ```
 
 **Encoder en base64 pour GitHub (Windows PowerShell) :**
+
 ```powershell
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("config-infomaniak-preprod"))
 # Copier la sortie dans le secret KUBECONFIG_PREPROD
@@ -257,8 +266,8 @@ base64 -w0 config-infomaniak-preprod
 
 > **Settings → Secrets and variables → Actions → Variables**
 
-| Variable | Valeur | Description |
-|----------|--------|-------------|
+| Variable             | Valeur   | Description                                                                             |
+| -------------------- | -------- | --------------------------------------------------------------------------------------- |
 | `K8S_PROD_ENABLED` | `true` | Active le déploiement prod. À ajouter uniquement quand le cluster prod K8s est prêt. |
 
 ---
@@ -370,18 +379,18 @@ kubectl get certificate -n mymemomaster-preprod
 
 #### Valeurs de la ConfigMap preprod (`k8s/preprod/configmap.yml`)
 
-| Clé | Valeur |
-|-----|--------|
-| `ENVIRONMENT` | `preprod` |
-| `API_PORT` | `3000` |
-| `PG_DB` | `mymemomasterdb` |
-| `API_PUBLIC_URL` | `https://preprod-api.my-memo-master.com` |
-| `CORS_ORIGIN` | `https://preprod.my-memo-master.com` |
-| `VITE_API_URL` | `https://preprod-api.my-memo-master.com/api/v1` |
-| `VITE_FRONT_URL` | `https://preprod.my-memo-master.com` |
-| `SMTP_HOST` | `smtp.hostinger.com` |
-| `SMTP_PORT` | `587` |
-| `EMAIL_FROM` | `noreply@my-memo-master.com` |
+| Clé               | Valeur                                            |
+| ------------------ | ------------------------------------------------- |
+| `ENVIRONMENT`    | `preprod`                                       |
+| `API_PORT`       | `3000`                                          |
+| `PG_DB`          | `mymemomasterdb`                                |
+| `API_PUBLIC_URL` | `https://preprod-api.my-memo-master.com`        |
+| `CORS_ORIGIN`    | `https://preprod.my-memo-master.com`            |
+| `VITE_API_URL`   | `https://preprod-api.my-memo-master.com/api/v1` |
+| `VITE_FRONT_URL` | `https://preprod.my-memo-master.com`            |
+| `SMTP_HOST`      | `smtp.hostinger.com`                            |
+| `SMTP_PORT`      | `587`                                           |
+| `EMAIL_FROM`     | `noreply@my-memo-master.com`                    |
 
 Pour modifier une valeur : éditer `k8s/preprod/configmap.yml` et merger sur `preprod` (le CD applique automatiquement).
 
@@ -444,13 +453,13 @@ Puis dans GitHub **Settings → Variables → Actions**, ajouter `K8S_PROD_ENABL
 
 #### Valeurs de la ConfigMap prod (`k8s/prod/configmap.yml`)
 
-| Clé | Valeur |
-|-----|--------|
-| `ENVIRONMENT` | `prod` |
-| `API_PUBLIC_URL` | `https://api.my-memo-master.com` |
-| `CORS_ORIGIN` | `https://my-memo-master.com` |
-| `VITE_API_URL` | `https://api.my-memo-master.com/api/v1` |
-| `VITE_FRONT_URL` | `https://my-memo-master.com` |
+| Clé               | Valeur                                    |
+| ------------------ | ----------------------------------------- |
+| `ENVIRONMENT`    | `prod`                                  |
+| `API_PUBLIC_URL` | `https://api.my-memo-master.com`        |
+| `CORS_ORIGIN`    | `https://my-memo-master.com`            |
+| `VITE_API_URL`   | `https://api.my-memo-master.com/api/v1` |
+| `VITE_FRONT_URL` | `https://my-memo-master.com`            |
 
 ---
 

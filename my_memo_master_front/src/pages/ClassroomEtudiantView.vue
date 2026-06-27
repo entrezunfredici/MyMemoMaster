@@ -266,38 +266,30 @@
   </div>
 
   <!-- Modal confirmation révocation -->
-  <div v-if="revokeModal.visible"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-dark/40"
-    role="dialog" aria-modal="true">
-    <div class="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 space-y-4">
-      <p class="text-base font-semibold text-dark">
-        Révoquer l'accès à {{ revokeModal.consent?.teacher?.name }}
-        ({{ revokeModal.consent?.subject ? revokeModal.consent.subject.name : 'Toutes matières' }}) ?
-      </p>
-      <p class="text-sm text-dark/70">
-        <template v-if="revokeModal.consent?.subjectId">
-          {{ revokeModal.consent.teacher?.name }} ne pourra plus consulter vos KPI de {{ revokeModal.consent.subject?.name }} dans ce groupe.
-        </template>
-        <template v-else>
-          {{ revokeModal.consent?.teacher?.name }} ne pourra plus consulter l'ensemble de vos KPI personnels dans ce groupe.
-        </template>
-      </p>
-      <div class="flex justify-end gap-3">
-        <button @click="closeRevokeModal"
-          class="rounded-lg border-2 border-gray px-4 py-2 text-sm text-dark hover:bg-light transition">
-          Annuler
-        </button>
-        <button @click="confirmRevoke"
-          class="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-light hover:bg-secondary/90 transition">
-          Révoquer
-        </button>
-      </div>
-    </div>
-  </div>
+  <ModalComponent
+    :visible="revokeModal.visible"
+    :title="`Révoquer l'accès à ${revokeModal.consent?.teacher?.name} (${revokeModal.consent?.subject ? revokeModal.consent.subject.name : 'Toutes matières'}) ?`"
+    size="sm"
+    @close="closeRevokeModal"
+  >
+    <p class="text-sm text-dark/70">
+      <template v-if="revokeModal.consent?.subjectId">
+        {{ revokeModal.consent.teacher?.name }} ne pourra plus consulter vos KPI de {{ revokeModal.consent.subject?.name }} dans ce groupe.
+      </template>
+      <template v-else>
+        {{ revokeModal.consent?.teacher?.name }} ne pourra plus consulter l'ensemble de vos KPI personnels dans ce groupe.
+      </template>
+    </p>
+    <template #footer>
+      <button class="btn-modal-cancel" @click="closeRevokeModal">Annuler</button>
+      <button class="btn-modal-danger" @click="confirmRevoke">Révoquer</button>
+    </template>
+  </ModalComponent>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch, reactive } from 'vue'
+import ModalComponent from '@/components/ModalComponent.vue'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useDeadlineStore } from '@/stores/deadlines'
@@ -491,7 +483,7 @@ async function retireRendu(rendu) {
   await submissionStore.deleteSubmission(selectedId.value, rendu.id, sub.id)
 }
 
-async function downloadFile(fileKey, originalName) {
+async function downloadFile(fileKey) {
   if (!fileKey) { notif.notify('Aucun fichier associé.', 'error'); return }
   try {
     const resp = await api.get('storage/presign', { key: fileKey, disposition: 'attachment' })

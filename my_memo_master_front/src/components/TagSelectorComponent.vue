@@ -187,10 +187,6 @@ const canCreate = computed(() => {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-function focusInput() {
-  inputRef.value?.focus()
-}
-
 function handleFieldClick() {
   if (showDropdown.value || colorPickerTag.value) {
     closeAll()

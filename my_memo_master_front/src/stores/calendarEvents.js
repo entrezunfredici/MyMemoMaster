@@ -7,13 +7,16 @@ export const useCalendarEventStore = defineStore('calendarEvents', {
     events: [],
     event: null,
     groupEvents: [],
-    _cache: {}, // { [groupId]: timestamp } — TTL 5 min
+    _currentGroupId: null,
+    _cache: {}, // { [groupId]: timestamp } — TTL 5 min, valide uniquement pour le groupe actif
   }),
 
   actions: {
     async fetchByGroup(groupId, force = false) {
       const TTL = 5 * 60 * 1000
-      if (!force && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
+      // CHOIX: condition inclut _currentGroupId === groupId
+      // RAISON: évite d'afficher les données d'un groupe précédent quand le cache d'un autre groupe est encore valide
+      if (!force && this._currentGroupId === groupId && this._cache[groupId] && Date.now() - this._cache[groupId] < TTL) return true
       try {
         const resp = await api.get(`class-groups/${groupId}/events`)
         if (resp?.status !== 200) {
@@ -21,6 +24,7 @@ export const useCalendarEventStore = defineStore('calendarEvents', {
           return false
         }
         this.groupEvents = resp.data.data
+        this._currentGroupId = groupId
         this._cache[groupId] = Date.now()
         return true
       } catch {

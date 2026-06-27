@@ -90,7 +90,7 @@ describe('useClassGroupStore', () => {
     expect(mockPost).toHaveBeenCalledWith('class-groups', { name: 'Terminale S1' })
     expect(store.groups).toHaveLength(1)
     expect(store.groups[0]).toEqual(GROUP_FIXTURE)
-    expect(result).toBe(true)
+    expect(result).toEqual(GROUP_FIXTURE)
     expect(mockNotify).toHaveBeenCalledWith('Groupe créé.', 'success')
   })
 
@@ -149,14 +149,14 @@ describe('useClassGroupStore', () => {
   // ── addMember ──────────────────────────────────────────────────────────────────
 
   it('addMember — succès — rafraîchit le groupe et notifie', async () => {
-    mockPost.mockResolvedValueOnce({ status: 200, data: {} })
+    mockPost.mockResolvedValueOnce({ status: 201, data: {} })
     mockGet.mockResolvedValueOnce({ status: 200, data: { data: { ...GROUP_FIXTURE, members: [{ userId: 2, role: 'student' }] } } })
 
     const store = useClassGroupStore()
     store.groups = [GROUP_FIXTURE]
     const result = await store.addMember(1, 2)
 
-    expect(mockPost).toHaveBeenCalledWith('class-groups/1/members', { userId: 2 })
+    expect(mockPost).toHaveBeenCalledWith('class-groups/1/members', { userId: 2, role: 'student' })
     expect(result).toBe(true)
     expect(mockNotify).toHaveBeenCalledWith('Membre ajouté.', 'success')
   })

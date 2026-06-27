@@ -121,3 +121,17 @@
   transition: background-color 0.2s;
 }
 .btn-modal-cancel:hover { background-color: #E5E7EB; }
+
+/* Bouton d'action destructive (suppression, révocation) */
+.btn-modal-danger {
+  flex: 1;
+  background-color: rgb(var(--secondary));
+  color: rgb(var(--light));
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.btn-modal-danger:hover { background-color: rgb(var(--secondary) / 0.9); }

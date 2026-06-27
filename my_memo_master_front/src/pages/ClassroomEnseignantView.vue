@@ -87,77 +87,169 @@
                     </div>
                   </div>
                   <StudentDetailComponent v-if="expandedAnalyticsStudents[s.userId]" :student="s" />
-                  <!-- Panneau KPI personnels -->
-                  <div v-if="expandedAnalyticsStudents[s.userId]" class="border-t border-gray mx-3 pb-3">
-                    <div class="pt-3 space-y-2">
-                      <p class="text-sm font-medium text-dark">KPI personnels partagés</p>
-                      <p v-if="!(s.userId in kpiConsentStore.studentKpis)" class="text-sm text-dark/60">
+                  <!-- Panneau KPI personnels partagés — S-02.07 -->
+                  <div v-if="expandedAnalyticsStudents[s.userId]" class="border-t border-gray mx-3 pb-4">
+                    <div class="pt-3 space-y-3">
+                      <p class="text-xs font-semibold text-dark/60 uppercase tracking-wide">KPI personnels partagés</p>
+
+                      <!-- Chargement -->
+                      <p v-if="!(s.userId in kpiConsentStore.studentKpis)" class="text-sm text-dark/60 italic">
                         Chargement des KPI…
                       </p>
+
+                      <!-- Pas de consentement -->
                       <div v-else-if="kpiConsentStore.studentKpis[s.userId] === null"
                         class="rounded-xl border border-gray bg-light/40 px-4 py-3 text-sm text-dark/60 space-y-1">
                         <p>Cet étudiant n'a pas encore partagé ses KPI personnels.</p>
                         <p class="text-xs">Il peut vous accorder l'accès depuis l'onglet "Partage de mes KPI" dans sa vue étudiant.</p>
                       </div>
+
+                      <!-- Données KPI -->
                       <template v-else>
+                        <!-- Barre de synthèse -->
+                        <div class="grid grid-cols-3 gap-1 text-center">
+                          <div class="rounded-xl bg-light border border-gray px-2 py-2">
+                            <p class="text-lg font-bold text-primary">
+                              {{ studentKpi(s.userId).revision.streakDays }}<span class="text-xs font-normal"> j</span>
+                            </p>
+                            <p class="text-xs text-dark/60 mt-0.5">Streak révision</p>
+                          </div>
+                          <div class="rounded-xl bg-light border border-gray px-2 py-2">
+                            <p class="text-lg font-bold" :class="disciplineScoreClass(studentKpi(s.userId).discipline.disciplineScore)">
+                              {{ studentKpi(s.userId).discipline.disciplineScore }}<span class="text-xs font-normal"> %</span>
+                            </p>
+                            <p class="text-xs text-dark/60 mt-0.5">Discipline 30j</p>
+                          </div>
+                          <div class="rounded-xl bg-light border border-gray px-2 py-2">
+                            <p class="text-lg font-bold text-primary">
+                              {{ studentKpi(s.userId).leitner.mastery }}<span class="text-xs font-normal"> %</span>
+                            </p>
+                            <p class="text-xs text-dark/60 mt-0.5">Maîtrise Leitner</p>
+                          </div>
+                        </div>
+
                         <!-- Révision -->
-                        <div v-if="kpiConsentStore.studentKpis[s.userId].revision"
-                          class="rounded-xl border border-gray px-3 py-2 space-y-1">
+                        <div class="rounded-xl border border-gray px-3 py-2 space-y-2">
                           <p class="text-xs font-semibold text-primary uppercase tracking-wide">Révision</p>
                           <div class="grid grid-cols-3 gap-1 text-xs">
                             <span class="text-dark/60">Planifiées</span>
                             <span class="text-dark/60">Complétées</span>
                             <span class="text-dark/60">Taux</span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].revision.totalPlanned }}</span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].revision.totalCompleted }}</span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].revision.completionRate }} %</span>
+                            <span class="font-semibold">{{ studentKpi(s.userId).revision.totalPlanned }}</span>
+                            <span class="font-semibold">{{ studentKpi(s.userId).revision.totalCompleted }}</span>
+                            <span class="font-semibold">{{ studentKpi(s.userId).revision.completionRate }} %</span>
+                          </div>
+                          <div class="flex justify-between text-xs">
+                            <span class="text-dark/60">30 jours (planifiées / complétées)</span>
+                            <span class="font-semibold">{{ studentKpi(s.userId).revision.sessionsLast30Days }} / {{ studentKpi(s.userId).revision.completedLast30Days }}</span>
                           </div>
                           <p class="text-xs text-dark/60">
-                            Streak : {{ kpiConsentStore.studentKpis[s.userId].revision.streakDays }} j ·
-                            Temps total : {{ formatMinutes(kpiConsentStore.studentKpis[s.userId].revision.totalMinutes) }}
+                            Streak : <span class="font-semibold text-dark">{{ studentKpi(s.userId).revision.streakDays }} j</span>
+                            · Temps total : <span class="font-semibold text-dark">{{ formatMinutes(studentKpi(s.userId).revision.totalMinutes) }}</span>
                           </p>
+                          <!-- Activité hebdomadaire (mini-graphique barres) -->
+                          <div v-if="studentKpi(s.userId).revision.weeklyActivity?.length" class="space-y-1">
+                            <p class="text-xs text-dark/60">Activité / semaine (8 sem.)</p>
+                            <div class="flex items-end gap-0.5 h-8">
+                              <div v-for="w in studentKpi(s.userId).revision.weeklyActivity" :key="w.week"
+                                class="flex-1 rounded-sm bg-primary/60 transition-all"
+                                :style="{ height: weeklyBarHeight(w.count) }"
+                                :title="`Semaine du ${w.week} : ${w.count} séance(s) complétée(s)`">
+                              </div>
+                            </div>
+                          </div>
                         </div>
+
                         <!-- Exercices -->
-                        <div v-if="kpiConsentStore.studentKpis[s.userId].exercises"
-                          class="rounded-xl border border-gray px-3 py-2 space-y-1">
+                        <div class="rounded-xl border border-gray px-3 py-2 space-y-2">
                           <p class="text-xs font-semibold text-primary uppercase tracking-wide">Exercices</p>
-                          <div class="grid grid-cols-3 gap-1 text-xs">
+                          <div class="grid grid-cols-4 gap-1 text-xs">
                             <span class="text-dark/60">Total</span>
-                            <span class="text-dark/60">Score moy.</span>
+                            <span class="text-dark/60">Moy.</span>
+                            <span class="text-dark/60">Min / Max</span>
                             <span class="text-dark/60">Tendance</span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].exercises.totalTests }}</span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].exercises.avgScore }} %</span>
-                            <span :class="[
-                              'font-semibold',
-                              kpiConsentStore.studentKpis[s.userId].exercises.recentTrend > 0 ? 'text-success' :
-                              kpiConsentStore.studentKpis[s.userId].exercises.recentTrend < 0 ? 'text-secondary' : ''
-                            ]">
-                              {{ kpiConsentStore.studentKpis[s.userId].exercises.recentTrend > 0 ? '+' : '' }}{{ kpiConsentStore.studentKpis[s.userId].exercises.recentTrend ?? '—' }} %
+                            <span class="font-semibold">{{ studentKpi(s.userId).exercises.totalTests }}</span>
+                            <span class="font-semibold">{{ studentKpi(s.userId).exercises.avgScore }} %</span>
+                            <span class="font-semibold">{{ studentKpi(s.userId).exercises.minScore }} / {{ studentKpi(s.userId).exercises.maxScore }} %</span>
+                            <span :class="['font-semibold', studentKpi(s.userId).exercises.recentTrend > 0 ? 'text-success' : studentKpi(s.userId).exercises.recentTrend < 0 ? 'text-secondary' : '']">
+                              {{ studentKpi(s.userId).exercises.recentTrend > 0 ? '+' : '' }}{{ studentKpi(s.userId).exercises.recentTrend ?? '—' }} %
+                            </span>
+                          </div>
+                          <!-- Dernières évaluations -->
+                          <div v-if="studentKpi(s.userId).exercises.scoreHistory?.length" class="space-y-0.5 pt-1">
+                            <p class="text-xs text-dark/60">5 dernières évaluations</p>
+                            <div v-for="h in studentKpi(s.userId).exercises.scoreHistory.slice(0, 5)" :key="h.date"
+                              class="flex justify-between text-xs">
+                              <span class="text-dark/70 truncate max-w-[120px]">{{ h.testName }}</span>
+                              <span :class="['font-semibold', h.percentage >= 70 ? 'text-success' : h.percentage >= 50 ? 'text-primary' : 'text-secondary']">
+                                {{ h.percentage }} %
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Leitner -->
+                        <div class="rounded-xl border border-gray px-3 py-2 space-y-2">
+                          <p class="text-xs font-semibold text-primary uppercase tracking-wide">Leitner</p>
+                          <p class="text-xs">
+                            <span class="text-dark/60">Cartes : </span><span class="font-semibold">{{ studentKpi(s.userId).leitner.totalCards }}</span>
+                            <span class="text-dark/60"> · Maîtrise : </span><span class="font-semibold">{{ studentKpi(s.userId).leitner.mastery }} %</span>
+                            <span class="text-dark/60"> · À réviser : </span><span class="font-semibold">{{ studentKpi(s.userId).leitner.cardsDue }}</span>
+                            <span class="text-dark/60"> · Succès : </span><span class="font-semibold">{{ studentKpi(s.userId).leitner.globalSuccessRate }} %</span>
+                          </p>
+                          <!-- Distribution par boîte -->
+                          <div v-if="studentKpi(s.userId).leitner.totalCards > 0">
+                            <p class="text-xs text-dark/60 mb-1">Distribution par boîte</p>
+                            <div class="flex gap-1 text-center">
+                              <div v-for="box in 5" :key="box" class="flex-1">
+                                <div class="h-1.5 rounded-sm"
+                                  :class="box <= 2 ? 'bg-secondary/50' : box === 3 ? 'bg-primary/50' : 'bg-success/50'">
+                                </div>
+                                <p class="text-xs font-semibold text-dark/70 mt-0.5">{{ studentKpi(s.userId).leitner.cardsByBox[box] ?? 0 }}</p>
+                                <p class="text-xs text-dark/40">B{{ box }}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Matières étudiées -->
+                        <div v-if="studentKpi(s.userId).subjects?.list?.length"
+                          class="rounded-xl border border-gray px-3 py-2 space-y-1">
+                          <p class="text-xs font-semibold text-primary uppercase tracking-wide">Matières étudiées</p>
+                          <div class="flex flex-wrap gap-1">
+                            <span v-for="sub in studentKpi(s.userId).subjects.list" :key="sub.subjectId"
+                              class="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                              {{ sub.name }}
+                              <span class="text-primary/60 ml-0.5 text-xs">
+                                {{ [sub.systems > 0 ? `${sub.systems} syst.` : null, sub.tests > 0 ? `${sub.tests} exo` : null].filter(Boolean).join(' · ') }}
+                              </span>
                             </span>
                           </div>
                         </div>
-                        <!-- Leitner -->
-                        <div v-if="kpiConsentStore.studentKpis[s.userId].leitner"
-                          class="rounded-xl border border-gray px-3 py-2">
-                          <p class="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Leitner</p>
-                          <p class="text-xs">
-                            <span class="text-dark/60">Cartes : </span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].leitner.totalCards }}</span>
-                            <span class="text-dark/60"> · Maîtrise : </span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].leitner.mastery }} %</span>
-                            <span class="text-dark/60"> · À réviser : </span>
-                            <span class="font-semibold">{{ kpiConsentStore.studentKpis[s.userId].leitner.cardsDue }}</span>
-                          </p>
+
+                        <!-- Discipline -->
+                        <div class="rounded-xl border border-gray px-3 py-2 space-y-1">
+                          <p class="text-xs font-semibold text-primary uppercase tracking-wide">Discipline</p>
+                          <div class="grid grid-cols-2 gap-1 text-xs">
+                            <span class="text-dark/60">Cette semaine (planifiées / complétées)</span>
+                            <span class="font-semibold text-right">{{ studentKpi(s.userId).discipline.plannedThisWeek }} / {{ studentKpi(s.userId).discipline.completedThisWeek }}</span>
+                            <span class="text-dark/60">Score 30 jours</span>
+                            <span :class="['font-semibold text-right', disciplineScoreClass(studentKpi(s.userId).discipline.disciplineScore)]">
+                              {{ studentKpi(s.userId).discipline.disciplineScore }} %
+                            </span>
+                          </div>
                         </div>
-                        <!-- Badges -->
-                        <div v-if="kpiConsentStore.studentKpis[s.userId].badges?.filter(b => b.unlocked).length"
+
+                        <!-- Badges débloqués -->
+                        <div v-if="studentKpi(s.userId).badges?.filter(b => b.unlocked).length"
                           class="rounded-xl border border-gray px-3 py-2">
                           <p class="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Badges débloqués</p>
                           <div class="flex flex-wrap gap-2">
-                            <span v-for="b in kpiConsentStore.studentKpis[s.userId].badges.filter(b => b.unlocked)"
-                              :key="b.id || b.name"
-                              class="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                              {{ b.name ?? b.label ?? b.type }}
+                            <span v-for="b in studentKpi(s.userId).badges.filter(b => b.unlocked)"
+                              :key="b.id"
+                              class="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+                              :title="b.description">
+                              {{ b.icon }} {{ b.label }}
                             </span>
                           </div>
                         </div>
@@ -178,19 +270,45 @@
             <div v-else-if="sectionStore.sections.length === 0" class="text-sm text-dark/60">Aucune section créée.</div>
             <div v-else class="space-y-2">
               <div v-for="s in sectionStore.sections" :key="s.id"
-                class="rounded-xl border border-gray px-4 py-3 flex items-center justify-between">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span :class="s.type === 'rendu' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'"
-                      class="rounded-full px-2 py-0.5 text-xs font-semibold uppercase">
-                      {{ s.type === 'rendu' ? 'Rendu' : 'Section' }}
-                    </span>
-                    <p class="text-sm font-semibold text-dark">{{ s.title }}</p>
+                class="rounded-xl border border-gray overflow-hidden">
+                <!-- En-tête de la section -->
+                <div
+                  :class="['px-4 py-3 flex items-center justify-between', s.type === 'rendu' ? 'cursor-pointer hover:bg-light/60 transition' : '']"
+                  @click="s.type === 'rendu' && toggleRenduSection(s.id)">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span :class="s.type === 'rendu' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'"
+                        class="rounded-full px-2 py-0.5 text-xs font-semibold uppercase">
+                        {{ s.type === 'rendu' ? 'Rendu' : 'Section' }}
+                      </span>
+                      <p class="text-sm font-semibold text-dark">{{ s.title }}</p>
+                    </div>
+                    <p class="text-xs text-dark/60 mt-0.5">{{ s.description }}</p>
+                    <p v-if="s.dueDate" class="text-xs text-dark/60">Date cible : {{ formatDate(s.dueDate) }}</p>
                   </div>
-                  <p class="text-xs text-dark/60 mt-0.5">{{ s.description }}</p>
-                  <p v-if="s.dueDate" class="text-xs text-dark/60">Date cible : {{ formatDate(s.dueDate) }}</p>
+                  <div class="flex items-center gap-3 shrink-0">
+                    <span v-if="s.type === 'rendu'" class="text-xs text-primary select-none">
+                      {{ expandedRenduSections[s.id] ? '▲' : '▼ Voir rendus' }}
+                    </span>
+                    <button @click.stop="sectionStore.delete(selectedId, s.id)" class="text-xs text-secondary hover:underline">Supprimer</button>
+                  </div>
                 </div>
-                <button @click="sectionStore.delete(selectedId, s.id)" class="text-xs text-secondary hover:underline">Supprimer</button>
+                <!-- Rendus étudiants (uniquement pour type=rendu) -->
+                <div v-if="s.type === 'rendu' && expandedRenduSections[s.id]"
+                  class="border-t border-gray bg-light/30 px-4 py-3 space-y-2">
+                  <p v-if="submissionStore.loadingSection[s.id]" class="text-xs text-dark/60 italic">Chargement des rendus...</p>
+                  <p v-else-if="!submissionStore.sectionSubmissions[s.id]?.length" class="text-xs text-dark/60 italic">Aucun rendu soumis.</p>
+                  <div v-else class="space-y-1">
+                    <div v-for="sub in submissionStore.sectionSubmissions[s.id]" :key="sub.id"
+                      class="flex items-center justify-between rounded-lg border border-gray bg-white px-3 py-2">
+                      <div>
+                        <p class="text-sm font-semibold text-dark">{{ sub.student?.name }}</p>
+                        <p class="text-xs text-dark/60">{{ sub.originalName }} · {{ formatFileSize(sub.fileSize) }} · {{ formatDate(sub.submittedAt) }}</p>
+                      </div>
+                      <button @click="downloadSubmission(sub.fileKey)" class="text-xs text-primary underline shrink-0">Télécharger</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -354,6 +472,7 @@ import { useClassGroupResourceStore } from '@/stores/classGroupResources'
 import { useTeacherAnalytics } from '@/composables/useTeacherAnalytics'
 import { useAuthStore } from '@/stores/auth'
 import { useKpiConsentStore } from '@/stores/kpiConsent'
+import { useClassGroupSubmissionStore } from '@/stores/classGroupSubmissions'
 import StudentDetailComponent from '@/components/StudentDetailComponent.vue'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
@@ -365,6 +484,7 @@ const sectionStore = useClassGroupSectionStore()
 const resourceStore = useClassGroupResourceStore()
 const authStore = useAuthStore()
 const kpiConsentStore = useKpiConsentStore()
+const submissionStore = useClassGroupSubmissionStore()
 const { analytics, analyticsLoading, expandedAnalyticsStudents, currentWeekScore, atRiskStudents, scoreTextClass, toggleStudentDetail, loadStudentAnalytics } = useTeacherAnalytics()
 
 const selectedId = ref(null)
@@ -386,6 +506,8 @@ const allOccurrences = computed(() =>
   ).sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`))
 )
 
+const expandedRenduSections = reactive({})
+
 const sectionForm = reactive({ title: '', type: 'section', description: '', dueDate: '', error: '' })
 const resourceForm = reactive({ title: '', type: 'cours', file: null, dragOver: false, error: '' })
 const deadlineForm = reactive({ name: '', type: 'ds', occurrenceId: '', dueDate: '', dueTime: '', error: '' })
@@ -394,6 +516,8 @@ async function selectGroup(id) {
   selectedId.value = id
   loadingData.value = true
   kpiConsentStore.clearStudentKpis()
+  submissionStore.clearSectionSubmissions()
+  Object.keys(expandedRenduSections).forEach((k) => delete expandedRenduSections[k])
   await Promise.all([
     calendarStore.fetchByGroup(id),
     deadlineStore.fetchByGroup(id),
@@ -404,12 +528,28 @@ async function selectGroup(id) {
   loadingData.value = false
 }
 
-// Ouvre/ferme l'accordion étudiant et charge les KPI au premier clic (lazy)
+// Ouvre/ferme l'accordion étudiant et (re)charge les KPI à chaque ouverture
 function toggleStudentAndLoadKpis(userId) {
   toggleStudentDetail(userId)
-  if (expandedAnalyticsStudents[userId] && !(userId in kpiConsentStore.studentKpis)) {
+  if (expandedAnalyticsStudents[userId]) {
     kpiConsentStore.fetchStudentKpis(userId, selectedId.value)
   }
+}
+
+function studentKpi(userId) {
+  return kpiConsentStore.studentKpis[userId]
+}
+
+function disciplineScoreClass(score) {
+  if (score >= 70) return 'text-success'
+  if (score >= 40) return 'text-primary'
+  return 'text-secondary'
+}
+
+// Normalise la hauteur d'une barre d'activité hebdomadaire (max 7 séances/sem.)
+function weeklyBarHeight(count) {
+  if (!count) return '3px'
+  return Math.max(20, Math.min(100, Math.round((count / 7) * 100))) + '%'
 }
 
 function formatMinutes(minutes) {
@@ -494,6 +634,33 @@ async function submitDeadline() {
   if (ok) {
     Object.assign(deadlineForm, { name: '', occurrenceId: '', dueDate: '', dueTime: '', error: '' })
     await deadlineStore.fetchByGroup(selectedId.value)
+  }
+}
+
+async function toggleRenduSection(sectionId) {
+  if (expandedRenduSections[sectionId]) {
+    expandedRenduSections[sectionId] = false
+    return
+  }
+  expandedRenduSections[sectionId] = true
+  await submissionStore.fetchBySection(selectedId.value, sectionId)
+}
+
+async function downloadSubmission(fileKey) {
+  if (!fileKey) { notif.notify('Aucun fichier associé.', 'error'); return }
+  try {
+    const resp = await api.get('storage/presign', { key: fileKey, disposition: 'attachment' })
+    if (resp?.status === 200 && resp.data?.url) {
+      const a = document.createElement('a')
+      a.href = resp.data.url
+      a.target = '_blank'
+      a.rel = 'noopener'
+      a.click()
+    } else {
+      notif.notify('Impossible de télécharger le fichier.', 'error')
+    }
+  } catch {
+    notif.notify('Impossible de télécharger le fichier.', 'error')
   }
 }
 

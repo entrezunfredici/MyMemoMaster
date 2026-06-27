@@ -32,8 +32,10 @@ export const useKpiConsentStore = defineStore('kpiConsent', {
           this._consentsFetchedAt = Date.now()
           return true
         }
+        notif.notify(resp?.data?.message || 'Erreur lors du chargement des partages.', 'error')
         return false
       } catch {
+        notif.notify('Erreur lors du chargement des partages.', 'error')
         return false
       } finally {
         this.loading = false
@@ -112,6 +114,7 @@ export const useKpiConsentStore = defineStore('kpiConsent', {
      * @returns {Promise<boolean>}
      */
     async fetchStudentKpis(studentId, classGroupId) {
+      delete this.studentKpis[studentId]
       try {
         const resp = await api.get(`kpi/student/${studentId}`, { classGroupId })
         if (resp?.status === 200) {

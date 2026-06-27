@@ -4,8 +4,12 @@ import { notif } from '@/helpers/notif'
 
 export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions', {
   state: () => ({
-    // Map sectionId → submission (own)
+    // Map sectionId → submission (own, vue étudiant)
     mySubmissions: {},
+    // Map sectionId → Submission[] (tous, vue enseignant)
+    sectionSubmissions: {},
+    // Map sectionId → boolean (chargement en cours)
+    loadingSection: {},
     uploading: false,
   }),
 
@@ -20,6 +24,29 @@ export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions',
       } catch {
         return false
       }
+    },
+
+    async fetchBySection(groupId, sectionId) {
+      this.loadingSection[sectionId] = true
+      try {
+        const resp = await api.get(`class-groups/${groupId}/sections/${sectionId}/submissions`)
+        if (resp?.status !== 200) {
+          this.sectionSubmissions[sectionId] = []
+          return false
+        }
+        this.sectionSubmissions[sectionId] = resp.data.data
+        return true
+      } catch {
+        this.sectionSubmissions[sectionId] = []
+        return false
+      } finally {
+        delete this.loadingSection[sectionId]
+      }
+    },
+
+    clearSectionSubmissions() {
+      this.sectionSubmissions = {}
+      this.loadingSection = {}
     },
 
     async uploadAndSubmit(groupId, sectionId, file) {

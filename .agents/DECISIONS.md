@@ -609,3 +609,12 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Utiliser `@aws-sdk/s3-request-presigner` pour générer une URL signée temporaire (15 min) côté serveur. Le backend retourne `{ url }`, le front redirige directement vers cette URL. Pour les téléchargements, `disposition=attachment` passe via `ResponseContentDisposition` qui force `Content-Disposition: attachment` dans la réponse S3.
 **Alternative écartée** : Proxy streaming (`Body.pipe(res)`) — plus de contrôle sur la bande passante et les droits, mais fragile avec les providers S3-compatibles non-AWS, et consomme la bande passante du serveur API pour chaque téléchargement.
 **Conséquences** : Les URLs signées expirent après 15 min — non partageable hors session. Si un utilisateur copie une presigned URL, elle expire. La bande passante S3 → client est directe (pas transit API). Infomaniak doit respecter `ResponseContentDisposition` (standard S3 — validé en pratique).
+
+
+---
+
+### [2026-06-27] Cache TTL Pinia — condition groupId actif obligatoire
+**Contexte** : Les stores `calendarEvents`, `deadlines`, `classGroupSections`, `classGroupResources` utilisent un cache TTL par `groupId` pour éviter des appels API redondants lors de la navigation. L'implémentation initiale stockait `_cache[groupId] = timestamp` sans tracker le groupe actif. Bug : après `fetchByGroup(A)` puis `fetchByGroup(B)`, revenir sur A dans les 5 min retournait `true` immédiatement (cache A valide) mais le tableau de données (`groupEvents`, etc.) contenait encore les données de B.
+**Décision** : Ajouter `_currentGroupId` dans le state de chaque store. La garde TTL inclut `this._currentGroupId === groupId`. Le cache n'est utilisé que si c'est le même groupe qu'au dernier fetch. Si l'utilisateur change de groupe, on refetche toujours.
+**Alternative écartée** : Stocker les données par `groupId` (ex. `eventsByGroup: { [groupId]: [] }`) — correct mais change le contrat de l'interface publique et nécessite de mettre à jour toutes les vues qui lisent `store.groupEvents` directement. / Supprimer le cache TTL entre groupes — corrige le bug mais on perd le bénéfice pour le scénario navigation aller-retour.
+**Conséquences** : Le cache TTL ne bénéficie que du cas "même groupe, re-mount rapide" (navigation aller-retour vers la même page avec le même groupe actif). Le switch entre groupes est toujours un fetch réseau. Ce comportement est correct : les données affichées doivent toujours correspondre au groupe sélectionné.
