@@ -40,6 +40,10 @@ jest.mock('../../services/Role.service', () => ({ findOne: jest.fn() }))
 process.env.AUTH_JWT_SECRET = 'test-secret'
 process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.NODE_ENV = 'test'
+// max évalué à la création du middleware (chargement de app.js) — doit être posé avant require.
+process.env.API_RATE_MAX = '200'
+// Active le rate limiting pour ce fichier de test (désactivé globalement par test/setup.js).
+delete process.env.RATE_LIMIT_DISABLED
 
 const request = require('supertest')
 const app = require('../../app')
@@ -90,15 +94,11 @@ describe('Sécurité — CORS', () => {
 // Rate limiting
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Sécurité — Rate limiting', () => {
-  const originalEnv = process.env.NODE_ENV
-
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv
+    delete process.env.RATE_LIMIT_DISABLED
   })
 
   it('authLimiter — retourne 429 après 5 tentatives sur /users/login', async () => {
-    process.env.NODE_ENV = 'production'
-
     // IP unique par test pour éviter les collisions avec d'autres suites
     const ip = `10.0.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`
     const sendReq = () =>
@@ -118,8 +118,6 @@ describe('Sécurité — Rate limiting', () => {
   })
 
   it('registerLimiter — retourne 429 après 10 tentatives sur /users/register', async () => {
-    process.env.NODE_ENV = 'production'
-
     const ip = `10.1.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`
     const sendReq = () =>
       request(app)
@@ -136,8 +134,8 @@ describe('Sécurité — Rate limiting', () => {
     expect(res.body.message).toBe('Trop de créations de compte, réessayez dans 1 heure.')
   })
 
-  it('rate limiters sont désactivés en environnement test (NODE_ENV=test)', async () => {
-    process.env.NODE_ENV = 'test'
+  it('rate limiters sont désactivés via RATE_LIMIT_DISABLED=true', async () => {
+    process.env.RATE_LIMIT_DISABLED = 'true'
 
     const ip = `10.2.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`
 
@@ -153,8 +151,6 @@ describe('Sécurité — Rate limiting', () => {
   })
 
   it('apiLimiter — retourne 429 après 200 requêtes sur une route quelconque', async () => {
-    process.env.NODE_ENV = 'production'
-
     const ip = `10.3.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`
     const sendReq = () => request(app).get('/api/v1/roles').set('X-Forwarded-For', ip)
 

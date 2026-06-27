@@ -1,9 +1,10 @@
 const rateLimit = require('express-rate-limit')
 const { ipKeyGenerator } = require('express-rate-limit')
 
-// CHOIX: skipInTest comme fonction (pas booléen) pour être réévalué à chaque requête
-// RAISON: permet de modifier NODE_ENV en cours de test sans recréer le middleware
-const skipInTest = () => process.env.NODE_ENV === 'test'
+// CHOIX: skip via RATE_LIMIT_DISABLED (pas NODE_ENV) — découple le rate limiting de l'environnement.
+// Les tests qui veulent désactiver le rate limiting posent RATE_LIMIT_DISABLED=true (via setup.js).
+// Les tests qui vérifient le rate limiting (security.test.js) le désactivent au niveau du test.
+const skipRateLimit = () => process.env.RATE_LIMIT_DISABLED === 'true'
 
 // Extrait l'userId du JWT sans vérifier la signature — usage exclusif : clé de rate limiting.
 // Vérifie le type de l'id et l'expiration pour limiter le bucket poisoning (DoS ciblé par userId).
@@ -35,7 +36,7 @@ function userKeyFromJwt(req) {
 const authLimiter = rateLimit({
   windowMs: parseInt(process.env.AUTH_RATE_WINDOW_MS, 10) || 15 * 60 * 1000,
   max: parseInt(process.env.AUTH_RATE_MAX, 10) || 5,
-  skip: skipInTest,
+  skip: skipRateLimit,
   message: { message: 'Trop de tentatives, réessayez dans 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -50,7 +51,7 @@ const authLimiter = rateLimit({
 const registerLimiter = rateLimit({
   windowMs: parseInt(process.env.REGISTER_RATE_WINDOW_MS, 10) || 60 * 60 * 1000,
   max: parseInt(process.env.REGISTER_RATE_MAX, 10) || 10,
-  skip: skipInTest,
+  skip: skipRateLimit,
   message: { message: 'Trop de créations de compte, réessayez dans 1 heure.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -69,7 +70,7 @@ const apiLimiter = rateLimit({
   // RAISON: keying par userId évite le problème NAT scolaire (plusieurs élèves derrière la même IP)
   max: parseInt(process.env.API_RATE_MAX, 10) || 500,
   keyGenerator: userKeyFromJwt,
-  skip: skipInTest,
+  skip: skipRateLimit,
   message: { message: 'Trop de requêtes, réessayez plus tard.' },
   standardHeaders: true,
   legacyHeaders: false
