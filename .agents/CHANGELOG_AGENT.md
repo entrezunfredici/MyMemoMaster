@@ -102,6 +102,7 @@
 | Tests fonctionnels consentement (front) | Stable — S-02.08 : 32 tests Vitest kpiConsent.store (état initial, TTL cache, grantConsent/revokeConsent/fetchStudentKpis/clearStudentKpis — cas nominal + limites + erreurs) | 2026-06-27 |
 | Revue de code & merge S-02 | Stable — S-02.09 : 1 bug critique cache TTL (4 stores), notification fetchMyConsents, 13 erreurs ESLint corrigées, 3 fichiers tests réécrits, 490/490 tests verts | 2026-06-27 |
 | Suivi des rendus enseignant | Stable — [IMP] 2026-06-27 : vue enseignant — panneau "rendu reçu / pas encore rendu" par section rendu, avec téléchargement. Route GET /status + service getSubmissionStatus + store fetchStatus | 2026-06-27 |
+| Documentation espace enseignant (Groupes classes) | Stable — S-03.12 : diagrams/classroom_enseignant.md — acteurs/permissions, modèle données, règles métier (groupes/membres/invitations/sections/rendus/ressources/soumissions/KPI), flux principaux, maquettes UI ASCII, tableau endpoints, cas limites, dette technique | 2026-06-28 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
