@@ -92,6 +92,24 @@ export const useTestStore = defineStore('tests', {
         notif.notify('Erreur lors de la suppression du test', 'error')
         return false
       }
+    },
+
+    async assignGroups(testId, groupIds) {
+      try {
+        const resp = await api.post(`tests/${testId}/groups`, { groupIds })
+        if (resp.status !== 200) {
+          notif.notify(resp.data?.message || 'Erreur lors de l\'assignation', 'error')
+          return false
+        }
+        // Met à jour le test dans la liste locale
+        const idx = this.tests.findIndex((t) => t.testId === testId)
+        if (idx !== -1) this.tests[idx] = { ...this.tests[idx], ...resp.data.data }
+        notif.notify(groupIds.length ? 'Exercice assigné aux groupes.' : 'Exercice rendu privé.', 'success')
+        return true
+      } catch (err) {
+        notif.notify('Erreur lors de l\'assignation des groupes', 'error')
+        return false
+      }
     }
   }
 })

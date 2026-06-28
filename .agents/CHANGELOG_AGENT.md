@@ -24,7 +24,7 @@
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
-| Test / Question / Response | Stable — M-06.05 : moteur de correction server-side (POST /tests/:id/submit), 4 types, tests service (16) + controller (7) ajoutés | 2026-06-21 |
+| Test / Question / Response | Stable — 2026-06-28 : séries d'exercices privées par propriétaire + assignation groupes (TestClassGroup M2M) ; GET /tests auth requis ; POST /:id/groups ; KPI perso filtrés aux tests privés ; KPI péda via TestClassGroup direct | 2026-06-28 |
 | TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
@@ -4149,4 +4149,44 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 - ✅ ESLint : 0 erreur (était 13)
 - ✅ Tests : 490/490 passants (était 477/479 + 1 fichier crashant)
 - ✅ Documentation mise à jour (CHANGELOG_AGENT.md)
+
+---
+
+### [EX-01] Propriété et assignation des séries d'exercices — 2026-06-28
+
+**Contexte :** Les séries d'exercices (Test) étaient globales et publiques (pas de filtre userId sur GET /tests, pas de vérification de propriété sur PUT/DELETE). Demande : rendre les exercices privés par défaut (comme les cartes Leitner et les mind maps), permettre aux enseignants de les assigner à un ou plusieurs groupes classes, et bifurquer les scores selon le contexte (privé → KPI perso, groupe → KPI pédagogiques).
+
+**Fichiers créés :**
+- `migrations/20260628000001-create-testclassgroup-table.js` — table `TestClassGroup` (testId, classGroupId, unique+index)
+- `models/TestClassGroup.model.js` — modèle Sequelize junction sans timestamps
+
+**Fichiers modifiés :**
+- `models/index.js` — enregistrement `TestClassGroup`
+- `models/Test.model.js` — association `belongsToMany(ClassGroup, { through: 'TestClassGroup', as: 'classGroups' })`
+- `models/ClassGroup.model.js` — association `belongsToMany(Test, { through: 'TestClassGroup', as: 'assignedTests' })`
+- `services/Test.service.js` — `findAll(userId)` : propres tests + legacy (userId null) + tests des groupes membres ; `findOne(id, userId)` : garde propriétaire/membre ; `update`/`delete` : vérif propriétaire ; nouvelle méthode `assignGroups(testId, userId, groupIds)` via `test.setClassGroups()`
+- `controllers/Test.controller.js` — codes 403/404 sur update/delete, nouveau handler `assignGroups`
+- `routes/Test.routes.js` — `authMiddleware` ajouté sur GET / et GET /:id ; nouvelle route `POST /:id/groups`
+- `validators/Test.validators.js` — ajout `exports.assignGroups` (`groupIds` isArray, items isInt)
+- `services/Kpi.service.js` — import `ClassGroup` ; include `classGroups` (required:false) dans TestResult ; filtre JS `privateTestResults` (tests sans groupe assigné) appliqué dans `getMyKpis` et `getPersonalKpisForSubjects`
+- `services/ClassGroup.service.js` — `getStudentAnalytics` : remplacement de la recherche via Deadline/EventOccurrence/CalendarEvent par `TestClassGroup.findAll({ where: { classGroupId } })` (plus direct, plus fiable)
+- `stores/tests.js` (front) — ajout action `assignGroups(testId, groupIds)`
+- `pages/ExercisesPage.vue` (front) — import `useClassGroupStore`, `useAuthStore`, `useRole` ; badge "Privé" / nom(s) de groupe par carte ; bouton "Assigner à des groupes" (visible enseignant propriétaire uniquement) ; modal checkboxes groupes + soumission
+
+**Ce qui est utilisable :**
+- Un utilisateur connecté voit uniquement ses propres exercices + les exercices assignés à ses groupes
+- Un enseignant peut assigner/désassigner un exercice à un ou plusieurs groupes depuis la page Exercices
+- Les scores sur un exercice privé alimentent les KPI personnels de l'étudiant
+- Les scores sur un exercice assigné à un groupe alimentent les KPI pédagogiques de l'enseignant
+- Les tests avec `userId=null` (legacy) restent visibles de tous les utilisateurs connectés
+
+**Hypothèses posées :**
+- Tests existants avec `userId=null` traités comme "legacy global" — compatibilité ascendante préservée
+- L'enseignant ne peut assigner qu'à ses propres groupes (le frontend ne montre que les groupes de l'utilisateur via `classGroupStore`)
+- Aucune validation backend que l'enseignant est bien membre du groupe visé (acceptable MVP)
+
+**Dette / points d'attention :**
+- Les tests Jest/Supertest existants sur Test.controller et Test.service utilisent l'ancienne signature sans `userId` — à adapter
+- `ClassGroup.service.js` n'importe plus `EventOccurrence`/`CalendarEvent` via la branche exercices (ils restent importés pour d'autres usages — vérifier s'ils sont encore nécessaires)
+- Migration `20260628000001` à passer avant toute mise en prod
 - ✅ Aucun bug bloquant connu sur le périmètre livré

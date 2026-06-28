@@ -1,6 +1,6 @@
 const dayjs = require('dayjs')
 const { Op } = require('sequelize')
-const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline, EventOccurrence, CalendarEvent, Test } = require('../models/index')
+const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline, EventOccurrence, CalendarEvent, Test, TestClassGroup } = require('../models/index')
 
 const AT_RISK_INACTIVE_DAYS = 7
 const AT_RISK_SCORE_DROP_PCT = 20
@@ -234,32 +234,19 @@ class ClassGroupService {
       return { activeStudentsCount: 0, atRiskCount: 0, scoreWeeklyTrend: this._computeGroupWeeklyTrend([]), students: [] }
     }
 
-    // Exercices assignés comme devoir dans CE groupe par les enseignants du groupe
-    const deadlines = teacherIds.length > 0
-      ? await Deadline.findAll({
-          where: { createdBy: teacherIds, testId: { [Op.not]: null } },
-          attributes: ['testId'],
-          include: [{
-            model: EventOccurrence,
-            as: 'occurrence',
-            required: true,
-            attributes: [],
-            include: [{
-              model: CalendarEvent,
-              as: 'calendarEvent',
-              where: { classGroupId: Number(groupId) },
-              attributes: []
-            }]
-          }]
-        })
-      : []
-    const teacherTestIds = [...new Set(deadlines.map((d) => d.testId).filter(Boolean))]
+    // Exercices directement assignés à ce groupe via TestClassGroup
+    const groupAssignments = await TestClassGroup.findAll({
+      where: { classGroupId: Number(groupId) },
+      attributes: ['testId'],
+      raw: true
+    })
+    const assignedTestIds = [...new Set(groupAssignments.map((a) => a.testId))]
 
     const [users, sessions, results] = await Promise.all([
       User.findAll({ where: { userId: studentIds }, attributes: ['userId', 'name', 'email'] }),
       RevisionSession.findAll({ where: { userId: studentIds, isDone: true } }),
-      teacherTestIds.length > 0
-        ? TestResult.findAll({ where: { userId: studentIds, testId: teacherTestIds }, order: [['completedAt', 'ASC']] })
+      assignedTestIds.length > 0
+        ? TestResult.findAll({ where: { userId: studentIds, testId: assignedTestIds }, order: [['completedAt', 'ASC']] })
         : Promise.resolve([])
     ])
 

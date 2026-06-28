@@ -613,6 +613,18 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-28] Séries d'exercices — propriété par créateur + assignation M2M aux groupes
+
+**Contexte** : Les exercices (Test) étaient globaux et publics. La demande est de les rendre privés par défaut (seul le créateur les voit), tout en permettant à un enseignant de les partager avec un ou plusieurs groupes. Le contexte d'utilisation (privé vs. groupe) détermine comment les scores sont comptabilisés dans les KPI.
+
+**Décision** : Table junction `TestClassGroup` (M2M entre Test et ClassGroup). Un test sans entrée dans cette table est privé — seul son créateur (`userId`) y accède. Un test avec des entrées est accessible aux membres des groupes assignés. `GET /tests` et `GET /tests/:id` requièrent désormais un JWT. La route `POST /tests/:id/groups` (propriétaire uniquement) permet de gérer les assignations via `setClassGroups()`. Dans `Kpi.service.js`, seuls les résultats des tests **sans groupe** (`classGroups.length === 0`) alimentent les KPI personnels. Dans `ClassGroup.service.js`, les KPI pédagogiques interrogent `TestClassGroup` directement (remplace l'approche via Deadline/EventOccurrence/CalendarEvent qui était indirecte et fragile).
+
+**Alternative écartée** : Une FK `classGroupId` nullable sur `Test` (un seul groupe) — ne permet pas d'assigner à plusieurs groupes simultanément. Garder la recherche via Deadline — indirecte, ne couvre pas les exercices assignés sans deadline associée.
+
+**Conséquences** : Migration `20260628000001` à passer. Les tests avec `userId=null` (legacy) restent visibles de tous les utilisateurs connectés. Les tests Jest existants sur Test.service/controller utilisent l'ancienne signature sans `userId` — à adapter. Le partage KPI pédagogiques (`KpiConsent`) continue de fonctionner sur le même jeu de données filtré.
+
+---
+
 ### [2026-06-27] Suivi rendus enseignant — endpoint /status séparé plutôt que jointure dans findBySection
 **Contexte** : Le prof veut voir, pour chaque section "rendu", qui a soumis et qui n'a pas encore soumis. `findBySection` ne retourne que les soumissions existantes — les étudiants sans soumission sont invisibles.
 **Décision** : Nouvel endpoint `GET /class-groups/:id/sections/:sectionId/submissions/status` qui croise `ClassGroupUsers` (rôle=student) avec `ClassGroupSubmission`. Retourne `{ submitted: [...], notSubmitted: [...] }`. `findBySection` est conservé inchangé (utilisé en interne / vue étudiant).

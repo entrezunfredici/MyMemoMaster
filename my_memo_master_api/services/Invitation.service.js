@@ -1,5 +1,6 @@
 const { Invitation, ClassGroup, ClassGroupUsers, User } = require('../models/index')
 const sendEmail = require('../helpers/sendEmail')
+const logger = require('../helpers/logger')
 
 class InvitationService {
   /**
@@ -52,13 +53,18 @@ class InvitationService {
     })
 
     const roleLabel = role === 'teacher' ? 'enseignant' : 'étudiant'
-    const frontUrl = process.env.FRONT_URL || 'http://localhost:5173'
+    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
 
-    await sendEmail(
-      `Invitation au groupe "${group.name}" sur MyMemoMaster`,
-      `Bonjour,\n\nVous avez été invité à rejoindre le groupe "${group.name}" en tant que ${roleLabel} sur MyMemoMaster.\n\nCréez votre compte sur ${frontUrl}/inscription pour accepter automatiquement cette invitation.\n\nUtilisez l'adresse email ${email} lors de votre inscription.\n\nCe message a été envoyé par un membre de la plateforme.`,
-      email
-    )
+    try {
+      await sendEmail(
+        `Invitation au groupe "${group.name}" sur MyMemoMaster`,
+        `Bonjour,\n\nVous avez été invité à rejoindre le groupe "${group.name}" en tant que ${roleLabel} sur MyMemoMaster.\n\nCréez votre compte sur ${frontUrl}/register pour accepter automatiquement cette invitation.\n\nUtilisez l'adresse email ${email} lors de votre inscription.\n\nCe message a été envoyé par un membre de la plateforme.`,
+        email
+      )
+    } catch (emailError) {
+      // L'invitation est déjà sauvegardée en base — l'échec email ne doit pas bloquer la réponse
+      logger.warn(`Invitation créée mais email non envoyé à ${email} : ${emailError?.message}`)
+    }
 
     return { directlyAdded: false, invitation }
   }

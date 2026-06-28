@@ -1,5 +1,5 @@
 const dayjs = require('dayjs')
-const { RevisionSession, TestResult, Test, Subject, LeitnerSystem, LeitnerBox, LeitnerCard } = require('../models')
+const { RevisionSession, TestResult, Test, Subject, LeitnerSystem, LeitnerBox, LeitnerCard, ClassGroup } = require('../models')
 
 /**
  * Retourne le lundi de la semaine (ISO) contenant la date donnée.
@@ -30,7 +30,11 @@ class KpiService {
             model: Test,
             as: 'test',
             attributes: ['testId', 'name', 'subjectId'],
-            include: [{ model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }]
+            required: true,
+            include: [
+              { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+              { model: ClassGroup, as: 'classGroups', through: { attributes: [] }, required: false, attributes: ['id'] }
+            ]
           }
         ],
         order: [['completedAt', 'ASC']]
@@ -48,10 +52,13 @@ class KpiService {
       })
     ])
 
+    // Seuls les résultats des tests privés (sans groupe assigné) alimentent les KPI persos
+    const privateTestResults = testResults.filter((r) => !r.test?.classGroups?.length)
+
     const revisionKpi = this._computeRevision(sessions)
-    const exercisesKpi = this._computeExercises(testResults)
+    const exercisesKpi = this._computeExercises(privateTestResults)
     const leitnerKpi = this._computeLeitner(leitnerSystems)
-    const subjectsKpi = this._computeSubjects(testResults, leitnerSystems)
+    const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
     const disciplineKpi = this._computeDiscipline(sessions)
     const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
 
@@ -79,7 +86,10 @@ class KpiService {
             attributes: ['testId', 'name', 'subjectId'],
             where: { subjectId: subjectIds },
             required: true,
-            include: [{ model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }]
+            include: [
+              { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+              { model: ClassGroup, as: 'classGroups', through: { attributes: [] }, required: false, attributes: ['id'] }
+            ]
           }
         ],
         order: [['completedAt', 'ASC']]
@@ -97,10 +107,12 @@ class KpiService {
       })
     ])
 
+    const privateTestResults = testResults.filter((r) => !r.test?.classGroups?.length)
+
     const revisionKpi = this._computeRevision(sessions)
-    const exercisesKpi = this._computeExercises(testResults)
+    const exercisesKpi = this._computeExercises(privateTestResults)
     const leitnerKpi = this._computeLeitner(leitnerSystems)
-    const subjectsKpi = this._computeSubjects(testResults, leitnerSystems)
+    const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
     const disciplineKpi = this._computeDiscipline(sessions)
     const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
 

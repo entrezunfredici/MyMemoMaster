@@ -74,6 +74,13 @@ module.exports = (instance) => {
       otherKey: 'tagId',
       as: 'tags'
     })
+
+    Test.belongsToMany(models.ClassGroup, {
+      through: 'TestClassGroup',
+      foreignKey: 'testId',
+      otherKey: 'classGroupId',
+      as: 'classGroups'
+    })
   }
 
   return Test

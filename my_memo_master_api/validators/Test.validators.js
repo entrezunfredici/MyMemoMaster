@@ -33,3 +33,12 @@ exports.update = [
     .isInt({ min: 1 })
     .withMessage('subjectId doit être un entier positif')
 ]
+
+exports.assignGroups = [
+  body('groupIds')
+    .isArray()
+    .withMessage('groupIds doit être un tableau'),
+  body('groupIds.*')
+    .isInt({ min: 1 })
+    .withMessage('Chaque groupId doit être un entier positif')
+]

@@ -11,63 +11,49 @@ const router = express.Router()
  * @swagger
  * /tests:
  *   get:
- *     summary: Récupère la liste complète des tests.
+ *     summary: Récupère les tests accessibles à l'utilisateur connecté (ses tests + tests des groupes dont il est membre)
  *     tags:
  *       - Tests
  *     responses:
- *       201:
- *         description: Test créé avec succès
- *       400:
- *         description: Requête invalide
+ *       200:
+ *         description: Liste des tests
+ *       401:
+ *         description: Non authentifié
  *       500:
  *         description: Erreur interne du serveur
- *
  */
-router.get('/', test.findAll)
+router.get('/', authMiddleware, test.findAll)
 
 /**
  * @swagger
- * /Tests/{id}:
+ * /tests/{id}:
  *   get:
- *     summary: Récupère un test par son ID
+ *     summary: Récupère un test par son ID (si l'utilisateur y a accès)
  *     tags:
  *       - Tests
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du Test
  *         schema:
  *           type: integer
  *     responses:
  *       200:
  *         description: Test correspondant à l'ID
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 1
- *                 name:
- *                   type: string
- *                   example: "controle m1"
- *                 subjectId:
- *                   type: integer
- *                   example: 42
+ *       401:
+ *         description: Non authentifié
  *       404:
- *         description: test non trouvé
+ *         description: Test non trouvé ou accès refusé
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get('/:id', test.findOne)
+router.get('/:id', authMiddleware, test.findOne)
 
 /**
  * @swagger
  * /tests:
  *   post:
- *     summary: Ajoute un nouveau test
+ *     summary: Crée un nouvel exercice (lié au créateur, privé par défaut)
  *     tags:
  *       - Tests
  *     requestBody:
@@ -79,10 +65,8 @@ router.get('/:id', test.findOne)
  *             properties:
  *               name:
  *                 type: string
- *                 example: "Controle M1"
  *               subjectId:
  *                 type: integer
- *                 example: 42
  *     responses:
  *       201:
  *         description: Test créé avec succès
@@ -90,7 +74,6 @@ router.get('/:id', test.findOne)
  *         description: Requête invalide
  *       500:
  *         description: Erreur interne du serveur
- *
  */
 router.post('/', authMiddleware, testValidators.create, validate, test.create)
 
@@ -98,34 +81,20 @@ router.post('/', authMiddleware, testValidators.create, validate, test.create)
  * @swagger
  * /tests/{id}:
  *   put:
- *     summary: Met à jour un test existant
+ *     summary: Met à jour un test (propriétaire uniquement)
  *     tags:
  *       - Tests
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du Test à mettre à jour
  *         schema:
  *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: "Controle M1 modifié"
- *               subjectId:
- *                 type: integer
- *                 example: 42
  *     responses:
  *       200:
  *         description: Test mis à jour avec succès
- *       400:
- *         description: Requête invalide
+ *       403:
+ *         description: Accès interdit
  *       404:
  *         description: Test non trouvé
  *       500:
@@ -137,19 +106,20 @@ router.put('/:id', authMiddleware, testValidators.update, validate, test.update)
  * @swagger
  * /tests/{id}:
  *   delete:
- *     summary: Supprime un test par son ID
+ *     summary: Supprime un test (propriétaire uniquement)
  *     tags:
  *       - Tests
  *     parameters:
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID du Test à supprimer
  *         schema:
  *           type: integer
  *     responses:
- *       200:
+ *       204:
  *         description: Test supprimé avec succès
+ *       403:
+ *         description: Accès interdit
  *       404:
  *         description: Test non trouvé
  *       500:
@@ -158,6 +128,42 @@ router.put('/:id', authMiddleware, testValidators.update, validate, test.update)
 router.delete('/:id', authMiddleware, test.delete)
 
 router.post('/:id/submit', authMiddleware, testValidators.submit, validate, test.submit)
+
+/**
+ * @swagger
+ * /tests/{id}/groups:
+ *   post:
+ *     summary: Assigne (ou désassigne) un test à des groupes classes — enseignant propriétaire uniquement
+ *     tags: [Tests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               groupIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: Liste des IDs de groupes. Tableau vide = test redevient privé.
+ *     responses:
+ *       200:
+ *         description: Groupes mis à jour avec succès.
+ *       403:
+ *         description: Accès interdit.
+ *       404:
+ *         description: Test non trouvé.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post('/:id/groups', authMiddleware, testValidators.assignGroups, validate, test.assignGroups)
 
 /**
  * @swagger

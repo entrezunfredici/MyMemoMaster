@@ -1,243 +1,125 @@
-const { Test, Subject, Question, TestResult, Tag } = require('../models/index')
+const { Op } = require('sequelize')
+const { Test, Subject, Question, TestResult, Tag, ClassGroup, ClassGroupUsers, TestClassGroup } = require('../models/index')
 
 const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
+const CLASS_GROUPS_INCLUDE = { model: ClassGroup, as: 'classGroups', attributes: ['id', 'name'], through: { attributes: [] }, required: false }
 const semanticService = require('./Semantic.service')
 
-/**
- * @swagger
- * tags:
- *   name: Tests
- *   description: Gestion des tests
- */
 class TestService {
   /**
-   * @swagger
-   * path:
-   *   /service/tests:
-   *     get:
-   *       summary: Récupérer tous les tests
-   *       description: Récupère la liste complète des tests.
-   *       tags: [Tests]
-   *       responses:
-   *         200:
-   *           description: Liste des tests
-   *           content:
-   *             application/json:
-   *               schema:
-   *                 type: array
-   *                 items:
-   *                   type: object
-   *                   properties:
-   *                     id:
-   *                       type: integer
-   *                       example: 1
-   *                     name:
-   *                       type: string
-   *                       example: "Test de connaissance"
-   *                     subjectId:
-   *                       type: integer
-   *                       example: 1
-   *         500:
-   *           description: Erreur interne du serveur
+   * Retourne les tests accessibles à l'utilisateur :
+   * - ses propres tests (privés ou assignés)
+   * - les tests assignés aux groupes dont il est membre
+   * - les tests legacy (userId null)
    */
-  async findAll() {
+  async findAll(userId) {
+    const memberships = await ClassGroupUsers.findAll({
+      where: { userId },
+      attributes: ['classGroupId'],
+      raw: true
+    })
+    const groupIds = memberships.map((m) => m.classGroupId)
+
+    let groupTestIds = []
+    if (groupIds.length > 0) {
+      const assignments = await TestClassGroup.findAll({
+        where: { classGroupId: groupIds },
+        attributes: ['testId'],
+        raw: true
+      })
+      groupTestIds = [...new Set(assignments.map((a) => a.testId))]
+    }
+
+    const orClauses = [{ userId }, { userId: null }]
+    if (groupTestIds.length > 0) {
+      orClauses.push({ testId: { [Op.in]: groupTestIds } })
+    }
+
     return await Test.findAll({
-      include: [{ model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }, TAG_INCLUDE]
+      where: { [Op.or]: orClauses },
+      include: [
+        { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+        TAG_INCLUDE,
+        CLASS_GROUPS_INCLUDE
+      ]
     })
   }
 
   /**
-   * @swagger
-   * path:
-   *   /service/tests/{id}:
-   *     get:
-   *       summary: Récupérer un test par ID
-   *       description: Récupère un test spécifique en fonction de l'ID fourni.
-   *       tags: [Tests]
-   *       parameters:
-   *         - in: path
-   *           name: id
-   *           required: true
-   *           schema:
-   *             type: integer
-   *           description: ID du test à récupérer.
-   *       responses:
-   *         200:
-   *           description: Détails du test
-   *           content:
-   *             application/json:
-   *               schema:
-   *                 type: object
-   *                 properties:
-   *                   id:
-   *                     type: integer
-   *                     example: 1
-   *                   name:
-   *                     type: string
-   *                     example: "Test de connaissance"
-   *                   subjectId:
-   *                     type: integer
-   *                     example: 1
-   *         404:
-   *           description: Test non trouvé
-   *         500:
-   *           description: Erreur interne du serveur
+   * Retourne un test si l'utilisateur est propriétaire ou membre d'un groupe assigné.
    */
-  async findOne(id) {
-    return await Test.findByPk(id, {
+  async findOne(id, userId) {
+    const test = await Test.findByPk(id, {
       include: [
         { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
         { model: Question, as: 'question', attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition'] },
-        TAG_INCLUDE
+        TAG_INCLUDE,
+        CLASS_GROUPS_INCLUDE
       ],
       order: [[{ model: Question, as: 'question' }, 'questionPosition', 'ASC']]
     })
+    if (!test) return null
+
+    // Propriétaire ou test legacy
+    if (test.userId === userId || test.userId === null) return test
+
+    // Membre d'un groupe assigné
+    const groupIds = (test.classGroups ?? []).map((g) => g.id)
+    if (groupIds.length > 0) {
+      const membership = await ClassGroupUsers.findOne({
+        where: { userId, classGroupId: groupIds }
+      })
+      if (membership) return test
+    }
+
+    return null // pas d'accès
   }
 
-  /**
-   * @swagger
-   * path:
-   *   /service/tests:
-   *     post:
-   *       summary: Créer un nouveau test
-   *       description: Crée un test avec les données fournies.
-   *       tags: [Tests]
-   *       requestBody:
-   *         required: true
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 name:
-   *                   type: string
-   *                   example: "Test de connaissance"
-   *                 subjectId:
-   *                   type: integer
-   *                   example: 1
-   *       responses:
-   *         201:
-   *           description: Test créé avec succès
-   *           content:
-   *             application/json:
-   *               schema:
-   *                 type: object
-   *                 properties:
-   *                   id:
-   *                     type: integer
-   *                     example: 1
-   *                   name:
-   *                     type: string
-   *                     example: "Test de connaissance"
-   *                   subjectId:
-   *                     type: integer
-   *                     example: 1
-   *         400:
-   *           description: Requête invalide
-   *         500:
-   *           description: Erreur interne du serveur
-   */
   async create(data) {
     return await Test.create(data)
   }
 
   /**
-   * @swagger
-   * path:
-   *   /service/tests/{id}:
-   *     put:
-   *       summary: Mettre à jour un test existant
-   *       description: Met à jour les informations d'un test existant en fonction de l'ID fourni.
-   *       tags: [Tests]
-   *       parameters:
-   *         - in: path
-   *           name: id
-   *           required: true
-   *           schema:
-   *             type: integer
-   *           description: ID du test à mettre à jour.
-   *       requestBody:
-   *         required: true
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 name:
-   *                   type: string
-   *                   example: "Test de mise à jour"
-   *                 subjectId:
-   *                   type: integer
-   *                   example: 1
-   *       responses:
-   *         200:
-   *           description: Test mis à jour avec succès
-   *           content:
-   *             application/json:
-   *               schema:
-   *                 type: object
-   *                 properties:
-   *                   id:
-   *                     type: integer
-   *                     example: 1
-   *                   name:
-   *                     type: string
-   *                     example: "Test de mise à jour"
-   *                   subjectId:
-   *                     type: integer
-   *                     example: 1
-   *         400:
-   *           description: Requête invalide
-   *         404:
-   *           description: Test non trouvé
-   *         500:
-   *           description: Erreur interne du serveur
+   * Mise à jour réservée au propriétaire.
+   * Retourne 'NOT_FOUND' ou 'FORBIDDEN' comme erreur signalée.
    */
-  async update(id, data) {
+  async update(id, data, userId) {
     const test = await Test.findByPk(id)
-    if (!test) {
-      throw new Error(' Test not found')
-    }
+    if (!test) throw Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' })
+    if (test.userId !== null && test.userId !== userId) throw Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' })
     return await test.update(data)
   }
 
   /**
-   * @swagger
-   * path:
-   *   /service/tests/{id}:
-   *     delete:
-   *       summary: Supprimer un test
-   *       description: Supprime un test en fonction de l'ID fourni.
-   *       tags: [Tests]
-   *       parameters:
-   *         - in: path
-   *           name: id
-   *           required: true
-   *           schema:
-   *             type: integer
-   *           description: ID du test à supprimer.
-   *       responses:
-   *         200:
-   *           description: Test supprimé avec succès
-   *         404:
-   *           description: Test non trouvé
-   *         500:
-   *           description: Erreur interne du serveur
+   * Suppression réservée au propriétaire.
    */
-  async delete(id) {
+  async delete(id, userId) {
     const test = await Test.findByPk(id)
-    if (!test) {
-      throw new Error('Test not found')
-    }
+    if (!test) throw Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' })
+    if (test.userId !== null && test.userId !== userId) throw Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' })
     return await test.destroy()
   }
 
   /**
-   * Évalue les réponses d'un utilisateur, sauvegarde le TestResult et retourne la correction.
+   * Assigne (ou désassigne) un test à des groupes.
+   * Seul le propriétaire peut modifier les assignations.
    * @param {number} testId
    * @param {number} userId
-   * @param {Array<{questionId: number, answer: *}>} answers
-   * @returns {{ score, total, results, resultId }|null}
+   * @param {number[]} groupIds - tableau vide = test redevient privé
+   */
+  async assignGroups(testId, userId, groupIds) {
+    const test = await Test.findByPk(testId)
+    if (!test) throw Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' })
+    if (test.userId !== userId) throw Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' })
+
+    const groups = groupIds.length > 0 ? await ClassGroup.findAll({ where: { id: groupIds } }) : []
+    await test.setClassGroups(groups)
+
+    return test.reload({ include: [CLASS_GROUPS_INCLUDE] })
+  }
+
+  /**
+   * Évalue les réponses d'un utilisateur, sauvegarde le TestResult et retourne la correction.
    */
   async submitAnswers(testId, userId, answers) {
     const test = await Test.findByPk(testId, {

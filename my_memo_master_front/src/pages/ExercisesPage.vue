@@ -25,6 +25,17 @@
       <template #stats>
         <div class="flex flex-wrap items-center gap-2 mt-1">
           <span class="subject-badge">{{ test.subject?.name || 'Sans sujet' }}</span>
+          <!-- Statut privé / groupes assignés -->
+          <span
+            v-if="!test.classGroups?.length"
+            class="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200"
+          >Privé</span>
+          <span
+            v-for="group in test.classGroups"
+            :key="group.id"
+            class="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 border border-blue-200"
+          >{{ group.name }}</span>
+          <!-- Tags -->
           <span
             v-for="tag in test.tags"
             :key="tag.tagId"
@@ -33,11 +44,51 @@
             {{ tag.name }}
           </span>
         </div>
+        <!-- Bouton assigner visible uniquement pour le propriétaire enseignant -->
+        <button
+          v-if="isEnseignant && test.userId === authStore.user?.userId"
+          type="button"
+          @click.stop="openAssignModal(test)"
+          class="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+        >Assigner à des groupes</button>
       </template>
     </MenuItem>
 
     <!-- Modals -->
     <template #modals>
+      <!-- Modal assignation groupes -->
+      <div v-if="showAssignModal" class="modal-overlay" @click="closeAssignModal">
+        <div class="modal-panel" @click.stop>
+          <h2 class="modal-title">Assigner aux groupes classes</h2>
+          <p class="text-sm text-gray-500 mb-4">
+            Sélectionnez les groupes qui auront accès à cet exercice.<br>
+            Les scores de ces étudiants apparaîtront dans vos KPI pédagogiques.
+          </p>
+          <div v-if="assignableGroups.length === 0" class="text-sm text-gray-400 italic mb-4">
+            Vous n'avez aucun groupe classe. Créez-en un depuis la page Classe.
+          </div>
+          <div v-else class="space-y-2 mb-6">
+            <label
+              v-for="group in assignableGroups"
+              :key="group.id"
+              class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50"
+            >
+              <input type="checkbox" :value="group.id" v-model="selectedGroupIds" class="accent-primary w-4 h-4" />
+              <span class="font-medium text-sm text-heading">{{ group.name }}</span>
+              <span v-if="group.level" class="text-xs text-gray-400">{{ group.level }}</span>
+            </label>
+          </div>
+          <p class="text-xs text-gray-400 mb-4">Aucune sélection = l'exercice reste privé.</p>
+          <div class="btn-row">
+            <button type="button" @click="submitAssign" :disabled="assignSubmitting" class="btn-modal-submit">
+              {{ assignSubmitting ? 'Enregistrement...' : 'Enregistrer' }}
+            </button>
+            <button type="button" @click="closeAssignModal" class="btn-modal-cancel">Annuler</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal création / édition exercice -->
       <div v-if="showModal" class="modal-overlay" @click="closeModal">
         <div class="modal-panel modal-panel--lg" @click.stop>
           <h2 class="modal-title">{{ isEditMode ? 'Modifier l\'exercice' : 'Nouvel exercice' }}</h2>
@@ -172,6 +223,9 @@ import { notif } from '@/helpers/notif'
 import { useTestStore } from '@/stores/tests'
 import { useSubjectStore } from '@/stores/subjects'
 import { useTagStore } from '@/stores/tags'
+import { useClassGroupStore } from '@/stores/classGroups'
+import { useAuthStore } from '@/stores/auth'
+import { useRole } from '@/composables/useRole'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
@@ -181,6 +235,9 @@ const router = useRouter()
 const testStore = useTestStore()
 const subjectStore = useSubjectStore()
 const tagStore = useTagStore()
+const classGroupStore = useClassGroupStore()
+const authStore = useAuthStore()
+const { isEnseignant } = useRole()
 
 const loading = ref(true)
 const searchQuery = ref('')
@@ -191,6 +248,14 @@ const editTestId = ref(null)
 const submitting = ref(false)
 const formError = ref('')
 const questionsToDelete = ref([])
+
+// — assignation groupes —
+const showAssignModal = ref(false)
+const assignTargetTest = ref(null)
+const selectedGroupIds = ref([])
+const assignSubmitting = ref(false)
+
+const assignableGroups = computed(() => classGroupStore.groups ?? [])
 
 const subjects = computed(() => subjectStore.subjects)
 const tests = computed(() => testStore.tests)
@@ -297,7 +362,9 @@ function removeQuestion(idx) {
 
 // ── lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  await Promise.all([testStore.fetchTests(), subjectStore.fetchSubjects()])
+  const fetches = [testStore.fetchTests(), subjectStore.fetchSubjects()]
+  if (isEnseignant.value) fetches.push(classGroupStore.fetchGroups())
+  await Promise.all(fetches)
   loading.value = false
 })
 
@@ -405,6 +472,27 @@ async function submitEdit() {
   } finally {
     submitting.value = false
   }
+}
+
+// ── assignation groupes ───────────────────────────────────────────────────────
+function openAssignModal(test) {
+  assignTargetTest.value = test
+  selectedGroupIds.value = (test.classGroups ?? []).map((g) => g.id)
+  showAssignModal.value = true
+}
+
+function closeAssignModal() {
+  showAssignModal.value = false
+  assignTargetTest.value = null
+  selectedGroupIds.value = []
+}
+
+async function submitAssign() {
+  if (!assignTargetTest.value) return
+  assignSubmitting.value = true
+  const ok = await testStore.assignGroups(assignTargetTest.value.testId, selectedGroupIds.value)
+  assignSubmitting.value = false
+  if (ok) closeAssignModal()
 }
 
 async function deleteTest(test) {

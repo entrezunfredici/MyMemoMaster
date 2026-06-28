@@ -44,7 +44,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
 import { useInvitationStore } from '@/stores/invitations'
 import { useClassGroupStore } from '@/stores/classGroups'
@@ -64,6 +64,11 @@ function defaultView() {
 }
 
 const activeView = ref(defaultView())
+
+// Recalcule si le roleId arrive après le montage (hydration Pinia / fetch async)
+watch([isAdmin, isEnseignant], () => {
+  activeView.value = defaultView()
+}, { immediate: true })
 
 const availableViews = [
   { key: 'etablissement', label: 'Établissement' },
