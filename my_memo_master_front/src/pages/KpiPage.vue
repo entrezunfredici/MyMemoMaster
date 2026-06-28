@@ -101,6 +101,54 @@
       <p v-else class="text-sm text-gray-400">Aucun exercice complété pour le moment.</p>
     </section>
 
+    <!-- EXERCICES DE CLASSE (KPI pédagogiques) -->
+    <section v-if="store.kpis.pedagogical?.totalTests > 0">
+      <h2 class="text-xl font-bold text-primary mb-1">Exercices de classe</h2>
+      <p class="text-sm text-gray-400 mb-3">Exercices assignés par tes enseignants — ces scores ne comptent pas dans tes KPI personnels.</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+        <StatCard label="Exercices passés" :value="store.kpis.pedagogical.totalTests" />
+        <StatCard label="Score moyen" :value="store.kpis.pedagogical.avgScore + ' %'" />
+        <StatCard label="Matières évaluées" :value="store.kpis.pedagogical.bySubject.length" />
+      </div>
+
+      <!-- Par matière -->
+      <div v-if="store.kpis.pedagogical.bySubject.length > 0" class="flex flex-wrap gap-3 mb-4">
+        <div
+          v-for="sub in store.kpis.pedagogical.bySubject"
+          :key="sub.subjectId"
+          class="bg-white border-2 border-blue-100 rounded-lg px-4 py-2 text-sm"
+        >
+          <span class="font-semibold text-blue-700">{{ sub.name }}</span>
+          <div class="text-xs text-gray-500 mt-0.5">
+            {{ sub.totalTests }} exercice{{ sub.totalTests > 1 ? 's' : '' }} · moy. {{ sub.avgScore }} %
+          </div>
+        </div>
+      </div>
+
+      <!-- Historique des 10 derniers -->
+      <div v-if="store.kpis.pedagogical.scoreHistory.length > 0" class="bg-white border-2 border-gray-100 rounded-xl p-4">
+        <p class="text-sm font-medium text-gray-500 mb-3">10 derniers résultats de classe</p>
+        <div class="space-y-2">
+          <div
+            v-for="entry in store.kpis.pedagogical.scoreHistory"
+            :key="entry.date + entry.testName"
+            class="flex items-center justify-between text-sm border-b border-gray-50 pb-1 last:border-0"
+          >
+            <div>
+              <span class="font-medium text-heading">{{ entry.testName }}</span>
+              <span class="text-xs text-gray-400 ml-2">{{ entry.groups.join(', ') }}</span>
+            </div>
+            <span
+              :class="[
+                'font-bold',
+                entry.percentage >= 80 ? 'text-green-600' : entry.percentage >= 50 ? 'text-orange-500' : 'text-red-500'
+              ]"
+            >{{ entry.percentage }} %</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- CARTES LEITNER -->
     <section>
       <h2 class="text-xl font-bold text-primary mb-3">Système Leitner</h2>

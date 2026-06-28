@@ -1,4 +1,4 @@
-const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline } = require('../../models/index')
+const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline, TestClassGroup } = require('../../models/index')
 const ClassGroupService = require('../../services/ClassGroup.service')
 
 jest.mock('../../models/index', () => ({
@@ -27,6 +27,9 @@ jest.mock('../../models/index', () => ({
     findAll: jest.fn()
   },
   Deadline: {
+    findAll: jest.fn()
+  },
+  TestClassGroup: {
     findAll: jest.fn()
   }
 }))
@@ -240,6 +243,39 @@ describe('ClassGroupService', () => {
     expect(result).toBeNull()
   })
 
+  it('removeMember — enseignant du groupe retire un étudiant — ok', async () => {
+    User.findByPk.mockResolvedValue(teacherUser)
+    const mockDestroy = jest.fn().mockResolvedValue()
+    ClassGroupUsers.findOne
+      .mockResolvedValueOnce({ role: 'teacher' })          // requester membership
+      .mockResolvedValueOnce({ role: 'student', destroy: mockDestroy }) // target membership
+
+    const result = await ClassGroupService.removeMember(1, 5, 2)
+
+    expect(mockDestroy).toHaveBeenCalled()
+    expect(result).toBe(true)
+  })
+
+  it('removeMember — enseignant tente de retirer un autre enseignant — retourne false', async () => {
+    User.findByPk.mockResolvedValue(teacherUser)
+    ClassGroupUsers.findOne
+      .mockResolvedValueOnce({ role: 'teacher' })          // requester membership
+      .mockResolvedValueOnce({ role: 'teacher', destroy: jest.fn() }) // target membership
+
+    const result = await ClassGroupService.removeMember(1, 3, 2)
+
+    expect(result).toBe(false)
+  })
+
+  it('removeMember — non-membre tente de retirer — retourne false', async () => {
+    User.findByPk.mockResolvedValue(teacherUser)
+    ClassGroupUsers.findOne.mockResolvedValueOnce(null) // pas teacher dans ce groupe
+
+    const result = await ClassGroupService.removeMember(1, 5, 99)
+
+    expect(result).toBe(false)
+  })
+
   // ── getKpi ────────────────────────────────────────────────────────────────────
 
   it('getKpi — admin — retourne les KPI calculés', async () => {
@@ -305,7 +341,7 @@ describe('ClassGroupService', () => {
       { classGroupId: 1, userId: 2, role: 'student' },
       { classGroupId: 1, userId: 3, role: 'student' }
     ])
-    Deadline.findAll.mockResolvedValue([{ testId: 10 }])
+    TestClassGroup.findAll.mockResolvedValue([{ testId: 10 }])
     User.findAll.mockResolvedValue([
       { userId: 2, name: 'Alice', email: 'alice@test.com' },
       { userId: 3, name: 'Bob', email: 'bob@test.com' }
@@ -340,6 +376,7 @@ describe('ClassGroupService', () => {
       { classGroupId: 1, userId: 2, role: 'student' }
     ])
     Deadline.findAll.mockResolvedValue([])
+    TestClassGroup.findAll.mockResolvedValue([])
     User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
     // Dernière session il y a 15 jours (NOW fixe = 2026-06-25)
     RevisionSession.findAll.mockResolvedValue([{ userId: 2, date: '2026-06-10' }])
@@ -360,6 +397,7 @@ describe('ClassGroupService', () => {
       { classGroupId: 1, userId: 2, role: 'student' }
     ])
     Deadline.findAll.mockResolvedValue([])
+    TestClassGroup.findAll.mockResolvedValue([])
     User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
     RevisionSession.findAll.mockResolvedValue([])
 
@@ -378,7 +416,7 @@ describe('ClassGroupService', () => {
       { classGroupId: 1, userId: 1, role: 'teacher' },
       { classGroupId: 1, userId: 2, role: 'student' }
     ])
-    Deadline.findAll.mockResolvedValue([{ testId: 10 }])
+    TestClassGroup.findAll.mockResolvedValue([{ testId: 10 }])
     User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
     RevisionSession.findAll.mockResolvedValue([{ userId: 2, date: '2026-06-24' }])
     // Score : 80 % → 56 % (baisse de 30%)
@@ -401,8 +439,9 @@ describe('ClassGroupService', () => {
       { classGroupId: 1, userId: 1, role: 'teacher' },
       { classGroupId: 1, userId: 2, role: 'student' }
     ])
-    // Pas de deadline avec testId → teacherTestIds vide → TestResult non appelé
+    // Pas de deadline ni d'assignation TestClassGroup → teacherTestIds vide → TestResult non appelé
     Deadline.findAll.mockResolvedValue([])
+    TestClassGroup.findAll.mockResolvedValue([])
     User.findAll.mockResolvedValue([{ userId: 2, name: 'Alice', email: 'alice@test.com' }])
     RevisionSession.findAll.mockResolvedValue([{ userId: 2, date: '2026-06-24' }])
 

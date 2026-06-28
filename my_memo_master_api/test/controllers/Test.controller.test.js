@@ -28,7 +28,8 @@ jest.mock('../../services/Test.service', () => ({
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
-  submitAnswers: jest.fn()
+  submitAnswers: jest.fn(),
+  assignGroups: jest.fn()
 }))
 
 jest.mock('../../services/Deadline.service', () => ({
@@ -79,7 +80,9 @@ describe('Test Controller', () => {
     it('200 — retourne tous les tests', async () => {
       testService.findAll.mockResolvedValue([mockTest])
 
-      const res = await request(app).get(`${BASE}/tests`)
+      const res = await request(app)
+        .get(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(200)
       expect(res.body).toHaveLength(1)
@@ -89,16 +92,25 @@ describe('Test Controller', () => {
     it('200 — retourne une liste vide', async () => {
       testService.findAll.mockResolvedValue([])
 
-      const res = await request(app).get(`${BASE}/tests`)
+      const res = await request(app)
+        .get(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(200)
       expect(res.body).toEqual([])
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).get(`${BASE}/tests`)
+      expect(res.status).toBe(401)
+    })
+
     it('500 — le service échoue', async () => {
       testService.findAll.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).get(`${BASE}/tests`)
+      const res = await request(app)
+        .get(`${BASE}/tests`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
     })
@@ -109,7 +121,9 @@ describe('Test Controller', () => {
     it('200 — retourne le test', async () => {
       testService.findOne.mockResolvedValue(mockTest)
 
-      const res = await request(app).get(`${BASE}/tests/1`)
+      const res = await request(app)
+        .get(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(200)
       expect(res.body.name).toBe('Contrôle Maths')
@@ -118,15 +132,24 @@ describe('Test Controller', () => {
     it('404 — test introuvable', async () => {
       testService.findOne.mockResolvedValue(null)
 
-      const res = await request(app).get(`${BASE}/tests/99`)
+      const res = await request(app)
+        .get(`${BASE}/tests/99`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(404)
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app).get(`${BASE}/tests/1`)
+      expect(res.status).toBe(401)
     })
 
     it('500 — le service échoue', async () => {
       testService.findOne.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).get(`${BASE}/tests/1`)
+      const res = await request(app)
+        .get(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
     })
@@ -395,6 +418,110 @@ describe('Test Controller', () => {
 
       expect(res.status).toBe(500)
       expect(res.body.message).toBeDefined()
+    })
+  })
+
+  // ── POST /tests/:id/groups ─────────────────────────────────────────────────
+  describe('POST /tests/:id/groups', () => {
+    const MOCK_TEST_WITH_GROUPS = { testId: 1, name: 'Contrôle Maths', classGroups: [{ id: 2, name: 'MP2A' }] }
+
+    it('200 — assigne des groupes au test', async () => {
+      testService.assignGroups.mockResolvedValue(MOCK_TEST_WITH_GROUPS)
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ groupIds: [2] })
+
+      expect(res.status).toBe(200)
+      expect(res.body.message).toBeDefined()
+      expect(res.body.data.classGroups).toHaveLength(1)
+      expect(testService.assignGroups).toHaveBeenCalledWith(1, 1, [2])
+    })
+
+    it('200 — tableau vide rend le test privé', async () => {
+      testService.assignGroups.mockResolvedValue({ ...MOCK_TEST_WITH_GROUPS, classGroups: [] })
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ groupIds: [] })
+
+      expect(res.status).toBe(200)
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .send({ groupIds: [2] })
+
+      expect(res.status).toBe(401)
+      expect(testService.assignGroups).not.toHaveBeenCalled()
+    })
+
+    it('400 — groupIds manquant', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({})
+
+      expect(res.status).toBe(400)
+      expect(testService.assignGroups).not.toHaveBeenCalled()
+    })
+
+    it('400 — groupIds contient un non-entier', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ groupIds: ['abc'] })
+
+      expect(res.status).toBe(400)
+      expect(testService.assignGroups).not.toHaveBeenCalled()
+    })
+
+    it('400 — groupIds n\'est pas un tableau', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ groupIds: 2 })
+
+      expect(res.status).toBe(400)
+      expect(testService.assignGroups).not.toHaveBeenCalled()
+    })
+
+    it('403 — test appartient à un autre utilisateur', async () => {
+      testService.assignGroups.mockRejectedValue(Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' }))
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ groupIds: [2] })
+
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBeDefined()
+    })
+
+    it('404 — test introuvable', async () => {
+      testService.assignGroups.mockRejectedValue(Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' }))
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ groupIds: [2] })
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
+    })
+
+    it('500 — le service échoue', async () => {
+      testService.assignGroups.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/groups`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ groupIds: [2] })
+
+      expect(res.status).toBe(500)
     })
   })
 })

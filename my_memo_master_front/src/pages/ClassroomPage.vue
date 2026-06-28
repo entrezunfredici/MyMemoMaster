@@ -46,6 +46,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRole } from '@/composables/useRole'
+import { useAuthStore } from '@/stores/auth'
 import { useInvitationStore } from '@/stores/invitations'
 import { useClassGroupStore } from '@/stores/classGroups'
 import ClassroomEtablissementView from './ClassroomEtablissementView.vue'
@@ -53,22 +54,32 @@ import ClassroomEnseignantView from './ClassroomEnseignantView.vue'
 import ClassroomEtudiantView from './ClassroomEtudiantView.vue'
 
 const { isAdmin, isEnseignant } = useRole()
+const authStore = useAuthStore()
 const invitationStore = useInvitationStore()
 const classGroupStore = useClassGroupStore()
 
-// Détermine la vue par défaut selon le rôle
+// Un étudiant plateforme peut être enseignant dans un groupe → vérifier les deux
+function isTeacherInAnyGroup() {
+  const userId = authStore.user?.userId
+  return classGroupStore.groups.some((g) =>
+    g.members?.some((m) => m.userId === userId && m.role === 'teacher')
+  )
+}
+
 function defaultView() {
   if (isAdmin.value) return 'etablissement'
-  if (isEnseignant.value) return 'enseignant'
+  if (isEnseignant.value || isTeacherInAnyGroup()) return 'enseignant'
   return 'etudiant'
 }
 
 const activeView = ref(defaultView())
 
-// Recalcule si le roleId arrive après le montage (hydration Pinia / fetch async)
-watch([isAdmin, isEnseignant], () => {
-  activeView.value = defaultView()
-}, { immediate: true })
+// Recalcule après chargement du profil ET après chargement des groupes
+watch(
+  [isAdmin, isEnseignant, () => classGroupStore.groups],
+  () => { activeView.value = defaultView() },
+  { immediate: true }
+)
 
 const availableViews = [
   { key: 'etablissement', label: 'Établissement' },

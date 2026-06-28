@@ -33,7 +33,7 @@ class KpiService {
             required: true,
             include: [
               { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
-              { model: ClassGroup, as: 'classGroups', through: { attributes: [] }, required: false, attributes: ['id'] }
+              { model: ClassGroup, as: 'classGroups', through: { attributes: [] }, required: false, attributes: ['id', 'name'] }
             ]
           }
         ],
@@ -54,15 +54,17 @@ class KpiService {
 
     // Seuls les résultats des tests privés (sans groupe assigné) alimentent les KPI persos
     const privateTestResults = testResults.filter((r) => !r.test?.classGroups?.length)
+    const groupTestResults = testResults.filter((r) => r.test?.classGroups?.length)
 
     const revisionKpi = this._computeRevision(sessions)
     const exercisesKpi = this._computeExercises(privateTestResults)
     const leitnerKpi = this._computeLeitner(leitnerSystems)
     const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
     const disciplineKpi = this._computeDiscipline(sessions)
+    const pedagogicalKpi = this._computePedagogical(groupTestResults)
     const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
 
-    return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, badges }
+    return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, pedagogical: pedagogicalKpi, badges }
   }
 
   /**
@@ -289,6 +291,51 @@ class KpiService {
     const disciplineScore = last30.length > 0 ? Math.round((completedLast30.length / last30.length) * 100) : 0
 
     return { plannedThisWeek, completedThisWeek, disciplineScore }
+  }
+
+  /**
+   * @private
+   * Calcule les KPI pédagogiques (exercices assignés par un enseignant à un groupe).
+   */
+  _computePedagogical(groupTestResults) {
+    if (groupTestResults.length === 0) {
+      return { totalTests: 0, avgScore: null, scoreHistory: [], bySubject: [] }
+    }
+
+    const percentages = groupTestResults.map((r) => Math.round((r.score / r.total) * 100))
+    const avgScore = Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
+
+    const scoreHistory = [...groupTestResults]
+      .reverse()
+      .slice(0, 10)
+      .map((r) => ({
+        date: r.completedAt,
+        score: r.score,
+        total: r.total,
+        percentage: Math.round((r.score / r.total) * 100),
+        testName: r.test?.name || 'Inconnu',
+        groups: (r.test?.classGroups ?? []).map((g) => g.name)
+      }))
+
+    // Agrégation par matière
+    const subjectMap = {}
+    for (const r of groupTestResults) {
+      const sub = r.test?.subject
+      if (!sub) continue
+      if (!subjectMap[sub.subjectId]) {
+        subjectMap[sub.subjectId] = { subjectId: sub.subjectId, name: sub.name, totalTests: 0, totalPct: 0 }
+      }
+      subjectMap[sub.subjectId].totalTests++
+      subjectMap[sub.subjectId].totalPct += Math.round((r.score / r.total) * 100)
+    }
+    const bySubject = Object.values(subjectMap).map((s) => ({
+      subjectId: s.subjectId,
+      name: s.name,
+      totalTests: s.totalTests,
+      avgScore: Math.round(s.totalPct / s.totalTests)
+    }))
+
+    return { totalTests: groupTestResults.length, avgScore, scoreHistory, bySubject }
   }
 
   /**

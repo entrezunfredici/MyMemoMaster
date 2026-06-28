@@ -200,6 +200,27 @@
               </div>
             </div>
 
+            <!-- Partage groupes classes (visible uniquement si l'utilisateur est teacher dans au moins un groupe) -->
+            <div
+              v-if="canAssignToGroups && editingTestUserId === authStore.user?.userId"
+              class="mb-6 border border-blue-200 rounded-lg p-4 bg-blue-50"
+            >
+              <p class="text-sm font-semibold text-blue-800 mb-1">Partager dans des groupes classes</p>
+              <p class="text-xs text-blue-600 mb-3">Les scores des étudiants de ces groupes seront comptabilisés dans vos KPI pédagogiques.</p>
+              <div class="space-y-2">
+                <label
+                  v-for="group in assignableGroups"
+                  :key="group.id"
+                  class="flex items-center gap-3 p-2 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 bg-white"
+                >
+                  <input type="checkbox" :value="group.id" v-model="form.groupIds" class="accent-primary w-4 h-4" />
+                  <span class="text-sm font-medium text-heading">{{ group.name }}</span>
+                  <span v-if="group.level" class="text-xs text-gray-400">{{ group.level }}</span>
+                </label>
+              </div>
+              <p class="text-xs text-gray-400 mt-2">Aucune sélection = l'exercice reste privé.</p>
+            </div>
+
             <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>
 
             <div class="btn-row">
@@ -255,7 +276,15 @@ const assignTargetTest = ref(null)
 const selectedGroupIds = ref([])
 const assignSubmitting = ref(false)
 
-const assignableGroups = computed(() => classGroupStore.groups ?? [])
+// Groupes où l'utilisateur courant est teacher (pour l'assignation)
+const assignableGroups = computed(() => {
+  const userId = authStore.user?.userId
+  return (classGroupStore.groups ?? []).filter((g) =>
+    g.members?.some((m) => m.userId === userId && m.role === 'teacher')
+  )
+})
+
+const canAssignToGroups = computed(() => assignableGroups.value.length > 0)
 
 const subjects = computed(() => subjectStore.subjects)
 const tests = computed(() => testStore.tests)
@@ -289,7 +318,8 @@ const defaultQuestion = () => ({
   reorderFragments: ['', ''],
 })
 
-const form = reactive({ name: '', subjectId: '', tagIds: [], questions: [defaultQuestion()] })
+const form = reactive({ name: '', subjectId: '', tagIds: [], groupIds: [], questions: [defaultQuestion()] })
+const editingTestUserId = ref(null)
 
 // ── helpers questions ─────────────────────────────────────────────────────────
 
@@ -362,9 +392,7 @@ function removeQuestion(idx) {
 
 // ── lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  const fetches = [testStore.fetchTests(), subjectStore.fetchSubjects()]
-  if (isEnseignant.value) fetches.push(classGroupStore.fetchGroups())
-  await Promise.all(fetches)
+  await Promise.all([testStore.fetchTests(), subjectStore.fetchSubjects(), classGroupStore.fetchGroups()])
   loading.value = false
 })
 
@@ -372,10 +400,12 @@ onMounted(async () => {
 function openCreateModal() {
   isEditMode.value = false
   editTestId.value = null
+  editingTestUserId.value = authStore.user?.userId ?? null
   questionsToDelete.value = []
   form.name = ''
   form.subjectId = null
   form.tagIds = []
+  form.groupIds = []
   form.questions = [defaultQuestion()]
   formError.value = ''
   showModal.value = true
@@ -384,6 +414,7 @@ function openCreateModal() {
 async function openEditModal(test) {
   isEditMode.value = true
   editTestId.value = test.testId
+  editingTestUserId.value = test.userId ?? null
   questionsToDelete.value = []
   formError.value = ''
 
@@ -397,6 +428,7 @@ async function openEditModal(test) {
   form.name = fullTest.name
   form.subjectId = fullTest.subjectId
   form.tagIds = (fullTest.tags || []).map((t) => t.tagId)
+  form.groupIds = (fullTest.classGroups ?? []).map((g) => g.id)
   form.questions = (fullTest.question ?? []).map(q => ({
     _key: nextKey(),
     idQuestion: q.idQuestion,
@@ -433,6 +465,7 @@ async function submitCreate() {
     }
 
     await tagStore.setEntityTags('test', testId, form.tagIds)
+    if (form.groupIds.length > 0) await testStore.assignGroups(testId, form.groupIds)
     notif.notify('Exercice créé avec succès !', 'success')
     closeModal()
     await testStore.fetchTests()
@@ -466,6 +499,7 @@ async function submitEdit() {
     }
 
     await tagStore.setEntityTags('test', editTestId.value, form.tagIds)
+    await testStore.assignGroups(editTestId.value, form.groupIds)
     notif.notify('Exercice modifié avec succès !', 'success')
     closeModal()
     await testStore.fetchTests()

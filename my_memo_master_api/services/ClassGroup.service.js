@@ -146,7 +146,25 @@ class ClassGroupService {
 
   async removeMember(groupId, targetUserId, requesterId) {
     const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
-    if (![1, 4].includes(requester?.roleId)) return false
+    const isAdmin = [1, 4].includes(requester?.roleId)
+
+    if (!isAdmin) {
+      // Un enseignant du groupe peut retirer des étudiants, mais pas d'autres enseignants
+      const requesterMembership = await ClassGroupUsers.findOne({
+        where: { classGroupId: groupId, userId: requesterId, role: 'teacher' }
+      })
+      if (!requesterMembership) return false
+
+      const targetMembership = await ClassGroupUsers.findOne({
+        where: { classGroupId: groupId, userId: targetUserId }
+      })
+      if (!targetMembership) return null
+      if (targetMembership.role === 'teacher') return false
+
+      await targetMembership.destroy()
+      return true
+    }
+
     const membership = await ClassGroupUsers.findOne({
       where: { classGroupId: groupId, userId: targetUserId }
     })

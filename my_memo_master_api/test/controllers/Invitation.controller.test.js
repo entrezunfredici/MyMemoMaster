@@ -90,6 +90,18 @@ describe('Invitation Controller', () => {
       expect(res.status).toBe(403)
     })
 
+    it('403 — enseignant tente d\'inviter un autre enseignant', async () => {
+      invitationService.invite.mockResolvedValue(false)
+
+      const res = await request(app)
+        .post(`${BASE}/class-groups/1/invitations`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ targetEmail: 'collegue@example.com', role: 'teacher' })
+
+      expect(res.status).toBe(403)
+      expect(invitationService.invite).toHaveBeenCalledWith('1', 1, { targetEmail: 'collegue@example.com', role: 'teacher' })
+    })
+
     it('404 — groupe introuvable', async () => {
       invitationService.invite.mockResolvedValue(null)
 

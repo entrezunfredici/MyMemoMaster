@@ -481,6 +481,56 @@
             <p v-if="deadlineForm.error" class="text-xs text-secondary">{{ deadlineForm.error }}</p>
           </div>
 
+          <!-- Inviter un étudiant -->
+          <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+            <h3 class="text-base font-semibold text-dark">Inviter un étudiant</h3>
+            <input v-model="inviteForm.targetEmail" type="email" placeholder="Email *"
+              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            <button @click="submitInvite"
+              class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
+              Envoyer l'invitation
+            </button>
+            <p v-if="inviteForm.message" :class="inviteForm.error ? 'text-secondary' : 'text-success'" class="text-xs">
+              {{ inviteForm.message }}
+            </p>
+          </div>
+
+          <!-- Membres du groupe -->
+          <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+            <h3 class="text-base font-semibold text-dark">Membres ({{ currentGroup.members?.length ?? 0 }})</h3>
+            <div class="space-y-2">
+              <div v-for="m in currentGroup.members" :key="m.userId"
+                class="rounded-xl border border-gray px-3 py-2 flex items-center justify-between text-sm">
+                <div>
+                  <p class="font-semibold text-dark">{{ m.user?.name ?? `#${m.userId}` }}</p>
+                  <p class="text-xs text-dark/60">{{ m.user?.email }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span :class="m.role === 'teacher' ? 'bg-primary/10 text-primary' : 'bg-gray text-dark/60'"
+                    class="rounded-full px-2 py-0.5 text-xs font-semibold">
+                    {{ m.role === 'teacher' ? 'Enseignant' : 'Étudiant' }}
+                  </span>
+                  <button v-if="m.role === 'student'"
+                    @click="classGroupStore.removeMember(selectedId, m.userId)"
+                    class="text-secondary text-xs hover:underline">×</button>
+                </div>
+              </div>
+              <p v-if="!currentGroup.members?.length" class="text-sm text-dark/60">Aucun membre.</p>
+            </div>
+
+            <!-- Invitations en attente -->
+            <div v-if="invitationStore.groupInvitations.length > 0" class="pt-2 border-t border-gray space-y-1">
+              <p class="text-xs font-semibold text-dark/60 uppercase tracking-wide">En attente</p>
+              <div v-for="inv in invitationStore.groupInvitations" :key="inv.id"
+                class="rounded-xl border border-gray/50 px-3 py-2 flex items-center justify-between text-xs text-dark/70">
+                <span>{{ inv.targetEmail }}</span>
+                <span class="rounded-full bg-gray px-2 py-0.5">
+                  {{ inv.role === 'teacher' ? 'Enseignant' : 'Étudiant' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </template>
@@ -502,6 +552,7 @@ import { useTeacherAnalytics } from '@/composables/useTeacherAnalytics'
 import { useAuthStore } from '@/stores/auth'
 import { useKpiConsentStore } from '@/stores/kpiConsent'
 import { useClassGroupSubmissionStore } from '@/stores/classGroupSubmissions'
+import { useInvitationStore } from '@/stores/invitations'
 import StudentDetailComponent from '@/components/StudentDetailComponent.vue'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
@@ -514,6 +565,7 @@ const resourceStore = useClassGroupResourceStore()
 const authStore = useAuthStore()
 const kpiConsentStore = useKpiConsentStore()
 const submissionStore = useClassGroupSubmissionStore()
+const invitationStore = useInvitationStore()
 const { analytics, analyticsLoading, expandedAnalyticsStudents, currentWeekScore, atRiskStudents, scoreTextClass, toggleStudentDetail, loadStudentAnalytics } = useTeacherAnalytics()
 
 const selectedId = ref(null)
@@ -540,6 +592,7 @@ const expandedRenduSections = reactive({})
 const sectionForm = reactive({ title: '', type: 'section', description: '', dueDate: '', error: '' })
 const resourceForm = reactive({ title: '', type: 'cours', file: null, dragOver: false, error: '' })
 const deadlineForm = reactive({ name: '', type: 'ds', occurrenceId: '', dueDate: '', dueTime: '', error: '' })
+const inviteForm = reactive({ targetEmail: '', role: 'student', message: '', error: false })
 
 async function selectGroup(id) {
   selectedId.value = id
@@ -554,6 +607,7 @@ async function selectGroup(id) {
     sectionStore.fetchByGroup(id),
     resourceStore.fetchByGroup(id),
     loadStudentAnalytics(id),
+    invitationStore.fetchByGroup(id),
   ])
   loadingData.value = false
 }
@@ -725,6 +779,23 @@ function deadlineTypeLabel(type) {
 function resourceTypeLabel(type) {
   const map = { cours: 'Cours', carte_mentale: 'Carte mentale', sujet: 'Sujet', autre: 'Autre' }
   return map[type] ?? type
+}
+
+async function submitInvite() {
+  inviteForm.error = false
+  inviteForm.message = ''
+  if (!inviteForm.targetEmail) { inviteForm.error = true; inviteForm.message = "L'email est requis."; return }
+  const ok = await invitationStore.invite(selectedId.value, { targetEmail: inviteForm.targetEmail, role: inviteForm.role })
+  inviteForm.error = !ok
+  inviteForm.message = ok ? 'Invitation envoyée.' : "Erreur lors de l'envoi."
+  if (ok) {
+    inviteForm.targetEmail = ''
+    await invitationStore.fetchByGroup(selectedId.value)
+  }
+}
+
+async function changeRole(userId, role) {
+  await classGroupStore.updateMemberRole(selectedId.value, userId, role)
 }
 
 async function deleteGroupDeadline(id) {

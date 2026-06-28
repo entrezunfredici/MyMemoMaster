@@ -25,6 +25,8 @@ class InvitationService {
         where: { classGroupId: groupId, userId: requesterId, role: 'teacher' }
       })
       if (!membership) return false
+      // Un enseignant ne peut inviter qu'en tant qu'étudiant
+      if (role === 'teacher') return false
     }
 
     const group = await ClassGroup.findByPk(groupId)
@@ -43,6 +45,11 @@ class InvitationService {
         where: { classGroupId: groupId, userId: existingUser.userId },
         defaults: { role }
       })
+      // Annule les invitations email en attente pour ce groupe/email (évite les doublons EN ATTENTE)
+      await Invitation.update(
+        { status: 'accepted', targetUserId: existingUser.userId },
+        { where: { classGroupId: groupId, targetEmail: email, status: 'pending' } }
+      )
       return { directlyAdded: true, user: { name: existingUser.name, email: existingUser.email } }
     }
 

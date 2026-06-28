@@ -186,6 +186,16 @@ describe('useClassGroupStore', () => {
     expect(mockNotify).toHaveBeenCalledWith('Membre retiré.', 'success')
   })
 
+  it('removeMember — non-200 — retourne false et notifie', async () => {
+    mockDel.mockResolvedValueOnce({ status: 403, data: { message: 'Accès refusé.' } })
+
+    const store = useClassGroupStore()
+    const result = await store.removeMember(1, 2)
+
+    expect(result).toBe(false)
+    expect(mockNotify).toHaveBeenCalledWith('Accès refusé.', 'error')
+  })
+
   it('removeMember — erreur réseau — retourne false', async () => {
     mockDel.mockRejectedValueOnce(new Error('Network error'))
 
@@ -193,5 +203,50 @@ describe('useClassGroupStore', () => {
     const result = await store.removeMember(1, 2)
 
     expect(result).toBe(false)
+  })
+
+  it('addMember — erreur réseau — retourne false', async () => {
+    mockPost.mockRejectedValueOnce(new Error('Network error'))
+
+    const store = useClassGroupStore()
+    const result = await store.addMember(1, 2)
+
+    expect(result).toBe(false)
+  })
+
+  // ── updateMemberRole ───────────────────────────────────────────────────────────
+
+  it('updateMemberRole — succès — rafraîchit le groupe et notifie', async () => {
+    const updatedGroup = { ...GROUP_FIXTURE, members: [{ userId: 2, role: 'teacher' }] }
+    mockPut.mockResolvedValueOnce({ status: 200, data: {} })
+    mockGet.mockResolvedValueOnce({ status: 200, data: { data: updatedGroup } })
+
+    const store = useClassGroupStore()
+    store.groups = [GROUP_FIXTURE]
+    const result = await store.updateMemberRole(1, 2, 'teacher')
+
+    expect(mockPut).toHaveBeenCalledWith('class-groups/1/members/2', { role: 'teacher' })
+    expect(result).toBe(true)
+    expect(mockNotify).toHaveBeenCalledWith('Rôle mis à jour.', 'success')
+  })
+
+  it('updateMemberRole — non-200 — retourne false et notifie', async () => {
+    mockPut.mockResolvedValueOnce({ status: 403, data: { message: 'Accès refusé.' } })
+
+    const store = useClassGroupStore()
+    const result = await store.updateMemberRole(1, 2, 'teacher')
+
+    expect(result).toBe(false)
+    expect(mockNotify).toHaveBeenCalledWith('Accès refusé.', 'error')
+  })
+
+  it('updateMemberRole — erreur réseau — retourne false et notifie', async () => {
+    mockPut.mockRejectedValueOnce(new Error('Network error'))
+
+    const store = useClassGroupStore()
+    const result = await store.updateMemberRole(1, 2, 'teacher')
+
+    expect(result).toBe(false)
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('rôle'), 'error')
   })
 })

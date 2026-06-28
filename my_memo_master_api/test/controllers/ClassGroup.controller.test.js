@@ -381,7 +381,7 @@ describe('ClassGroup Controller', () => {
       expect(res.status).toBe(200)
     })
 
-    it('403 — droits insuffisants', async () => {
+    it('403 — droits insuffisants (non-membre)', async () => {
       classGroupService.removeMember.mockResolvedValue(false)
 
       const res = await request(app)
@@ -389,6 +389,23 @@ describe('ClassGroup Controller', () => {
         .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(403)
+    })
+
+    it('403 — enseignant tente de retirer un autre enseignant', async () => {
+      classGroupService.removeMember.mockResolvedValue(false)
+
+      const res = await request(app)
+        .delete(`${BASE}/class-groups/1/members/3`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app)
+        .delete(`${BASE}/class-groups/1/members/2`)
+
+      expect(res.status).toBe(401)
     })
 
     it('404 — membre introuvable', async () => {

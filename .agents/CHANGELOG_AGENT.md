@@ -4186,7 +4186,103 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 - Aucune validation backend que l'enseignant est bien membre du groupe visé (acceptable MVP)
 
 **Dette / points d'attention :**
-- Les tests Jest/Supertest existants sur Test.controller et Test.service utilisent l'ancienne signature sans `userId` — à adapter
 - `ClassGroup.service.js` n'importe plus `EventOccurrence`/`CalendarEvent` via la branche exercices (ils restent importés pour d'autres usages — vérifier s'ils sont encore nécessaires)
 - Migration `20260628000001` à passer avant toute mise en prod
 - ✅ Aucun bug bloquant connu sur le périmètre livré
+
+---
+
+### [2026-06-28] S-03.08 — Tableau de bord enseignant groupes — DoD complet
+
+**Ticket :** S-03.08
+
+**Fonctionnel livré (session courante) :**
+- `pages/ClassroomEnseignantView.vue` — gestion membres : inviter un étudiant par email, voir la liste des membres (badge rôle, bouton retrait étudiant uniquement), invitations en attente
+- `services/Invitation.service.js` (back) — enseignant ne peut inviter qu'avec `role: 'student'` (pas `teacher`)
+- `services/ClassGroup.service.js` (back) — `removeMember` : enseignant peut retirer un étudiant, pas un autre enseignant
+
+**Tests ajoutés :**
+- `test/stores/classGroupSections.store.test.js` (13 tests) — fetchByGroup (cache TTL, force, erreurs), create, update, delete
+- `test/stores/classGroupResources.store.test.js` (12 tests) — fetchByGroup, uploadAndCreate (2 étapes, échec upload, échec création), delete
+- `test/stores/classGroupSubmissions.store.test.js` (17 tests) — fetchStatus, fetchMine, fetchBySection, clearSubmissionStatus, clearSectionSubmissions, uploadAndSubmit, deleteSubmission
+- `test/controllers/ClassGroup.controller.test.js` (+2 tests) — 403 enseignant retire enseignant, 401 sans token
+- `test/services/Invitation.service.test.js` (7 tests — nouveau fichier) — restriction rôle teacher, ajout direct, non-membre, groupe inexistant
+- `test/components/ClassroomPage.test.js` (10 tests) — déjà verts (préexistants corrigés)
+- `test/stores/classGroups.store.test.js` (14 tests) — déjà verts
+
+**Ce qui est utilisable :**
+- Dashboard enseignant complet : KPI pédagogiques, sections/rendus, ressources, échéances, gestion membres
+- Restrictions d'autorisation correctes (invitation student-only, retrait enseignant bloqué)
+- 42 nouveaux tests frontend + tests backend ciblés
+
+**Dette / points d'attention :**
+- Pas de tests composant pour `ClassroomEnseignantView.vue` lui-même (trop couplé aux stores async) — couvert indirectement via tests des stores
+- ✅ Aucun bug bloquant connu
+
+---
+
+### [2026-06-28] S-03.09 — Interface gestion membres groupe — DoD complet
+
+**Ticket :** S-03.09
+
+**Périmètre couvert :**
+- Vue admin (`ClassroomEtablissementView.vue`) — invitation (rôles étudiant/enseignant), liste membres, changement de rôle, suppression, invitations en attente
+- Vue enseignant (`ClassroomEnseignantView.vue`) — invitation étudiant uniquement (restriction UI + backend), liste membres en lecture (badge rôle), suppression étudiants uniquement, invitations en attente
+- Vue étudiant — pas de gestion membres (correct par spec)
+- Backend — 5 endpoints présents avec autorisations correctes (admin CRUD complet, enseignant invite étudiant + retire étudiant uniquement)
+
+**Tests ajoutés :**
+- `test/stores/classGroups.store.test.js` (+5 tests) — `updateMemberRole` (succès, 403, réseau), `removeMember` non-200, `addMember` réseau → 19 tests au total
+
+**Ce qui est utilisable :**
+- Gestion membres complète pour les admins
+- Gestion membres restreinte pour les enseignants (invite étudiant, retire étudiant, lecture seule sur les enseignants)
+- Restrictions d'autorisation correctes côté front ET back
+
+**Dette / points d'attention :**
+- Pas de tests composant pour les vues admin/enseignant (complexité async) — couvert par tests des stores et du backend
+- ✅ Aucun bug bloquant connu
+
+---
+
+### [2026-06-28] S-03.06 — API KPI de groupe (avancement)
+
+**Ticket :** S-03.06 — DoD complet
+
+**Fichiers créés/modifiés :**
+- `services/ClassGroup.service.js` — méthodes `getKpi(groupId, requesterId)` et `getStudentAnalytics(groupId, requesterId)` + helper `_computeGroupWeeklyTrend(results)`
+- `controllers/ClassGroup.controller.js` — handlers `getKpi` et `getStudentAnalytics` (false→403, null→404, data→200)
+- `routes/ClassGroup.routes.js` — `GET /class-groups/:id/kpi` et `GET /class-groups/:id/kpi/students` (authMiddleware, Swagger JSDoc)
+- `test/services/ClassGroup.service.test.js` — 14 tests `getKpi` + `getStudentAnalytics` (at-risk×4, scoreWeeklyTrend, auth)
+- `test/controllers/ClassGroup.controller.test.js` — 7+7 tests controller (401/403/404/500)
+- `diagrams/kpi_pedagogiques.md` — spécification complète (208 lignes) : définitions KPI, règles de calcul, seuils, droits d'accès, format réponse API
+
+**Ce qui est utilisable :**
+- Un admin ou enseignant du groupe peut consulter les indicateurs globaux du groupe (membres, scores, invitations en attente)
+- L'analyse pédagogique détaillée identifie les étudiants at-risk selon 4 critères indépendants : aucune session, inactif >7j, baisse de score >20%, aucun exercice >14j
+- Tendance hebdomadaire des scores sur 4 semaines (ISO)
+- Les KPI pédagogiques utilisent `TestClassGroup` (tests assignés au groupe) — plus direct que l'ancienne approche via `Deadline`
+
+**Hypothèses posées :**
+- Seuils at-risk (7j inactivité, 20% baisse, 14j sans exercice) codés en constantes dans le service — configurables si besoin
+- Pas de cache côté API (calcul à chaque appel) — acceptable au volume MVP
+
+**Dette / points d'attention :**
+- ✅ Aucun bug bloquant connu sur le périmètre livré
+
+---
+
+### [2026-06-28] S-03.05 — Tests assignGroups + correctifs tests existants
+
+**Ticket :** S-03.05 (DoD — Tests OK)
+
+**Fichiers modifiés :**
+- `test/controllers/Test.controller.test.js` — ajout mock `assignGroups` dans le service mocké ; ajout describe `POST /tests/:id/groups` (8 cas : 200 nominal, 200 tableau vide, 401, 400×3, 403, 404, 500) ; correction GET /tests et GET /tests/:id (ajout token Bearer manquant suite à l'authMiddleware ajouté sur ces routes) ; +2 cas 401 explicites
+- `test/services/Test.service.test.js` — ajout mocks `ClassGroupUsers`, `TestClassGroup`, `ClassGroup` ; correction `findAll` existant (mocks manquants pour la nouvelle logique membership) ; ajout describe `assignGroups` (4 cas : nominal, tableau vide, NOT_FOUND, FORBIDDEN)
+
+**Ce qui est utilisable :**
+- 63 tests passent (0 échec) sur les deux fichiers
+- DoD S-03.05 complet : fonctionnel ✅, tests ✅, changelog ✅, DECISIONS ✅
+
+**Dette / points d'attention :**
+- Le warning "A worker process has failed to exit gracefully" est préexistant (Redis mock non fermé) — non bloquant

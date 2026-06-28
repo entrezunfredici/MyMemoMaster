@@ -1,4 +1,4 @@
-const { Test, TestResult } = require('../../models/index')
+const { Test, TestResult, ClassGroup, ClassGroupUsers, TestClassGroup } = require('../../models/index')
 const semanticService = require('../../services/Semantic.service')
 const TestService = require('../../services/Test.service')
 
@@ -16,9 +16,10 @@ jest.mock('../../models/index', () => ({
   },
   Subject: {},
   Question: {},
-  TestResult: {
-    create: jest.fn()
-  }
+  TestResult: { create: jest.fn() },
+  ClassGroup: { findAll: jest.fn() },
+  ClassGroupUsers: { findAll: jest.fn() },
+  TestClassGroup: { findAll: jest.fn() }
 }))
 
 describe('TestService', () => {
@@ -31,9 +32,12 @@ describe('TestService', () => {
       { testId: 1, subjectId: 1, name: 'Controle milieu semestre' },
       { testId: 2, subjectId: 1, name: 'Controle finale' }
     ]
+    // findAll charge les memberships et les tests assignés aux groupes de l'utilisateur
+    ClassGroupUsers.findAll.mockResolvedValue([])
+    TestClassGroup.findAll.mockResolvedValue([])
     Test.findAll.mockResolvedValue(mockTests)
 
-    const tests = await TestService.findAll()
+    const tests = await TestService.findAll(1)
 
     expect(Test.findAll).toHaveBeenCalledTimes(1)
     expect(tests).toEqual(mockTests)
@@ -236,6 +240,56 @@ describe('TestService', () => {
       const result = await TestService.submitAnswers(1, 1, [])
       expect(result.results[0].correct).toBe(false)
       expect(result.score).toBe(0)
+    })
+  })
+
+  // ── assignGroups ──────────────────────────────────────────────────────────
+  describe('assignGroups', () => {
+    const makeTestWithGroups = (extra = {}) => ({
+      testId: 1,
+      userId: 1,
+      setClassGroups: jest.fn().mockResolvedValue(undefined),
+      reload: jest.fn().mockResolvedValue({ testId: 1, classGroups: extra.classGroups ?? [] }),
+      ...extra
+    })
+
+    it('assigne les groupes et retourne le test rechargé', async () => {
+      const mockTest = makeTestWithGroups()
+      const mockGroups = [{ id: 2, name: 'MP2A' }]
+      Test.findByPk.mockResolvedValue(mockTest)
+      ClassGroup.findAll.mockResolvedValue(mockGroups)
+
+      const result = await TestService.assignGroups(1, 1, [2])
+
+      expect(Test.findByPk).toHaveBeenCalledWith(1)
+      expect(ClassGroup.findAll).toHaveBeenCalled()
+      expect(mockTest.setClassGroups).toHaveBeenCalledWith(mockGroups)
+      expect(mockTest.reload).toHaveBeenCalled()
+      expect(result).toBeDefined()
+    })
+
+    it('tableau vide — supprime tous les groupes (test privé)', async () => {
+      const mockTest = makeTestWithGroups()
+      Test.findByPk.mockResolvedValue(mockTest)
+      ClassGroup.findAll.mockResolvedValue([])
+
+      await TestService.assignGroups(1, 1, [])
+
+      expect(mockTest.setClassGroups).toHaveBeenCalledWith([])
+    })
+
+    it('lève NOT_FOUND si le test n\'existe pas', async () => {
+      Test.findByPk.mockResolvedValue(null)
+
+      await expect(TestService.assignGroups(99, 1, [2])).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    })
+
+    it('lève FORBIDDEN si l\'utilisateur n\'est pas propriétaire', async () => {
+      const mockTest = makeTestWithGroups({ userId: 99 })
+      Test.findByPk.mockResolvedValue(mockTest)
+
+      await expect(TestService.assignGroups(1, 1, [2])).rejects.toMatchObject({ code: 'FORBIDDEN' })
+      expect(mockTest.setClassGroups).not.toHaveBeenCalled()
     })
   })
 })
