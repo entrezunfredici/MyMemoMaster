@@ -37,6 +37,7 @@ export const useClassGroupSectionStore = defineStore('classGroupSections', {
           return false
         }
         this.sections.push(resp.data.data)
+        this._cache[groupId] = Date.now()
         notif.notify('Section créée.', 'success')
         return resp.data.data
       } catch {
@@ -54,6 +55,7 @@ export const useClassGroupSectionStore = defineStore('classGroupSections', {
         }
         const idx = this.sections.findIndex((s) => s.id === sectionId)
         if (idx !== -1) this.sections[idx] = resp.data.data
+        this._cache[groupId] = Date.now()
         notif.notify('Section mise à jour.', 'success')
         return true
       } catch {
@@ -70,6 +72,7 @@ export const useClassGroupSectionStore = defineStore('classGroupSections', {
           return false
         }
         this.sections = this.sections.filter((s) => s.id !== sectionId)
+        this._cache[groupId] = Date.now()
         notif.notify('Section supprimée.', 'success')
         return true
       } catch {

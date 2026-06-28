@@ -149,9 +149,22 @@ describe('ClassGroupSubmissionService', () => {
       expect(result).toBe(false)
     })
 
+    it('upsert — enseignant du groupe — retourne false', async () => {
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne
+        .mockResolvedValueOnce(studentMembership) // _isMember → membre
+        .mockResolvedValueOnce(teacherMembership) // _isTeacher → est enseignant
+
+      const result = await ClassGroupSubmissionService.upsert(1, 1, 2, {})
+      expect(result).toBe(false)
+      expect(ClassGroupSection.findOne).not.toHaveBeenCalled()
+    })
+
     it('upsert — section absente ou pas de type rendu — retourne null', async () => {
       User.findByPk.mockResolvedValue(studentUser)
-      ClassGroupUsers.findOne.mockResolvedValue(studentMembership)
+      ClassGroupUsers.findOne
+        .mockResolvedValueOnce(studentMembership) // _isMember
+        .mockResolvedValueOnce(null)              // _isTeacher (étudiant)
       ClassGroupSection.findOne.mockResolvedValue(null)
 
       const result = await ClassGroupSubmissionService.upsert(1, 1, 2, {})
@@ -160,7 +173,9 @@ describe('ClassGroupSubmissionService', () => {
 
     it('upsert — nouvelle soumission — crée et retourne la soumission', async () => {
       User.findByPk.mockResolvedValue(studentUser)
-      ClassGroupUsers.findOne.mockResolvedValue(studentMembership)
+      ClassGroupUsers.findOne
+        .mockResolvedValueOnce(studentMembership) // _isMember
+        .mockResolvedValueOnce(null)              // _isTeacher (étudiant)
       ClassGroupSection.findOne.mockResolvedValue({ id: 1, type: 'rendu' })
       ClassGroupSubmission.findOne.mockResolvedValue(null) // pas de soumission existante
       const created = { id: 1, sectionId: 1, classGroupId: 1, studentId: 2, url: 'https://example.com' }
@@ -175,7 +190,9 @@ describe('ClassGroupSubmissionService', () => {
 
     it('upsert — soumission existante sans changement de fileKey — met à jour', async () => {
       User.findByPk.mockResolvedValue(studentUser)
-      ClassGroupUsers.findOne.mockResolvedValue(studentMembership)
+      ClassGroupUsers.findOne
+        .mockResolvedValueOnce(studentMembership) // _isMember
+        .mockResolvedValueOnce(null)              // _isTeacher (étudiant)
       ClassGroupSection.findOne.mockResolvedValue({ id: 1, type: 'rendu' })
       const existing = {
         id: 1, fileKey: null,
@@ -191,7 +208,9 @@ describe('ClassGroupSubmissionService', () => {
     it('upsert — soumission existante avec nouveau fileKey — supprime ancien S3 et met à jour', async () => {
       const { s3Client } = require('../../config/storage.config')
       User.findByPk.mockResolvedValue(studentUser)
-      ClassGroupUsers.findOne.mockResolvedValue(studentMembership)
+      ClassGroupUsers.findOne
+        .mockResolvedValueOnce(studentMembership) // _isMember
+        .mockResolvedValueOnce(null)              // _isTeacher (étudiant)
       ClassGroupSection.findOne.mockResolvedValue({ id: 1, type: 'rendu' })
       const existing = {
         id: 1, fileKey: 'uploads/old-file.pdf',

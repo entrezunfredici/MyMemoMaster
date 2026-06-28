@@ -91,18 +91,40 @@ describe('ClassGroupService', () => {
 
   // ── findOne ───────────────────────────────────────────────────────────────────
 
-  it('findOne — retourne le groupe avec ses membres', async () => {
+  it('findOne — admin — retourne le groupe avec ses membres', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
     ClassGroup.findByPk.mockResolvedValue(mockGroup)
 
-    const result = await ClassGroupService.findOne(1)
+    const result = await ClassGroupService.findOne(1, 1)
 
     expect(ClassGroup.findByPk).toHaveBeenCalledWith(1, expect.objectContaining({ include: expect.any(Array) }))
     expect(result).toBe(mockGroup)
   })
 
+  it('findOne — non-membre — retourne false', async () => {
+    User.findByPk.mockResolvedValue(teacherUser)
+    ClassGroupUsers.findOne.mockResolvedValue(null) // pas membre du groupe
+
+    const result = await ClassGroupService.findOne(1, 2)
+
+    expect(result).toBe(false)
+    expect(ClassGroup.findByPk).not.toHaveBeenCalled()
+  })
+
+  it('findOne — membre — retourne le groupe', async () => {
+    User.findByPk.mockResolvedValue(teacherUser)
+    ClassGroupUsers.findOne.mockResolvedValue({ classGroupId: 1, userId: 2 })
+    ClassGroup.findByPk.mockResolvedValue(mockGroup)
+
+    const result = await ClassGroupService.findOne(1, 2)
+
+    expect(result).toBe(mockGroup)
+  })
+
   it('findOne — groupe inexistant — retourne null', async () => {
+    User.findByPk.mockResolvedValue(adminUser)
     ClassGroup.findByPk.mockResolvedValue(null)
-    const result = await ClassGroupService.findOne(99)
+    const result = await ClassGroupService.findOne(99, 1)
     expect(result).toBeNull()
   })
 

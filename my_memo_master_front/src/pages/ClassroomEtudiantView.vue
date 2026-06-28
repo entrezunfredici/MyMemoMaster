@@ -336,9 +336,9 @@ async function selectGroup(id) {
   ])
   loading.value = false
   // Charge les soumissions propres à chaque rendu
-  for (const s of sectionStore.sections.filter((s) => s.type === 'rendu')) {
-    submissionStore.fetchMine(id, s.id)
-  }
+  await Promise.all(
+    sectionStore.sections.filter((s) => s.type === 'rendu').map((s) => submissionStore.fetchMine(id, s.id))
+  )
   // Charge la liste des matières si ce n'est pas encore fait
   if (!subjectStore.subjects.length) subjectStore.fetchSubjects()
 }
@@ -431,9 +431,8 @@ async function confirmRevoke() {
 
 // ── Séances & échéances ───────────────────────────────────────────────────────
 
-const now = new Date()
-
 const upcomingOccurrences = computed(() => {
+  const now = new Date()
   const all = calendarStore.groupEvents.flatMap((ev) =>
     (ev.occurrences ?? []).map((o) => ({ ...o, calendarEvent: ev }))
   )
@@ -443,15 +442,16 @@ const upcomingOccurrences = computed(() => {
     .slice(0, 10)
 })
 
-const upcomingDeadlines = computed(() =>
-  deadlineStore.groupDeadlines
+const upcomingDeadlines = computed(() => {
+  const now = new Date()
+  return deadlineStore.groupDeadlines
     .filter((d) => new Date(d.dueDate) >= now)
     .slice(0, 10)
-)
+})
 
 function isUrgent(dueDate) {
   if (!dueDate) return false
-  return (new Date(dueDate) - now) / (1000 * 60 * 60 * 24) <= 3
+  return (new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24) <= 3
 }
 
 // Gestion upload rendus

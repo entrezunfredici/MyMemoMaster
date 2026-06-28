@@ -35,7 +35,8 @@ class ClassGroupSectionService {
     if (!(await this._canWrite(groupId, requesterId))) return false
     const section = await ClassGroupSection.findOne({ where: { id: sectionId, classGroupId: groupId } })
     if (!section) return null
-    await section.update(data)
+    const { title, type, description, dueDate } = data
+    await section.update({ title, type, description, dueDate })
     return section
   }
 

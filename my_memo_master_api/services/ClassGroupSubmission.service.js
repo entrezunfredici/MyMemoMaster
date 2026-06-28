@@ -2,7 +2,6 @@ const { DeleteObjectCommand } = require('@aws-sdk/client-s3')
 const { s3Client, bucket } = require('../config/storage.config')
 const { ClassGroupSubmission, ClassGroupSection, ClassGroupUsers, User } = require('../models/index')
 const logger = require('../helpers/logger')
-const { Op } = require('sequelize')
 
 class ClassGroupSubmissionService {
   async _isMember(groupId, userId) {
@@ -40,6 +39,8 @@ class ClassGroupSubmissionService {
 
   async upsert(sectionId, groupId, studentId, data) {
     if (!(await this._isMember(groupId, studentId))) return false
+    // Un enseignant (ou admin) ne peut pas soumettre un rendu
+    if (await this._isTeacher(groupId, studentId)) return false
     if (!(await this._sectionBelongsToGroup(sectionId, groupId))) return null
 
     const existing = await ClassGroupSubmission.findOne({ where: { sectionId, studentId } })

@@ -794,10 +794,6 @@ async function submitInvite() {
   }
 }
 
-async function changeRole(userId, role) {
-  await classGroupStore.updateMemberRole(selectedId.value, userId, role)
-}
-
 async function deleteGroupDeadline(id) {
   const ok = await deadlineStore.deleteDeadline(id)
   if (ok) await deadlineStore.fetchByGroup(selectedId.value)

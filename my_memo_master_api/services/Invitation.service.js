@@ -41,10 +41,14 @@ class InvitationService {
     })
 
     if (existingUser) {
-      await ClassGroupUsers.findOrCreate({
+      const [membership, created] = await ClassGroupUsers.findOrCreate({
         where: { classGroupId: groupId, userId: existingUser.userId },
         defaults: { role }
       })
+      // Si l'utilisateur est déjà membre avec un rôle différent, mettre à jour son rôle
+      if (!created && membership.role !== role) {
+        await membership.update({ role })
+      }
       // Annule les invitations email en attente pour ce groupe/email (évite les doublons EN ATTENTE)
       await Invitation.update(
         { status: 'accepted', targetUserId: existingUser.userId },

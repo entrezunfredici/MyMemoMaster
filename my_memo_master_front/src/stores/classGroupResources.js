@@ -54,6 +54,7 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
           return false
         }
         this.resources.unshift(createResp.data.data)
+        this._cache[groupId] = Date.now()
         notif.notify('Ressource ajoutée.', 'success')
         return createResp.data.data
       } catch {
@@ -72,6 +73,7 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
           return false
         }
         this.resources = this.resources.filter((r) => r.id !== resourceId)
+        this._cache[groupId] = Date.now()
         notif.notify('Ressource supprimée.', 'success')
         return true
       } catch {

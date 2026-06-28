@@ -107,6 +107,11 @@ export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions',
           return false
         }
         this.mySubmissions[sectionId] = null
+        if (this.sectionSubmissions[sectionId]) {
+          this.sectionSubmissions[sectionId] = this.sectionSubmissions[sectionId].filter(
+            (s) => s.id !== submissionId
+          )
+        }
         notif.notify('Soumission retirée.', 'success')
         return true
       } catch {

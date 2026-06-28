@@ -13,7 +13,8 @@ exports.findAll = async (req, res) => {
 
 exports.findOne = async (req, res) => {
   try {
-    const group = await ClassGroupService.findOne(req.params.id)
+    const group = await ClassGroupService.findOne(req.params.id, req.user.id)
+    if (group === false) return res.status(403).json({ message: 'Accès refusé.' })
     if (!group) return res.status(404).json({ message: 'Groupe introuvable.' })
     res.status(200).json({ message: 'Groupe récupéré avec succès.', data: group })
   } catch (error) {

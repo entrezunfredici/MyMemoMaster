@@ -1,5 +1,4 @@
 const dayjs = require('dayjs')
-const { Op } = require('sequelize')
 const { ClassGroup, ClassGroupUsers, User, Invitation, TestResult, RevisionSession, Deadline, EventOccurrence, CalendarEvent, Test, TestClassGroup } = require('../models/index')
 
 const AT_RISK_INACTIVE_DAYS = 7
@@ -42,11 +41,19 @@ class ClassGroupService {
 
   /**
    * Récupère un groupe par son ID avec ses membres.
+   * Seuls les membres du groupe et les admins y ont accès.
    *
    * @param {number} id
-   * @returns {Promise<ClassGroup|null>}
+   * @param {number} requesterId
+   * @returns {Promise<ClassGroup|null|false>} false si non membre
    */
-  async findOne(id) {
+  async findOne(id, requesterId) {
+    const requester = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    const isAdmin = [1, 4].includes(requester?.roleId)
+    if (!isAdmin) {
+      const membership = await ClassGroupUsers.findOne({ where: { classGroupId: id, userId: requesterId } })
+      if (!membership) return false
+    }
     return ClassGroup.findByPk(id, {
       include: [{
         model: ClassGroupUsers,
@@ -82,7 +89,8 @@ class ClassGroupService {
     if (![1, 4].includes(user?.roleId)) return false
     const group = await ClassGroup.findByPk(id)
     if (!group) return null
-    await group.update(data)
+    const { name, description, level, code, score } = data
+    await group.update({ name, description, level, code, score })
     return group
   }
 
@@ -246,7 +254,6 @@ class ClassGroupService {
 
     const allMembers = await ClassGroupUsers.findAll({ where: { classGroupId: groupId } })
     const studentIds = allMembers.filter((m) => m.role === 'student').map((m) => m.userId)
-    const teacherIds = allMembers.filter((m) => m.role === 'teacher').map((m) => m.userId)
 
     if (studentIds.length === 0) {
       return { activeStudentsCount: 0, atRiskCount: 0, scoreWeeklyTrend: this._computeGroupWeeklyTrend([]), students: [] }

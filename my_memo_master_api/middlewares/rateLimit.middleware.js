@@ -21,7 +21,9 @@ function userKeyFromJwt(req) {
         Number.isInteger(payload?.id) && payload.id > 0 &&
         Number.isInteger(payload?.exp) && payload.exp > now
       ) return `uid_${payload.id}`
-    } catch {}
+    } catch {
+      // parse error — fallback to IP key
+    }
   }
   return ipKeyGenerator(req)
 }

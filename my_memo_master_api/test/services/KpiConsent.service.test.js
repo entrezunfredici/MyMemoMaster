@@ -1,4 +1,4 @@
-const { KpiConsent, ClassGroupUsers, User, ClassGroup, Subject } = require('../../models/index')
+const { KpiConsent, ClassGroupUsers, User } = require('../../models/index')
 const KpiConsentService = require('../../services/KpiConsent.service')
 
 jest.mock('../../models/index', () => ({
