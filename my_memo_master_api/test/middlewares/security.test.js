@@ -46,6 +46,7 @@ process.env.API_RATE_MAX = '200'
 delete process.env.RATE_LIMIT_DISABLED
 
 const request = require('supertest')
+const jwt = require('jsonwebtoken')
 const app = require('../../app')
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,8 +152,12 @@ describe('Sécurité — Rate limiting', () => {
   })
 
   it('apiLimiter — retourne 429 après 200 requêtes sur une route quelconque', async () => {
-    const ip = `10.3.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`
-    const sendReq = () => request(app).get('/api/v1/roles').set('X-Forwarded-For', ip)
+    // userKeyFromJwt extrait uid_NNN depuis le JWT — clé stable indépendante du comportement req.ip en test
+    const token = jwt.sign({ id: 9999 }, 'test-secret', { expiresIn: '1h' })
+    const sendReq = () =>
+      request(app)
+        .get('/api/v1/roles')
+        .set('Authorization', `Bearer ${token}`)
 
     for (let i = 0; i < 200; i++) {
       await sendReq()

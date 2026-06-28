@@ -214,6 +214,51 @@ describe('useClassGroupStore', () => {
     expect(result).toBe(false)
   })
 
+  // ── fetchKpi ───────────────────────────────────────────────────────────────────
+
+  const KPI_FIXTURE = {
+    memberCount: 25,
+    studentCount: 22,
+    teacherCount: 3,
+    pendingInvitations: 2,
+    avgScore: 73.4,
+    atRiskStudents: [{ userId: 5, name: 'Bob', reason: 'inactive' }],
+    scoreTrend: [{ week: '2026-W26', avg: 70 }, { week: '2026-W27', avg: 73 }]
+  }
+
+  it('fetchKpi — succès — peuple kpi et retourne true', async () => {
+    mockGet.mockResolvedValueOnce({ status: 200, data: { data: KPI_FIXTURE } })
+
+    const store = useClassGroupStore()
+    const result = await store.fetchKpi(1)
+
+    expect(mockGet).toHaveBeenCalledWith('class-groups/1/kpi')
+    expect(store.kpi).toEqual(KPI_FIXTURE)
+    expect(result).toBe(true)
+  })
+
+  it('fetchKpi — réponse non-200 — kpi passe à null et retourne false', async () => {
+    mockGet.mockResolvedValueOnce({ status: 403, data: { message: 'Accès refusé.' } })
+
+    const store = useClassGroupStore()
+    store.kpi = KPI_FIXTURE
+    const result = await store.fetchKpi(1)
+
+    expect(result).toBe(false)
+    expect(store.kpi).toBeNull()
+  })
+
+  it('fetchKpi — erreur réseau — kpi passe à null et retourne false', async () => {
+    mockGet.mockRejectedValueOnce(new Error('Network error'))
+
+    const store = useClassGroupStore()
+    store.kpi = KPI_FIXTURE
+    const result = await store.fetchKpi(1)
+
+    expect(result).toBe(false)
+    expect(store.kpi).toBeNull()
+  })
+
   // ── updateMemberRole ───────────────────────────────────────────────────────────
 
   it('updateMemberRole — succès — rafraîchit le groupe et notifie', async () => {

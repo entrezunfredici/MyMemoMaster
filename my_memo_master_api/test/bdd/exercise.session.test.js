@@ -249,7 +249,7 @@ describe('Exercices — parcours complet (tests fonctionnels)', () => {
   // ── GET /tests/:id ─────────────────────────────────────────────────────────
 
   it('GET /tests/:id — retourne le test avec les 4 questions et leur content parsé', async () => {
-    const res = await request(app).get(`${BASE}/tests/${testId}`)
+    const res = await request(app).get(`${BASE}/tests/${testId}`).set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(200)
     expect(res.body.testId).toBe(testId)

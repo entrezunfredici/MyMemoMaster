@@ -4245,6 +4245,34 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 
 ---
 
+### [2026-06-28] S-03.10 — Tests fonctionnels flux groupe — DoD complet
+
+**Ticket :** S-03.10
+
+**Périmètre couvert :**
+- Stores frontend : classGroups (22 tests), classGroupSections (13), classGroupResources (12), classGroupSubmissions (17), invitations (14)
+- Composant ClassroomPage (10 tests), ExercisesPage (8 tests)
+- Composable useTeacherAnalytics (préexistant)
+- Backend controllers : ClassGroup, ClassGroupSection, ClassGroupResource, ClassGroupSubmission, Invitation
+- Backend services : ClassGroup (32), ClassGroupSection, ClassGroupResource, ClassGroupSubmission, Invitation (7)
+
+**Tests ajoutés (session courante) :**
+- `test/stores/classGroups.store.test.js` (+3 tests) — `fetchKpi` (succès, 403, réseau) → 22 tests au total
+
+**Ce qui est utilisable :**
+- Couverture complète des flux CRUD groupe (création, mise à jour, suppression)
+- Couverture flux membres (add/remove/updateRole avec restrictions par rôle)
+- Couverture flux invitations (invite, accept, decline, teacher ne peut inviter que des étudiants)
+- Couverture flux sections/ressources/rendus avec upload 2 étapes et cache TTL
+- Couverture KPI groupe (fetchKpi avec réponse valide, erreur 403, erreur réseau)
+
+**Dette / points d'attention :**
+- Pas de tests composant pour les 3 vues Classroom (trop couplées aux stores async) — stratégie documentée
+- Pas de tests BDD E2E flux complet (hors V1)
+- ✅ Aucun bug bloquant connu
+
+---
+
 ### [2026-06-28] S-03.06 — API KPI de groupe (avancement)
 
 **Ticket :** S-03.06 — DoD complet
