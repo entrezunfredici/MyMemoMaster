@@ -52,7 +52,7 @@ class QuestionService {
   async update(id, data) {
     const question = await Question.findByPk(id)
     if (!question) {
-      throw new Error('Question not found')
+      throw Object.assign(new Error('Question introuvable'), { code: 'NOT_FOUND' })
     }
     const { statement, questionPosition, type, content } = data
     return await question.update({ statement, questionPosition, type, content })
@@ -61,7 +61,7 @@ class QuestionService {
   async delete(id) {
     const question = await Question.findByPk(id)
     if (!question) {
-      throw new Error('Question not found')
+      throw Object.assign(new Error('Question introuvable'), { code: 'NOT_FOUND' })
     }
     return await question.destroy()
   }

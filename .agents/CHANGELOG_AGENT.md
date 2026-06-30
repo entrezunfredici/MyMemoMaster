@@ -24,7 +24,7 @@
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
-| Test / Question / Response | Stable — 2026-06-28 : séries d'exercices privées par propriétaire + assignation groupes (TestClassGroup M2M) ; GET /tests auth requis ; POST /:id/groups ; KPI perso filtrés aux tests privés ; KPI péda via TestClassGroup direct | 2026-06-28 |
+| Test / Question / Response | Stable — M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-06-30 |
 | TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
@@ -103,6 +103,7 @@
 | Revue de code & merge S-02 | Stable — S-02.09 : 1 bug critique cache TTL (4 stores), notification fetchMyConsents, 13 erreurs ESLint corrigées, 3 fichiers tests réécrits, 490/490 tests verts | 2026-06-27 |
 | Suivi des rendus enseignant | Stable — [IMP] 2026-06-27 : vue enseignant — panneau "rendu reçu / pas encore rendu" par section rendu, avec téléchargement. Route GET /status + service getSubmissionStatus + store fetchStatus | 2026-06-27 |
 | Documentation espace enseignant (Groupes classes) | Stable — S-03.12 : diagrams/classroom_enseignant.md — acteurs/permissions, modèle données, règles métier (groupes/membres/invitations/sections/rendus/ressources/soumissions/KPI), flux principaux, maquettes UI ASCII, tableau endpoints, cas limites, dette technique | 2026-06-28 |
+| Documentation types et correction Exercices | Stable — M-06.14 : diagrams/exercices_types_correction.md — schémas JSON 4 types, flux créateur/player/correction, seuils sémantiques, modèle TestResult, périmètre MVP | 2026-06-30 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -4426,3 +4427,80 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 - `--atomic` rollback automatiquement si un pod ne passe pas readiness dans le timeout — surveiller les premières exécutions
 
 ---
+
+### [M-06.13] — Revue de code & merge — Séries d'exercices — 2026-06-30
+
+**Périmètre audité :**
+- `controllers/Test.controller.js` — handlers HTTP Test + assignGroups + submit
+- `services/Test.service.js` — findAll, findOne, submitAnswers, assignGroups
+- `controllers/Question.controller.js` — CRUD + findOne
+- `services/Question.service.js` — CRUD
+- `routes/Question.routes.js` — routing + middleware
+- `validators/Test.validators.js` / `validators/Question.validators.js`
+- `models/Test.model.js` / `models/TestClassGroup.model.js` / `models/Question.model.js`
+- `test/controllers/Test.controller.test.js` — suite Supertest
+- `test/controllers/Question.controller.test.js` — suite Supertest
+- `test/services/Test.service.test.js` — unitaires service
+- `my_memo_master_front/src/stores/tests.js` / `testResults.js`
+
+**Bugs corrigés :**
+
+| # | Fichier | Problème | Correction |
+|---|---------|----------|------------|
+| 1 | `routes/Question.routes.js` | `POST /questions`, `PUT /questions/edit/:id`, `DELETE /questions/:id` sans `authMiddleware` — n'importe quel visiteur anonyme pouvait créer/modifier/supprimer des questions | Ajout `authMiddleware` sur les 3 routes d'écriture |
+| 2 | `services/Question.service.js` | `update()` et `delete()` lançaient `new Error('Question not found')` en anglais, sans code d'erreur | Messages traduits en français + `{ code: 'NOT_FOUND' }` |
+| 3 | `controllers/Question.controller.js` | `findOne` retournait `200` avec corps `null` si la question n'existait pas | Ajout du contrôle null → `404` |
+| 4 | `controllers/Question.controller.js` | `update` et `delete` ne capturaient pas `NOT_FOUND` | Branchage `error.code === 'NOT_FOUND'` → `404` |
+| 5 | `services/Test.service.js` | `submitAnswers` n'avait aucun contrôle d'accès — un utilisateur connaissant l'ID d'un test privé pouvait soumettre des réponses et obtenir les bonnes réponses en retour | Vérification identique à `findOne` : propriétaire OU test legacy OU membre d'un groupe assigné |
+
+**Tests ajoutés :**
+- `test/controllers/Test.controller.test.js` : +4 tests (403/404 pour `PUT /:id` et `DELETE /:id`) — 1279 tests total
+- `test/controllers/Question.controller.test.js` : +8 tests (401 sur POST/PUT/DELETE, 404 sur GET/:id, PUT/DELETE) + mock `reminder.worker`
+- `test/services/Test.service.test.js` : +1 test (accès refusé dans submitAnswers), +`userId: null` sur tous les mocks submitAnswers
+
+**Fichiers modifiés :**
+- `controllers/Question.controller.js`
+- `services/Question.service.js`
+- `routes/Question.routes.js`
+- `services/Test.service.js`
+- `test/controllers/Test.controller.test.js`
+- `test/controllers/Question.controller.test.js`
+- `test/services/Test.service.test.js`
+
+**Résultats tests :** 1279 back ✅ (était 1268) · 548 front ✅ · linter vert ✅
+
+**DoD :**
+- ✅ Architecture conforme : controller → service → model, pas de logique dans les controllers
+- ✅ Tests : 1279 back + 548 front, tous passants
+- ✅ Linter ESLint : 0 erreur
+- ✅ Revue de code : 5 bugs corrigés
+- ✅ Changelog et DECISIONS.md mis à jour
+- ✅ Aucun bug bloquant connu
+
+**Dette / points d'attention :**
+- `Question.service.js` : pas de contrôle d'ownership sur `update`/`delete` — n'importe quel utilisateur connecté peut modifier ou supprimer une question. Acceptable MVP (les questions ne sont pas scopées par utilisateur) mais à documenter si le besoin de propriété émerge.
+- `Question.model.js` : `hasOne(Response)` et `hasOne(LeitnerCard)` déclarent des propriétés `through`/`otherKey` propres à `belongsToMany` — Sequelize les ignore silencieusement. Dette pré-existante, neutre fonctionnellement.
+- `tests.js` store : `fetchTests()` non-awaité dans `createTest()` et `updateTest()` — léger délai possible sur la liste front. Non-bloquant.
+
+---
+
+### [2026-06-30] M-06.14 — Documentation types et correction (Séries d'exercices)
+
+**Fichier créé :**
+- `diagrams/exercices_types_correction.md` — documentation de référence complète
+
+**Ce qui est documenté :**
+- Structure JSON du champ `content` pour les 4 types (`open`, `mcq`, `fill_blank`, `reorder`)
+- API de création d'exercice et d'ajout de questions (endpoints + champs + validations)
+- Comportement du player front-end par type (initialisation réponses, Fisher-Yates shuffle, soumission)
+- Algorithme de correction serveur par type avec seuils exacts
+- Seuils du service sémantique (HIGH 0.78 / GREY 0.55–0.78 / LOW 0.55, overlap mots-clés 0.30)
+- Modèle `TestResult` (colonnes, indexes) et règles d'affichage historique (seuil 50 %)
+- Contrôle d'accès `submitAnswers` (3 branches : propriétaire, legacy, groupe)
+- Périmètre MVP (hors scope : correction IA avancée, banque publique, notation établissement)
+
+**DoD :**
+- ✅ Document de référence créé et fidèle au code source
+- ✅ Aucun test à modifier (tâche documentaire pure)
+- ✅ CHANGELOG et DECISIONS mis à jour
+- ✅ Aucun bug bloquant

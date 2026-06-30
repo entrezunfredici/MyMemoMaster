@@ -109,12 +109,21 @@ describe('TestService', () => {
       expect(TestResult.create).not.toHaveBeenCalled()
     })
 
+    it('retourne null si l\'utilisateur n\'a pas accès (test privé d\'un autre)', async () => {
+      Test.findByPk.mockResolvedValue({ userId: 99, classGroups: [], question: [] })
+
+      const result = await TestService.submitAnswers(1, 1, [])
+
+      expect(result).toBeNull()
+      expect(TestResult.create).not.toHaveBeenCalled()
+    })
+
     it('calcule le score (somme des similarités) et crée le TestResult', async () => {
       const questions = [
         makeQuestion(1, 'open', { correct_answer: 'Paris' }),
         makeQuestion(2, 'open', { correct_answer: 'Berlin' })
       ]
-      Test.findByPk.mockResolvedValue({ testId: 1, question: questions })
+      Test.findByPk.mockResolvedValue({ testId: 1, userId: null, question: questions })
       TestResult.create.mockResolvedValue({ resultId: 42, score: 1.2, total: 2 })
       semanticService.gradeSemantic
         .mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: 'Correct (similarity=1.00).', decision_zone: 'correct' })
@@ -136,7 +145,7 @@ describe('TestService', () => {
 
     it('open — insensible à la casse et aux espaces (correction IA)', async () => {
       Test.findByPk.mockResolvedValue({
-        question: [makeQuestion(1, 'open', { correct_answer: '  Paris  ' })]
+        userId: null, question: [makeQuestion(1, 'open', { correct_answer: '  Paris  ' })]
       })
       TestResult.create.mockResolvedValue({ resultId: 1 })
       semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 0.99, explanation: 'Correct (similarity=0.99).', decision_zone: 'correct' })
@@ -149,7 +158,7 @@ describe('TestService', () => {
 
     it('open — réponse vide est incorrecte', async () => {
       Test.findByPk.mockResolvedValue({
-        question: [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
+        userId: null, question: [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
       })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
@@ -159,7 +168,7 @@ describe('TestService', () => {
 
     it('mcq — bonne option sélectionnée', async () => {
       const content = { options: [{ text: 'A', correct: false }, { text: 'B', correct: true }] }
-      Test.findByPk.mockResolvedValue({ question: [makeQuestion(1, 'mcq', content)] })
+      Test.findByPk.mockResolvedValue({ userId: null, question: [makeQuestion(1, 'mcq', content)] })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: 1 }])
@@ -171,7 +180,7 @@ describe('TestService', () => {
 
     it('mcq — mauvaise option sélectionnée', async () => {
       const content = { options: [{ text: 'A', correct: false }, { text: 'B', correct: true }] }
-      Test.findByPk.mockResolvedValue({ question: [makeQuestion(1, 'mcq', content)] })
+      Test.findByPk.mockResolvedValue({ userId: null, question: [makeQuestion(1, 'mcq', content)] })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: 0 }])
@@ -182,7 +191,7 @@ describe('TestService', () => {
 
     it('mcq — aucune réponse (null) est incorrecte', async () => {
       const content = { options: [{ text: 'A', correct: true }] }
-      Test.findByPk.mockResolvedValue({ question: [makeQuestion(1, 'mcq', content)] })
+      Test.findByPk.mockResolvedValue({ userId: null, question: [makeQuestion(1, 'mcq', content)] })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: null }])
@@ -191,7 +200,7 @@ describe('TestService', () => {
 
     it('fill_blank — tous les trous corrects (insensible casse/espaces)', async () => {
       const content = { blanks: ['rouge', 'bleu'], template: 'Le {{0}} et le {{1}}' }
-      Test.findByPk.mockResolvedValue({ question: [makeQuestion(1, 'fill_blank', content)] })
+      Test.findByPk.mockResolvedValue({ userId: null, question: [makeQuestion(1, 'fill_blank', content)] })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: ['Rouge', ' BLEU '] }])
@@ -203,7 +212,7 @@ describe('TestService', () => {
 
     it('fill_blank — un trou incorrect', async () => {
       const content = { blanks: ['rouge', 'bleu'] }
-      Test.findByPk.mockResolvedValue({ question: [makeQuestion(1, 'fill_blank', content)] })
+      Test.findByPk.mockResolvedValue({ userId: null, question: [makeQuestion(1, 'fill_blank', content)] })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: ['rouge', 'vert'] }])
@@ -212,7 +221,7 @@ describe('TestService', () => {
 
     it('reorder — ordre correct', async () => {
       const content = { fragments: ['le', 'chat', 'dort'] }
-      Test.findByPk.mockResolvedValue({ question: [makeQuestion(1, 'reorder', content)] })
+      Test.findByPk.mockResolvedValue({ userId: null, question: [makeQuestion(1, 'reorder', content)] })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: ['le', 'chat', 'dort'] }])
@@ -224,7 +233,7 @@ describe('TestService', () => {
 
     it('reorder — ordre incorrect', async () => {
       const content = { fragments: ['le', 'chat', 'dort'] }
-      Test.findByPk.mockResolvedValue({ question: [makeQuestion(1, 'reorder', content)] })
+      Test.findByPk.mockResolvedValue({ userId: null, question: [makeQuestion(1, 'reorder', content)] })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: ['chat', 'le', 'dort'] }])
@@ -233,7 +242,7 @@ describe('TestService', () => {
 
     it('question non répondue — traitée comme incorrecte', async () => {
       Test.findByPk.mockResolvedValue({
-        question: [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
+        userId: null, question: [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
       })
       TestResult.create.mockResolvedValue({ resultId: 1 })
 

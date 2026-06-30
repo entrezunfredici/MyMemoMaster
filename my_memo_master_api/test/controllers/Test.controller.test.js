@@ -252,6 +252,30 @@ describe('Test Controller', () => {
       expect(res.status).toBe(400)
     })
 
+    it('403 — test appartient à un autre utilisateur', async () => {
+      testService.update.mockRejectedValue(Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' }))
+
+      const res = await request(app)
+        .put(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Contrôle Maths v2' })
+
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBeDefined()
+    })
+
+    it('404 — test introuvable', async () => {
+      testService.update.mockRejectedValue(Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' }))
+
+      const res = await request(app)
+        .put(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Contrôle Maths v2' })
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
+    })
+
     it('500 — le service échoue', async () => {
       testService.update.mockRejectedValue(new Error('DB error'))
 
@@ -279,6 +303,28 @@ describe('Test Controller', () => {
     it('401 — sans token', async () => {
       const res = await request(app).delete(`${BASE}/tests/1`)
       expect(res.status).toBe(401)
+    })
+
+    it('403 — test appartient à un autre utilisateur', async () => {
+      testService.delete.mockRejectedValue(Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' }))
+
+      const res = await request(app)
+        .delete(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBeDefined()
+    })
+
+    it('404 — test introuvable', async () => {
+      testService.delete.mockRejectedValue(Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' }))
+
+      const res = await request(app)
+        .delete(`${BASE}/tests/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
     })
 
     it('500 — le service échoue', async () => {

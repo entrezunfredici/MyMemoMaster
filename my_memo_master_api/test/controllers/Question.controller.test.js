@@ -19,6 +19,7 @@ jest.mock('../../models/index', () => ({
 }))
 
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
+jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
 
 jest.mock('../../services/Question.service', () => ({
@@ -37,8 +38,12 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.NODE_ENV = 'test'
 
 const request = require('supertest')
+const jwt = require('jsonwebtoken')
 const app = require('../../app')
 const questionService = require('../../services/Question.service')
+
+const SECRET = 'test-secret'
+const makeToken = (payload = { id: 1 }) => jwt.sign(payload, SECRET)
 
 const BASE = '/api/v1'
 
@@ -132,6 +137,15 @@ describe('Question Controller', () => {
       expect(res.body.statement).toBe('Quelle est la capitale ?')
     })
 
+    it('404 — question introuvable', async () => {
+      questionService.findOne.mockResolvedValue(null)
+
+      const res = await request(app).get(`${BASE}/questions/99`)
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
+    })
+
     it('500 — le service échoue', async () => {
       questionService.findOne.mockRejectedValue(new Error('DB error'))
 
@@ -167,15 +181,25 @@ describe('Question Controller', () => {
     it('201 — crée une question', async () => {
       questionService.create.mockResolvedValue(mockQuestion)
 
-      const res = await request(app).post(`${BASE}/questions`).send(validBody)
+      const res = await request(app)
+        .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(validBody)
 
       expect(res.status).toBe(201)
       expect(questionService.create).toHaveBeenCalledTimes(1)
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).post(`${BASE}/questions`).send(validBody)
+      expect(res.status).toBe(401)
+      expect(questionService.create).not.toHaveBeenCalled()
+    })
+
     it('400 — statement manquant', async () => {
       const res = await request(app)
         .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ questionPosition: 1, type: 'open' })
 
       expect(res.status).toBe(400)
@@ -185,6 +209,7 @@ describe('Question Controller', () => {
     it('400 — type manquant', async () => {
       const res = await request(app)
         .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ statement: 'Question ?', questionPosition: 1 })
 
       expect(res.status).toBe(400)
@@ -193,6 +218,7 @@ describe('Question Controller', () => {
     it('400 — questionPosition invalide (non entier)', async () => {
       const res = await request(app)
         .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ statement: 'Question ?', questionPosition: 'abc', type: 'open' })
 
       expect(res.status).toBe(400)
@@ -201,6 +227,7 @@ describe('Question Controller', () => {
     it('400 — idTest invalide (non entier)', async () => {
       const res = await request(app)
         .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ ...validBody, idTest: 'abc' })
 
       expect(res.status).toBe(400)
@@ -209,7 +236,10 @@ describe('Question Controller', () => {
     it('500 — le service échoue', async () => {
       questionService.create.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).post(`${BASE}/questions`).send(validBody)
+      const res = await request(app)
+        .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(validBody)
 
       expect(res.status).toBe(500)
     })
@@ -225,15 +255,37 @@ describe('Question Controller', () => {
 
       const res = await request(app)
         .put(`${BASE}/questions/edit/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ statement: 'Question modifiée ?' })
 
       expect(res.status).toBe(200)
     })
 
+    it('401 — sans token', async () => {
+      const res = await request(app).put(`${BASE}/questions/edit/1`).send({ statement: 'Q ?' })
+      expect(res.status).toBe(401)
+      expect(questionService.update).not.toHaveBeenCalled()
+    })
+
     it('400 — statement vide (ne peut pas être vide si fourni)', async () => {
-      const res = await request(app).put(`${BASE}/questions/edit/1`).send({ statement: '' })
+      const res = await request(app)
+        .put(`${BASE}/questions/edit/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ statement: '' })
 
       expect(res.status).toBe(400)
+    })
+
+    it('404 — question introuvable', async () => {
+      questionService.update.mockRejectedValue(Object.assign(new Error('Question introuvable'), { code: 'NOT_FOUND' }))
+
+      const res = await request(app)
+        .put(`${BASE}/questions/edit/99`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ statement: 'Question modifiée ?' })
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
     })
 
     it('500 — le service échoue', async () => {
@@ -241,6 +293,7 @@ describe('Question Controller', () => {
 
       const res = await request(app)
         .put(`${BASE}/questions/edit/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
         .send({ statement: 'Question modifiée ?' })
 
       expect(res.status).toBe(500)
@@ -252,15 +305,36 @@ describe('Question Controller', () => {
     it('204 — supprime la question', async () => {
       questionService.delete.mockResolvedValue(true)
 
-      const res = await request(app).delete(`${BASE}/questions/1`)
+      const res = await request(app)
+        .delete(`${BASE}/questions/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(204)
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app).delete(`${BASE}/questions/1`)
+      expect(res.status).toBe(401)
+      expect(questionService.delete).not.toHaveBeenCalled()
+    })
+
+    it('404 — question introuvable', async () => {
+      questionService.delete.mockRejectedValue(Object.assign(new Error('Question introuvable'), { code: 'NOT_FOUND' }))
+
+      const res = await request(app)
+        .delete(`${BASE}/questions/99`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
     })
 
     it('500 — le service échoue', async () => {
       questionService.delete.mockRejectedValue(new Error('DB error'))
 
-      const res = await request(app).delete(`${BASE}/questions/1`)
+      const res = await request(app)
+        .delete(`${BASE}/questions/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
     })

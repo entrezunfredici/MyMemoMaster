@@ -43,6 +43,7 @@ exports.findOne = async (req, res) => {
   try {
     const { id } = req.params
     const question = await QuestionService.findOne(id)
+    if (!question) return res.status(404).json({ message: `Question introuvable pour l'identifiant ${id}.` })
     res.status(200).json(question)
   } catch (error) {
     logger.error(error?.message || error)
@@ -87,6 +88,7 @@ exports.update = async (req, res) => {
     const question = await QuestionService.update(id, data)
     res.status(200).json(question)
   } catch (error) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ message: error.message })
     logger.error(error?.message || error)
     res
       .status(500)
@@ -100,6 +102,7 @@ exports.delete = async (req, res) => {
     await QuestionService.delete(id)
     res.status(204).send()
   } catch (error) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ message: error.message })
     logger.error(error?.message || error)
     res
       .status(500)

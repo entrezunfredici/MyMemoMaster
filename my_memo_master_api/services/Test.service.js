@@ -120,17 +120,29 @@ class TestService {
 
   /**
    * Évalue les réponses d'un utilisateur, sauvegarde le TestResult et retourne la correction.
+   * Accès identique à findOne : propriétaire, test legacy (userId null) ou membre d'un groupe assigné.
    */
   async submitAnswers(testId, userId, answers) {
     const test = await Test.findByPk(testId, {
-      include: [{
-        model: Question,
-        as: 'question',
-        attributes: ['idQuestion', 'type', 'content', 'questionPosition']
-      }],
+      include: [
+        {
+          model: Question,
+          as: 'question',
+          attributes: ['idQuestion', 'type', 'content', 'questionPosition']
+        },
+        CLASS_GROUPS_INCLUDE
+      ],
       order: [[{ model: Question, as: 'question' }, 'questionPosition', 'ASC']]
     })
     if (!test) return null
+
+    // Vérification d'accès (même logique que findOne)
+    if (test.userId !== userId && test.userId !== null) {
+      const groupIds = (test.classGroups ?? []).map((g) => g.id)
+      if (groupIds.length === 0) return null
+      const membership = await ClassGroupUsers.findOne({ where: { userId, classGroupId: groupIds } })
+      if (!membership) return null
+    }
 
     const questions = test.question ?? []
     const results = await Promise.all(questions.map(async q => {

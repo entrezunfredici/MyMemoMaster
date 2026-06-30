@@ -655,3 +655,25 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Table de jonction `TestClassGroup` (`testId` FK→Test, `classGroupId` FK→ClassGroup, contrainte unique `(testId, classGroupId)`, ON DELETE CASCADE sur les deux). Sequelize `belongsToMany` des deux côtés (`Test.classGroups`, `ClassGroup.assignedTests`). Méthode `setClassGroups()` (Sequelize helper) pour remplacer l'ensemble des groupes en une seule opération — évite de gérer les deltas manuellement. Endpoint `POST /tests/:id/groups` avec le tableau complet des `groupIds` à chaque appel (idempotent).
 **Alternative écartée** : Colonne `classGroupId` nullable directement sur `Test` — un exercice ne pourrait appartenir qu'à un seul groupe. Rejeté car un enseignant peut enseigner la même matière à plusieurs classes. / Table `TestAssignment` avec `assignedBy` + `assignedAt` — plus riche mais surconçu pour le MVP.
 **Conséquences** : Migration `20260628000001-create-testclassgroup-table.js` à passer en prod. `Test.service.findAll(userId)` effectue 2 requêtes supplémentaires (memberships + assignments) pour construire la clause `OR` — acceptable au volume MVP. Les KPI persos filtrent sur `classGroups.length === 0` (privé) ; les KPI pédagogiques filtrent sur `classGroups.length > 0`.
+
+### [2026-06-30] submitAnswers — contrôle d'accès identique à findOne
+**Contexte** : `Test.service.submitAnswers` ne vérifiait pas si l'utilisateur avait accès au test avant de permettre la soumission. Un utilisateur connaissant l'ID d'un test privé pouvait obtenir la correction complète (bonnes réponses + scores sémantiques) via `POST /tests/:id/submit`.
+**Décision** : Réutiliser exactement la même logique d'accès que `findOne` dans `submitAnswers` : propriétaire (userId match), test legacy (userId null), ou membre d'un groupe assigné via `ClassGroupUsers`. Retourner `null` (→ 404 controller) si aucune condition n'est remplie.
+**Alternative écartée** : Extraire la logique d'accès dans une méthode privée `_checkAccess(test, userId)` — améliorerait la maintenabilité mais constitue une refactorisation hors du périmètre d'une revue de code.
+**Conséquences** : `submitAnswers` fait désormais une requête `ClassGroupUsers.findOne` supplémentaire pour les tests non-propriétaires. Le include `CLASS_GROUPS_INCLUDE` est ajouté au `findByPk` initial. Coût négligeable en MVP.
+
+---
+
+### [2026-06-30] Routes Question — authMiddleware sur les routes d'écriture
+**Contexte** : Les routes `POST /questions`, `PUT /questions/edit/:id`, `DELETE /questions/:id` n'avaient pas d'`authMiddleware`, contrairement à la décision 2026-06-23 ("Seules les routes d'écriture (POST/PUT/DELETE) ont reçu authMiddleware"). Les GET restent intentionnellement publics.
+**Décision** : Ajouter `authMiddleware` sur les 3 routes d'écriture. Les GET (`/`, `/tests/:testId`, `/card/:cardId`, `/:id`, `/correction/:id`) restent publics (contenu pédagogique).
+**Alternative écartée** : Ajouter ownership sur update/delete (vérifier que la question appartient au créateur) — les questions ne sont pas scopées par userId dans le modèle actuel ; différé si ce besoin émerge.
+**Conséquences** : Les tests Question.controller ont été mis à jour pour envoyer un token JWT sur les routes protégées. Un mock `reminder.worker` manquant a été ajouté dans ce test (causa un import silencieux brisé).
+
+---
+
+### [2026-06-30] Question.content — champ JSON polymorphe sérialisé en TEXT
+**Contexte** : Les 4 types de questions ont des structures de données radicalement différentes. Stocker chaque variante dans des colonnes dédiées aurait multiplié les colonnes nullables et les migrations.
+**Décision** : Un seul champ `content TEXT` avec get/set Sequelize qui JSON.parse/stringify automatiquement. La structure attendue par type est documentée dans `diagrams/exercices_types_correction.md` et validée par le service à la correction (les clés manquantes defaultent à `null`/`[]` sans erreur).
+**Alternative écartée** : Colonnes séparées par type (`correct_answer TEXT`, `options JSONB`, etc.) — migration complexe à chaque nouveau type, couplage fort entre modèle et type de question. / Type JSONB PostgreSQL — pas compatible SQLite dev, dialecte-dépendant.
+**Conséquences** : Pas de validation SQL de la structure interne du `content` — la cohérence est assurée uniquement au niveau service. Le getter Sequelize retourne `null` si le JSON est malformé (try/catch silencieux).

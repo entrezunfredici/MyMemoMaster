@@ -1,5 +1,6 @@
 const express = require('express')
 const QuestionController = require('../controllers/Question.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
 const questionValidators = require('../validators/Question.validators')
 
@@ -251,7 +252,7 @@ router.get('/correction/:id', QuestionController.getCorrectionByQuestion)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post('/', questionValidators.create, validate, QuestionController.create)
+router.post('/', authMiddleware, questionValidators.create, validate, QuestionController.create)
 
 /**
  * @swagger
@@ -304,7 +305,7 @@ router.post('/', questionValidators.create, validate, QuestionController.create)
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put('/edit/:id', questionValidators.update, validate, QuestionController.update)
+router.put('/edit/:id', authMiddleware, questionValidators.update, validate, QuestionController.update)
 
 /**
  * @swagger
@@ -328,7 +329,7 @@ router.put('/edit/:id', questionValidators.update, validate, QuestionController.
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete('/:id', QuestionController.delete)
+router.delete('/:id', authMiddleware, QuestionController.delete)
 
 module.exports = (app) => {
   /**
