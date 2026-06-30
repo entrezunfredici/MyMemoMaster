@@ -474,6 +474,10 @@
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
             <input v-model="deadlineForm.dueTime" type="time"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            <select v-model="deadlineForm.testId" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+              <option :value="null">Exercice associé (optionnel)</option>
+              <option v-for="t in testStore.tests" :key="t.testId" :value="t.testId">{{ t.name }}</option>
+            </select>
             <button @click="submitDeadline"
               class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
               Ajouter l'échéance
@@ -546,6 +550,7 @@ import { ref, computed, onMounted, watch, reactive } from 'vue'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useDeadlineStore } from '@/stores/deadlines'
+import { useTestStore } from '@/stores/tests'
 import { useClassGroupSectionStore } from '@/stores/classGroupSections'
 import { useClassGroupResourceStore } from '@/stores/classGroupResources'
 import { useTeacherAnalytics } from '@/composables/useTeacherAnalytics'
@@ -560,6 +565,7 @@ import { notif } from '@/helpers/notif'
 const classGroupStore = useClassGroupStore()
 const calendarStore = useCalendarEventStore()
 const deadlineStore = useDeadlineStore()
+const testStore = useTestStore()
 const sectionStore = useClassGroupSectionStore()
 const resourceStore = useClassGroupResourceStore()
 const authStore = useAuthStore()
@@ -591,7 +597,7 @@ const expandedRenduSections = reactive({})
 
 const sectionForm = reactive({ title: '', type: 'section', description: '', dueDate: '', error: '' })
 const resourceForm = reactive({ title: '', type: 'cours', file: null, dragOver: false, error: '' })
-const deadlineForm = reactive({ name: '', type: 'ds', occurrenceId: '', dueDate: '', dueTime: '', error: '' })
+const deadlineForm = reactive({ name: '', type: 'ds', occurrenceId: '', dueDate: '', dueTime: '', testId: null, error: '' })
 const inviteForm = reactive({ targetEmail: '', role: 'student', message: '', error: false })
 
 async function selectGroup(id) {
@@ -602,7 +608,7 @@ async function selectGroup(id) {
   submissionStore.clearSubmissionStatus()
   Object.keys(expandedRenduSections).forEach((k) => delete expandedRenduSections[k])
   await Promise.all([
-    calendarStore.fetchByGroup(id),
+    calendarStore.fetchByGroup(id, true),
     deadlineStore.fetchByGroup(id),
     sectionStore.fetchByGroup(id),
     resourceStore.fetchByGroup(id),
@@ -645,6 +651,7 @@ function formatMinutes(minutes) {
 
 onMounted(async () => {
   if (!classGroupStore.groups.length) await classGroupStore.fetchGroups()
+  if (!testStore.tests.length) testStore.fetchTests()
   if (groups.value.length) selectGroup(groups.value[0].id)
 })
 
@@ -714,9 +721,10 @@ async function submitDeadline() {
     occurrenceId: Number(deadlineForm.occurrenceId),
     dueDate: deadlineForm.dueDate,
     dueTime: deadlineForm.dueTime || null,
+    testId: deadlineForm.testId || null,
   })
   if (ok) {
-    Object.assign(deadlineForm, { name: '', occurrenceId: '', dueDate: '', dueTime: '', error: '' })
+    Object.assign(deadlineForm, { name: '', occurrenceId: '', dueDate: '', dueTime: '', testId: null, error: '' })
     await deadlineStore.fetchByGroup(selectedId.value)
   }
 }

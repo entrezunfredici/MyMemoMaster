@@ -155,6 +155,11 @@
                     {{ formatDate(dl.dueDate) }}{{ dl.dueTime ? ' à ' + dl.dueTime.slice(0,5) : '' }}
                   </span>
                 </p>
+                <router-link v-if="dl.test"
+                  :to="{ name: 'exercise-detail', params: { id: dl.test.testId } }"
+                  class="mt-1 inline-block text-xs text-primary underline hover:text-primary/80">
+                  Voir l'exercice : {{ dl.test.name }}
+                </router-link>
               </div>
               <span class="rounded-full bg-gray px-2 py-1 text-xs text-dark/70">{{ deadlineTypeLabel(dl.type) }}</span>
             </div>

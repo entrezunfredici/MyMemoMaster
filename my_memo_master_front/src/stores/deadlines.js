@@ -7,6 +7,7 @@ export const useDeadlineStore = defineStore('deadlines', {
     deadlines: [],
     deadline: null,
     groupDeadlines: [],
+    testDeadlines: [],
     _currentGroupId: null,
     _cache: {}, // { [groupId]: timestamp } — TTL 5 min, valide uniquement pour le groupe actif
   }),
@@ -27,6 +28,17 @@ export const useDeadlineStore = defineStore('deadlines', {
         return true
       } catch {
         notif.notify('Erreur lors du chargement des échéances.', 'error')
+        return false
+      }
+    },
+
+    async fetchByTest(testId) {
+      try {
+        const resp = await api.get(`tests/${testId}/deadlines`)
+        if (resp?.status !== 200) return false
+        this.testDeadlines = resp.data.data
+        return true
+      } catch {
         return false
       }
     },

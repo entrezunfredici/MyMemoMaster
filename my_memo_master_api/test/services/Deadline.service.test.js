@@ -9,7 +9,8 @@ jest.mock('../../models/index', () => ({
   ClassGroupUsers: {
     findAll: jest.fn(),
     findOne: jest.fn()
-  }
+  },
+  Test: {}
 }))
 
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
@@ -165,6 +166,40 @@ describe('DeadlineService', () => {
       const result = await DeadlineService.update(1, 1, { name: 'X' })
 
       expect(result).toBe(false)
+    })
+  })
+
+  // ── findByTest ───────────────────────────────────────────────────────────────
+  describe('findByTest', () => {
+    it("retourne les échéances liées à un test pour les groupes de l'utilisateur", async () => {
+      models.ClassGroupUsers.findAll.mockResolvedValue([{ classGroupId: 10 }])
+      models.Deadline.findAll.mockResolvedValue([makeDeadline()])
+
+      const result = await DeadlineService.findByTest(42, 1)
+
+      expect(models.ClassGroupUsers.findAll).toHaveBeenCalledWith({ where: { userId: 1 } })
+      expect(models.Deadline.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { testId: 42 } })
+      )
+      expect(result).toHaveLength(1)
+    })
+
+    it("retourne [] si l'utilisateur n'appartient à aucun groupe", async () => {
+      models.ClassGroupUsers.findAll.mockResolvedValue([])
+
+      const result = await DeadlineService.findByTest(42, 1)
+
+      expect(models.Deadline.findAll).not.toHaveBeenCalled()
+      expect(result).toEqual([])
+    })
+
+    it('retourne [] si aucune échéance liée au test', async () => {
+      models.ClassGroupUsers.findAll.mockResolvedValue([{ classGroupId: 10 }])
+      models.Deadline.findAll.mockResolvedValue([])
+
+      const result = await DeadlineService.findByTest(99, 1)
+
+      expect(result).toEqual([])
     })
   })
 

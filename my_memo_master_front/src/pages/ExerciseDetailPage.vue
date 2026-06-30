@@ -168,6 +168,25 @@
         </button>
       </div>
 
+      <!-- Échéances liées à cet exercice -->
+      <div v-if="deadlineStore.testDeadlines.length" class="mt-12 border-t border-gray-200 pt-8">
+        <h2 class="text-xl font-bold text-heading mb-4">Échéances liées à cet exercice</h2>
+        <div class="space-y-2">
+          <div v-for="dl in deadlineStore.testDeadlines" :key="dl.id"
+            class="rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold text-gray-800">{{ dl.name }}</p>
+              <p class="text-xs text-gray-500">
+                {{ dl.occurrence?.calendarEvent?.name }} ·
+                {{ formatDeadlineDate(dl.dueDate) }}
+                <span v-if="dl.dueTime"> à {{ dl.dueTime.slice(0,5) }}</span>
+              </p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">{{ deadlineTypeLabel(dl.type) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Historique des résultats -->
       <div v-if="resultHistory.length" class="mt-12 border-t border-gray-200 pt-8">
         <h2 class="text-xl font-bold text-heading mb-4">Historique de vos résultats</h2>
@@ -210,11 +229,13 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTestStore } from '@/stores/tests'
 import { useTestResultStore } from '@/stores/testResults'
+import { useDeadlineStore } from '@/stores/deadlines'
 import { notif } from '@/helpers/notif'
 
 const route = useRoute()
 const testStore = useTestStore()
 const testResultStore = useTestResultStore()
+const deadlineStore = useDeadlineStore()
 
 const loading = ref(true)
 const resultsShown = ref(false)
@@ -235,7 +256,8 @@ onMounted(async () => {
   const id = Number(route.params.id)
   const [ok] = await Promise.all([
     testStore.fetchTestById(id),
-    testResultStore.fetchByTest(id)
+    testResultStore.fetchByTest(id),
+    deadlineStore.fetchByTest(id),
   ])
   if (!ok) {
     notif.notify('Exercice introuvable.', 'error')
@@ -388,5 +410,15 @@ function formatDate(isoDate) {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
+}
+
+function formatDeadlineDate(dueDate) {
+  if (!dueDate) return '—'
+  return new Date(dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function deadlineTypeLabel(type) {
+  const map = { ds: 'DS', devoir: 'Devoir', exposé: 'Exposé', autre: 'Autre' }
+  return map[type] ?? type
 }
 </script>

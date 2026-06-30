@@ -343,7 +343,7 @@ async function submitEvent() {
     eventForm.success = 'Créneau créé avec succès.'
     eventForm.name = ''
     eventForm.date = ''
-    await calendarStore.fetchByGroup(selectedId.value)
+    await calendarStore.fetchByGroup(selectedId.value, true)
   }
 }
 
@@ -367,7 +367,7 @@ async function changeRole(userId, role) {
 
 async function deleteGroupEvent(eventId) {
   await calendarStore.deleteEvent(eventId)
-  await calendarStore.fetchByGroup(selectedId.value)
+  await calendarStore.fetchByGroup(selectedId.value, true)
 }
 
 function formatDate(value) {

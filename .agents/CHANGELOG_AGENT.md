@@ -44,7 +44,7 @@
 | Documentation règles métier Calendrier | Stable — M-03.01 : modèle données, acteurs, règles synchro, todo list, récurrence | 2026-06-10 |
 | ClassGroup / ClassGroupUsers | Stable — M-05.01 : droits élargis à Admin établissement (roleId=4) | 2026-06-14 |
 | CalendarEvent / EventOccurrence | Stable — CRUD complet + récurrence auto/manual, protection RESTRICT | 2026-06-10 |
-| Deadline | Stable — CRUD complet, droits enseignant par groupe | 2026-06-10 |
+| Deadline | Stable — M-06.07 front : select exercice dans formulaire enseignant + lien exercice côté étudiant + section échéances dans ExerciseDetailPage | 2026-06-30 |
 | RevisionSession | Stable — CRUD + liens optionnels idSystem/idTest + bouton Planifier depuis FlashcardsPage | 2026-06-13 |
 | Reminder (rappels BullMQ) | Stable — CRUD complet, queue Redis, worker email | 2026-06-12 |
 | ESLint / Prettier (front + back) | Stable — lint vert après revue M-03 (formatDate supprimée, globalThis→window, Reminder.controller normalisé) | 2026-06-14 |
@@ -4271,6 +4271,76 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 - Pas de tests composant pour les 3 vues Classroom (trop couplées aux stores async) — stratégie documentée
 - Pas de tests BDD E2E flux complet (hors V1)
 - ✅ Aucun bug bloquant connu
+
+---
+
+### [M-06.07] — API gestion échéances exercices — 2026-06-30
+
+**Feature list ID :** M-06 | **ID source planning :** M-06.07 | **Version :** MVP Sprint 4 Back-end
+
+**Objectif :** Exposer une API permettant de lier une Deadline à un exercice (Test) et de lister les échéances d'un exercice donné.
+
+**Fichiers créés/modifiés :**
+- `models/Deadline.model.js` — FK `testId` optionnelle vers `Test` (`SET NULL` on delete) ; index `testId`
+- `services/Deadline.service.js` — méthode `findByTest(testId, userId)` : liste les Deadlines d'un test filtrées par les groupes de l'utilisateur
+- `controllers/Deadline.controller.js` — handler `findByTest` (200 / 500)
+- `routes/Test.routes.js` — `GET /tests/:id/deadlines` (authMiddleware, Swagger JSDoc)
+- `validators/Deadline.validators.js` — champ `testId` optionnel accepté en création
+- `test/controllers/Test.controller.test.js` — 4 tests `GET /tests/:id/deadlines` (200 nominal, 200 vide, 401, 500)
+- `test/services/Deadline.service.test.js` — 3 tests `findByTest` ajoutés (nominal, utilisateur sans groupe, aucune échéance) ; mock `Test: {}` ajouté
+
+**Ce qui est utilisable :**
+- `POST /deadlines` accepte un `testId` pour lier une échéance à un exercice
+- `GET /tests/:id/deadlines` retourne les échéances liées à un exercice, filtrées aux groupes de l'utilisateur connecté
+- Seul un enseignant du groupe peut créer une échéance (validation `_isTeacherForOccurrence`)
+- Suppression de l'exercice → `testId` mis à NULL sur les Deadlines (pas de suppression en cascade)
+
+**Comment tester fonctionnellement :**
+
+1. **Prérequis** : un groupe, un enseignant membre, un étudiant membre, un exercice créé par l'enseignant.
+2. **Créer une échéance liée à l'exercice** (en tant qu'enseignant) :
+   ```
+   POST /api/v1/deadlines
+   { "name": "Rendre le DM", "type": "devoir", "occurrenceId": <id>, "dueDate": "2026-09-15", "testId": <testId> }
+   ```
+   → 201, `data.testId` == testId
+3. **Lister les échéances de l'exercice** (en tant qu'étudiant du même groupe) :
+   ```
+   GET /api/v1/tests/<testId>/deadlines
+   ```
+   → 200, tableau contenant l'échéance créée
+4. **Vérifier la restriction de groupe** : appeler le même endpoint avec un utilisateur n'appartenant à aucun groupe → 200 `data: []`
+5. **Vérifier la protection enseignant** : créer une échéance en tant qu'étudiant → 403
+6. **Supprimer l'exercice** → vérifier que la Deadline existe toujours mais avec `testId: null`
+
+**Hypothèses posées :**
+- Un seul exercice par Deadline en MVP (FK simple, pas M2M) — une Deadline peut être "générique" si `testId` est null
+
+**DoD :**
+- ✅ Fonctionnel conforme aux critères d'acceptation
+- ✅ Tests OK (4 controller + 3 service)
+- ✅ Revue : inclus dans M-06-REVIEW (périmètre Deadline)
+- ✅ Changelog à jour (cette entrée)
+- ✅ Aucun bug bloquant connu
+
+---
+
+### [M-06.07-FRONT] — Interface front liaison exercice-échéance — 2026-06-30
+
+**Contexte :** Le back M-06.07 était livré (API `GET /tests/:id/deadlines`, `testId` FK sur Deadline) mais aucune interface front ne l'exposait.
+
+**Fichiers modifiés :**
+- `src/stores/deadlines.js` — ajout state `testDeadlines: []` + action `fetchByTest(testId)` → `GET /tests/:id/deadlines`
+- `src/pages/ClassroomEnseignantView.vue` — import `useTestStore` ; `fetchTests()` au montage ; `deadlineForm.testId` ; select "Exercice associé (optionnel)" dans le formulaire ; `testId` passé à `createDeadline`
+- `src/pages/ClassroomEtudiantView.vue` — `<router-link>` vers `exercise-detail` si `dl.test` présent sur la carte échéance
+- `src/pages/ExerciseDetailPage.vue` — import `useDeadlineStore` ; `fetchByTest(id)` dans `onMounted` ; section "Échéances liées à cet exercice" + helpers `formatDeadlineDate` / `deadlineTypeLabel`
+
+**Ce qui est utilisable :**
+- Enseignant : formulaire d'échéance avec select optionnel pour lier un exercice
+- Étudiant : chaque carte échéance affiche un lien cliquable vers l'exercice si `testId` est renseigné
+- Page exercice : section "Échéances liées" visible si au moins une échéance de groupe pointe vers cet exercice
+
+**Vérification :** `vite build` ✅ — 0 erreur, 0 warning
 
 ---
 
