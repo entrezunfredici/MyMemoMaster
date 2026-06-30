@@ -641,6 +641,14 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-30] Migration vers Helm pour le déploiement Kubernetes
+**Contexte** : Les manifests `k8s/preprod/` et `k8s/prod/` étaient quasi-identiques (14 fichiers en doublon). Toute modification de resources/probes/config devait être faite deux fois.
+**Décision** : Un seul chart Helm `helm/` avec `values-preprod.yaml` et `values-prod.yaml`. Le CD utilise `helm upgrade --install --atomic` au lieu de `kubectl apply` + `rollout restart`. Le flag `--set rolloutTimestamp=$(date +%s)` force un rolling update à chaque push même avec des images `:latest`. Le script `k8s/helm-migrate.sh` annote les ressources existantes pour adoption Helm sans downtime.
+**Alternative écartée** : Kustomize — pas de logique conditionnelle (Redis Deployment vs StatefulSet selon l'env), moins expressif que Helm pour les valeurs par environnement.
+**Conséquences** : Les anciens dossiers `k8s/preprod/` et `k8s/prod/` sont conservés en référence mais ne sont plus appliqués par le CD. Avant le premier déploiement Helm, exécuter `bash k8s/helm-migrate.sh <env>` pour annoter les ressources existantes.
+
+---
+
 ### [2026-06-28] TestClassGroup — table de jonction M2M pour l'affectation exercices ↔ groupes
 
 **Contexte** : Un enseignant doit pouvoir affecter une série d'exercices à un ou plusieurs groupes classes (S-03.05). Le test (exercice) appartient à son créateur ; les groupes sont indépendants. Un exercice peut être partagé avec 0, 1 ou N groupes.

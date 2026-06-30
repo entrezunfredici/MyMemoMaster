@@ -221,9 +221,11 @@ jobs:
           EOF
 
   # ═══════════════════════════════════════════════════════════════════════════
-  #  2b. DEPLOY PREPROD → Kubernetes (Infomaniak)
-  #      Namespace : mymemomaster-preprod
-  #      Seuls api et front sont redémarrés (postgres/redis restent en place)
+  #  2b. DEPLOY PREPROD → Kubernetes via Helm
+  #      Release : mmm-preprod  /  Namespace : mymemomaster-preprod
+  #
+  #  Première fois : exécuter k8s/helm-migrate.sh preprod pour adopter les
+  #  ressources kubectl existantes avant de laisser Helm les gérer.
   # ═══════════════════════════════════════════════════════════════════════════
 
   deploy_preprod:
@@ -243,27 +245,31 @@ jobs:
           echo "${{ secrets.KUBECONFIG_PREPROD }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
       - name: Verify cluster connection
         run: kubectl cluster-info
 
-      - name: Apply K8s manifests
-        run: kubectl apply -f k8s/preprod/
-
-      - name: Rollout restart (api + front uniquement)
+      - name: Deploy with Helm
         run: |
-          kubectl rollout restart deployment/mmm-preprod-api   -n mymemomaster-preprod
-          kubectl rollout restart deployment/mmm-preprod-front -n mymemomaster-preprod
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/mmm-preprod-api   -n mymemomaster-preprod --timeout=180s
-          kubectl rollout status deployment/mmm-preprod-front -n mymemomaster-preprod --timeout=180s
+          helm upgrade --install mmm-preprod ./helm \
+            -f helm/values-preprod.yaml \
+            -n mymemomaster-preprod \
+            --create-namespace \
+            --set "rolloutTimestamp=$(date +%s)" \
+            --rollback-on-failure \
+            --timeout 5m
 
   # ═══════════════════════════════════════════════════════════════════════════
-  #  2c. DEPLOY PROD → Kubernetes
-  #      Désactivé jusqu'à ce que le cluster prod soit prêt.
-  #      Pour activer : ajouter la variable GitHub Actions K8S_PROD_ENABLED=true
-  #      dans Settings → Variables → Actions de ce dépôt.
+  #  2c. DEPLOY PROD → Kubernetes via Helm
+  #      Release : mmm-prod  /  Namespace : mymemomaster
+  #      Désactivé jusqu'à K8S_PROD_ENABLED=true dans Settings → Variables.
+  #
+  #  Première fois : exécuter k8s/helm-migrate.sh prod pour adopter les
+  #  ressources kubectl existantes avant de laisser Helm les gérer.
   # ═══════════════════════════════════════════════════════════════════════════
 
   deploy_prod:
@@ -283,21 +289,23 @@ jobs:
           echo "${{ secrets.KUBECONFIG_PROD }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
       - name: Verify cluster connection
         run: kubectl cluster-info
 
-      - name: Apply K8s manifests
-        run: kubectl apply -f k8s/prod/
-
-      - name: Rollout restart (api + front uniquement)
+      - name: Deploy with Helm
         run: |
-          kubectl rollout restart deployment/mmm-prod-api   -n mymemomaster
-          kubectl rollout restart deployment/mmm-prod-front -n mymemomaster
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/mmm-prod-api   -n mymemomaster --timeout=300s
-          kubectl rollout status deployment/mmm-prod-front -n mymemomaster --timeout=300s
+          helm upgrade --install mmm-prod ./helm \
+            -f helm/values-prod.yaml \
+            -n mymemomaster \
+            --create-namespace \
+            --set "rolloutTimestamp=$(date +%s)" \
+            --rollback-on-failure \
+            --timeout 8m
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  3. NOTIFICATIONS DISCORD

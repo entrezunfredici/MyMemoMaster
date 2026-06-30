@@ -4315,3 +4315,44 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 
 **Dette / points d'attention :**
 - Le warning "A worker process has failed to exit gracefully" est préexistant (Redis mock non fermé) — non bloquant
+
+
+### [2026-06-30] Intégration Helm — chart unique preprod/prod
+
+**Contexte :** Les dossiers `k8s/preprod/` et `k8s/prod/` contenaient 14 fichiers YAML quasi-identiques. Chaque modification (resources, probes, config) devait être répercutée deux fois. Le CD utilisait `kubectl apply` + `rollout restart` séparés, sans rollback automatique en cas d'échec.
+
+**Fichiers créés :**
+- `helm/Chart.yaml` — métadonnées du chart
+- `helm/values.yaml` — valeurs partagées (base commune)
+- `helm/values-preprod.yaml` — surcharges preprod (images _preprod_, 1 replica, pgadmin activé, Redis Deployment)
+- `helm/values-prod.yaml` — surcharges prod (images prod, 2 replicas, pgadmin désactivé, Redis StatefulSet)
+- `helm/templates/_helpers.tpl` — helpers : secretName, configName, labels, imageApi, imageFront
+- `helm/templates/configmap.yaml` — ConfigMap généré depuis `values.config`
+- `helm/templates/statefulset-postgres.yaml` — PostgreSQL StatefulSet + PVC
+- `helm/templates/redis.yaml` — Redis Deployment (ephemeral) ou StatefulSet (persistent) selon `redis.persistent`
+- `helm/templates/deployment-api.yaml` — API Node.js, `rolloutTimestamp` en annotation pour forcer le rolling update
+- `helm/templates/deployment-front.yaml` — Frontend Vue/nginx
+- `helm/templates/deployment-pgadmin.yaml` — PgAdmin (conditionnel `pgadmin.enabled`)
+- `helm/templates/services.yaml` — Services ClusterIP pour tous les composants
+- `helm/templates/ingress.yaml` — Ingress nginx + TLS cert-manager (pgadmin conditionnel)
+- `k8s/helm-migrate.sh` — script one-shot d'annotation des ressources existantes pour adoption Helm
+
+**Fichiers modifiés :**
+- `.github/workflows/cd.yml` — `deploy_preprod` et `deploy_prod` remplacent `kubectl apply + rollout restart` par `helm upgrade --install --atomic`
+- `.agents/DECISIONS.md` — entrée Helm ajoutée
+
+**Ce qui est utilisable :**
+- `helm upgrade --install mmm-preprod ./helm -f helm/values-preprod.yaml -n mymemomaster-preprod --create-namespace --set rolloutTimestamp=$(date +%s) --atomic --timeout 3m`
+- `helm upgrade --install mmm-prod ./helm -f helm/values-prod.yaml -n mymemomaster --create-namespace --set rolloutTimestamp=$(date +%s) --atomic --timeout 5m`
+- Les noms de ressources générés matchent exactement l'existant : `mmm-preprod-postgres`, `mmm-preprod-api`, etc.
+
+**Hypothèses posées :**
+- Les secrets K8s (`mmm-{env}-secrets`) restent créés manuellement sur le cluster — le chart ne les gère pas (données sensibles)
+- `azure/setup-helm@v4` avec version `v3.16.0` est disponible sur les runners `ubuntu-latest`
+
+**Dette / points d'attention :**
+- Avant le premier déploiement Helm en preprod : `bash k8s/helm-migrate.sh preprod` (annote les ressources existantes)
+- Les anciens dossiers `k8s/preprod/` et `k8s/prod/` sont conservés en archive mais plus utilisés par le CD
+- `--atomic` rollback automatiquement si un pod ne passe pas readiness dans le timeout — surveiller les premières exécutions
+
+---

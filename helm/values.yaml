@@ -1,0 +1,130 @@
+# =============================================================================
+#  values.yaml — Valeurs partagées (base commune preprod + prod)
+#  Les surcharges par environnement sont dans values-preprod.yaml / values-prod.yaml
+# =============================================================================
+
+# ── Docker Hub ────────────────────────────────────────────────────────────────
+dockerhubUsername: fredissimo
+
+image:
+  api:
+    name: ""        # défini dans values-{env}.yaml
+    tag: latest
+  front:
+    name: ""        # défini dans values-{env}.yaml
+    tag: latest
+
+# ── Déploiement ───────────────────────────────────────────────────────────────
+replicas:
+  api: 1
+  front: 1
+
+# Injecté par le CD via --set rolloutTimestamp=$(date +%s)
+# Force un rolling update même si l'image :latest n'a pas changé
+rolloutTimestamp: ""
+
+# Nom du Secret K8s créé manuellement sur le cluster (ne pas inclure dans le chart)
+# Défaut calculé dans _helpers.tpl : {{ .Release.Name }}-secrets
+# Ex: mmm-preprod-secrets / mmm-prod-secrets
+secretName: ""
+
+# ── Configuration applicative (ConfigMap) ─────────────────────────────────────
+config:
+  NODE_ENV: production
+  ENVIRONMENT: ""           # "preprod" | "prod"
+  API_PORT: "3000"
+  API_BYPASS_AUTH: "false"
+  AUTH_JWT_EXPIRES_IN: 1d
+  PG_DB: mymemomasterdb
+  PG_PORT: "5432"
+  DB_SYNC_MAX_RETRIES: "5"
+  DB_SYNC_RETRY_DELAY: "5000"
+  PG_POOL_MAX: "10"
+  PG_POOL_MIN: "2"
+  PG_POOL_ACQUIRE: "30000"
+  PG_POOL_IDLE: "10000"
+  REDIS_PORT: "6379"
+  SMTP_HOST: smtp.hostinger.com
+  SMTP_PORT: "587"
+  SMTP_SECURE: "false"
+  EMAIL_FROM: noreply@my-memo-master.com
+  API_PUBLIC_URL: ""        # défini dans values-{env}.yaml
+  CORS_ORIGIN: ""           # défini dans values-{env}.yaml
+  VITE_API_URL: ""          # défini dans values-{env}.yaml
+  VITE_FRONT_URL: ""        # défini dans values-{env}.yaml
+  PGADMIN_DEFAULT_EMAIL: admin@my-memo-master.com
+
+  # ── Stockage S3 (Infomaniak Swiss Backup) ────────────────────────────────
+  S3_ENDPOINT: ""
+  S3_REGION: us-east-1
+  S3_BUCKET: ""
+  S3_PUBLIC_URL: ""
+  S3_FORCE_PATH_STYLE: "true"
+
+  # ── Auth refresh token ────────────────────────────────────────────────────
+  AUTH_REFRESH_TOKEN_EXPIRES_DAYS: "7"
+
+# ── Domaines & Ingress ────────────────────────────────────────────────────────
+domain:
+  api: ""         # défini dans values-{env}.yaml
+  front: ""       # défini dans values-{env}.yaml
+  pgadmin: ""     # défini dans values-{env}.yaml (si pgadmin.enabled)
+
+certManager:
+  clusterIssuer: letsencrypt-prod-cloudflare
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+postgres:
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+redis:
+  # false = Deployment sans PVC (preprod, données éphémères)
+  # true  = StatefulSet avec PVC (prod, données persistées)
+  persistent: false
+  storage: 2Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ── API ───────────────────────────────────────────────────────────────────────
+api:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+front:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# ── PgAdmin (admin DB optionnel) ─────────────────────────────────────────────
+pgadmin:
+  enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

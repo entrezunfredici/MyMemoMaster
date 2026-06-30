@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-api
+spec:
+  replicas: {{ .Values.replicas.api }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-api
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-api
+      {{- if .Values.rolloutTimestamp }}
+      annotations:
+        rollout-timestamp: {{ .Values.rolloutTimestamp | quote }}
+      {{- end }}
+    spec:
+      containers:
+        - name: api
+          image: {{ include "mmm.imageApi" . }}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: {{ include "mmm.configName" . }}
+            - secretRef:
+                name: {{ include "mmm.secretName" . }}
+          env:
+            - name: PG_HOST
+              value: {{ .Release.Name }}-postgres
+            - name: REDIS_HOST
+              value: {{ .Release.Name }}-redis
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}

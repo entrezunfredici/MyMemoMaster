@@ -1,0 +1,80 @@
+# =============================================================================
+#  values-preprod.yaml — Surcharges environnement preprod
+#  Usage : helm upgrade --install mmm-preprod ./helm -f helm/values-preprod.yaml \
+#            -n mymemomaster-preprod --create-namespace
+# =============================================================================
+
+image:
+  api:
+    name: mymemomaster_preprod_api
+  front:
+    name: mymemomaster_preprod_front
+
+replicas:
+  api: 1
+  front: 1
+
+config:
+  ENVIRONMENT: preprod
+  API_PUBLIC_URL: https://preprod-api.my-memo-master.com
+  CORS_ORIGIN: https://preprod.my-memo-master.com
+  VITE_API_URL: https://preprod-api.my-memo-master.com/api/v1
+  VITE_FRONT_URL: https://preprod.my-memo-master.com
+  S3_ENDPOINT: https://s3.swiss-backup04.infomaniak.com
+  S3_BUCKET: default
+  S3_PUBLIC_URL: https://s3.swiss-backup04.infomaniak.com
+
+domain:
+  api: preprod-api.my-memo-master.com
+  front: preprod.my-memo-master.com
+  pgadmin: preprod-pgadmin.my-memo-master.com
+
+postgres:
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# Deployment sans PVC — pertes de cache acceptables en preprod
+redis:
+  persistent: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+api:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+front:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# PgAdmin activé en preprod pour faciliter l'administration
+pgadmin:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

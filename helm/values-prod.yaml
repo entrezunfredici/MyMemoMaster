@@ -1,0 +1,70 @@
+# =============================================================================
+#  values-prod.yaml — Surcharges environnement production
+#  Usage : helm upgrade --install mmm-prod ./helm -f helm/values-prod.yaml \
+#            -n mymemomaster --create-namespace
+# =============================================================================
+
+image:
+  api:
+    name: mymemomaster_api
+  front:
+    name: mymemomaster_front
+
+replicas:
+  api: 2
+  front: 2
+
+config:
+  ENVIRONMENT: prod
+  API_PUBLIC_URL: https://api.my-memo-master.com
+  CORS_ORIGIN: https://my-memo-master.com
+  VITE_API_URL: https://api.my-memo-master.com/api/v1
+  VITE_FRONT_URL: https://my-memo-master.com
+
+domain:
+  api: api.my-memo-master.com
+  front: my-memo-master.com
+
+postgres:
+  storage: 20Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# StatefulSet avec PVC — données de cache BullMQ persistées en prod
+redis:
+  persistent: true
+  storage: 2Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+api:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+front:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# PgAdmin désactivé en prod
+pgadmin:
+  enabled: false

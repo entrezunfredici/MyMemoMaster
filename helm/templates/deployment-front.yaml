@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-front
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-front
+spec:
+  replicas: {{ .Values.replicas.front }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-front
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-front
+      {{- if .Values.rolloutTimestamp }}
+      annotations:
+        rollout-timestamp: {{ .Values.rolloutTimestamp | quote }}
+      {{- end }}
+    spec:
+      containers:
+        - name: front
+          image: {{ include "mmm.imageFront" . }}
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              cat > /usr/share/nginx/html/config.js << EOF
+              window.__APP_CONFIG__ = {
+                API_URL: "${VITE_API_URL}",
+                FRONT_URL: "${VITE_FRONT_URL}"
+              };
+              EOF
+              if ! grep -q '/config.js' /usr/share/nginx/html/index.html; then
+                sed -i '/type="module"/i \  <script src="/config.js"></script>' /usr/share/nginx/html/index.html
+              fi
+              exec nginx -g 'daemon off;'
+          envFrom:
+            - configMapRef:
+                name: {{ include "mmm.configName" . }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.front.resources | nindent 12 }}
