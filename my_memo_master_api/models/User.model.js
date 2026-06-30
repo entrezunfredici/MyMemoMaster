@@ -55,6 +55,11 @@ module.exports = (instance) => {
         allowNull: false,
         defaultValue: false
       },
+      isActive: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+      },
       lastLogin: {
         type: DataTypes.DATE,
         allowNull: true
@@ -132,6 +137,16 @@ module.exports = (instance) => {
     User.hasMany(models.Reminder, {
       foreignKey: 'userId',
       as: 'reminders'
+    })
+
+    User.hasOne(models.Etablissement, {
+      foreignKey: 'adminId',
+      as: 'etablissement'
+    })
+
+    User.hasMany(models.AuditLog, {
+      foreignKey: 'actorId',
+      as: 'auditLogs'
     })
   }
 

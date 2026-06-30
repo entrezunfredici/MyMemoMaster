@@ -4504,3 +4504,174 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 - ✅ Aucun test à modifier (tâche documentaire pure)
 - ✅ CHANGELOG et DECISIONS mis à jour
 - ✅ Aucun bug bloquant
+
+---
+
+### [2026-06-30] S-04.01 — Définition périmètre admin (Analyse)
+
+**Feature list ID :** S-04 | **ID source planning :** S-04.01 | **Version :** V1
+**User stories :** US-16, US-22
+
+**Contexte :** Tâche d'analyse — définir formellement le périmètre de l'admin établissement (roleId=4) pour la fonctionnalité Gestion des établissements et invitations. Certaines briques existaient déjà (rôles RBAC en M-05.01, invitation en S-01.07, ClassroomEtablissementView) mais aucun document ne consolidait le modèle de données, la matrice de contrôle d'accès et les endpoints à livrer.
+
+**Fichiers créés :**
+- `diagrams/etablissement_admin_perimeter.md` — document de référence complet : contexte, périmètre IN/OUT, acteurs, modèle ERD (Etablissement + isActive sur User + AuditLog), matrice de contrôle d'accès, endpoints API à livrer, flux nominaux, stratégie de tests, liens vers l'implémentation, points d'attention
+
+**Fichiers modifiés :**
+- `.agents/DECISIONS.md` — 2 nouvelles entrées : absence de FK établissementId en V1 (scope via Invitation.invitedBy) + AuditLog conçu mais implémentation différée en V2
+
+**Ce qui est couvert par ce document :**
+- Entité `Etablissement` : model (name, code, adminId), unicité du code, lien implicite aux groupes via adminId
+- Champ `isActive` à ajouter sur `User` : activation/désactivation par admin, garde login
+- Entité `AuditLog` : schema, événements à auditer, politique de rétention (V2)
+- Matrice complète admin plateforme (1) vs admin établissement (4) vs enseignant / étudiant
+- 12 endpoints API à implémenter (CRUD Etablissement + activate/deactivate user + audit)
+- Stratégie de tests pour chaque couche (service + controller + Auth.middleware)
+
+**Ce qui N'est PAS couvert (hors V1) :**
+- Facturation établissement
+- Provisioning SCIM / interopérabilité ENT
+- Multi-établissements par admin
+- `etablissementId` FK sur User et ClassGroup (prévu V2)
+- Implémentation AuditLog (conçu, non codé)
+- Front "gestion des utilisateurs" dans ClassroomEtablissementView (liste invités, activation)
+
+**DoD S-04.01 :**
+- ✅ Document livré conforme au périmètre IN/OUT (Établissements, Admins, Activation comptes, Audit trail, Pilotage établissement, Définition périmètre admin)
+- ✅ Stratégie de tests documentée (section 8 du document)
+- ✅ Décisions techniques enregistrées dans DECISIONS.md
+- ✅ CHANGELOG mis à jour
+- ✅ Aucun bug bloquant sur le périmètre livré (tâche d'analyse)
+
+---
+
+### [2026-06-30] S-04.04 — API CRUD établissements et admins (Back-end)
+
+**Feature list ID :** S-04 | **ID source planning :** S-04.04 | **Version :** V1
+**User stories :** US-16, US-22
+
+**Contexte :** Implémentation de la couche service → controller → routes pour les établissements, l'activation/désactivation de comptes utilisateurs, et la garde `isActive` dans le middleware RBAC.
+
+**Fichiers créés :**
+- `services/Etablissement.service.js` — CRUD complet : `findAll`, `findOne(id)`, `findByAdmin(adminId)`, `create`, `update`, `delete` ; utilise les includes Sequelize pour charger l'admin associé
+- `validators/Etablissement.validators.js` — 3 ensembles : `create` (name, code, adminId?), `update` (tous optionnels), `byId` (param id entier)
+- `controllers/Etablissement.controller.js` — 5 handlers : `findAll`, `findOne` (scope roleId=4 via `findByAdmin`), `create` (409 si code dupliqué), `update` (409 si code dupliqué), `destroy`
+- `routes/Etablissement.routes.js` — 5 routes + Swagger JSDoc : `GET /etablissements` (roleId=1), `GET /etablissements/:id` (roleId=1,4), `POST /etablissements` (roleId=1), `PUT /etablissements/:id` (roleId=1), `DELETE /etablissements/:id` (roleId=1)
+- `test/services/Etablissement.service.test.js` — 12 tests (findAll, findOne, findByAdmin, create, update, delete)
+- `test/controllers/Etablissement.controller.test.js` — 15 tests (tous les handlers + cas limites roleId=4, 409 duplicate)
+
+**Fichiers modifiés :**
+- `middlewares/requireRole.middleware.js` — ajout de la garde `isActive === false` → 401 "Compte désactivé." ; la query Sequelize inclut maintenant `isActive` en plus de `roleId`
+- `services/User.service.js` — nouvelle méthode `setActive(targetUserId, active, requesterRoleId)` : retourne `null` si cible introuvable, `false` si roleId=4 tente d'agir sur roleId=1, l'utilisateur mis à jour sinon
+- `controllers/User.controller.js` — 2 nouveaux handlers `activate` et `deactivate` (PATCH) + garde `isActive === false` au login (→ 403)
+- `routes/User.routes.js` — 2 nouvelles routes `PATCH /users/:id/activate` et `PATCH /users/:id/deactivate` (requireRole 1, 4)
+- `app.js` — import + enregistrement `etablissementRoutes(v1)` ; ajout de `'PATCH'` dans les méthodes CORS autorisées
+- `test/middlewares/requireRole.middleware.test.js` — ajout du test `isActive=false → 401` + mise à jour de l'assertion `attributes` vers `['roleId', 'isActive']`
+- `test/services/User.service.test.js` — 4 nouveaux tests pour `setActive` (nominal, null, false, admin→admin)
+
+**Ce qui est utilisable :**
+- `GET/POST/PUT/DELETE /api/v1/etablissements` — CRUD complet (admin plateforme)
+- `GET /api/v1/etablissements/:id` — accessible aux admin établissement (scope leur propre établissement)
+- `PATCH /api/v1/users/:id/activate` et `/deactivate` — pour admins plateforme et établissement
+- Login bloqué pour les comptes avec `isActive=false`
+- Toute route `requireRole` bloque les comptes désactivés (401)
+
+**Tests :** 1329/1329 passants (+32 nouveaux) · zéro régression
+
+**Hypothèses posées :**
+- Les routes `authMiddleware` seules (sans `requireRole`) ne vérifient pas `isActive` : c'est acceptable car le JWT expire en 15 min et le login est bloqué → impact V1 minimal
+- Admin établissement (roleId=4) ne peut pas activer/désactiver un admin plateforme (roleId=1) — garde dans `setActive`
+- Le scope roleId=4 sur `GET /etablissements/:id` passe par `findByAdmin(requesterId)` : s'il n'a pas d'établissement, 404 ; si l'id ne correspond pas au sien, 403
+
+**DoD S-04.04 :**
+- ✅ Fonctionnel : 5 endpoints CRUD Etablissement + 2 endpoints activate/deactivate opérationnels
+- ✅ Tests : 1329/1329 (32 nouveaux tests)
+- ✅ isActive bloqué au login et dans requireRole
+- ✅ CORS étendu à PATCH
+- ✅ Documentation mise à jour (CHANGELOG_AGENT.md, DECISIONS.md)
+- ✅ Aucun bug bloquant connu
+
+---
+
+### [2026-06-30] S-04.03 — Modèle données (établissements, logs) (Conception)
+
+**Feature list ID :** S-04 | **ID source planning :** S-04.03 | **Version :** V1
+**User stories :** US-16, US-22
+
+**Contexte :** Implémentation du modèle de données défini dans l'analyse S-04.01. Trois axes : entité Etablissement, entité AuditLog, et ajout du champ `isActive` sur User.
+
+**Fichiers créés :**
+- `models/Etablissement.model.js` — modèle Sequelize : id, name, code (UNIQUE), adminId (FK→User SET NULL), createdAt, updatedAt ; association `belongsTo(User, as: 'admin')`
+- `models/AuditLog.model.js` — modèle Sequelize : id, actorId (FK→User SET NULL nullable), action STRING(50), entityType STRING(30), entityId (nullable), metadata JSON (nullable), createdAt (pas de updatedAt — log immuable) ; association `belongsTo(User, as: 'actor')` ; index sur actorId, (entityType, entityId), createdAt
+- `migrations/20260630000001-create-etablissement-table.js` — table Etablissement + index adminId
+- `migrations/20260630000002-create-auditlog-table.js` — table AuditLog + 3 index
+- `migrations/20260630000003-add-isactive-to-user.js` — colonne isActive BOOLEAN NOT NULL DEFAULT TRUE sur User
+- `test/models/Etablissement.model.test.js` — 9 tests schéma (nom table, id PK, name NOT NULL, code unique, adminId SET NULL, createdAt/updatedAt, index adminId, associate exposée)
+- `test/models/AuditLog.model.test.js` — 9 tests schéma (nom table, id PK, actorId SET NULL, action NOT NULL, entityType NOT NULL, entityId nullable, metadata JSON nullable, createdAt sans updatedAt, index ×3, associate exposée)
+
+**Fichiers modifiés :**
+- `models/User.model.js` — ajout champ `isActive: BOOLEAN NOT NULL DEFAULT TRUE` ; ajout associations `hasOne(Etablissement, as: 'etablissement')` + `hasMany(AuditLog, as: 'auditLogs')`
+- `models/index.js` — enregistrement `Etablissement` et `AuditLog`
+
+**Ce qui est utilisable :**
+- `Sequelize.sync({ alter: { drop: false } })` crée les tables Etablissement et AuditLog automatiquement en dev (SQLite)
+- En prod : appliquer les 3 migrations dans l'ordre (20260630000001 → 002 → 003)
+- `isActive` disponible sur tous les User (valeur par défaut `true` → aucun compte existant n'est bloqué)
+- Associations bidirectionnelles User ↔ Etablissement et User ↔ AuditLog utilisables dans les includes Sequelize
+
+**Tests :** 18 tests modèles passent · 1297/1297 tests totaux · zéro régression
+
+**Hypothèses posées :**
+- La contrainte `UNIQUE` sur `Etablissement.code` est gérée par la migration ; en dev SQLite le sync alter peut créer un index dupliqué si la table existait avant — nettoyer avec `dropTable` en dev si nécessaire
+- `AuditLog` est immuable : pas de `UPDATE` ni `DELETE` prévus sur cette table
+- `isActive = false` bloque la connexion — la garde dans `Auth.middleware.js` sera ajoutée en S-04.04 (service + routes)
+
+**DoD S-04.03 :**
+- ✅ Fonctionnel : 3 entités conformes au schéma S-04.01, sync Sequelize opérationnel
+- ✅ Tests : 18 tests schéma (9 × Etablissement + 9 × AuditLog) + 1297/1297 tests totaux passants
+- ✅ Migrations : 3 fichiers prêts à appliquer en prod
+- ✅ Documentation mise à jour (CHANGELOG_AGENT.md, DECISIONS.md)
+- ✅ Aucun bug bloquant connu
+
+---
+
+### [2026-06-30] S-04.02 — Maquettes UI espace admin (Analyse)
+
+**Feature list ID :** S-04 | **ID source planning :** S-04.02 | **Version :** V1
+**User stories :** US-16, US-22
+
+**Contexte :** Tâche d'analyse — produire les maquettes ASCII de l'UI admin pour guider l'implémentation front. Basé sur le modèle S-04.01 (`diagrams/etablissement_admin_perimeter.md`). La vue `ClassroomEtablissementView.vue` existait déjà (gestion groupes + emploi du temps + membres), mais sans tableau de bord, ni gestion utilisateurs cross-groupes, ni page admin plateforme.
+
+**Fichiers créés :**
+- `diagrams/etablissement_admin_ui.md` — maquettes ASCII complètes :
+  - `ClassroomEtablissementView.vue` : extension en 3 onglets (Tableau de bord / Groupes / Utilisateurs), maquette tableau de bord avec indicateurs, onglet Utilisateurs avec liste + statuts + activer/désactiver + modal invitation rapide + modal confirmation
+  - `AdminPlatformePage.vue` (nouveau) : page route `/admin` pour roleId=1, onglet Établissements (liste + CRUD modal create/update/delete), onglet Utilisateurs plateforme (liste paginée + toggle actif/désact.), onglet Logs (V2 — conception uniquement)
+  - Comportements et flux d'interaction (activation/désactivation, création établissement, stats tableau de bord)
+  - Définition des 2 stores Pinia à créer (`etablissements.js`, `adminUsers.js`)
+  - Routes Vue Router à ajouter (`/admin` meta.roles [1])
+  - Stratégie de tests
+  - Points d'attention implémentation (isActive dans les réponses API, pagination, modal bg-white, etc.)
+
+**Fichiers modifiés :**
+- `.agents/DECISIONS.md` — entrée : architecture onglets pour ClassroomEtablissementView + séparation AdminPlatformePage
+
+**Ce qui est couvert par ce document :**
+- Extension de `ClassroomEtablissementView.vue` en 3 onglets sans réécriture du contenu existant
+- Page `AdminPlatformePage.vue` isolée (roleId=1 only) avec CRUD établissements
+- Gestion des statuts utilisateurs (✅ Actif / 🚫 Désact. / ⏳ En attente / ⚠️ Non validé)
+- Flux d'activation/désactivation avec confirmation modale
+- Architecture stores (`etablissements.js`, `adminUsers.js`)
+- Onglet Logs : conception uniquement (AuditLog V2)
+
+**Ce qui N'est PAS couvert (prochains tickets d'implémentation) :**
+- Implémentation des pages/composants décrits
+- Stores Pinia (création effective)
+- Tests frontend (stratégie documentée, implémentation différée)
+- AuditLog UI (onglet Logs — V2)
+
+**DoD S-04.02 :**
+- ✅ Maquettes livrées pour les 2 espaces (admin établissement + admin plateforme)
+- ✅ Stratégie de tests documentée (section 9 du document)
+- ✅ Décisions techniques enregistrées dans DECISIONS.md
+- ✅ CHANGELOG mis à jour
+- ✅ Aucun bug bloquant sur le périmètre livré (tâche d'analyse)

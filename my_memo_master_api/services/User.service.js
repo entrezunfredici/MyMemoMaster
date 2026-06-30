@@ -257,6 +257,15 @@ class UserService {
     )
   }
 
+  async setActive(targetUserId, active, requesterRoleId) {
+    const target = await User.findByPk(targetUserId, { attributes: ['userId', 'roleId', 'isActive'] })
+    if (!target) return null
+    // Admin établissement (4) ne peut pas agir sur un admin plateforme (1)
+    if (requesterRoleId === 4 && target.roleId === 1) return false
+    await User.update({ isActive: active }, { where: { userId: targetUserId } })
+    return this.findOne(targetUserId)
+  }
+
   async _processPendingEmailInvitations(userId, email) {
     const pending = await Invitation.findAll({
       where: { targetEmail: email.toLowerCase(), status: 'pending' }

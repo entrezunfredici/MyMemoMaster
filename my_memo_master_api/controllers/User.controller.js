@@ -42,6 +42,10 @@ exports.login = async (req, res) => {
       return res.status(403).send({ message: 'Veuillez vérifier votre adresse email avant de vous connecter.' })
     }
 
+    if (user.isActive === false) {
+      return res.status(403).send({ message: 'Votre compte a été désactivé. Contactez un administrateur.' })
+    }
+
     const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '15m'
     const token = jwt.sign({ id: user.userId }, process.env.AUTH_JWT_SECRET, { expiresIn })
 
@@ -232,6 +236,30 @@ exports.removeRole = async (req, res) => {
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).send({ message: 'Erreur lors de la suppression du rôle.' })
+  }
+}
+
+exports.activate = async (req, res) => {
+  try {
+    const result = await userService.setActive(req.params.id, true, req.user.roleId)
+    if (result === null) return res.status(404).send({ message: 'Utilisateur introuvable.' })
+    if (result === false) return res.status(403).send({ message: 'Accès refusé.' })
+    res.status(200).send({ message: 'Compte activé.', data: result })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: "Erreur lors de l'activation du compte." })
+  }
+}
+
+exports.deactivate = async (req, res) => {
+  try {
+    const result = await userService.setActive(req.params.id, false, req.user.roleId)
+    if (result === null) return res.status(404).send({ message: 'Utilisateur introuvable.' })
+    if (result === false) return res.status(403).send({ message: 'Accès refusé.' })
+    res.status(200).send({ message: 'Compte désactivé.', data: result })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la désactivation du compte.' })
   }
 }
 

@@ -478,4 +478,48 @@ describe('UserService', () => {
       expect(isHash).toBe(true)
     })
   })
+
+  // ── setActive ──────────────────────────────────────────────────────────────
+
+  describe('setActive', () => {
+    it('active un compte et retourne l\'utilisateur mis à jour', async () => {
+      User.findByPk.mockResolvedValueOnce({ userId: 5, roleId: 2, isActive: false })
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 5, isActive: true } })
+
+      const result = await UserService.setActive(5, true, 1)
+
+      expect(User.update).toHaveBeenCalledWith({ isActive: true }, { where: { userId: 5 } })
+      expect(result).toBeDefined()
+    })
+
+    it('retourne null si l\'utilisateur cible est introuvable', async () => {
+      User.findByPk.mockResolvedValueOnce(null)
+
+      const result = await UserService.setActive(999, false, 1)
+
+      expect(result).toBeNull()
+      expect(User.update).not.toHaveBeenCalled()
+    })
+
+    it('retourne false si roleId=4 tente d\'agir sur un admin plateforme (roleId=1)', async () => {
+      User.findByPk.mockResolvedValueOnce({ userId: 1, roleId: 1, isActive: true })
+
+      const result = await UserService.setActive(1, false, 4)
+
+      expect(result).toBe(false)
+      expect(User.update).not.toHaveBeenCalled()
+    })
+
+    it('roleId=1 peut désactiver un admin plateforme', async () => {
+      User.findByPk.mockResolvedValueOnce({ userId: 2, roleId: 1, isActive: true })
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 2, isActive: false } })
+
+      const result = await UserService.setActive(2, false, 1)
+
+      expect(User.update).toHaveBeenCalledWith({ isActive: false }, { where: { userId: 2 } })
+      expect(result).toBeDefined()
+    })
+  })
 })

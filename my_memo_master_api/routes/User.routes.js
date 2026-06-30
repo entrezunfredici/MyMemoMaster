@@ -467,6 +467,54 @@ router.delete('/:id/role', authMiddleware, requireRole(1), user.removeRole)
  *       500:
  *         description: Erreur lors de la suppression.
  */
+/**
+ * @swagger
+ * /users/{id}/activate:
+ *   patch:
+ *     summary: Activer le compte d'un utilisateur
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Compte activé.
+ *       403:
+ *         description: Accès refusé.
+ *       404:
+ *         description: Utilisateur introuvable.
+ */
+router.patch('/:id/activate', authMiddleware, requireRole(1, 4), user.activate)
+
+/**
+ * @swagger
+ * /users/{id}/deactivate:
+ *   patch:
+ *     summary: Désactiver le compte d'un utilisateur
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Compte désactivé.
+ *       403:
+ *         description: Accès refusé.
+ *       404:
+ *         description: Utilisateur introuvable.
+ */
+router.patch('/:id/deactivate', authMiddleware, requireRole(1, 4), user.deactivate)
+
 router.delete('/:id', authMiddleware, user.delete)
 
 module.exports = (app) => {

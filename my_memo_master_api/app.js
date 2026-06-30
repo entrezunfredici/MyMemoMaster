@@ -45,6 +45,7 @@ const planningRoutes = require('./routes/Planning.routes')
 const testResultRoutes = require('./routes/TestResult.routes')
 const tagRoutes = require('./routes/Tag.routes')
 const searchRoutes = require('./routes/Search.routes')
+const etablissementRoutes = require('./routes/Etablissement.routes')
 const { startFifoCron } = require('./jobs/fifo.cron')
 const { startReminderWorker } = require('./jobs/reminder.worker')
 const { startKpiAlertCron } = require('./jobs/kpiAlert.cron')
@@ -85,7 +86,7 @@ app.use(
         callback(null, false)
       }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 )
@@ -139,6 +140,7 @@ planningRoutes(v1)
 testResultRoutes(v1)
 tagRoutes(v1)
 searchRoutes(v1)
+etablissementRoutes(v1)
 app.use('/api/v1', v1)
 
 // ... Autres middlewares

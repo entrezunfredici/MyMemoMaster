@@ -664,6 +664,54 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 
 ---
 
+### [2026-06-30] S-04.01 — Etablissement sans FK sur User/ClassGroup en V1 (scope via Invitation.invitedBy)
+**Contexte** : Pour scoper les droits de l'admin établissement (roleId=4) à ses propres utilisateurs, deux options : (1) ajouter `etablissementId` sur `User` et `ClassGroup`, ce qui nécessite des migrations et rompt l'accès actuel de l'admin via `requireRole(1, 4)` sur les groupes ; (2) utiliser `Invitation.invitedBy` comme indicateur de scope implicite.
+**Décision** : En V1, pas de FK `etablissementId` sur `User` ni `ClassGroup`. Le scope de l'admin établissement pour l'activation/désactivation de comptes est dérivé de `Invitation.invitedBy = req.user.id`. L'entité `Etablissement` (name, code, adminId) est créée comme entité de configuration légère sans jointure directe aux groupes ou aux utilisateurs.
+**Alternative écartée** : `etablissementId` FK sur `User` et `ClassGroup` dès V1 — correct architecturalement mais nécessite 2 migrations + mise à jour de tous les services existants qui ne connaissent pas ce champ. Risque de casser les tests existants (724+ tests). Différé en V2.
+**Conséquences** : Un utilisateur peut appartenir à plusieurs établissements si il a été invité par des admins différents — cas rare en MVP mais non contraint. La garde d'activation vérifie `Invitation.invitedBy` et non un lien direct. Si un admin réinvite un utilisateur déjà membre, deux invitations coexistent — sans impact car `invitedBy` sert uniquement de permission gate, pas de lien structurel.
+
+---
+
+### [2026-06-30] S-04.01 — AuditLog conçu en V1, implémentation différée en V2
+**Contexte** : Le périmètre S-04 inclut un audit trail (traçabilité des actions admin). Deux options : (1) implémenter la table `AuditLog` + la logique d'insertion dès V1 ; (2) concevoir le schéma maintenant et l'implémenter en V2.
+**Décision** : L'entité `AuditLog` (id, actorId, action, entityType, entityId, metadata JSON, createdAt) est conçue et documentée dans `diagrams/etablissement_admin_perimeter.md` mais non implémentée en V1. En V1, les logs Winston + Morgan couvrent la traçabilité minimale (chaque requête HTTP loguée avec acteur, endpoint, status).
+**Alternative écartée** : Implémenter `AuditLog` dès V1 — nécessite de hooker tous les services concernés (User, ClassGroup, Invitation, Etablissement) et d'écrire les tests associés. Complexité disproportionnée pour une fonctionnalité non bloquante en MVP.
+**Conséquences** : Pas de requêtage SQL sur l'historique des actions admin en V1 (uniquement logs fichier). À implémenter avant toute certification RGPD ou audit de conformité. La migration et le schéma sont prêts dans le document — l'implémentation V2 ne nécessitera pas de re-analyse.
+
+---
+
+### [2026-06-30] S-04.04 — isActive vérifié dans requireRole, pas dans Auth.middleware
+**Contexte** : Pour bloquer les comptes désactivés sur les appels API, deux emplacements étaient candidats : `Auth.middleware` (vérifie le JWT) ou `requireRole` (vérifie le rôle avec un DB lookup déjà présent).
+**Décision** : Garde `isActive` ajoutée dans `requireRole.middleware.js` uniquement. Auth.middleware reste synchrone (JWT uniquement, sans DB call). La garde au login est ajoutée dans `User.controller.js`.
+**Alternative écartée** : Ajouter un `User.findByPk` dans Auth.middleware — rompt les 28 tests controllers existants qui mockent `User: {}` (sans `findByPk`). Le coût de migration était disproportionné par rapport au gain V1 (les routes sans requireRole concernent des opérations peu sensibles, le JWT expire en 15 min).
+**Conséquences** : Les routes `authMiddleware`-seules (`GET /users/:id`, `GET /invitations/mine`, etc.) n'appliquent pas la garde `isActive`. Acceptable en V1 car : login bloqué → pas de nouveau token, JWT actuel expire vite. À reconsidérer si durée JWT augmente ou si routes sensibles n'utilisent pas requireRole.
+
+---
+
+### [2026-06-30] S-04.04 — Scope roleId=4 sur GET /etablissements/:id géré dans le controller
+**Contexte** : L'admin établissement (roleId=4) doit pouvoir accéder aux détails de son propre établissement, mais pas aux autres. Deux options : scope dans le service ou dans le controller.
+**Décision** : Le controller `findOne` inspecte `req.user.roleId` : si roleId=4, il appelle `EtablissementService.findByAdmin(requesterId)` et vérifie que l'id demandé correspond ; sinon appel normal via `findOne(id)`. Le service expose `findByAdmin` comme méthode autonome.
+**Alternative écartée** : Passer `requesterId` + `roleId` au service et y appliquer le scope — l'injection de la logique HTTP (roleId) dans le service viole la séparation des responsabilités.
+**Conséquences** : Le controller contient une branche de routing logique (`if roleId === 4`), ce qui est acceptable car c'est de la logique de présentation (qui voit quoi), pas de la logique métier.
+
+---
+
+### [2026-06-30] S-04.03 — AuditLog sans updatedAt (log immuable)
+**Contexte** : Les tables Sequelize ont habituellement `timestamps: true` (createdAt + updatedAt). Pour `AuditLog`, un enregistrement ne doit jamais être modifié après insertion — updatedAt n'a pas de sens et induirait en erreur.
+**Décision** : `timestamps: false` sur AuditLog + uniquement la colonne `createdAt` déclarée manuellement. Pas de `UPDATE` ni `DELETE` prévu en SQL sur cette table.
+**Alternative écartée** : `timestamps: true` et ignorer `updatedAt` — la colonne existante mais jamais mise à jour est trompeuse pour les futures lectures de schéma.
+**Conséquences** : Le service AuditLog (V2) ne doit exposer que `create` et `findAll` — aucune méthode `update` ou `delete`. Si une entrée de log est corrompue, la corriger directement en SQL avec un script de migration one-shot.
+
+---
+
+### [2026-06-30] S-04.02 — ClassroomEtablissementView en onglets, AdminPlatformePage séparée
+**Contexte** : La vue admin établissement (`ClassroomEtablissementView.vue`) couvre la gestion des groupes. S-04 ajoute la gestion des utilisateurs et un tableau de bord. Deux options : (1) tout consolider dans `ClassroomEtablissementView.vue` ; (2) extraire l'espace admin plateforme dans une page dédiée.
+**Décision** : `ClassroomEtablissementView.vue` est étendue en 3 onglets (Tableau de bord / Groupes / Utilisateurs) sans déplacer son contenu actuel — l'onglet Groupes enveloppe l'existant tel quel. L'espace admin plateforme (CRUD établissements, liste globale utilisateurs) va dans une **nouvelle page `AdminPlatformePage.vue`** sur la route `/admin` avec `meta.roles: [1]`. Les deux audiences (admin établissement et admin plateforme) sont ainsi séparées sans couplage.
+**Alternative écartée** : Tout dans `ClassroomEtablissementView.vue` avec des sections conditionnelles sur `isAdminPlateforme` — crée une vue "fourre-tout" qui gère deux périmètres fonctionnels distincts, difficile à maintenir et à tester.
+**Conséquences** : Un lien "Administration" s'ajoute dans `NavbarComponent.vue` visible uniquement pour roleId=1. Le guard `meta.roles: [1]` existant suffit pour la protection de `/admin`. Les deux stores sont distincts : `etablissements.js` (CRUD pour admin plateforme) et `adminUsers.js` (activate/deactivate pour les deux rôles admin avec scope différent).
+
+---
+
 ### [2026-06-30] Routes Question — authMiddleware sur les routes d'écriture
 **Contexte** : Les routes `POST /questions`, `PUT /questions/edit/:id`, `DELETE /questions/:id` n'avaient pas d'`authMiddleware`, contrairement à la décision 2026-06-23 ("Seules les routes d'écriture (POST/PUT/DELETE) ont reçu authMiddleware"). Les GET restent intentionnellement publics.
 **Décision** : Ajouter `authMiddleware` sur les 3 routes d'écriture. Les GET (`/`, `/tests/:testId`, `/card/:cardId`, `/:id`, `/correction/:id`) restent publics (contenu pédagogique).

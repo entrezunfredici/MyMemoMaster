@@ -83,12 +83,22 @@ describe('requireRole middleware', () => {
     expect(next).not.toHaveBeenCalled()
   })
 
+  it('retourne 401 si le compte est désactivé (isActive=false)', async () => {
+    User.findByPk.mockResolvedValue({ roleId: 1, isActive: false })
+
+    await requireRole(1)(req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(401)
+    expect(res.json).toHaveBeenCalledWith({ message: 'Compte désactivé.' })
+    expect(next).not.toHaveBeenCalled()
+  })
+
   it('vérifie le bon userId depuis req.user.id', async () => {
     req.user.id = 42
     User.findByPk.mockResolvedValue({ roleId: 1 })
 
     await requireRole(1)(req, res, next)
 
-    expect(User.findByPk).toHaveBeenCalledWith(42, { attributes: ['roleId'] })
+    expect(User.findByPk).toHaveBeenCalledWith(42, { attributes: ['roleId', 'isActive'] })
   })
 })

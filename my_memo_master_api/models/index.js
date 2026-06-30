@@ -39,6 +39,8 @@ models.ClassGroupResource = require('./ClassGroupResource.model')(instance)
 models.ClassGroupSubmission = require('./ClassGroupSubmission.model')(instance)
 models.KpiConsent = require('./KpiConsent.model')(instance)
 models.TestClassGroup = require('./TestClassGroup.model')(instance)
+models.Etablissement = require('./Etablissement.model')(instance)
+models.AuditLog = require('./AuditLog.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {
