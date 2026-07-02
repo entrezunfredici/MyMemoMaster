@@ -36,7 +36,8 @@
     </div>
 
     <!-- Vue active -->
-    <ClassroomEtablissementView v-if="activeView === 'etablissement'" />
+    <ClassroomPlateformeView v-if="activeView === 'plateforme'" />
+    <ClassroomEtablissementView v-else-if="activeView === 'etablissement'" />
     <ClassroomEnseignantView v-else-if="activeView === 'enseignant'" />
     <ClassroomEtudiantView v-else />
 
@@ -49,11 +50,12 @@ import { useRole } from '@/composables/useRole'
 import { useAuthStore } from '@/stores/auth'
 import { useInvitationStore } from '@/stores/invitations'
 import { useClassGroupStore } from '@/stores/classGroups'
+import ClassroomPlateformeView from './ClassroomPlateformeView.vue'
 import ClassroomEtablissementView from './ClassroomEtablissementView.vue'
 import ClassroomEnseignantView from './ClassroomEnseignantView.vue'
 import ClassroomEtudiantView from './ClassroomEtudiantView.vue'
 
-const { isAdmin, isEnseignant } = useRole()
+const { isAdmin, isAdminPlateforme, isEnseignant } = useRole()
 const authStore = useAuthStore()
 const invitationStore = useInvitationStore()
 const classGroupStore = useClassGroupStore()
@@ -67,6 +69,7 @@ function isTeacherInAnyGroup() {
 }
 
 function defaultView() {
+  if (isAdminPlateforme.value) return 'plateforme'
   if (isAdmin.value) return 'etablissement'
   if (isEnseignant.value || isTeacherInAnyGroup()) return 'enseignant'
   return 'etudiant'
@@ -76,16 +79,19 @@ const activeView = ref(defaultView())
 
 // Recalcule après chargement du profil ET après chargement des groupes
 watch(
-  [isAdmin, isEnseignant, () => classGroupStore.groups],
+  [isAdminPlateforme, isAdmin, isEnseignant, () => classGroupStore.groups],
   () => { activeView.value = defaultView() },
   { immediate: true }
 )
 
-const availableViews = [
-  { key: 'etablissement', label: 'Établissement' },
-  { key: 'enseignant', label: 'Enseignant' },
-  { key: 'etudiant', label: 'Étudiant' },
-]
+const availableViews = computed(() => {
+  const views = []
+  if (isAdminPlateforme.value) views.push({ key: 'plateforme', label: 'Plateforme' })
+  if (isAdmin.value) views.push({ key: 'etablissement', label: 'Établissement' })
+  views.push({ key: 'enseignant', label: 'Enseignant' })
+  views.push({ key: 'etudiant', label: 'Étudiant' })
+  return views
+})
 
 const pendingInvitations = computed(() => invitationStore.mine)
 

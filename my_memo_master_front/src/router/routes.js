@@ -161,16 +161,6 @@ const routes = [
       private: true
     }
   },
-  // ==================== ADMIN ====================
-  {
-    path: '/admin',
-    name: 'admin',
-    component: () => import('../pages/AdminPage.vue'),
-    meta: {
-      title: 'Administration',
-      private: true
-    }
-  },
   // ==================== AUTH & ACCOUNT ====================
   {
     path: '/auth',

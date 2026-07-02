@@ -1,6 +1,7 @@
 const { Op } = require('sequelize')
 const { Etablissement, User, ClassGroup, ClassGroupUsers, Invitation, AuditLog, ClassGroupResource, ClassGroupSection } = require('../models/index')
 const AuditLogService = require('./AuditLog.service')
+const sendEmail = require('../helpers/sendEmail')
 const logger = require('../helpers/logger')
 
 const adminInclude = {
@@ -280,25 +281,53 @@ class EtablissementService {
     const etab = await Etablissement.findByPk(etablissementId)
     if (!etab) return null
 
-    const user = await User.findOne({ where: { email } })
-    if (!user) return 'user_not_found'
+    const normalizedEmail = email.trim().toLowerCase()
+    const user = await User.findOne({ where: { email: normalizedEmail } })
 
-    await Promise.all([
-      user.update({ roleId: 4 }),
-      etab.update({ adminId: user.userId })
-    ])
-
-    try {
-      await AuditLogService.log(requesterId, 'ADMIN_ETABLISSEMENT_ASSIGNED', 'Etablissement', Number(etablissementId), {
-        adminId: user.userId,
-        adminEmail: email
-      })
-    } catch (auditErr) {
-      logger.warn(`Audit log échoué (ADMIN_ETABLISSEMENT_ASSIGNED): ${auditErr.message}`)
+    // Cas 1 : le compte existe → assignation directe
+    if (user) {
+      await Promise.all([
+        user.update({ roleId: 4 }),
+        etab.update({ adminId: user.userId })
+      ])
+      try {
+        await AuditLogService.log(requesterId, 'ADMIN_ETABLISSEMENT_ASSIGNED', 'Etablissement', Number(etablissementId), {
+          adminId: user.userId, adminEmail: normalizedEmail
+        })
+      } catch (auditErr) {
+        logger.warn(`Audit log échoué (ADMIN_ETABLISSEMENT_ASSIGNED): ${auditErr.message}`)
+      }
+      const updated = await Etablissement.findByPk(etablissementId, { include: [adminInclude] })
+      return { directlyAssigned: true, etab: updated, user: { userId: user.userId, name: user.name, email: user.email } }
     }
 
-    const updated = await Etablissement.findByPk(etablissementId, { include: [adminInclude] })
-    return { etab: updated, user: { userId: user.userId, name: user.name, email: user.email } }
+    // Cas 2 : pas de compte → invitation email
+    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
+
+    const [invitation] = await Invitation.findOrCreate({
+      where: { etablissementId: Number(etablissementId), targetEmail: normalizedEmail, status: 'pending', role: 'admin_etablissement' },
+      defaults: { invitedByUserId: requesterId, targetUserId: null, classGroupId: null }
+    })
+
+    try {
+      await sendEmail(
+        `Invitation à gérer l'établissement "${etab.name}" sur MyMemoMaster`,
+        `Bonjour,\n\nVous avez été invité à devenir gestionnaire de l'établissement "${etab.name}" sur MyMemoMaster.\n\nCréez votre compte sur ${frontUrl}/register en utilisant l'adresse email ${normalizedEmail}.\n\nVos droits d'administration seront automatiquement activés lors de votre inscription.\n\nCe message a été envoyé par l'équipe MyMemoMaster.`,
+        normalizedEmail
+      )
+    } catch (emailError) {
+      logger.warn(`Invitation gérant créée mais email non envoyé à ${normalizedEmail} : ${emailError?.message}`)
+    }
+
+    try {
+      await AuditLogService.log(requesterId, 'ADMIN_ETABLISSEMENT_INVITED', 'Invitation', invitation.id, {
+        targetEmail: normalizedEmail, etablissementId: Number(etablissementId)
+      })
+    } catch (auditErr) {
+      logger.warn(`Audit log échoué (ADMIN_ETABLISSEMENT_INVITED): ${auditErr.message}`)
+    }
+
+    return { directlyAssigned: false, email: normalizedEmail }
   }
 
   _emptyStats() {

@@ -1,4 +1,4 @@
-const { Invitation, ClassGroup, ClassGroupUsers, User } = require('../models/index')
+const { Invitation, ClassGroup, ClassGroupUsers, Etablissement, User } = require('../models/index')
 const sendEmail = require('../helpers/sendEmail')
 const logger = require('../helpers/logger')
 const AuditLogService = require('./AuditLog.service')
@@ -179,10 +179,16 @@ class InvitationService {
       where: { targetEmail: email.toLowerCase(), status: 'pending' }
     })
     for (const inv of pending) {
-      await ClassGroupUsers.findOrCreate({
-        where: { classGroupId: inv.classGroupId, userId },
-        defaults: { role: inv.role }
-      })
+      if (inv.role === 'admin_etablissement' && inv.etablissementId) {
+        // Invitation gérant établissement → promouvoir le nouveau compte
+        await User.update({ roleId: 4 }, { where: { userId } })
+        await Etablissement.update({ adminId: userId }, { where: { id: inv.etablissementId } })
+      } else if (inv.classGroupId) {
+        await ClassGroupUsers.findOrCreate({
+          where: { classGroupId: inv.classGroupId, userId },
+          defaults: { role: inv.role }
+        })
+      }
       await inv.update({ status: 'accepted', targetUserId: userId })
     }
   }

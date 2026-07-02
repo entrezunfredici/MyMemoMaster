@@ -141,11 +141,15 @@ export const useEtablissementStore = defineStore('etablissement', {
         notif.notify(resp?.data?.message || "Erreur lors de l'assignation du gérant.", 'error')
         return false
       }
-      const idx = this.list.findIndex((e) => e.id === etablissementId)
-      if (idx !== -1) this.list[idx] = resp.data.data.etab
-      if (this.current?.id === etablissementId) this.current = resp.data.data.etab
-      notif.notify('Gérant assigné avec succès.', 'success')
-      return resp.data.data
+      const data = resp.data.data
+      // Mise à jour locale uniquement si assignation directe (sinon pas de données etab à jour)
+      if (data.directlyAssigned && data.etab) {
+        const idx = this.list.findIndex((e) => e.id === etablissementId)
+        if (idx !== -1) this.list[idx] = data.etab
+        if (this.current?.id === etablissementId) this.current = data.etab
+      }
+      notif.notify(resp.data.message, data.directlyAssigned ? 'success' : 'info')
+      return data
     },
 
     async activateUser(userId) {

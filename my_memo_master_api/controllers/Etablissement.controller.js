@@ -140,8 +140,13 @@ exports.assignAdmin = async (req, res) => {
   try {
     const result = await EtablissementService.assignAdmin(req.params.id, req.body.email, req.user.id)
     if (result === null) return res.status(404).json({ message: 'Établissement introuvable.' })
-    if (result === 'user_not_found') return res.status(404).json({ message: 'Aucun compte trouvé pour cet email.' })
-    res.status(200).json({ message: 'Gérant assigné avec succès.', data: result })
+    if (result.directlyAssigned) {
+      return res.status(200).json({ message: 'Gérant assigné avec succès.', data: result })
+    }
+    return res.status(200).json({
+      message: `Aucun compte trouvé pour ${result.email}. Un email d'invitation a été envoyé.`,
+      data: result
+    })
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).json({ message: "Erreur lors de l'assignation du gérant." })

@@ -12,8 +12,15 @@ module.exports = (instance) => {
       },
       classGroupId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true, // null pour les invitations gérant établissement
         references: { model: 'ClassGroup', key: 'id' },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
+      },
+      etablissementId: {
+        type: DataTypes.INTEGER,
+        allowNull: true, // renseigné uniquement pour les invitations admin_etablissement
+        references: { model: 'Etablissement', key: 'id' },
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE'
       },
@@ -36,10 +43,10 @@ module.exports = (instance) => {
         onUpdate: 'CASCADE'
       },
       role: {
-        type: DataTypes.STRING(20),
+        type: DataTypes.STRING(25),
         allowNull: false,
         defaultValue: 'student'
-        // Valeurs : 'teacher' | 'student'
+        // Valeurs : 'teacher' | 'student' | 'admin_etablissement'
       },
       status: {
         type: DataTypes.STRING(20),
@@ -66,6 +73,7 @@ module.exports = (instance) => {
 
   Invitation.associate = (models) => {
     Invitation.belongsTo(models.ClassGroup, { foreignKey: 'classGroupId', as: 'classGroup' })
+    Invitation.belongsTo(models.Etablissement, { foreignKey: 'etablissementId', as: 'etablissement' })
     Invitation.belongsTo(models.User, { foreignKey: 'targetUserId', as: 'targetUser' })
     Invitation.belongsTo(models.User, { foreignKey: 'invitedByUserId', as: 'invitedBy' })
   }

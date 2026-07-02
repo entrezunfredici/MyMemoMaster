@@ -38,9 +38,9 @@
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
-          <router-link v-if="isAdminPlateforme" to="/admin"
-            :class="[route?.name === 'admin' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
-            title="Administration">
+          <router-link v-if="isAdminPlateforme" to="/classroom"
+            class="p-3 rounded-lg text-primary bg-light"
+            title="Administration plateforme">
             <ShieldCheckIcon class="size-8" />
           </router-link>
           <router-link to="/calendar"
@@ -119,8 +119,8 @@
         :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
-      <router-link v-if="isAdminPlateforme" to="/admin"
-        :class="[route?.name === 'admin' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+      <router-link v-if="isAdminPlateforme" to="/classroom"
+        :class="[route?.name === 'classroom' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="Administration">
         <ShieldCheckIcon class="size-8" />
       </router-link>
