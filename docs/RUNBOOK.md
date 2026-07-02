@@ -76,7 +76,7 @@ docker compose --env-file .env ps
 
 ## Mise à jour (déploiement continu)
 
-Le pipeline CD (GitHub Actions) gère automatiquement la mise à jour à chaque push sur `main` (prod) ou `dev` (preprod). En cas de déploiement manuel :
+Le pipeline CD (GitHub Actions) gère automatiquement la mise à jour à chaque push sur `main` (prod), `staging` (preprod) ou `dev` (test). En cas de déploiement manuel :
 
 ```sh
 cd /var/www/html/my_memo_master_prod

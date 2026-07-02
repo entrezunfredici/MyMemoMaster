@@ -1,5 +1,13 @@
 const { body, param } = require('express-validator')
 
+const contentIdParam = param('contentId')
+  .isInt({ min: 1 })
+  .withMessage("L'identifiant du contenu est invalide.")
+
+const contentTypeParam = param('contentType')
+  .isIn(['resource', 'section'])
+  .withMessage("Le type de contenu doit être 'resource' ou 'section'.")
+
 const idParam = param('id')
   .isInt({ min: 1 })
   .withMessage("L'identifiant de l'établissement est invalide.")
@@ -50,3 +58,15 @@ exports.update = [
 ]
 
 exports.byId = [idParam]
+
+exports.assignAdmin = [
+  idParam,
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage("L'email est requis.")
+    .isEmail()
+    .withMessage("L'email est invalide.")
+]
+
+exports.deleteContent = [idParam, contentTypeParam, contentIdParam]

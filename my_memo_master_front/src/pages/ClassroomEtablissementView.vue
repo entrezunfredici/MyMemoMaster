@@ -1,6 +1,160 @@
 <template>
   <div class="space-y-6">
 
+    <!-- Navigation onglets -->
+    <div class="flex gap-1 border-b border-gray">
+      <button v-for="tab in tabs" :key="tab.key"
+        @click="switchTab(tab.key)"
+        :class="[activeTab === tab.key
+          ? 'border-b-2 border-primary text-primary font-semibold'
+          : 'text-dark/60 hover:text-dark', 'pb-2 px-3 text-sm transition']">
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <!-- Onglet Stats -->
+    <template v-if="activeTab === 'stats'">
+      <div v-if="loadingStats" class="text-sm text-dark/60">Chargement...</div>
+      <div v-else-if="!etabStore.stats" class="text-sm text-dark/60">Aucune donnée disponible.</div>
+      <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-primary">{{ etabStore.stats.groupCount }}</p>
+          <p class="text-xs text-dark/60 mt-1">Groupes</p>
+        </div>
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-primary">{{ etabStore.stats.totalMembers }}</p>
+          <p class="text-xs text-dark/60 mt-1">Membres</p>
+        </div>
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-success">{{ etabStore.stats.activeMembers }}</p>
+          <p class="text-xs text-dark/60 mt-1">Actifs</p>
+        </div>
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-secondary">{{ etabStore.stats.pendingInvitations }}</p>
+          <p class="text-xs text-dark/60 mt-1">Invitations en attente</p>
+        </div>
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-dark">{{ etabStore.stats.validatedAccounts }}</p>
+          <p class="text-xs text-dark/60 mt-1">Emails vérifiés</p>
+        </div>
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-dark">{{ etabStore.stats.roleBreakdown?.students ?? 0 }}</p>
+          <p class="text-xs text-dark/60 mt-1">Étudiants</p>
+        </div>
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-dark">{{ etabStore.stats.roleBreakdown?.teachers ?? 0 }}</p>
+          <p class="text-xs text-dark/60 mt-1">Enseignants</p>
+        </div>
+        <div class="rounded-xl border border-gray bg-white p-3 text-center">
+          <p class="text-2xl font-bold text-dark">{{ etabStore.stats.inactiveMembers }}</p>
+          <p class="text-xs text-dark/60 mt-1">Inactifs</p>
+        </div>
+      </div>
+    </template>
+
+    <!-- Onglet Journal -->
+    <template v-if="activeTab === 'audit'">
+      <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+        <h2 class="text-lg font-semibold text-dark">Journal d'activité</h2>
+        <div class="flex flex-wrap gap-2">
+          <input v-model="auditFilters.action" type="text" placeholder="Action (ex: USER_INVITED)"
+            class="rounded-lg border border-gray px-3 py-1.5 text-sm" />
+          <input v-model="auditFilters.limit" type="number" placeholder="Limite (défaut 100)"
+            class="rounded-lg border border-gray px-3 py-1.5 text-sm w-36" />
+          <button @click="reloadAudit"
+            class="rounded-lg bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20 transition">
+            Filtrer
+          </button>
+        </div>
+        <div v-if="etabStore.audit.length === 0" class="text-sm text-dark/60">Aucune entrée.</div>
+        <div v-else class="space-y-1 max-h-96 overflow-y-auto">
+          <div v-for="log in etabStore.audit" :key="log.id"
+            class="rounded-lg border border-gray/50 px-3 py-2 text-xs flex items-center justify-between gap-2">
+            <span class="font-mono text-primary font-semibold truncate">{{ log.action }}</span>
+            <span class="text-dark/70">{{ log.entityType }} #{{ log.entityId ?? '—' }}</span>
+            <span class="text-dark/50">{{ log.actor?.name ?? '—' }}</span>
+            <span class="text-dark/40 shrink-0">{{ formatDate(log.createdAt) }}</span>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Onglet Contenu -->
+    <template v-if="activeTab === 'content'">
+      <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-4">
+        <h2 class="text-lg font-semibold text-dark">Modération du contenu</h2>
+        <div v-if="!etabStore.content" class="text-sm text-dark/60">Chargement...</div>
+        <template v-else>
+          <div class="space-y-2">
+            <p class="text-sm font-semibold text-dark">Ressources ({{ etabStore.content.resources?.length ?? 0 }})</p>
+            <div v-if="!etabStore.content.resources?.length" class="text-xs text-dark/50">Aucune ressource.</div>
+            <div v-for="r in etabStore.content.resources" :key="r.id"
+              class="rounded-lg border border-gray/50 px-3 py-2 text-xs flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <p class="font-medium text-dark truncate">{{ r.title }}</p>
+                <p class="text-dark/50">{{ r.classGroup?.name }} · {{ r.type }} · {{ r.creator?.name }}</p>
+              </div>
+              <button @click="confirmDeleteContent('resource', r.id, r.title)"
+                class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-secondary hover:bg-secondary/20 transition">
+                Supprimer
+              </button>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <p class="text-sm font-semibold text-dark">Sections ({{ etabStore.content.sections?.length ?? 0 }})</p>
+            <div v-if="!etabStore.content.sections?.length" class="text-xs text-dark/50">Aucune section.</div>
+            <div v-for="s in etabStore.content.sections" :key="s.id"
+              class="rounded-lg border border-gray/50 px-3 py-2 text-xs flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <p class="font-medium text-dark truncate">{{ s.title }}</p>
+                <p class="text-dark/50">{{ s.classGroup?.name }} · {{ s.type }} · {{ s.creator?.name }}</p>
+              </div>
+              <button @click="confirmDeleteContent('section', s.id, s.title)"
+                class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-secondary hover:bg-secondary/20 transition">
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Onglet Comptes -->
+    <template v-if="activeTab === 'comptes'">
+      <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
+        <h2 class="text-lg font-semibold text-dark">Gestion des comptes</h2>
+        <p class="text-xs text-dark/60">Membres du groupe sélectionné. Sélectionnez un groupe dans l'onglet Groupes.</p>
+        <div v-if="!currentGroup" class="text-sm text-dark/60">Aucun groupe sélectionné.</div>
+        <div v-else class="space-y-2">
+          <div v-for="m in currentGroup.members" :key="m.userId"
+            class="rounded-xl border border-gray px-3 py-2 flex items-center justify-between text-sm">
+            <div>
+              <p class="font-semibold text-dark">{{ m.user?.name ?? `#${m.userId}` }}</p>
+              <p class="text-xs text-dark/60">{{ m.user?.email }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span :class="m.user?.isActive === false ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success'"
+                class="rounded-full px-2 py-0.5 text-xs font-medium">
+                {{ m.user?.isActive === false ? 'Inactif' : 'Actif' }}
+              </span>
+              <button v-if="m.user?.isActive !== false" @click="deactivate(m.userId)"
+                class="rounded-lg border border-secondary/40 px-2 py-1 text-xs text-secondary hover:bg-secondary/10 transition">
+                Désactiver
+              </button>
+              <button v-else @click="activate(m.userId)"
+                class="rounded-lg border border-success/40 px-2 py-1 text-xs text-success hover:bg-success/10 transition">
+                Activer
+              </button>
+            </div>
+          </div>
+          <p v-if="!currentGroup.members?.length" class="text-xs text-dark/60">Aucun membre.</p>
+        </div>
+      </div>
+    </template>
+
+    <!-- Onglet Groupes (contenu existant) -->
+    <template v-if="activeTab === 'groupes'">
+
     <!-- Bandeau groupes -->
     <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-4">
       <div class="flex items-center justify-between">
@@ -232,6 +386,10 @@
     <div v-else class="rounded-2xl border-2 border-gray bg-white p-6 text-center text-dark/70">
       Sélectionnez un groupe pour gérer son emploi du temps et ses membres.
     </div>
+
+    </template>
+    <!-- fin onglet Groupes -->
+
   </div>
 </template>
 
@@ -240,10 +398,81 @@ import { ref, computed, onMounted, watch, reactive } from 'vue'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useInvitationStore } from '@/stores/invitations'
+import { useEtablissementStore } from '@/stores/etablissement'
+import { useRole } from '@/composables/useRole'
 
 const classGroupStore = useClassGroupStore()
 const calendarStore = useCalendarEventStore()
 const invitationStore = useInvitationStore()
+const etabStore = useEtablissementStore()
+const { isAdminEtablissement } = useRole()
+
+// ── Onglets ────────────────────────────────────────────────────────────────
+
+// Seul roleId=4 a accès aux onglets d'administration de l'établissement
+const tabs = computed(() => {
+  if (isAdminEtablissement.value) {
+    return [
+      { key: 'groupes', label: 'Groupes' },
+      { key: 'stats', label: 'Statistiques' },
+      { key: 'audit', label: 'Journal' },
+      { key: 'content', label: 'Contenu' },
+      { key: 'comptes', label: 'Comptes' },
+    ]
+  }
+  return [{ key: 'groupes', label: 'Groupes' }]
+})
+const activeTab = ref('groupes')
+const loadingStats = ref(false)
+const auditFilters = reactive({ action: '', limit: '' })
+
+let etabId = null
+
+async function switchTab(key) {
+  activeTab.value = key
+  if (!etabId) return
+  if (key === 'stats' && !etabStore.stats) {
+    loadingStats.value = true
+    await etabStore.fetchStats(etabId)
+    loadingStats.value = false
+  }
+  if (key === 'audit' && !etabStore.audit.length) await etabStore.fetchAudit(etabId)
+  if (key === 'content' && !etabStore.content) await etabStore.fetchContent(etabId)
+}
+
+async function reloadAudit() {
+  if (!etabId) return
+  await etabStore.fetchAudit(etabId, {
+    action: auditFilters.action || undefined,
+    limit: auditFilters.limit || undefined,
+  })
+}
+
+async function confirmDeleteContent(type, id, title) {
+  if (!confirm(`Supprimer "${title}" ? Cette action est irréversible.`)) return
+  await etabStore.deleteContent(etabId, type, id)
+}
+
+async function activate(userId) {
+  const ok = await etabStore.activateUser(userId)
+  if (ok) {
+    const member = currentGroup.value?.members?.find((m) => m.userId === userId)
+    if (member?.user) member.user.isActive = true
+  }
+}
+
+async function deactivate(userId) {
+  const ok = await etabStore.deactivateUser(userId)
+  if (ok) {
+    const member = currentGroup.value?.members?.find((m) => m.userId === userId)
+    if (member?.user) member.user.isActive = false
+  }
+}
+
+function formatDate(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 const selectedId = ref(null)
 const loadingEvents = ref(false)
@@ -282,6 +511,12 @@ async function selectGroup(id) {
 onMounted(async () => {
   if (!classGroupStore.groups.length) await classGroupStore.fetchGroups()
   if (classGroupStore.groups.length) selectGroup(classGroupStore.groups[0].id)
+
+  // Résoudre l'ID de l'établissement pour les onglets Stats/Journal/Contenu (roleId=4 uniquement)
+  if (isAdminEtablissement.value) {
+    const etab = await etabStore.fetchMine()
+    if (etab?.id) etabId = etab.id
+  }
 })
 
 watch(() => classGroupStore.groups, (list) => {
@@ -368,10 +603,5 @@ async function changeRole(userId, role) {
 async function deleteGroupEvent(eventId) {
   await calendarStore.deleteEvent(eventId)
   await calendarStore.fetchByGroup(selectedId.value, true)
-}
-
-function formatDate(value) {
-  if (!value) return ''
-  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 </script>

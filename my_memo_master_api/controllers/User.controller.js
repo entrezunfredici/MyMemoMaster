@@ -209,7 +209,7 @@ exports.changePassword = async (req, res) => {
 exports.addRole = async (req, res) => {
   const { roleId } = req.body
   try {
-    await userService.setRole(req.params.id, roleId)
+    await userService.setRole(req.params.id, roleId, req.user.id)
     res.status(200).send({ message: 'Rôle ajouté avec succès.' })
   } catch (error) {
     logger.error(error?.message || error)
@@ -220,7 +220,7 @@ exports.addRole = async (req, res) => {
 exports.updateRole = async (req, res) => {
   try {
     const { roleId } = req.body
-    await userService.setRole(req.params.id, roleId)
+    await userService.setRole(req.params.id, roleId, req.user.id)
     res.status(200).send({ message: 'Rôle mis à jour avec succès.' })
   } catch (error) {
     logger.error(error?.message || error)
@@ -230,8 +230,7 @@ exports.updateRole = async (req, res) => {
 
 exports.removeRole = async (req, res) => {
   try {
-    const { roleId } = req.body
-    await userService.deleteRole(req.params.id, roleId)
+    await userService.deleteRole(req.params.id, req.user.id)
     res.status(200).send({ message: 'Rôle supprimé avec succès.' })
   } catch (error) {
     logger.error(error?.message || error)
@@ -241,7 +240,7 @@ exports.removeRole = async (req, res) => {
 
 exports.activate = async (req, res) => {
   try {
-    const result = await userService.setActive(req.params.id, true, req.user.roleId)
+    const result = await userService.setActive(req.params.id, true, req.user.roleId, req.user.id)
     if (result === null) return res.status(404).send({ message: 'Utilisateur introuvable.' })
     if (result === false) return res.status(403).send({ message: 'Accès refusé.' })
     res.status(200).send({ message: 'Compte activé.', data: result })
@@ -253,7 +252,7 @@ exports.activate = async (req, res) => {
 
 exports.deactivate = async (req, res) => {
   try {
-    const result = await userService.setActive(req.params.id, false, req.user.roleId)
+    const result = await userService.setActive(req.params.id, false, req.user.roleId, req.user.id)
     if (result === null) return res.status(404).send({ message: 'Utilisateur introuvable.' })
     if (result === false) return res.status(403).send({ message: 'Accès refusé.' })
     res.status(200).send({ message: 'Compte désactivé.', data: result })

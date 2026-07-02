@@ -1,6 +1,7 @@
 const { Invitation, ClassGroup, ClassGroupUsers, User } = require('../models/index')
 const sendEmail = require('../helpers/sendEmail')
 const logger = require('../helpers/logger')
+const AuditLogService = require('./AuditLog.service')
 
 class InvitationService {
   /**
@@ -54,6 +55,13 @@ class InvitationService {
         { status: 'accepted', targetUserId: existingUser.userId },
         { where: { classGroupId: groupId, targetEmail: email, status: 'pending' } }
       )
+      try {
+        await AuditLogService.log(requesterId, 'USER_INVITED', 'User', existingUser.userId, {
+          targetEmail: email, groupId, role, directlyAdded: true
+        })
+      } catch (auditErr) {
+        logger.warn(`Audit log échoué (invite direct): ${auditErr.message}`)
+      }
       return { directlyAdded: true, user: { name: existingUser.name, email: existingUser.email } }
     }
 
@@ -77,6 +85,13 @@ class InvitationService {
       logger.warn(`Invitation créée mais email non envoyé à ${email} : ${emailError?.message}`)
     }
 
+    try {
+      await AuditLogService.log(requesterId, 'USER_INVITED', 'Invitation', invitation.id, {
+        targetEmail: email, groupId, role, directlyAdded: false
+      })
+    } catch (auditErr) {
+      logger.warn(`Audit log échoué (invite email): ${auditErr.message}`)
+    }
     return { directlyAdded: false, invitation }
   }
 

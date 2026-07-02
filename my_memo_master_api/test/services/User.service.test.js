@@ -1,3 +1,7 @@
+jest.mock('../../services/AuditLog.service', () => ({
+  log: jest.fn().mockResolvedValue({})
+}))
+
 jest.mock('../../models/index', () => ({
   User: {
     findAll: jest.fn(),

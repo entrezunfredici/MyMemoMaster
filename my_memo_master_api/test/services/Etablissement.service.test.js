@@ -1,4 +1,4 @@
-const { Etablissement, User } = require('../../models/index')
+const { Etablissement, User, ClassGroup, ClassGroupUsers, Invitation, AuditLog, ClassGroupResource, ClassGroupSection } = require('../../models/index')
 const EtablissementService = require('../../services/Etablissement.service')
 
 jest.mock('../../models/index', () => ({
@@ -8,8 +8,17 @@ jest.mock('../../models/index', () => ({
     findOne: jest.fn(),
     create: jest.fn()
   },
-  User: {}
+  User: {},
+  ClassGroup: { findAll: jest.fn() },
+  ClassGroupUsers: { findAll: jest.fn() },
+  Invitation: { findAll: jest.fn() },
+  AuditLog: { findAll: jest.fn() },
+  ClassGroupResource: { findAll: jest.fn(), findByPk: jest.fn() },
+  ClassGroupSection: { findAll: jest.fn(), findByPk: jest.fn() }
 }))
+
+jest.mock('../../services/AuditLog.service', () => ({ log: jest.fn().mockResolvedValue({}) }))
+jest.mock('../../helpers/logger', () => ({ warn: jest.fn(), error: jest.fn() }))
 
 const mockEtab = { id: 1, name: 'Lycée Victor Hugo', code: 'LVH', adminId: 10 }
 const mockEtabInstance = { ...mockEtab, update: jest.fn(), destroy: jest.fn() }
@@ -155,6 +164,321 @@ describe('EtablissementService', () => {
       const result = await EtablissementService.delete(999)
 
       expect(result).toBeNull()
+    })
+  })
+
+  // ── getStats ───────────────────────────────────────────────────────────────
+
+  describe('getStats', () => {
+    const mockUser1 = { userId: 101, isActive: true, hasValidatedEmail: true }
+    const mockUser2 = { userId: 102, isActive: false, hasValidatedEmail: true }
+    const mockUser3 = { userId: 103, isActive: true, hasValidatedEmail: false }
+
+    const mockMemberships = [
+      { user: mockUser1, role: 'student' },
+      { user: mockUser2, role: 'teacher' },
+      { user: mockUser3, role: 'student' }
+    ]
+
+    const mockInvitations = [
+      { status: 'pending' },
+      { status: 'pending' },
+      { status: 'accepted' }
+    ]
+
+    const mockActivity = [{ id: 5, action: 'USER_ACCOUNT_ACTIVATED', actor: { userId: 10 } }]
+
+    beforeEach(() => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: 10 })
+      ClassGroup.findAll.mockResolvedValue([{ id: 11 }, { id: 12 }])
+      ClassGroupUsers.findAll.mockResolvedValue(mockMemberships)
+      Invitation.findAll.mockResolvedValue(mockInvitations)
+      AuditLog.findAll.mockResolvedValue(mockActivity)
+    })
+
+    it('retourne les stats complètes pour roleId=1', async () => {
+      const result = await EtablissementService.getStats(1, 99, 1)
+
+      expect(result).toMatchObject({
+        groupCount: 2,
+        totalMembers: 3,
+        activeMembers: 2,
+        inactiveMembers: 1,
+        validatedAccounts: 2,
+        pendingInvitations: 2,
+        roleBreakdown: { students: 2, teachers: 1 },
+        recentActivity: mockActivity
+      })
+    })
+
+    it('retourne les stats pour roleId=4 sur son propre établissement', async () => {
+      const result = await EtablissementService.getStats(1, 10, 4)
+
+      expect(result.groupCount).toBe(2)
+      expect(result.totalMembers).toBe(3)
+    })
+
+    it('retourne null si l\'établissement est introuvable', async () => {
+      Etablissement.findByPk.mockResolvedValue(null)
+
+      const result = await EtablissementService.getStats(999, 10, 1)
+
+      expect(result).toBeNull()
+    })
+
+    it('retourne false si roleId=4 accède à un autre établissement', async () => {
+      // etab.adminId=10, requesterId=99 (différent)
+      const result = await EtablissementService.getStats(1, 99, 4)
+
+      expect(result).toBe(false)
+    })
+
+    it('retourne des stats vides si adminId est null', async () => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: null })
+
+      const result = await EtablissementService.getStats(1, 99, 1)
+
+      expect(result).toMatchObject({
+        groupCount: 0,
+        totalMembers: 0,
+        pendingInvitations: 0,
+        roleBreakdown: { students: 0, teachers: 0 },
+        recentActivity: []
+      })
+      expect(ClassGroup.findAll).not.toHaveBeenCalled()
+    })
+
+    it('déduplique les membres présents dans plusieurs groupes', async () => {
+      // Le même user apparaît 2 fois (2 groupes différents)
+      ClassGroupUsers.findAll.mockResolvedValue([
+        { user: mockUser1, role: 'student' },
+        { user: mockUser1, role: 'student' } // même userId
+      ])
+
+      const result = await EtablissementService.getStats(1, 10, 1)
+
+      expect(result.totalMembers).toBe(1)
+    })
+
+    it('retourne 0 membres si aucun groupe', async () => {
+      ClassGroup.findAll.mockResolvedValue([])
+
+      const result = await EtablissementService.getStats(1, 10, 1)
+
+      expect(result.groupCount).toBe(0)
+      expect(result.totalMembers).toBe(0)
+      expect(ClassGroupUsers.findAll).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── getContent ─────────────────────────────────────────────────────────────
+
+  describe('getContent', () => {
+    const mockResources = [{ id: 1, title: 'Cours de maths', classGroupId: 11 }]
+    const mockSections = [{ id: 2, title: 'Devoir maison', classGroupId: 11 }]
+
+    beforeEach(() => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: 10 })
+      ClassGroup.findAll.mockResolvedValue([{ id: 11 }, { id: 12 }])
+      ClassGroupResource.findAll.mockResolvedValue(mockResources)
+      ClassGroupSection.findAll.mockResolvedValue(mockSections)
+    })
+
+    it('retourne les ressources et sections pour roleId=1', async () => {
+      const result = await EtablissementService.getContent(1, 99, 1)
+
+      expect(result).toEqual({ resources: mockResources, sections: mockSections })
+      expect(ClassGroupResource.findAll).toHaveBeenCalled()
+      expect(ClassGroupSection.findAll).toHaveBeenCalled()
+    })
+
+    it('retourne le contenu pour roleId=4 sur son établissement', async () => {
+      const result = await EtablissementService.getContent(1, 10, 4)
+
+      expect(result.resources).toEqual(mockResources)
+      expect(result.sections).toEqual(mockSections)
+    })
+
+    it('retourne null si établissement introuvable', async () => {
+      Etablissement.findByPk.mockResolvedValue(null)
+
+      const result = await EtablissementService.getContent(999, 99, 1)
+
+      expect(result).toBeNull()
+    })
+
+    it('retourne false si roleId=4 accède à un autre établissement', async () => {
+      const result = await EtablissementService.getContent(1, 99, 4)
+
+      expect(result).toBe(false)
+    })
+
+    it('retourne des listes vides si adminId est null', async () => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: null })
+
+      const result = await EtablissementService.getContent(1, 99, 1)
+
+      expect(result).toEqual({ resources: [], sections: [] })
+      expect(ClassGroup.findAll).not.toHaveBeenCalled()
+    })
+
+    it('retourne des listes vides si aucun groupe', async () => {
+      ClassGroup.findAll.mockResolvedValue([])
+
+      const result = await EtablissementService.getContent(1, 99, 1)
+
+      expect(result).toEqual({ resources: [], sections: [] })
+      expect(ClassGroupResource.findAll).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── deleteContent ──────────────────────────────────────────────────────────
+
+  describe('deleteContent', () => {
+    const mockResource = { id: 5, classGroupId: 11, destroy: jest.fn() }
+    const mockSection = { id: 6, classGroupId: 12, destroy: jest.fn() }
+
+    beforeEach(() => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: 10 })
+      ClassGroup.findAll.mockResolvedValue([{ id: 11 }, { id: 12 }])
+      mockResource.destroy.mockResolvedValue()
+      mockSection.destroy.mockResolvedValue()
+    })
+
+    it('supprime une ressource et retourne true', async () => {
+      ClassGroupResource.findByPk.mockResolvedValue(mockResource)
+
+      const result = await EtablissementService.deleteContent(1, 'resource', 5, 10, 4)
+
+      expect(mockResource.destroy).toHaveBeenCalled()
+      expect(result).toBe(true)
+    })
+
+    it('supprime une section et retourne true', async () => {
+      ClassGroupSection.findByPk.mockResolvedValue(mockSection)
+
+      const result = await EtablissementService.deleteContent(1, 'section', 6, 1, 1)
+
+      expect(mockSection.destroy).toHaveBeenCalled()
+      expect(result).toBe(true)
+    })
+
+    it('retourne null si établissement introuvable', async () => {
+      Etablissement.findByPk.mockResolvedValue(null)
+
+      const result = await EtablissementService.deleteContent(999, 'resource', 5, 1, 1)
+
+      expect(result).toBeNull()
+    })
+
+    it('retourne false si roleId=4 accède à un autre établissement', async () => {
+      const result = await EtablissementService.deleteContent(1, 'resource', 5, 99, 4)
+
+      expect(result).toBe(false)
+    })
+
+    it('retourne not_found si la ressource est introuvable', async () => {
+      ClassGroupResource.findByPk.mockResolvedValue(null)
+
+      const result = await EtablissementService.deleteContent(1, 'resource', 999, 10, 1)
+
+      expect(result).toBe('not_found')
+    })
+
+    it('retourne not_found si le contenu appartient à un autre établissement', async () => {
+      ClassGroupResource.findByPk.mockResolvedValue({ id: 5, classGroupId: 99 }) // groupId 99 pas dans l'établissement
+
+      const result = await EtablissementService.deleteContent(1, 'resource', 5, 10, 1)
+
+      expect(result).toBe('not_found')
+    })
+  })
+
+  // ── getAuditLogs ───────────────────────────────────────────────────────────
+
+  describe('getAuditLogs', () => {
+    const mockLogs = [
+      { id: 1, action: 'USER_INVITED', entityType: 'Invitation', actorId: 10 },
+      { id: 2, action: 'USER_ACCOUNT_ACTIVATED', entityType: 'User', actorId: 10 }
+    ]
+
+    beforeEach(() => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: 10 })
+      AuditLog.findAll.mockResolvedValue(mockLogs)
+    })
+
+    it('retourne les logs de l\'établissement pour roleId=1', async () => {
+      const result = await EtablissementService.getAuditLogs(1, 99, 1)
+
+      expect(AuditLog.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ actorId: 10 }) })
+      )
+      expect(result).toEqual(mockLogs)
+    })
+
+    it('retourne les logs pour roleId=4 sur son établissement', async () => {
+      const result = await EtablissementService.getAuditLogs(1, 10, 4)
+
+      expect(result).toEqual(mockLogs)
+    })
+
+    it('retourne null si établissement introuvable', async () => {
+      Etablissement.findByPk.mockResolvedValue(null)
+
+      const result = await EtablissementService.getAuditLogs(999, 10, 1)
+
+      expect(result).toBeNull()
+      expect(AuditLog.findAll).not.toHaveBeenCalled()
+    })
+
+    it('retourne false si roleId=4 accède à un autre établissement', async () => {
+      // adminId=10, requesterId=99
+      const result = await EtablissementService.getAuditLogs(1, 99, 4)
+
+      expect(result).toBe(false)
+      expect(AuditLog.findAll).not.toHaveBeenCalled()
+    })
+
+    it('retourne un tableau vide si adminId est null', async () => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: null })
+
+      const result = await EtablissementService.getAuditLogs(1, 99, 1)
+
+      expect(result).toEqual([])
+      expect(AuditLog.findAll).not.toHaveBeenCalled()
+    })
+
+    it('applique le filtre action quand fourni', async () => {
+      AuditLog.findAll.mockResolvedValue([mockLogs[0]])
+
+      const result = await EtablissementService.getAuditLogs(1, 99, 1, { action: 'USER_INVITED' })
+
+      expect(AuditLog.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ action: 'USER_INVITED' }) })
+      )
+      expect(result).toHaveLength(1)
+    })
+
+    it('applique le filtre entityType + entityId quand fournis', async () => {
+      AuditLog.findAll.mockResolvedValue([mockLogs[1]])
+
+      await EtablissementService.getAuditLogs(1, 99, 1, { entityType: 'User', entityId: '5' })
+
+      expect(AuditLog.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ entityType: 'User', entityId: 5 })
+        })
+      )
+    })
+
+    it('applique la limite personnalisée', async () => {
+      AuditLog.findAll.mockResolvedValue([])
+
+      await EtablissementService.getAuditLogs(1, 99, 1, { limit: '10' })
+
+      expect(AuditLog.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 10 })
+      )
     })
   })
 })

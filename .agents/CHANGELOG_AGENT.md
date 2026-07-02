@@ -80,6 +80,7 @@
 | Front — RBAC (useRole, router guard) | Stable — M-05.11 : 2 bugs corrigés (connectionToken mort + /calendar private:false) + 12+20 tests Vitest | 2026-06-17 |
 | Rôle par défaut inscription | Stable — roleId=2 (Étudiant) par défaut dans modèle + service | 2026-06-14 |
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
+| CI/CD — branches de déploiement | Stable — branches Git renommées `test`→`dev`, `preprod`→`staging` (main inchangée) ; noms internes d'infra (images DockerHub, namespace K8s, chemin VPS) non touchés | 2026-07-01 |
 | Refresh token (rotation, révocation) | Stable — M-00b.07 H1 : hash SHA-256 stocké en base (même pattern reset password), brut envoyé au client | 2026-06-23 |
 | Reset mot de passe (token hashé) | Stable — M-05.06 : token 64-char hex brut envoyé par email, hash SHA-256 stocké en base | 2026-06-15 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
@@ -104,6 +105,9 @@
 | Suivi des rendus enseignant | Stable — [IMP] 2026-06-27 : vue enseignant — panneau "rendu reçu / pas encore rendu" par section rendu, avec téléchargement. Route GET /status + service getSubmissionStatus + store fetchStatus | 2026-06-27 |
 | Documentation espace enseignant (Groupes classes) | Stable — S-03.12 : diagrams/classroom_enseignant.md — acteurs/permissions, modèle données, règles métier (groupes/membres/invitations/sections/rendus/ressources/soumissions/KPI), flux principaux, maquettes UI ASCII, tableau endpoints, cas limites, dette technique | 2026-06-28 |
 | Documentation types et correction Exercices | Stable — M-06.14 : diagrams/exercices_types_correction.md — schémas JSON 4 types, flux créateur/player/correction, seuils sémantiques, modèle TestResult, périmètre MVP | 2026-06-30 |
+| Etablissement (CRUD + pilotage) | Stable — S-04.05 : CRUD complet + contrôle accès roleId=4 (limité à son établissement) + validators + migrations + 9 tests service + 12 tests controller | 2026-07-01 |
+| AuditLog (audit trail) | Stable — S-04.05 : log automatique activation/désactivation/rôle via User.service, service + controller + GET /audit-logs (roleId=1) + 7 tests service + 3 tests controller | 2026-07-01 |
+| API activation comptes (PATCH activate/deactivate) | Stable — S-04.05 : endpoints protégés requireRole(1,4), tests controller activate/deactivate ajoutés (12 cas) | 2026-07-01 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -4675,3 +4679,228 @@ ClassroomPage a été refactorisé pour déléguer à des vues enfants (`Classro
 - ✅ Décisions techniques enregistrées dans DECISIONS.md
 - ✅ CHANGELOG mis à jour
 - ✅ Aucun bug bloquant sur le périmètre livré (tâche d'analyse)
+
+---
+
+### [2026-07-01] S-04.05 — API gestion comptes (activation, rôles)
+
+**Feature list ID :** S-04 | **ID source planning :** S-04.05 | **Version :** V1
+**User stories :** US-16, US-22
+
+**Contexte :** Complétion du ticket S-04.05 (WIP → Stable). Le squelette Établissement + AuditLog existait déjà (S-04.03) ; ce ticket finalise l'audit trail fonctionnel et les tests manquants.
+
+**Fichiers créés :**
+- `services/AuditLog.service.js` — `log(actorId, action, entityType, entityId, metadata)` + `findAll(filters)` (limit 500, order DESC)
+- `controllers/AuditLog.controller.js` — `findAll` : GET /audit-logs avec filtres query (actorId, entityType, entityId)
+- `routes/AuditLog.routes.js` — GET /audit-logs protégé `requireRole(1)` + JSDoc Swagger
+- `test/services/AuditLog.service.test.js` — 7 tests (log champs, entityId/metadata null, actorId null, findAll sans/avec filtres)
+- `test/controllers/AuditLog.controller.test.js` — 3 tests (200 liste, filtres transmis, 500 erreur)
+
+**Fichiers modifiés :**
+- `services/User.service.js` — imports `logger` + `AuditLog.service` ; `setRole(userId, roleId, actorId)` + `deleteRole(userId, actorId)` + `setActive(targetUserId, active, requesterRoleId, actorId)` loguent dans AuditLog (try/catch non-bloquant)
+- `controllers/User.controller.js` — `addRole`, `updateRole`, `removeRole`, `activate`, `deactivate` passent `req.user.id` comme actorId ; `removeRole` n'envoie plus `roleId` inutile à `deleteRole`
+- `app.js` — ajout import + montage `auditLogRoutes(v1)`
+- `test/controllers/User.controller.test.js` — `setActive: jest.fn()` ajouté au mock service + 12 tests PATCH activate/deactivate (200, 404, 403 service, 403 rôle, 401, 500)
+- `test/services/User.service.test.js` — `jest.mock('../../services/AuditLog.service', ...)` ajouté pour isoler les tests existants
+
+**Ce qui est utilisable :**
+- `PATCH /api/v1/users/:id/activate` — roleId=1 ou 4 (admin étab ne peut pas activer un admin plateforme)
+- `PATCH /api/v1/users/:id/deactivate` — mêmes droits
+- `GET /api/v1/audit-logs?actorId=&entityType=&entityId=` — roleId=1 uniquement
+- Toute activation/désactivation/changement de rôle écrit automatiquement dans `AuditLog`
+
+**Hypothèses posées :**
+- L'audit trail est non-bloquant : si `AuditLog.create` échoue, l'action principale (activation, rôle) réussit quand même et l'erreur est loguée en `warn`
+- La lecture des logs est réservée à l'admin plateforme (roleId=1) ; l'admin établissement (roleId=4) n'a pas accès à GET /audit-logs dans cette version
+
+**DoD S-04.05 :**
+- ✅ Fonctionnel : audit trail écrit en base sur activate/deactivate/setRole/deleteRole
+- ✅ Tests : 12 cas activate/deactivate controller + 7 AuditLog.service + 3 AuditLog.controller
+- ✅ Route GET /audit-logs opérationnelle (filtres actorId, entityType, entityId)
+- ✅ Documentation CHANGELOG mis à jour
+- ✅ Aucun bug bloquant connu sur le périmètre livré
+
+---
+
+### [2026-07-01] S-04.07 — API pilotage établissement (stats)
+
+**Feature list ID :** S-04 | **ID source planning :** S-04.07 | **Version :** V1
+**User stories :** US-16, US-22
+
+**Contexte :** Endpoint de pilotage pour le tableau de bord admin établissement. Les stats couvrent les 7 indicateurs définis dans `diagrams/etablissement_admin_ui.md` (section 3.2).
+
+**Fichiers modifiés :**
+- `services/Etablissement.service.js` — ajout `getStats(etablissementId, requesterId, requesterRoleId)` : contrôle accès, groupes via `ClassGroup.createdBy`, membres dédupliqués via `ClassGroupUsers JOIN User`, invitations `Invitation.invitedByUserId`, activité récente via `AuditLog` (5 dernières entrées) ; import `Op` (sequelize) + ajout modèles `ClassGroup, ClassGroupUsers, Invitation, AuditLog`
+- `controllers/Etablissement.controller.js` — ajout handler `getStats` (404 si null, 403 si false)
+- `routes/Etablissement.routes.js` — ajout `GET /:id/stats` protégé `requireRole(1, 4)` + JSDoc Swagger
+- `test/services/Etablissement.service.test.js` — mock étendu (ClassGroup, ClassGroupUsers, Invitation, AuditLog) + 7 tests getStats (nominal roleId=1, nominal roleId=4, null→404, false→403, adminId null, déduplication, pas de groupes)
+- `test/controllers/Etablissement.controller.test.js` — mock étendu + 5 tests getStats (200 roleId=1, 200 roleId=4, 404, 403, 500)
+
+**Ce qui est utilisable :**
+- `GET /api/v1/etablissements/:id/stats` — roleId=1 (tous établissements) ou roleId=4 (son établissement uniquement)
+- Réponse : `{ groupCount, totalMembers, activeMembers, inactiveMembers, validatedAccounts, pendingInvitations, roleBreakdown: { students, teachers }, recentActivity }`
+
+**Hypothèses posées :**
+- Les "groupes de l'établissement" = tous les `ClassGroup` dont `createdBy = etab.adminId` (pas de FK directe Établissement ↔ ClassGroup en V1)
+- `recentActivity` = 5 dernières entrées `AuditLog` dont `actorId = etab.adminId` (actions de l'admin, pas l'établissement entier)
+- Si `adminId` est null, les stats retournent des zéros sans requête BDD supplémentaire
+
+**DoD S-04.07 :**
+- ✅ Fonctionnel : endpoint `/stats` opérationnel, contrôle accès roleId=1/4
+- ✅ Tests : 7 tests service + 5 tests controller (nominal + 404 + 403 + 500 + déduplication + edge cases)
+- ✅ Documentation Swagger complète sur la route
+- ✅ CHANGELOG mis à jour
+- ✅ Aucun bug bloquant connu
+
+---
+
+### [2026-07-01] S-04.08 — Logs activité admin (audit trail)
+
+**Feature list ID :** S-04 | **ID source planning :** S-04.08 | **Version :** V1
+**User stories :** US-16, US-22
+
+**Contexte :** Complète l'audit trail pour les actions admin en ajoutant la lecture scopée par établissement et le logging USER_INVITED manquant.
+
+**Fichiers modifiés :**
+- `services/Etablissement.service.js` — ajout `getAuditLogs(etablissementId, requesterId, requesterRoleId, filters)` : contrôle accès, filtre par actorId=etab.adminId, filtres optionnels (action, entityType, entityId, limit)
+- `controllers/Etablissement.controller.js` — ajout handler `getAuditLogs` (transmet les query filters)
+- `routes/Etablissement.routes.js` — ajout `GET /:id/audit` protégé `requireRole(1, 4)` + JSDoc Swagger
+- `services/Invitation.service.js` — import AuditLog.service + appel `log(USER_INVITED)` sur les 2 branches : ajout direct (entityType=User) et invitation email (entityType=Invitation) — try/catch non-bloquant
+- `test/services/Etablissement.service.test.js` — 8 tests getAuditLogs (nominal roleId=1, roleId=4, null→null, false→false, adminId null, filtre action, filtre entityType+entityId, limit)
+- `test/controllers/Etablissement.controller.test.js` — mock étendu + 5 tests getAuditLogs (200, filtres, 404, 403, 500)
+- `test/services/Invitation.service.test.js` — mock AuditLog.service ajouté pour isoler les tests existants
+
+**Ce qui est utilisable :**
+- `GET /api/v1/etablissements/:id/audit` — roleId=1 (tous), roleId=4 (son établissement uniquement)
+- Query params : `?action=USER_INVITED&entityType=Invitation&entityId=5&limit=50`
+- USER_INVITED est désormais loggé sur chaque invitation envoyée (directe ou email)
+
+**Actions auditées dans le périmètre S-04 :**
+| Action | Déclencheur | Loggé depuis |
+|---|---|---|
+| USER_ACCOUNT_ACTIVATED | PATCH /users/:id/activate | User.service (S-04.05) |
+| USER_ACCOUNT_DEACTIVATED | PATCH /users/:id/deactivate | User.service (S-04.05) |
+| USER_ROLE_CHANGED | POST/PUT/DELETE /users/:id/role | User.service (S-04.05) |
+| USER_INVITED | POST /class-groups/:id/invitations | Invitation.service (S-04.08) |
+
+**TODO (hors périmètre V1) :**
+- GROUP_CREATED / GROUP_MEMBER_ADDED / GROUP_MEMBER_REMOVED — classé V2 (implique modification ClassGroup.service)
+- LOGIN_SUCCESS / LOGIN_FAILED — classé V2
+
+**DoD S-04.08 :**
+- ✅ Fonctionnel : GET /etablissements/:id/audit opérationnel, filtres actifs
+- ✅ USER_INVITED loggé sur les 2 branches invitation
+- ✅ Tests : 8 tests service + 5 tests controller
+- ✅ CHANGELOG mis à jour
+- ✅ Aucun bug bloquant connu
+
+---
+
+## [2026-07-01] S-04.06 — API modération de contenu
+
+### Fichiers créés
+_(aucun)_
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `my_memo_master_api/services/Etablissement.service.js` | +2 méthodes : `getContent()` + `deleteContent()` ; imports `ClassGroupResource`, `ClassGroupSection`, `AuditLogService`, `logger` |
+| `my_memo_master_api/controllers/Etablissement.controller.js` | +2 handlers : `exports.getContent` + `exports.deleteContent` |
+| `my_memo_master_api/routes/Etablissement.routes.js` | +2 routes : `GET /:id/content` + `DELETE /:id/content/:contentType/:contentId` |
+| `my_memo_master_api/validators/Etablissement.validators.js` | +1 export : `deleteContent` (validation `:contentType` + `:contentId`) |
+| `my_memo_master_api/test/services/Etablissement.service.test.js` | +13 tests (6 `getContent` + 6 `deleteContent` + AuditLog.service mock) |
+| `my_memo_master_api/test/controllers/Etablissement.controller.test.js` | +9 tests (4 `getContent` + 5 `deleteContent` ; mocks `getContent` + `deleteContent`) |
+
+### Ce qui est utilisable
+
+#### `GET /api/v1/etablissements/:id/content`
+- **Accès** : `requireRole(1, 4)` — admin plateforme ou admin établissement
+- **Comportement** :
+  - roleId=4 : uniquement son propre établissement → 403 sinon
+  - adminId null ou aucun groupe → `{ resources: [], sections: [] }`
+  - Nominal → `{ resources: [...], sections: [...] }` avec `creator` et `classGroup` inclus
+
+#### `DELETE /api/v1/etablissements/:id/content/:contentType/:contentId`
+- **Accès** : `requireRole(1, 4)`
+- **Paramètre contentType** : `'resource'` | `'section'` (validé par express-validator)
+- **Comportement** :
+  - Vérifie que le contenu appartient à un groupe de l'établissement (sinon 404)
+  - Détruit l'item via `item.destroy()`
+  - Log audit non-bloquant : `CONTENT_RESOURCE_REMOVED` ou `CONTENT_SECTION_REMOVED`
+
+### Actions audit ajoutées
+
+| Action | Contexte |
+|---|---|
+| `CONTENT_RESOURCE_REMOVED` | Admin supprime une `ClassGroupResource` via modération |
+| `CONTENT_SECTION_REMOVED` | Admin supprime une `ClassGroupSection` via modération |
+
+### Hypothèses posées
+- Les `ClassGroupSubmission` (rendus étudiants) sont **hors scope** de la modération V1 : leur suppression reste du ressort de l'enseignant ou de l'étudiant via les routes ClassGroup existantes.
+- Le contenu est identifié par son appartenance à un groupe créé par l'admin de l'établissement (`ClassGroup.createdBy = adminId`), cohérent avec la logique S-04.07.
+- Aucune migration requise (pas de nouvelle colonne `status`/`flagged`).
+
+### Dette / TODO V2
+- Ajouter une liste de `ClassGroupSubmission` dans `getContent` si la modération des rendus devient nécessaire.
+- Ajouter un champ `moderatedAt` / `moderatedBy` sur les models pour conserver une trace visible côté DB (actuellement traçable uniquement via l'audit log).
+
+---
+
+## [2026-07-01] Renommage des branches CI/CD — `test`→`dev`, `preprod`→`staging`
+
+### Fichiers créés
+_(aucun)_
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `.github/workflows/ci.yml` | Branches déclencheuses : `preprod`→`staging`, `test`→`dev` |
+| `.github/workflows/cd.yml` | `workflow_run.branches` + toutes les conditions `head_branch`/`outputs.branch` : `test`→`dev`, `preprod`→`staging` ; commentaires mis à jour |
+| `README.md` | Tableau "Branche git → Images Docker Hub → Cible", phrase de déclenchement CD, arborescence `.github/workflows/`, phrase "merger sur `staging`" |
+| `docs/RUNBOOK.md` | Phrase de déclenchement CD (`main`/`staging`/`dev`) |
+
+### Ce qui est utilisable
+- Un push sur `dev` déclenche le déploiement VPS (environnement "test" existant) ; un push sur `staging` déclenche le déploiement Kubernetes (environnement "preprod" existant) ; `main` inchangé.
+
+### Hypothèses posées
+- Portée volontairement limitée aux branches Git et aux triggers CI/CD (décision utilisateur) : les noms internes d'infrastructure existants (images DockerHub `mymemomaster_test_*`/`mymemomaster_preprod_*`, namespace K8s `mymemomaster-preprod`, release Helm `mmm-preprod`, chemin VPS `/var/www/html/my_memo_master_test`, ingress `k8s/preprod/`) ne sont **pas** renommés pour ne pas casser l'infra déployée.
+- Le `README.md` documentait déjà une branche `dev` comme branche d'intégration de base pour le travail quotidien (`git checkout dev` avant de créer une feature branche). Ce renommage fait de `dev` à la fois la branche d'intégration ET le trigger de déploiement VPS — à confirmer que c'est le comportement voulu (chaque merge sur `dev` déploiera désormais automatiquement sur le VPS test).
+
+### Dette / TODO V2
+- Si le renommage complet de l'infra est souhaité plus tard (namespace, images, chemin VPS), il faudra migrer prudemment (recréation namespace K8s, re-push images, déplacement dossier VPS) sans interrompre les environnements existants.
+
+---
+
+## [S-04.09] Interface admin (comptes, actions) — Frontend V1
+
+**Date :** 2026-07-01
+**Branche :** dev_back_refactor
+**Statut :** Livré ✅
+
+### Fichiers créés
+- `my_memo_master_front/src/stores/etablissement.js` — store Pinia complet (fetchAll, fetchMine, fetchOne, createEtab, updateEtab, deleteEtab, fetchStats, fetchAudit, fetchContent, deleteContent, activateUser, deactivateUser)
+- `my_memo_master_front/src/pages/AdminPage.vue` — page admin plateforme (roleId=1) : liste CRUD établissements + panel détail avec onglets Stats / Journal / Contenu
+
+### Fichiers modifiés
+- `my_memo_master_api/controllers/Etablissement.controller.js` — ajout `exports.findMine`
+- `my_memo_master_api/routes/Etablissement.routes.js` — ajout `GET /mine` (requireRole(4)) avant `/:id`
+- `my_memo_master_api/test/controllers/Etablissement.controller.test.js` — mock + 3 tests `findMine`
+- `my_memo_master_front/src/helpers/api.js` — ajout méthode `patch` (même pattern que `put`)
+- `my_memo_master_front/src/pages/ClassroomEtablissementView.vue` — navigation par onglets (Groupes / Stats / Journal / Contenu / Comptes), appel `etabStore.fetchMine()` dans `onMounted`, fonctions switchTab / reloadAudit / confirmDeleteContent / activate / deactivate
+- `my_memo_master_front/src/router/routes.js` — ajout route `/admin` → `AdminPage.vue` (private: true)
+
+### Ce qui est utilisable
+- Admin plateforme (roleId=1) peut accéder à `/admin` : lister, créer, modifier, supprimer des établissements, consulter stats/journal/contenu par établissement
+- Admin établissement (roleId=4) voit dans `ClassroomEtablissementView` ses stats, journal d'audit, contenu modérable, et liste des comptes avec activation/désactivation
+- `api.patch()` disponible pour toute la front
+
+### Hypothèses posées
+- `isActive` est retourné dans les membres du groupe par `GET /class-groups/:id` — si absent, badge affiche "Actif" par défaut
+- Le contenu de l'onglet Comptes liste les membres du groupe sélectionné, pas tous les membres de l'établissement
+- `ClassGroupSubmission` exclu de la modération de contenu en V1 (aligné avec S-04.06)
+
+### Dette éventuelle
+- Aucun test frontend (Vue) pour AdminPage et ClassroomEtablissementView (tests unitaires Jest backend uniquement)
+- L'onglet Comptes de ClassroomEtablissementView affiche les membres du groupe courant ; une vue "tous les comptes de l'étab" serait plus complète

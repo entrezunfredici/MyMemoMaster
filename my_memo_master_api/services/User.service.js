@@ -1,6 +1,8 @@
 const { User, Role, UserOnboardingState, Invitation, ClassGroupUsers } = require('../models/index')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
+const logger = require('../helpers/logger')
+const AuditLogService = require('./AuditLog.service')
 
 class UserService {
   async findAll() {
@@ -75,7 +77,7 @@ class UserService {
     })
   }
 
-  async setRole(userId, roleId) {
+  async setRole(userId, roleId, actorId = null) {
     if (!(await Role.findByPk(roleId))) throw new Error("Le rôle n'existe pas")
 
     await User.update(
@@ -84,16 +86,26 @@ class UserService {
         where: { userId: userId }
       }
     )
+    try {
+      await AuditLogService.log(actorId, 'USER_ROLE_CHANGED', 'User', userId, { roleId })
+    } catch (auditErr) {
+      logger.warn(`Audit log échoué (setRole): ${auditErr.message}`)
+    }
     return this.findOne(userId)
   }
 
-  async deleteRole(userId) {
+  async deleteRole(userId, actorId = null) {
     await User.update(
       { roleId: null },
       {
         where: { userId: userId }
       }
     )
+    try {
+      await AuditLogService.log(actorId, 'USER_ROLE_CHANGED', 'User', userId, { roleId: null })
+    } catch (auditErr) {
+      logger.warn(`Audit log échoué (deleteRole): ${auditErr.message}`)
+    }
     return this.findOne(userId)
   }
 
@@ -257,12 +269,23 @@ class UserService {
     )
   }
 
-  async setActive(targetUserId, active, requesterRoleId) {
+  async setActive(targetUserId, active, requesterRoleId, actorId = null) {
     const target = await User.findByPk(targetUserId, { attributes: ['userId', 'roleId', 'isActive'] })
     if (!target) return null
     // Admin établissement (4) ne peut pas agir sur un admin plateforme (1)
     if (requesterRoleId === 4 && target.roleId === 1) return false
     await User.update({ isActive: active }, { where: { userId: targetUserId } })
+    try {
+      await AuditLogService.log(
+        actorId,
+        active ? 'USER_ACCOUNT_ACTIVATED' : 'USER_ACCOUNT_DEACTIVATED',
+        'User',
+        targetUserId,
+        { previousIsActive: target.isActive }
+      )
+    } catch (auditErr) {
+      logger.warn(`Audit log échoué (setActive): ${auditErr.message}`)
+    }
     return this.findOne(targetUserId)
   }
 

@@ -9,8 +9,8 @@ on:
       - completed
     branches:
       - main
-      - preprod
-      - test
+      - staging
+      - dev
 
 permissions:
   contents: read
@@ -23,13 +23,13 @@ permissions:
 #    DOCKERHUB_PASSWORD      — mot de passe / token Docker Hub
 #    DISCORD_LOG             — webhook Discord pour les notifications
 #
-#  Branche test (VPS) :
+#  Branche dev → environnement "test" (VPS) :
 #    SSH_TEST_PRIVATE_KEY    — clé SSH privée pour le VPS test
 #    SSH_TEST_USERNAME       — utilisateur SSH du VPS test
 #    VPS_PORT                — port SSH du VPS
 #    VPS_IP                  — adresse IP du VPS
 #
-#  Branche preprod (Kubernetes) :
+#  Branche staging → environnement "preprod" (Kubernetes) :
 #    KUBECONFIG_PREPROD      — kubeconfig base64 pour le cluster K8s preprod
 #
 #  Branche main (Kubernetes prod — activé via variable K8S_PROD_ENABLED=true) :
@@ -70,7 +70,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build and Push — test images
-        if: github.event.workflow_run.head_branch == 'test'
+        if: github.event.workflow_run.head_branch == 'dev'
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest \
             -f my_memo_master_api/Dockerfile my_memo_master_api/
@@ -81,7 +81,7 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest
 
       - name: Build and Push — preprod images
-        if: github.event.workflow_run.head_branch == 'preprod'
+        if: github.event.workflow_run.head_branch == 'staging'
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_api:latest \
             -f my_memo_master_api/Dockerfile my_memo_master_api/
@@ -110,7 +110,7 @@ jobs:
     name: Deploy to VPS (test)
     runs-on: ubuntu-latest
     needs: push_images
-    if: needs.push_images.outputs.branch == 'test'
+    if: needs.push_images.outputs.branch == 'dev'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -232,7 +232,7 @@ jobs:
     name: Deploy to Kubernetes (preprod)
     runs-on: ubuntu-latest
     needs: push_images
-    if: needs.push_images.outputs.branch == 'preprod'
+    if: needs.push_images.outputs.branch == 'staging'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

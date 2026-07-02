@@ -206,15 +206,15 @@ flowchart TD
 ```
 Branche git  →  Images Docker Hub                          →  Cible
 ─────────────────────────────────────────────────────────────────────────
-test         →  mymemomaster_test_api/front:latest         →  VPS (docker compose)
-preprod      →  mymemomaster_preprod_api/front:latest      →  Kubernetes Infomaniak mutualisé
+dev          →  mymemomaster_test_api/front:latest         →  VPS (docker compose)
+staging      →  mymemomaster_preprod_api/front:latest      →  Kubernetes Infomaniak mutualisé
 main         →  mymemomaster_api/front:latest              →  Kubernetes Infomaniak dédié
 ```
 
 Le pipeline CI/CD fonctionne en deux temps :
 
 1. **CI** (`.github/workflows/ci.yml`) — tests + lint + build, déclenché sur toutes les branches
-2. **CD** (`.github/workflows/cd.yml`) — build Docker + déploiement, déclenché quand le CI passe sur `test`, `preprod` ou `main`
+2. **CD** (`.github/workflows/cd.yml`) — build Docker + déploiement, déclenché quand le CI passe sur `dev`, `staging` ou `main`
 
 ---
 
@@ -392,7 +392,7 @@ kubectl get certificate -n mymemomaster-preprod
 | `SMTP_PORT`      | `587`                                           |
 | `EMAIL_FROM`     | `noreply@my-memo-master.com`                    |
 
-Pour modifier une valeur : éditer `k8s/preprod/configmap.yml` et merger sur `preprod` (le CD applique automatiquement).
+Pour modifier une valeur : éditer `k8s/preprod/configmap.yml` et merger sur `staging` (le CD applique automatiquement).
 
 #### Migration depuis l'ancienne preprod (namespace `default`)
 
@@ -468,7 +468,7 @@ Puis dans GitHub **Settings → Variables → Actions**, ajouter `K8S_PROD_ENABL
 ```
 .github/workflows/
 ├── ci.yml                  — Tests, lint, build (toutes les branches)
-└── cd.yml                  — Build Docker + déploiement (test/preprod/main)
+└── cd.yml                  — Build Docker + déploiement (dev/staging/main)
 
 server_docker_compose/
 ├── docker-compose.yml      — Déployé sur le VPS test par le CD

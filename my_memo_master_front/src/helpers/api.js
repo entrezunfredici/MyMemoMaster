@@ -399,6 +399,27 @@ async function del(endpoint, data = {}) {
 }
 
 /**
+ * Effectue une requête PATCH vers l'API.
+ *
+ * @param {string} endpoint - Chemin de l'endpoint
+ * @param {object} [data={}] - Corps de la requête
+ * @returns {Promise<{data: *, status: number}|undefined>}
+ */
+async function patch(endpoint, data = {}) {
+  if (!endpoint) throw new Error("Un endpoint est requis pour l'appel API")
+  if (typeof endpoint !== 'string') throw new Error("L'endpoint doit être une chaîne de caractères")
+  try {
+    const response = await axiosApi.patch(endpoint, data)
+    if (response?.status === 204) return undefined
+    if (handleSpecialStatus(response?.status)) return undefined
+    return toResponse(response)
+  } catch (error) {
+    console.error('Error during API call using api.js:', error.stack)
+    router.push({ path: '/error-server' })
+  }
+}
+
+/**
  * Télécharge un fichier depuis l'API avec authentification — retourne un Blob.
  *
  * @param {string} endpoint - Chemin de l'endpoint (ex: "storage/stream?key=...")
@@ -419,6 +440,7 @@ export const api = {
   get,
   post,
   put,
+  patch,
   del,
   getBlob,
 }

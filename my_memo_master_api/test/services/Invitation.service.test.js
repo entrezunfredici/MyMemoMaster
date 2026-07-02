@@ -10,6 +10,7 @@ jest.mock('../../models/index', () => ({
 
 jest.mock('../../helpers/sendEmail', () => jest.fn().mockResolvedValue(true))
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
+jest.mock('../../services/AuditLog.service', () => ({ log: jest.fn().mockResolvedValue({}) }))
 
 const adminUser   = { roleId: 1 }
 const teacherUser = { roleId: 3 }

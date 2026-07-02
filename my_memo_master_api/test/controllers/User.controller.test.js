@@ -38,6 +38,7 @@ jest.mock('../../services/User.service', () => ({
   setPassword: jest.fn(),
   setRole: jest.fn(),
   deleteRole: jest.fn(),
+  setActive: jest.fn(),
   verifyValidEmailCode: jest.fn(),
   verifyResetPasswordCode: jest.fn(),
   setEmailValidated: jest.fn().mockResolvedValue(true)
@@ -581,6 +582,126 @@ describe('User Controller', () => {
         .delete('/api/v1/users/2/role')
         .set('Authorization', `Bearer ${makeToken()}`)
         .send({ roleId: 3 })
+
+      expect(res.status).toBe(500)
+    })
+  })
+
+  // ── PATCH /users/:id/activate ─────────────────────────────────────────────
+  describe('PATCH /users/:id/activate', () => {
+    it('200 — compte activé', async () => {
+      userService.setActive.mockResolvedValue({ userId: 2, isActive: true })
+
+      const res = await request(app)
+        .patch('/api/v1/users/2/activate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(userService.setActive).toHaveBeenCalledTimes(1)
+    })
+
+    it('404 — utilisateur introuvable (service retourne null)', async () => {
+      userService.setActive.mockResolvedValue(null)
+
+      const res = await request(app)
+        .patch('/api/v1/users/999/activate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(404)
+    })
+
+    it('403 — admin étab ne peut pas agir sur admin plateforme (service retourne false)', async () => {
+      userService.setActive.mockResolvedValue(false)
+
+      const res = await request(app)
+        .patch('/api/v1/users/1/activate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+    })
+
+    it('403 — rôle non autorisé (étudiant)', async () => {
+      User.findByPk.mockResolvedValueOnce({ roleId: 2 })
+
+      const res = await request(app)
+        .patch('/api/v1/users/2/activate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+      expect(userService.setActive).not.toHaveBeenCalled()
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app).patch('/api/v1/users/2/activate')
+      expect(res.status).toBe(401)
+    })
+
+    it('500 — le service échoue', async () => {
+      userService.setActive.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .patch('/api/v1/users/2/activate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(500)
+    })
+  })
+
+  // ── PATCH /users/:id/deactivate ───────────────────────────────────────────
+  describe('PATCH /users/:id/deactivate', () => {
+    it('200 — compte désactivé', async () => {
+      userService.setActive.mockResolvedValue({ userId: 2, isActive: false })
+
+      const res = await request(app)
+        .patch('/api/v1/users/2/deactivate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(userService.setActive).toHaveBeenCalledTimes(1)
+    })
+
+    it('404 — utilisateur introuvable (service retourne null)', async () => {
+      userService.setActive.mockResolvedValue(null)
+
+      const res = await request(app)
+        .patch('/api/v1/users/999/deactivate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(404)
+    })
+
+    it('403 — admin étab ne peut pas désactiver un admin plateforme (service retourne false)', async () => {
+      userService.setActive.mockResolvedValue(false)
+
+      const res = await request(app)
+        .patch('/api/v1/users/1/deactivate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+    })
+
+    it('403 — rôle non autorisé (étudiant)', async () => {
+      User.findByPk.mockResolvedValueOnce({ roleId: 2 })
+
+      const res = await request(app)
+        .patch('/api/v1/users/2/deactivate')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+      expect(userService.setActive).not.toHaveBeenCalled()
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app).patch('/api/v1/users/2/deactivate')
+      expect(res.status).toBe(401)
+    })
+
+    it('500 — le service échoue', async () => {
+      userService.setActive.mockRejectedValue(new Error('DB error'))
+
+      const res = await request(app)
+        .patch('/api/v1/users/2/deactivate')
+        .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)
     })

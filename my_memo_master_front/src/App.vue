@@ -38,6 +38,11 @@
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
+          <router-link v-if="isAdminPlateforme" to="/admin"
+            :class="[route?.name === 'admin' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+            title="Administration">
+            <ShieldCheckIcon class="size-8" />
+          </router-link>
           <router-link to="/calendar"
             :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="Calendrier & rappels">
@@ -114,6 +119,11 @@
         :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
+      <router-link v-if="isAdminPlateforme" to="/admin"
+        :class="[route?.name === 'admin' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+        title="Administration">
+        <ShieldCheckIcon class="size-8" />
+      </router-link>
       <router-link to="/calendar"
         :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="Calendrier & rappels">
@@ -152,8 +162,9 @@ import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
 import ClassroomIcon from '@/icons/ClassroomIcon.vue'
 import KpiIcon from '@/icons/KpiIcon.vue'
-import { HomeIcon, CalendarIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
+import { useRole } from '@/composables/useRole'
 import { VITE_APP_NAME } from '@/config';
 import { isMobile } from '@/helpers/functions';
 import NotificationBell from '@/components/NotificationBellComponent.vue'
@@ -161,6 +172,7 @@ import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 
 const route = useRoute()
+const { isAdminPlateforme } = useRole()
 
 const konamiSequence = [
   'ArrowUp',
