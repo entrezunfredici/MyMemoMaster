@@ -1,4 +1,4 @@
-const { User, Role, UserOnboardingState, Invitation, ClassGroupUsers } = require('../models/index')
+const { User, Role, UserOnboardingState, Invitation, ClassGroupUsers, Etablissement } = require('../models/index')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const logger = require('../helpers/logger')
@@ -294,10 +294,16 @@ class UserService {
       where: { targetEmail: email.toLowerCase(), status: 'pending' }
     })
     for (const inv of pending) {
-      await ClassGroupUsers.findOrCreate({
-        where: { classGroupId: inv.classGroupId, userId },
-        defaults: { role: inv.role }
-      })
+      if (inv.role === 'admin_etablissement' && inv.etablissementId) {
+        // Invitation gérant établissement → promouvoir le compte et l'associer
+        await User.update({ roleId: 4 }, { where: { userId } })
+        await Etablissement.update({ adminId: userId }, { where: { id: inv.etablissementId } })
+      } else if (inv.classGroupId) {
+        await ClassGroupUsers.findOrCreate({
+          where: { classGroupId: inv.classGroupId, userId },
+          defaults: { role: inv.role }
+        })
+      }
       await inv.update({ status: 'accepted', targetUserId: userId })
     }
   }
