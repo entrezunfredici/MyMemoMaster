@@ -21,7 +21,18 @@ L'historique indique des dates de **2025**. L'ensemble du développement documen
 Section 3.5 mentionne "validateBody (zod/ajv)". Le projet utilise **`express-validator`** (pas zod, pas ajv).
 
 ### ❌ ERREUR #4 — Tests "prévus" alors qu'ils sont livrés
-La section 3.4 présente les tests comme à venir ("E2E Cypress à joindre"). En réalité : **724 tests back** (Jest + Supertest) et **130+ tests front** (Vitest) sont déjà exécutés et passent.
+La section 3.4 présente les tests comme à venir ("E2E Cypress à joindre"). En réalité (chiffres vérifiés au 2026-07-04 par exécution de `npm test`) : **1419 tests back** (Jest + Supertest, 75 suites, 100% verts) et **548 tests front** (Vitest, 545 verts / 3 en échec sur `ClassroomPage.test.js` — régression mineure à corriger avant la soutenance, sans lien avec le sujet).
+
+### ❌ ERREUR #5 — Compteurs d'entités et de migrations obsolètes
+Le document indique "18 entités" et "23 migrations". Le projet a grossi depuis : **33 modèles Sequelize** (30 entités métier + 3 tables de jointure) et **61 migrations**. Voir texte corrigé section 3.1 et tableau section 2.1.
+
+### ❌ ERREUR #6 — Déploiement présenté comme "Docker Compose uniquement"
+Le document (et la version précédente de ce fichier de corrections) présente un déploiement à 2 environnements (préprod/prod) uniquement via Docker Compose + Traefik sur un VPS unique. Ce n'est plus le cas depuis le **2026-06-30** (migration Helm) et le **2026-07-01** (renommage des branches). L'architecture réelle actuelle a **3 environnements sur 2 infrastructures différentes** :
+- Branche `dev` → environnement **"test"** → **Docker Compose sur VPS** (inchangé, via SSH)
+- Branche `staging` → environnement **"preprod"** → **Kubernetes via Helm** (`helm upgrade --install`, rollback atomique)
+- Branche `main` → environnement **"production"** → **Kubernetes via Helm**, mais **désactivé par défaut** (variable `K8S_PROD_ENABLED` à positionner manuellement dans GitHub Actions)
+
+Voir texte corrigé sections 2.3, 3.7 et 5.2/5.3.
 
 ---
 
@@ -37,8 +48,8 @@ MyMemoMaster est une application web d'aide à la révision destinée en priorit
 - Authentification : **JWT** (access token 15 min) + refresh token rotatif (7 jours) + bcryptjs
 - Traitement NLP : **`@xenova/transformers`** intégré à l'API Node.js
 - Queue asynchrone : **BullMQ + Redis** (rappels email différés)
-- Conteneurisation : **Docker Compose** + Traefik (reverse proxy HTTPS, Let's Encrypt)
-- CI/CD : **GitHub Actions** (lint + tests + build + déploiement VPS)
+- Conteneurisation : **Docker Compose** + Traefik (environnement "test" sur VPS) et **Kubernetes via Helm** (environnements "preprod" et "production")
+- CI/CD : **GitHub Actions** (CI : lint + tests + build ; CD : 3 pipelines de déploiement selon la branche — VPS, K8s preprod, K8s prod)
 
 Cette architecture en couches strictes facilite la séparation des responsabilités, le test unitaire de chaque couche, et l'évolution indépendante du front et du back.
 
@@ -49,37 +60,51 @@ Cette architecture en couches strictes facilite la séparation des responsabilit
 | Élément | Description | Outils / preuve |
 |---------|-------------|-----------------|
 | Frontend | Vue.js 3 + Vite, composants métier, state Pinia, routing Vue Router | `my_memo_master_front/`, Tailwind CSS, Pinia persist |
-| Backend | API Node.js 22, architecture controller → service → model, 18 entités | `my_memo_master_api/`, Express v4, Sequelize v6 |
+| Backend | API Node.js 22, architecture controller → service → model, 33 modèles | `my_memo_master_api/`, Express v4, Sequelize v6 |
 | Base de données | SQLite en local (dev) / PostgreSQL en production Docker | `config/db.config.js`, `config/dbms.config.js` |
 | Gestion de source | GitHub, branche `dev` d'intégration, branches `dev_back_*` / `dev_front_*` | Dépôt GitHub, conventions commits [ADD]/[IMP]/[REF]/[FIX] |
-| Conteneurisation | Docker Compose orchestrant 5 services en local | `docker-compose.yml`, Dockerfile API + Front |
+| Conteneurisation | Docker Compose en local (5 services) et en environnement "test" VPS ; Kubernetes/Helm pour "preprod" et "production" | `docker-compose.yml`, `server_docker_compose/`, `helm/`, Dockerfile API + Front |
 | Documentation API | Swagger/OpenAPI auto-générée depuis JSDoc des routes | `/api-docs` (swagger-ui-express) |
 | Qualité code | ESLint v9 (back) + ESLint v8 + Prettier (front) | `npm run lint`, `npm run format` |
-| Tests back | Jest + Supertest (724 tests intégration + unitaires) | `npm test` dans `my_memo_master_api/` |
-| Tests front | Vitest + @vue/test-utils + @pinia/testing (130+ tests) | `npm test` dans `my_memo_master_front/` |
+| Tests back | Jest + Supertest (1419 tests intégration + unitaires, 75 suites) | `npm test` dans `my_memo_master_api/` |
+| Tests front | Vitest + @vue/test-utils + @pinia/testing (548 tests) | `npm test` dans `my_memo_master_front/` |
 | Logging | Winston (tous les controllers) | `helpers/logger.js` |
 | Envoi email | Nodemailer (SMTP configurable) | `helpers/sendEmail.js`, variables SMTP_* |
 | Queue jobs | BullMQ + Redis (rappels asynchrones) | `jobs/reminder.queue.js`, `jobs/reminder.worker.js` |
-| Migrations DB | Sequelize CLI (23 migrations) | `my_memo_master_api/migrations/` |
+| Migrations DB | Sequelize CLI (61 migrations) | `my_memo_master_api/migrations/` |
 | Seeders | Sequelize CLI (rôles + user admin) | `my_memo_master_api/seeders/` |
 
 ---
 
 ## SECTION 2.3 — Protocole de déploiement continu (TEXTE CORRIGÉ)
 
-Le déploiement continu est opérationnel via GitHub Actions. Le pipeline enchaîne automatiquement :
+> Mis à jour au 2026-07-04 : l'architecture de déploiement a changé en profondeur les 2026-06-30/07-01 (migration Kubernetes/Helm + renommage des branches). Voir aussi ERREUR #6.
 
-1. **Lint** : ESLint sur l'API et le front (0 erreur requise)
-2. **Tests** : Jest (back) + Vitest (front) — 724 + 130+ tests
-3. **Build** : `vite build` du frontend (détecte les erreurs TypeScript/imports)
-4. **Déploiement préproduction** : push sur `dev` → build image Docker → push DockerHub → SSH VPS → `docker compose pull && docker compose up -d`
-5. **Déploiement production** : push sur `main` → même pipeline → services production
+Le déploiement continu repose sur **deux workflows GitHub Actions chaînés** : `ci.yml` (déclenché sur push) puis `cd.yml` (déclenché par `workflow_run` quand le CI se termine avec succès sur une branche de déploiement).
 
-La matrice CI est dynamique : une branche `dev_back_*` ne lance que les tests et le lint du back, une branche `dev_front_*` ne lance que les tests et le build du front, `main` et `dev` lancent les deux services en parallèle.
+**Pipeline CI (`ci.yml`) :**
+1. **Matrice dynamique** : une branche `dev_back_*` ne lance que les tests et le lint du back, une branche `dev_front_*` ne lance que les tests et le build du front, les branches `main` / `staging` / `dev` / `*devops*` lancent les deux services en parallèle.
+2. **Tests** : Jest (back) + Vitest (front) — 1419 + 548 tests
+3. **Lint** : ESLint sur l'API et le front (0 erreur requise)
+4. **Build** : `vite build` du frontend (détecte les erreurs TypeScript/imports), uniquement pour le service `front`
 
-Le `server_docker_compose/docker-compose.yml` est valide par `docker compose config -q` dans le pipeline CD avant toute tentative de déploiement (gate de sécurité).
+**Pipeline CD (`cd.yml`) — 3 déploiements distincts selon la branche :**
 
-**Stratégie de retour arrière :** les images Docker sont taguées `latest` sur DockerHub. Un rollback consiste à repasser sur l'image précédente via `docker compose pull <tag_précédent> && docker compose up -d`. La procédure est documentée dans `docs/RUNBOOK.md`.
+| Branche | Environnement | Infrastructure | Mécanisme |
+|---------|---------------|-----------------|-----------|
+| `dev` | "test" | VPS (Docker Compose) | Build & push image DockerHub `mymemomaster_test_*` → SSH VPS → `docker compose pull && up -d` → vérification healthcheck (24 tentatives × 5s) |
+| `staging` | "preprod" | Kubernetes (namespace `mymemomaster-preprod`) | Build & push image DockerHub `mymemomaster_preprod_*` → `helm upgrade --install mmm-preprod ./helm -f helm/values-preprod.yaml --rollback-on-failure --timeout 5m` |
+| `main` | "production" | Kubernetes (namespace `mymemomaster`) | Idem (`--rollback-on-failure --timeout 8m`), mais **le job ne s'exécute que si la variable GitHub Actions `K8S_PROD_ENABLED=true` est positionnée manuellement** — désactivé par défaut |
+
+Une notification Discord (webhook `DISCORD_LOG`) est envoyée en fin de CD (succès/échec), ainsi qu'en fin de CI via `notify_ci.yml` (indépendant de la réussite du déploiement).
+
+Pour l'environnement "test" (VPS), le `server_docker_compose/docker-compose.yml` est validé par `docker compose config -q` avant toute tentative de déploiement (gate de sécurité) ; les variables d'environnement du VPS distant sont également vérifiées (présence de `.env`, `ENVIRONMENT=test`).
+
+**Stratégie de retour arrière :**
+- **VPS ("test")** : images Docker taguées `latest` sur DockerHub. Rollback manuel via `docker compose pull <tag_précédent> && docker compose up -d`.
+- **Kubernetes ("preprod"/"prod")** : `helm upgrade --rollback-on-failure` effectue un **rollback automatique** vers la dernière révision saine si le déploiement échoue dans le timeout imparti (5 min preprod / 8 min prod). Rollback manuel possible via `helm rollback mmm-preprod` / `helm rollback mmm-prod`.
+
+La procédure complète est documentée dans `docs/RUNBOOK.md`.
 
 ---
 
@@ -101,7 +126,7 @@ Aucune logique métier ne se trouve dans les controllers. Cette séparation perm
 - `rateLimit.middleware.js` : 3 limiteurs (auth: 5 req/15min, register: 10/1h, API global: 200/15min)
 - `errorHandler.middleware.js` : filet de sécurité global pour les erreurs non catchées
 
-**18 entités back-end** avec CRUD complet : User, Role, Subject, Unit, Fields, FieldsType, Test, Question, Response, LeitnerSystem, LeitnerBox, LeitnerCard, Diagramme, Tutorials, OnboardingState, Kpi, CalendarEvent/EventOccurrence, ClassGroup, RevisionSession, Deadline, Reminder, Planning, Storage, Grading/Semantic, TestResult.
+**33 modèles Sequelize** (30 entités métier + 3 tables de jointure) avec CRUD complet : User, Role, Subject, Unit, Fields, FieldsType, Test, Question, Response, LeitnerSystem, LeitnerBox, LeitnerCard, Diagramme, Tutorials, OnboardingState, Kpi, CalendarEvent/EventOccurrence, ClassGroup, ClassGroupSection, ClassGroupResource, ClassGroupSubmission, Invitation, Etablissement, AuditLog, Tag, KpiConsent, UserKpiAlertSettings, RevisionSession, Deadline, Reminder, Planning, Storage, Grading/Semantic, TestResult (+ tables de jointure ClassGroupUsers, TestClassGroup, leitnerSystemsUsers).
 
 ---
 
@@ -123,16 +148,32 @@ Aucune logique métier ne se trouve dans les controllers. Cette séparation perm
 | Profil utilisateur | Gérer ses informations personnelles | Modification profil, changement mot de passe (critères front + back), suppression compte (confirmation textuelle "SUPPRIMER"), déconnexion | **Livré** |
 | Upload de fichiers | Stocker les pièces jointes et images | Upload S3 (Infomaniak/compatible) avec fallback disque local dev, `multerS3` dynamique, images mindmap (`/api/uploads/mindmaps/`), `POST /storage/upload` multi-fichiers | **Livré** |
 | Infrastructure Docker + CD | Déployer de façon reproductible | Docker Compose local (5 services) + VPS (4 services), Traefik HTTPS/HSTS, Let's Encrypt, pipeline CD GitHub Actions, `backup.sh`, `docs/RUNBOOK.md` | **Livré** |
+| Groupes classes (Classroom) | Organiser étudiants/enseignants par classe | `ClassGroup` + `ClassGroupUsers`, sections/ressources/rendus (`ClassGroupSection`, `ClassGroupResource`, `ClassGroupSubmission`), suivi "rendu reçu / pas encore rendu" avec téléchargement, 3 vues front (Établissement/Enseignant/Étudiant) | **Livré** |
+| Invitations de groupe | Inviter un étudiant/enseignant dans un groupe | Invitation par email (ajout direct si compte existant, email sinon), hook post-inscription pour honorer les invitations en attente, panneau "invitations en attente" (accept/decline) | **Livré** |
+| Établissements + pilotage multi-tenant | Rattacher utilisateurs/groupes à un établissement | `Etablissement` CRUD, contrôle d'accès `roleId=4` limité à son établissement, activation/désactivation de comptes (`PATCH activate/deactivate`) | **Livré** |
+| Journal d'audit (AuditLog) | Tracer les actions sensibles (activation, rôle) | Log automatique via `User.service`, `GET /audit-logs` réservé `roleId=1` | **Livré** |
+| Tags (classification transverse) | Retrouver/organiser le contenu par thème libre | `Tag` model M2M, `TagSelector` front, intégré sur cartes mentales/flashcards/exercices | **Livré** |
+| Recherche cross-contenu | Retrouver un contenu par mot-clé | `GET /search?subjectId&q`, navigation arborescente par sujet (`SubjectsPage`) | **Livré** |
+| KPI pédagogiques enseignant + consentement | Suivre la progression des étudiants avec leur accord | Dashboard enseignant (score, activité hebdo, badges, matières), système de consentement étudiant (`KpiConsent` : grant/revoke/liste), alertes KPI paramétrables (`UserKpiAlertSettings`) | **Livré** |
 
 ---
 
 ## SECTION 3.4 — Tests unitaires (TEXTE COMPLÉTÉ)
 
-### Suite de tests back-end (Jest + Supertest) — 724 tests au total
+> Chiffres vérifiés le 2026-07-04 par exécution réelle (`npm test`) : la suite a beaucoup grossi depuis la première rédaction du document (724 → 1419 back, 130+ → 548 front). Le tableau ci-dessous liste les suites historiques et les principaux ajouts ; il n'est pas exhaustif (75 fichiers de tests côté back, 35 côté front).
+
+### Suite de tests back-end (Jest + Supertest) — 1419 tests au total (75 suites)
 
 | Périmètre | Type | Nombre | Fichier(s) |
 |-----------|------|--------|-----------|
-| Intégration API — controllers (18 entités) | Supertest | ~500 | `test/controllers/*.controller.test.js` |
+| Intégration API — controllers (33 modèles) | Supertest | ~900 | `test/controllers/*.controller.test.js` |
+| Invitations (service + controller) | Unitaire/Intégration | 44 | `test/services/Invitation.service.test.js`, `test/controllers/Invitation.controller.test.js` |
+| Établissement (service + controller) | Unitaire/Intégration | 21 | `test/services/Etablissement.service.test.js`, `test/controllers/Etablissement.controller.test.js` |
+| AuditLog (service + controller) | Unitaire/Intégration | 10 | `test/services/AuditLog.service.test.js`, `test/controllers/AuditLog.controller.test.js` |
+| KpiConsent (service + controller + BDD) | Unitaire/Intégration | 45 + 3 BDD | `test/services/KpiConsent.service.test.js`, `test/controllers/KpiConsent.controller.test.js` |
+| Tags (controller) | Intégration | 39 | `test/controllers/Tag.controller.test.js` |
+| Recherche cross-contenu | Intégration | 11 | `test/controllers/Search.controller.test.js` |
+| Activation/désactivation de comptes | Intégration | 12 | `test/controllers/User.controller.test.js` |
 | Auth middleware (JWT invalide, expiré, absent) | Unitaire | 7 | `test/middlewares/auth.middleware.test.js` |
 | RequireRole middleware (RBAC) | Unitaire | 8 | `test/middlewares/requireRole.middleware.test.js` |
 | Sécurité (CORS, rate limiting) | Intégration | 8 | `test/middlewares/security.test.js` |
@@ -148,7 +189,9 @@ Aucune logique métier ne se trouve dans les controllers. Cette séparation perm
 | Moteur de correction exercices (4 types) | Unitaire | 16 | `test/services/Test.service.test.js` |
 | Couche API Axios (get, post, put, del) | Unitaire | 20 | `my_memo_master_front/test/helpers/api.test.js` |
 
-### Suite de tests front-end (Vitest + @vue/test-utils) — 130+ tests
+### Suite de tests front-end (Vitest + @vue/test-utils) — 548 tests (545 verts / 3 en échec)
+
+> 3 échecs actuels dans `test/components/ClassroomPage.test.js` (assertions sur le libellé "Vue :" — régression mineure à corriger avant la soutenance, sans impact fonctionnel constaté).
 
 | Périmètre | Type | Nombre | Fichier(s) |
 |-----------|------|--------|-----------|
@@ -159,14 +202,16 @@ Aucune logique métier ne se trouve dans les controllers. Cette séparation perm
 | Composant ProfilePage (saveProfile, changePassword, logout, suppression) | Composant | 17 | `test/components/ProfilePage.test.js` |
 | Guard Vue Router (routes privées, redirection, meta.roles) | Router | 12 | `test/router/router.guard.test.js` |
 | Composable useRole (5 rôles, computed, hasAnyRole) | Composable | 20 | `test/composables/useRole.test.js` |
+| Store invitations + composant ClassroomPage | Store + Composant | 14 + 12 | `test/stores/invitations.store.test.js`, `test/components/ClassroomPage.test.js` |
+| Store kpiConsent (cache TTL, grant/revoke) | Store | 32 | `test/stores/kpiConsent.store.test.js` |
 
 **Commandes d'exécution :**
 ```bash
 # Back-end
-cd my_memo_master_api && npm test        # → 724/724 ✅
+cd my_memo_master_api && npm test        # → 1419/1419 ✅
 
 # Front-end
-cd my_memo_master_front && npm test      # → 130+/130+ ✅
+cd my_memo_master_front && npm test      # → 545/548 (3 échecs ClassroomPage à corriger)
 ```
 
 ---
@@ -203,6 +248,12 @@ cd my_memo_master_front && npm test      # → 130+/130+ ✅
 | Sécurité avancée (RBAC, refresh token, SHA-256) | 2026-06-14 → 06-17 | 5 rôles, requireRole middleware, refresh token rotatif, reset password SHA-256, guards Vue Router, useRole composable, ProfilePage tests | Branches `dev_back_security`, `dev_front_rbac` |
 | Exercices (4 types + correction server-side) | 2026-06-19 → 06-21 | QCM/trou/reorder/open, `POST /tests/:id/submit`, TestResult historique scores, éditeur + player front | Branches `dev_back_exercises`, `dev_front_exercises` |
 | Mind Map (upload images S3 + doc) | 2026-06-22 → 06-23 | Upload images nœuds multerS3 (fallback local), auto-resize, DOC_mindmap_editor.md | Branche `dev_back_refactor` |
+| Groupes classes + Invitations (Classroom) | 2026-06-24 → 06-28 | `ClassGroup`/`Invitation`/sections/ressources/rendus, suivi rendu enseignant, 3 vues front (Établissement/Enseignant/Étudiant), 74+ tests back dédiés | Branches `dev_back_classroom`, `dev_front_classroom` |
+| Tags + Recherche + navigation par sujet | 2026-06-24 → 06-25 | `Tag` model M2M + `TagSelector`, `GET /search`, `SubjectsPage` (arborescence), `SubjectSelectorComponent` réutilisable | Branche `dev_back_refactor` |
+| KPI pédagogiques + consentement étudiant | 2026-06-26 → 06-27 | Dashboard enseignant (score/activité/badges), `KpiConsent` (grant/revoke/liste), `UserKpiAlertSettings` (digest 18h), 8 bugs de revue corrigés | Branches `dev_back_kpi`, `dev_front_kpi` |
+| Établissements + Audit + activation comptes | 2026-07-01 | `Etablissement` CRUD (pilotage multi-tenant `roleId=4`), `AuditLog` (traçabilité activation/rôle), `PATCH activate/deactivate` | Branche `dev_back_refactor` |
+| Migration Kubernetes/Helm (preprod + prod) | 2026-06-30 | Chart Helm unique remplaçant 14 fichiers YAML dupliqués (`k8s/preprod/`, `k8s/prod/`), déploiement `helm upgrade --install` avec rollback automatique, script `helm-migrate.sh` pour l'adoption des ressources existantes | `helm/`, `.github/workflows/cd.yml` |
+| Renommage branches CI/CD | 2026-07-01 | `test`→`dev`, `preprod`→`staging` (infra DockerHub/K8s/VPS inchangée) | `.github/workflows/` |
 
 ---
 
@@ -241,6 +292,8 @@ cd my_memo_master_front && npm test      # → 130+/130+ ✅
 | BUG-10 | `/calendar` déclarée `private: false` → page avec données personnelles accessible sans authentification | Haute (sécurité) | `private: true` dans `routes.js` | Corrigé (2026-06-17) |
 | BUG-11 | `ForgotPasswordPage` et `ResetPasswordPage` utilisaient `.custom-border` et `.formulaire` non définies → mise en page cassée | Basse | Extraction dans `auth-form.css` partagé, import dans les 4 pages | Corrigé (2026-06-16) |
 | BUG-12 | Reset password avec code 6 chiffres : entropie insuffisante (900 000 valeurs), stocké en clair | Haute (sécurité) | Migration vers token 64 chars hex, hash SHA-256 en base | Corrigé (2026-06-15) |
+| BUG-13 | `atRiskStudents` (KPI enseignant) provoquait un crash serveur sur groupe sans étudiant ; requêtes croisées Deadline/RevisionSession ignoraient la limite au groupe | Haute | Garde sur tableau vide + filtrage explicite par `groupId` dans les requêtes croisées | Corrigé (2026-06-26) |
+| BUG-14 | Cache TTL du consentement KPI partagé entre 4 stores Pinia → données d'un étudiant affichées pour un autre après changement de sélection | Haute | Clé de cache incluant `studentId`, invalidation explicite sur `revokeConsent` | Corrigé (2026-06-27) |
 
 ---
 
@@ -251,7 +304,7 @@ cd my_memo_master_front && npm test      # → 130+/130+ ✅
 | Document | Contenu | Emplacement |
 |----------|---------|-------------|
 | Swagger/OpenAPI | Tous les endpoints documentés avec paramètres, réponses, schémas | `/api-docs` (en ligne), généré depuis `routes/*.routes.js` |
-| Schéma BDD (ERD Mermaid) | 21 tables avec types, contraintes FK, index, comportements ON DELETE | `diagrams/schema_bdd.md` |
+| Schéma BDD (ERD Mermaid) | Types, contraintes FK, index, comportements ON DELETE — **⚠ à vérifier/rafraîchir** : le nombre de tables du diagramme date d'avant l'ajout d'Établissement/Invitation/Tags/KpiConsent/AuditLog | `diagrams/schema_bdd.md` |
 | Algorithme Leitner | Algo des 5 boîtes, calcul next\_review\_at, règles de session, droits | `diagrams/leitner_algo.md` |
 | Règles métier Calendrier | Acteurs, modèle de données, règles récurrence, todo list, cas limites | `diagrams/calendar_rules.md` |
 | Documentation éditeur Mind Map | Architecture composants, format JSON, store, helpers, tests | `diagrams/DOC_mindmap_editor.md` |
@@ -261,26 +314,43 @@ cd my_memo_master_front && npm test      # → 130+/130+ ✅
 
 ### 5.2 Manuel de déploiement (résumé)
 
-**Prérequis :** Docker 24+, Docker Compose v2, accès SSH VPS, DNS configuré vers le VPS, variables `.env` renseignées.
+> Le déploiement diffère selon l'environnement depuis la migration Kubernetes/Helm (2026-06-30) : "test" reste sur Docker Compose/VPS, "preprod" et "production" sont sur Kubernetes.
 
-**Déploiement initial :**
+**Environnement local (dev) :**
 ```bash
 git clone <repo> && cd MyMemoMaster
 cp .env.example .env           # renseigner PG_*, JWT_*, SMTP_*, S3_*, CORS_ORIGIN
 docker compose up -d           # démarre 5 services (api, front, postgres, pgadmin, redis)
 cd my_memo_master_api
-npx sequelize-cli db:migrate   # applique les 23 migrations
+npx sequelize-cli db:migrate   # applique les 61 migrations
 npx sequelize-cli db:seed:all  # insère rôles + user admin
 # Puis reset des séquences PostgreSQL (voir RUNBOOK.md)
 ```
 
-**Mise à jour :**
+**Environnement "test" (VPS, Docker Compose) — automatique via CD sur push `dev` :**
 ```bash
-docker compose pull && docker compose up -d   # met à jour les images
-npx sequelize-cli db:migrate                   # applique les nouvelles migrations
+# géré par .github/workflows/cd.yml (job deploy_test)
+docker compose --env-file .env pull
+docker compose --env-file .env up -d
 ```
 
-**Rollback :** revenir au tag d'image précédent sur DockerHub, `docker compose up -d`.
+**Environnements "preprod"/"production" (Kubernetes via Helm) — automatique via CD sur push `staging`/`main` :**
+```bash
+# Prérequis : bash k8s/helm-migrate.sh preprod   (une seule fois, avant le tout premier déploiement Helm)
+helm upgrade --install mmm-preprod ./helm -f helm/values-preprod.yaml \
+  -n mymemomaster-preprod --create-namespace \
+  --set "rolloutTimestamp=$(date +%s)" --rollback-on-failure --timeout 5m
+
+# Production : job désactivé par défaut, nécessite K8S_PROD_ENABLED=true dans les variables GitHub Actions
+helm upgrade --install mmm-prod ./helm -f helm/values-prod.yaml \
+  -n mymemomaster --create-namespace \
+  --set "rolloutTimestamp=$(date +%s)" --rollback-on-failure --timeout 8m
+```
+Les migrations Sequelize ne sont **pas** appliquées automatiquement par le CD Kubernetes — à exécuter manuellement (`kubectl exec` dans le pod API) après déploiement d'une nouvelle version avec migrations.
+
+**Rollback :**
+- VPS ("test") : revenir au tag d'image précédent sur DockerHub, `docker compose up -d`.
+- Kubernetes ("preprod"/"prod") : automatique via `--rollback-on-failure` si le déploiement échoue ; rollback manuel avec `helm rollback mmm-preprod` (ou `mmm-prod`).
 
 ### 5.3 Points de vigilance pour la mise à jour
 
@@ -288,6 +358,10 @@ npx sequelize-cli db:migrate                   # applique les nouvelles migratio
 - `LeitnerBox.intervall` est en secondes (valeurs dev : 5/10/15/20/30s) — à configurer en jours en production (86400, 259200, 604800…)
 - Les séquences PostgreSQL doivent être remises à jour après tout `db:seed:all` avec IDs explicites (voir RUNBOOK.md)
 - `BullMQ/Redis` : les jobs en attente sont perdus si Redis redémarre sans persistance AOF/RDB — les rappels actifs doivent être recréés
+- Avant le tout premier déploiement Helm sur un environnement existant : exécuter `k8s/helm-migrate.sh` (ou `.ps1`) pour faire adopter par Helm les ressources déjà présentes sur le cluster, sous peine de conflit de nommage
+- Les anciens manifests bruts `k8s/preprod/` et `k8s/prod/` sont conservés en archive mais ne sont plus utilisés par le CD (remplacés par le chart Helm unique)
+- Déploiement production Kubernetes **désactivé par défaut** (`K8S_PROD_ENABLED` doit être positionné manuellement dans les variables GitHub Actions) — à vérifier avant de considérer le déploiement prod comme opérationnel
+- Les secrets Kubernetes (`mmm-{env}-secrets`) sont créés manuellement sur le cluster, non gérés par le chart Helm
 
 ---
 
@@ -298,9 +372,12 @@ npx sequelize-cli db:migrate                   # applique les nouvelles migratio
 | Erreur Python AI service corrigée partout | ☐ |
 | Dates section 3.7 corrigées (2025 → 2026) | ☐ |
 | "zod/ajv" remplacé par "express-validator" | ☐ |
-| Tests présentés comme livrés (724 back + 130 front) | ☐ |
+| Tests présentés comme livrés (1419 back + 548 front, 3 échecs ClassroomPage à corriger) | ☐ |
 | Modules manquants ajoutés (Calendrier, Rappels, Planning, RBAC) | ☐ |
-| Bugs réels documentés (12 bugs corrigés) | ☐ |
+| Modules récents ajoutés (Groupes classes, Invitations, Établissements, Audit, Tags, Recherche, KPI+consentement) | ☐ |
+| Compteurs entités/migrations mis à jour (33 modèles, 61 migrations) | ☐ |
+| Déploiement mis à jour (3 environnements : VPS test / K8s preprod / K8s prod via Helm, prod désactivée par défaut) | ☐ |
+| Bugs réels documentés (14 bugs corrigés) | ☐ |
 | Documentation existante référencée (Swagger, ERD, RUNBOOK) | ☐ |
 | Cahier de recettes rempli après exécution en préprod | ☐ |
 | Placeholders et encadrés d'aide supprimés | ☐ |
