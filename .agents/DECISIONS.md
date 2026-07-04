@@ -755,3 +755,11 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Validation via `Number.isInteger()` + plafond `Math.min(val, 500)`. La route `GET /:id/audit` utilise désormais un validator express-validator dédié (`auditLogs`) qui refuse les valeurs non entières avant d'atteindre le service.  
 **Alternative écartée** : Valider uniquement dans le service — la validation au niveau route est préférable (rejet rapide, message d'erreur structuré).  
 **Conséquences** : Requêtes avec `limit > 500` sont automatiquement plafonnées. Les clients doivent paginer pour obtenir plus de 500 entrées d'audit.
+
+---
+
+### [2026-07-04] ClassroomPage — sélecteur de vue conditionné sur `isAdmin`, pas sur le nombre de vues disponibles
+**Contexte** : Le commit `f4d654e` a introduit `v-if="availableViews.length > 1"` pour afficher le sélecteur "Vue :", couplé à un `availableViews` rendu exclusif pour l'admin plateforme (`[{key:'plateforme'}]` uniquement). Résultat : le sélecteur restait affiché pour un simple étudiant/enseignant (2 vues toujours poussées : enseignant + étudiant) et disparaissait pour l'admin plateforme (1 seule vue), cassant 3 tests CI (`ClassroomPage.test.js`).
+**Décision** : Le sélecteur reste conditionné strictement sur `isAdmin` (roleId 1 ou 4), pas sur le nombre de vues. `availableViews` redevient additif : `plateforme` s'ajoute aux vues (étalissement/enseignant/étudiant) pour l'admin plateforme au lieu de les remplacer — un admin plateforme peut donc basculer entre les 4 vues, un admin établissement entre 3, et un enseignant/étudiant n'a pas de sélecteur (vue fixe imposée par son rôle).
+**Alternative écartée** : Garder `availableViews.length > 1` en poussant conditionnellement enseignant/étudiant selon le rôle — plus de complexité pour un gain nul, et risque de recréer la même régression au prochain ajout de vue.
+**Conséquences** : Toute nouvelle vue ajoutée à `ClassroomPage.vue` doit être poussée dans `availableViews` de façon additive (jamais en remplacement d'une vue existante) pour ne pas rompre l'invariant "le sélecteur n'apparaît que pour `isAdmin`".

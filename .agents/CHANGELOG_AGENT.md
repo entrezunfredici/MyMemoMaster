@@ -4980,3 +4980,22 @@ Documentation complète de la fonctionnalité "Gestion des établissements et in
 | Module | État |
 |--------|------|
 | Documentation administration | Stable — S-04.13 livré |
+
+---
+
+### [2026-07-04] FIX — Régression toggle "Vue :" de ClassroomPage (CI front)
+
+#### Contexte
+Le commit `f4d654e` ("[IMP] classgroup") avait modifié `ClassroomPage.vue` en remplaçant la condition d'affichage du sélecteur de vue `v-if="isAdmin"` par `v-if="availableViews.length > 1"`, et rendu `availableViews` exclusif (un admin plateforme ne recevait plus que `[{key:'plateforme'}]` au lieu de `[plateforme, etablissement, enseignant, etudiant]`). Conséquence en CI (`test/components/ClassroomPage.test.js`) : le sélecteur restait affiché pour un étudiant/enseignant (car `enseignant`+`etudiant` sont toujours poussés → `length > 1`), et disparaissait pour l'admin plateforme (1 seule entrée → `length === 1`).
+
+#### Fichier modifié
+- `my_memo_master_front/src/pages/ClassroomPage.vue`
+
+#### Correction
+- Restauration de `v-if="isAdmin"` pour la visibilité du sélecteur (seuls roleId 1 et 4 le voient).
+- Restauration du calcul additif de `availableViews` (`plateforme` en plus de `etablissement`/`enseignant`/`etudiant` pour un admin plateforme, pas à la place).
+
+#### État
+| Module | État |
+|--------|------|
+| Front — ClassroomPage (toggle Vue) | Stable — régression f4d654e corrigée, 548/548 tests front verts |

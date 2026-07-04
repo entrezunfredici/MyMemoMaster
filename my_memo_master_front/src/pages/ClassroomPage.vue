@@ -26,7 +26,7 @@
     </section>
 
     <!-- Sélection de vue -->
-    <div v-if="availableViews.length > 1" class="flex items-center gap-2">
+    <div v-if="isAdmin" class="flex items-center gap-2">
       <span class="text-sm text-dark/70">Vue :</span>
       <button v-for="v in availableViews" :key="v.key"
         @click="activeView = v.key"
@@ -85,8 +85,8 @@ watch(
 )
 
 const availableViews = computed(() => {
-  if (isAdminPlateforme.value) return [{ key: 'plateforme', label: 'Plateforme' }]
   const views = []
+  if (isAdminPlateforme.value) views.push({ key: 'plateforme', label: 'Plateforme' })
   if (isAdmin.value) views.push({ key: 'etablissement', label: 'Établissement' })
   views.push({ key: 'enseignant', label: 'Enseignant' })
   views.push({ key: 'etudiant', label: 'Étudiant' })
