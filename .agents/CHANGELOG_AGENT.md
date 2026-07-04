@@ -4957,3 +4957,26 @@ _(aucun)_
 #### Dette connue
 - `_processPendingEmailInvitations` dans User.service.js a les mêmes lacunes que `assignAdmin` (pas de transaction, pas de vérification roleId=1, pas de révocation ancien admin) — à corriger en ticket dédié
 - Le scope des groupes par `createdBy: adminId` est un défaut de design (pas de FK `etablissementId` sur ClassGroup) — une migration ajoutant cette FK permettrait un scope fiable même après changement d'admin
+
+---
+
+### [2026-07-04] S-04.13 — Documentation administration établissements
+
+#### Fichier créé
+- `docs/DOC_administration_etablissements.md`
+
+#### Contenu
+Documentation complète de la fonctionnalité "Gestion des établissements et invitations" incluant :
+- Modèle de données (Etablissement, AuditLog, User — champs pertinents)
+- Tableau des rôles et droits (roleId 1, 4)
+- Référence complète des 11 endpoints API (auth, params, réponses, codes d'erreur)
+- Flux complets : création/déploiement établissement, remplacement gérant, gestion compte problématique
+- Référence des 7 actions d'audit trail avec metadata
+- Tableau de toutes les contraintes métier et gardes (10 règles)
+- Section dette connue : limitation scope `createdBy:adminId`, gardes manquantes `_processPendingEmailInvitations`, absence vue "tous les comptes"
+- Tableaux de référence rapide pour `assignAdmin`, `setActive`, `deleteContent`
+
+#### État
+| Module | État |
+|--------|------|
+| Documentation administration | Stable — S-04.13 livré |
