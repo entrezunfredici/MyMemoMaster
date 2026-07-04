@@ -1,4 +1,4 @@
-const { body, param } = require('express-validator')
+const { body, param, query } = require('express-validator')
 
 const contentIdParam = param('contentId')
   .isInt({ min: 1 })
@@ -67,6 +67,19 @@ exports.assignAdmin = [
     .withMessage("L'email est requis.")
     .isEmail()
     .withMessage("L'email est invalide.")
+    .normalizeEmail()
+]
+
+exports.auditLogs = [
+  idParam,
+  query('entityId')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("L'identifiant de l'entité doit être un entier positif."),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 500 })
+    .withMessage('La limite doit être un entier entre 1 et 500.')
 ]
 
 exports.deleteContent = [idParam, contentTypeParam, contentIdParam]

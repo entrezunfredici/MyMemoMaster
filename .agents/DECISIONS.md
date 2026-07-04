@@ -733,3 +733,25 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Renommer uniquement les branches Git et les triggers `ci.yml`/`cd.yml` : `test` → `dev`, `preprod` → `staging` (`main` inchangé). Les noms internes d'infrastructure déjà en place restent identiques : images DockerHub (`mymemomaster_test_*`, `mymemomaster_preprod_*`), namespace K8s (`mymemomaster-preprod`), release Helm (`mmm-preprod`), chemin VPS (`/var/www/html/my_memo_master_test`), manifests (`k8s/preprod/`).
 **Alternative écartée** : Renommage complet de l'infra (namespace K8s, images, chemin VPS, ingress) — plus cohérent sémantiquement mais nécessite de recréer le namespace K8s (secrets/configmaps à refaire), de repousser les images sous un nouveau nom, et de migrer le dossier VPS sans casser le déploiement en cours ; reporté à une décision explicite si besoin.
 **Conséquences** : `README.md` documentait déjà une branche `dev` comme branche d'intégration de base (`git checkout dev` avant de créer une feature branch) — ce renommage fait donc de `dev` à la fois la branche d'intégration quotidienne ET le trigger de déploiement automatique vers le VPS test. Chaque merge sur `dev` déploie désormais automatiquement sur le VPS test (comportement à confirmer avec l'équipe si ce n'est pas voulu).
+
+### [2026-07-04] assignAdmin — désactivation admin-à-admin intentionnellement bloquée
+**Contexte** : La revue S-04.12 a identifié qu'un admin plateforme (roleId=1) pouvait désactiver tous les autres admins plateforme, permettant à un attaquant de rester le seul admin actif.  
+**Décision** : `setActive` bloque la désactivation d'un user roleId=1 par tout autre roleId=1. Aucun admin plateforme ne peut désactiver un autre admin plateforme via l'API.  
+**Alternative écartée** : Permettre la désactivation admin-à-admin pour gérer les comptes compromis — trop risqué sans mécanisme de "dernier recours" ; une intervention directe en BDD est préférable pour ce cas extrême.  
+**Conséquences** : Pour désactiver un compte admin plateforme compromis, il faut une intervention directe en base de données. Le self-deactivation est également bloqué (targetId === actorId).
+
+---
+
+### [2026-07-04] assignAdmin — un user ne peut gérer qu'un seul établissement à la fois
+**Contexte** : Sans garde, un admin plateforme pouvait assigner le même user comme admin de deux établissements (double roleId=4 + double accès via etab.adminId !== requesterId).  
+**Décision** : `assignAdmin` vérifie `Etablissement.findOne({ where: { adminId: user.userId } })` avant la promotion. Retourne `'already_admin'` si un autre établissement pointe déjà vers cet admin.  
+**Alternative écartée** : Permettre le multi-établissement — incompatible avec le modèle de données actuel (pas de table junction admin↔etab).  
+**Conséquences** : Pour changer d'établissement, l'admin doit d'abord être révoqué du premier. L'ancien admin perd son roleId=4 lors du remplacement (réinitialisé à 2).
+
+---
+
+### [2026-07-04] getAuditLogs — limit plafonnée à 500, entityId validé numériquement
+**Contexte** : `filters.limit` et `filters.entityId` venaient directement de req.query (strings). Une string non numérique produisait NaN dans les clauses SQL Sequelize (crash PostgreSQL ou dump de table).  
+**Décision** : Validation via `Number.isInteger()` + plafond `Math.min(val, 500)`. La route `GET /:id/audit` utilise désormais un validator express-validator dédié (`auditLogs`) qui refuse les valeurs non entières avant d'atteindre le service.  
+**Alternative écartée** : Valider uniquement dans le service — la validation au niveau route est préférable (rejet rapide, message d'erreur structuré).  
+**Conséquences** : Requêtes avec `limit > 500` sont automatiquement plafonnées. Les clients doivent paginer pour obtenir plus de 500 entrées d'audit.

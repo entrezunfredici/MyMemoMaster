@@ -140,6 +140,8 @@ exports.assignAdmin = async (req, res) => {
   try {
     const result = await EtablissementService.assignAdmin(req.params.id, req.body.email, req.user.id)
     if (result === null) return res.status(404).json({ message: 'Établissement introuvable.' })
+    if (result === 'platform_admin') return res.status(409).json({ message: "Impossible d'assigner un administrateur plateforme comme gérant d'établissement." })
+    if (result === 'already_admin') return res.status(409).json({ message: 'Cet utilisateur est déjà gestionnaire d\'un autre établissement.' })
     if (result.directlyAssigned) {
       return res.status(200).json({ message: 'Gérant assigné avec succès.', data: result })
     }

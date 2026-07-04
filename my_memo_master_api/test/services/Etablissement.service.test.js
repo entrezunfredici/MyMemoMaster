@@ -7,9 +7,10 @@ jest.mock('../../models/index', () => ({
     findAll: jest.fn(),
     findByPk: jest.fn(),
     findOne: jest.fn(),
-    create: jest.fn()
+    create: jest.fn(),
+    sequelize: { transaction: jest.fn((cb) => cb({})) }
   },
-  User: { findOne: jest.fn() },
+  User: { findOne: jest.fn(), update: jest.fn() },
   ClassGroup: { findAll: jest.fn() },
   ClassGroupUsers: { findAll: jest.fn() },
   Invitation: { findAll: jest.fn(), findOrCreate: jest.fn() },
@@ -395,6 +396,17 @@ describe('EtablissementService', () => {
 
       expect(result).toBe('not_found')
     })
+
+    it('admin plateforme (roleId=1) peut supprimer du contenu orphelin quand adminId est null', async () => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: null })
+      const orphanResource = { id: 5, classGroupId: 99, destroy: jest.fn().mockResolvedValue() }
+      ClassGroupResource.findByPk.mockResolvedValue(orphanResource)
+
+      const result = await EtablissementService.deleteContent(1, 'resource', 5, 1, 1)
+
+      expect(orphanResource.destroy).toHaveBeenCalled()
+      expect(result).toBe(true)
+    })
   })
 
   // ── assignAdmin ────────────────────────────────────────────────────────────
@@ -402,6 +414,7 @@ describe('EtablissementService', () => {
   describe('assignAdmin', () => {
     const mockUserInstance = {
       userId: 5,
+      roleId: 2,
       name: 'Gérant',
       email: 'gerant@exemple.fr',
       update: jest.fn()
@@ -416,8 +429,10 @@ describe('EtablissementService', () => {
 
     beforeEach(() => {
       Etablissement.findByPk.mockResolvedValue(mockEtabInstance)
+      Etablissement.findOne.mockResolvedValue(null)
       mockEtabInstance.update.mockResolvedValue()
       mockUserInstance.update.mockResolvedValue()
+      User.update.mockResolvedValue()
       sendEmail.mockResolvedValue()
     })
 
@@ -433,15 +448,46 @@ describe('EtablissementService', () => {
     it('assigne directement le gérant si le compte existe', async () => {
       User.findOne.mockResolvedValue(mockUserInstance)
       Etablissement.findByPk
-        .mockResolvedValueOnce(mockEtabInstance)  // premier appel (findByPk au début)
-        .mockResolvedValueOnce({ ...mockEtabInstance, adminId: 5 }) // second appel (rechargement)
+        .mockResolvedValueOnce(mockEtabInstance)
+        .mockResolvedValueOnce({ ...mockEtabInstance, adminId: 5 })
 
       const result = await EtablissementService.assignAdmin(1, 'gerant@exemple.fr', 1)
 
-      expect(mockUserInstance.update).toHaveBeenCalledWith({ roleId: 4 })
-      expect(mockEtabInstance.update).toHaveBeenCalledWith({ adminId: mockUserInstance.userId })
+      expect(mockUserInstance.update).toHaveBeenCalledWith({ roleId: 4 }, expect.any(Object))
+      expect(mockEtabInstance.update).toHaveBeenCalledWith({ adminId: mockUserInstance.userId }, expect.any(Object))
       expect(result.directlyAssigned).toBe(true)
       expect(result.user.email).toBe('gerant@exemple.fr')
+    })
+
+    it('retourne platform_admin si l\'utilisateur est admin plateforme (roleId=1)', async () => {
+      User.findOne.mockResolvedValue({ ...mockUserInstance, roleId: 1 })
+
+      const result = await EtablissementService.assignAdmin(1, 'admin@exemple.fr', 1)
+
+      expect(result).toBe('platform_admin')
+      expect(mockUserInstance.update).not.toHaveBeenCalled()
+    })
+
+    it('retourne already_admin si l\'utilisateur gère déjà un autre établissement', async () => {
+      User.findOne.mockResolvedValue(mockUserInstance)
+      Etablissement.findOne.mockResolvedValue({ id: 99 }) // autre établissement
+
+      const result = await EtablissementService.assignAdmin(1, 'gerant@exemple.fr', 1)
+
+      expect(result).toBe('already_admin')
+      expect(mockUserInstance.update).not.toHaveBeenCalled()
+    })
+
+    it('révoque le rôle de l\'ancien admin lors d\'un remplacement', async () => {
+      const etabWithAdmin = { ...mockEtabInstance, adminId: 10, update: jest.fn() }
+      User.findOne.mockResolvedValue(mockUserInstance)
+      Etablissement.findByPk
+        .mockResolvedValueOnce(etabWithAdmin)
+        .mockResolvedValueOnce({ ...etabWithAdmin, adminId: mockUserInstance.userId })
+
+      await EtablissementService.assignAdmin(1, 'gerant@exemple.fr', 1)
+
+      expect(User.update).toHaveBeenCalledWith({ roleId: 2 }, expect.objectContaining({ where: { userId: 10 } }))
     })
 
     it('normalise l\'email en minuscule avant la recherche', async () => {
@@ -475,13 +521,13 @@ describe('EtablissementService', () => {
       expect(result.email).toBe('nouveau@exemple.fr')
     })
 
-    it('n\'échoue pas si l\'envoi d\'email plante (invitation déjà créée)', async () => {
+    it('ne renvoie pas d\'email si l\'invitation existe déjà (created=false)', async () => {
       User.findOne.mockResolvedValue(null)
       Invitation.findOrCreate.mockResolvedValue([mockInvitation, false])
-      sendEmail.mockRejectedValue(new Error('SMTP timeout'))
 
       const result = await EtablissementService.assignAdmin(1, 'nouveau@exemple.fr', 1)
 
+      expect(sendEmail).not.toHaveBeenCalled()
       expect(result.directlyAssigned).toBe(false)
     })
   })
@@ -571,6 +617,60 @@ describe('EtablissementService', () => {
       expect(AuditLog.findAll).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 10 })
       )
+    })
+
+    it('plafonne la limite à 500 si supérieure', async () => {
+      AuditLog.findAll.mockResolvedValue([])
+
+      await EtablissementService.getAuditLogs(1, 99, 1, { limit: '9999' })
+
+      expect(AuditLog.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 500 })
+      )
+    })
+
+    it('utilise la limite par défaut (100) si limit n\'est pas un nombre valide', async () => {
+      AuditLog.findAll.mockResolvedValue([])
+
+      await EtablissementService.getAuditLogs(1, 99, 1, { limit: 'abc' })
+
+      expect(AuditLog.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 100 })
+      )
+    })
+
+    it('ignore entityId si non numérique (pas de NaN dans WHERE)', async () => {
+      AuditLog.findAll.mockResolvedValue([])
+
+      await EtablissementService.getAuditLogs(1, 99, 1, { entityId: 'abc' })
+
+      const callArgs = AuditLog.findAll.mock.calls[0][0]
+      expect(callArgs.where).not.toHaveProperty('entityId')
+    })
+  })
+
+  // ── getStats — déduplication ───────────────────────────────────────────────
+
+  describe('getStats — déduplication multi-rôles', () => {
+    beforeEach(() => {
+      Etablissement.findByPk.mockResolvedValue({ id: 1, adminId: 10 })
+      ClassGroup.findAll.mockResolvedValue([{ id: 11 }])
+      Invitation.findAll.mockResolvedValue([])
+      AuditLog.findAll.mockResolvedValue([])
+    })
+
+    it('compte un user teacher+student comme teacher (rôle le plus élevé)', async () => {
+      const user = { userId: 101, isActive: true, hasValidatedEmail: true }
+      ClassGroupUsers.findAll.mockResolvedValue([
+        { user, role: 'student' },
+        { user, role: 'teacher' }
+      ])
+
+      const result = await EtablissementService.getStats(1, 99, 1)
+
+      expect(result.totalMembers).toBe(1)
+      expect(result.roleBreakdown.teachers).toBe(1)
+      expect(result.roleBreakdown.students).toBe(0)
     })
   })
 })

@@ -95,22 +95,23 @@ class EtablissementService {
         }]
       })
 
-      // Déduplication par userId + cumul du rôle ClassGroup (student/teacher)
+          // Déduplication par userId — teacher prime sur student si multi-groupes
       const seen = new Map()
       for (const m of memberships) {
         if (!m.user) continue
         if (!seen.has(m.user.userId)) {
-          seen.set(m.user.userId, { user: m.user, role: m.role })
+          seen.set(m.user.userId, { user: m.user, isTeacher: false })
         }
+        if (m.role === 'teacher') seen.get(m.user.userId).isTeacher = true
       }
 
-      for (const { user, role } of seen.values()) {
+      for (const { user, isTeacher } of seen.values()) {
         memberStats.total++
         if (user.isActive) memberStats.active++
         else memberStats.inactive++
         if (user.hasValidatedEmail) memberStats.validated++
-        if (role === 'student') memberStats.students++
-        else if (role === 'teacher') memberStats.teachers++
+        if (isTeacher) memberStats.teachers++
+        else memberStats.students++
       }
     }
 
@@ -169,13 +170,19 @@ class EtablissementService {
     const where = { actorId: adminId }
     if (filters.action) where.action = filters.action
     if (filters.entityType) where.entityType = filters.entityType
-    if (filters.entityId) where.entityId = parseInt(filters.entityId, 10)
+    if (filters.entityId) {
+      const entityId = parseInt(filters.entityId, 10)
+      if (Number.isInteger(entityId) && entityId > 0) where.entityId = entityId
+    }
+
+    const limitVal = parseInt(filters.limit, 10)
+    const limit = Number.isInteger(limitVal) && limitVal > 0 ? Math.min(limitVal, 500) : 100
 
     return AuditLog.findAll({
       where,
       include: [{ model: User, as: 'actor', attributes: ['userId', 'name', 'email'] }],
       order: [['createdAt', 'DESC']],
-      limit: filters.limit ? parseInt(filters.limit, 10) : 100
+      limit
     })
   }
 
@@ -250,14 +257,18 @@ class EtablissementService {
     const Model = contentType === 'resource' ? ClassGroupResource : ClassGroupSection
     const item = await Model.findByPk(contentId)
 
-    if (!item || !groupIds.includes(item.classGroupId)) return 'not_found'
+    // Admin plateforme (1) sans admin assigné : peut nettoyer le contenu orphelin
+    const inEtab = (requesterRoleId === 1 && !adminId)
+      ? !!item
+      : item && groupIds.includes(item.classGroupId)
+    if (!inEtab) return 'not_found'
 
     await item.destroy()
 
     const action = contentType === 'resource' ? 'CONTENT_RESOURCE_REMOVED' : 'CONTENT_SECTION_REMOVED'
     const entityType = contentType === 'resource' ? 'ClassGroupResource' : 'ClassGroupSection'
     try {
-      await AuditLogService.log(requesterId, action, entityType, contentId, {
+      await AuditLogService.log(requesterId, action, entityType, Number(contentId), {
         classGroupId: item.classGroupId,
         etablissementId: Number(etablissementId)
       })
@@ -286,10 +297,22 @@ class EtablissementService {
 
     // Cas 1 : le compte existe → assignation directe
     if (user) {
-      await Promise.all([
-        user.update({ roleId: 4 }),
-        etab.update({ adminId: user.userId })
-      ])
+      // Impossible de dégrader un admin plateforme en gérant établissement
+      if (user.roleId === 1) return 'platform_admin'
+
+      // Un utilisateur ne peut gérer qu'un seul établissement à la fois
+      const existingEtab = await Etablissement.findOne({ where: { adminId: user.userId } })
+      if (existingEtab && existingEtab.id !== Number(etablissementId)) return 'already_admin'
+
+      await Etablissement.sequelize.transaction(async (t) => {
+        // Révoquer le rôle de l'ancien admin si différent du nouveau
+        if (etab.adminId && etab.adminId !== user.userId) {
+          await User.update({ roleId: 2 }, { where: { userId: etab.adminId }, transaction: t })
+        }
+        await user.update({ roleId: 4 }, { transaction: t })
+        await etab.update({ adminId: user.userId }, { transaction: t })
+      })
+
       try {
         await AuditLogService.log(requesterId, 'ADMIN_ETABLISSEMENT_ASSIGNED', 'Etablissement', Number(etablissementId), {
           adminId: user.userId, adminEmail: normalizedEmail
@@ -301,22 +324,24 @@ class EtablissementService {
       return { directlyAssigned: true, etab: updated, user: { userId: user.userId, name: user.name, email: user.email } }
     }
 
-    // Cas 2 : pas de compte → invitation email
+    // Cas 2 : pas de compte → invitation email (une seule par email/établissement)
     const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
 
-    const [invitation] = await Invitation.findOrCreate({
+    const [invitation, created] = await Invitation.findOrCreate({
       where: { etablissementId: Number(etablissementId), targetEmail: normalizedEmail, status: 'pending', role: 'admin_etablissement' },
       defaults: { invitedByUserId: requesterId, targetUserId: null, classGroupId: null }
     })
 
-    try {
-      await sendEmail(
-        `Invitation à gérer l'établissement "${etab.name}" sur MyMemoMaster`,
-        `Bonjour,\n\nVous avez été invité à devenir gestionnaire de l'établissement "${etab.name}" sur MyMemoMaster.\n\nCréez votre compte sur ${frontUrl}/register en utilisant l'adresse email ${normalizedEmail}.\n\nVos droits d'administration seront automatiquement activés lors de votre inscription.\n\nCe message a été envoyé par l'équipe MyMemoMaster.`,
-        normalizedEmail
-      )
-    } catch (emailError) {
-      logger.warn(`Invitation gérant créée mais email non envoyé à ${normalizedEmail} : ${emailError?.message}`)
+    if (created) {
+      try {
+        await sendEmail(
+          `Invitation à gérer l'établissement "${etab.name}" sur MyMemoMaster`,
+          `Bonjour,\n\nVous avez été invité à devenir gestionnaire de l'établissement "${etab.name}" sur MyMemoMaster.\n\nCréez votre compte sur ${frontUrl}/register en utilisant l'adresse email ${normalizedEmail}.\n\nVos droits d'administration seront automatiquement activés lors de votre inscription.\n\nCe message a été envoyé par l'équipe MyMemoMaster.`,
+          normalizedEmail
+        )
+      } catch (emailError) {
+        logger.warn(`Invitation gérant créée mais email non envoyé à ${normalizedEmail} : ${emailError?.message}`)
+      }
     }
 
     try {

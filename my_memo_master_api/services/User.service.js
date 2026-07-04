@@ -272,8 +272,12 @@ class UserService {
   async setActive(targetUserId, active, requesterRoleId, actorId = null) {
     const target = await User.findByPk(targetUserId, { attributes: ['userId', 'roleId', 'isActive'] })
     if (!target) return null
+    // Personne ne peut se désactiver lui-même
+    if (actorId !== null && Number(targetUserId) === Number(actorId)) return false
     // Admin établissement (4) ne peut pas agir sur un admin plateforme (1)
     if (requesterRoleId === 4 && target.roleId === 1) return false
+    // Un admin plateforme (1) ne peut pas désactiver un autre admin plateforme (1)
+    if (target.roleId === 1 && requesterRoleId === 1) return false
     await User.update({ isActive: active }, { where: { userId: targetUserId } })
     try {
       await AuditLogService.log(

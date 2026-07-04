@@ -343,7 +343,7 @@ router.get(
   '/:id/audit',
   authMiddleware,
   requireRole(1, 4),
-  etablissementValidators.byId,
+  etablissementValidators.auditLogs,
   validate,
   etablissement.getAuditLogs
 )

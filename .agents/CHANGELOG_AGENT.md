@@ -4904,3 +4904,56 @@ _(aucun)_
 ### Dette éventuelle
 - Aucun test frontend (Vue) pour AdminPage et ClassroomEtablissementView (tests unitaires Jest backend uniquement)
 - L'onglet Comptes de ClassroomEtablissementView affiche les membres du groupe courant ; une vue "tous les comptes de l'étab" serait plus complète
+
+---
+
+### [2026-07-04] S-04.12 — Revue de code & corrections de bugs (15 findings)
+
+#### Fichiers modifiés
+- `my_memo_master_api/services/Etablissement.service.js`
+- `my_memo_master_api/services/User.service.js`
+- `my_memo_master_api/controllers/Etablissement.controller.js`
+- `my_memo_master_api/routes/Etablissement.routes.js`
+- `my_memo_master_api/validators/Etablissement.validators.js`
+- `my_memo_master_api/test/services/Etablissement.service.test.js`
+- `my_memo_master_api/test/controllers/Etablissement.controller.test.js`
+
+#### Ce qui est corrigé
+
+**Sécurité critique :**
+- `assignAdmin` : bloque la promotion d'un admin plateforme (roleId=1) en gérant établissement
+- `assignAdmin` : révoque le roleId=4 de l'ancien admin lors d'un remplacement (évite les accès orphelins)
+- `setActive` : bloque l'auto-désactivation (`targetId === actorId`)
+- `setActive` : bloque la désactivation admin-à-admin (roleId=1 ne peut pas désactiver un autre roleId=1)
+- `assignAdmin` : transaction Sequelize autour des deux mises à jour (évite l'état partiel)
+- `assignAdmin` : vérification préalable si l'utilisateur gère déjà un autre établissement
+
+**Correctness / Abus :**
+- `assignAdmin` : `created` de `findOrCreate` désormais vérifié — l'email n'est envoyé que si l'invitation est nouvelle (évite le flood)
+- `getAuditLogs` : `entityId` non numérique ignoré (plus de NaN dans WHERE Sequelize)
+- `getAuditLogs` : `limit` non numérique → défaut 100 ; plafonné à 500 (évite le dump de table)
+- `deleteContent` : l'admin plateforme (roleId=1) peut supprimer du contenu orphelin quand `adminId` est null
+- `deleteContent` : `contentId` casté en Number avant passage à l'audit log
+- `getStats` : déduplication multi-rôles — un user teacher ET student est compté comme teacher (plus de compteur aléatoire)
+- Route `GET /:id/audit` : utilise désormais `auditLogs` validator avec validation de `entityId` et `limit`
+- `assignAdmin` validator : `.normalizeEmail()` ajouté pour cohérence avec les autres validators
+
+**Tests ajoutés (95 tests total) :**
+- roleId=1 protection dans `assignAdmin`
+- Révocation ancien admin lors d'un remplacement
+- Invitation existante → email non renvoyé
+- Limite > 500 plafonnée à 500
+- `limit` et `entityId` invalides → valeurs par défaut correctes
+- Contenu orphelin supprimable par admin plateforme
+- Déduplication multi-rôles dans `getStats`
+- Controller : 409 pour `platform_admin` et `already_admin`
+
+#### État
+| Module | État |
+|--------|------|
+| Etablissement (service) | Stable — 15 bugs S-04.12 corrigés |
+| User (service) | Stable — setActive renforcé |
+
+#### Dette connue
+- `_processPendingEmailInvitations` dans User.service.js a les mêmes lacunes que `assignAdmin` (pas de transaction, pas de vérification roleId=1, pas de révocation ancien admin) — à corriger en ticket dédié
+- Le scope des groupes par `createdBy: adminId` est un défaut de design (pas de FK `etablissementId` sur ClassGroup) — une migration ajoutant cette FK permettrait un scope fiable même après changement d'admin

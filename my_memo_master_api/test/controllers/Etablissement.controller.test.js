@@ -293,6 +293,24 @@ describe('Etablissement.controller', () => {
       expect(res.status).toHaveBeenCalledWith(404)
     })
 
+    it('retourne 409 si l\'utilisateur est admin plateforme (roleId=1)', async () => {
+      req.body = { email: 'admin@exemple.fr' }
+      EtablissementService.assignAdmin.mockResolvedValue('platform_admin')
+
+      await assignAdmin(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(409)
+    })
+
+    it('retourne 409 si l\'utilisateur gère déjà un autre établissement', async () => {
+      req.body = { email: 'gerant@exemple.fr' }
+      EtablissementService.assignAdmin.mockResolvedValue('already_admin')
+
+      await assignAdmin(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(409)
+    })
+
     it('retourne 500 en cas d\'erreur service', async () => {
       req.body = { email: 'x@exemple.fr' }
       EtablissementService.assignAdmin.mockRejectedValue(new Error('DB crash'))
