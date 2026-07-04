@@ -37,9 +37,11 @@ function userKeyFromJwt(req) {
  */
 const authLimiter = rateLimit({
   windowMs: parseInt(process.env.AUTH_RATE_WINDOW_MS, 10) || 15 * 60 * 1000,
-  max: parseInt(process.env.AUTH_RATE_MAX, 10) || 5,
+  max: parseInt(process.env.AUTH_RATE_MAX, 10) || 10,
+  // Seules les tentatives échouées (4xx/5xx) incrémentent le compteur
+  skipSuccessfulRequests: true,
   skip: skipRateLimit,
-  message: { message: 'Trop de tentatives, réessayez dans 15 minutes.' },
+  message: { message: 'Trop de tentatives échouées, réessayez dans 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
 })

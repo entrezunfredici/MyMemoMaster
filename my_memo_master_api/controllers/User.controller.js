@@ -117,6 +117,29 @@ exports.verifyEmail = async (req, res) => {
   }
 }
 
+exports.resendVerification = async (req, res) => {
+  const { email } = req.body
+  const genericMessage = { message: "Si ce compte existe et n'est pas encore vérifié, un nouveau code vous a été envoyé." }
+  try {
+    const user = await userService.findByEmail(email)
+    if (!user || user.hasValidatedEmail) return res.status(200).send(genericMessage)
+
+    const code = await userService.setValidEmailCode(user.userId)
+    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
+    const verifyLink = `${frontUrl}/verify-email?email=${encodeURIComponent(email)}&code=${code}`
+    await sendEmail(
+      'Nouveau code de vérification - MyMemoMaster',
+      `Bonjour ${user.name},\n\nVoici votre nouveau lien de vérification :\n\n${verifyLink}\n\nCe lien est valable 30 minutes.\n\nSi vous n'avez pas demandé ce code, ignorez cet email.`,
+      email
+    )
+
+    res.status(200).send(genericMessage)
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: "Erreur lors de l'envoi du code de vérification." })
+  }
+}
+
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body
   const genericMessage = { message: 'Si cet email existe, un code de réinitialisation vous a été envoyé.' }

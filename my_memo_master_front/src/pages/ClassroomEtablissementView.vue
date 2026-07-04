@@ -504,6 +504,7 @@ async function selectGroup(id) {
   await Promise.all([
     calendarStore.fetchByGroup(id),
     invitationStore.fetchByGroup(id),
+    classGroupStore.fetchGroupById(id),
   ])
   loadingEvents.value = false
 }

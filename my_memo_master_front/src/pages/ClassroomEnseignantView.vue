@@ -558,10 +558,12 @@ import { useAuthStore } from '@/stores/auth'
 import { useKpiConsentStore } from '@/stores/kpiConsent'
 import { useClassGroupSubmissionStore } from '@/stores/classGroupSubmissions'
 import { useInvitationStore } from '@/stores/invitations'
+import { useRole } from '@/composables/useRole'
 import StudentDetailComponent from '@/components/StudentDetailComponent.vue'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
 
+const { isAdminEtablissement } = useRole()
 const classGroupStore = useClassGroupStore()
 const calendarStore = useCalendarEventStore()
 const deadlineStore = useDeadlineStore()
@@ -577,8 +579,9 @@ const { analytics, analyticsLoading, expandedAnalyticsStudents, currentWeekScore
 const selectedId = ref(null)
 const loadingData = ref(false)
 
-// Seuls les groupes où l'utilisateur est teacher (ou admin)
+// Le gérant d'établissement voit tous les groupes ; un enseignant ne voit que les siens
 const groups = computed(() => {
+  if (isAdminEtablissement.value) return classGroupStore.groups
   const userId = authStore.user?.userId
   return classGroupStore.groups.filter((g) =>
     g.members?.some((m) => m.userId === userId && m.role === 'teacher')

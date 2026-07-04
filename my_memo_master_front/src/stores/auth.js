@@ -133,6 +133,10 @@ export const useAuthStore = defineStore('auth', {
       const resp = await api.post('users/login', { email, password })
 
       if (!resp || resp.status !== 200) {
+        if (resp?.status === 403 && resp?.data?.message?.includes('vérifier votre adresse email')) {
+          router.push({ path: '/verify-email', query: { email, expired: '1' } })
+          return 'redirect'
+        }
         const message = extractApiError(resp, 'Email ou mot de passe incorrect.')
         notif.notify(message, 'error')
         return false
@@ -179,6 +183,16 @@ export const useAuthStore = defineStore('auth', {
         notif.notify('Vos informations ont été mises à jour.', 'success')
       }
 
+      return true
+    },
+
+    async resendVerificationEmail(email) {
+      const resp = await api.post('users/resend-verification', { email })
+      if (!resp || resp.status !== 200) {
+        notif.notify(resp?.data?.message || "Erreur lors de l'envoi du code.", 'error')
+        return false
+      }
+      notif.notify('Un nouveau code de vérification vous a été envoyé par email.', 'success')
       return true
     },
 

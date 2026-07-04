@@ -112,6 +112,14 @@ router.post('/login', authLimiter, userValidators.login, validate, user.login)
  */
 router.post('/verify-email', authLimiter, user.verifyEmail)
 
+router.post(
+  '/resend-verification',
+  authLimiter,
+  userValidators.resendVerification,
+  validate,
+  user.resendVerification
+)
+
 /**
  * @swagger
  * /users/forgot-password:

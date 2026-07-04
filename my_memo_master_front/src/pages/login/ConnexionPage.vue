@@ -50,7 +50,7 @@ async function submitForm() {
   submitting.value = true
   try {
     const success = await authStore.login(email.value, password.value, '/')
-    if (!success) {
+    if (success === false) {
       errorMessage.value = 'Email ou mot de passe incorrect.'
     }
   } catch (e) {

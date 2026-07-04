@@ -60,3 +60,5 @@ exports.update = [
 exports.refreshToken = [
   body('refreshToken').notEmpty().withMessage('Token de rafraîchissement requis')
 ]
+
+exports.resendVerification = [emailRules]

@@ -33,6 +33,8 @@ export const useClassGroupStore = defineStore('classGroups', {
           return false
         }
         this.group = resp.data.data
+        const idx = this.groups.findIndex((g) => g.id === id)
+        if (idx !== -1) this.groups[idx] = resp.data.data
         return true
       } catch {
         notif.notify('Erreur lors de la récupération du groupe.', 'error')
