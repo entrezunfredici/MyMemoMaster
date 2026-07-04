@@ -8,6 +8,7 @@ jest.mock('../../services/Etablissement.service', () => ({
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
+  assignAdmin: jest.fn(),
   getStats: jest.fn(),
   getAuditLogs: jest.fn(),
   getContent: jest.fn(),
@@ -22,6 +23,7 @@ const {
   create,
   update,
   destroy,
+  assignAdmin,
   getStats,
   getAuditLogs,
   getContent,
@@ -239,6 +241,65 @@ describe('Etablissement.controller', () => {
       await destroy(req, res)
 
       expect(res.status).toHaveBeenCalledWith(404)
+    })
+  })
+
+  // ── assignAdmin ────────────────────────────────────────────────────────────
+
+  describe('assignAdmin', () => {
+    beforeEach(() => {
+      req.params = { id: '1' }
+      req.user = { id: 1, roleId: 1 }
+    })
+
+    it('retourne 200 si l\'utilisateur existe et est directement assigné', async () => {
+      req.body = { email: 'gerant@exemple.fr' }
+      EtablissementService.assignAdmin.mockResolvedValue({
+        directlyAssigned: true,
+        etab: mockEtab,
+        user: { userId: 5, name: 'Gérant', email: 'gerant@exemple.fr' }
+      })
+
+      await assignAdmin(req, res)
+
+      expect(EtablissementService.assignAdmin).toHaveBeenCalledWith('1', 'gerant@exemple.fr', 1)
+      expect(res.status).toHaveBeenCalledWith(200)
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('Gérant assigné')
+      }))
+    })
+
+    it('retourne 200 avec message invitation si le compte n\'existe pas', async () => {
+      req.body = { email: 'nouveau@exemple.fr' }
+      EtablissementService.assignAdmin.mockResolvedValue({
+        directlyAssigned: false,
+        email: 'nouveau@exemple.fr'
+      })
+
+      await assignAdmin(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(200)
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('invitation')
+      }))
+    })
+
+    it('retourne 404 si l\'établissement est introuvable', async () => {
+      req.body = { email: 'x@exemple.fr' }
+      EtablissementService.assignAdmin.mockResolvedValue(null)
+
+      await assignAdmin(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(404)
+    })
+
+    it('retourne 500 en cas d\'erreur service', async () => {
+      req.body = { email: 'x@exemple.fr' }
+      EtablissementService.assignAdmin.mockRejectedValue(new Error('DB crash'))
+
+      await assignAdmin(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(500)
     })
   })
 

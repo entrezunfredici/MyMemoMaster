@@ -1,4 +1,5 @@
 const { Etablissement, User, ClassGroup, ClassGroupUsers, Invitation, AuditLog, ClassGroupResource, ClassGroupSection } = require('../../models/index')
+const sendEmail = require('../../helpers/sendEmail')
 const EtablissementService = require('../../services/Etablissement.service')
 
 jest.mock('../../models/index', () => ({
@@ -8,14 +9,16 @@ jest.mock('../../models/index', () => ({
     findOne: jest.fn(),
     create: jest.fn()
   },
-  User: {},
+  User: { findOne: jest.fn() },
   ClassGroup: { findAll: jest.fn() },
   ClassGroupUsers: { findAll: jest.fn() },
-  Invitation: { findAll: jest.fn() },
+  Invitation: { findAll: jest.fn(), findOrCreate: jest.fn() },
   AuditLog: { findAll: jest.fn() },
   ClassGroupResource: { findAll: jest.fn(), findByPk: jest.fn() },
   ClassGroupSection: { findAll: jest.fn(), findByPk: jest.fn() }
 }))
+
+jest.mock('../../helpers/sendEmail', () => jest.fn().mockResolvedValue())
 
 jest.mock('../../services/AuditLog.service', () => ({ log: jest.fn().mockResolvedValue({}) }))
 jest.mock('../../helpers/logger', () => ({ warn: jest.fn(), error: jest.fn() }))
@@ -391,6 +394,95 @@ describe('EtablissementService', () => {
       const result = await EtablissementService.deleteContent(1, 'resource', 5, 10, 1)
 
       expect(result).toBe('not_found')
+    })
+  })
+
+  // ── assignAdmin ────────────────────────────────────────────────────────────
+
+  describe('assignAdmin', () => {
+    const mockUserInstance = {
+      userId: 5,
+      name: 'Gérant',
+      email: 'gerant@exemple.fr',
+      update: jest.fn()
+    }
+    const mockEtabInstance = {
+      id: 1,
+      name: 'Lycée Test',
+      adminId: null,
+      update: jest.fn()
+    }
+    const mockInvitation = { id: 20 }
+
+    beforeEach(() => {
+      Etablissement.findByPk.mockResolvedValue(mockEtabInstance)
+      mockEtabInstance.update.mockResolvedValue()
+      mockUserInstance.update.mockResolvedValue()
+      sendEmail.mockResolvedValue()
+    })
+
+    it('retourne null si l\'établissement est introuvable', async () => {
+      Etablissement.findByPk.mockResolvedValue(null)
+
+      const result = await EtablissementService.assignAdmin(99, 'gerant@exemple.fr', 1)
+
+      expect(result).toBeNull()
+      expect(User.findOne).not.toHaveBeenCalled()
+    })
+
+    it('assigne directement le gérant si le compte existe', async () => {
+      User.findOne.mockResolvedValue(mockUserInstance)
+      Etablissement.findByPk
+        .mockResolvedValueOnce(mockEtabInstance)  // premier appel (findByPk au début)
+        .mockResolvedValueOnce({ ...mockEtabInstance, adminId: 5 }) // second appel (rechargement)
+
+      const result = await EtablissementService.assignAdmin(1, 'gerant@exemple.fr', 1)
+
+      expect(mockUserInstance.update).toHaveBeenCalledWith({ roleId: 4 })
+      expect(mockEtabInstance.update).toHaveBeenCalledWith({ adminId: mockUserInstance.userId })
+      expect(result.directlyAssigned).toBe(true)
+      expect(result.user.email).toBe('gerant@exemple.fr')
+    })
+
+    it('normalise l\'email en minuscule avant la recherche', async () => {
+      User.findOne.mockResolvedValue(mockUserInstance)
+      Etablissement.findByPk.mockResolvedValue(mockEtabInstance)
+
+      await EtablissementService.assignAdmin(1, 'GERANT@EXEMPLE.FR', 1)
+
+      expect(User.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { email: 'gerant@exemple.fr' } })
+      )
+    })
+
+    it('crée une invitation et envoie un email si le compte n\'existe pas', async () => {
+      User.findOne.mockResolvedValue(null)
+      Invitation.findOrCreate.mockResolvedValue([mockInvitation, true])
+
+      const result = await EtablissementService.assignAdmin(1, 'nouveau@exemple.fr', 1)
+
+      expect(Invitation.findOrCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            targetEmail: 'nouveau@exemple.fr',
+            role: 'admin_etablissement',
+            status: 'pending'
+          })
+        })
+      )
+      expect(sendEmail).toHaveBeenCalled()
+      expect(result.directlyAssigned).toBe(false)
+      expect(result.email).toBe('nouveau@exemple.fr')
+    })
+
+    it('n\'échoue pas si l\'envoi d\'email plante (invitation déjà créée)', async () => {
+      User.findOne.mockResolvedValue(null)
+      Invitation.findOrCreate.mockResolvedValue([mockInvitation, false])
+      sendEmail.mockRejectedValue(new Error('SMTP timeout'))
+
+      const result = await EtablissementService.assignAdmin(1, 'nouveau@exemple.fr', 1)
+
+      expect(result.directlyAssigned).toBe(false)
     })
   })
 

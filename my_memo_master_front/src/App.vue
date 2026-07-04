@@ -38,11 +38,6 @@
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
-          <router-link v-if="isAdminPlateforme" to="/classroom"
-            class="p-3 rounded-lg text-primary bg-light"
-            title="Administration plateforme">
-            <ShieldCheckIcon class="size-8" />
-          </router-link>
           <router-link to="/calendar"
             :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="Calendrier & rappels">
