@@ -515,15 +515,13 @@ describe('UserService', () => {
       expect(User.update).not.toHaveBeenCalled()
     })
 
-    it('roleId=1 peut désactiver un admin plateforme', async () => {
+    it('retourne false si roleId=1 tente de désactiver un autre admin plateforme (roleId=1)', async () => {
       User.findByPk.mockResolvedValueOnce({ userId: 2, roleId: 1, isActive: true })
-      User.update.mockResolvedValue([1])
-      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 2, isActive: false } })
 
       const result = await UserService.setActive(2, false, 1)
 
-      expect(User.update).toHaveBeenCalledWith({ isActive: false }, { where: { userId: 2 } })
-      expect(result).toBeDefined()
+      expect(User.update).not.toHaveBeenCalled()
+      expect(result).toBe(false)
     })
   })
 })

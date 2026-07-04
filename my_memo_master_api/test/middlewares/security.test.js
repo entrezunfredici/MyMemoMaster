@@ -42,6 +42,7 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 process.env.NODE_ENV = 'test'
 // max évalué à la création du middleware (chargement de app.js) — doit être posé avant require.
 process.env.API_RATE_MAX = '200'
+process.env.AUTH_RATE_MAX = '5'
 // Active le rate limiting pour ce fichier de test (désactivé globalement par test/setup.js).
 delete process.env.RATE_LIMIT_DISABLED
 
@@ -114,7 +115,7 @@ describe('Sécurité — Rate limiting', () => {
 
     const res = await sendReq()
     expect(res.status).toBe(429)
-    expect(res.body.message).toBe('Trop de tentatives, réessayez dans 15 minutes.')
+    expect(res.body.message).toBe('Trop de tentatives échouées, réessayez dans 15 minutes.')
     expect(res.headers['ratelimit-limit']).toBeDefined()
   })
 
