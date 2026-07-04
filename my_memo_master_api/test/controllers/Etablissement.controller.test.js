@@ -1,5 +1,4 @@
 const EtablissementService = require('../../services/Etablissement.service')
-const logger = require('../../helpers/logger')
 
 jest.mock('../../services/Etablissement.service', () => ({
   findAll: jest.fn(),

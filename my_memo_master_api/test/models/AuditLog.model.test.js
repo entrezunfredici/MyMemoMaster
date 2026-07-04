@@ -1,5 +1,3 @@
-const { DataTypes } = require('sequelize')
-
 const mockDefine = jest.fn()
 
 const mockInstance = {
