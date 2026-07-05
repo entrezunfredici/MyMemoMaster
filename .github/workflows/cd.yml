@@ -263,18 +263,20 @@ jobs:
             --atomic \
             --timeout 5m
 
-      - name: "[TEST] Debug pods/pvc/events (temporaire)"
+      - name: "[TEST] Debug node taints/conditions (temporaire)"
         if: always()
         run: |
           {
-            echo "=== PODS ==="
-            kubectl get pods -n mymemomaster-preprod
+            echo "=== NODES ==="
+            kubectl get nodes -o wide
             echo ""
-            echo "=== PVC ==="
-            kubectl get pvc -n mymemomaster-preprod
-            echo ""
-            echo "=== EVENTS (20 dernieres) ==="
-            kubectl get events -n mymemomaster-preprod --sort-by=.lastTimestamp | tail -20
+            for n in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
+              echo "=== NODE: $n (Taints/Conditions) ==="
+              kubectl describe node "$n" | sed -n '/^Taints:/,/^Addresses:/p'
+              echo ""
+            done
+            echo "=== PODS (resume par statut) ==="
+            kubectl get pods -n mymemomaster-preprod --no-headers | awk '{print $3}' | sort | uniq -c
           } > /tmp/debug.txt
           cat /tmp/debug.txt
           PAYLOAD=$(jq -Rs '{content: ("```\n" + .[0:1900] + "\n```")}' /tmp/debug.txt)
