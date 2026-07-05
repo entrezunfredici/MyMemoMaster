@@ -263,6 +263,23 @@ jobs:
             --atomic \
             --timeout 5m
 
+      - name: "[TEST] Debug pods/pvc/events (temporaire)"
+        if: always()
+        run: |
+          {
+            echo "=== PODS ==="
+            kubectl get pods -n mymemomaster-preprod
+            echo ""
+            echo "=== PVC ==="
+            kubectl get pvc -n mymemomaster-preprod
+            echo ""
+            echo "=== EVENTS (20 dernieres) ==="
+            kubectl get events -n mymemomaster-preprod --sort-by=.lastTimestamp | tail -20
+          } > /tmp/debug.txt
+          cat /tmp/debug.txt
+          PAYLOAD=$(jq -Rs '{content: ("```\n" + .[0:1900] + "\n```")}' /tmp/debug.txt)
+          curl -s -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "${{ secrets.DISCORD_LOG }}"
+
   # ═══════════════════════════════════════════════════════════════════════════
   #  2c. DEPLOY PROD → Kubernetes via Helm
   #      Release : mmm-prod  /  Namespace : mymemomaster
