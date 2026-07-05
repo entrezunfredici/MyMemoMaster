@@ -78,7 +78,7 @@ describe('ExercisesPage', () => {
 
   describe('assignableGroups', () => {
     it('ne retient que les groupes où l\'utilisateur est teacher', async () => {
-      const wrapper = mountPage({
+      mountPage({
         user: TEACHER_USER,
         groups: [GROUP_MP2I, GROUP_WHERE_STUDENT]
       })
@@ -95,7 +95,7 @@ describe('ExercisesPage', () => {
 
     it('retourne vide si l\'utilisateur est étudiant dans tous les groupes', async () => {
       const studentInAllGroups = { id: 3, name: 'L3 Info', level: 'L3', members: [{ userId: 10, role: 'student' }] }
-      const wrapper = mountPage({ user: TEACHER_USER, groups: [studentInAllGroups] })
+      mountPage({ user: TEACHER_USER, groups: [studentInAllGroups] })
       await flushPromises()
 
       const classGroupStore = useClassGroupStore()
