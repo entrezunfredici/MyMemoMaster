@@ -4999,3 +4999,25 @@ Le commit `f4d654e` ("[IMP] classgroup") avait modifié `ClassroomPage.vue` en r
 | Module | État |
 |--------|------|
 | Front — ClassroomPage (toggle Vue) | Stable — régression f4d654e corrigée, 548/548 tests front verts |
+
+---
+
+### [2026-07-06] FIX — Readiness probe K8s sur une route inexistante (/api/v1/health)
+
+#### Contexte
+Le chart Helm (`helm/templates/deployment-api.yaml`) déclare une readinessProbe HTTP sur `/api/v1/health`, mais aucune route de ce nom n'existait dans l'API Express : le handler 404 global répondait, les pods API ne passaient jamais `Ready`, et les déploiements `helm --atomic` (preprod) échouaient en timeout puis rollback. Cause racine probable des échecs de déploiement investigués par les commits `[TEST] debug pods/pvc/events` / `[TEST] debug node taints/conditions`. Anomalie détectée lors de l'audit du repo pour le dossier de certification B2 (section 6).
+
+#### Fichiers créés/modifiés
+- `my_memo_master_api/app.js` — ajout de `GET /api/v1/health` (vérifie la connexion DB via `instance.authenticate()` : 200 `{status:'ok'}` / 503 `{status:'unavailable'}`), déclaré **avant** le routeur v1 pour échapper au rate limiting global (voir DECISIONS.md)
+- `my_memo_master_api/test/controllers/Health.test.js` — 3 tests (DB joignable → 200, DB injoignable → 503, accès sans token)
+
+#### Utilisable
+- La readiness probe K8s cible désormais une route réelle ; les rollouts preprod devraient converger. À vérifier au prochain déploiement `staging`.
+
+#### Dette
+- Pas de healthcheck Docker Compose sur le service `api` côté VPS (la boucle CD accepte le statut `running` faute de healthcheck) — l'endpoint permet désormais d'en ajouter un facilement.
+
+#### État
+| Module | État |
+|--------|------|
+| Health endpoint / readiness probe | Stable — route + 3 tests, probe Helm cohérente |

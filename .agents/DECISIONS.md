@@ -763,3 +763,11 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Le sélecteur reste conditionné strictement sur `isAdmin` (roleId 1 ou 4), pas sur le nombre de vues. `availableViews` redevient additif : `plateforme` s'ajoute aux vues (étalissement/enseignant/étudiant) pour l'admin plateforme au lieu de les remplacer — un admin plateforme peut donc basculer entre les 4 vues, un admin établissement entre 3, et un enseignant/étudiant n'a pas de sélecteur (vue fixe imposée par son rôle).
 **Alternative écartée** : Garder `availableViews.length > 1` en poussant conditionnellement enseignant/étudiant selon le rôle — plus de complexité pour un gain nul, et risque de recréer la même régression au prochain ajout de vue.
 **Conséquences** : Toute nouvelle vue ajoutée à `ClassroomPage.vue` doit être poussée dans `availableViews` de façon additive (jamais en remplacement d'une vue existante) pour ne pas rompre l'invariant "le sélecteur n'apparaît que pour `isAdmin`".
+
+---
+
+### [2026-07-06] Health endpoint déclaré hors du routeur v1 (avant le rate limiter)
+**Contexte** : La readinessProbe K8s cible `/api/v1/health` toutes les 10 s. Toutes les routes v1 passent par `apiLimiter` (500 req/15 min, clé IP pour le trafic non authentifié) : la sonde kubelet aurait consommé le bucket anonyme, voire été bloquée — pods NotReady en cascade lors d'un pic.
+**Décision** : Déclarer `app.get('/api/v1/health')` directement dans `app.js`, avant le montage du routeur v1 et donc hors rate limiting. L'endpoint vérifie réellement la disponibilité de la base (`instance.authenticate()`) : 200 si OK, 503 sinon — un pod dont la DB est injoignable ne doit pas recevoir de trafic.
+**Alternative écartée** : Route dans `routes/Health.routes.js` comme les entités — rejeté car le montage via le routeur v1 la placerait derrière `apiLimiter` ; un `skip` conditionnel dans le limiteur ajouterait de la complexité pour un endpoint d'infrastructure sans logique métier.
+**Conséquences** : Exception documentée au pattern controller→service (endpoint infra, pas une entité). L'endpoint est public par conception (aucune donnée sensible retournée). Le healthcheck Compose côté VPS peut désormais s'appuyer dessus.
