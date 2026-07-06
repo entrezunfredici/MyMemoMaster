@@ -20,6 +20,12 @@ exports.register = async (req, res) => {
     )
     res.status(201).send({ message: 'Inscription réussie ! Vérifiez votre email pour activer votre compte.' })
   } catch (error) {
+    // OWASP F-M4 — doublon d'email : cas attendu (pré-check du service) et race condition
+    // entre findByEmail et create (contrainte UNIQUE de la base) → 400, pas 500
+    if (error?.name === 'SequelizeUniqueConstraintError' || error?.message === 'Email déjà utilisé') {
+      logger.warn(`Inscription refusée — email déjà utilisé : ${req.body?.email} (IP ${req.ip})`)
+      return res.status(400).send({ message: 'Cet email est déjà utilisé.' })
+    }
     logger.error(error?.message || error)
     if (newUser) {
       await userService.delete(newUser.userId).catch((e) => logger.error(e?.message || e))
@@ -46,10 +52,13 @@ exports.login = async (req, res) => {
     }
 
     if (!user.hasValidatedEmail) {
+      // OWASP F-M8 : les refus d'accès (403) sont journalisés
+      logger.warn(`Connexion refusée — email non vérifié : ${email} (IP ${req.ip})`)
       return res.status(403).send({ message: 'Veuillez vérifier votre adresse email avant de vous connecter.' })
     }
 
     if (user.isActive === false) {
+      logger.warn(`Connexion refusée — compte désactivé : ${email} (IP ${req.ip})`)
       return res.status(403).send({ message: 'Votre compte a été désactivé. Contactez un administrateur.' })
     }
 

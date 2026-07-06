@@ -75,7 +75,7 @@ describe('User Controller', () => {
 
       const res = await request(app)
         .post('/api/v1/users/register')
-        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123' })
+        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123!' })
 
       expect(res.status).toBe(201)
       expect(userService.create).toHaveBeenCalledTimes(1)
@@ -84,7 +84,7 @@ describe('User Controller', () => {
     it('400 — email invalide', async () => {
       const res = await request(app)
         .post('/api/v1/users/register')
-        .send({ name: 'Bob', email: 'not-an-email', password: 'Password123' })
+        .send({ name: 'Bob', email: 'not-an-email', password: 'Password123!' })
 
       expect(res.status).toBe(400)
       expect(res.body.errors).toBeDefined()
@@ -101,7 +101,15 @@ describe('User Controller', () => {
     it('400 — mot de passe sans majuscule', async () => {
       const res = await request(app)
         .post('/api/v1/users/register')
-        .send({ name: 'Bob', email: 'bob@example.com', password: 'alllower123' })
+        .send({ name: 'Bob', email: 'bob@example.com', password: 'alllower123!' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('400 — mot de passe sans caractère spécial', async () => {
+      const res = await request(app)
+        .post('/api/v1/users/register')
+        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123' })
 
       expect(res.status).toBe(400)
     })
@@ -109,17 +117,41 @@ describe('User Controller', () => {
     it('400 — nom trop court', async () => {
       const res = await request(app)
         .post('/api/v1/users/register')
-        .send({ name: 'B', email: 'bob@example.com', password: 'Password123' })
+        .send({ name: 'B', email: 'bob@example.com', password: 'Password123!' })
 
       expect(res.status).toBe(400)
     })
 
-    it('500 — le service échoue', async () => {
+    it('400 — email déjà utilisé (pré-check du service)', async () => {
       userService.create.mockRejectedValue(new Error('Email déjà utilisé'))
 
       const res = await request(app)
         .post('/api/v1/users/register')
-        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123' })
+        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123!' })
+
+      expect(res.status).toBe(400)
+      expect(res.body.message).toBe('Cet email est déjà utilisé.')
+    })
+
+    it('400 — email déjà utilisé (race condition, contrainte UNIQUE)', async () => {
+      const uniqueError = new Error('Validation error')
+      uniqueError.name = 'SequelizeUniqueConstraintError'
+      userService.create.mockRejectedValue(uniqueError)
+
+      const res = await request(app)
+        .post('/api/v1/users/register')
+        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123!' })
+
+      expect(res.status).toBe(400)
+      expect(res.body.message).toBe('Cet email est déjà utilisé.')
+    })
+
+    it('500 — le service échoue (erreur interne)', async () => {
+      userService.create.mockRejectedValue(new Error('Connexion base perdue'))
+
+      const res = await request(app)
+        .post('/api/v1/users/register')
+        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123!' })
 
       expect(res.status).toBe(500)
     })
@@ -373,7 +405,7 @@ describe('User Controller', () => {
 
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', code: VALID_TOKEN, newPassword: 'NewPass123' })
+        .send({ email: 'bob@example.com', code: VALID_TOKEN, newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(201)
     })
@@ -384,7 +416,7 @@ describe('User Controller', () => {
 
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', code: WRONG_TOKEN, newPassword: 'NewPass123' })
+        .send({ email: 'bob@example.com', code: WRONG_TOKEN, newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(401)
     })
@@ -392,7 +424,7 @@ describe('User Controller', () => {
     it('400 — token absent', async () => {
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', newPassword: 'NewPass123' })
+        .send({ email: 'bob@example.com', newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(400)
     })
@@ -400,7 +432,7 @@ describe('User Controller', () => {
     it('400 — token format invalide (trop court)', async () => {
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', code: 'abc123', newPassword: 'NewPass123' })
+        .send({ email: 'bob@example.com', code: 'abc123', newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(400)
     })
@@ -416,7 +448,7 @@ describe('User Controller', () => {
       const res = await request(app)
         .put('/api/v1/users/1/change-password')
         .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ id: 1, oldPassword: 'OldPass123', newPassword: 'NewPass123' })
+        .send({ id: 1, oldPassword: 'OldPass123', newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(200)
     })
@@ -428,7 +460,7 @@ describe('User Controller', () => {
       const res = await request(app)
         .put('/api/v1/users/1/change-password')
         .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ id: 1, oldPassword: 'WrongOld1', newPassword: 'NewPass123' })
+        .send({ id: 1, oldPassword: 'WrongOld1', newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(401)
     })
@@ -436,16 +468,16 @@ describe('User Controller', () => {
     it('401 — pas de token', async () => {
       const res = await request(app)
         .put('/api/v1/users/1/change-password')
-        .send({ id: 1, oldPassword: 'OldPass123', newPassword: 'NewPass123' })
+        .send({ id: 1, oldPassword: 'OldPass123', newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(401)
     })
 
-    it('400 — id invalide', async () => {
+    it('400 — nouveau mot de passe sans caractère spécial', async () => {
       const res = await request(app)
         .put('/api/v1/users/1/change-password')
         .set('Authorization', `Bearer ${makeToken()}`)
-        .send({ id: 'not-an-int', oldPassword: 'OldPass123', newPassword: 'NewPass123' })
+        .send({ oldPassword: 'OldPass123', newPassword: 'NewPass123' })
 
       expect(res.status).toBe(400)
     })

@@ -23,7 +23,18 @@
           </div>
 
           <div class="year-grid">
-            <div v-for="(m, idx) in MONTHS" :key="idx" class="month-block" @click="goToMonth(idx)">
+            <!-- RGAA 7.x — pattern bouton ARIA (un <button> natif est invalide ici : contient h3 + grille) -->
+            <div
+              v-for="(m, idx) in MONTHS"
+              :key="idx"
+              class="month-block"
+              role="button"
+              tabindex="0"
+              :aria-label="`Afficher le mois de ${m}`"
+              @click="goToMonth(idx)"
+              @keydown.enter.prevent="goToMonth(idx)"
+              @keydown.space.prevent="goToMonth(idx)"
+            >
               <h3>{{ m.toUpperCase() }}</h3>
               <div class="mini-grid">
                 <span v-for="d in DAYS_SHORT" :key="d" class="mini-label">{{ d[0] }}</span>

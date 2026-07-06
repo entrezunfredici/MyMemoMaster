@@ -3,6 +3,7 @@ const os = require('os')
 const multer = require('multer')
 const multerS3 = require('multer-s3')
 const { s3Client, bucket } = require('../config/storage.config')
+const { extensionMatchesMime, s3SniffContentType } = require('../helpers/fileSignature')
 const logger = require('../helpers/logger')
 
 const ALLOWED_MIME_TYPES = [
@@ -22,22 +23,31 @@ const ALLOWED_MIME_TYPES = [
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 Mo
 
 const fileFilter = (_req, file, cb) => {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-    cb(null, true)
-  } else {
+  if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
     const err = new Error(
       `Type de fichier non autorisé. Types acceptés : ${ALLOWED_MIME_TYPES.join(', ')}`
     )
     err.isFileFilterError = true
-    cb(err, false)
+    return cb(err, false)
   }
+  // OWASP A08-M2 — croisement extension ↔ MIME déclaré (anti-spoofing, 1re ligne)
+  const ext = path.extname(file.originalname).toLowerCase()
+  if (!extensionMatchesMime(ext, file.mimetype)) {
+    const err = new Error(
+      `L'extension du fichier (${ext || 'absente'}) ne correspond pas à son type déclaré.`
+    )
+    err.isFileFilterError = true
+    return cb(err, false)
+  }
+  cb(null, true)
 }
 
 const storage = bucket
   ? multerS3({
       s3: s3Client,
       bucket,
-      contentType: multerS3.AUTO_CONTENT_TYPE,
+      // OWASP A08-M2 — magic bytes vérifiés sur le flux (2e ligne, remplace AUTO_CONTENT_TYPE)
+      contentType: s3SniffContentType,
       key: (req, file, cb) => {
         const userId = req.user?.id || 'anon'
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`

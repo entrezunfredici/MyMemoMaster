@@ -33,6 +33,8 @@
 **Alternative écartée** : Stocker le refresh token hashé en base (sha256) — plus sécurisé si la DB est compromise, mais ajoute de la complexité sans bénéfice MVP. Le token en clair est cohérent avec l'approche des codes `validEmailCode` déjà en clair. / Refresh token dans un httpOnly cookie — pas de XSS, mais ajoute de la complexité CORS hors MVP.
 **Conséquences** : Migration `20260614000002` à passer. Si la DB est compromise, les refresh tokens actifs sont lisibles. La rotation limite la fenêtre d'exploitation. `AUTH_JWT_EXPIRES_IN=15m` et `AUTH_REFRESH_TOKEN_EXPIRES_DAYS=7` sont les nouvelles valeurs par défaut (ancienne valeur: 24h pour l'access token).
 
+> **Mise à jour [2026-07-06]** : l'alternative « stocké en clair » a été révisée par le correctif OWASP A02-H1 (ticket M-00b.07b) : `setRefreshToken` hache désormais le token en SHA-256 avant stockage, et `verifyRefreshToken` hache le token entrant avant comparaison (voir `.agents/SECURITY_AUDIT_OWASP.md`). Le token en clair ne transite que vers le client.
+
 ---
 
 ### [2026-06-15] Reset password token — hashé SHA-256, token brut envoyé par email
@@ -72,6 +74,8 @@
 **Décision** : Utiliser `better-sqlite3` comme driver SQLite principal.  
 **Alternative écartée** : `sqlite3` (api asynchrone, moins performant) — conservé dans `package.json` par précaution mais potentiellement inutilisé.  
 **Conséquences** : `better-sqlite3` est un module natif (compilation C++) — problématique sur Windows sans Windows SDK. L'image Docker Alpine compile nativement lors du build.
+
+> **Mise à jour [2026-07-06]** : cette décision ne reflète plus le code. `better-sqlite3` a disparu de `package.json`, et `config/db.config.js` ne déclare aucun `dialectModule` — Sequelize v6 utilise donc le driver par défaut `sqlite3`, qui est **requis** et ne doit pas être retiré des dépendances. Repasser à `better-sqlite3` demanderait de le réinstaller et d'ajouter `dialectModule: require('better-sqlite3')` — non justifié aujourd'hui (usage dev/test uniquement).
 
 ---
 
@@ -779,3 +783,16 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : `ON DELETE SET NULL` — écarté car des `LeitnerBox` orphelines (sans système parent) n'ont aucun sens métier ; `SET NULL` est justement le comportement implicite qu'appliquait Sequelize `sync()` en dev/SQLite via les défauts de l'association `belongsTo` (FK nullable), ce qui explique pourquoi le bug ne s'est jamais manifesté en local/tests — seul PostgreSQL en prod (schéma piloté par les migrations, indépendant des associations Sequelize) était affecté.
 **Conséquences** : La suppression d'un système de Leitner supprime désormais aussi ses boîtes en cascade (comportement identique en dev/SQLite et prod/PostgreSQL). Migration testée dans les deux sens sur SQLite et sur un conteneur PostgreSQL 17 jetable avant merge. Test de non-régression `test/bdd/leitner.delete.test.js` vérifie la suppression réelle par `idBox` (pas seulement l'absence d'erreur, qu'un simple `SET NULL` aurait aussi satisfaite).
 **Conséquences** : Exception documentée au pattern controller→service (endpoint infra, pas une entité). L'endpoint est public par conception (aucune donnée sensible retournée). Le healthcheck Compose côté VPS peut désormais s'appuyer dessus.
+
+---
+
+### [2026-07-06] Métriques RED/USE — prom-client, serveur HTTP dédié sur un port séparé
+**Contexte** : Aucune métrique applicative n'existait (seulement logs Winston/Morgan + AuditLog métier). Besoin d'exposer des métriques RED (Rate, Errors, Duration) sur les requêtes HTTP et USE (Utilization, Saturation, Errors) sur le process Node, pour un futur scraping Prometheus — sans savoir encore si une stack Prometheus/Grafana existe déjà sur le cluster.
+**Décision** :
+- Dépendance `prom-client` (nouvelle, à ajouter à la liste approuvée — fait dans `CONVENTIONS.md`).
+- `helpers/metrics.js` : `Registry` dédiée (pas le registre global de prom-client), `collectDefaultMetrics()` pour l'USE (CPU, mémoire, event-loop-lag, handles — désactivé si `NODE_ENV=test` pour ne pas laisser de `setInterval` actif après les tests Jest), + 2 métriques custom pour le RED : `http_request_duration_seconds` (Histogram) et `http_requests_total` (Counter), labellisées `method`/`route`/`status_code` (Errors = filtrer `status_code >= 500` côté requête PromQL, pas une métrique séparée).
+- `middlewares/metrics.middleware.js` : instrumente chaque requête via `res.on('finish')`. Le label `route` utilise `req.route.path` (nom de route Express, ex. `/users/:id`) et non `req.originalUrl`, pour éviter l'explosion de cardinalité Prometheus si un attaquant ou un bot génère des URLs arbitraires ; les requêtes non matchées (404) sont regroupées sous le label `non_route`.
+- `GET /metrics` n'est **pas** une route Express de l'app publique : c'est un second serveur `http.createServer` démarré dans `server.js` sur `METRICS_PORT` (défaut 9090), en dehors de l'app Express/Helmet/CORS. Les Services K8s (`k8s/prod/service.yml`, `k8s/preprod/service.yml`) exposent ce port en ClusterIP, mais aucun Ingress ne le référence — le port 9090 est donc structurellement injoignable depuis l'extérieur du cluster (contrairement à un chemin `/metrics` sur le port applicatif, qui aurait été routé par l'Ingress `path: /` catch-all existant). Annotations `prometheus.io/scrape|port|path` ajoutées sur les Deployments pour un scraping par découverte de pods, sans dépendre d'un CRD `ServiceMonitor` (pas encore su si `prometheus-operator` est installé).
+- Endpoint non authentifié (choix utilisateur) : la protection vient de l'isolation réseau (port séparé, non exposé), pas d'un token applicatif.
+**Alternative écartée** : `express-prom-bundle` (wrapper tout-en-un) — écarté pour garder le contrôle explicite sur le label `route` (cardinalité) et ne pas ajouter une dépendance quand ~30 lignes suffisent. `/api/v1/metrics` sur le port applicatif existant — écarté car l'Ingress prod/preprod route tout (`path: /`, `pathType: Prefix`) vers le service API : un chemin dédié aurait nécessité soit un `configuration-snippet` nginx (annotation désactivée par défaut sur les installations récentes d'ingress-nginx, fragile), soit une règle Ingress explicite de refus — plus complexe et plus fragile qu'un port physiquement séparé. Exporters dédiés Postgres/Redis (USE infra) — hors périmètre de ce ticket (validé avec l'utilisateur), à faire si besoin dans un ticket dédié.
+**Conséquences** : Nouvelle dépendance `prom-client` en prod. `METRICS_PORT` (9090) ajouté aux ConfigMaps K8s prod/preprod ; `docker-compose.yml` n'a rien à changer (Traefik ne route déjà que le port `API_PORT`, donc 9090 n'est jamais publié côté VPS Docker). Dette : pas encore de Prometheus/Grafana déployé pour consommer ces métriques (scope à valider) ; USE limité au process Node (pas de vision CPU/mémoire host ni Postgres/Redis).

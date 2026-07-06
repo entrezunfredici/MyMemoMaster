@@ -38,6 +38,7 @@
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
 | Kpi | Stable — M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-06-24 |
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
+| Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -5145,3 +5146,38 @@ Signalé par l'utilisateur : suppression d'un système de Leitner → 500 côté
 | Module | État |
 |--------|------|
 | LeitnerSystem / LeitnerBox | Stable — FK `LeitnerBox.idSystem` en `ON DELETE CASCADE`, suppression d'un système fonctionnelle |
+
+---
+
+### [2026-07-06] Métriques RED/USE (Prometheus) — instrumentation HTTP + process Node
+
+#### Contexte
+Demande utilisateur suite à une discussion sur les types de logs existants (Winston/Morgan/AuditLog) : le projet n'avait aucune métrique applicative (rate/erreurs/durée des requêtes, saturation du process). Décisions de périmètre validées avec l'utilisateur avant codage : stack Prometheus/Grafana cluster inconnue (instrumentation seule, pas de déploiement de la stack) ; USE limité au process Node (pas d'exporters Postgres/Redis) ; `/metrics` non authentifié mais jamais exposé via l'Ingress.
+
+#### Fichiers créés/modifiés
+- `helpers/metrics.js` (nouveau) — `Registry` prom-client dédiée, `collectDefaultMetrics()` pour l'USE (désactivé si `NODE_ENV=test`), + `http_request_duration_seconds` (Histogram) et `http_requests_total` (Counter) pour le RED, labellisés `method`/`route`/`status_code`
+- `middlewares/metrics.middleware.js` (nouveau) — instrumente chaque requête via `res.on('finish')` ; label `route` = `req.route.path` nommé (évite l'explosion de cardinalité), `non_route` pour les 404
+- `app.js` — montage de `metricsMiddleware` juste après `trust proxy`, avant Morgan (couvre la durée totale du pipeline)
+- `server.js` — second `http.createServer` sur `METRICS_PORT` (défaut 9090), sert uniquement `GET /metrics` (texte Prometheus), complètement découplé de l'app Express
+- `package.json` — dépendance `prom-client` ajoutée
+- `k8s/prod/service.yml`, `k8s/preprod/service.yml` — port nommé `metrics` (9090) ajouté au Service ClusterIP, non référencé par l'Ingress
+- `k8s/prod/deployment.yml`, `k8s/preprod/deployment.yml` — `containerPort` 3000 (nommé `http`) + 9090 (nommé `metrics`), annotations `prometheus.io/scrape|port|path` sur le pod template
+- `k8s/prod/configmap.yml`, `k8s/preprod/configmap.yml` — variable `METRICS_PORT: "9090"`
+- `test/helpers/metrics.test.js` (nouveau) — 4 tests (content-type, inc/observe visibles dans `register.metrics()`, USE désactivé en test)
+- `test/middlewares/metrics.middleware.test.js` (nouveau) — 5 tests (next() appelé, labels route connue, durée positive, `non_route` sur 404, status_code 500)
+- `.agents/CONVENTIONS.md` — `prom-client` ajouté aux dépendances approuvées, `helpers/metrics.js` documenté, règle sur le port `/metrics` séparé
+- `.agents/DECISIONS.md` — entrée détaillant le choix du port séparé plutôt qu'un chemin sur le port applicatif (l'Ingress route tout en `path: /`, une exclusion par annotation nginx aurait été fragile)
+
+#### Vérifications effectuées
+- Suite Jest complète relancée après ajout (voir résultat dans le message de fin de ticket)
+- `npm run lint` relancé sur l'API
+
+#### Dette / points d'attention
+- Pas encore de Prometheus/Grafana déployé sur le cluster pour scraper `/metrics` — à confirmer par l'utilisateur ; les annotations `prometheus.io/*` sont prêtes mais inertes tant qu'aucun scraper ne les lit (pas de `ServiceMonitor` CRD, au cas où `prometheus-operator` serait utilisé plutôt qu'un Prometheus scrape-config classique)
+- USE = process Node uniquement (CPU/mémoire/event-loop du process API) — pas de vision CPU/mémoire host ni Postgres/Redis (exporters dédiés non demandés pour ce ticket)
+- `docker-compose.yml` (VPS Traefik) inchangé : Traefik ne route déjà que `API_PORT`, donc le port 9090 n'est jamais publié publiquement sans modification — pas d'action requise, mais pas non plus scrappable depuis l'extérieur du réseau Docker en l'état (cohérent avec le choix "jamais exposé")
+
+#### État
+| Module | État |
+|--------|------|
+| Métriques RED/USE (Prometheus) | Stable — instrumentation complète, port dédié 9090 hors Ingress, stack de scraping (Prometheus/Grafana) non déployée |

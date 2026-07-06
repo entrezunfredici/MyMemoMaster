@@ -60,6 +60,13 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run lint
 
+      # OWASP A06 — composants vulnérables : bloque si une dépendance de production
+      # a une vulnérabilité high/critical connue (les devDependencies sont exclues,
+      # elles n'entrent pas dans les images déployées)
+      - name: Audit Dependencies (OWASP A06)
+        working-directory: ${{ matrix.path }}
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Build
         if: matrix.service == 'front'
         working-directory: ${{ matrix.path }}
