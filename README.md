@@ -2,14 +2,14 @@
 
 ## Partie 1: Présentation
 
-MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leur révisions. En centralisant diverses fonctionnalités visant à optimiser l’apprentissage. La ou MyMEmoMaster pourra se démarquer de ces concurrents c’est sur le fait de proposer un large éventail de fonctionnalités :
-[.env.example](.env.example)
-Les fonctionnalitées principales sont :
-⇒ un éditeur de cartes mentales
-⇒ un système de leitner
-⇒ une fonctionnalitée exercices
+MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leurs révisions, en centralisant diverses fonctionnalités visant à optimiser l'apprentissage. Là où MyMemoMaster se démarque de ses concurrents, c'est par le large éventail de fonctionnalités proposées.
 
-L'applications disposera de fonctionnalitées interactives.
+Les fonctionnalités principales sont :
+⇒ un éditeur de cartes mentales
+⇒ un système de Leitner
+⇒ une fonctionnalité exercices
+
+L'application dispose de fonctionnalités interactives.
 
 ## Partie 2: À l'attention des collaborateurs
 
@@ -34,7 +34,7 @@ MyMemoMaster
 
 ### Bien commencer:
 
-1. Logiciels nécéssaires:
+1. Logiciels nécessaires :
 
 - Postman ⇒ https://www.postman.com
 - VS Code ⇒ https://code.visualstudio.com
@@ -65,7 +65,7 @@ cd MyMemoMaster
 docker-compose down ; docker-compose up --build
 ```
 
-A noter, le docker compose dispose d'un reverseproxy (traefik), lorsque vous demmarez le projet avec docker, le font est accéssible à l'adresse :
+À noter : le docker compose dispose d'un reverse proxy (Traefik). Lorsque vous démarrez le projet avec Docker, le front est accessible à l'adresse :
 
 ```
  http://localhost/
@@ -112,72 +112,72 @@ cd MyMemoMaster/my_memo_master_api
 npm run seed
 ```
 
-6. Configurer PGAdmin:
-   6.1. PgAdmin Docker:
-   Ouvrez votre navigateur et allez à l'adresse suivante: http://localhost:5050
-   entrer les identifiants définis dans le .env
-   une fois connecté, faire un clic droit sur "Servers" passer sa souris sur "nouveau" puis cliquer sur "Server"
-   remplir les champs comme suit:
-   dans l'ongle général:
+6. Configurer PgAdmin :
+   6.1. PgAdmin Docker :
+   Ouvrez votre navigateur et allez à l'adresse suivante : http://localhost:5050
+   Entrez les identifiants définis dans le .env.
+   Une fois connecté, faites un clic droit sur "Servers", passez la souris sur "Nouveau" puis cliquez sur "Server".
+   Remplissez les champs comme suit :
+   dans l'onglet Général :
 
-- Name: my memo master (ou le nom que vous voulez)
-  dans l'oglet Connexion
-- Nom d'hôte/Adresse: la valeur de PG_HOST dans le .env
-- Port: la valeur de PG_PORT dans le .env
-- identifiant de connexion: la valeur de PG_USER dans le .env
-- Mot de passe: la valeur de PG_PASS dans le .env
-  Pour finir cliquer sur "Enregistrer"
-  6.2. PgAdmin local:
-  Télerchargez Postgres SQL et PG admin sur votre machine
-  Ouvrez PGAdmin et connectez vous avec les identifiants définis dans le .env
-  creer la base de donnée "PG_DB"
+- Name : my memo master (ou le nom que vous voulez)
+  dans l'onglet Connexion :
+- Nom d'hôte/Adresse : la valeur de PG_HOST dans le .env
+- Port : la valeur de PG_PORT dans le .env
+- Identifiant de connexion : la valeur de PG_USER dans le .env
+- Mot de passe : la valeur de PG_PASS dans le .env
+  Pour finir, cliquez sur "Enregistrer".
+  6.2. PgAdmin local :
+  Téléchargez PostgreSQL et PgAdmin sur votre machine.
+  Ouvrez PgAdmin et connectez-vous avec les identifiants définis dans le .env.
+  Créez la base de données "PG_DB".
 
-### Methode de travail:
+### Méthode de travail :
 
-Etape 1, se caller sur la branche dev:
+Étape 1, se caler sur la branche dev :
 
 ```sh
 git checkout dev
 git pull
 ```
 
-Etape 2, créer une branche pour la feature que vous souhaitez ajouter:
+Étape 2, créer une branche pour la feature que vous souhaitez ajouter :
 
 ```sh
 git checkout -b dev_front/back_ma-feature
 ```
 
-Etape 3, travailler sur votre feature:
+Étape 3, travailler sur votre feature :
 
 1. tests unitaires
 2. code
 3. documentation swagger
 
-Etape 4, pusher sur votre branche (chaques fin de séance et quand votre feature est finie):
+Étape 4, pusher sur votre branche (à chaque fin de séance et quand votre feature est finie) :
 quand votre branche n'est pas encore sur git
 
 ```sh
 git add .
-git commmit -m "`<message>`"
+git commit -m "`<message>`"
 git push origin dev_front/back_ma-feature
 ```
 
-quand votre branche est déja sur git
+quand votre branche est déjà sur git
 
 ```sh
 git add .
-git commmit -m "`<message>`"
+git commit -m "`<message>`"
 git push
 ```
 
-Règles de nommage du commit:
-un adjectif:
+Règles de nommage du commit :
+un préfixe :
 
-- [ADD] pour les ajouts de fonctionnalitées
-- [IMP] pour les améliorations de fonctionnalitées
+- [ADD] pour les ajouts de fonctionnalités
+- [IMP] pour les améliorations de fonctionnalités
 - [REF] pour les refactorisations
 - [FIX] pour les corrections de bugs
-  suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
+  suivi d'une courte description de la fonctionnalité ajoutée ou modifiée
 
 Workflow
 

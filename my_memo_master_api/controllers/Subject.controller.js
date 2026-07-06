@@ -22,10 +22,9 @@ exports.findOne = async (req, res) => {
       res.status(200).send(data)
     }
   } catch (error) {
+    logger.error(error?.message || error)
     res.status(500).send({
-      message:
-        error.message ||
-        `Erreur lors de la récupération du sujet avec l'identifiant ${req.params.id}.`
+      message: `Erreur lors de la récupération du sujet avec l'identifiant ${req.params.id}.`
     })
   }
 }

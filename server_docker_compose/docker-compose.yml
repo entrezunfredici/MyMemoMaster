@@ -116,6 +116,14 @@ services:
     image: ${IMAGE_API}
     volumes:
       - api-data:/app/data
+    # Sonde HTTP sur /api/v1/health (vérifie aussi la connexion DB) — node:22 a fetch natif
+    # La boucle de vérification du CD s'appuie sur ce statut (healthy) au lieu de "running"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch(`http://127.0.0.1:$${process.env.API_PORT||3000}/api/v1/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     environment:
       NODE_ENV: production
       ENVIRONMENT: ${ENVIRONMENT}

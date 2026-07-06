@@ -1,9 +1,11 @@
+# syntax=docker/dockerfile:1
 # ---- Stage 1: Build Vite (prod) ----
 FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+# Cache npm persistant entre builds (BuildKit) — voir Dockerfile API pour la justification
+RUN --mount=type=cache,target=/root/.npm npm ci --legacy-peer-deps
 
 COPY . .
 

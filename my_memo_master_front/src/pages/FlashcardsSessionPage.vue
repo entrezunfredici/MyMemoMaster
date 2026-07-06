@@ -75,22 +75,27 @@
             </p>
           </div>
 
-          <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="cardStore.lastCorrection?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-            <p class="font-bold mb-1">{{ cardStore.lastCorrection?.success ? '✅ Excellent !' : '❌ À revoir' }}</p>
-            <!-- Score IA uniquement pour les questions ouvertes -->
-            <p v-if="currentCard.question?.type !== 'mcq'" class="text-sm">
-              Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%
-            </p>
-            <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
-              Réponse attendue : {{ cardStore.lastCorrection?.correction }}
-            </p>
-            <p v-if="cardStore.lastCorrection?.explanation" class="text-sm mt-1 opacity-80">
-              {{ cardStore.lastCorrection?.explanation }}
-            </p>
-            <Button class="mt-4 w-full" :callback="nextStep">Continuer</Button>
+          <!-- Zone aria-live toujours présente dans le DOM (sinon les lecteurs d'écran
+               peuvent rater l'insertion) : le résultat de la correction est annoncé (RGAA 13.x) ;
+               le texte ✅/❌ double l'information portée par la couleur (RGAA 3.x) -->
+          <div aria-live="polite">
+            <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="cardStore.lastCorrection?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+              <p class="font-bold mb-1">{{ cardStore.lastCorrection?.success ? '✅ Excellent !' : '❌ À revoir' }}</p>
+              <!-- Score IA uniquement pour les questions ouvertes -->
+              <p v-if="currentCard.question?.type !== 'mcq'" class="text-sm">
+                Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%
+              </p>
+              <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
+                Réponse attendue : {{ cardStore.lastCorrection?.correction }}
+              </p>
+              <p v-if="cardStore.lastCorrection?.explanation" class="text-sm mt-1 opacity-80">
+                {{ cardStore.lastCorrection?.explanation }}
+              </p>
+              <Button class="mt-4 w-full" :callback="nextStep">Continuer</Button>
+            </div>
           </div>
 
-          <div v-else class="pb-4 w-full flex justify-center mt-4">
+          <div v-if="!showFeedback" class="pb-4 w-full flex justify-center mt-4">
             <Button
               class="w-full"
               :callback="handleValidation"

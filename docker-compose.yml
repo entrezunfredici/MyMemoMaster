@@ -184,6 +184,14 @@ services:
     networks:
       - mmm_network
     restart: on-failure
+    # Sonde HTTP sur /api/v1/health (vérifie aussi la connexion DB) — node:22 a fetch natif
+    # start_period long : l'entrypoint joue npm install + migrations avant d'écouter
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch(`http://127.0.0.1:$${process.env.API_PORT||3000}/api/v1/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
 
   front:
     profiles: ["dev"]
@@ -339,6 +347,13 @@ services:
       - mmm_network
       - traefik_proxy
     restart: unless-stopped
+    # Sonde HTTP sur /api/v1/health (vérifie aussi la connexion DB) — node:22 a fetch natif
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch(`http://127.0.0.1:$${process.env.API_PORT||3000}/api/v1/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   front_server:
     profiles: ["test", "prod"]

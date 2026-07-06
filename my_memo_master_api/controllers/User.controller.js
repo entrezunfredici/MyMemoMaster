@@ -33,10 +33,17 @@ exports.login = async (req, res) => {
     const { email, password } = req.body
 
     const user = await userService.findByEmail(email)
-    if (!user) return res.status(401).send({ message: 'Identifiants invalides.' })
+    if (!user) {
+      // OWASP A09 : les échecs d'authentification sont journalisés (détection bruteforce a posteriori)
+      logger.warn(`Échec de connexion — email inconnu : ${email} (IP ${req.ip})`)
+      return res.status(401).send({ message: 'Identifiants invalides.' })
+    }
 
     const isPasswordValid = await userService.verifyPassword(user.userId, password)
-    if (!isPasswordValid) return res.status(401).send({ message: 'Identifiants invalides.' })
+    if (!isPasswordValid) {
+      logger.warn(`Échec de connexion — mot de passe invalide pour ${email} (IP ${req.ip})`)
+      return res.status(401).send({ message: 'Identifiants invalides.' })
+    }
 
     if (!user.hasValidatedEmail) {
       return res.status(403).send({ message: 'Veuillez vérifier votre adresse email avant de vous connecter.' })

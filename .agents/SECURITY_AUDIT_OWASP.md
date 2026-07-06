@@ -94,9 +94,10 @@ if (!user.hasValidatedEmail) {
 **Description** : La validation repose sur `file.mimetype` (fourni par le client), pas sur les magic bytes du fichier.  
 **Recommandation** : Croiser avec l'extension extraite de `file.originalname` sur liste blanche. Idéalement utiliser le package `file-type` (magic bytes) pour détecter le vrai type.
 
-#### [A09-M3] Tentatives d'auth échouées non loggées
+#### [A09-M3] Tentatives d'auth échouées non loggées — ✅ Corrigé (2026-07-06)
 **Fichier** : `controllers/User.controller.js:login`  
-**Description** : Les échecs de connexion (mauvais mot de passe, email inconnu) ne sont pas loggés. Impossible de détecter un bruteforce a posteriori.  
+**Description** : Les échecs de connexion (mauvais mot de passe, email inconnu) n'étaient pas loggés. Impossible de détecter un bruteforce a posteriori.  
+**Correctif** : `logger.warn` sur les deux branches 401 du login (email inconnu / mot de passe invalide), avec email et `req.ip` (fiable grâce à `trust proxy`).  
 **Recommandation** :
 ```js
 logger.warn(`[AUTH] Connexion échouée pour ${email} depuis ${req.ip}`)

@@ -1,3 +1,7 @@
+// Police auto-hébergée (remplace le CDN Google Fonts : pas d'appel externe — RGPD, offline PWA)
+import '@fontsource/roboto/400.css'
+import '@fontsource/roboto/700.css'
+
 import './assets/base.css'
 import './assets/main.css'
 import './assets/modal-form.css'

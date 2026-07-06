@@ -28,7 +28,7 @@
 | TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
-| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — M-07.01 : subjectId FK directe, filtre utilisateur sur findAll, include Subject | 2026-06-20 |
+| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-07-06 : erreur 500 à la suppression d'un système corrigée (FK LeitnerBox.idSystem sans ON DELETE CASCADE) | 2026-07-06 |
 | LeitnerSystemsUsers | Stable | init |
 | Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
@@ -5021,3 +5021,127 @@ Le chart Helm (`helm/templates/deployment-api.yaml`) déclare une readinessProbe
 | Module | État |
 |--------|------|
 | Health endpoint / readiness probe | Stable — route + 3 tests, probe Helm cohérente |
+
+---
+
+### [2026-07-06] IMP — Correctifs accessibilité prioritaires (plan RGAA du dossier B2, §5.3)
+
+#### Contexte
+L'audit d'accessibilité mené pour le dossier de certification B2 (section 5.3, référentiel RGAA 4) a relevé des non-conformités. Les deux chantiers priorité 1 (coût faible, usages bloquants clavier/lecteur d'écran) sont traités.
+
+#### Fichiers créés/modifiés
+- `my_memo_master_front/index.html` — `<html lang="en">` → `lang="fr"` (RGAA 8.3 : les lecteurs d'écran prononçaient le français avec une voix anglaise)
+- `my_memo_master_front/src/components/ModalComponent.vue` — gestion complète du focus (RGAA 7.x) : focus déplacé dans le panneau à l'ouverture, focus trap Tab/Shift+Tab bouclant dans la modale, restitution du focus à l'élément précédent à la fermeture, `aria-label` sur l'overlay (titre) et sur le bouton × (« Fermer »). La fermeture Échap existait déjà.
+- `my_memo_master_front/test/components/ModalComponent.test.js` — **créé** : 10 tests (rendu/aria, overlay vs panneau, Échap ouvert/fermé, focus initial, trap Tab et Shift+Tab, restitution du focus)
+
+#### Utilisable
+- Toute modale de l'app (composant partagé) est désormais utilisable intégralement au clavier sans fuite de focus.
+
+#### Dette / reste à faire (plan §5.3 du dossier B2)
+- Campagne labels/noms accessibles champ par champ (106 inputs / 20 `for=` explicites)
+- Conversion des 21 `<div @click>` en `<button>`
+- Zones `aria-live` pour les feedbacks dynamiques ; contrôle automatisé (axe-core/Lighthouse) en CI
+
+#### État
+| Module | État |
+|--------|------|
+| Accessibilité (RGAA) | Priorité 1 traitée (lang + focus modale, 10 tests) — campagne labels et div cliquables planifiées |
+
+---
+
+### [2026-07-06] IMP — Correctifs qualité issus de la revue de code du dossier B2
+
+#### Contexte
+La revue de code menée pour le dossier de certification B2 a relevé des irrégularités mineures mais visibles : fuite d'`error.message` dans une réponse 500, acceptation d'un token JWT sans schéma `Bearer`, fichiers morts à la racine, titre HTML générique, fautes d'orthographe dans le README.
+
+#### Fichiers créés/modifiés
+- `my_memo_master_api/controllers/Subject.controller.js` — `findOne` : le catch 500 n'expose plus `error.message` au client (message générique français + `logger.error`, aligné sur les autres handlers du fichier). Seule occurrence de ce pattern dans les 36 controllers (vérifié par grep).
+- `my_memo_master_api/middlewares/Auth.middleware.js` — parsing strict du header `Authorization` : seul `Bearer <token>` est accepté (RFC 6750) ; un token nu ou un header à segments surnuméraires → 401. **Changement de comportement** : l'acceptation du token nu était testée ; tous les clients (front `helpers/api.js`, Swagger UI) envoient le préfixe — vérifié.
+- `my_memo_master_api/test/middlewares/Auth.middleware.test.js` — test « token sans préfixe » inversé (attend désormais 401) + nouveau test segments surnuméraires (7 → 8 tests).
+- `my_memo_master_front/index.html` — `<title>App</title>` → `<title>MyMemoMaster</title>` (titre pré-JS, le router gère ensuite les titres par page).
+- `README.md` — passe d'orthographe/typographie sur les parties 1 et 2 (fonctionnalitées→fonctionnalités, nécéssaires, demmarez, accéssible, Télerchargez, commmit, etc.) ; `git commmit` corrigé dans les blocs de commande ; « un adjectif » → « un préfixe ».
+- **Supprimés** : `agent.md` (doublon racine de `.agents/AGENT.md`/CLAUDE.md), `my_memo_master_front/src/components/Interpreter.vue.bak` (fichier mort, aucune référence), dossier vide `custom_node/`.
+
+#### Dette / non traité (assumé)
+- `diagramme.model.js` / `leitnerSystemsUsers.model.js` en casse non conforme — renommage risqué sous Windows (git case-insensitive), reporté.
+- Fonts Google chargées depuis CDN externe (`index.html`) — auto-hébergement à évaluer (RGPD/perf).
+- `tp.md`/`tp2/` : documents de cours conservés tels quels.
+- `.docker-tmp/` non supprimé (contexte de build docker, à vérifier avant purge).
+
+#### État
+| Module | État |
+|--------|------|
+| Qualité code/doc (revue B2) | Corrigée — fuite 500 unique, Bearer strict (8 tests), README relu, racine nettoyée |
+
+---
+
+### [2026-07-06] IMP — Résorption de dette technique (2e passe revue B2)
+
+#### Contexte
+Traitement des éléments de dette sûrs et à forte valeur listés dans les entrées précédentes. Les chantiers larges (campagne labels a11y, conversion div→button, magic bytes upload, blacklist JWT) restent planifiés.
+
+#### Fichiers créés/modifiés
+- `models/diagramme.model.js` → **`Diagramme.model.js`**, `models/leitnerSystemsUsers.model.js` → **`LeitnerSystemsUsers.model.js`** — casse alignée sur la convention PascalCase (git mv en deux temps, Windows case-insensitive) + `require` mis à jour dans `models/index.js` (seul point d'entrée, vérifié par grep).
+- `controllers/User.controller.js` — OWASP A09-M3 corrigé : `logger.warn` sur les deux branches d'échec du login (email inconnu / mot de passe invalide) avec email + `req.ip`. Statut mis à jour dans SECURITY_AUDIT_OWASP.md.
+- `docker-compose.yml` (services `api` et `api_server`) + `server_docker_compose/docker-compose.yml` (service `api`) — **healthcheck HTTP sur /api/v1/health** via `node -e fetch(...)` (node:22, pas de curl/wget dans l'image). La boucle de vérification du CD s'appuie désormais sur `healthy` au lieu de `running`. `$$` pour échapper l'interpolation compose ; `config -q` validé sur les deux fichiers. `start_period` 120s en dev (npm install + migrations dans l'entrypoint), 60s en serveur.
+- `my_memo_master_front/package.json` — **nouvelle dépendance signalée : `@fontsource/roboto`** (auto-hébergement de la police, licence OFL). `main.js` importe les graisses 400/700 ; les `<link>` Google Fonts sont retirés d'`index.html` → plus aucun appel externe au chargement (RGPD, offline PWA, CSP plus stricte possible).
+- `src/pages/FlashcardsSessionPage.vue` — zone `aria-live="polite"` **toujours montée** enveloppant le feedback de correction (RGAA 13.x) ; le `v-else` du bloc de validation devient `v-if="!showFeedback"` (la chaîne v-if/v-else était rompue par le wrapper).
+
+#### Dette restante (inchangée, planifiée)
+- Campagne labels/noms accessibles ; conversion des `<div @click>` ; axe-core en CI ; magic bytes upload (A08-M2) ; révocation JWT (A07-M1).
+
+#### État
+| Module | État |
+|--------|------|
+| Dette technique (revue B2) | Résorbée pour les lots sûrs — modèles renommés, log auth, healthchecks API, fonts auto-hébergées, aria-live |
+
+---
+
+### [2026-07-06] IMP — Accélération des builds Docker (npm ci + caches)
+
+#### Contexte
+Le stage deps de l'image API prenait ~5 min (npm install : compilation sqlite3, téléchargement onnxruntime/AWS SDK) à chaque invalidation de couche, en local comme en CI (où chaque run part de zéro).
+
+#### Fichiers modifiés
+- `my_memo_master_api/Dockerfile` — `npm install --omit=dev` → `RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev` : install depuis le lockfile (reproductible, aligné CI) + cache npm persistant entre builds (BuildKit).
+- `my_memo_master_front/Dockerfile` — même cache mount sur le `npm ci --legacy-peer-deps` existant.
+- `.github/workflows/cd.yml` — job `push_images` refondu : les 3 blocs conditionnels par branche sont remplacés par une étape `Compute image names` (préfixe selon la branche) + 2 étapes `docker/build-push-action@v6` avec `cache-from/to: type=gha` (scopes api/front, mode=max). Comportement identique (mêmes tags poussés), mais couches réutilisées entre les runs.
+
+#### Risques assumés
+- `npm ci` échoue si package-lock.json désynchronisé de package.json (échec voulu, fail-fast).
+- `--mount=type=cache` requiert BuildKit (Docker 23+ ; le VPS ne builde pas, il pull).
+- Cache GHA limité à 10 Go/repo : éviction possible (mode=max stocke toutes les couches) → au pire un cache miss = durée de build actuelle, jamais un échec.
+- Premier build après le changement : aucun gain (caches vides).
+
+#### Dette signalée par l'IDE (préexistante, à traiter — Bloc 4)
+- Scan de vulnérabilités : l'image de base `node:22-bookworm-slim` remonte 1 CVE critique + 4 high. Mettre à jour le tag/digest de base et re-scanner (docker scout / trivy) lors du prochain cycle de mise à jour des dépendances.
+
+#### État
+| Module | État |
+|--------|------|
+| Builds Docker (local + CD) | Optimisés — npm ci + cache npm BuildKit + cache de couches GHA ; validation build locale en cours |
+
+---
+
+### [2026-07-06] FIX — Erreur 500 à la suppression d'un système de Leitner
+
+#### Contexte
+Signalé par l'utilisateur : suppression d'un système de Leitner → 500 côté front. `LeitnerSystem.service.js#delete` fait un simple `system.destroy()` sans gérer les enfants. Chaque système est créé avec 5 `LeitnerBox` par défaut (`LeitnerSystem.service.js#create`), donc tout système réel a des boîtes liées. Contrairement à `LeitnerSystemsUsers`, `LeitnerSystemTag` et `cardSystems` (tous `ON DELETE CASCADE`), la migration `20260226152200-create-leitnerbox-table.js` ne définissait aucun `onDelete` sur la FK `LeitnerBox.idSystem` → PostgreSQL applique `NO ACTION` par défaut → violation de contrainte FK à chaque suppression → exception non catchée spécifiquement, remontée en 500 générique par le controller.
+
+#### Fichiers créés/modifiés
+- `migrations/20260706000001-add-cascade-delete-leitnerbox-idsystem.js` — nouvelle migration qui remplace la contrainte FK `LeitnerBox.idSystem` par `ON DELETE CASCADE ON UPDATE CASCADE`. Dialecte Postgres : la contrainte n'ayant pas de nom explicite (créée par `CREATE TABLE` avec `references` inline), le nom auto-généré (`LeitnerBox_idSystem_fkey`) est retrouvé dynamiquement via `information_schema` avant `DROP`/`ADD CONSTRAINT` (bloc `DO $$`), pour ne pas dépendre d'une hypothèse de nommage. Dialecte SQLite : recréation de table (`_new`/rename), suivant le pattern déjà utilisé dans `20260702000001-add-etablissement-to-invitation.js`.
+- `models/LeitnerBox.model.js` — ajout de `references`/`onDelete: 'CASCADE'`/`onUpdate: 'CASCADE'` sur `idSystem` (absents jusqu'ici), pour que `sync({ alter })` (utilisé en dev/tests SQLite) applique le même comportement que la migration en prod.
+- `test/bdd/leitner.delete.test.js` — nouveau test de non-régression (DB SQLite in-memory réelle, aucune couche mockée) : crée un système via l'API (5 boîtes auto), le supprime, vérifie un 200 et que les boîtes sont réellement supprimées (par `idBox`, pas seulement détachées par `idSystem` — un `SET NULL` silencieux aurait aussi satisfait un test moins strict).
+
+#### Vérifications effectuées
+- Suite complète : 77 suites / 1424 tests verts après le correctif.
+- Migration testée dans les deux sens (`up`/`down`) sur SQLite (fichier réel) **et** sur un conteneur PostgreSQL 17 jetable : reproduction du bug exact (système + 5 boîtes → `DELETE` réussit et cascade après le correctif ; `down()` restaure bien l'ancienne contrainte sans `ON DELETE`).
+- Sans le fix modèle, `sync()` de Sequelize appliquait déjà un comportement implicite de l'association `belongsTo` (`SET NULL`, la FK étant nullable) — d'où l'absence de crash en dev/SQLite malgré le bug ; seul PostgreSQL en prod (contrainte issue de la migration brute, indépendante des associations Sequelize) déclenchait le 500. Le test de non-régression vérifie donc la suppression réelle (CASCADE), pas seulement l'absence d'erreur.
+
+#### Dette / points d'attention
+- Aucune autre table enfant de `LeitnerSystem` n'a ce problème (toutes déjà en `CASCADE`) — audit limité à `LeitnerBox`.
+
+#### État
+| Module | État |
+|--------|------|
+| LeitnerSystem / LeitnerBox | Stable — FK `LeitnerBox.idSystem` en `ON DELETE CASCADE`, suppression d'un système fonctionnelle |
