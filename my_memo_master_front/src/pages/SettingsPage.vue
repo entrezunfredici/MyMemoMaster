@@ -140,7 +140,7 @@
                 <p class="settings__row-hint">En dessous de ce pourcentage, une alerte est envoyée.</p>
               </div>
               <div class="flex items-center gap-2">
-                <input
+                <input aria-label="Seuil d'alerte discipline"
                   type="range"
                   min="10"
                   max="80"

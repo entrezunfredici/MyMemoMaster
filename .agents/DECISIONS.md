@@ -796,3 +796,27 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 - Endpoint non authentifié (choix utilisateur) : la protection vient de l'isolation réseau (port séparé, non exposé), pas d'un token applicatif.
 **Alternative écartée** : `express-prom-bundle` (wrapper tout-en-un) — écarté pour garder le contrôle explicite sur le label `route` (cardinalité) et ne pas ajouter une dépendance quand ~30 lignes suffisent. `/api/v1/metrics` sur le port applicatif existant — écarté car l'Ingress prod/preprod route tout (`path: /`, `pathType: Prefix`) vers le service API : un chemin dédié aurait nécessité soit un `configuration-snippet` nginx (annotation désactivée par défaut sur les installations récentes d'ingress-nginx, fragile), soit une règle Ingress explicite de refus — plus complexe et plus fragile qu'un port physiquement séparé. Exporters dédiés Postgres/Redis (USE infra) — hors périmètre de ce ticket (validé avec l'utilisateur), à faire si besoin dans un ticket dédié.
 **Conséquences** : Nouvelle dépendance `prom-client` en prod. `METRICS_PORT` (9090) ajouté aux ConfigMaps K8s prod/preprod ; `docker-compose.yml` n'a rien à changer (Traefik ne route déjà que le port `API_PORT`, donc 9090 n'est jamais publié côté VPS Docker). Dette : pas encore de Prometheus/Grafana déployé pour consommer ces métriques (scope à valider) ; USE limité au process Node (pas de vision CPU/mémoire host ni Postgres/Redis).
+
+---
+
+### [2026-07-06] Magic bytes uploads — signatures codées à la main plutôt que le package file-type
+**Contexte** : L'audit OWASP (A08-M2) demandait de ne plus faire confiance au MIME déclaré par le client sur les uploads. La recommandation initiale citait le package `file-type`.
+**Décision** : Implémenter `helpers/fileSignature.js` : table de signatures binaires pour les 11 types autorisés (JPEG/PNG/GIF/WebP/PDF/OOXML/CFB), croisement extension ↔ MIME au `fileFilter`, et vérification des magic bytes **sur le flux** via une fonction `contentType` custom pour multer-s3 (lit le premier chunk, rejette ou relaie via PassThrough — même mécanique que `AUTO_CONTENT_TYPE`, qui détectait sans jamais rejeter).
+**Alternative écartée** : Package `file-type` — les versions ≥17 sont ESM-only (projet CommonJS) et la v16 CJS n'est plus maintenue. Les types autorisés étant peu nombreux et leurs signatures stables, la table maison est plus simple à auditer (12 tests dédiés).
+**Conséquences** : Tout nouveau type MIME autorisé doit être ajouté dans `SIGNATURES` **et** `EXTENSIONS_BY_MIME`, sinon il sera rejeté. Le fallback disque (dev sans S3) ne vérifie que extension ↔ MIME (pas de hook de flux dans diskStorage) — acceptable, la prod est sur S3.
+
+---
+
+### [2026-07-06] sqlite3 déplacé en devDependencies + npm audit bloquant en CI (OWASP A06)
+**Contexte** : `npm audit` remontait 5 vulnérabilités high sur l'API, toutes dans la chaîne de build de `sqlite3` (node-gyp/tar/make-fetch-happen). Or SQLite ne sert qu'en dev/tests — la prod, la preprod et le VPS de test sont sur PostgreSQL.
+**Décision** : (1) `sqlite3` passe en devDependencies : `npm ci --omit=dev` (Dockerfile) et `npm install` sous `NODE_ENV=production` ne l'installent plus — la chaîne vulnérable sort des images déployées. (2) Étape CI bloquante `npm audit --omit=dev --audit-level=high` sur les deux applications. (3) `npm audit fix` appliqué au front (form-data).
+**Alternative écartée** : Forcer la mise à jour de la chaîne sqlite3 (`npm audit fix --force` → sqlite3@6) — breaking change inutile pour une dépendance de dev ; ignorer les findings — indéfendable pour le critère OWASP du référentiel.
+**Conséquences** : 0 high/critical sur les dépendances de prod à date. Résiduel : `uuid` moderate (transitive de Sequelize), sous le seuil du job. Un développeur qui fait `npm install --omit=dev` en local n'aura pas SQLite — utiliser l'install complète en local.
+
+---
+
+### [2026-07-06] Campagne accessibilité — aria-label systématique plutôt que refonte label for/id
+**Contexte** : L'audit statique (`scripts/audit-a11y.mjs`, développé pour l'occasion) relevait 135 non-conformités RGAA : 111 champs sans nom accessible, 14 boutons symboles sans nom, 10 éléments cliquables sans équivalent clavier.
+**Décision** : (1) Champs : `aria-label` (statique ou `:aria-label` dynamique pour les champs en boucle), libellé aligné sur le label visible ou le placeholder — appliqué par codemod, vérifié par ré-audit. (2) Éléments cliquables : lien natif quand la sémantique s'y prête (TutorialItem), sinon pattern ARIA `role="button"`/`tabindex="0"`/`@keydown.enter/.space`. (3) Motifs justifiés encodés comme exceptions dans l'outil (overlays de fermeture, `@click.stop`, wrapper `cursor-text`). (4) Non-régression : tests axe-core dans Vitest (CI).
+**Alternative écartée** : Association `label for`/`id` généralisée — plus canonique mais exige des ids uniques dans des composants répétés (v-for) et une refonte des templates ; `aria-label` donne le même nom accessible sans restructuration. Un `<button>` natif pour les blocs mois du calendrier — invalide (contenu non-phrasing : h3 + grille).
+**Conséquences** : Les libellés visibles et les aria-label doivent rester synchronisés lors des évolutions (WCAG 2.5.3 label-in-name). Tout nouveau formulaire doit passer `node scripts/audit-a11y.mjs` (0 attendu) ; les contrastes et un test lecteur d'écran réel restent hors périmètre outillé (docs/AUDIT_RGAA.md §5).

@@ -16,12 +16,12 @@
 
         <div class="py-4">
           <span class="text-lg font-medium text-gray-light">Question</span>
-          <input v-model="question.statement" type="text" placeholder="Quelle est la loi de bernouilli ?" class="w-full p-2 rounded-lg text-dark" />
+          <input aria-label="Énoncé de la question" v-model="question.statement" type="text" placeholder="Quelle est la loi de bernouilli ?" class="w-full p-2 rounded-lg text-dark" />
         </div>
 
         <div class="py-4">
           <span class="text-lg font-medium text-gray-light">Réponse</span>
-          <textarea v-model="response.content" placeholder="Quelle est la réponse ?" class="w-full p-2 rounded-lg text-dark" />
+          <textarea aria-label="Réponse attendue" v-model="response.content" placeholder="Quelle est la réponse ?" class="w-full p-2 rounded-lg text-dark" />
         </div>
 
         <div class="py-4 flex justify-end">

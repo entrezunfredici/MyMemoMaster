@@ -115,7 +115,7 @@
 
           <div class="form-group">
             <label class="form-label">Question</label>
-            <textarea
+            <textarea aria-label="Énoncé de la carte"
               v-model="form.statement"
               placeholder="Quelle est la loi d'Ohm ?"
               class="form-input"
@@ -127,7 +127,7 @@
           <!-- Champ réponse : open uniquement -->
           <div v-if="form.type === 'open'" class="form-group--lg">
             <label class="form-label">Réponse correcte</label>
-            <textarea
+            <textarea aria-label="Réponse de la carte"
               v-model="form.answer"
               placeholder="U = R × I"
               class="form-input"
@@ -141,14 +141,14 @@
             <label class="form-label">Options (sélectionne la bonne réponse)</label>
             <div class="space-y-2">
               <div v-for="(opt, oi) in form.mcqOptions" :key="oi" class="flex items-center gap-2">
-                <input
+                <input :aria-label="`Marquer l'option ${oi + 1} comme correcte`"
                   type="radio"
                   :name="`mcq-correct-card`"
                   :checked="opt.correct"
                   @change="setMcqCorrect(oi)"
                   class="accent-primary shrink-0"
                 />
-                <input
+                <input :aria-label="`Texte de l'option ${oi + 1}`"
                   :value="opt.text"
                   @input="setOptionText(oi, $event.target.value)"
                   type="text"
@@ -201,14 +201,14 @@
       @click="closeBoxModal"
     >
       <div class="modal-panel modal-panel--sm" @click.stop>
-        <button @click="closeBoxModal" class="modal-close">&times;</button>
+        <button aria-label="Fermer" @click="closeBoxModal" class="modal-close">&times;</button>
         <h2 class="modal-title">
           {{ editingBox ? 'Modifier la boîte' : 'Nouvelle boîte' }}
         </h2>
         <form @submit.prevent="submitBoxForm">
           <div class="form-group">
             <label class="form-label">Niveau</label>
-            <input
+            <input aria-label="Niveau de la boîte"
               v-model="boxForm.level"
               type="number"
               min="1"
@@ -219,7 +219,7 @@
           </div>
           <div class="form-group--lg">
             <label class="form-label">Intervalle (secondes)</label>
-            <input
+            <input aria-label="Intervalle en secondes"
               v-model="boxForm.intervall"
               type="number"
               min="1"

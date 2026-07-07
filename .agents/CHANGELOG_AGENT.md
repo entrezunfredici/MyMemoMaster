@@ -20,7 +20,7 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
-| Auth (register, login, reset password) | Stable — 2026-06-23 : envoi email vérification à l'inscription (lien cliquable + code), page VerifyEmailPage.vue | 2026-06-23 |
+| Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués | 2026-07-06 |
 | User (CRUD, profil) | Stable | init |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
@@ -39,6 +39,9 @@
 | Kpi | Stable — M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-06-24 |
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
+| Accessibilité RGAA (front) | Stable — campagne 135→0 non-conformités, outil scripts/audit-a11y.mjs, 4 tests axe-core en CI, preuve docs/AUDIT_RGAA.md | 2026-07-06 |
+| Sécurité dépendances (OWASP A06) | Stable — npm audit bloquant en CI, sqlite3 en devDeps, 0 high/critical en prod | 2026-07-06 |
+| Manuel d'utilisation | Stable — docs/MANUEL_UTILISATION.md (3 profils + FAQ), captures à insérer | 2026-07-06 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -51,7 +54,7 @@
 | ESLint / Prettier (front + back) | Stable — lint vert après revue M-03 (formatDate supprimée, globalThis→window, Reminder.controller normalisé) | 2026-06-14 |
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
-| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — M-00.13 : messages Auth.middleware en français | 2026-06-06 |
+| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — 2026-07-06 : requireRole loggue les refus (F-M8), errorHandler anti log-injection (F-M7), uploads magic bytes via helpers/fileSignature (A08-M2) | 2026-07-06 |
 | Tests intégration API (Supertest) | Stable — M-05.08 : 724 tests total (+8 : POST /refresh-token + POST /logout) | 2026-06-16 |
 | Tests unitaires auth (Bcrypt, JWT, RBAC) | Stable — M-05.12 : Auth.middleware (7 tests JWT) + bcrypt User.service (6 tests verifyPassword/setPassword/create) | 2026-06-17 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
@@ -5181,3 +5184,54 @@ Demande utilisateur suite à une discussion sur les types de logs existants (Win
 | Module | État |
 |--------|------|
 | Métriques RED/USE (Prometheus) | Stable — instrumentation complète, port dédié 9090 hors Ingress, stack de scraping (Prometheus/Grafana) non déployée |
+
+---
+
+### [2026-07-06] IMP — Complétion Bloc 2 : bloquant prod, sécurité OWASP, campagne accessibilité, documentation
+
+#### Contexte
+Suite de la revue B2 : correction du bloquant identifié (colonne manquante en prod), résorption du backlog sécurité de priorité moyenne, campagne d'accessibilité outillée complète, et production des preuves manquantes du dossier (manuel d'utilisation, audit RGAA).
+
+#### Fichiers créés/modifiés — API
+- `migrations/20260706000002-add-validemailcodeexpiresat-to-user.js` (nouveau) — **bug prod corrigé** : `validEmailCodeExpiresAt` était utilisée par User.service (correctif A04-H4) mais aucune migration ne la créait → register/verify-email plantaient sur PostgreSQL (migrations seules, pas de sync). Migration idempotente (describeTable avant add/remove).
+- `scripts/sync-pg-sequences.js` (nouveau) + `entrypoint.sh` — resynchronisation automatique de la séquence `Role_roleId_seq` après les seeders (setval sur MAX, no-op hors PostgreSQL). Résorbe la dette « reset manuel des séquences » (DECISIONS 2026-06-14).
+- `helpers/fileSignature.js` (nouveau, 12 tests) + `middlewares/upload.middleware.js` + `middlewares/mindmapImageUpload.js` — **A08-M2** : croisement extension↔MIME + magic bytes sur le flux S3 (voir DECISIONS).
+- `app.js` — **A05-M4** : CSP Helmet explicite (défauts + imgSrc blob:). Note : Helmet v8 posait déjà une CSP par défaut, le constat d'audit était inexact — vérifié empiriquement, statut corrigé dans l'audit.
+- `validators/User.validators.js` — **F-M2** : caractère spécial exigé (password + newPassword) ; **F-M3** : règle `body('id')` de changePassword supprimée (le controller lit req.user.id).
+- `controllers/User.controller.js` — **F-M4** : doublon email → 400 « Cet email est déjà utilisé. » (pré-check ET SequelizeUniqueConstraintError — avant : 500) ; **F-M8** : logger.warn sur les 403 du login (email non vérifié, compte désactivé).
+- `middlewares/requireRole.middleware.js` — **F-M8** : logger.warn sur les refus RBAC (userId, roleId, méthode, URL, IP).
+- `middlewares/errorHandler.middleware.js` — **F-M7** : caractères de contrôle retirés des messages avant journalisation (anti log-injection).
+- `package.json` — **A06** : `sqlite3` déplacé en devDependencies (voir DECISIONS) ; tests : User.controller.test (nouvelles règles + 400 doublon + race condition), requireRole.middleware.test (mock warn + test du log), test/helpers/fileSignature.test.js (nouveau).
+
+#### Fichiers créés/modifiés — Front
+- `scripts/audit-a11y.mjs` (nouveau) — audit statique RGAA maison (11.1, 1.1, 7.1, 11.9, 8.3, 13.x), sortie lisible ou JSON. Première passe : **135 non-conformités ; après campagne : 0**.
+- Campagne aria-label (23 fichiers, 125 insertions) — tous les champs et boutons symboles ont un nom accessible en français.
+- Équivalents clavier (7 fichiers) — role="button"/tabindex/@keydown sur cartes de groupe, accordéons élève/section, cellules et pilules du calendrier, dropzone, onglets de filtre sujet ; `TutorialItem.vue` converti en lien natif `<a>` ; blocs mois du calendrier en pattern ARIA.
+- `ExerciseDetailPage.vue` — zone `aria-live="polite"` toujours montée autour du score (RGAA 13.x).
+- `test/a11y/axe.test.js` (nouveau) + devDependency **axe-core** (signalée, ajoutée à CONVENTIONS) — 4 tests runtime en CI.
+- `package-lock.json` — `npm audit fix` (form-data high).
+
+#### CI/CD & docs
+- `.github/workflows/ci.yml` — étape bloquante `npm audit --omit=dev --audit-level=high` (OWASP A06).
+- `.github/workflows/cd.yml` — retrait de l'étape debug temporaire `[TEST] Debug node taints/conditions` (fix health endpoint en place).
+- `docs/MANUEL_UTILISATION.md` (nouveau) — manuel utilisateur autonome : 3 profils (étudiant/enseignant/gérant), 11 sections + FAQ, marqueurs [CAPTURE ICI].
+- `docs/AUDIT_RGAA.md` (nouveau) — preuve d'audit outillé : méthode 3 niveaux, chiffres avant/après, motifs justifiés, limites.
+- `B2_RENDU.md` — chiffres actualisés (80 suites/1447 tests API, 37 fichiers/562 front, couverture 85,74 %/86,17 %), métriques Prometheus en 1.3, audit deps en 2.3, statuts sécurité 5.2/8.4, section 5.3 réécrite (audit outillé), 9.1/9.6 (manuel), synthèses.
+- `.agents/` — SECURITY_AUDIT_OWASP (statuts ✅ A05-M4/A08-M2/F-M2/M3/M4/M7/M8 + section A06), CONVENTIONS (axe-core, règle magic bytes, règle sqlite3, règle audit a11y), DECISIONS (3 entrées + 2 notes de mise à jour sur entrées périmées : better-sqlite3 inexact, refresh token hashé depuis M-00b.07b).
+
+#### Vérifications effectuées
+- API : 80 suites / **1447 tests verts** ; lint 0 erreur ; `npm audit --omit=dev` : 0 high/critical.
+- Front : 37 fichiers / **562 tests verts** (incl. 4 axe-core) ; lint 0 erreur ; audit fix : 0 vulnérabilité ; `audit-a11y.mjs` : **0 non-conformité**.
+- Migration validEmailCodeExpiresAt : up/down testés via describeTable (pattern 20260604000000).
+
+#### Dette restante (mise à jour)
+- A07-M1 (révocation JWT) : risque résiduel assumé, palliatif 15 min + rotation.
+- Contrastes RGAA + test lecteur d'écran : audit navigateur à faire (docs/AUDIT_RGAA.md §5).
+- Focus non piégé dans les modales « artisanales » (hors ModalComponent) — migration progressive.
+- Screenshots du dossier B2 ([SCREENSHOT ICI] ×7 + [CAPTURE ICI] du manuel) — à réaliser manuellement.
+- CVE image de base node:22-bookworm-slim (Bloc 4).
+
+#### État
+| Module | État |
+|--------|------|
+| Bloc 2 (dossier + code) | Complet côté code et preuves outillées — restent les captures d'écran manuelles et l'audit contrastes navigateur |

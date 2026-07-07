@@ -1,3 +1,4 @@
 node_modules
 database/db.sqlite
 public/uploads/
+coverage/

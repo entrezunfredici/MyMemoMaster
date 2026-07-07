@@ -27,7 +27,7 @@
 
           <!-- open -->
           <template v-if="question.type === 'open'">
-            <textarea
+            <textarea aria-label="Entrez votre réponse ici"
               v-model="userAnswers[idx]"
               placeholder="Entrez votre réponse ici..."
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
@@ -64,7 +64,7 @@
                 :key="pi"
               >
                 <span v-if="part.type === 'text'">{{ part.value }}</span>
-                <input
+                <input :aria-label="`Réponse du trou ${part.index}`"
                   v-else
                   v-model="userAnswers[idx][part.index]"
                   type="text"
@@ -116,13 +116,16 @@
       </div>
 
       <!-- Mode résultats -->
-      <div v-if="resultsShown" class="space-y-6">
-        <!-- Score -->
-        <div class="bg-gradient-to-r from-blue-500 to-blue-700 p-8 rounded-lg text-white text-center mb-8">
+      <!-- RGAA 13.x — zone aria-live toujours montée : le score est annoncé aux
+           lecteurs d'écran quand il apparaît (la zone doit précéder le changement) -->
+      <div aria-live="polite">
+        <div v-if="resultsShown" class="bg-gradient-to-r from-blue-500 to-blue-700 p-8 rounded-lg text-white text-center mb-8">
           <h2 class="text-3xl font-bold mb-2">Votre score</h2>
           <p class="text-5xl font-bold">{{ correctCount }}/{{ questions.length }}</p>
           <p class="text-lg mt-2">{{ Math.round((correctCount / questions.length) * 100) }}%</p>
         </div>
+      </div>
+      <div v-if="resultsShown" class="space-y-6">
 
         <!-- Détail par question -->
         <div

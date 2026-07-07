@@ -37,7 +37,7 @@
           <!-- Réponse ouverte -->
           <div v-if="currentCard.question?.type !== 'mcq'" class="py-2">
             <span class="text-sm font-medium text-gray-light uppercase">Ta Réponse</span>
-            <textarea
+            <textarea aria-label="Saisissez votre réponse"
               v-model="userAnswer"
               :disabled="showFeedback || submitting"
               placeholder="Saisissez votre réponse..."

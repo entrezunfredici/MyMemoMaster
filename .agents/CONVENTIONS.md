@@ -160,9 +160,11 @@ router.get("/", authMiddleware, entity.findAll);
 - Les erreurs ne sont jamais catchées silencieusement — toujours logger avec Winston + retourner un message HTTP
 - L'authentification utilise un middleware `Auth.middleware.js` posé sur les routes privées
 - Le rate limiting est appliqué sur les routes d'auth (login : 5 tentatives / 15 min, register : 10 / 1h)
-- Les uploads de fichiers vont dans `public/uploads/`
+- Les uploads de fichiers vont dans `public/uploads/` ; tout middleware d'upload croise extension ↔ MIME et vérifie les magic bytes via `helpers/fileSignature.js` (OWASP A08)
 - La documentation Swagger est générée automatiquement depuis les JSDoc des routes et servie sur `/api-docs`
 - En dev, SQLite est utilisé (pas de PG_HOST) ; en prod/docker, PostgreSQL
+- `sqlite3` est une **devDependency** (dev/test uniquement — la prod est sur PostgreSQL) : ne pas la remonter en dependencies, sa chaîne de build porte des CVE
+- L'accessibilité est outillée : `node scripts/audit-a11y.mjs` (front, audit statique RGAA) et `test/a11y/` (axe-core, exécuté en CI) — toute nouvelle page/formulaire doit passer les deux
 - Les métriques Prometheus (RED/USE) sont exposées sur `GET /metrics` via un serveur HTTP séparé (`METRICS_PORT`, défaut 9090) — jamais sur le port applicatif, jamais routé par l'Ingress/Traefik
 
 ---
@@ -196,6 +198,7 @@ router.get("/", authMiddleware, entity.findAll);
 | Notifications front | vue-toastification |
 | Math front | KaTeX / MathJax |
 | Graphiques front | chart.js + vue-chartjs |
+| Accessibilité (tests front) | axe-core (dev) |
 
 ---
 

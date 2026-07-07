@@ -2,10 +2,11 @@ jest.mock('../../models/index', () => ({
   User: { findByPk: jest.fn() }
 }))
 
-jest.mock('../../helpers/logger', () => ({ error: jest.fn() }))
+jest.mock('../../helpers/logger', () => ({ error: jest.fn(), warn: jest.fn() }))
 
 const requireRole = require('../../middlewares/requireRole.middleware')
 const { User } = require('../../models/index')
+const logger = require('../../helpers/logger')
 
 describe('requireRole middleware', () => {
   let req, res, next
@@ -71,6 +72,19 @@ describe('requireRole middleware', () => {
     expect(res.status).toHaveBeenCalledWith(403)
     expect(res.json).toHaveBeenCalledWith({ message: 'Accès refusé. Permissions insuffisantes.' })
     expect(next).not.toHaveBeenCalled()
+  })
+
+  it('journalise le refus RBAC en warn (OWASP F-M8)', async () => {
+    User.findByPk.mockResolvedValue({ roleId: 2 })
+    req.method = 'DELETE'
+    req.originalUrl = '/api/v1/roles/1'
+    req.ip = '10.0.0.1'
+
+    await requireRole(1)(req, res, next)
+
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+    expect(logger.warn.mock.calls[0][0]).toContain('userId 1')
+    expect(logger.warn.mock.calls[0][0]).toContain('DELETE /api/v1/roles/1')
   })
 
   it('retourne 500 si la requête DB échoue', async () => {

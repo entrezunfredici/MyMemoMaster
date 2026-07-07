@@ -262,6 +262,7 @@ Jest + Supertest côté API, Vitest + @vue/test-utils côté front, exécutés e
 - **Healthchecks** à tous les étages : `pg_isready` sur PostgreSQL, `redis-cli ping` sur Redis, `wget --spider` sur le front ([docker-compose.yml](docker-compose.yml) ; HEALTHCHECK aussi intégré à l'image front, [my_memo_master_front/Dockerfile](my_memo_master_front/Dockerfile)). Les dépendances de démarrage s'appuient dessus (`depends_on: condition: service_healthy`), et le pipeline CD s'en sert comme critère de succès du déploiement (section 6).
 - **Limites de ressources** : chaque service Docker Compose déclare `limits` et `reservations` CPU/mémoire paramétrables (ex. API : 0.50 CPU / 512 Mo par défaut), et les manifests Helm déclarent `requests`/`limits` Kubernetes par environnement ([helm/values-preprod.yaml](helm/values-preprod.yaml)). Le pool de connexions PostgreSQL est dimensionné par configuration ([my_memo_master_api/config/dbms.config.js](my_memo_master_api/config/dbms.config.js) : `max`, `min`, `acquire`, `idle`).
 - **Logs applicatifs structurés** : logger Winston + logs d'accès HTTP Morgan pipés dans Winston, format `combined` en production ([my_memo_master_api/app.js](my_memo_master_api/app.js), lignes 62–67).
+- **Métriques applicatives RED/USE (Prometheus)** : l'API est instrumentée avec `prom-client` — histogramme `http_request_duration_seconds` et compteur `http_requests_total` labellisés méthode/route/code (RED), métriques process Node (CPU, mémoire, event-loop — USE) via `collectDefaultMetrics` ([my_memo_master_api/helpers/metrics.js](my_memo_master_api/helpers/metrics.js), [middlewares/metrics.middleware.js](my_memo_master_api/middlewares/metrics.middleware.js)). L'endpoint `/metrics` est servi par un **serveur HTTP dédié** (port 9090, [server.js](my_memo_master_api/server.js)) jamais exposé par l'Ingress — décision documentée dans [.agents/DECISIONS.md](.agents/DECISIONS.md) ; les annotations `prometheus.io/*` sont posées sur les pods ([k8s/](k8s/)). L'instrumentation est testée (9 tests dédiés).
 - **Notifications temps réel** : chaque exécution CI/CD notifie un canal Discord (succès/échec, branche concernée) — [.github/workflows/notify_ci.yml](.github/workflows/notify_ci.yml) et job `notify` de [.github/workflows/cd.yml](.github/workflows/cd.yml). L'équipe est prévenue d'une régression sans avoir à surveiller GitHub.
 
 ### Analyse statique continue : SonarQube (temporairement désactivé)
@@ -300,8 +301,8 @@ La méthode de travail impose l'ordre « tests unitaires → code → documentat
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | Environnement de développement détaillé | Docker Compose profil`dev` + mode hors Docker (SQLite), VS Code/Postman/Git documentés (README)  |
 | Environnements de déploiement et de test  | test = VPS Compose, preprod/prod = Kubernetes Helm, isolation par namespace/réseau/images          |
-| Outils de suivi de qualité                | ESLint ×2, Prettier, Jest/Vitest, SonarQube (configuré, désactivé — assumé), CI bloquante     |
-| Outils de suivi de performance             | Healthchecks, limites de ressources, pool DB configuré, logs Winston/Morgan, notifications Discord |
+| Outils de suivi de qualité                | ESLint ×2, Prettier, Jest/Vitest, npm audit bloquant en CI, SonarQube (configuré, désactivé — assumé)     |
+| Outils de suivi de performance             | Healthchecks, limites de ressources, pool DB configuré, logs Winston/Morgan, métriques Prometheus RED/USE, notifications Discord |
 | Gestion de sources                         | GitHub, monorepo, stratégie de branches alignée sur les environnements, conventions de commit     |
 
 ---
@@ -356,7 +357,8 @@ Chaque entrée de la matrice exécute la même séquence, définie dans le job `
 | 1. Installation reproductible | `npm ci`        | installe**exactement** les versions verrouillées dans `package-lock.json` — pas de dérive de dépendances entre le poste du développeur et le runner |
 | 2. Tests                      | `npm run test`  | Jest + Supertest (API) / Vitest (front) — détection des régressions fonctionnelles                                                                            |
 | 3. Lint                       | `npm run lint`  | ESLint — détection des défauts de qualité et erreurs statiques                                                                                               |
-| 4. Build (front uniquement)   | `npm run build` | vérifie que le bundle Vite de production se construit                                                                                                           |
+| 4. Audit des dépendances      | `npm audit --omit=dev --audit-level=high` | **bloque** si une dépendance de production porte une vulnérabilité high/critical connue (OWASP A06) — les devDependencies, absentes des images déployées, sont exclues |
+| 5. Build (front uniquement)   | `npm run build` | vérifie que le bundle Vite de production se construit                                                                                                           |
 
 Trois réglages du workflow méritent justification :
 
@@ -426,7 +428,7 @@ Légende : rectangles = jobs GitHub Actions ; losange = aiguillage par branche ;
 
 | Attendu du référentiel                     | Réponse apportée                                                                                                                  |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Protocole d'intégration continue explicité | Workflow ci.yml : déclencheurs, matrice, séquence npm ci → test → lint → build                                                 |
+| Protocole d'intégration continue explicité | Workflow ci.yml : déclencheurs, matrice, séquence npm ci → test → lint → audit dépendances → build                                                 |
 | Fusion des codes sources                     | Stratégie de branches outillée : CI sur branches de travail avant fusion, re-validation complète sur les branches d'intégration |
 | Tests réguliers des blocs de code           | Exécution des deux harnais à chaque push, environnement de test hermétique (SQLite in-memory, mocks)                             |
 | Réduction des risques de régression        | CI bloquante en amont du CD (`workflow_run` + `conclusion == 'success'`), notification immédiate des échecs                   |
@@ -579,21 +581,23 @@ Les chiffres ci-dessous sont issus d'une exécution réelle des deux suites sur 
 
 | Harnais | Outillage                                 | Volume                           | Résultat               | Durée |
 | ------- | ----------------------------------------- | -------------------------------- | ----------------------- | ------ |
-| API     | Jest + Supertest                          | **76 suites, 1 423 tests** | 1 423 passés, 0 échec | ~54 s  |
-| Front   | Vitest + @vue/test-utils + @pinia/testing | **36 fichiers, 558 tests** | 558 passés, 0 échec   | ~40 s  |
+| API     | Jest + Supertest                          | **80 suites, 1 447 tests** | 1 447 passés, 0 échec | ~40 s  |
+| Front   | Vitest + @vue/test-utils + @pinia/testing | **37 fichiers, 562 tests** | 562 passés, 0 échec   | ~35 s  |
 
 Répartition par couche, révélatrice de la stratégie de test :
 
 | Couche testée                                           | Fichiers | Tests | Ce qui est validé                                                                 |
 | -------------------------------------------------------- | -------- | ----- | ---------------------------------------------------------------------------------- |
-| `test/controllers/` (API)                              | 34       | 788   | contrat HTTP de chaque endpoint : codes de statut, corps de réponse, cas d'erreur |
+| `test/controllers/` (API)                              | 34       | 791   | contrat HTTP de chaque endpoint : codes de statut, corps de réponse, cas d'erreur |
 | `test/services/` (API)                                 | 34       | 554   | logique métier isolée : algorithmes, règles de droits, cas limites              |
-| `test/middlewares/` (API)                              | 3        | 25    | JWT, RBAC, rate limiting (tests de sécurité dédiés)                            |
+| `test/middlewares/` (API)                              | 4        | 31    | JWT, RBAC, rate limiting, instrumentation métriques (tests de sécurité dédiés)                            |
 | `test/models/` (API)                                   | 2        | 18    | contraintes de modèles sensibles (AuditLog, Etablissement)                        |
-| `test/bdd/` (API)                                      | 3        | 38    | scénarios fonctionnels de bout en bout (sessions complètes)                      |
+| `test/helpers/` (API)                                  | 2        | 14    | helpers transverses : métriques Prometheus, signatures binaires des uploads (magic bytes)       |
+| `test/bdd/` (API)                                      | 4        | 39    | scénarios fonctionnels de bout en bout (sessions complètes)                      |
 | `test/components/` (front)                             | 17       | 256   | rendu et interactions des pages/composants critiques                               |
 | `test/stores/` (front)                                 | 14       | 228   | state management Pinia : actions, mutations d'état, appels API mockés            |
 | `test/router/`, `composables/`, `helpers/` (front) | 4        | 73    | guards de navigation, logique réutilisable                                        |
+| `test/a11y/` (front)                                   | 1        | 4     | accessibilité runtime (axe-core) des composants critiques — non-régression RGAA          |
 
 La pyramide est assumée : la masse des tests porte sur les couches controller et service de l'API — là où vivent le contrat public et la logique métier — complétée par des tests fonctionnels transverses (`test/bdd/`) qui valident les enchaînements réels.
 
@@ -674,10 +678,10 @@ La couverture de code de l'API, mesurée par `npx jest --coverage` sur le code a
 
 | Métrique    | Couverture                        |
 | ------------ | --------------------------------- |
-| Lignes       | **86,14 %** (3 984 / 4 625) |
-| Instructions | 85,72 % (4 299 / 5 015)           |
-| Fonctions    | 84,70 % (598 / 706)               |
-| Branches     | 66,30 % (1 478 / 2 229)           |
+| Lignes       | **86,17 %** |
+| Instructions | 85,74 %           |
+| Fonctions    | 84,81 %               |
+| Branches     | 66,44 %           |
 
 La majorité du code développé est donc couverte, conformément au critère du référentiel. La couverture de branches, plus basse, est typique d'un code défensif (branches d'erreur rares, garde-fous) ; les branches critiques — algorithme Leitner, droits, authentification — sont, elles, couvertes explicitement par les cas listés en 4.3.
 
@@ -687,7 +691,7 @@ Le harnais entier — les deux suites — est exécuté **à chaque push** par l
 
 | Attendu du référentiel                            | Réponse apportée                                                                                                 |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Harnais de test unitaire développé                | 1 981 tests au total (1 423 API + 558 front), exécution vérifiée verte                                          |
+| Harnais de test unitaire développé                | 2 009 tests au total (1 447 API + 562 front), exécution vérifiée verte                                          |
 | Tests tenant compte des fonctionnalités demandées | Jeu complet sur la fonctionnalité cœur (Leitner) : 21 tests unitaires + 10 scénarios fonctionnels + 13 tests UI |
 | Cas nominal, limites, erreurs                       | Nommage systématique*méthode – condition – attendu* ; erreurs de contrat testées (400/401/404)              |
 | Prévention des régressions                        | Exécution bloquante en CI à chaque push ; tests de comportement côté front                                     |
@@ -762,7 +766,7 @@ Plutôt que d'égrener des mesures de sécurité au fil de l'eau, j'ai conduit u
 | F-07       | A02   | generateToken.js utilisait Math.random() (non-crypto)               | Faible      | ✅ Corrigé |
 | F-08       | A05   | Swagger UI accessible en production                                 | Moyenne     | ✅ Corrigé |
 
-L'audit assume aussi ce qui **reste** à traiter (ex. A07-M1 : pas de révocation JWT — palliatif : expiration 15 min ; A08-M2 : détection de type MIME par magic bytes recommandée). Présenter au jury les risques résiduels documentés fait partie de la démarche : la sécurité est un processus tracé, pas un état déclaré.
+Le backlog de l'audit a été **résorbé par lots successifs**, tracés dans le document : après M-00b.07b, la passe du 2026-07-06 a corrigé les priorités moyennes restantes — CSP explicite (A05-M4), vérification des uploads par magic bytes (A08-M2), journalisation des échecs d'authentification et des refus d'accès (A09-M3, F-M8), doublon d'email en 400 au lieu de 500 y compris sur la race condition de contrainte UNIQUE (F-M4), caractère spécial exigé dans les mots de passe (F-M2), neutralisation de l'injection de logs (F-M7). L'audit assume ce qui **reste** : A07-M1 (pas de révocation JWT — palliatif documenté : expiration 15 min + rotation du refresh token). Présenter au jury les risques résiduels documentés fait partie de la démarche : la sécurité est un processus tracé, pas un état déclaré.
 
 ### La défense en profondeur implémentée
 
@@ -772,10 +776,12 @@ Chaque étage du pipeline de la section 5.1 porte une mesure, rattachable à une
 - **A02 — Cryptographie** : mots de passe bcrypt ; access token 15 min ; refresh token opaque avec **rotation à chaque renouvellement** ; token de reset password hashé SHA-256 en base, token brut envoyé par email uniquement (décisions des 2026-06-14/15, [.agents/DECISIONS.md](.agents/DECISIONS.md)) ;
 - **A03 — Injection** : requêtes exclusivement via l'ORM Sequelize (paramétrées) ; nettoyage des balises HTML de tous les champs du body par [sanitize.middleware.js](my_memo_master_api/middlewares/sanitize.middleware.js) ; validation d'entrée déclarative par entité ;
 - **A04 — Conception** : anti-énumération d'emails (réponses génériques) ; rate limiting à trois étages ([rateLimit.middleware.js](my_memo_master_api/middlewares/rateLimit.middleware.js)) : global 500 req/15 min, login 10 tentatives **échouées**/15 min (`skipSuccessfulRequests: true`), inscription 10/h. Le limiteur global cle-vère par userId extrait du JWT plutôt que par IP — le commentaire du code justifie ce choix : « le keying par userId évite le problème NAT scolaire (plusieurs élèves derrière la même IP) », cas d'usage central pour une application utilisée en classe ;
-- **A05 — Configuration** : en-têtes durcis par `helmet` ; CORS en liste blanche par fonction (pas de reflet d'origine inconnue, [app.js](my_memo_master_api/app.js) lignes 72–93) ; Swagger désactivé en production ; body JSON limité à 10 ko ; `trust proxy` réglé pour que le rate limiting voie la vraie IP derrière Traefik ; secrets hors dépôt (section 1.2) ; HTTPS forcé + HSTS par labels Traefik ([docker-compose.yml](docker-compose.yml)) ;
-- **A09 — Journalisation** : Winston + Morgan (section 1.3), messages d'erreur internes masqués en production.
+- **A05 — Configuration** : en-têtes durcis par `helmet` avec **CSP explicite** (défauts stricts + `blob:` pour les aperçus d'images — auditable dans le code, [app.js](my_memo_master_api/app.js)) ; CORS en liste blanche par fonction (pas de reflet d'origine inconnue, [app.js](my_memo_master_api/app.js) lignes 72–93) ; Swagger désactivé en production ; body JSON limité à 10 ko ; `trust proxy` réglé pour que le rate limiting voie la vraie IP derrière Traefik ; secrets hors dépôt (section 1.2) ; HTTPS forcé + HSTS par labels Traefik ([docker-compose.yml](docker-compose.yml)) ;
+- **A06 — Composants vulnérables** : audit npm **bloquant en CI** sur les dépendances de production (`npm audit --omit=dev --audit-level=high`, section 2.3) — le driver SQLite (dev/test uniquement) a été déplacé en devDependencies pour sortir sa chaîne de build vulnérable des images déployées : **0 vulnérabilité high/critical** sur les deux applications à la date du dossier ;
+- **A08 — Intégrité des données** : uploads vérifiés en **deux lignes de défense** ([helpers/fileSignature.js](my_memo_master_api/helpers/fileSignature.js)) — croisement extension ↔ MIME déclaré au filtrage, puis **magic bytes lus sur le flux** avant écriture S3 (remplace `AUTO_CONTENT_TYPE` qui détectait sans jamais rejeter) : un exécutable renommé en `.png` est refusé même avec un MIME forgé ;
+- **A09 — Journalisation** : Winston + Morgan (section 1.3), messages d'erreur internes masqués en production, échecs d'authentification et refus d'accès (401/403) journalisés en `warn` avec IP, messages d'erreur nettoyés des caractères de contrôle avant écriture (anti log-injection).
 
-Ces mesures sont **elles-mêmes testées** : [test/middlewares/security.test.js](my_memo_master_api/test/middlewares/security.test.js) et [test/middlewares/Auth.middleware.test.js](my_memo_master_api/test/middlewares/Auth.middleware.test.js) valident JWT invalide/expiré, RBAC et rate limiting (24 tests, section 4.1).
+Ces mesures sont **elles-mêmes testées** : [test/middlewares/security.test.js](my_memo_master_api/test/middlewares/security.test.js) et [test/middlewares/Auth.middleware.test.js](my_memo_master_api/test/middlewares/Auth.middleware.test.js) valident JWT invalide/expiré, RBAC (dont la journalisation des refus) et rate limiting (31 tests, section 4.1) ; la vérification des signatures binaires d'upload a ses 12 tests dédiés ([test/helpers/fileSignature.test.js](my_memo_master_api/test/helpers/fileSignature.test.js)).
 
 ## 5.3 Accessibilité : audit et plan de mise en conformité
 
@@ -803,14 +809,20 @@ J'ai audité le code de [my_memo_master_front/src/](my_memo_master_front/src/) c
 | Critère (RGAA)                   | Constat                                                                                                                                                                                                                                                                                                | Correction préconisée                                                                                                                                                                                                                                                                                                                        |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 8.3 — Langue de la page          | [index.html](my_memo_master_front/index.html) déclarait `<html lang="en">` alors que l'application est en français : les lecteurs d'écran prononçaient le contenu avec une voix anglaise                                                                                                          | ✅**Corrigé** pendant la rédaction de ce dossier : `lang="fr"`                                                                                                                                                                                                                                                                       |
-| 11.1 — Étiquettes de champs     | 106`<input>` pour 84 `<label>` dont 20 seulement avec `for=` explicite : une partie des champs n'a vraisemblablement pas de nom accessible (les labels enveloppants sont valides, mais l'écart doit être résorbé champ par champ)                                                            | Audit champ par champ, ajout de`for`/`id` ou `aria-label`                                                                                                                                                                                                                                                                                |
-| 7.x — Gestion du focus           | [ModalComponent.vue](my_memo_master_front/src/components/ModalComponent.vue) se fermait à Échap mais ne piégeait pas le focus (Tab sortait de la modale) et ne le restituait pas à la fermeture ; le bouton × n'avait pas de nom accessible ; 21 `<div @click>` restent inaccessibles au clavier | ✅**Corrigé** pour la modale pendant la rédaction : focus trap Tab/Shift+Tab, focus initial, restitution à la fermeture, `aria-label="Fermer"` — couvert par 10 tests ([test/components/ModalComponent.test.js](my_memo_master_front/test/components/ModalComponent.test.js)). Reste : convertir les div cliquables en `<button>` |
-| 3.x — Information par la couleur | Le feedback bonne/mauvaise réponse en session de révision s'appuie sur vert/rouge (section 4.4) ; à doubler d'une information textuelle systématique (déjà partiel : score et correction affichés)                                                                                              | Vérifier chaque usage de couleur porteuse de sens                                                                                                                                                                                                                                                                                             |
-| 13.x — Zones dynamiques          | Aucune région`aria-live` : les mises à jour dynamiques (toasts, compteurs de session) ne sont pas annoncées aux lecteurs d'écran                                                                                                                                                                 | `aria-live="polite"` sur les zones de feedback                                                                                                                                                                                                                                                                                               |
+| 11.1 — Étiquettes de champs     | 106`<input>` pour 84 `<label>` dont 20 seulement avec `for=` explicite : une partie des champs n'a vraisemblablement pas de nom accessible (les labels enveloppants sont valides, mais l'écart doit être résorbé champ par champ)                                                            | ✅ **Corrigé** (campagne outillée 2026-07-06) : l'audit statique a dénombré précisément **111 champs sans nom accessible** ; `aria-label` ajouté sur chacun, ré-audit à **0** — voir [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)                                                                                                                                                                                                                                                                                |
+| 7.x — Gestion du focus           | [ModalComponent.vue](my_memo_master_front/src/components/ModalComponent.vue) se fermait à Échap mais ne piégeait pas le focus (Tab sortait de la modale) et ne le restituait pas à la fermeture ; le bouton × n'avait pas de nom accessible ; 21 `<div @click>` restent inaccessibles au clavier | ✅**Corrigé** pour la modale pendant la rédaction : focus trap Tab/Shift+Tab, focus initial, restitution à la fermeture, `aria-label="Fermer"` — couvert par 10 tests ([test/components/ModalComponent.test.js](my_memo_master_front/test/components/ModalComponent.test.js)). ✅ Les éléments cliquables restants sont **tous traités** (2026-07-06) : conversion sémantique ou pattern ARIA `role="button"`/`tabindex`/`@keydown`, motifs d'overlay documentés comme justifiés |
+| 3.x — Information par la couleur | Le feedback bonne/mauvaise réponse en session de révision s'appuie sur vert/rouge (section 4.4) ; à doubler d'une information textuelle systématique (déjà partiel : score et correction affichés)                                                                                              | ✅ **Vérifié conforme** : chaque feedback couleur est doublé d'un texte explicite (« Correct »/« Incorrect », score, correction attendue)                                                                                                                                                                                                                                                                                             |
+| 13.x — Zones dynamiques          | Aucune région`aria-live` : les mises à jour dynamiques (toasts, compteurs de session) ne sont pas annoncées aux lecteurs d'écran                                                                                                                                                                 | ✅ **Corrigé** : zones `aria-live="polite"` toujours montées sur le feedback de session (FlashcardsSessionPage) et le score d'exercice (ExerciseDetailPage) ; les toasts portent nativement `role="alert"`                                                                                                                                                                                                                                                                                               |
 
-### Plan de mise en conformité
+### Mise en conformité : campagne outillée et non-régression
 
-Décision de conception assumée : pour un MVP, j'ai priorisé les chantiers à coût faible couvrant les usages bloquants pour un utilisateur de lecteur d'écran ou de navigation clavier. Les deux premiers — (1) `lang="fr"`, (2) gestion complète du focus de la modale (trap, focus initial, restitution) avec 10 tests anti-régression — **ont été réalisés pendant la rédaction de ce dossier** (tracés dans [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md), entrée du 2026-07-06). Restent planifiés : (3) la campagne labels/noms accessibles champ par champ et (4) la conversion des div cliquables. À moyen terme : intégration d'un contrôle automatisé (axe-core dans les tests Vitest ou Lighthouse CI) pour rendre l'accessibilité **non régressive**, au même titre que les tests fonctionnels. `[PREUVE MANQUANTE : audit RGAA outillé complet (contrastes mesurés, tests lecteur d'écran) — non réalisé à ce jour]`
+Les chantiers annoncés ont été **réalisés et outillés** (campagne du 2026-07-06, tracée dans [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md)) ; le livrable d'audit complet, avec méthode, chiffres avant/après et commandes de reproduction, est versionné : **[docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)**.
+
+1. **Audit statique développé pour le projet** ([my_memo_master_front/scripts/audit-a11y.mjs](my_memo_master_front/scripts/audit-a11y.mjs)) : vérifie sur les 73 fichiers `.vue` les noms accessibles des champs (RGAA 11.1), les `alt` (1.1), les équivalents clavier des éléments cliquables (7.1), les noms des boutons symboles (11.9), la langue (8.3) et les zones `aria-live` (13.x). Première exécution : **135 non-conformités** — 111 champs sans nom accessible, 14 boutons « × » sans nom, 10 éléments cliquables sans clavier.
+2. **Campagne de correction intégrale** : `aria-label` en français sur chaque champ (statiques ou dynamiques pour les champs générés en boucle), noms contextuels sur les boutons symboles (« Fermer », « Supprimer la ressource »…), conversion sémantique (lien natif pour les tuiles de tutoriel), pattern ARIA `role="button"`/`tabindex`/`@keydown` sur les cartes, accordéons, cellules de calendrier et dropzone. Les motifs légitimes (overlays de fermeture, `@click.stop`) sont **documentés comme exceptions dans l'outil**. Ré-exécution : **0 non-conformité**.
+3. **Non-régression** : 4 tests axe-core (DOM réellement rendu) tournent dans la suite Vitest **à chaque push** ([my_memo_master_front/test/a11y/axe.test.js](my_memo_master_front/test/a11y/axe.test.js)) — l'accessibilité est vérifiée par la CI au même titre que les tests fonctionnels. Deux zones `aria-live` couvrent désormais les feedbacks dynamiques (session de révision, score d'exercice).
+
+Restent hors périmètre de cet audit outillé, documentés dans [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md) §5 : la mesure des contrastes (à faire au navigateur — jsdom ne rend pas les styles) et un test lecteur d'écran réel (protocole NVDA planifié sur les trois parcours critiques).
 
 ## 5.4 Évolutivité du code
 
@@ -830,7 +842,7 @@ L'historique git est structuré par les conventions de commit `[ADD]/[IMP]/[REF]
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Bonnes pratiques, framework, paradigmes             | Express/Vue/Sequelize ; architecture en couches uniforme sur 36 controllers ; validation déclarative                                |
 | Sécurisation couvrant l'OWASP Top 10               | Audit versionné (8 corrections tracées + risques résiduels documentés), défense en profondeur par catégorie, mesures testées  |
-| Exigences d'accessibilité, référentiel justifié | RGAA 4 choisi et justifié ; audit réel du code (conformités**et** non-conformités) ; plan de mise en conformité priorisé |
+| Exigences d'accessibilité, référentiel justifié | RGAA 4 choisi et justifié ; audit outillé versionné ([docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)) : 135 non-conformités détectées → 0 après campagne ; non-régression axe-core en CI |
 | Évolutivité                                       | API versionnée, 61 migrations, config externalisée, contrat Swagger, mémoire de projet                                            |
 | Traçabilité / gestion de versions                 | Git + conventions de commit + double journal (état, décisions)                                                                     |
 
@@ -950,10 +962,10 @@ J'ai fait le choix d'un cahier de recettes **exécutable** : chaque scénario de
 Le cahier s'organise en trois volets, conformément au critère (tests fonctionnels, structurels, de sécurité) :
 
 - **Recette fonctionnelle de bout en bout** : les parcours utilisateur complets, implémentés dans [my_memo_master_api/test/bdd/](my_memo_master_api/test/bdd/) — requêtes HTTP réelles traversant toutes les couches jusqu'à la base (section 4.2) — et, côté interface, dans les tests de pages ([my_memo_master_front/test/components/](my_memo_master_front/test/components/)) ;
-- **Recette structurelle** : le contrat HTTP de chaque endpoint (codes de statut, corps, cas d'erreur), implémenté par les 785 tests de [test/controllers/](my_memo_master_api/test/controllers/) couvrant les 33 modules de l'API — l'exhaustivité des fonctionnalités attendues est portée par ce volet ;
+- **Recette structurelle** : le contrat HTTP de chaque endpoint (codes de statut, corps, cas d'erreur), implémenté par les 791 tests de [test/controllers/](my_memo_master_api/test/controllers/) couvrant les 34 modules de l'API — l'exhaustivité des fonctionnalités attendues est portée par ce volet ;
 - **Recette de sécurité** : les tests dédiés de [test/middlewares/security.test.js](my_memo_master_api/test/middlewares/security.test.js) et l'audit OWASP (section 5.2).
 
-**Statut de la recette** : les statuts « ✅ » des tableaux ci-dessous correspondent à la dernière exécution réelle des suites sur le code actuel du dépôt (1 423/1 423 tests API et 558/558 tests front passés — section 4.1).
+**Statut de la recette** : les statuts « ✅ » des tableaux ci-dessous correspondent à la dernière exécution réelle des suites sur le code actuel du dépôt (1 447/1 447 tests API et 562/562 tests front passés — section 4.1).
 
 ## 7.2 Recette fonctionnelle — parcours de bout en bout
 
@@ -1044,7 +1056,7 @@ Le dispositif de détection fonctionne en continu :
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | Cahier de recettes reprenant l'ensemble des fonctionnalités       | Volet structurel : contrat HTTP des 33 modules (785 tests) ; volet fonctionnel : parcours complets détaillés ci-dessus |
 | Scénarios de tests et résultats attendus rédigés               | 42 scénarios formalisés (L-01→UI-06, S-01→S-08) avec résultat attendu explicite, extraits des tests réels          |
-| Tests fonctionnels, structurels et de sécurité conformes au plan | Trois volets exécutés à chaque push, statuts issus d'une exécution réelle vérifiée (1 423 + 558 tests verts)      |
+| Tests fonctionnels, structurels et de sécurité conformes au plan | Trois volets exécutés à chaque push, statuts issus d'une exécution réelle vérifiée (1 447 + 562 tests verts)      |
 | Détection des anomalies et régressions                           | CI bloquante + notification ; cas de régression réel détecté et tracé (2026-07-04)                                  |
 
 ---
@@ -1111,7 +1123,7 @@ app.get('/api/v1/health', async (_req, res) => {
 
 Deux choix de conception accompagnent le correctif, consignés dans [.agents/DECISIONS.md](.agents/DECISIONS.md) (entrée 2026-07-06) : la route est déclarée **hors du rate limiter** (une sonde kubelet bloquée par le limiteur ferait passer les pods NotReady en cascade — l'alternative `routes/Health.routes.js` est écartée avec justification), et elle teste réellement la base (`authenticate()`) pour qu'un pod sans base de données ne reçoive pas de trafic.
 
-**Vérification** : 3 tests ajoutés ([test/controllers/Health.test.js](my_memo_master_api/test/controllers/Health.test.js) — 200 si base joignable, 503 sinon, accès sans authentification), suite complète rejouée : 1 422/1 422 verts. Le correctif est déployé par le pipeline CD standard, et l'étape de debug temporaire du CD pourra être retirée une fois la convergence du rollout confirmée — retrait lui-même tracé par commit.
+**Vérification** : 3 tests ajoutés ([test/controllers/Health.test.js](my_memo_master_api/test/controllers/Health.test.js) — 200 si base joignable, 503 sinon, accès sans authentification), suite complète rejouée : 1 422/1 422 verts. Le correctif est déployé par le pipeline CD standard, et l'étape de debug temporaire du CD a été **retirée** une fois le correctif en place — le pipeline est revenu à son état nominal.
 
 **Ce que ce cas démontre** : le traitement « tire profit du processus d'intégration et de déploiement continu » (critère C2.3.2) à double titre — l'instrumentation du pipeline a servi d'outil de diagnostic, et le correctif a suivi le circuit standard test → CI → CD sans procédure d'exception.
 
@@ -1123,7 +1135,8 @@ L'audit de sécurité (section 5.2) a produit un **plan de correction priorisé 
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | Immédiat (session d'audit, M-00b.07)        | 8 corrections : routes sans auth (critique), énumération d'emails, tokens non-crypto, Swagger en prod…   | ✅ Corrigé                                  |
 | Haute priorité avant production (M-00b.07b) | Refresh token hashé, JWT 15 min, contrôle de propriétaire sur Storage.delete, expiration des codes email | ✅ Corrigé (tracé par ticket)              |
-| Priorité moyenne (backlog)                  | Révocation JWT (blacklist Redis), magic bytes sur uploads, journalisation des échecs d'authentification   | 📋 Planifié, documenté avec recommandation |
+| Priorité moyenne (2026-07-06)                | Magic bytes sur uploads, journalisation des échecs d'authentification et refus d'accès, CSP explicite, anti log-injection, doublon email en 400, caractère spécial mot de passe   | ✅ Corrigé (tracé dans l'audit)              |
+| Risque résiduel assumé                       | Révocation JWT (blacklist Redis) — palliatif : expiration 15 min + rotation refresh token                  | 📋 Documenté avec recommandation             |
 
 Ce plan illustre la **qualification** : chaque constat porte une sévérité, un fichier, un correctif proposé — et les éléments non corrigés immédiatement ne sont pas perdus, ils constituent un backlog argumenté avec palliatif documenté (ex. : pas de révocation JWT, palliatif = expiration 15 min).
 
@@ -1152,6 +1165,7 @@ La documentation du projet est **versionnée avec le code** — elle évolue dan
 | Manuel d'installation / prise en main dev | [README.md](README.md) (parties 1–2)                                                                                                                                        | Nouveau contributeur              | « Comment je démarre ? »                            |
 | Manuel de déploiement                    | [README.md](README.md) (partie 3), [docs/https-setup.md](docs/https-setup.md)                                                                                                 | Ops / mainteneur                  | « Comment je mets en place un environnement ? »      |
 | Manuel d'exploitation et de mise à jour  | [docs/RUNBOOK.md](docs/RUNBOOK.md)                                                                                                                                           | Ops / astreinte                   | « Comment j'opère, je mets à jour, je restaure ? » |
+| Manuel d'utilisation                     | [docs/MANUEL_UTILISATION.md](docs/MANUEL_UTILISATION.md)                                                                                                                                    | Utilisateur final (étudiant, enseignant, gérant) | « Comment j'utilise l'application ? »               |
 | Contrat d'API                             | Swagger généré, servi sur`/api-docs`                                                                                                                                   | Développeur front / tiers        | « Que fait chaque endpoint ? »                       |
 | Fonctionnement des modules                | [docs/DOC_administration_etablissements.md](docs/DOC_administration_etablissements.md), [.agents/DOC_mindmap_editor.md](.agents/DOC_mindmap_editor.md), [diagrams/](diagrams/) | Développeur reprenant un module  | « Comment ce module fonctionne-t-il et pourquoi ? »  |
 | Journal des décisions                    | [.agents/DECISIONS.md](.agents/DECISIONS.md)                                                                                                                                 | Toute l'équipe, futur soi        | « Pourquoi le code est-il comme ça ? »              |
@@ -1208,9 +1222,7 @@ Documenter la **dette et les limitations** dans les livrables (et pas seulement 
 
 ## 9.6 Manuel d'utilisation
 
-L'aide à l'utilisateur final est aujourd'hui **embarquée dans l'application** : parcours d'onboarding à la première connexion (page dédiée + état persisté côté serveur, module `OnboardingState`), page de tutoriels alimentée par l'API (module `Tutorials`, [my_memo_master_front/src/pages/TutorialsPage.vue](my_memo_master_front/src/pages/TutorialsPage.vue)). Ce choix (guidage contextuel plutôt que manuel séparé) est adapté à une application grand public — un étudiant ne lit pas un PDF avant de réviser.
-
-`[PREUVE MANQUANTE : manuel d'utilisation rédigé (document autonome) — inexistant dans le dépôt à ce jour ; le guidage embarqué (onboarding + tutoriels) en tient lieu pour le MVP]`
+L'aide à l'utilisateur final existe à deux niveaux complémentaires. **Embarquée dans l'application** : parcours d'onboarding à la première connexion (page dédiée + état persisté côté serveur, module `OnboardingState`), page de tutoriels alimentée par l'API (module `Tutorials`, [my_memo_master_front/src/pages/TutorialsPage.vue](my_memo_master_front/src/pages/TutorialsPage.vue)) — le guidage contextuel est adapté à une application grand public. **Manuel autonome** : [docs/MANUEL_UTILISATION.md](docs/MANUEL_UTILISATION.md), versionné avec le code, couvre les trois profils (étudiant, enseignant, gérant d'établissement) : création de compte et cycle de session, flashcards Leitner, cartes mentales, exercices, organisation (calendrier/to-do/rappels), suivi de progression et consentement KPI, groupes classes, administration, et une FAQ des blocages courants (email non vérifié, rate limiting, formats d'upload).
 
 [SCREENSHOT ICI : parcours d'onboarding et page Tutoriels dans l'application]
 
@@ -1220,7 +1232,7 @@ L'aide à l'utilisateur final est aujourd'hui **embarquée dans l'application** 
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Manuel de déploiement                | README partie 3 (secrets, kubeconfig, VPS, cluster) + docs/https-setup.md                                  |
 | Manuel de mise à jour                | RUNBOOK (mise à jour, rollback, sauvegarde/restauration) + migrations documentées + scripts helm-migrate |
-| Manuel d'utilisation                  | Guidage embarqué (onboarding, tutoriels) ; manuel autonome signalé comme preuve manquante                |
+| Manuel d'utilisation                  | [docs/MANUEL_UTILISATION.md](docs/MANUEL_UTILISATION.md) (3 profils + FAQ) + guidage embarqué (onboarding, tutoriels)                |
 | Clarté et choix opérés décrits    | Documentation par question/public ; décisions au format Contexte/Décision/Alternative/Conséquences      |
 | Traçabilité équipes et évolutions | .agents/ (décisions + état + conventions), dette documentée, contrat d'API généré du code            |
 

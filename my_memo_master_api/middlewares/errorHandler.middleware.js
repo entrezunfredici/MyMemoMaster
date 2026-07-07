@@ -4,6 +4,7 @@ const logger = require('../helpers/logger')
 // OWASP F-M7 — neutralise les retours à la ligne et caractères de contrôle dans les
 // messages d'erreur avant journalisation (un message forgé ne peut pas injecter de
 // fausses lignes de log ni corrompre le format)
+// eslint-disable-next-line no-control-regex -- le but est précisément de retirer les caractères de contrôle
 const CONTROL_CHARS = new RegExp('[\\u0000-\\u001f\\u007f]+', 'g')
 const sanitizeForLog = (value) => String(value ?? '').replace(CONTROL_CHARS, ' ')
 

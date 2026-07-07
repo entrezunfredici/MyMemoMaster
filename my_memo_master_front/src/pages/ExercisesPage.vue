@@ -97,7 +97,7 @@
             <!-- Nom -->
             <div class="form-group">
               <label class="form-label">Titre de l'exercice</label>
-              <input v-model="form.name" type="text" placeholder="Ex : Équations du second degré" class="form-input" required />
+              <input aria-label="Nom de l'exercice" v-model="form.name" type="text" placeholder="Ex : Équations du second degré" class="form-input" required />
             </div>
 
             <!-- Sujet -->
@@ -133,7 +133,7 @@
                   <!-- Type -->
                   <div class="mb-3">
                     <label class="form-label--xs">Type</label>
-                    <select v-model="q.type" class="form-input form-input--sm" @change="onTypeChange(q)">
+                    <select aria-label="Type de question" v-model="q.type" class="form-input form-input--sm" @change="onTypeChange(q)">
                       <option value="open">Question ouverte</option>
                       <option value="mcq">QCM (choix multiple)</option>
                       <option value="fill_blank">Texte à trou</option>
@@ -144,14 +144,14 @@
                   <!-- Énoncé -->
                   <div class="mb-3">
                     <label class="form-label--xs">Énoncé</label>
-                    <textarea v-model="q.statement" placeholder="Entrez l'énoncé de la question" class="form-input form-input--sm" rows="2" required />
+                    <textarea aria-label="Entrez l'énoncé de la question" v-model="q.statement" placeholder="Entrez l'énoncé de la question" class="form-input form-input--sm" rows="2" required />
                   </div>
 
                   <!-- open -->
                   <template v-if="q.type === 'open'">
                     <div>
                       <label class="form-label--xs">Réponse attendue</label>
-                      <textarea v-model="q.openAnswer" placeholder="Réponse correcte (utilisée pour la correction)" class="form-input form-input--sm" rows="2" required />
+                      <textarea aria-label="Réponse correcte (utilisée pour la correction)" v-model="q.openAnswer" placeholder="Réponse correcte (utilisée pour la correction)" class="form-input form-input--sm" rows="2" required />
                     </div>
                   </template>
 
@@ -160,8 +160,8 @@
                     <label class="block text-xs font-semibold text-gray-500 mb-2">Options (cocher la bonne réponse)</label>
                     <div class="space-y-2">
                       <div v-for="(opt, oi) in q.mcqOptions" :key="oi" class="flex items-center gap-2">
-                        <input type="radio" :name="`mcq-correct-${idx}`" :value="oi" v-model="q.mcqCorrectIdx" class="accent-primary" />
-                        <input :value="opt.text" @input="setExerciseOptionText(q, oi, $event.target.value)" type="text" placeholder="Option..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
+                        <input :aria-label="`Marquer l'option ${oi + 1} comme correcte`" type="radio" :name="`mcq-correct-${idx}`" :value="oi" v-model="q.mcqCorrectIdx" class="accent-primary" />
+                        <input :aria-label="`Texte de l'option ${oi + 1}`" :value="opt.text" @input="setExerciseOptionText(q, oi, $event.target.value)" type="text" placeholder="Option..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
                         <button v-if="q.mcqOptions.length > 2" type="button" @click="removeExerciseOption(q, oi)" class="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
                       </div>
                     </div>
@@ -172,13 +172,13 @@
                   <template v-else-if="q.type === 'fill_blank'">
                     <div class="mb-3">
                       <label class="form-label--xs">Texte avec trous — utilise <code v-pre class="bg-gray-200 px-1 rounded">{{0}}</code>, <code v-pre class="bg-gray-200 px-1 rounded">{{1}}</code>…</label>
-                      <textarea v-model="q.fillTemplate" placeholder="La photosynthèse produit du {{0}} grâce à la lumière {{1}}." class="form-input form-input--sm" rows="2" required @input="syncFillBlanks(q)" />
+                      <textarea aria-label="Texte à trous avec emplacements" v-model="q.fillTemplate" placeholder="La photosynthèse produit du {{0}} grâce à la lumière {{1}}." class="form-input form-input--sm" rows="2" required @input="syncFillBlanks(q)" />
                     </div>
                     <div v-if="q.fillBlanks.length" class="space-y-2">
                       <label class="form-label--xs">Réponses attendues</label>
                       <div v-for="(blank, bi) in q.fillBlanks" :key="bi" class="flex items-center gap-2">
                         <span class="text-xs text-gray-400 w-14 shrink-0">Trou {{ bi }}</span>
-                        <input v-model="q.fillBlanks[bi]" type="text" :placeholder="`Réponse du trou ${bi}`" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
+                        <input :aria-label="`Réponse du trou ${bi}`" v-model="q.fillBlanks[bi]" type="text" :placeholder="`Réponse du trou ${bi}`" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
                       </div>
                     </div>
                     <p v-else class="text-xs text-gray-400 italic">Utilisez <code v-pre class="bg-gray-200 px-1 rounded">{{0}}</code>, <code v-pre class="bg-gray-200 px-1 rounded">{{1}}</code>… dans le texte pour créer des trous.</p>
@@ -190,7 +190,7 @@
                     <div class="space-y-2">
                       <div v-for="(frag, fi) in q.reorderFragments" :key="fi" class="flex items-center gap-2">
                         <span class="text-xs text-gray-400 w-5 shrink-0">{{ fi + 1 }}.</span>
-                        <input v-model="q.reorderFragments[fi]" type="text" placeholder="Fragment..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
+                        <input :aria-label="`Fragment ${fi + 1}`" v-model="q.reorderFragments[fi]" type="text" placeholder="Fragment..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
                         <button v-if="q.reorderFragments.length > 2" type="button" @click="q.reorderFragments.splice(fi, 1)" class="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
                       </div>
                     </div>

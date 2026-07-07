@@ -50,14 +50,14 @@
           </button>
         </div>
         <div v-if="customMode" class="custom-delay">
-          <input
+          <input aria-label="Valeur"
             v-model.number="form.customValue"
             type="number"
             min="1"
             class="reminder-input reminder-input--sm"
             placeholder="Valeur"
           />
-          <select v-model="form.customUnit" class="reminder-select">
+          <select aria-label="Unité du délai" v-model="form.customUnit" class="reminder-select">
             <option value="minutes">min</option>
             <option value="hours">h</option>
             <option value="days">jours</option>
@@ -67,7 +67,7 @@
 
       <div class="reminder-form__row">
         <label class="reminder-form__label">Message <span class="optional">(optionnel)</span></label>
-        <input
+        <input aria-label="Message du rappel"
           v-model="form.message"
           type="text"
           class="reminder-input"

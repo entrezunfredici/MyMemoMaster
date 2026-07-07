@@ -82,7 +82,7 @@
           <form @submit.prevent="submitForm">
             <div class="mb-4">
               <label class="form-label">Nom du système</label>
-              <input
+              <input aria-label="Nom du système de Leitner"
                 v-model="form.name"
                 type="text"
                 placeholder="Ex : Maths S1, Vocabulaire anglais..."
@@ -111,26 +111,26 @@
       <!-- Modal planification de session -->
       <div v-if="showPlanModal" class="modal-overlay" @click="closePlanModal">
         <div class="modal-panel" @click.stop>
-          <button @click="closePlanModal" class="modal-close">&times;</button>
+          <button aria-label="Fermer" @click="closePlanModal" class="modal-close">&times;</button>
           <h2 class="modal-title" style="margin-bottom: 0.25rem">Planifier une session</h2>
           <p class="text-sm text-gray-500 mb-6">Système : <span class="font-semibold text-primary">{{ planningSystem?.name }}</span></p>
           <form @submit.prevent="submitPlanForm">
             <div class="form-group">
               <label class="form-label">Nom de la session</label>
-              <input v-model="planForm.name" type="text" class="form-input" required />
+              <input aria-label="Nom de la session" v-model="planForm.name" type="text" class="form-input" required />
             </div>
             <div class="form-group">
               <label class="form-label">Date</label>
-              <input v-model="planForm.date" type="date" class="form-input" required />
+              <input aria-label="Date de la session" v-model="planForm.date" type="date" class="form-input" required />
             </div>
             <div class="flex gap-4 mb-6">
               <div class="flex-1">
                 <label class="form-label">Heure de début</label>
-                <input v-model="planForm.startTime" type="time" class="form-input" required />
+                <input aria-label="Heure de début" v-model="planForm.startTime" type="time" class="form-input" required />
               </div>
               <div class="flex-1">
                 <label class="form-label">Heure de fin</label>
-                <input v-model="planForm.endTime" type="time" class="form-input" required />
+                <input aria-label="Heure de fin" v-model="planForm.endTime" type="time" class="form-input" required />
               </div>
             </div>
             <p v-if="planError" class="text-red-600 text-sm mb-4">{{ planError }}</p>

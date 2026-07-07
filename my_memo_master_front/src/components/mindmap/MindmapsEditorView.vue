@@ -240,16 +240,16 @@ onBeforeUnmount(() => {
   <!-- Modal nom (première création / export) -->
   <div v-if="showExportModal" class="modal-overlay" @click="showExportModal = false">
     <div class="modal-panel" @click.stop>
-      <button @click="showExportModal = false" class="modal-close">&times;</button>
+      <button aria-label="Fermer" @click="showExportModal = false" class="modal-close">&times;</button>
       <h2 class="modal-title">Enregistrer la carte mentale</h2>
       <form @submit.prevent="confirmExportModal">
         <div class="mb-4">
           <label class="form-label">Nom</label>
-          <input v-model="exportName" type="text" class="form-input" required autofocus />
+          <input aria-label="Nom de la carte mentale" v-model="exportName" type="text" class="form-input" required autofocus />
         </div>
         <div class="mb-4">
           <label class="form-label">Matière</label>
-          <select
+          <select aria-label="Sujet associé"
             :value="currentDiagramMeta?.subjectId"
             @change="currentDiagramMeta && (currentDiagramMeta.subjectId = Number($event.target.value) || null)"
             class="form-input"

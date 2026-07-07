@@ -50,7 +50,7 @@
     </div>
 
     <h2>Zone de texte</h2>
-    <textarea
+    <textarea aria-label="Saisir ou coller votre contenu mathématique"
       ref="textareaRef"
       v-model="userInput"
       rows="6"

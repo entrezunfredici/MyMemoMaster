@@ -89,10 +89,10 @@ if (!user.hasValidatedEmail) {
 **Description** : Aucune blacklist de tokens, aucun numéro de version de session en base. Réduire `AUTH_JWT_EXPIRES_IN` à `15m` est le palliatif principal.  
 **Recommandation long terme** : Blacklist Redis sur le `jti` (JWT ID), ou version de session dans le token vérifiée côté serveur.
 
-#### [A08-M2] MIME type spoofing sur upload (extension non vérifiée)
+#### [A08-M2] MIME type spoofing sur upload (extension non vérifiée) — ✅ Corrigé (2026-07-06)
 **Fichiers** : `middlewares/upload.middleware.js`, `middlewares/mindmapImageUpload.js`  
 **Description** : La validation repose sur `file.mimetype` (fourni par le client), pas sur les magic bytes du fichier.  
-**Recommandation** : Croiser avec l'extension extraite de `file.originalname` sur liste blanche. Idéalement utiliser le package `file-type` (magic bytes) pour détecter le vrai type.
+**Correctif** : `helpers/fileSignature.js` — croisement extension ↔ MIME au fileFilter + vérification des magic bytes sur le flux avant écriture S3 (fonction `contentType` custom remplaçant `AUTO_CONTENT_TYPE`) dans les deux middlewares d'upload. Signatures codées à la main (12 tests) : `file-type` moderne est ESM-only, incompatible CommonJS.
 
 #### [A09-M3] Tentatives d'auth échouées non loggées — ✅ Corrigé (2026-07-06)
 **Fichier** : `controllers/User.controller.js:login`  
@@ -103,9 +103,9 @@ if (!user.hasValidatedEmail) {
 logger.warn(`[AUTH] Connexion échouée pour ${email} depuis ${req.ip}`)
 ```
 
-#### [A05-M4] Helmet sans CSP explicite
+#### [A05-M4] Helmet sans CSP explicite — ✅ Corrigé (2026-07-06)
 **Fichier** : `my_memo_master_api/app.js:56`  
-**Description** : `helmet()` sans configuration explicite n'active pas de Content-Security-Policy en Helmet v8.  
+**Description initiale (inexacte)** : `helmet()` sans configuration explicite n'activerait pas de CSP. Vérification empirique : Helmet v8 pose bien une CSP par défaut. Le correctif rend la politique **explicite et auditable** dans le code (défauts + `imgSrc blob:` pour les aperçus d'images).  
 **Recommandation** :
 ```js
 app.use(helmet({
@@ -122,15 +122,21 @@ app.use(helmet({
 | ID | OWASP | Titre | Action suggérée |
 |----|-------|-------|-----------------|
 | F-M1 | A02 | JWT_EXPIRES_IN = 1d en dev | Changer à 15m dans .env dev |
-| F-M2 | A07 | Politique MDP sans caractère spécial | Ajouter `.matches(/[^a-zA-Z0-9]/)` dans validators |
-| F-M3 | A07 | Validator changePassword valide `body('id')` inutilisé | Supprimer cette règle |
-| F-M4 | A04 | Race condition inscription email dupliqué | Capturer l'erreur Sequelize UNIQUE et retourner 409 |
+| F-M2 | A07 | Politique MDP sans caractère spécial | ✅ Corrigé (2026-07-06) — règle ajoutée sur password et newPassword |
+| F-M3 | A07 | Validator changePassword valide `body('id')` inutilisé | ✅ Corrigé (2026-07-06) — règle supprimée (le controller utilise req.user.id) |
+| F-M4 | A04 | Race condition inscription email dupliqué | ✅ Corrigé (2026-07-06) — SequelizeUniqueConstraintError et pré-check → 400 « Cet email est déjà utilisé. » (400 plutôt que 409 : conforme à la table des codes de CONVENTIONS.md) |
 | F-M5 | A05 | PGAdmin credentials admin/admin en dev | Changer dans .env dev |
 | F-M6 | A05 | Redis sans mot de passe en dev | Définir REDIS_PASS dans .env dev |
-| F-M7 | A09 | Log injection possible dans errorHandler | Sanitiser err.message avant log |
-| F-M8 | A09 | Accès 403 non loggés en production | Ajouter logger.warn sur les refus d'accès |
+| F-M7 | A09 | Log injection possible dans errorHandler | ✅ Corrigé (2026-07-06) — caractères de contrôle retirés de err.message et req.path avant log |
+| F-M8 | A09 | Accès 403 non loggés en production | ✅ Corrigé (2026-07-06) — logger.warn sur les 403 de requireRole (userId, rôle, route, IP) et du login (email non vérifié / compte désactivé) |
 
 ---
+
+### Couverture A06 — composants vulnérables (ajout 2026-07-06)
+
+- Job **npm audit bloquant en CI** (`npm audit --omit=dev --audit-level=high`) sur API et front.
+- `sqlite3` déplacé en devDependencies (usage dev/test uniquement, la prod est sur PostgreSQL) : sa chaîne de build (node-gyp/tar, 5 vulnérabilités high) sort des images déployées.
+- `form-data` (front) corrigé via `npm audit fix`. État à date : **0 high/critical** sur les dépendances de production des deux applications. Résiduel : `uuid` (moderate, transitive de Sequelize) — sous le seuil, suivi via le job CI.
 
 ## Points positifs confirmés
 

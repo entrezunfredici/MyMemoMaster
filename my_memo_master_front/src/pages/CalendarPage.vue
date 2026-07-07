@@ -93,7 +93,12 @@
                 today: isToday(currentYear, currentMonth, day),
                 weekend: isWeekend(currentYear, currentMonth, day)
               }"
+              role="button"
+              tabindex="0"
+              :aria-label="`Créer une séance le ${day} ${MONTHS[currentMonth]}`"
               @click="openCreateModal(currentYear, currentMonth, day)"
+              @keydown.enter.prevent="openCreateModal(currentYear, currentMonth, day)"
+              @keydown.space.prevent="openCreateModal(currentYear, currentMonth, day)"
             >
               <div class="day-num">{{ day }}</div>
               <div
@@ -101,7 +106,11 @@
                 :key="ei"
                 class="event-pill"
                 :class="`event-pill--${ev.type}`"
+                role="button"
+                tabindex="0"
+                :aria-label="`Détail de ${ev.label}`"
                 @click.stop="openDetail(ev)"
+                @keydown.enter.stop.prevent="openDetail(ev)"
               >
                 {{ ev.label }}
               </div>
@@ -140,30 +149,30 @@
           <form class="create-form" @submit.prevent="submitCreate">
             <div class="create-form__field">
               <label>Nom <span class="required">*</span></label>
-              <input v-model="createForm.name" type="text" placeholder="Ex: Maths — Chapitre 3" maxlength="150" required />
+              <input aria-label="Nom de la séance" v-model="createForm.name" type="text" placeholder="Ex: Maths — Chapitre 3" maxlength="150" required />
             </div>
 
             <div class="create-form__row">
               <div class="create-form__field">
                 <label>Date <span class="required">*</span></label>
-                <input v-model="createForm.date" type="date" required />
+                <input aria-label="Date de la séance" v-model="createForm.date" type="date" required />
               </div>
             </div>
 
             <div class="create-form__row">
               <div class="create-form__field">
                 <label>Début <span class="required">*</span></label>
-                <input v-model="createForm.startTime" type="time" required />
+                <input aria-label="Heure de début" v-model="createForm.startTime" type="time" required />
               </div>
               <div class="create-form__field">
                 <label>Fin <span class="required">*</span></label>
-                <input v-model="createForm.endTime" type="time" required />
+                <input aria-label="Heure de fin" v-model="createForm.endTime" type="time" required />
               </div>
             </div>
 
             <div class="create-form__field">
               <label>Description</label>
-              <textarea v-model="createForm.description" placeholder="Notes optionnelles…" rows="2" maxlength="1000" />
+              <textarea aria-label="Notes optionnelles" v-model="createForm.description" placeholder="Notes optionnelles…" rows="2" maxlength="1000" />
             </div>
 
             <div class="create-form__actions">

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 /**
  * Audit statique d'accessibilité RGAA — MyMemoMaster front.
  *
@@ -100,11 +101,12 @@ for (const file of vueFiles) {
   for (const tag of ['div', 'span']) {
     for (const t of findTags(template, tag)) {
       if (!/@click(\.[a-z]+)*="/i.test(t.attrs)) continue
-      // @click.stop nu (non-action) et @click.self (fermeture d'overlay au clic
-      // hors panneau — action accessible par ailleurs via bouton/Échap) : motifs admis
+      // @click.stop nu (non-action), @click.self (fermeture d'overlay au clic hors
+      // panneau — action accessible par ailleurs via bouton/Échap) et wrapper
+      // cursor-text (clic = focus d'un input interne, lui-même focusable) : motifs admis
       const isOverlayPattern =
         /@click\.(stop|self)(\.[a-z]+)*="/i.test(t.attrs) ||
-        /class="[^"]*(overlay|backdrop)[^"]*"/i.test(t.attrs)
+        /class="[^"]*(overlay|backdrop|cursor-text)[^"]*"/i.test(t.attrs)
       const keyboardable =
         hasAttr(t.attrs, 'role') && hasAttr(t.attrs, 'tabindex') && /@keydown/i.test(t.attrs)
       if (!isOverlayPattern && !keyboardable) {
