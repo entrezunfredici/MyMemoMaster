@@ -28,7 +28,7 @@
 | TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
-| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-07-06 : erreur 500 à la suppression d'un système corrigée (FK LeitnerBox.idSystem sans ON DELETE CASCADE) | 2026-07-06 |
+| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-07-08 |
 | LeitnerSystemsUsers | Stable | init |
 | Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
@@ -5235,3 +5235,29 @@ Suite de la revue B2 : correction du bloquant identifié (colonne manquante en p
 | Module | État |
 |--------|------|
 | Bloc 2 (dossier + code) | Complet côté code et preuves outillées — restent les captures d'écran manuelles et l'audit contrastes navigateur |
+
+---
+
+### [2026-07-08] FIX — Erreur 500 à la suppression d'un système de Leitner contenant des cartes (suite du fix 2026-07-06)
+
+#### Contexte
+Signalé par l'utilisateur : suppression d'une série (système de Leitner) → 500 + redirection `/error-server`. Le fix du 2026-07-06 (FK `LeitnerBox.idSystem` en CASCADE) ne couvrait que le premier niveau : la cascade système → boîtes déclenchait ensuite une violation FK sur `LeitnerCard.idBox` (`NO ACTION`, migration `20260226152300` sans `onDelete`). Tout système contenant au moins une carte restait donc insupprimable. Reproduit sur le Postgres dev Docker : `ERROR: update or delete on table "LeitnerBox" violates foreign key constraint "LeitnerCard_idBox_fkey"`. La note « aucune autre table enfant n'a ce problème » de l'entrée 2026-07-06 était inexacte : l'audit s'était limité aux enfants directs de `LeitnerSystem`, pas au second niveau de cascade.
+
+#### Fichiers créés/modifiés
+- `migrations/20260708000001-add-cascade-delete-leitnercard-idbox.js` — remplace la FK `LeitnerCard.idBox` par `ON DELETE CASCADE ON UPDATE CASCADE`. Même pattern que `20260706000001` : Postgres = contrainte retrouvée dynamiquement via `information_schema` (bloc `DO $$`) ; SQLite = recréation de table (`_new`/rename) avec **`PRAGMA foreign_keys = OFF`** le temps du rebuild (sinon le `DROP TABLE LeitnerCard` cascaderait sur `cardSystems` et perdrait les liaisons cartes↔systèmes), réactivé en `finally`. Les 3 index (`idQuestion`, `idBox`, `next_review_at`) sont recréés.
+- `models/LeitnerCard.model.js` — ajout de `references`/`onDelete: 'CASCADE'`/`onUpdate: 'CASCADE'` sur `idBox` (même raison que le fix modèle LeitnerBox : aligner `sync()` dev/tests sur la migration prod).
+- `test/bdd/leitner.delete.test.js` — nouveau cas : système + carte (avec sa Question) dans la boîte 1 → DELETE 200, carte supprimée en cascade (2 niveaux), Question **conservée** (elle n'appartient pas au système).
+
+#### Vérifications effectuées
+- `test/bdd/leitner.delete.test.js` : 2/2 verts (ancien cas boîtes + nouveau cas cartes).
+- Migration appliquée sur le Postgres dev Docker (restart du conteneur API → entrypoint rejoue les migrations) : `delete_rule = CASCADE` vérifié dans `information_schema`, puis `DELETE` du système 1 (1 carte) validé dans une transaction annulée (`BEGIN`/`DELETE`/`ROLLBACK` — aucune donnée touchée).
+- Chaîne d'erreur front élucidée au passage : `api.js` a `validateStatus < 500`, donc un 500 backend lève une exception axios → `catch` → `router.push('/error-server')` + retour `undefined` → le store affiche le toast générique. Comportement front inchangé (hors périmètre).
+
+#### Dette / points d'attention
+- Audit de cascade refait sur **toute la profondeur** cette fois : `LeitnerSystem` ← LeitnerBox/LeitnerSystemsUsers/LeitnerSystemTag/cardSystems (CASCADE), RevisionSession.idSystem (SET NULL) ; `LeitnerBox` ← LeitnerCard.idBox (CASCADE après ce fix) ; `LeitnerCard` ← cardSystems.idCard (CASCADE). Plus de FK bloquante dans le sous-arbre Leitner.
+- Suite Jest complète et lint relancés — voir rapport de fin de ticket.
+
+#### État
+| Module | État |
+|--------|------|
+| LeitnerSystem / LeitnerBox / LeitnerCard | Stable — cascade de suppression complète sur les 2 niveaux (système → boîtes → cartes), suppression d'un système avec cartes fonctionnelle |

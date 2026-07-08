@@ -24,7 +24,13 @@ module.exports = (instance) => {
       },
       idBox: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: true,
+        references: {
+          model: 'LeitnerBox',
+          key: 'idBox'
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       next_review_at: {
         type: DataTypes.DATE,
