@@ -444,9 +444,16 @@ Légende : rectangles = jobs GitHub Actions ; losange = aiguillage par branche ;
 
 La conception des interfaces suit trois niveaux de raffinement successifs :
 
-**Niveau 1 — Maquettes graphiques (Figma).** Les écrans principaux ont été maquettés sur Figma en amont du développement. Ces maquettes sont externes au dépôt.
+**Niveau 1 — Prototype interactif versionné.** Les écrans principaux ont été prototypés en amont sous forme d'une maquette **interactive et navigable**, réalisée avec l'outil de design de Claude (assistance IA — démarche assumée et cohérente avec l'outillage du projet), exportée en **HTML autonome** et versionnée dans le dépôt : [prototype/MyMemoMaster - Standalone.html](prototype/) (14 écrans : authentification, accueil, mindmaps, flashcards et session Leitner, exercices, classe, calendrier, to-do, KPI, profil, réglages — procédure d'ouverture dans [prototype/README.md](prototype/README.md)). Le prototype fixe l'identité visuelle et les parcours ; les captures ci-dessous sont **générées automatiquement depuis ce fichier** par script Puppeteer ([prototype/captures/](prototype/captures/)), donc reproductibles :
 
-[SCREENSHOT ICI : maquettes Figma des écrans principaux — page d'accueil, session de flashcards, éditeur de cartes mentales]
+| | |
+|---|---|
+| ![Connexion](prototype/captures/01-connexion.png) | ![Accueil](prototype/captures/03-accueil.png) |
+| Connexion | Accueil — alertes & suggestions |
+| ![Session Leitner](prototype/captures/08-flashcards-session.png) | ![Détail exercice](prototype/captures/10-exercice-detail.png) |
+| Session de révision (répartition par boîte) | Exercice — question ouverte + QCM |
+
+Des maquettes graphiques Figma antérieures existent également, externes au dépôt ; le prototype HTML versionné en constitue la trace exploitable et vérifiable.
 
 **Niveau 2 — Spécifications UI versionnées.** Pour les fonctionnalités complexes, j'ai versionné dans le dépôt des documents de conception qui font le lien entre les règles métier et l'interface : [diagrams/dashboard_enseignant_ui.md](diagrams/dashboard_enseignant_ui.md), [diagrams/etablissement_admin_ui.md](diagrams/etablissement_admin_ui.md), [diagrams/kpi_consent_ui.md](diagrams/kpi_consent_ui.md), [diagrams/ui_navigation_sujet.md](diagrams/ui_navigation_sujet.md). Ces documents contiennent des **maquettes filaires** (wireframes) et précisent le contexte d'intégration de chaque écran. Extrait de [diagrams/dashboard_enseignant_ui.md](diagrams/dashboard_enseignant_ui.md) :
 
@@ -562,12 +569,12 @@ Ce mécanisme est la contrepartie ergonomique d'une exigence de sécurité : c'e
 
 | Attendu du référentiel                         | Réponse apportée                                                                                       |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| Prototype fonctionnel répondant aux besoins     | Application déployée et utilisable en autonomie ; 28 pages couvrant les 6 fonctionnalités principales |
+| Prototype fonctionnel répondant aux besoins     | Prototype HTML interactif versionné (14 écrans, captures reproductibles) + application déployée et utilisable en autonomie ; 28 pages couvrant les 6 fonctionnalités principales |
 | Composants d'interface présents et fonctionnels | Bibliothèque de composants réutilisables (boutons, modales, menus, loaders…)                          |
 | Spécificités ergonomiques                      | Responsive Tailwind, PWA installable, onboarding/tutoriels, toasts, règles d'ergonomie codifiées       |
 | Équipements ciblés                             | Web desktop + mobile (PWA, points de rupture)                                                            |
 | Exigences de sécurité                          | Guards de navigation (authentification + rôles), refresh token silencieux, jauge de mot de passe        |
-| User stories / cohérence fonctionnelle          | Maquettes versionnées reliant règles métier ↔ écrans (diagrams/*_ui.md)                             |
+| User stories / cohérence fonctionnelle          | Prototype navigable (prototype/) + maquettes versionnées reliant règles métier ↔ écrans (diagrams/*_ui.md)                             |
 
 ---
 

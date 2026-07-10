@@ -5261,3 +5261,24 @@ Signalé par l'utilisateur : suppression d'une série (système de Leitner) → 
 | Module | État |
 |--------|------|
 | LeitnerSystem / LeitnerBox / LeitnerCard | Stable — cascade de suppression complète sur les 2 niveaux (système → boîtes → cartes), suppression d'un système avec cartes fonctionnelle |
+
+---
+
+### [2026-07-07] ADD — Prototype interactif versionné + captures automatisées (preuve C2.2.1)
+
+#### Contexte
+L'utilisateur a exporté son prototype (outil de design de Claude) en HTML autonome dans `prototype/`. Le dossier B2 référençait des maquettes Figma externes au dépôt — preuve non vérifiable par le jury.
+
+#### Fichiers créés/modifiés
+- `prototype/MyMemoMaster - Standalone.html` (déposé par l'utilisateur) — prototype navigable 14 écrans, aucun CDN externe. **Particularité** : le bundle se relit par `fetch` → doit être servi en HTTP (bloqué en `file://`), documenté dans `prototype/README.md` (nouveau).
+- `prototype/captures/*.png` (16 captures, 1440×900) — générées par script Puppeteer (Chrome headless local) : connexion, inscription, accueil, tutoriels, mindmaps, flashcards + gestion cartes + session Leitner, exercices + détail, classe, calendrier, to-do, KPI, profil, réglages. Connexion du prototype : tout email/mot de passe non vides.
+- `B2_RENDU.md` section 3.1 — « Niveau 1 » réécrit : prototype interactif versionné (assistance IA assumée) remplace la référence Figma non vérifiable ; 4 captures embarquées en tableau ; synthèse C2.2.1 mise à jour.
+
+#### Vérifications
+- Captures contrôlées visuellement (connexion, accueil, mindmaps, session Leitner, détail exercice).
+- Scripts de capture conservés dans le scratchpad de session (non versionnés — ponctuels).
+
+#### État
+| Module | État |
+|--------|------|
+| Prototype (preuve C2.2.1) | Versionné + 16 captures reproductibles ; restent les [SCREENSHOT ICI] de l'app réelle déployée |
