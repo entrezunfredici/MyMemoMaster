@@ -54,10 +54,12 @@ api:
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
+      # Le chargement du modèle sémantique (all-mpnet-base-v2) pique à ~800Mi :
+      # 512Mi de limite = OOMKill en boucle au démarrage (constaté le 2026-07-11)
+      memory: 512Mi
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 1Gi
 
 front:
   resources:

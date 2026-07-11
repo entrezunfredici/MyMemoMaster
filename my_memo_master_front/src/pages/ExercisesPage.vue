@@ -246,6 +246,7 @@ import { useSubjectStore } from '@/stores/subjects'
 import { useTagStore } from '@/stores/tags'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useAuthStore } from '@/stores/auth'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 import { useRole } from '@/composables/useRole'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
@@ -258,6 +259,7 @@ const subjectStore = useSubjectStore()
 const tagStore = useTagStore()
 const classGroupStore = useClassGroupStore()
 const authStore = useAuthStore()
+const guidedTourStore = useGuidedTourStore()
 const { isEnseignant } = useRole()
 
 const loading = ref(true)
@@ -403,7 +405,8 @@ function openCreateModal() {
   editingTestUserId.value = authStore.user?.userId ?? null
   questionsToDelete.value = []
   form.name = ''
-  form.subjectId = null
+  // Parcours guidé : pré-sélectionne la matière liée aux étapes précédentes
+  form.subjectId = guidedTourStore.active ? guidedTourStore.links.subjectId : null
   form.tagIds = []
   form.groupIds = []
   form.questions = [defaultQuestion()]
@@ -457,6 +460,7 @@ async function submitCreate() {
     const created = await testStore.createTest()
     if (!created) { formError.value = 'Erreur lors de la création de l\'exercice.'; return }
     const testId = testStore.test.testId
+    guidedTourStore.recordLinks({ testId })
 
     for (let i = 0; i < form.questions.length; i++) {
       const q = form.questions[i]

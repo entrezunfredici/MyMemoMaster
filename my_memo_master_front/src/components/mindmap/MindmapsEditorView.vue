@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { api } from '@/helpers/api'
 import { useToast } from 'vue-toastification'
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue'
 
 const props = defineProps({
@@ -14,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['back'])
 const toast = useToast()
 const mindmapStore = useMindMapBuilderStore()
+const guidedTourStore = useGuidedTourStore()
 
 // ── État interne ──────────────────────────────────────────────────────────────
 const currentDiagramId = ref(props.diagramId)
@@ -82,6 +84,7 @@ const performAutoSave = async () => {
       if (newId) {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
+        guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
         pendingPayload.value = null
         pendingCreate.value = false
@@ -174,6 +177,7 @@ const confirmExportModal = async () => {
       if (newId) {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
+        guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
         toast.success('Carte créée.')
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
       }

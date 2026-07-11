@@ -5,6 +5,7 @@ import { useToast } from 'vue-toastification'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
+import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 import { useTagStore } from '@/stores/tags'
 
 const props = defineProps({
@@ -170,12 +171,7 @@ onMounted(fetchDiagrams)
             </div>
             <div class="mb-4">
               <label class="form-label">Matière</label>
-              <select aria-label="Sujet associé" v-model="createSubjectId" class="form-input">
-                <option :value="null">— Aucune matière —</option>
-                <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">
-                  {{ s.name }}
-                </option>
-              </select>
+              <SubjectSelectorComponent v-model="createSubjectId" />
             </div>
             <div class="btn-row">
               <button type="submit" class="btn-modal-submit">Créer</button>

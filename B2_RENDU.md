@@ -29,24 +29,24 @@
 
     La plupart des étudiants ont des méthodes de révision peu efficaces qui les mettent en difficulté : 83,6 % s'appuient sur des méthodes de révision passives, 27 % préparent leurs examens au dernier moment, seulement 34 % disposent d'un calendrier de révision utile et seul 1 étudiant sur 2 s'entraîne via des annales ou des exercices (études et enquêtes versionnées dans[docs/sources/](docs/sources/) — voir Annexe D). Pour remédier à ces problèmes, MyMemoMaster propose une plateforme de révision et de suivi étudiant tout-en-un, à destination des étudiants principalement et des enseignants. La plateforme centralise des fonctionnalités fondées sur des méthodes pédagogiques actives dont l'efficacité est documentée par ces mêmes travaux :
 
-- **Systèmes de Leitner** : questions-réponses à répétition espacée — l'algorithme représente les cartes dans des « boîtes » et fait remonter plus fréquemment les questions échouées ;
+- **Systèmes de Leitner** : questions-réponses à répétition espacée — l'algorithme représente les cartes dans des « boîtes » et fait remonter plus fréquemment les questions échouées et moins fréquemment les questions réussies ;
 - **Cartes mentales** : éditeur graphique de schémas de notions et de leurs liens ;
 - **Séries d'exercices** : entraînement avec correction automatique, y compris une correction par **similarité sémantique** pour les réponses ouvertes, exécutée par un modèle d'IA embarqué dans l'API (bibliothèque `@xenova/transformers`, modèle `all-mpnet-base-v2`);
 - **Calendrier, échéances et rappels** : planification des sessions de révision, todo-list, notifications par email (file de traitement BullMQ/Redis) ;
 - **KPI personnels et pédagogiques** : indicateurs de progression pour l'étudiant, tableaux de bord pour l'enseignant, avec gestion du consentement de partage ;
 - **Groupes classes et établissements** : partage de ressources pédagogiques, invitations, périmètre d'administration pour les gérants d'établissement.
 
-Cette liste correspond aux modules effectivement présents dans le code : chaque fonctionnalité ci-dessus a son module de routes monté dans [my_memo_master_api/app.js](my_memo_master_api/app.js) (lignes 111–146 : `leitnerSystemRoutes`, `diagrammeRoutes`, `questionRoutes`, `semanticRoutes`, `calendarEventRoutes`, `kpiRoutes`, `classGroupRoutes`, `etablissementRoutes`…).
+Chaque fonctionnalité ci-dessus a ses propres routes intégrées dans l'api [my_memo_master_api/app.js](my_memo_master_api/app.js) (lignes 111–146 : `leitnerSystemRoutes`, `diagrammeRoutes`, `questionRoutes`, `semanticRoutes`, `calendarEventRoutes`, `kpiRoutes`, `classGroupRoutes`, `etablissementRoutes`…).
 
 ## Stack technique
 
-La stack est documentée dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md) et vérifiable dans les manifestes npm de l'api ([my_memo_master_api/package.json](my_memo_master_api/package.json)) et celui du front ([my_memo_master_front/package.json](my_memo_master_front/package.json)) :
+La stack est documentée dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md) et vérifiable dans le manifeste npm de l'api ([my_memo_master_api/package.json](my_memo_master_api/package.json)) et celui du front ([my_memo_master_front/package.json](my_memo_master_front/package.json)) :
 
 | Couche                      | Technologie                                                                      |
 | --------------------------- | -------------------------------------------------------------------------------- |
 | Runtime API                 | Node.js 22                                                                       |
 | Framework API               | Express.js v4                                                                    |
-| ORM / Base de données      | Sequelize v6 — PostgreSQL 15 (test/preprod/prod), SQLite (développement local) |
+| ORM / Base de données      | Sequelize v6 — PostgreSQL 17 (test/preprod/prod), SQLite (développement local) |
 | Authentification            | JWT (`jsonwebtoken`) + `bcryptjs`, refresh token avec rotation               |
 | File de tâches asynchrones | BullMQ + Redis (rappels, notifications email)                                    |
 | IA embarquée               | `@xenova/transformers` (correction par similarité sémantique)                |
@@ -98,7 +98,7 @@ graph TD
     end
 
     subgraph Data ["Persistance"]
-        DB[(PostgreSQL 15)]
+        DB[(PostgreSQL 17)]
         Redis[(Redis — broker BullMQ)]
         S3[(Object Storage S3 Infomaniak<br/>uploads images)]
     end
@@ -113,7 +113,7 @@ graph TD
     Worker -->|SMTP| Mail["Serveur SMTP<br/>(emails transactionnels)"]
 ```
 
-Deux précisions d'honnêteté documentaire : contrairement à l'architecture **cible** décrite dans [archi.md](archi.md), l'API IA séparée (Python/FastAPI) n'existe pas à ce jour — la correction sémantique s'exécute dans le processus Node de l'API ([my_memo_master_api/services/Semantic.service.js](my_memo_master_api/services/Semantic.service.js)) ; et Redis sert **exclusivement** de broker BullMQ, pas de cache applicatif (règle de [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md)).
+Redis sert **exclusivement** de broker BullMQ, pas de cache applicatif (règle de [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md)).
 
 ---
 
@@ -131,7 +131,7 @@ Plutôt que d'avoir plusieurs docker compose divergents, j'ai unifié les enviro
 
 ```yaml
 #  Usage:
-#    Dev local : docker compose --env-file .env.dev  up --build
+#    Dev local : docker compose --env-file v.env.dev  up --build
 #    Test VPS  : docker compose --env-file .env.test up
 #    Prod : docker compose --env-file .env.prod up
 #
@@ -159,7 +159,7 @@ En dev, l'API monte le code source en volume pour le hot-reload via nodemon, et 
 
 ### Développement hors Docker : la bascule SQLite / PostgreSQL
 
-Pour permettre un développement encore plus léger (hors docker), l'API peut tourner sur SQLite. La bascule est automatique et repose sur une seule condition — la présence de `PG_HOST` dans l'environnement ([my_memo_master_api/models/index.js](my_memo_master_api/models/index.js)) :
+Pour permettre un développement encore plus léger (hors docker), l'API peut fonctionner avec SQLite. La bascule est automatique et repose sur une seule condition — la présence (ou pas) de `PG_HOST` dans l'environnement ([my_memo_master_api/models/index.js](my_memo_master_api/models/index.js)) :
 
 ```javascript
 const dbmsConfig = require('../config/dbms.config')  // PostgreSQL + pool
@@ -169,11 +169,11 @@ const dbConfig = require('../config/db.config')       // SQLite fichier local
 const instance = new Sequelize(process.env.PG_HOST ? dbmsConfig : dbConfig)
 ```
 
-Cette décision est tracée dans le journal des décisions ([.agents/DECISIONS.md](.agents/DECISIONS.md), « [2026-06-03] SQLite en dev, PostgreSQL en prod ») avec ses conséquences assumées : Sequelize doit rester compatible avec les deux dialectes et les migrations doivent être testées sur les deux. Ce même mécanisme sert le harnais de test (section 4) : les tests s'exécutent sur SQLite in-memory, sans dépendance à une base externe — condition indispensable pour tourner dans les runners CI.
+Cette décision est tracée dans le journal des décisions ([docs/DECISIONS.md](docs/DECISIONS.md), « [2026-06-03] SQLite en dev, PostgreSQL en prod ») avec ses conséquences assumées : Sequelize doit rester compatible avec les deux dialectes et les migrations doivent être testées sur les deux. Ce même mécanisme sert le harnais de test (section 4) : les tests s'exécutent sur SQLite in-memory, sans dépendance à une base externe — condition indispensable pour tourner dans les runners CI.
 
 ### Configuration par variables d'environnement
 
-Toute la configuration passe par des variables d'environnement, jamais par des valeurs codées en dur : le fichier [.env.example](.env.example) (racine) sert de contrat documenté, et chaque environnement a son `.env` propre non versionné ([.gitignore](.gitignore)). Côté API, les accès sont centralisés dans [my_memo_master_api/config/](my_memo_master_api/config/) (`db.config.js`, `dbms.config.js`, `redis.config.js`, `storage.config.js`, `swagger.config.js`) ; côté front dans `src/config.js` — règle formalisée dans [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md). L'homogénéité de style entre contributeurs est en outre garantie par un [.editorconfig](.editorconfig) à la racine.
+Toute la configuration passe par des variables d'environnement, présentes dans le fichier .env. Les variables d'environnements nécéssaires dans le .env sont documentées dans le  [.env.example](.env.example). Ainsi chaque environnement a son `.env` propre non versionné ([.gitignore](.gitignore)). Côté API, les accès sont centralisés dans [my_memo_master_api/config/](my_memo_master_api/config/) (`db.config.js`, `dbms.config.js`, `redis.config.js`, `storage.config.js`, `swagger.config.js`) ; côté front dans `src/config.js` — règle formalisée dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md). L'homogénéité de style entre contributeurs est en outre garantie par un [.editorconfig](.editorconfig) à la racine.
 
 ## 1.2 Environnements de déploiements
 
@@ -224,13 +224,13 @@ Jest + Supertest côté API, Vitest + @vue/test-utils côté front, exécutés e
 - **Métriques applicatives RED/USE (Prometheus)** : l'API est instrumentée avec `prom-client` — histogramme `http_request_duration_seconds` et compteur `http_requests_total` labellisés méthode/route/code (RED), métriques process Node (CPU, mémoire, event-loop — USE) via `collectDefaultMetrics` ([my_memo_master_api/helpers/metrics.js](my_memo_master_api/helpers/metrics.js), [middlewares/metrics.middleware.js](my_memo_master_api/middlewares/metrics.middleware.js)). L'endpoint `/metrics` est servi par un **serveur HTTP dédié** (port 9090, [server.js](my_memo_master_api/server.js)) jamais exposé par l'Ingress — décision documentée dans [.agents/DECISIONS.md](.agents/DECISIONS.md) ; les annotations `prometheus.io/*` sont posées sur les pods ([k8s/](k8s/)). L'instrumentation est testée (9 tests dédiés).
 - **Notifications temps réel** : chaque exécution CI/CD notifie un canal Discord (succès/échec, branche concernée) — [.github/workflows/notify_ci.yml](.github/workflows/notify_ci.yml) et job `notify` de [.github/workflows/cd.yml](.github/workflows/cd.yml). L'équipe est prévenue d'une régression sans avoir à surveiller GitHub.
 
-### Analyse statique continue : SonarQube (temporairement désactivé)
+### Analyse statique continue : SonarCloud (SonarQube Cloud)
 
-Le projet a intégré une analyse SonarQube auto-hébergée : la configuration du scanner est versionnée ([sonar-project.properties](sonar-project.properties)) et le job d'analyse existe dans le pipeline CI avec une distinction prod/preprod par token ([.github/workflows/ci.yml](.github/workflows/ci.yml), lignes 68–91). Ce job est **actuellement commenté** : le serveur SonarQube que j'auto-hébergeais est hors service et sa reconfiguration est planifiée. J'assume ce choix de transparence plutôt que de présenter un outil comme actif alors qu'il ne l'est pas ; dans l'intervalle, la couverture qualité reste assurée par le triptyque bloquant lint + tests + build en CI, et la revue de sécurité a été menée manuellement (audit OWASP, section 5.2).
+Le projet intègre une analyse statique continue sur SonarCloud, l'offre SaaS de SonarQube (gratuite pour les dépôts publics) : la configuration du scanner est versionnée ([sonar-project.properties](sonar-project.properties)) et le job `sonarcloud` du pipeline CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) exécute l'analyse après le succès des tests et du lint, sur chaque branche poussée (main, staging, dev, branches de feature) — SonarCloud gère l'analyse par branche nativement, sans dupliquer les projets. Le tableau de bord (bugs, code smells, duplication, hotspots de sécurité, quality gate) est consultable sur sonarcloud.io. Historique assumé : l'analyse était initialement portée par une instance SonarQube auto-hébergée, dont l'exploitation (serveur dédié, maintenance, disponibilité) s'est révélée disproportionnée — la migration vers le SaaS conserve la capacité d'analyse en supprimant cette charge d'infrastructure. Cette analyse complète le triptyque bloquant lint + tests + build et l'audit de dépendances `npm audit` déjà en place dans la CI (l'audit de sécurité manuel reste documenté en section 5.2).
 
 ## 1.4 Dépôt de gestion du code source
 
-Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), dépôt unique pour l'API, le front, l'infrastructure et la documentation. Ce choix du monorepo est une décision de conception : les deux applications, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement). J'ai défini la stratégie de branches suivante, documentée dans le [README.md](README.md) (« Méthode de travail ») et **outillée par le pipeline CI** (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
+Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), dépôt unique pour toute l'application. Ce choix du monorepo est une décision de conception : les deux applications, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement). La stratégie de branches que j'ai définie est documentée dans le [README.md](README.md) (« Méthode de travail ») .  **Le fonctionement de la pipeli,ne CI** est adaptée à la stratégie de gestion des branches (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
 
 ```mermaid
 gitGraph
@@ -344,7 +344,13 @@ Cette architecture en deux workflows chaînés garantit structurellement qu'**au
 
 Chaque exécution CI notifie un canal Discord via le workflow dédié [.github/workflows/notify_ci.yml](.github/workflows/notify_ci.yml) : message de succès, ou message d'échec indiquant la branche fautive (`"Tests failed on branch $BRANCH_NAME!"`). Le pipeline CD envoie de son côté un bilan de déploiement (`✅/❌ Déploiement **<branche>** réussi/échoué`, job `notify` de [cd.yml](.github/workflows/cd.yml)). Une régression introduite sur `dev` est ainsi connue de l'équipe en quelques minutes, sans surveillance active de l'interface GitHub.
 
-[SCREENSHOT ICI : canal Discord montrant une notification d'échec CI et une notification de déploiement réussi]
+![Notification Discord d'échec CI](docs/CI_failed_in_discord.png)
+
+*Notification d'échec CI : « Tests failed on branch dev_back_student_kpi! » — la branche fautive est nommée dans le message, l'équipe est alertée sans consulter l'interface GitHub.*
+
+![Notifications Discord — succès CI sur staging puis bilan de déploiement](docs/discordMessage.png)
+
+*Canal Discord de l'équipe : notification de succès CI sur `staging` (workflow `notify_ci.yml`), suivie du bilan de déploiement du pipeline CD — état des nœuds et pods du cluster Kubernetes, puis confirmation « ✅ Déploiement **staging** réussi ».*
 
 ## 2.6 Vue d'ensemble du pipeline
 
@@ -372,6 +378,10 @@ flowchart LR
 ```
 
 Légende : rectangles = jobs GitHub Actions ; losange = aiguillage par branche ; la flèche CI → CD n'existe que si la CI conclut en succès.
+
+![Exécution réelle du workflow CD dans GitHub Actions](docs/CICD.png)
+
+*Exécution réelle du workflow `cd.yml` (déclenché par `workflow_run`) pour un push sur `staging` : construction et publication des images Docker, aiguillage par branche — seul « Deploy to Kubernetes (preprod) » s'exécute, les cibles VPS test et prod sont ignorées — puis notification Discord.*
 
 ---
 

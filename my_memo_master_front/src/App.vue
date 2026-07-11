@@ -73,6 +73,7 @@
           route.meta.title }}</h1>
         <NotificationBell class="mt-3" />
       </header>
+      <GuidedTourBanner />
       <main class="mb-8 mr-4">
         <RouterView />
       </main>
@@ -85,6 +86,9 @@
         route.meta.title }}</h1>
       <NotificationBell class="mt-3" />
     </header>
+    <div class="m-4 mb-0">
+      <GuidedTourBanner />
+    </div>
     <main class="m-4 pb-[75px]">
       <RouterView />
     </main>
@@ -163,6 +167,7 @@ import { useRole } from '@/composables/useRole'
 import { VITE_APP_NAME } from '@/config';
 import { isMobile } from '@/helpers/functions';
 import NotificationBell from '@/components/NotificationBellComponent.vue'
+import GuidedTourBanner from '@/components/GuidedTourBannerComponent.vue'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 

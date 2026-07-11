@@ -333,6 +333,7 @@ import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useDeadlineStore } from '@/stores/deadlines'
 import { usePlanningStore } from '@/stores/planning'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 import ReminderWidget from '@/components/ReminderWidget.vue'
 import TodoWidget from '@/components/TodoWidget.vue'
 
@@ -341,6 +342,7 @@ const calendarStore = useCalendarEventStore()
 const revisionStore = useRevisionSessionStore()
 const deadlineStore = useDeadlineStore()
 const planningStore = usePlanningStore()
+const guidedTourStore = useGuidedTourStore()
 
 /* ── Constantes ── */
 const MONTHS = [
@@ -392,10 +394,16 @@ async function submitCreate() {
     startTime: createForm.value.startTime,
     endTime: createForm.value.endTime,
     ...(createForm.value.description ? { description: createForm.value.description } : {}),
+    // Parcours guidé : lie la séance au système de Leitner créé pendant le parcours
+    ...(guidedTourStore.active && guidedTourStore.links.leitnerSystemId
+      ? { idSystem: guidedTourStore.links.leitnerSystemId }
+      : {}),
   }
   const ok = await revisionStore.createSession(payload)
   creating.value = false
   if (ok) {
+    const created = revisionStore.sessions[revisionStore.sessions.length - 1]
+    guidedTourStore.recordLinks({ revisionSessionId: created?.id ?? -1 })
     showCreateModal.value = false
     revisionStore.fetchSessions()
     planningStore.fetchPriorities()

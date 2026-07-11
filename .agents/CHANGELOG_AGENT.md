@@ -113,6 +113,7 @@
 | Etablissement (CRUD + pilotage) | Stable — S-04.05 : CRUD complet + contrôle accès roleId=4 (limité à son établissement) + validators + migrations + 9 tests service + 12 tests controller | 2026-07-01 |
 | AuditLog (audit trail) | Stable — S-04.05 : log automatique activation/désactivation/rôle via User.service, service + controller + GET /audit-logs (roleId=1) + 7 tests service + 3 tests controller | 2026-07-01 |
 | API activation comptes (PATCH activate/deactivate) | Stable — S-04.05 : endpoints protégés requireRole(1,4), tests controller activate/deactivate ajoutés (12 cas) | 2026-07-01 |
+| Front — Parcours guidé (onboarding d'usage) | Stable — store guidedTour.js (persisté localStorage) + bandeau GuidedTourBannerComponent dans App.vue + bouton HomePage ; 4 étapes sur les vraies pages (mindmap → Leitner → exercices → planification) avec pré-liaison subjectId/idSystem ; 12 tests Vitest | 2026-07-11 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -5353,3 +5354,72 @@ Décision utilisateur : regrouper dans `docs/` toute la documentation et le prot
 | Module | État |
 |--------|------|
 | Arborescence documentation | Stable — docs/ regroupe manuels, audits (OWASP + RGAA), prototype+captures, sources bibliographiques, synthèse mémoire ; .agents/ ne garde que la mémoire agent (AGENT, CONVENTIONS, CHANGELOG, DECISIONS, DOC_mindmap_editor, référentiel) |
+
+---
+
+### [2026-07-11] ADD — Parcours guidé (mindmap → Leitner → exercices → planification)
+
+#### Contexte
+Demande utilisateur : un bouton dans l'interface lance un parcours guidé qui enchaîne la création d'une carte mentale, du système de Leitner lié, d'une série d'exercices, puis la planification — en utilisant les **vrais formulaires** des pages existantes, avec un bouton supplémentaire pour passer à l'étape suivante et une liaison automatique des éléments entre eux. Précision utilisateur : le module `OnboardingState` (API + page `/onboarding`) est **réservé à une autre fonctionnalité** — ne pas l'utiliser ici.
+
+#### Fichiers créés
+- `my_memo_master_front/src/stores/guidedTour.js` — store Pinia persisté (localStorage) : `GUIDED_TOUR_STEPS` (4 étapes : mindmap → leitner → exercise → planning, chacune avec route réelle, label, hint, linkKey), état `active`/`stepIndex`/`links` (subjectId, mindMapId, leitnerSystemId, testId, revisionSessionId), getters `currentStep`/`isLastStep`/`currentStepDone`, actions `start`/`recordLinks` (no-op si inactif)/`advance`/`finish`/`quit`
+- `my_memo_master_front/src/components/GuidedTourBannerComponent.vue` — bandeau affiché tant que le parcours est actif : progression (points + compteur), label + hint de l'étape, bouton « Étape suivante → » (désactivé tant que l'élément de l'étape n'est pas créé, devient « Terminer le parcours 🎉 » à la dernière étape), bouton « Reprendre l'étape → » si l'utilisateur a quitté la page de l'étape, croix « Quitter » avec confirm
+- `my_memo_master_front/test/stores/guidedTour.store.test.js` — 12 tests Vitest (état initial, start, recordLinks actif/inactif/clé inconnue, currentStepDone, advance nominal/dernière étape/inactif, quit, parcours complet)
+
+#### Fichiers modifiés
+- `src/App.vue` — `<GuidedTourBanner />` monté au-dessus du `<main>` dans les layouts desktop et mobile (un seul point d'insertion, visible sur toutes les pages)
+- `src/pages/HomePage.vue` — bouton d'entrée « 🧭 Parcours guidé » (carte pleine largeur au-dessus du menu) : `tourStore.start()` + navigation vers l'étape 1
+- `src/components/mindmap/MindmapsEditorView.vue` — après chaque POST `diagrammes` réussi (auto-save et modal export), `recordLinks({ mindMapId, subjectId })`
+- `src/components/mindmap/MindmapsListView.vue` — le `<select>` matière du modal « Nouvelle carte » remplacé par `SubjectSelectorComponent` (création de matière inline — c'est ce qui permet de créer la matière au début du parcours)
+- `src/pages/FlashcardsPage.vue` — `openCreateModal` pré-remplit `form.subjectId` depuis `links.subjectId` si parcours actif ; création réussie → `recordLinks({ leitnerSystemId })` ; le modal « Planifier » valide aussi l'étape planification (`recordLinks({ revisionSessionId })`)
+- `src/pages/ExercisesPage.vue` — même pré-remplissage de `form.subjectId` ; test créé → `recordLinks({ testId })`
+- `src/pages/CalendarPage.vue` — si parcours actif, le payload de création de séance inclut `idSystem: links.leitnerSystemId` (liaison séance ↔ système Leitner) ; création réussie → `recordLinks({ revisionSessionId })`
+
+#### Ce qui est utilisable
+- Depuis la HomePage : bouton « Parcours guidé » → bandeau persistant qui accompagne l'utilisateur sur les 4 pages réelles, avec passage d'étape déverrouillé par la création effective de l'élément (pas un simple « suivant »)
+- Liaison automatique : matière choisie/créée à l'étape mindmap pré-sélectionnée dans les formulaires Leitner et exercice ; séance du calendrier liée au système Leitner créé
+- L'état survit au rechargement de page (persistance localStorage) ; `recordLinks` est no-op hors parcours, donc aucun impact sur l'usage normal des pages
+
+#### Hypothèses posées
+- La « création de la matière » n'est pas une étape séparée : elle se fait inline à l'étape 1 via `SubjectSelectorComponent` (validé implicitement : l'utilisateur voulait « peu de modifs »)
+- L'étape planification est validable depuis CalendarPage **ou** depuis le bouton « + Planifier » de FlashcardsPage (deux chemins réels vers la même action)
+- `revisionSessions.createSession` retourne un booléen : l'id de la séance créée est lu via `sessions[sessions.length - 1]` (fallback `-1` si absent) plutôt que de changer la signature du store (interface publique)
+
+#### Dette éventuelle
+- Pas de test composant pour `GuidedTourBannerComponent.vue` (le store, qui porte la logique, est couvert)
+- `MindmapsEditorView.ensureMeta` force `subjectId || 1` (comportement préexistant) : une carte créée « sans matière » enregistre subjectId=1 dans le parcours — TODO: à corriger dans un ticket mindmap dédié
+- Le bandeau n'apparaît pas sur les routes sans layout (pages auth) — sans impact, elles sont hors parcours
+
+#### État
+| Module | État |
+|--------|------|
+| Front — Parcours guidé | Stable — livré, 12 tests store verts, lint vert, audit a11y 0 non-conformité |
+
+---
+
+### [2026-07-11] IMP — Analyse statique migrée vers SonarCloud (job CI réactivé)
+
+#### Contexte
+Le job SonarQube auto-hébergé était commenté dans la CI (serveur hors service). Décision utilisateur : migrer vers SonarCloud (SaaS, gratuit pour dépôts publics) plutôt que ré-héberger ou supprimer l'analyse statique.
+
+#### Fichiers modifiés
+- `sonar-project.properties` — configuration complète du scanner : projectKey `entrezunfredici_MyMemoMaster`, organization `entrezunfredici`, sources monorepo (api + front/src), tests déclarés séparément, exclusions (node_modules, dist, coverage, api/test, api/public)
+- `.github/workflows/ci.yml` — bloc commenté `sonar_analysis` (2 tokens prod/preprod auto-hébergés) remplacé par un job `sonarcloud` actif : `SonarSource/sonarqube-scan-action@v5`, `needs: test_and_lint`, checkout `fetch-depth: 0`, secret unique `SONAR_TOKEN` + `SONAR_HOST_URL: https://sonarcloud.io` — un seul projet, l'analyse de branches SonarCloud remplace la distinction prod/preprod par token
+- `B2_RENDU.md` — section 1.3 « Analyse statique continue » réécrite : SonarQube « temporairement désactivé » → SonarCloud actif, avec l'historique auto-hébergé assumé comme choix d'arbitrage infrastructure
+
+#### Actions restantes côté utilisateur (le job échouera tant que non faites)
+1. Créer le compte/organisation SonarCloud via GitHub, importer le dépôt (dépôt public requis pour le plan gratuit)
+2. Vérifier que projectKey/organization générés correspondent à `sonar-project.properties` (ajuster sinon)
+3. Désactiver l'Automatic Analysis sur le projet SonarCloud (conflit avec l'analyse CI)
+4. Créer le secret GitHub `SONAR_TOKEN`
+5. Les anciens secrets `SONAR_PROD_TOKEN`, `SONAR_PREPROD_TOKEN`, `SONAR_HOST_URL` peuvent être supprimés des secrets GitHub
+
+#### Dette éventuelle
+- Pas de remontée de couverture (lcov) vers SonarCloud — nécessiterait de générer la couverture en CI (jest --coverage + @vitest/coverage-v8, nouvelle devDependency front) et `sonar.javascript.lcov.reportPaths` ; à faire dans un ticket dédié si souhaité
+- Le job n'est pas bloquant pour le merge (pas de quality gate check GitHub) — activable plus tard via l'app GitHub SonarCloud
+
+#### État
+| Module | État |
+|--------|------|
+| CI — Analyse statique | Stable — job `sonarcloud` actif dans ci.yml, en attente du secret SONAR_TOKEN côté GitHub |

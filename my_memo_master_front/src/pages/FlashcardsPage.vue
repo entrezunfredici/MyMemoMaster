@@ -159,6 +159,7 @@ import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useSubjectStore } from '@/stores/subjects'
 import { useTagStore } from '@/stores/tags'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 
@@ -169,6 +170,7 @@ const boxStore = useLeitnerBoxStore()
 const sessionStore = useRevisionSessionStore()
 const subjectStore = useSubjectStore()
 const tagStore = useTagStore()
+const guidedTourStore = useGuidedTourStore()
 
 const loading = ref(true)
 const searchQuery = ref('')
@@ -225,8 +227,12 @@ const submitPlanForm = async () => {
     idSystem: planningSystem.value.idSystem
   })
   submittingPlan.value = false
-  if (ok) closePlanModal()
-  else planError.value = 'Erreur lors de la création de la session.'
+  if (ok) {
+    // Parcours guidé : planifier une session valide aussi l'étape « planification »
+    const created = sessionStore.sessions[sessionStore.sessions.length - 1]
+    guidedTourStore.recordLinks({ revisionSessionId: created?.id ?? -1 })
+    closePlanModal()
+  } else planError.value = 'Erreur lors de la création de la session.'
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -251,7 +257,8 @@ const goToSession = (systemId) => {
 const openCreateModal = () => {
   editingId.value = null
   form.name = ''
-  form.subjectId = null
+  // Parcours guidé : pré-sélectionne la matière de la carte mentale créée à l'étape précédente
+  form.subjectId = guidedTourStore.active ? guidedTourStore.links.subjectId : null
   form.tagIds = []
   showModal.value = true
 }
@@ -280,6 +287,7 @@ const submitForm = async () => {
     : await systemStore.createSystem()
   if (ok) {
     const systemId = editingId.value || systemStore.system.idSystem
+    if (!editingId.value) guidedTourStore.recordLinks({ leitnerSystemId: systemId })
     await tagStore.setEntityTags('leitnersystem', systemId, form.tagIds)
     closeModal()
     await systemStore.fetchSystems()

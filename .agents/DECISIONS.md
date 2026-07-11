@@ -870,3 +870,30 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : fichiers à plat à la racine de `docs/` (état intermédiaire créé manuellement) — un `README.md` de prototype à la racine de `docs/` se lirait comme le README du dossier docs, et les copies manuelles étaient des exports plus anciens que les versions git.
 
 **Conséquences** : tout nouveau livrable documentaire va dans `docs/` ; `.agents/DOC_mindmap_editor.md` reste l'exception (doc technique interne citée par le B2) et pourra suivre le même chemin si besoin.
+
+---
+
+### [2026-07-11] Parcours guidé — état front persisté (Pinia + localStorage), pas de nouveau backend, formulaires réels plutôt qu'overlay
+
+**Contexte** : ajout d'un parcours guidé (carte mentale → système de Leitner → exercices → planification) déclenché par un bouton. L'API `OnboardingState` existe (tourSeen + checklist JSONB) mais l'utilisateur a précisé qu'elle est réservée à une autre fonctionnalité (onboarding). L'utilisateur veut « peu de modifs » : les vrais formulaires + un bouton pour passer à l'étape suivante + liaison des éléments.
+
+**Décision** :
+- État du parcours dans un store Pinia `guidedTour.js` persisté en localStorage (`persist: true`, plugin déjà en place) — `active`, `stepIndex`, et `links` (IDs des entités créées) pour lier les étapes : la matière de l'étape 1 pré-remplit les formulaires Leitner/exercice, la séance planifiée reçoit `idSystem`.
+- UI = un bandeau unique (`GuidedTourBannerComponent`) monté dans `App.vue`, visible sur toutes les pages tant que le parcours est actif ; le bouton « Étape suivante » est déverrouillé par la création effective de l'élément (détectée aux points de succès des POST existants via `recordLinks`, no-op hors parcours).
+- Le parcours s'appuie sur les pages réelles (MindmapsPage, FlashcardsPage, ExercisesPage, CalendarPage) — pas de page wizard dédiée ni d'overlay.
+
+**Alternative écartée** : (1) réutiliser `OnboardingState.checklist` — exclu par l'utilisateur (réservé à l'onboarding) ; (2) visite guidée en overlay (driver.js / intro.js) — dépendance hors liste approuvée et sélecteurs CSS fragiles ; (3) un bouton « suivant » ajouté dans chaque formulaire — plus invasif que le bandeau global pour le même résultat, et l'utilisateur perdrait le fil hors des pages d'étape.
+
+**Conséquences** : le parcours est par-appareil (localStorage), non synchronisé entre appareils — acceptable pour un guide d'usage ponctuel ; si un jour il faut le synchroniser, prévoir une entité dédiée (ne pas squatter OnboardingState). Toute page qui crée une entité du parcours doit appeler `guidedTourStore.recordLinks(...)` au point de succès. L'ordre des étapes est centralisé dans `GUIDED_TOUR_STEPS` (stores/guidedTour.js).
+
+---
+
+### [2026-07-11] Analyse statique — SonarCloud (SaaS) plutôt que ré-hébergement SonarQube ou abandon
+
+**Contexte** : le job SonarQube de la CI était commenté depuis la panne du serveur auto-hébergé. Trois options : ré-héberger, supprimer l'analyse statique (couverture qualité déjà assurée par lint + tests + npm audit + axe-core bloquants), ou migrer vers SonarCloud.
+
+**Décision** : SonarCloud (SonarQube Cloud), gratuit pour les dépôts publics. Un seul projet pour le monorepo (`sonar.sources` couvre api + front/src) — l'analyse de branches native de SonarCloud remplace l'ancienne distinction prod/preprod par tokens séparés. Job CI `sonarcloud` via `SonarSource/sonarqube-scan-action@v5` (action unifiée qui a remplacé `sonarcloud-github-action`), exécuté après tests + lint, non bloquant.
+
+**Alternative écartée** : ré-héberger SonarQube — charge d'exploitation (JVM, base, maintenance, disponibilité) disproportionnée pour l'apport, la panne l'a démontré ; suppression pure — perd l'axe « analyse statique continue » du dossier B2 alors que le SaaS l'offre à coût quasi nul ; Automatic Analysis SonarCloud (sans job CI) — écarté car incompatible avec l'analyse par scanner CI (il faut choisir) et sans contrôle sur le déclenchement post-tests.
+
+**Conséquences** : dépôt public requis (plan gratuit) ; secret unique `SONAR_TOKEN` (les anciens SONAR_PROD_TOKEN/SONAR_PREPROD_TOKEN/SONAR_HOST_URL sont obsolètes) ; l'Automatic Analysis doit rester désactivée sur SonarCloud sinon le job CI échoue ; la couverture lcov et le quality gate bloquant sont des extensions possibles documentées dans le CHANGELOG.
