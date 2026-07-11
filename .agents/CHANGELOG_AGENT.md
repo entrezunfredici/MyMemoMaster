@@ -42,6 +42,7 @@
 | Accessibilité RGAA (front) | Stable — campagne 135→0 non-conformités, outil scripts/audit-a11y.mjs, 4 tests axe-core en CI, preuve docs/AUDIT_RGAA.md | 2026-07-06 |
 | Sécurité dépendances (OWASP A06) | Stable — npm audit bloquant en CI, sqlite3 en devDeps, 0 high/critical en prod | 2026-07-06 |
 | Manuel d'utilisation | Stable — docs/MANUEL_UTILISATION.md (3 profils + FAQ), captures à insérer | 2026-07-06 |
+| Synthèse mémoire du projet (hors .agents/) | Stable — docs/MEMOIRE_PROJET.md : présentation du dispositif + synthèse conventions/décisions/changelog/audit OWASP, sources .agents/ font foi | 2026-07-11 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
 | Documentation schéma BDD | Stable — M-00.15 : ERD Mermaid + descriptions tables + index + ON DELETE | 2026-06-06 |
 | Documentation algo Leitner | Stable — M-01.13 : algo, règles métier, cas limites, droits, endpoints | 2026-06-10 |
@@ -5282,3 +5283,73 @@ L'utilisateur a exporté son prototype (outil de design de Claude) en HTML auton
 | Module | État |
 |--------|------|
 | Prototype (preuve C2.2.1) | Versionné + 16 captures reproductibles ; restent les [SCREENSHOT ICI] de l'app réelle déployée |
+
+---
+
+### [2026-07-11] ADD — Synthèse « Mémoire du projet » hors .agents/ (docs/MEMOIRE_PROJET.md)
+
+#### Contexte
+Demande utilisateur : rendre la mémoire du projet (conventions, décisions, changelog, audit OWASP) accessible **en dehors** du dossier caché `.agents/` — utile notamment pour le jury B2 (B2_RENDU.md la cite comme preuve d'évolutivité organisationnelle, §104 et §840). Dupliquer les sources (~530 Ko, dont CHANGELOG 402 Ko) créerait une divergence inévitable : choix d'un **document de synthèse unique** qui présente le dispositif et renvoie vers les sources.
+
+#### Fichiers créés/modifiés
+- `docs/MEMOIRE_PROJET.md` (nouveau) — 6 sections : rôle du dispositif (3 questions / 3 fichiers + CLAUDE.md comme point d'entrée), essentiel des conventions, panorama thématique des 90+ décisions, état du projet (100+ modules Stable), résumé complet de l'audit OWASP (corrigé / restant / points positifs), cycle de vie de la mémoire. Bandeau « les sources font foi » + date de synchronisation en tête.
+
+#### Points d'attention
+- Le document porte une **date de synchronisation (2026-07-11)** : à rafraîchir si les chiffres clés évoluent fortement (nb de décisions, état des modules, dette OWASP). Ce n'est pas un fichier à maintenir à chaque ticket — les sources `.agents/` restent canoniques.
+
+#### État
+| Module | État |
+|--------|------|
+| Synthèse mémoire du projet (docs/) | Stable — docs/MEMOIRE_PROJET.md créé, sources .agents/ canoniques |
+
+---
+
+### [2026-07-11] ADD — Manuels de déploiement complets (VPS + Kubernetes) et section Annexes du dossier B2
+
+#### Contexte
+Demande utilisateur double : (1) vérifier l'existence de manuels de déploiement — constat : le déploiement VPS était éclaté entre README partie 3 et RUNBOOK, et la partie Kubernetes du README décrivait le flux `kubectl apply` **obsolète depuis la migration Helm** (décision 2026-06-30) ; (2) ajouter une section Annexes au dossier B2 (liens vers les fichiers du dépôt, l'utilisateur partagera les dossiers).
+
+#### Fichiers créés/modifiés
+- `docs/MANUEL_DEPLOIEMENT_VPS.md` (nouveau) — environnement test : architecture (6 services + Traefik), prérequis, préparation `.env` (garde-fou ENVIRONMENT=test du CD), premier déploiement, déroulé du job `deploy_test` (validations, boucle santé 24×5s), secours/rollback (renvoi RUNBOOK), vérifications.
+- `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` (nouveau) — preprod/prod via Helm : chart + values par env (Redis éphémère/persistant, PgAdmin on/off), ségrégation ConfigMap/Secret, adoption `helm-migrate.sh`, création des Secrets, `helm upgrade --atomic` + `rolloutTimestamp`, `K8S_PROD_ENABLED`, modification de config, `helm rollback`, tableau de correspondance des environnements. Note explicite : `k8s/preprod|prod/` = référence historique non appliquée par le CD.
+- `README.md` partie 3 — encart en tête : renvoi vers les deux manuels + avertissement que les sections `kubectl apply` preprod/prod sont le flux historique pré-Helm (le README reste la référence secrets/variables GitHub Actions).
+- `B2_RENDU.md` — nouvelle section **Annexes** en fin de dossier : A. galerie des 16 captures du prototype (tableau de liens vers prototype/captures/), B. emplacement `[CAPTURES ICI]` pour l'app déployée, C. index des documents du dépôt (16 documents → chemin → sections). Ajouts : ligne Annexes dans la table du plan, appel « voir Annexe A » en 3.1, ligne 9.1 « Manuel de déploiement » pointant les 2 nouveaux manuels, §9.2 réécrit autour des manuels dédiés (README = complément CI/CD).
+
+#### Incident résolu au passage
+Le dossier `prototype/` (HTML standalone + 16 captures, versionnés le 2026-07-07) avait **disparu du working tree** en cours de session (git status : `D` sur tous les fichiers — suppression locale, cause probable OneDrive ou manipulation). Restauré via `git checkout -- prototype/`. Un fichier **non suivi** `docs/MyMemoMaster - Standalone.html` (doublon du prototype) est apparu en même temps — laissé en place, à arbitrer par l'utilisateur (doublon probable à supprimer).
+
+#### Dette / points d'attention
+- `B2_RENDU.pdf` en retard sur le Markdown (annexes + liens mémoire projet) — à regénérer avant le rendu.
+- Annexe B : captures de l'app déployée à réaliser manuellement (marqueur `[CAPTURES ICI]`).
+- `server_docker_compose/.env.example` ligne 13 : commentaire « branche git : test » obsolète (branche renommée `dev`) — mineur, non corrigé (hors périmètre).
+
+#### État
+| Module | État |
+|--------|------|
+| Manuels de déploiement | Stable — docs/MANUEL_DEPLOIEMENT_VPS.md + docs/MANUEL_DEPLOIEMENT_KUBERNETES.md complets, README partie 3 recadré (Helm), cartographie 9.1/9.2 du B2 à jour |
+| Dossier B2 — Annexes | Stable — annexes A (galerie liens) / B (captures à faire) / C (index documents) + appels depuis le corps |
+
+---
+
+### [2026-07-11] REF — Réorganisation : docs/ devient le dossier unique de documentation (prototype, audit OWASP, sources)
+
+#### Contexte
+Décision utilisateur : regrouper dans `docs/` toute la documentation et le prototypage. L'utilisateur avait déplacé manuellement des copies (HTML du prototype, captures, audit OWASP) à la racine de `docs/` — copies partiellement obsolètes (HTML = export antérieur au commit du 2026-07-07, audit reformaté par l'éditeur ce qui cassait les retours à la ligne markdown). Ajout par l'utilisateur de 4 PDF de sources scientifiques (`docs/sources/`) appuyant les statistiques réécrites en section 0.1 du B2.
+
+#### Fichiers créés/modifiés
+- `git mv prototype/ → docs/prototype/` (HTML standalone, README, 16 captures — historique préservé, contenu = versions git, plus récentes que les copies manuelles supprimées).
+- `git mv .agents/SECURITY_AUDIT_OWASP.md → docs/SECURITY_AUDIT_OWASP.md` (l'audit rejoint AUDIT_RGAA.md dans docs/ ; la copie reformatée de l'utilisateur supprimée au profit du contenu git).
+- `docs/sources/` (nouveau, utilisateur) — 2009_Karpicke_Butler_Roediger.pdf, Dunlosky_SciAmMind.pdf, ZIP_2022.pdf, Texe+4_pp.79-102.pdf.
+- `docs/prototype/README.md` — `cd prototype` → `cd docs/prototype`.
+- `B2_RENDU.md` — tous les liens `prototype/*` → `docs/prototype/*`, `.agents/SECURITY_AUDIT_OWASP.md` → `docs/SECURITY_AUDIT_OWASP.md` ; commentaire arborescence docs/ réécrit ; §0.1 : orthographe corrigée + renvoi vers docs/sources/ et l'Annexe D ; **Annexe D — Sources bibliographiques** ajoutée (2 références identifiées, 2 marquées [À COMPLÉTER]) ; ligne Annexes du plan mise à jour.
+- `docs/MEMOIRE_PROJET.md` — liens audit OWASP mis à jour vers docs/.
+
+#### Dette / points d'attention
+- Annexe D : références exactes de `ZIP_2022.pdf` et `Texe+4_pp.79-102.pdf` à compléter par l'utilisateur.
+- Les entrées historiques du changelog qui citent `prototype/` ou `.agents/SECURITY_AUDIT_OWASP.md` restent telles quelles (journal immuable).
+- `B2_RENDU.pdf` toujours à regénérer.
+
+#### État
+| Module | État |
+|--------|------|
+| Arborescence documentation | Stable — docs/ regroupe manuels, audits (OWASP + RGAA), prototype+captures, sources bibliographiques, synthèse mémoire ; .agents/ ne garde que la mémoire agent (AGENT, CONVENTIONS, CHANGELOG, DECISIONS, DOC_mindmap_editor, référentiel) |

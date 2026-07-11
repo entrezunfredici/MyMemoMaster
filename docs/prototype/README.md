@@ -8,7 +8,7 @@
 Le bundle se dépaquette en JavaScript et se relit lui-même par `fetch` — bloqué par les navigateurs en `file://`. **Le servir en HTTP local** :
 
 ```bash
-cd prototype
+cd docs/prototype
 npx http-server -p 8123
 # puis ouvrir http://127.0.0.1:8123/MyMemoMaster%20-%20Standalone.html
 ```

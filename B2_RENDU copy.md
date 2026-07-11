@@ -6,28 +6,38 @@
 
 ---
 
+## Avant-propos : conventions du document
+
+Ce dossier couvre les compétences **C2.1.1 à C2.4.1** du référentiel « Expert en développement logiciel ». Chaque section ouvre sur la ou les compétences qu'elle couvre. Les conventions suivantes s'appliquent à l'ensemble du document :
+
+- **Toute affirmation technique est adossée à un fichier réel du dépôt** : le chemin est indiqué, accompagné si nécessaire d'un extrait court (≤ 30 lignes).
+- Ce qui est **cité du code** est distingué de ce qui est **inféré** ou relève d'une **décision de conception** ; ces deux derniers cas sont signalés explicitement dans la prose.
+- Les schémas sont réalisés en Mermaid.
+
 ### Plan du dossier
 
-| Section      | Contenu                                                                                                                                                                    | Compétence couverte |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Introduction | Présentation du projet                                                                                                                                                    | —                   |
-| 1            | Environnements de développement, de test et de déploiement                                                                                                               | C2.1.1               |
-| 2            | Intégration continue                                                                                                                                                      | C2.1.2               |
-| 3            | Prototypage et conception de l'application                                                                                                                                 | C2.2.1               |
-| 4            | Harnais de tests unitaires                                                                                                                                                 | C2.2.2               |
-| 5            | Développement : évolutivité, sécurisation, accessibilité                                                                                                              | C2.2.3               |
-| 6            | Déploiement continu et progressif                                                                                                                                         | C2.2.4               |
-| 7            | Cahier de recettes                                                                                                                                                         | C2.3.1               |
-| 8            | Plan de correction des bogues                                                                                                                                              | C2.3.2               |
-| 9            | Documentation technique d'exploitation                                                                                                                                     | C2.4.1               |
-| 10           | Glossaire                                                                                                                                                                  | —                   |
-| Annexes      | A. Galerie du prototype · B. Captures de l'application · C. Index des documents du dépôt · D. Sources bibliographiques · E. Synthèse de couverture des compétences | —                   |
+| Section | Contenu                                                                                                                     | Compétence couverte |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 0       | Présentation du projet et de son architecture                                                                              | —                   |
+| 1       | Environnements de développement, de test et de déploiement                                                                | C2.1.1               |
+| 2       | Intégration continue                                                                                                       | C2.1.2               |
+| 3       | Prototypage et conception de l'application                                                                                  | C2.2.1               |
+| 4       | Harnais de tests unitaires                                                                                                  | C2.2.2               |
+| 5       | Développement : évolutivité, sécurisation, accessibilité                                                               | C2.2.3               |
+| 6       | Déploiement continu et progressif                                                                                          | C2.2.4               |
+| 7       | Cahier de recettes                                                                                                          | C2.3.1               |
+| 8       | Plan de correction des bogues                                                                                               | C2.3.2               |
+| 9       | Documentation technique d'exploitation                                                                                      | C2.4.1               |
+| 10      | Glossaire                                                                                                                   | —                   |
+| Annexes | A. Galerie du prototype · B. Captures de l'application · C. Index des documents du dépôt · D. Sources bibliographiques | —                   |
 
 ---
 
-# Présentation du projet
+# Section 0 — Présentation du projet
 
-    La plupart des étudiants ont des méthodes de révision peu efficaces qui les mettent en difficulté : 83,6 % s'appuient sur des méthodes de révision passives, 27 % préparent leurs examens au dernier moment, seulement 34 % disposent d'un calendrier de révision utile et seul 1 étudiant sur 2 s'entraîne via des annales ou des exercices (études et enquêtes versionnées dans[docs/sources/](docs/sources/) — voir Annexe D). Pour remédier à ces problèmes, MyMemoMaster propose une plateforme de révision et de suivi étudiant tout-en-un, à destination des étudiants principalement et des enseignants. La plateforme centralise des fonctionnalités fondées sur des méthodes pédagogiques actives dont l'efficacité est documentée par ces mêmes travaux :
+## 0.1 Le produit : MyMemoMaster
+
+La plupart des étudiants ont des méthodes de révision peu efficaces qui les mettent en difficulté : 83,6 % s'appuient sur des méthodes de révision passives, 27 % préparent leurs examens au dernier moment, seulement 34 % disposent d'un calendrier de révision utile et seul 1 étudiant sur 2 s'entraîne via des annales ou des exercices (études et enquêtes versionnées dans [docs/sources/](docs/sources/) — voir Annexe D). Pour remédier à ces problèmes, MyMemoMaster propose une plateforme de révision et de suivi étudiant tout-en-un, à destination des étudiants principalement et des enseignants. La plateforme centralise des fonctionnalités fondées sur des méthodes pédagogiques actives dont l'efficacité est documentée par ces mêmes travaux :
 
 - **Systèmes de Leitner** : questions-réponses à répétition espacée — l'algorithme représente les cartes dans des « boîtes » et fait remonter plus fréquemment les questions échouées ;
 - **Cartes mentales** : éditeur graphique de schémas de notions et de leurs liens ;
@@ -36,9 +46,27 @@
 - **KPI personnels et pédagogiques** : indicateurs de progression pour l'étudiant, tableaux de bord pour l'enseignant, avec gestion du consentement de partage ;
 - **Groupes classes et établissements** : partage de ressources pédagogiques, invitations, périmètre d'administration pour les gérants d'établissement.
 
-Cette liste correspond aux modules effectivement présents dans le code : chaque fonctionnalité ci-dessus a son module de routes monté dans [my_memo_master_api/app.js](my_memo_master_api/app.js) (lignes 111–146 : `leitnerSystemRoutes`, `diagrammeRoutes`, `questionRoutes`, `semanticRoutes`, `calendarEventRoutes`, `kpiRoutes`, `classGroupRoutes`, `etablissementRoutes`…).
+Cette liste correspond aux modules effectivement présents dans le code : chaque fonctionnalité ci-dessus se retrouve dans les routes de l'API, montées dans [my_memo_master_api/app.js](my_memo_master_api/app.js) (extrait, lignes 111–146 abrégées) :
 
-## Stack technique
+```javascript
+// Routes v1
+const v1 = express.Router()
+v1.use(apiLimiter)
+subjectRoutes(v1)
+// ...
+leitnerSystemRoutes(v1)   // systèmes de Leitner
+diagrammeRoutes(v1)       // cartes mentales
+questionRoutes(v1)        // exercices
+semanticRoutes(v1)        // correction sémantique (IA embarquée)
+calendarEventRoutes(v1)   // calendrier
+kpiRoutes(v1)             // indicateurs
+classGroupRoutes(v1)      // groupes classes
+etablissementRoutes(v1)   // établissements
+// ...
+app.use('/api/v1', v1)
+```
+
+## 0.2 Stack technique
 
 La stack est documentée dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md) et vérifiable dans les manifestes npm de l'api ([my_memo_master_api/package.json](my_memo_master_api/package.json)) et celui du front ([my_memo_master_front/package.json](my_memo_master_front/package.json)) :
 
@@ -57,7 +85,9 @@ La stack est documentée dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md) et vér
 | Conteneurisation            | Docker, Docker Compose, Helm/Kubernetes                                          |
 | CI/CD                       | GitHub Actions                                                                   |
 
-## Organisation du depot
+Le choix SQLite en développement / PostgreSQL en production est une décision de conception documentée et argumentée dans le journal des décisions du projet ([docs/DECISIONS.md](docs/DECISIONS.md), entrée du 2026-06-03) ; ce mécanisme est détaillé en section 1.
+
+## 0.3 Organisation du depot
 
 ```txt
 MyMemoMaster/
@@ -72,9 +102,21 @@ MyMemoMaster/
 └── diagrams/                 # Spécifications : règles métier, schéma BDD, UI
 ```
 
-La mémoire du projet est synthétisée dans [docs/MEMOIRE_PROJET.md](docs/MEMOIRE_PROJET.md), qui présente le dispositif et renvoie vers les fichiers sources de [.agents/](.agents/). Le choix du monorepo est une décision de conception, argumentée en section 1.4.
+La mémoire du projet est synthétisée dans [docs/MEMOIRE_PROJET.md](docs/MEMOIRE_PROJET.md), qui présente le dispositif et renvoie vers les fichiers sources de [.agents/](.agents/).
 
-## Architecture de l'application
+Le choix du monorepo est une décision de conception : les deux applications, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement) et au pipeline CI de cibler sélectivement l'API ou le front selon la branche (mécanisme détaillé en section 2).
+
+## 0.4 Environnements de déploiements
+
+Le projet est déployé danstrois environnements distincts, chacun alimenté par une branche git dédiée. Cette correspondance est documentée dans le [README.md](README.md) (partie 3) et implémentée dans le pipeline [.github/workflows/cd.yml](.github/workflows/cd.yml) :
+
+| Branche git | Environnement     | Infrastructure                          | Images Docker Hub                         |
+| ----------- | ----------------- | --------------------------------------- | ----------------------------------------- |
+| `dev`     | **test**    | VPS (Docker Compose + Traefik)          | `mymemomaster_test_api` / `_front`    |
+| `staging` | **preprod** | Kubernetes Infomaniak mutualisé (Helm) | `mymemomaster_preprod_api` / `_front` |
+| `main`    | **prod**    | Kubernetes Infomaniak dédié (Helm)    | `mymemomaster_api` / `_front`         |
+
+## 0.5 Architecture de l'application
 
 Le schéma ci-dessous représente l'architecture de l'application, telle qu'elle résulte des fichiers d'infrastructure du dépôt ([docker-compose.yml](docker-compose.yml), [helm/templates/](helm/templates/)). Légende : les rectangles sont des conteneurs applicatifs, les cylindres des services de persistance, les flèches indiquent le sens des requêtes, et chaque sous-graphe correspond à une couche d'infrastructure.
 
@@ -113,7 +155,14 @@ graph TD
     Worker -->|SMTP| Mail["Serveur SMTP<br/>(emails transactionnels)"]
 ```
 
-Deux précisions d'honnêteté documentaire : contrairement à l'architecture **cible** décrite dans [archi.md](archi.md), l'API IA séparée (Python/FastAPI) n'existe pas à ce jour — la correction sémantique s'exécute dans le processus Node de l'API ([my_memo_master_api/services/Semantic.service.js](my_memo_master_api/services/Semantic.service.js)) ; et Redis sert **exclusivement** de broker BullMQ, pas de cache applicatif (règle de [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md)).
+Deux précisions d'honnêteté documentaire :
+
+- Le document [archi.md](archi.md) du dépôt présente une architecture **cible** comportant une API IA séparée (Python/FastAPI). Cette brique n'existe pas dans le code à ce jour : la correction sémantique est exécutée **dans le processus Node de l'API** ([my_memo_master_api/services/Semantic.service.js](my_memo_master_api/services/Semantic.service.js), qui charge `require('@xenova/transformers').pipeline`). Le présent dossier décrit l'existant ; l'externalisation de l'IA est une évolution envisagée.
+- Redis est utilisé **exclusivement** comme broker de la file BullMQ (rappels/notifications), pas comme cache applicatif — règle explicite de [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md) (« Ce qui est hors-scope »).
+
+## 0.6 Périmètre du dossier
+
+Les sections suivantes déroulent le cycle complet de conception et de développement de cette application : mise en place des environnements et de l'outillage qualité (section 1), intégration continue (section 2), démarche de prototypage (section 3), harnais de tests (section 4), pratiques de développement — architecture, sécurité OWASP, accessibilité (section 5), déploiement continu (section 6), recette (section 7), traitement des anomalies (section 8) et documentation d'exploitation (section 9).
 
 ---
 
@@ -123,7 +172,7 @@ Deux précisions d'honnêteté documentaire : contrairement à l'architecture **
 
 ## 1.1 Environnement de développement local
 
-J'ai conçu l'environnement de développement pour qu'un contributeur soit opérationnel rapidement : copier `.env.example` en `.env`, Ajouter les URLS et clefs d'accès aux services externes utilisés par l'app (S3, serveur SMTP, token cloudflare)  puis `docker compose up --build`. La procédure complète est documentée dans le [README.md](README.md) (il y a également une partie 2, « Bien commencer »), qui liste aussi l'outillage attendu (VS Code, Postman, Git, Docker).
+J'ai conçu l'environnement de développement pour qu'un contributeur soit opérationnel rapidement : copier `.env.example` en `.env`, Ajouter les URLS et clefs d'accèsaux services externes utilisés par l'app (S3, serveur SMTP, token cloudflare)  puis `docker compose up --build`. La procédure complète est documentée dans le [README.md](README.md) (il y a également une partie 2, « Bien commencer »), qui liste aussi l'outillage attendu (VS Code, Postman, Git, Docker).
 
 ### Un docker-compose unifié piloté par profils
 
@@ -159,7 +208,7 @@ En dev, l'API monte le code source en volume pour le hot-reload via nodemon, et 
 
 ### Développement hors Docker : la bascule SQLite / PostgreSQL
 
-Pour permettre un développement encore plus léger (hors docker), l'API peut tourner sur SQLite. La bascule est automatique et repose sur une seule condition — la présence de `PG_HOST` dans l'environnement ([my_memo_master_api/models/index.js](my_memo_master_api/models/index.js)) :
+Pour permettre un développement encore plus léger (sans démon Docker), l'API sait tourner sur SQLite. La bascule est automatique et repose sur une seule condition — la présence de `PG_HOST` dans l'environnement ([my_memo_master_api/models/index.js](my_memo_master_api/models/index.js)) :
 
 ```javascript
 const dbmsConfig = require('../config/dbms.config')  // PostgreSQL + pool
@@ -175,17 +224,9 @@ Cette décision est tracée dans le journal des décisions ([.agents/DECISIONS.m
 
 Toute la configuration passe par des variables d'environnement, jamais par des valeurs codées en dur : le fichier [.env.example](.env.example) (racine) sert de contrat documenté, et chaque environnement a son `.env` propre non versionné ([.gitignore](.gitignore)). Côté API, les accès sont centralisés dans [my_memo_master_api/config/](my_memo_master_api/config/) (`db.config.js`, `dbms.config.js`, `redis.config.js`, `storage.config.js`, `swagger.config.js`) ; côté front dans `src/config.js` — règle formalisée dans [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md). L'homogénéité de style entre contributeurs est en outre garantie par un [.editorconfig](.editorconfig) à la racine.
 
-## 1.2 Environnements de déploiements
+## 1.2 Environnements de test, préproduction et production
 
-Le projet est déployé dans trois environnements distincts, alimenté par une branche git dédiée :
-
-| Branche git | Environnement     | Infrastructure                          | Images Docker Hub                         |
-| ----------- | ----------------- | --------------------------------------- | ----------------------------------------- |
-| `dev`     | **test**    | VPS (Docker Compose + Traefik)          | `mymemomaster_test_api` / `_front`    |
-| `staging` | **preprod** | Kubernetes Infomaniak mutualisé (Helm) | `mymemomaster_preprod_api` / `_front` |
-| `main`    | **prod**    | Kubernetes Infomaniak dédié (Helm)    | `mymemomaster_api` / `_front`         |
-
-Cette correspondance est documentée dans le [README.md](README.md) (partie 3) et implémentée dans le pipeline [.github/workflows/cd.yml](.github/workflows/cd.yml). Chaque environnement dispose de sa propre architecture :
+Les trois environnements cibles présentés en section 0.4 ont des infrastructures volontairement différenciées, proportionnées à leur rôle :
 
 **Test (VPS, Docker Compose).** L'environnement de test tourne sur un VPS avec le fichier dédié [server_docker_compose/docker-compose.yml](server_docker_compose/docker-compose.yml), déployé automatiquement par le pipeline CD (section 6). Il comprend PostgreSQL et Redis avec healthchecks, l'API, le front, PgAdmin, et un service `backup` que j'ai écrit pour produire un dump PostgreSQL quotidien avec rétention configurable (extrait des logs du service : `[backup] Service démarré — sauvegarde quotidienne à ${BACKUP_HOUR}h00 UTC`, `Rétention ${BACKUP_RETENTION_DAYS}j appliquée`).
 
@@ -230,7 +271,7 @@ Le projet a intégré une analyse SonarQube auto-hébergée : la configuration d
 
 ## 1.4 Dépôt de gestion du code source
 
-Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), dépôt unique pour l'API, le front, l'infrastructure et la documentation. Ce choix du monorepo est une décision de conception : les deux applications, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement). J'ai défini la stratégie de branches suivante, documentée dans le [README.md](README.md) (« Méthode de travail ») et **outillée par le pipeline CI** (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
+Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), dépôt unique pour l'API, le front, l'infrastructure et la documentation (choix monorepo, section 0.3). J'ai défini la stratégie de branches suivante, documentée dans le [README.md](README.md) (« Méthode de travail ») et **outillée par le pipeline CI** (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
 
 ```mermaid
 gitGraph
@@ -253,6 +294,16 @@ gitGraph
 - les commits suivent une convention de préfixes `[ADD]` / `[IMP]` / `[REF]` / `[FIX]`, ce qui rend l'historique exploitable comme journal des évolutions et des correctifs (utilisé en sections 8 et 9).
 
 La méthode de travail impose l'ordre « tests unitaires → code → documentation Swagger » pour chaque fonctionnalité ([README.md](README.md), étape 3) : l'environnement n'est pas qu'un outillage, il porte aussi le processus de développement.
+
+### Synthèse de couverture C2.1.1
+
+| Attendu du référentiel                   | Réponse apportée                                                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Environnement de développement détaillé | Docker Compose profil`dev` + mode hors Docker (SQLite), VS Code/Postman/Git documentés (README)                                 |
+| Environnements de déploiement et de test  | test = VPS Compose, preprod/prod = Kubernetes Helm, isolation par namespace/réseau/images                                         |
+| Outils de suivi de qualité                | ESLint ×2, Prettier, Jest/Vitest, npm audit bloquant en CI, SonarQube (configuré, désactivé — assumé)                        |
+| Outils de suivi de performance             | Healthchecks, limites de ressources, pool DB configuré, logs Winston/Morgan, métriques Prometheus RED/USE, notifications Discord |
+| Gestion de sources                         | GitHub, monorepo, stratégie de branches alignée sur les environnements, conventions de commit                                    |
 
 ---
 
@@ -372,6 +423,16 @@ flowchart LR
 ```
 
 Légende : rectangles = jobs GitHub Actions ; losange = aiguillage par branche ; la flèche CI → CD n'existe que si la CI conclut en succès.
+
+### Synthèse de couverture C2.1.2
+
+| Attendu du référentiel                     | Réponse apportée                                                                                                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Protocole d'intégration continue explicité | Workflow ci.yml : déclencheurs, matrice, séquence npm ci → test → lint → audit dépendances → build                           |
+| Fusion des codes sources                     | Stratégie de branches outillée : CI sur branches de travail avant fusion, re-validation complète sur les branches d'intégration |
+| Tests réguliers des blocs de code           | Exécution des deux harnais à chaque push, environnement de test hermétique (SQLite in-memory, mocks)                             |
+| Réduction des risques de régression        | CI bloquante en amont du CD (`workflow_run` + `conclusion == 'success'`), notification immédiate des échecs                   |
+| Séquences d'intégration définies          | Chaînage documenté branche → CI → CD → environnement (schéma 2.6)                                                             |
 
 ---
 
@@ -504,6 +565,17 @@ axiosApi.interceptors.response.use(async (response) => {
 
 Ce mécanisme est la contrepartie ergonomique d'une exigence de sécurité : c'est lui qui rend acceptable un jeton d'accès à durée courte (15 minutes, décision documentée dans [.agents/DECISIONS.md](.agents/DECISIONS.md) et [docs/SECURITY_AUDIT_OWASP.md](docs/SECURITY_AUDIT_OWASP.md)) sans dégrader l'expérience — l'utilisateur ne se voit jamais demander de se reconnecter toutes les 15 minutes. Le front intègre aussi un indicateur de robustesse du mot de passe à l'inscription (`PasswordStrengthComponent.vue`).
 
+### Synthèse de couverture C2.2.1
+
+| Attendu du référentiel                         | Réponse apportée                                                                                                                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prototype fonctionnel répondant aux besoins     | Prototype HTML interactif versionné (14 écrans, captures reproductibles) + application déployée et utilisable en autonomie ; 28 pages couvrant les 6 fonctionnalités principales |
+| Composants d'interface présents et fonctionnels | Bibliothèque de composants réutilisables (boutons, modales, menus, loaders…)                                                                                                       |
+| Spécificités ergonomiques                      | Responsive Tailwind, PWA installable, onboarding/tutoriels, toasts, règles d'ergonomie codifiées                                                                                    |
+| Équipements ciblés                             | Web desktop + mobile (PWA, points de rupture)                                                                                                                                         |
+| Exigences de sécurité                          | Guards de navigation (authentification + rôles), refresh token silencieux, jauge de mot de passe                                                                                     |
+| User stories / cohérence fonctionnelle          | Prototype navigable (docs/prototype/) + maquettes versionnées reliant règles métier ↔ écrans (diagrams/*_ui.md)                                                                  |
+
 ---
 
 # Section 4 — Harnais de tests unitaires
@@ -621,6 +693,16 @@ La couverture de code de l'API, mesurée par `npx jest --coverage` sur le code a
 La majorité du code développé est donc couverte, conformément au critère du référentiel. La couverture de branches, plus basse, est typique d'un code défensif (branches d'erreur rares, garde-fous) ; les branches critiques — algorithme Leitner, droits, authentification — sont, elles, couvertes explicitement par les cas listés en 4.3.
 
 Le harnais entier — les deux suites — est exécuté **à chaque push** par la CI et conditionne tout déploiement (sections 2.3 et 2.4). La méthode de travail du projet place par ailleurs l'écriture des tests **avant** le code dans le cycle de développement d'une fonctionnalité ([README.md](README.md), étape 3 : « 1. tests unitaires, 2. code, 3. documentation swagger »).
+
+### Synthèse de couverture C2.2.2
+
+| Attendu du référentiel                            | Réponse apportée                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Harnais de test unitaire développé                | 2 009 tests au total (1 447 API + 562 front), exécution vérifiée verte                                          |
+| Tests tenant compte des fonctionnalités demandées | Jeu complet sur la fonctionnalité cœur (Leitner) : 21 tests unitaires + 10 scénarios fonctionnels + 13 tests UI |
+| Cas nominal, limites, erreurs                       | Nommage systématique*méthode – condition – attendu* ; erreurs de contrat testées (400/401/404)              |
+| Prévention des régressions                        | Exécution bloquante en CI à chaque push ; tests de comportement côté front                                     |
+| Bon fonctionnement du logiciel                      | Tests fonctionnels de bout en bout (test/bdd/) traversant toutes les couches réelles                              |
 
 ---
 
@@ -761,6 +843,16 @@ Restent hors périmètre de cet audit outillé, documentés dans [docs/AUDIT_RGA
 
 L'historique git est structuré par les conventions de commit `[ADD]/[IMP]/[REF]/[FIX]` (section 1.4), et doublé de deux journaux versionnés : [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md) (état global module par module + une entrée par ticket terminé, avec dette éventuelle) et [.agents/DECISIONS.md](.agents/DECISIONS.md) (chaque choix structurant avec l'alternative écartée). Les évolutions du prototype sont donc tracées à trois niveaux : le commit (quoi), le changelog (où en est-on), la décision (pourquoi).
 
+### Synthèse de couverture C2.2.3
+
+| Attendu du référentiel                            | Réponse apportée                                                                                                                                                                        |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bonnes pratiques, framework, paradigmes             | Express/Vue/Sequelize ; architecture en couches uniforme sur 36 controllers ; validation déclarative                                                                                     |
+| Sécurisation couvrant l'OWASP Top 10               | Audit versionné (8 corrections tracées + risques résiduels documentés), défense en profondeur par catégorie, mesures testées                                                       |
+| Exigences d'accessibilité, référentiel justifié | RGAA 4 choisi et justifié ; audit outillé versionné ([docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)) : 135 non-conformités détectées → 0 après campagne ; non-régression axe-core en CI |
+| Évolutivité                                       | API versionnée, 61 migrations, config externalisée, contrat Swagger, mémoire de projet                                                                                                 |
+| Traçabilité / gestion de versions                 | Git + conventions de commit + double journal (état, décisions)                                                                                                                          |
+
 ---
 
 # Section 6 — Déploiement continu et progressif
@@ -854,6 +946,16 @@ La chaîne d'environnements sert précisément à cela : l'environnement de **te
 
 [SCREENSHOT ICI : environnement de test test.my-memo-master.com et environnement de preprod preprod.my-memo-master.com côte à côte, montrant la même fonctionnalité en cours de validation]
 
+### Synthèse de couverture C2.2.4
+
+| Attendu du référentiel                             | Réponse apportée                                                                                                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Déploiement à chaque modification de code          | CD automatique sur chaque fusion`dev`/`staging`/`main`, conditionné à la CI verte                                        |
+| Déploiement progressif                              | Promotion test → preprod → prod ; verrou explicite`K8S_PROD_ENABLED` sur la prod                                             |
+| Vérification de la performance technique            | Healthchecks bloquants (boucle VPS, readiness probes K8s),`helm --atomic` avec rollback auto, collecte de logs en échec       |
+| Vérification fonctionnelle auprès des utilisateurs | Environnement de test dédié à la validation avant promotion, notifications de disponibilité                                  |
+| Solution stable et conforme                          | Images multi-stage reproductibles, migrations automatiques idempotentes, anomalie de probe détectée et tracée vers correction |
+
 ---
 
 # Section 7 — Cahier de recettes
@@ -874,11 +976,9 @@ Le cahier s'organise en trois volets, conformément au critère (tests fonctionn
 
 ## 7.2 Recette fonctionnelle — parcours de bout en bout
 
-Chaque parcours ouvre sur la user story qu'il valide, pour tracer le besoin utilisateur jusqu'au scénario de test. Les intitulés de scénario et les résultats attendus ci-dessous sont **directement extraits des tests du dépôt** (les intitulés encodent systématiquement condition → résultat attendu, convention de nommage du harnais, section 4.3).
+Les intitulés de scénario et les résultats attendus ci-dessous sont **directement extraits des tests du dépôt** (les intitulés encodent systématiquement condition → résultat attendu, convention de nommage du harnais, section 4.3).
 
-### Fonctionnalité cœur — Session de révision Leitner ([test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js))
-
-*En tant qu'étudiant, je veux réviser mes cartes par répétition espacée — les cartes échouées revenant plus souvent — afin de mémoriser durablement.*
+### Fonctionnalité 1 — Session de révision Leitner ([test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js))
 
 | ID   | Scénario                                                                          | Résultat attendu                                           | Statut |
 | ---- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------ |
@@ -893,15 +993,43 @@ Chaque parcours ouvre sur la user story qu'il valide, pour tracer le besoin util
 | L-09 | Réponse sans token                                                                | 401                                                         | ✅     |
 | L-10 | Corps invalide (`cardId` manquant)                                               | 400                                                         | ✅     |
 
-### Autres parcours — synthèse
+### Fonctionnalité 2 — Passage d'une série d'exercices ([test/bdd/exercise.session.test.js](my_memo_master_api/test/bdd/exercise.session.test.js))
 
-Les trois autres recettes fonctionnelles suivent le même formalisme (scénarios extraits des tests : cas nominal + cas limites + erreurs attendues) ; elles sont synthétisées ici, le détail scénario par scénario restant lisible dans les fichiers de test référencés :
+| ID   | Scénario                                                | Résultat attendu                                         | Statut |
+| ---- | -------------------------------------------------------- | --------------------------------------------------------- | ------ |
+| E-01 | Soumission sans token                                    | 401                                                       | ✅     |
+| E-02 | Soumission sans réponses (`answers` manquant ou vide) | 400                                                       | ✅     |
+| E-03 | Soumission sur test introuvable                          | 404                                                       | ✅     |
+| E-04 | Parcours nominal — 4/4 réponses correctes              | Score = 4,`TestResult` persisté en base                | ✅     |
+| E-05 | 0/4 réponse correcte                                    | Score = 0                                                 | ✅     |
+| E-06 | Question non répondue                                   | Traitée comme incorrecte pour tous les types de question | ✅     |
+| E-07 | QCM — bonne option choisie                              | `correct: true` + réponse correcte renvoyée           | ✅     |
+| E-08 | Texte à trou — casse et espaces différents            | Accepté (correction insensible à la casse/espaces)      | ✅     |
+| E-09 | Remise en ordre — ordre incorrect                       | `correct: false` + ordre attendu renvoyé               | ✅     |
+| E-10 | Consultation d'un test                                   | Les 4 questions retournées avec leur contenu parsé      | ✅     |
 
-| Parcours (user story)                                                                                                                                                   | Scénarios couverts                                                                                                                                                                                                                  | Tests                                                                                                                               | Statut   |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| **Passage d'une série d'exercices** — *en tant qu'étudiant, je veux m'entraîner sur des exercices corrigés automatiquement afin d'évaluer ma progression* | Parcours nominal 4/4 avec persistance du score ; 0/4 ; question non répondue traitée comme incorrecte ; correction par type de question (QCM, texte à trou insensible à la casse/espaces, remise en ordre) ; erreurs 400/401/404 | [test/bdd/exercise.session.test.js](my_memo_master_api/test/bdd/exercise.session.test.js) (E-01 → E-10)                             | ✅ 10/10 |
-| **Échéances et rappels** — *en tant qu'étudiant, je veux planifier des échéances avec rappels par email afin d'anticiper mes révisions*                  | Création d'un rappel → job BullMQ planifié ; date déjà passée refusée (400) ; liste avec statut`pending` ; suppression annulant le rappel **et** le job ; erreurs 400/401/404                                         | [test/bdd/deadline.reminder.test.js](my_memo_master_api/test/bdd/deadline.reminder.test.js) (D-01 → D-07)                           | ✅ 7/7   |
-| **Interface de session de révision** — *en tant qu'étudiant, je veux un retour immédiat sur chaque réponse pendant ma session de révision*                | Chargement, session vide, activation du bouton Valider, feedback bonne/mauvaise réponse, fin de session, sortie avec confirmation                                                                                                   | [test/components/FlashcardsSessionPage.test.js](my_memo_master_front/test/components/FlashcardsSessionPage.test.js) (UI-01 → UI-06) | ✅ 6/6   |
+### Fonctionnalité 3 — Échéances et rappels ([test/bdd/deadline.reminder.test.js](my_memo_master_api/test/bdd/deadline.reminder.test.js))
+
+| ID   | Scénario                                       | Résultat attendu                                                                            | Statut |
+| ---- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- | ------ |
+| D-01 | Accès sans token                               | 401                                                                                          | ✅     |
+| D-02 | Création avec champs obligatoires manquants    | 400                                                                                          | ✅     |
+| D-03 | Création d'un rappel sur une échéance        | Job BullMQ planifié                                                                         | ✅     |
+| D-04 | Date de rappel déjà passée                   | 400                                                                                          | ✅     |
+| D-05 | Échéance introuvable /`entityType` invalide | 404 / 400                                                                                    | ✅     |
+| D-06 | Liste des rappels                               | Rappel créé listé avec statut`pending`                                                  | ✅     |
+| D-07 | Suppression d'un rappel                         | Rappel supprimé**et** job BullMQ annulé ; liste vide ensuite ; re-suppression → 404 | ✅     |
+
+### Recette de l'interface — session de révision ([test/components/FlashcardsSessionPage.test.js](my_memo_master_front/test/components/FlashcardsSessionPage.test.js))
+
+| ID    | Scénario                 | Résultat attendu                                                             | Statut |
+| ----- | ------------------------- | ----------------------------------------------------------------------------- | ------ |
+| UI-01 | Chargement de la session  | Indicateur « Chargement » affiché puis masqué                             | ✅     |
+| UI-02 | Aucune carte due          | Message « Aucune carte à réviser »                                        | ✅     |
+| UI-03 | Saisie de réponse        | Bouton Valider désactivé si vide, actif sinon                               | ✅     |
+| UI-04 | Bonne / mauvaise réponse | Feedback vert avec score / rouge avec correction attendue                     | ✅     |
+| UI-05 | Fin de session            | « Session terminée » après la dernière carte                             | ✅     |
+| UI-06 | Sortie de session         | Bouton Retour + confirmation → redirection ; annulation → reste sur la page | ✅     |
 
 ## 7.3 Recette de sécurité
 
@@ -928,6 +1056,15 @@ Le dispositif de détection fonctionne en continu :
 2. **Signalement immédiat** : l'échec est notifié sur Discord avec la branche fautive (section 2.5) ;
 3. **Régression réelle documentée** : ce dispositif a fonctionné en conditions réelles — exemple tracé dans [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md), entrée du 2026-07-04 : un commit d'amélioration (`[IMP] classgroup`) a cassé le comportement du sélecteur de vue de ClassroomPage ; la CI front l'a détecté via `test/components/ClassroomPage.test.js`, et la correction est documentée (analysée en section 8) ;
 4. **Anomalies hors recette** : les anomalies découvertes autrement (audit, exploitation) rejoignent le même circuit de consignation et de correction — section 8.
+
+### Synthèse de couverture C2.3.1
+
+| Attendu du référentiel                                           | Réponse apportée                                                                                                       |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Cahier de recettes reprenant l'ensemble des fonctionnalités       | Volet structurel : contrat HTTP des 33 modules (785 tests) ; volet fonctionnel : parcours complets détaillés ci-dessus |
+| Scénarios de tests et résultats attendus rédigés               | 42 scénarios formalisés (L-01→UI-06, S-01→S-08) avec résultat attendu explicite, extraits des tests réels          |
+| Tests fonctionnels, structurels et de sécurité conformes au plan | Trois volets exécutés à chaque push, statuts issus d'une exécution réelle vérifiée (1 447 + 562 tests verts)      |
+| Détection des anomalies et régressions                           | CI bloquante + notification ; cas de régression réel détecté et tracé (2026-07-04)                                  |
 
 ---
 
@@ -1010,6 +1147,16 @@ L'audit de sécurité (section 5.2) a produit un **plan de correction priorisé 
 
 Ce plan illustre la **qualification** : chaque constat porte une sévérité, un fichier, un correctif proposé — et les éléments non corrigés immédiatement ne sont pas perdus, ils constituent un backlog argumenté avec palliatif documenté (ex. : pas de révocation JWT, palliatif = expiration 15 min).
 
+### Synthèse de couverture C2.3.2
+
+| Attendu du référentiel                             | Réponse apportée                                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bogues détectés, qualifiés et traités            | 3 sources de détection illustrées par 3 cas réels ; qualification par sévérité (audit) et cause racine (cas 2)                               |
+| Fiche de consignation permettant de reproduire       | Entrées structurées du CHANGELOG_AGENT (contexte, mécanisme, fichiers, état) — ex. 2026-07-04 et 2026-07-06                                   |
+| Analyse des points d'amélioration par échec        | Analyse de cause racine documentée (régression de condition d'affichage ; incohérence chart↔code) ; dette résiduelle notée dans chaque fiche |
+| Corrections conformes garantissant le fonctionnement | Correctif accompagné de tests anti-réapparition, recette complète rejouée, redéploiement par le circuit CI/CD standard                        |
+| Tirer profit de l'intégration/déploiement continu  | Pipeline instrumenté pour le diagnostic ; correctifs livrés par le flux standard ; 250 commits`[FIX]` auditables                               |
+
 ---
 
 # Section 9 — Documentation technique d'exploitation
@@ -1091,6 +1238,16 @@ Documenter la **dette et les limitations** dans les livrables (et pas seulement 
 L'aide à l'utilisateur final existe à deux niveaux complémentaires. **Embarquée dans l'application** : parcours d'onboarding à la première connexion (page dédiée + état persisté côté serveur, module `OnboardingState`), page de tutoriels alimentée par l'API (module `Tutorials`, [my_memo_master_front/src/pages/TutorialsPage.vue](my_memo_master_front/src/pages/TutorialsPage.vue)) — le guidage contextuel est adapté à une application grand public. **Manuel autonome** : [docs/MANUEL_UTILISATION.md](docs/MANUEL_UTILISATION.md), versionné avec le code, couvre les trois profils (étudiant, enseignant, gérant d'établissement) : création de compte et cycle de session, flashcards Leitner, cartes mentales, exercices, organisation (calendrier/to-do/rappels), suivi de progression et consentement KPI, groupes classes, administration, et une FAQ des blocages courants (email non vérifié, rate limiting, formats d'upload).
 
 [SCREENSHOT ICI : parcours d'onboarding et page Tutoriels dans l'application]
+
+### Synthèse de couverture C2.4.1
+
+| Attendu du référentiel              | Réponse apportée                                                                                                    |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Manuel de déploiement                | README partie 3 (secrets, kubeconfig, VPS, cluster) + docs/https-setup.md                                             |
+| Manuel de mise à jour                | RUNBOOK (mise à jour, rollback, sauvegarde/restauration) + migrations documentées + scripts helm-migrate            |
+| Manuel d'utilisation                  | [docs/MANUEL_UTILISATION.md](docs/MANUEL_UTILISATION.md) (3 profils + FAQ) + guidage embarqué (onboarding, tutoriels) |
+| Clarté et choix opérés décrits    | Documentation par question/public ; décisions au format Contexte/Décision/Alternative/Conséquences                 |
+| Traçabilité équipes et évolutions | .agents/ (décisions + état + conventions), dette documentée, contrat d'API généré du code                       |
 
 ---
 
@@ -1194,22 +1351,6 @@ Chaque document versionné cité dans le dossier, avec la ou les sections qui s'
 | [Dunlosky_SciAmMind.pdf](docs/sources/Dunlosky_SciAmMind.pdf)                       | Dunlosky et al.,*What Works, What Doesn't*, Scientific American Mind                                                                                           | Comparaison de l'efficacité des techniques d'étude : entraînement par tests et répétition espacée en tête, relecture et surlignage en queue             |
 | [ZIP_2022.pdf](docs/sources/ZIP_2022.pdf)                                           | [À COMPLÉTER : référence exacte de l'enquête 2022]                                                                                                          | Statistiques citées en section 0.1                                                                                                                            |
 | [Texe+4_pp.79-102.pdf](docs/sources/Texe+4_pp.79-102.pdf)                           | [À COMPLÉTER : référence exacte, pp. 79–102]                                                                                                                | Statistiques citées en section 0.1                                                                                                                            |
-
-## Annexe E — Synthèse de couverture des compétences
-
-Récapitulatif de la couverture du référentiel, une ligne par compétence ; les preuves détaillées figurent dans la section correspondante.
-
-| Compétence                                                             | Section | Réponse apportée (preuves clés)                                                                                                                                                                                                                                                                              |
-| ----------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C2.1.1 — Environnements de développement, test, déploiement          | 1       | Docker Compose à profils + mode hors Docker (SQLite) ; test = VPS Compose, preprod/prod = Kubernetes Helm ; ESLint ×2, Prettier, Jest/Vitest, npm audit bloquant ; healthchecks, métriques Prometheus RED/USE, logs Winston/Morgan ; monorepo GitHub, stratégie de branches alignée sur les environnements |
-| C2.1.2 — Intégration continue                                         | 2       | Workflow ci.yml (npm ci → test → lint → audit → build), matrice de jobs ciblée par préfixe de branche, harnais hermétique (SQLite in-memory, mocks), CI bloquante en amont du CD (`workflow_run`), notification immédiate des échecs                                                                 |
-| C2.2.1 — Prototypage                                                   | 3       | Prototype HTML interactif versionné (14 écrans) + application déployée ; bibliothèque de composants réutilisables ; responsive Tailwind, PWA, onboarding ; guards de navigation, refresh token silencieux, jauge de mot de passe                                                                          |
-| C2.2.2 — Harnais de tests unitaires                                    | 4       | 2 009 tests verts (1 447 API + 562 front) ; jeu complet sur la fonctionnalité cœur Leitner (21 unitaires + 10 fonctionnels + 13 UI) ; cas nominal/limites/erreurs systématiques ; exécution bloquante en CI à chaque push                                                                                  |
-| C2.2.3 — Développement : évolutivité, sécurisation, accessibilité | 5       | Architecture en couches uniforme (36 controllers) ; audit OWASP versionné (8 corrections tracées, défense en profondeur) ; RGAA 4 : 135 non-conformités → 0, non-régression axe-core en CI ; API versionnée, 61 migrations ; double journal (état, décisions)                                          |
-| C2.2.4 — Déploiement continu et progressif                            | 6       | CD automatique conditionné à la CI verte ; promotion test → preprod → prod avec verrou`K8S_PROD_ENABLED` ; healthchecks bloquants, `helm --atomic` avec rollback auto ; images multi-stage reproductibles, migrations idempotentes                                                                      |
-| C2.3.1 — Cahier de recettes                                            | 7       | Volet structurel : contrat HTTP des 33 modules (785 tests) ; 42 scénarios formalisés avec résultat attendu ; trois volets (fonctionnel, structurel, sécurité) exécutés à chaque push ; régression réelle détectée et tracée (2026-07-04)                                                           |
-| C2.3.2 — Plan de correction des bogues                                 | 8       | 3 sources de détection illustrées par 3 cas réels ; fiches de consignation reproductibles (CHANGELOG_AGENT) ; analyse de cause racine ; correctifs avec tests anti-réapparition livrés par le circuit CI/CD ; 250 commits`[FIX]` auditables                                                              |
-| C2.4.1 — Documentation technique d'exploitation                        | 9       | Manuels de déploiement (VPS, Kubernetes), d'exploitation (RUNBOOK), d'utilisation (3 profils + FAQ) ; décisions au format Contexte/Décision/Alternative/Conséquences ; contrat d'API Swagger généré depuis le code                                                                                       |
 
 ---
 

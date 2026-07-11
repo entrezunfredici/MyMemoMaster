@@ -201,6 +201,9 @@ flowchart TD
 
 ## Partie 3 : Déploiement
 
+> **Manuels de déploiement détaillés** : [docs/MANUEL_DEPLOIEMENT_VPS.md](docs/MANUEL_DEPLOIEMENT_VPS.md) (environnement test) et [docs/MANUEL_DEPLOIEMENT_KUBERNETES.md](docs/MANUEL_DEPLOIEMENT_KUBERNETES.md) (preprod/prod via **Helm**).
+> Cette partie reste la référence pour les **secrets et variables GitHub Actions** (CI/CD). Les sections preprod/prod ci-dessous décrivent le déploiement historique par `kubectl apply -f k8s/…` : depuis la migration Helm (2026-06-30), le CD déploie via `helm upgrade --install` avec le chart [helm/](helm/) — seuls les prérequis cluster (cert-manager, secret Cloudflare, ClusterIssuers) et la création des Secrets applicatifs restent d'actualité tels quels.
+
 ### Vue d'ensemble
 
 ```
