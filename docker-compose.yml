@@ -1,17 +1,23 @@
 # =============================================================================
-#  MyMemoMaster — docker-compose.yml (unified)
+#  MyMemoMaster — docker-compose.yml (unifié dev + test)
 #
-#  Usage:
-#    Dev local : docker compose --env-file .env.dev  up --build
-#    Test VPS  : docker compose --env-file .env.test up
-#    Prod  VPS : docker compose --env-file .env.prod up
+#  Fichier unique pour le dev local ET le VPS de test (déployé par le CD).
 #
-#  Profiles (défini via COMPOSE_PROFILES dans le .env.*) :
+#  Usage :
+#    Dev local : docker compose --env-file .env up --build
+#                (.env copié depuis .env.example — COMPOSE_PROFILES=dev)
+#    Test VPS  : déployé automatiquement par .github/workflows/cd.yml
+#                (job deploy_test — force --profile test sur toutes les commandes)
+#                Manuel : docker compose --profile test --env-file .env up -d
+#                (.env copié depuis .env.test.example)
+#
+#  Profils (via COMPOSE_PROFILES dans le .env, ou --profile en CLI) :
 #    dev  — Traefik local HTTP, build depuis les sources, hot-reload API
-#    test — Images DockerHub, Traefik externe HTTPS, domaines de test
-#    prod — Images DockerHub, Traefik externe HTTPS, domaines de prod
+#    test — Images DockerHub, Traefik externe HTTPS Let's Encrypt, domaines de test
 #
-#  Kubernetes (preprod/prod) : voir k8s/ — docker-compose non utilisé
+#  postgres et redis n'ont pas de profil : démarrés dans tous les environnements.
+#
+#  Kubernetes (preprod/prod) : voir helm/ — docker-compose non utilisé
 # =============================================================================
 
 services:
@@ -44,6 +50,7 @@ services:
           memory: ${POSTGRES_RESERVE_MEMORY:-256M}
     networks:
       - mmm_network
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -66,6 +73,7 @@ services:
           memory: ${REDIS_RESERVE_MEMORY:-32M}
     networks:
       - mmm_network
+    restart: unless-stopped
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  DEV — machine locale, HTTP, images buildées localement
@@ -200,12 +208,12 @@ services:
       context: ./my_memo_master_front
       dockerfile: Dockerfile
       args:
-        VITE_APP_NAME: ${VITE_APP_NAME}
-        VITE_APP_COMPANY_NAME: ${VITE_APP_COMPANY_NAME}
-        VITE_APP_AUTHOR_NAME: ${VITE_APP_AUTHOR_NAME}
-        VITE_APP_DESCRIPTION: ${VITE_APP_DESCRIPTION}
-        VITE_APP_THEME_COLOR: ${VITE_APP_THEME_COLOR}
-        VITE_APP_BG_COLOR: ${VITE_APP_BG_COLOR}
+        VITE_APP_NAME: ${VITE_APP_NAME:-}
+        VITE_APP_COMPANY_NAME: ${VITE_APP_COMPANY_NAME:-}
+        VITE_APP_AUTHOR_NAME: ${VITE_APP_AUTHOR_NAME:-}
+        VITE_APP_DESCRIPTION: ${VITE_APP_DESCRIPTION:-}
+        VITE_APP_THEME_COLOR: ${VITE_APP_THEME_COLOR:-}
+        VITE_APP_BG_COLOR: ${VITE_APP_BG_COLOR:-}
         VITE_FRONT_URL: ${VITE_FRONT_URL}
         VITE_API_URL: ${VITE_API_URL}
     depends_on:
@@ -233,13 +241,13 @@ services:
       retries: 3
 
   # ═══════════════════════════════════════════════════════════════════════════
-  #  TEST / PROD VPS — images DockerHub, Traefik externe, HTTPS Let's Encrypt
-  #  Commande : docker compose --env-file .env.test up
+  #  TEST VPS — images DockerHub, Traefik externe, HTTPS Let's Encrypt
+  #  Déployé par le CD (cd.yml, job deploy_test) avec --profile test
   #  Prérequis VPS : réseau Docker "traefik_proxy" existant (Traefik déjà lancé)
   # ═══════════════════════════════════════════════════════════════════════════
 
   pgadmin_server:
-    profiles: ["test", "prod"]
+    profiles: ["test"]
     image: dpage/pgadmin4:8
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
@@ -271,9 +279,10 @@ services:
     networks:
       - mmm_network
       - traefik_proxy
+    restart: unless-stopped
 
   api_server:
-    profiles: ["test", "prod"]
+    profiles: ["test"]
     image: ${IMAGE_API}
     volumes:
       - api-data:/app/data
@@ -356,7 +365,7 @@ services:
       start_period: 60s
 
   front_server:
-    profiles: ["test", "prod"]
+    profiles: ["test"]
     image: ${IMAGE_FRONT}
     # Injection runtime de la config : permet de déployer la même image sur
     # plusieurs environnements sans rebuild. L'app lit window.__APP_CONFIG__.
@@ -407,6 +416,80 @@ services:
       start_period: 5s
       retries: 3
 
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  Sauvegarde automatique PostgreSQL — pg_dump quotidien vers volume Docker
+  #  Logs : docker compose --profile test logs backup
+  #  Dump manuel : docker compose --profile test exec backup /usr/local/bin/backup.sh
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  backup:
+    profiles: ["test"]
+    image: postgres:17-alpine
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /backups
+
+        do_backup() {
+          TS=$$(date +"%Y%m%d_%H%M%S")
+          FILE="/backups/mymemomaster_$${ENVIRONMENT}_$${TS}.dump"
+          echo "[backup] $$(date '+%Y-%m-%d %H:%M:%S') — dump $${PG_DB}@$${PG_HOST}..."
+          PGPASSWORD="$${PG_PASS}" pg_dump \
+            -h "$${PG_HOST}" -p "$${PG_PORT}" \
+            -U "$${PG_USER}" -Fc "$${PG_DB}" > "$${FILE}" \
+            || { echo "[backup] ERREUR pg_dump — dump partiel supprimé"; rm -f "$${FILE}"; return 1; }
+          echo "[backup] OK : $$(basename "$${FILE}") ($$(du -sh "$${FILE}" | cut -f1))"
+          find /backups -name "mymemomaster_$${ENVIRONMENT}_*.dump" \
+            -mtime "+$${BACKUP_RETENTION_DAYS}" -delete
+          echo "[backup] Rétention $${BACKUP_RETENTION_DAYS}j appliquée"
+        }
+
+        echo "[backup] Service démarré — sauvegarde quotidienne à $${BACKUP_HOUR}h00 UTC"
+        echo "[backup] Volume : /backups | Rétention : $${BACKUP_RETENTION_DAYS}j"
+        echo "[backup] Sauvegarde initiale au démarrage..."
+        do_backup || echo "[backup] AVERTISSEMENT : sauvegarde initiale échouée"
+
+        while true; do
+          NOW_H=$$(date -u +%H); NOW_M=$$(date -u +%M); NOW_S=$$(date -u +%S)
+          NOW_SECS=$$(( 10#$${NOW_H} * 3600 + 10#$${NOW_M} * 60 + 10#$${NOW_S} ))
+          TGT_SECS=$$(( 10#$${BACKUP_HOUR} * 3600 ))
+          if [ "$${NOW_SECS}" -lt "$${TGT_SECS}" ]; then
+            WAIT=$$(( TGT_SECS - NOW_SECS ))
+          else
+            WAIT=$$(( 86400 - NOW_SECS + TGT_SECS ))
+          fi
+          echo "[backup] Prochain dump dans $${WAIT}s (~$${BACKUP_HOUR}h00 UTC)"
+          sleep "$${WAIT}"
+          do_backup || echo "[backup] ERREUR : sauvegarde échouée — nouvelle tentative au prochain cycle"
+        done
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      PG_HOST: postgres
+      PG_PORT: ${PG_PORT:-5432}
+      PG_USER: ${PG_USER}
+      PG_PASS: ${PG_PASS}
+      PG_DB: ${PG_DB}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - backup-data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: ${BACKUP_LIMIT_CPUS:-0.10}
+          memory: ${BACKUP_LIMIT_MEMORY:-128M}
+        reservations:
+          cpus: ${BACKUP_RESERVE_CPUS:-0.05}
+          memory: ${BACKUP_RESERVE_MEMORY:-32M}
+    networks:
+      - mmm_network
+    restart: unless-stopped
+
 # =============================================================================
 #  RÉSEAUX
 # =============================================================================
@@ -415,7 +498,7 @@ networks:
   mmm_network:
     name: my_memo_master_${ENVIRONMENT}_network
     driver: bridge
-  # Réseau externe géré par Traefik sur le VPS (test/prod uniquement)
+  # Réseau externe géré par Traefik sur le VPS (profil test uniquement)
   # En dev, ce réseau n'est pas utilisé → pas besoin qu'il existe localement
   traefik_proxy:
     external: true
@@ -430,3 +513,4 @@ volumes:
   api-node-modules:
   api-data:
   redis-data:
+  backup-data:

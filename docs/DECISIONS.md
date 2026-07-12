@@ -297,6 +297,8 @@
 
 ### [2026-06-11] server_docker_compose/ séparé du docker-compose.yml racine
 
+> ⚠️ **Révoquée le 2026-07-12** — `server_docker_compose/` a été supprimé ; le VPS test est déployé avec le compose racine et `--profile test` (voir l'entrée du 2026-07-12).
+
 **Contexte** : Le pipeline CD (`cd.yml`) déploie sur un VPS en copiant un fichier compose dédié et en le validant via `docker compose config -q`. Le `docker-compose.yml` racine contient le profil `dev` avec `build:` et un Traefik local sans HTTPS — inutilisable directement sur le VPS.
 **Décision** : Créer `server_docker_compose/docker-compose.yml` avec uniquement les 4 services VPS (`postgres`, `pgadmin`, `api`, `front`), images DockerHub, Traefik HTTPS Let's Encrypt. Les noms de services correspondent à ce que le script de déploiement CD appelle (`up -d pgadmin api front`).
 **Alternative écartée** : Adapter le compose racine avec un troisième profil — les noms de services diffèrent (`api` vs `api_server`) et les deux fichiers servent des usages très différents (dev vs prod); les séparer évite la confusion.
@@ -870,3 +872,13 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : fichiers à plat à la racine de `docs/` (état intermédiaire créé manuellement) — un `README.md` de prototype à la racine de `docs/` se lirait comme le README du dossier docs, et les copies manuelles étaient des exports plus anciens que les versions git.
 
 **Conséquences** : tout nouveau livrable documentaire va dans `docs/` ; `.agents/DOC_mindmap_editor.md` reste l'exception (doc technique interne citée par le B2) et pourra suivre le même chemin si besoin.
+
+### [2026-07-12] docker-compose unifié dev/test — server_docker_compose/ supprimé, le CD déploie le compose racine avec --profile test
+
+**Contexte** : la décision du 2026-06-11 avait créé `server_docker_compose/docker-compose.yml` (fichier VPS dédié) en plus du compose racine à profils. Résultat constaté : les profils `test`/`prod` du compose racine étaient du code mort (aucun `.env.test`/`.env.prod`, CD sur le fichier dédié), les deux fichiers divergeaient (noms de services `api` vs `api_server`, service `backup` absent du racine), et chaque variable d'environnement devait être maintenue aux deux endroits — exactement la duplication que les profils devaient éviter.
+
+**Décision** : le `docker-compose.yml` racine devient l'unique compose du projet, avec **deux profils** : `dev` (comportement local inchangé) et `test` (images DockerHub, Traefik externe HTTPS — services `api_server`, `front_server`, `pgadmin_server`, `backup`). Le profil `prod` est supprimé (prod/preprod sont sur Kubernetes via Helm). Le CD (`cd.yml`, job `deploy_test`) téléverse le compose racine et force `--profile test` sur toutes ses commandes. Le template VPS devient `.env.test.example` à la racine, avec `COMPOSE_PROFILES=test` pour les commandes manuelles sur le VPS.
+
+**Alternative écartée** : garder les deux fichiers en supprimant seulement les profils morts du racine — moins risqué mais conserve la double maintenance des variables d'environnement.
+
+**Conséquences** : le `.env` du VPS doit recevoir `COMPOSE_PROFILES=test` ; les commandes d'exploitation utilisent les noms `*_server` (RUNBOOK et MANUEL_DEPLOIEMENT_VPS mis à jour) ; les volumes nommés sont conservés au premier déploiement post-migration (le nom de projet ne change pas). Révoque la décision du 2026-06-11.

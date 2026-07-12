@@ -39,6 +39,7 @@
 | Kpi | Stable — M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-06-24 |
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
+| Monitoring (Prometheus central) | Stable — Prometheus par environnement dans le chart Helm (`monitoring.enabled`), scrape par annotations pod, Deployment/emptyDir preprod vs StatefulSet/PVC prod, non exposé par l'Ingress ; port metrics restauré dans le chart (perdu à la migration Helm) | 2026-07-11 |
 | Accessibilité RGAA (front) | Stable — campagne 135→0 non-conformités, outil scripts/audit-a11y.mjs, 4 tests axe-core en CI, preuve docs/AUDIT_RGAA.md | 2026-07-06 |
 | Sécurité dépendances (OWASP A06) | Stable — npm audit bloquant en CI, sqlite3 en devDeps, 0 high/critical en prod | 2026-07-06 |
 | Manuel d'utilisation | Stable — docs/MANUEL_UTILISATION.md (3 profils + FAQ), captures à insérer | 2026-07-06 |
@@ -85,6 +86,7 @@
 | Front — RBAC (useRole, router guard) | Stable — M-05.11 : 2 bugs corrigés (connectionToken mort + /calendar private:false) + 12+20 tests Vitest | 2026-06-17 |
 | Rôle par défaut inscription | Stable — roleId=2 (Étudiant) par défaut dans modèle + service | 2026-06-14 |
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
+| Infrastructure Docker Compose (dev/test unifié) | Stable — compose racine unique à 2 profils (dev local / test VPS), `server_docker_compose/` supprimé, CD sur `--profile test`, template VPS `.env.test.example` | 2026-07-12 |
 | CI/CD — branches de déploiement | Stable — branches Git renommées `test`→`dev`, `preprod`→`staging` (main inchangée) ; noms internes d'infra (images DockerHub, namespace K8s, chemin VPS) non touchés | 2026-07-01 |
 | Refresh token (rotation, révocation) | Stable — M-00b.07 H1 : hash SHA-256 stocké en base (même pattern reset password), brut envoyé au client | 2026-06-23 |
 | Reset mot de passe (token hashé) | Stable — M-05.06 : token 64-char hex brut envoyé par email, hash SHA-256 stocké en base | 2026-06-15 |
@@ -5423,3 +5425,112 @@ Le job SonarQube auto-hébergé était commenté dans la CI (serveur hors servic
 | Module | État |
 |--------|------|
 | CI — Analyse statique | Stable — job `sonarcloud` actif dans ci.yml, en attente du secret SONAR_TOKEN côté GitHub |
+
+---
+
+### [2026-07-11] FIX — Job SonarCloud restreint à main (analyse multi-branches = plan payant)
+
+#### Contexte
+Premier push (branche `staging`) après la configuration SonarCloud : analyse refusée, l'analyse multi-branches est réservée aux plans payants — le plan gratuit n'accepte que la branche principale (+ PR).
+
+#### Fichiers modifiés
+- `.github/workflows/ci.yml` — job `sonarcloud` : `if: success() && github.ref == 'refs/heads/main'` (skipped, pas rouge, sur les autres branches)
+- `B2_RENDU.md` — section 1.3 : « sur chaque branche poussée » → analyse du tronc `main` à chaque merge, limitation du plan gratuit assumée
+
+#### État
+| Module | État |
+|--------|------|
+| CI — Analyse statique | Stable — job `sonarcloud` actif sur main uniquement (plan gratuit) |
+
+---
+
+### [2026-07-11] DOC — docs/CHANGELOG.md : synthèse chronologique de l'historique du dépôt
+
+#### Contexte
+`docs/CHANGELOG.md` était une copie manuelle (non suivie par git) de `.agents/CHANGELOG_AGENT.md`. Demande utilisateur : le remplacer par une synthèse de tout ce qui a été fait depuis la création du dépôt, en s'appuyant sur l'historique git complet.
+
+#### Fichiers modifiés
+- `docs/CHANGELOG.md` — réécrit : synthèse en 8 phases (oct. 2024 → juil. 2026) issue des 831 commits de la branche + du journal agent — amorçage, fondations backend en équipe, interpréteur/pipeline, Traefik/HTTPS, stabilisation solo, reprise + outillage IA, grand sprint qualité de juin 2026, industrialisation/B2. Vue d'ensemble chiffrée (dates, volumes, contributeurs, stack) + renvois vers les sources détaillées
+- `B2_RENDU.md` — la référence « CHANGELOG_AGENT » pointait sur docs/CHANGELOG.md (copie) : corrigée vers `.agents/CHANGELOG_AGENT.md`, avec mention de la synthèse docs/CHANGELOG.md
+
+#### Hypothèses posées
+- Le document se lit chronologiquement (ancien → récent), contrairement au journal agent : c'est un récit de construction, pas un journal de tickets
+- Les identités git multiples d'une même personne ont été regroupées (Jordan/jordanQuin, LalbaAnthony et variantes, rlena/Lénaaaa)
+
+#### État
+| Module | État |
+|--------|------|
+| docs/CHANGELOG.md | Stable — synthèse historique versionnable, à enrichir d'une ligne par jalon futur |
+
+---
+
+### [2026-07-11] ADD — Prometheus central par environnement dans le chart Helm
+
+#### Contexte
+L'instrumentation RED/USE (2026-07-06) exposait `GET /metrics` mais aucun scraper n'existait — les annotations `prometheus.io/*` étaient inertes (dette identifiée à l'époque). L'utilisateur envisageait un sidecar + un Prometheus par pod ; recadré vers le modèle pull standard : **un Prometheus central par environnement**, validé par l'utilisateur. Découverte en chemin : la migration Helm (2026-06-30) avait perdu le port metrics de l'API (ni `containerPort` 9090, ni annotations `prometheus.io/*`, ni `METRICS_PORT` dans le chart) — restauré dans ce ticket.
+
+#### Fichiers créés
+- `helm/templates/prometheus.yaml` — ServiceAccount + Role/RoleBinding namespacés (pods get/list/watch) + ConfigMap `prometheus.yml` (job `kubernetes-pods` : `kubernetes_sd_configs` role pod limité au namespace de la release, relabel sur les annotations `prometheus.io/scrape|port|path`, labels `namespace`/`pod`/`app`) + Deployment/emptyDir ou StatefulSet/PVC selon `monitoring.persistent` (même pattern que redis.yaml) + Service ClusterIP 9090. Annotation `checksum/config` pour redémarrer sur changement de config. Le tout conditionné par `monitoring.enabled`.
+
+#### Fichiers modifiés
+- `helm/templates/deployment-api.yaml` — ports nommés `http` (3000) / `metrics` (9090) + annotations `prometheus.io/scrape|port|path` sur le pod template (restauration post-migration Helm)
+- `helm/values.yaml` — `config.METRICS_PORT: "9090"` (restauration) + section `monitoring` (enabled, imageTag v3.5.0 LTS épinglée, scrapeInterval 30s, retention 15d, persistent, storage, resources)
+- `helm/values-preprod.yaml` — monitoring éphémère (Deployment + emptyDir, rétention 7 j, ressources réduites)
+- `helm/values-prod.yaml` — monitoring persistant (StatefulSet + PVC 5 Gi, rétention 15 j)
+- `.agents/DECISIONS.md` — entrée « Prometheus central par environnement dans le chart Helm »
+
+#### Ce qui est utilisable
+- Au prochain déploiement CD (staging → preprod, main → prod si `K8S_PROD_ENABLED`), un pod `<release>-prometheus` scrape les pods API du namespace. Accès UI : `kubectl port-forward svc/<release>-prometheus 9090:9090 -n <namespace>`
+- Validé par `helm lint` + `helm template` sur les deux jeux de values (preprod : Deployment + emptyDir + rétention 7d ; prod : StatefulSet + PVC + rétention 15d)
+
+#### Hypothèses posées
+- Le kubeconfig CI a le droit de créer Role/RoleBinding dans le namespace de la release (RBAC namespacé choisi précisément pour éviter le ClusterRole)
+- Prometheus v3.5.0 (LTS) disponible sur Docker Hub — épinglée, à bumper volontairement
+
+#### Dette / non couvert
+- Pas de Grafana ni d'Alertmanager (visualisation via l'UI Prometheus en port-forward)
+- Pas d'exporters Postgres/Redis — USE infra toujours limité au process Node (ticket dédié si besoin)
+- Les manifests historiques `k8s/prod|preprod/` (non appliqués par le CD depuis Helm) n'ont pas été touchés
+- Prometheus non déployé sur l'environnement test (VPS docker-compose) — périmètre K8s uniquement
+
+#### État
+| Module | État |
+|--------|------|
+| Monitoring (Prometheus central) | Stable — scraping opérationnel au prochain déploiement, port metrics restauré dans le chart |
+
+---
+
+### [2026-07-12] REF — docker-compose unifié dev/test : suppression de server_docker_compose/, le CD déploie le compose racine (profil test)
+
+#### Contexte
+Question de l'utilisateur sur la coexistence des profils du compose racine et du fichier VPS dédié. Constat : les profils `test`/`prod` du compose racine étaient du code mort (le CD déployait `server_docker_compose/docker-compose.yml`, aucun `.env.test`/`.env.prod` n'existait), les deux fichiers divergeaient (noms de services, service `backup` absent du racine) et chaque variable d'environnement devait être maintenue en double. Décision utilisateur : un seul fichier, deux profils — `dev` (local, inchangé) et `test` (images DockerHub, VPS).
+
+#### Fichiers supprimés
+- `server_docker_compose/docker-compose.yml` et `server_docker_compose/.env.example` (`git rm`) ; ligne `server_docker_compose/server_proxy/` retirée du `.gitignore`
+
+#### Fichiers créés
+- `.env.test.example` — template du `.env` VPS (ex-`server_docker_compose/.env.example`), enrichi : `COMPOSE_PROFILES=test`, `ADMIN_SEED_EMAIL`, section S3 (vide par défaut)
+
+#### Fichiers modifiés
+- `docker-compose.yml` — profil `prod` supprimé (`profiles: ["test", "prod"]` → `["test"]`) ; service `backup` (pg_dump quotidien) migré depuis le fichier VPS + volume `backup-data` ; `restart: unless-stopped` ajouté sur postgres, redis, pgadmin_server (alignement VPS) ; args de build `VITE_APP_*` du front dev rendus optionnels (`:-`) pour un `config -q` sans warning côté CD ; en-tête réécrit
+- `.github/workflows/cd.yml` (job `deploy_test`) — validation sur le compose racine avec `--profile test` + `.env.test.example` ; `scp` du compose racine ; `--profile test` forcé sur down/config/pull/up/ps/logs ; services démarrés : `pgadmin_server api_server front_server backup` ; boucle santé sur `postgres api_server front_server`
+- Docs : `README.md` (section VPS + arborescence), `docs/RUNBOOK.md` et `docs/MANUEL_DEPLOIEMENT_VPS.md` (noms `*_server`, `.env.test.example`, note COMPOSE_PROFILES), `docs/https-setup.md`, `traefik/docker-compose.yml` (commentaire), `B2_RENDU.md` (arborescence, en-tête cité, section 1.2), `.env.example` (en-têtes), `my_memo_master_front/src/config.js` (commentaire)
+- `.agents/DECISIONS.md` + `docs/DECISIONS.md` — décision du 2026-06-11 marquée révoquée + nouvelle entrée 2026-07-12
+
+#### Ce qui est utilisable
+- `docker compose --env-file .env up --build` en local (profil dev, inchangé) ; le CD déploie le VPS test avec le même fichier
+- Validé : `docker compose --profile test --env-file .env.test.example config -q` OK (6 services : postgres, redis, api_server, front_server, pgadmin_server, backup) ; profil dev OK (postgres, redis, traefik, pgadmin, api, front)
+
+#### Hypothèses posées / action requise
+- **Action manuelle sur le VPS** : ajouter `COMPOSE_PROFILES=test` au `/var/www/html/my_memo_master_test/.env` (le CD n'en dépend pas — `--profile test` explicite — mais les commandes manuelles du RUNBOOK oui)
+- Au premier déploiement post-migration, les conteneurs changent de nom (`api` → `api_server`…) ; les volumes nommés sont conservés (nom de projet inchangé) — pas de perte de données
+- Le `down` du CD au premier passage s'exécute sur l'ancien fichier encore présent sur le VPS (ordre stop → upload) : les anciens conteneurs sont bien supprimés
+
+#### Dette / non couvert
+- Les blocs `build:` du profil dev sont présents dans le fichier téléversé sur le VPS — inertes tant que le profil dev n'y est pas activé
+- Warnings `config` préexistants sur le profil dev (`REDIS_PASS`, `ADMIN_SEED_EMAIL` non définis dans `.env.example`) — non traités (hors périmètre)
+
+#### État
+| Module | État |
+|--------|------|
+| Infrastructure Docker Compose (dev/test unifié) | Stable — un seul compose, 2 profils, CD adapté, doc alignée |

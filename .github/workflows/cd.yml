@@ -121,11 +121,11 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # Valide le compose racine avec le profil test et le template d'env VPS
       - name: Validate docker-compose syntax
         run: |
-          cp server_docker_compose/.env.example server_docker_compose/.env
-          docker compose -f server_docker_compose/docker-compose.yml \
-            --env-file server_docker_compose/.env config -q
+          docker compose -f docker-compose.yml --profile test \
+            --env-file .env.test.example config -q
 
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -142,16 +142,18 @@ jobs:
             mkdir -p /var/www/html/my_memo_master_test
             cd /var/www/html/my_memo_master_test
             if [ -f .env ]; then
-              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env down || true
+              env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env down || true
             else
               echo "No .env found — skipping docker compose down."
             fi
           EOF
 
+      # Le compose racine (unifié dev/test) est déployé tel quel sur le VPS ;
+      # seuls les services du profil test y sont démarrés (--profile test)
       - name: Upload docker-compose
         run: |
           scp -P ${{ secrets.VPS_PORT }} \
-            server_docker_compose/docker-compose.yml \
+            docker-compose.yml \
             ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_test/docker-compose.yml
 
       - name: Validate test server env
@@ -168,7 +170,7 @@ jobs:
               grep '^ENVIRONMENT=' .env || true
               exit 1
             fi
-            env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env config -q
+            env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env config -q
           EOF
 
       - name: Deploy to VPS
@@ -176,18 +178,20 @@ jobs:
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             cd /var/www/html/my_memo_master_test
+            # --profile test : n'active que les services VPS du compose unifié
+            # (api_server, front_server, pgadmin_server, backup) + postgres/redis (sans profil)
             compose() {
-              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env "$@"
+              env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env "$@"
             }
 
             compose pull
             compose up -d postgres redis
-            compose up -d pgadmin api front backup
+            compose up -d pgadmin_server api_server front_server backup
             compose ps
 
             attempt=1
             max_attempts=24
-            services="postgres api front"
+            services="postgres api_server front_server"
             all_ready=0
 
             while [ "$attempt" -le "$max_attempts" ]; do

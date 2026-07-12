@@ -27,7 +27,9 @@
 
 # Présentation du projet
 
-    La plupart des étudiants ont des méthodes de révision peu efficaces qui les mettent en difficulté : 83,6 % s'appuient sur des méthodes de révision passives, 27 % préparent leurs examens au dernier moment, seulement 34 % disposent d'un calendrier de révision utile et seul 1 étudiant sur 2 s'entraîne via des annales ou des exercices (études et enquêtes versionnées dans[docs/sources/](docs/sources/) — voir Annexe D). Pour remédier à ces problèmes, MyMemoMaster propose une plateforme de révision et de suivi étudiant tout-en-un, à destination des étudiants principalement et des enseignants. La plateforme centralise des fonctionnalités fondées sur des méthodes pédagogiques actives dont l'efficacité est documentée par ces mêmes travaux :
+    La plupart des étudiants ont des méthodes de révision peu efficaces qui les mettent en difficulté : 83,6 % s'appuient sur des méthodes de révision passives, 27 % préparent leurs examens au dernier moment, seulement 34 % disposent d'un calendrier de révision utile et seul 1 étudiant sur 2 s'entraîne via des annales ou des exercices (études et enquêtes versionnées dans[docs/sources/](docs/sources/) — voir Annexe D).
+
+Pour remédier à ces problèmes, MyMemoMaster propose une plateforme de révision et de suivi étudiant tout-en-un, à destination des étudiants principalement et des enseignants. La plateforme centralise des fonctionnalités fondées sur des méthodes pédagogiques actives dont l'efficacité est documentée par ces mêmes travaux :
 
 - **Systèmes de Leitner** : questions-réponses à répétition espacée — l'algorithme représente les cartes dans des « boîtes » et fait remonter plus fréquemment les questions échouées et moins fréquemment les questions réussies ;
 - **Cartes mentales** : éditeur graphique de schémas de notions et de leurs liens ;
@@ -66,8 +68,7 @@ MyMemoMaster/
 ├── .github/workflows/        # Pipelines CI/CD (ci.yml, cd.yml, notify_ci.yml)
 ├── helm/                     # Chart Helm (déploiements Kubernetes preprod/prod)
 ├── k8s/                      # Manifests Kubernetes + scripts de migration Helm
-├── server_docker_compose/    # docker-compose déployé sur le VPS de test
-├── docker-compose.yml        # Environnement de développement local complet
+├── docker-compose.yml        # Compose unifié : profil dev (local) + profil test (VPS)
 ├── docs/                     # Documentation : manuels (déploiement, utilisation, RUNBOOK), audits (OWASP, RGAA), prototype + captures, sources bibliographiques, synthèse mémoire du projet
 └── diagrams/                 # Spécifications : règles métier, schéma BDD, UI
 ```
@@ -130,18 +131,18 @@ J'ai conçu l'environnement de développement pour qu'un contributeur soit opér
 Plutôt que d'avoir plusieurs docker compose divergents, j'ai unifié les environnements Docker dans un seul [docker-compose.yml](docker-compose.yml) piloté par les *profiles*. Les profils sont documentés dans L'en-tête du fichier :
 
 ```yaml
-#  Usage:
-#    Dev local : docker compose --env-file v.env.dev  up --build
-#    Test VPS  : docker compose --env-file .env.test up
-#    Prod : docker compose --env-file .env.prod up
+#  Usage :
+#    Dev local : docker compose --env-file .env up --build
+#                (.env copié depuis .env.example — COMPOSE_PROFILES=dev)
+#    Test VPS  : déployé automatiquement par .github/workflows/cd.yml
+#                (job deploy_test — force --profile test sur toutes les commandes)
 #
-#  Profiles (défini via COMPOSE_PROFILES dans le .env.*) :
+#  Profils (via COMPOSE_PROFILES dans le .env, ou --profile en CLI) :
 #    dev  — Traefik local HTTP, build depuis les sources, hot-reload API
-#    test — Images DockerHub, Traefik externe HTTPS, domaines de test
-#    prod — Images DockerHub, Traefik externe HTTPS, domaines de prod
+#    test — Images DockerHub, Traefik externe HTTPS Let's Encrypt, domaines de test
 ```
 
-Les services de persistance (`postgres`, `redis`) n'ont pas de profils ils sont donc demarés dans tous les cas ; les services `dev` (Traefik local, PgAdmin, API buildée depuis les sources, front) et les services `test`/`prod` (`api_server`, `front_server`, images Docker Hub, TLS Let's Encrypt) sont mutuellement exclusifs. Bénéfice : l'environnement de développement reproduit la topologie de production (reverse proxy, réseau, healthchecks) tout en gardant ses spécificités locales — c'est une application du principe de parité dev/prod.
+Les services de persistance (`postgres`, `redis`) n'ont pas de profils ils sont donc demarés dans tous les cas ; les services `dev` (Traefik local, PgAdmin, API buildée depuis les sources, front) et les services `test` (`api_server`, `front_server`, `backup`, images Docker Hub, TLS Let's Encrypt) sont mutuellement exclusifs. C'est ce même fichier que le pipeline CD téléverse sur le VPS de test en n'y activant que le profil `test` ; les environnements preprod/prod, eux, sont déployés sur Kubernetes via Helm et n'utilisent pas docker compose. Bénéfice : l'environnement de développement reproduit la topologie de production (reverse proxy, réseau, healthchecks) tout en gardant ses spécificités locales — c'est une application du principe de parité dev/prod.
 
 En dev, l'API monte le code source en volume pour le hot-reload via nodemon, et le front est routé par un Traefik local dont le dashboard (`localhost:8080`) sert d'outil de diagnostic du routage ([docker-compose.yml](docker-compose.yml), service `api`, lignes 125–133) :
 
@@ -173,11 +174,11 @@ Cette décision est tracée dans le journal des décisions ([docs/DECISIONS.md](
 
 ### Configuration par variables d'environnement
 
-Toute la configuration passe par des variables d'environnement, présentes dans le fichier .env. Les variables d'environnements nécéssaires dans le .env sont documentées dans le  [.env.example](.env.example). Ainsi chaque environnement a son `.env` propre non versionné ([.gitignore](.gitignore)). Côté API, les accès sont centralisés dans [my_memo_master_api/config/](my_memo_master_api/config/) (`db.config.js`, `dbms.config.js`, `redis.config.js`, `storage.config.js`, `swagger.config.js`) ; côté front dans `src/config.js` — règle formalisée dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md). L'homogénéité de style entre contributeurs est en outre garantie par un [.editorconfig](.editorconfig) à la racine.
+Toute la configuration passe par des variables d'environnement, présentes dans le fichier .env qui est unique a chaque environnement et non versionné ([.gitignore](.gitignore)). Ces variables d'environnements sont documentées dans le fichier [.env.example](.env.example).  Côté API, les accès sont centralisés dans [my_memo_master_api/config/](my_memo_master_api/config/) (`db.config.js`, `dbms.config.js`, `redis.config.js`, `storage.config.js`, `swagger.config.js`) ; côté front dans `src/config.js` — règle formalisée dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md). L'homogénéité de style entre contributeurs est en outre garantie par un [.editorconfig](.editorconfig) à la racine.
 
 ## 1.2 Environnements de déploiements
 
-Le projet est déployé dans trois environnements distincts, alimenté par une branche git dédiée :
+Le projet est déployé dans trois environnements distincts alimenté par une branche git dédiée :
 
 | Branche git | Environnement     | Infrastructure                          | Images Docker Hub                         |
 | ----------- | ----------------- | --------------------------------------- | ----------------------------------------- |
@@ -187,9 +188,11 @@ Le projet est déployé dans trois environnements distincts, alimenté par une b
 
 Cette correspondance est documentée dans le [README.md](README.md) (partie 3) et implémentée dans le pipeline [.github/workflows/cd.yml](.github/workflows/cd.yml). Chaque environnement dispose de sa propre architecture :
 
-**Test (VPS, Docker Compose).** L'environnement de test tourne sur un VPS avec le fichier dédié [server_docker_compose/docker-compose.yml](server_docker_compose/docker-compose.yml), déployé automatiquement par le pipeline CD (section 6). Il comprend PostgreSQL et Redis avec healthchecks, l'API, le front, PgAdmin, et un service `backup` que j'ai écrit pour produire un dump PostgreSQL quotidien avec rétention configurable (extrait des logs du service : `[backup] Service démarré — sauvegarde quotidienne à ${BACKUP_HOUR}h00 UTC`, `Rétention ${BACKUP_RETENTION_DAYS}j appliquée`).
+**L'environnement de Test** fonctionne sur un VPS avec le profil `test` du docker compose unifié ([docker-compose.yml](docker-compose.yml)), déployé automatiquement par le pipeline CD (section 6). Il comprend PostgreSQL et Redis avec healthchecks, l'API, le front, PgAdmin, et un service `backup` que j'ai écrit pour produire un dump PostgreSQL quotidien avec rétention configurable (extrait des logs du service : `[backup] Service démarré — sauvegarde quotidienne à ${BACKUP_HOUR}h00 UTC`, `Rétention ${BACKUP_RETENTION_DAYS}j appliquée`).
 
-**Preprod et prod (Kubernetes, Helm).** Les deux environnements Kubernetes sont déployés par un chart Helm unique ([helm/](helm/)) : les templates ([helm/templates/](helm/templates/) — deployments API/front/pgadmin, StatefulSet PostgreSQL, Redis, ConfigMap, Ingress, Services) sont partagés, et chaque environnement n'est qu'un fichier de surcharges ([helm/values-preprod.yaml](helm/values-preprod.yaml), [helm/values-prod.yaml](helm/values-prod.yaml)). Exemple de différenciation assumée en preprod :
+**Les environnements de Preprod et de prod** fonctionnent avec Kubernetes et sont déployés par un chart Helm unique ([helm/](helm/)). Chaque environnement ([helm/values-preprod.yaml](helm/values-preprod.yaml), [helm/values-prod.yaml](helm/values-prod.yaml)) est une srucharge des templates communs ([helm/templates/](helm/templates/) — deployments API/front/pgadmin, StatefulSet PostgreSQL, Redis, ConfigMap, Ingress, Services) 
+
+ Exemple de différenciation assumée en preprod :
 
 ```yaml
 # Deployment sans PVC — pertes de cache acceptables en preprod
@@ -197,7 +200,7 @@ redis:
   persistent: false
 ```
 
-C'est une décision de conception : la preprod économise un volume persistant là où la prod n'a pas ce droit. De même, PgAdmin est activé en preprod « pour faciliter l'administration » (commentaire du fichier de values) alors que l'exposition d'outils d'administration en prod est restreinte.
+C'est une décision de conception : la preprod économise un volume persistant là où la prod n'a pas ce droit. De même, PgAdmin est activé en preprod pour faciliter l'administration alors que l'exposition d'outils d'administration en prod est restreinte.
 
 **Isolation des environnements.** Chaque environnement a son espace propre : namespaces Kubernetes distincts (`mymemomaster-preprod` / `mymemomaster`), réseaux Docker nommés par environnement (`my_memo_master_${ENVIRONMENT}_network`), images Docker Hub distinctes (`_test_`, `_preprod_`, sans suffixe pour la prod), secrets gérés hors dépôt (secrets GitHub Actions et Secrets Kubernetes créés manuellement — procédure documentée dans le [README.md](README.md), partie 3). Le pipeline CD vérifie même que le `.env` présent sur le VPS correspond bien à l'environnement attendu avant de déployer (`grep -q '^ENVIRONMENT=test$' .env`, [.github/workflows/cd.yml](.github/workflows/cd.yml)).
 
@@ -205,7 +208,7 @@ C'est une décision de conception : la preprod économise un volume persistant l
 
 ### Qualité du code : linters et formateurs
 
-Les deux applications ont chacune leur configuration de lint, exécutée localement et **bloquante en CI** (section 2) :
+L'application à deux configuration de lint, exécutées localement et **bloquante en CI** (section 2) :
 
 - **API** : ESLint v9 en configuration *flat* ([my_memo_master_api/eslint.config.mjs](my_memo_master_api/eslint.config.mjs)) — règles `@eslint/js` recommandées + `eslint-config-prettier`, globals Node/Jest déclarés ;
 - **Front** : ESLint v8 + `eslint-plugin-vue` + Prettier ([my_memo_master_front/package.json](my_memo_master_front/package.json), script `lint` couvrant `.vue,.js,.jsx,.cjs,.mjs`).
@@ -214,7 +217,7 @@ Les scripts npm normalisent l'usage : `npm run lint` et `npm run format` des deu
 
 ### Qualité fonctionnelle : les harnais de test
 
-Jest + Supertest côté API, Vitest + @vue/test-utils côté front, exécutés en CI à chaque push. Le harnais est détaillé en section 4 ; au titre de l'outillage d'environnement, le point notable est qu'il est **auto-suffisant** (SQLite in-memory, mock du modèle d'IA dans [my_memo_master_api/__mocks__/](my_memo_master_api/__mocks__/)) : aucun service externe n'est requis pour valider un commit.
+Les tests Jest + Supertest côté API, Vitest + @vue/test-utils côté front sont exécutés en CI à chaque push. Le harnais est détaillé en section 4 ; L'environnement de test est **auto-suffisant** (SQLite in-memory, mock du modèle d'IA dans [my_memo_master_api/__mocks__/](my_memo_master_api/__mocks__/)) : aucun service externe n'est requis pour valider un commit.
 
 ### Suivi de performance et de disponibilité
 
@@ -226,11 +229,11 @@ Jest + Supertest côté API, Vitest + @vue/test-utils côté front, exécutés e
 
 ### Analyse statique continue : SonarCloud (SonarQube Cloud)
 
-Le projet intègre une analyse statique continue sur SonarCloud, l'offre SaaS de SonarQube (gratuite pour les dépôts publics) : la configuration du scanner est versionnée ([sonar-project.properties](sonar-project.properties)) et le job `sonarcloud` du pipeline CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) exécute l'analyse après le succès des tests et du lint, sur chaque branche poussée (main, staging, dev, branches de feature) — SonarCloud gère l'analyse par branche nativement, sans dupliquer les projets. Le tableau de bord (bugs, code smells, duplication, hotspots de sécurité, quality gate) est consultable sur sonarcloud.io. Historique assumé : l'analyse était initialement portée par une instance SonarQube auto-hébergée, dont l'exploitation (serveur dédié, maintenance, disponibilité) s'est révélée disproportionnée — la migration vers le SaaS conserve la capacité d'analyse en supprimant cette charge d'infrastructure. Cette analyse complète le triptyque bloquant lint + tests + build et l'audit de dépendances `npm audit` déjà en place dans la CI (l'audit de sécurité manuel reste documenté en section 5.2).
+Le projet intègre une analyse statique continue sur SonarCloud, l'offre SaaS de SonarQube : la configuration du scanner est versionnée ([sonar-project.properties](sonar-project.properties)) et le job `sonarcloud` du pipeline CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) exécute l'analyse après le succès des tests et du lint, à chaque push sur la branche principale `main` — l'analyse multi-branches étant réservée aux plans payants de SonarCloud, le suivi qualité porte sur le tronc, alimenté à chaque merge de release. Le tableau de bord (bugs, code smells, duplication, hotspots de sécurité, quality gate) est consultable sur sonarcloud.io. Historique assumé : l'analyse était initialement portée par une instance SonarQube auto-hébergée, dont l'exploitation (serveur dédié, maintenance, disponibilité) s'est révélée disproportionnée — la migration vers le SaaS conserve la capacité d'analyse en supprimant cette charge d'infrastructure. Cette analyse complète le triptyque bloquant lint + tests + build et l'audit de dépendances `npm audit` déjà en place dans la CI (l'audit de sécurité manuel reste documenté en section 5.2).
 
 ## 1.4 Dépôt de gestion du code source
 
-Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), dépôt unique pour toute l'application. Ce choix du monorepo est une décision de conception : les deux applications, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement). La stratégie de branches que j'ai définie est documentée dans le [README.md](README.md) (« Méthode de travail ») .  **Le fonctionement de la pipeli,ne CI** est adaptée à la stratégie de gestion des branches (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
+Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), dépôt unique pour toute l'application. Ce choix du monorepo est une décision de conception : l'api le front, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement). La stratégie de branches que j'ai définie est documentée dans le [README.md](README.md) (« Méthode de travail ») .  **Le fonctionement de la pipeli,ne CI** est adaptée à la stratégie de gestion des branches (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
 
 ```mermaid
 gitGraph
@@ -249,10 +252,11 @@ gitGraph
 
 - les branches de travail sont préfixées `dev_back_*` ou `dev_front_*` selon le périmètre ;
 - `dev` intègre en continu et alimente l'environnement de **test** ;
-- `staging` promeut vers la **preprod** ; `main` vers la **prod** ;
+- `staging` alimente l'environnement de **preprod** ;
+- `main` alimente l'environneemtn de **prod** ;
 - les commits suivent une convention de préfixes `[ADD]` / `[IMP]` / `[REF]` / `[FIX]`, ce qui rend l'historique exploitable comme journal des évolutions et des correctifs (utilisé en sections 8 et 9).
 
-La méthode de travail impose l'ordre « tests unitaires → code → documentation Swagger » pour chaque fonctionnalité ([README.md](README.md), étape 3) : l'environnement n'est pas qu'un outillage, il porte aussi le processus de développement.
+La méthode de travail impose l'ordre « tests unitaires → code → documentation Swagger » pour chaque fonctionnalité ([README.md](README.md), étape 3) : ainsi l'environnement porte aussi le processus de développement.
 
 ---
 
@@ -262,7 +266,7 @@ La méthode de travail impose l'ordre « tests unitaires → code → documentat
 
 ## 2.1 Protocole d'intégration continue
 
-J'ai implémenté l'intégration continue avec GitHub Actions dans le workflow [.github/workflows/ci.yml](.github/workflows/ci.yml). Le protocole tient en une phrase : **aucun code ne progresse vers un environnement sans avoir passé tests, lint et build sur un runner neutre**. Le workflow se déclenche à chaque push sur les branches d'intégration (`main`, `staging`, `dev`) et sur les branches de travail (`dev_back_*`, `dev_front_*`, `*devops*`) :
+J'ai implémenté l'intégration continue avec GitHub Actions dans le workflow [.github/workflows/ci.yml](.github/workflows/ci.yml). Le protocole tient en une phrase : **aucun code ne progresse vers un environnement sans avoir passé build, tests et lint sur un runner neutre**. Le workflow se déclenche à chaque push sur les branches d'intégration (`main`, `staging`, `dev`) et sur les branches de travail (`dev_back_*`, `dev_front_*`, `*devops*`) :
 
 ```yaml
 on:
@@ -276,11 +280,11 @@ on:
       - 'dev_front_*'
 ```
 
-Le déclenchement sur les branches de travail — et pas seulement sur les branches d'intégration — est un choix délibéré : le développeur reçoit le verdict de la CI **avant** de fusionner dans `dev`, ce qui déplace la détection des régressions au plus tôt dans le cycle (principe *shift-left*). La fusion dans une branche d'intégration re-déclenche une validation complète, qui conditionne ensuite le déploiement (section 2.3).
+Le déclenchement sur les branches de travail et les branches d'intégration est un choix délibéré : le développeur reçoit le verdict de la CI **avant** de fusionner dans `dev`, ce qui déplace la détection des régressions au plus tôt dans le cycle (principe *shift-left*). La fusion dans une branche d'intégration re-déclenche une validation complète, qui conditionne ensuite le déploiement (section 2.3).
 
-## 2.2 Une matrice de jobs adaptée au monorepo
+## 2.2 matrice de jobs
 
-Un monorepo pose un problème classique de CI : re-valider systématiquement les deux applications gaspille du temps de runner quand une branche ne touche qu'un côté. J'ai résolu ce point avec un job `setup` qui construit **dynamiquement la matrice de jobs selon le préfixe de la branche** ([.github/workflows/ci.yml](.github/workflows/ci.yml), job `setup`) :
+Afin de ne pas gaspiller du temps d'execution, j'ai un  job `setup` qui construit **dynamiquement la matrice de jobs selon le préfixe de la branche** ([.github/workflows/ci.yml](.github/workflows/ci.yml), job `setup`)  :
 
 ```yaml
       - id: set-matrix
@@ -295,7 +299,7 @@ Un monorepo pose un problème classique de CI : re-valider systématiquement les
           fi
 ```
 
-Une branche `dev_front_*` ne valide que le front, une branche `dev_back_*` que l'API ; les branches d'intégration (`dev`, `staging`, `main`) valident **toujours les deux**, car c'est là que les contributions front et back se rencontrent — c'est précisément le moment où une régression d'interface entre les deux peut apparaître. La stratégie de nommage des branches (section 1.4) n'est donc pas cosmétique : elle pilote l'outillage.
+Une branche `dev_front_*` ne valide que le front et une branche `dev_back_*` ne valide que l'API ; les branches d'intégration (`dev`, `staging`, `main`) valident **toujours les deux**, car c'est là que les contributions front et back se rencontrent — c'est précisément le moment où une régression d'interface entre les deux peut apparaître. La stratégie de nommage des branches (section 1.4) joue un rôle important dans le pilotage de l'outillage CI.
 
 ## 2.3 Séquence de validation d'un bloc de code
 
@@ -642,7 +646,9 @@ Le harnais entier — les deux suites — est exécuté **à chaque push** par l
 
 ### Le pipeline d'une requête
 
-J'ai imposé sur toute l'API une architecture en couches stricte — **route → middlewares → controller → service → model** — formalisée comme règle de projet dans [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md) (« Pas de logique métier dans les controllers — tout passe par les services »). Chaque requête traverse le même pipeline :
+L'architecture de l'api est composée des couches : **route → middlewares → controller → service → model**
+
+Cette architecture est décrite dans [docs/CONVENTIONS.md](docs/CONVENTIONS.md) (« Pas de logique métier dans les controllers — tout passe par les services »). Chaque requête traverse le même pipeline :
 
 ```mermaid
 flowchart LR
@@ -657,9 +663,13 @@ flowchart LR
     C -.->|erreur| E["errorHandler global"]
 ```
 
-Légende : chaque bloc est un fichier ou dossier réel de [my_memo_master_api/](my_memo_master_api/) ; les flèches pleines suivent le traitement nominal, la flèche pointillée le chemin d'erreur.
+Légende :
 
-La composition est lisible directement dans la déclaration des routes ([my_memo_master_api/routes/User.routes.js](my_memo_master_api/routes/User.routes.js)) :
+* chaque bloc est un fichier ou dossier réel de [my_memo_master_api/](my_memo_master_api/) ;
+* les flèches pleines décrivenet le traitement de la requête,
+* la flèche pointillée décris le chemin d'erreur.
+
+La composition est lisible dans la déclaration des routes ([my_memo_master_api/routes/User.routes.js](my_memo_master_api/routes/User.routes.js)) :
 
 ```javascript
 router.post('/register', registerLimiter, userValidators.register, validate, user.register)
@@ -667,9 +677,7 @@ router.post('/login', authLimiter, userValidators.login, validate, user.login)
 router.put('/:id', authMiddleware, userValidators.update, validate, user.update)
 ```
 
-### Des responsabilités étanches
-
-**Le controller ne fait que du HTTP.** Son rôle se limite à try/catch, appel du service et traduction en code de statut, messages en français ([my_memo_master_api/controllers/Subject.controller.js](my_memo_master_api/controllers/Subject.controller.js)) :
+**Le controller ne fait que du HTTP.** Son rôle se limite à appeler le service et traduire la réponse en un code de statut et un messages en français ([my_memo_master_api/controllers/Subject.controller.js](my_memo_master_api/controllers/Subject.controller.js)) :
 
 ```javascript
 exports.findAll = async (req, res) => {
@@ -1088,10 +1096,10 @@ L'interface interactive est servie sur `/api-docs` en développement et test, et
 
 ## 9.5 Traçabilité pour les équipes et les évolutions futures
 
-Le critère « assurer une traçabilité pour le suivi des équipes et des futures évolutions » est traité par un dispositif que j'ai conçu explicitement pour la **reprise sans contexte oral** — le dossier [.agents/](.agents/) :
+Le critère « assurer une traçabilité pour le suivi des équipes et des futures évolutions » est traité par un dispositif que j'ai conçu explicitement pour la **reprise sans contexte oral** — le dossier [.docs/](.docs/) :
 
-- [.agents/DECISIONS.md](.agents/DECISIONS.md) impose un format à chaque décision structurante — *Contexte / Décision / Alternative écartée / Conséquences* — dont l'objectif est énoncé dans son en-tête : « permettre de comprendre "pourquoi" le code est comme il est, 2 mois plus tard ». Les sections précédentes de ce dossier en ont cité plusieurs entrées réelles (choix SQLite/PostgreSQL, rotation des refresh tokens, RBAC en base, placement du health endpoint) ;
-- [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md) maintient un tableau d'état module par module et une entrée par ticket (fichiers touchés, ce qui est utilisable, hypothèses, **dette éventuelle**) — les fiches d'anomalie de la section 8 en sont des extraits ;
+- [docs/DECISIONS.md](docs/DECISIONS.md) impose un format à chaque décision structurante — *Contexte / Décision / Alternative écartée / Conséquences* — dont l'objectif est énoncé dans son en-tête : « permettre de comprendre "pourquoi" le code est comme il est, 2 mois plus tard ». Les sections précédentes de ce dossier en ont cité plusieurs entrées réelles (choix SQLite/PostgreSQL, rotation des refresh tokens, RBAC en base, placement du health endpoint) ;
+- [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md) maintient un tableau d'état module par module et une entrée par ticket (fichiers touchés, ce qui est utilisable, hypothèses, **dette éventuelle**) — les fiches d'anomalie de la section 8 en sont des extraits ; [docs/CHANGELOG.md](docs/CHANGELOG.md) en propose la synthèse chronologique depuis la création du dépôt (phases, contributeurs, jalons) ;
 - la documentation de fonctionnement par module descend au niveau des règles métier : [docs/DOC_administration_etablissements.md](docs/DOC_administration_etablissements.md) (11 sections : modèle de données, rôles et droits, référence des endpoints, audit trail, flux complets, contraintes et gardes, **dette connue et limitations V1**), [diagrams/schema_bdd.md](diagrams/schema_bdd.md) (ERD), [diagrams/leitner_algo.md](diagrams/leitner_algo.md), [diagrams/mindmap_rules.md](diagrams/mindmap_rules.md), etc.
 
 Documenter la **dette et les limitations** dans les livrables (et pas seulement les réussites) est un choix délibéré : c'est ce qui rend la documentation digne de confiance pour celui qui reprend le code.

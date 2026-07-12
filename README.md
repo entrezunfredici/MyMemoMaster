@@ -278,21 +278,23 @@ base64 -w0 config-infomaniak-preprod
 ### Environnement TEST — VPS (docker compose)
 
 Le VPS fait tourner l'environnement de test via docker compose.
-Le fichier `server_docker_compose/docker-compose.yml` est déployé automatiquement par le CD.
+Le `docker-compose.yml` racine (unifié dev/test) est déployé automatiquement par le CD,
+qui n'y active que le profil `test` (`--profile test`).
 
 **Prérequis sur le VPS :**
 
-Créer le fichier `/var/www/html/my_memo_master_test/.env` en copiant et remplissant `server_docker_compose/.env.example` :
+Créer le fichier `/var/www/html/my_memo_master_test/.env` en copiant et remplissant `.env.test.example` :
 
 ```bash
 mkdir -p /var/www/html/my_memo_master_test
-cp server_docker_compose/.env.example /var/www/html/my_memo_master_test/.env
+cp .env.test.example /var/www/html/my_memo_master_test/.env
 nano /var/www/html/my_memo_master_test/.env
 ```
 
 Variables obligatoires à renseigner dans ce `.env` :
 
 ```env
+COMPOSE_PROFILES=test                     # active les services VPS du compose unifié
 ENVIRONMENT=test                          # NE PAS CHANGER — vérifié par le CD
 
 IMAGE_API=fredissimo/mymemomaster_test_api:latest
@@ -473,9 +475,9 @@ Puis dans GitHub **Settings → Variables → Actions**, ajouter `K8S_PROD_ENABL
 ├── ci.yml                  — Tests, lint, build (toutes les branches)
 └── cd.yml                  — Build Docker + déploiement (dev/staging/main)
 
-server_docker_compose/
-├── docker-compose.yml      — Déployé sur le VPS test par le CD
-└── .env.example            — Template à copier en .env sur le VPS
+docker-compose.yml          — Compose unifié : profil dev (local) + profil test (VPS, déployé par le CD)
+.env.example                — Template .env dev local
+.env.test.example           — Template à copier en .env sur le VPS test
 
 k8s/
 ├── cert-manager/           — ClusterIssuers Let's Encrypt + secret Cloudflare
