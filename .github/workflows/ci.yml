@@ -73,8 +73,9 @@ jobs:
         run: npm run build
 
   # Analyse statique continue sur SonarCloud (SonarQube Cloud) — remplace
-  # l'instance SonarQube auto-hébergée. Un seul projet (monorepo), l'analyse
-  # de branches distingue main / staging / dev côté SonarCloud.
+  # l'instance SonarQube auto-hébergée. Un seul projet (monorepo).
+  # Limité à main : l'analyse multi-branches est une fonctionnalité payante
+  # de SonarCloud — le plan gratuit n'accepte que la branche principale.
   # Config du scanner : sonar-project.properties à la racine.
   # Prérequis : secret SONAR_TOKEN (token généré sur sonarcloud.io) et
   # Automatic Analysis désactivée sur le projet SonarCloud.
@@ -82,7 +83,7 @@ jobs:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
     needs: test_and_lint
-    if: success()
+    if: success() && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

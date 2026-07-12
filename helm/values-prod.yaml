@@ -68,3 +68,17 @@ front:
 # PgAdmin désactivé en prod
 pgadmin:
   enabled: false
+
+# Prometheus avec PVC — historique de métriques persisté en prod
+monitoring:
+  enabled: true
+  persistent: true
+  storage: 5Gi
+  retention: 15d
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi

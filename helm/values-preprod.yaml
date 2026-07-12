@@ -80,3 +80,16 @@ pgadmin:
     limits:
       cpu: 250m
       memory: 256Mi
+
+# Prometheus sans PVC — perte de l'historique acceptable en preprod
+monitoring:
+  enabled: true
+  persistent: false
+  retention: 7d
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
