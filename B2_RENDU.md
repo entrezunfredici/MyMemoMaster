@@ -190,7 +190,7 @@ Cette correspondance est documentée dans le [README.md](README.md) (partie 3) e
 
 **L'environnement de Test** fonctionne sur un VPS avec le profil `test` du docker compose unifié ([docker-compose.yml](docker-compose.yml)), déployé automatiquement par le pipeline CD (section 6). Il comprend PostgreSQL et Redis avec healthchecks, l'API, le front, PgAdmin, et un service `backup` que j'ai écrit pour produire un dump PostgreSQL quotidien avec rétention configurable (extrait des logs du service : `[backup] Service démarré — sauvegarde quotidienne à ${BACKUP_HOUR}h00 UTC`, `Rétention ${BACKUP_RETENTION_DAYS}j appliquée`).
 
-**Les environnements de Preprod et de prod** fonctionnent avec Kubernetes et sont déployés par un chart Helm unique ([helm/](helm/)). Chaque environnement ([helm/values-preprod.yaml](helm/values-preprod.yaml), [helm/values-prod.yaml](helm/values-prod.yaml)) est une srucharge des templates communs ([helm/templates/](helm/templates/) — deployments API/front/pgadmin, StatefulSet PostgreSQL, Redis, ConfigMap, Ingress, Services) 
+**Les environnements de Preprod et de prod** fonctionnent avec Kubernetes et sont déployés par un chart Helm unique ([helm/](helm/)). Chaque environnement ([helm/values-preprod.yaml](helm/values-preprod.yaml), [helm/values-prod.yaml](helm/values-prod.yaml)) est une srucharge des templates communs ([helm/templates/](helm/templates/) — deployments API/front/pgadmin, StatefulSet PostgreSQL, Redis, ConfigMap, Ingress, Services)
 
  Exemple de différenciation assumée en preprod :
 
@@ -229,11 +229,11 @@ Les tests Jest + Supertest côté API, Vitest + @vue/test-utils côté front son
 
 ### Analyse statique continue : SonarCloud (SonarQube Cloud)
 
-Le projet intègre une analyse statique continue sur SonarCloud, l'offre SaaS de SonarQube : la configuration du scanner est versionnée ([sonar-project.properties](sonar-project.properties)) et le job `sonarcloud` du pipeline CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) exécute l'analyse après le succès des tests et du lint, à chaque push sur la branche principale `main` — l'analyse multi-branches étant réservée aux plans payants de SonarCloud, le suivi qualité porte sur le tronc, alimenté à chaque merge de release. Le tableau de bord (bugs, code smells, duplication, hotspots de sécurité, quality gate) est consultable sur sonarcloud.io. Historique assumé : l'analyse était initialement portée par une instance SonarQube auto-hébergée, dont l'exploitation (serveur dédié, maintenance, disponibilité) s'est révélée disproportionnée — la migration vers le SaaS conserve la capacité d'analyse en supprimant cette charge d'infrastructure. Cette analyse complète le triptyque bloquant lint + tests + build et l'audit de dépendances `npm audit` déjà en place dans la CI (l'audit de sécurité manuel reste documenté en section 5.2).
+Le projet intègre une analyse statique continue sur SonarCloud, l'offre SaaS de SonarQube : la configuration du scanner est versionnée ([sonar-project.properties](sonar-project.properties)) et le job `sonarcloud` du pipeline CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) exécute l'analyse après le succès des tests et du lint, à chaque push sur la branche principale `main` — l'analyse multi-branches étant réservée aux plans payants de SonarCloud, le suivi qualité porte sur le tronc, alimenté à chaque merge de release. Le tableau de bord (bugs, code smells, duplication, hotspots de sécurité, quality gate) est consultable sur sonarcloud.io.
 
 ## 1.4 Dépôt de gestion du code source
 
-Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), dépôt unique pour toute l'application. Ce choix du monorepo est une décision de conception : l'api le front, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement). La stratégie de branches que j'ai définie est documentée dans le [README.md](README.md) (« Méthode de travail ») .  **Le fonctionement de la pipeli,ne CI** est adaptée à la stratégie de gestion des branches (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
+Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`), ainsi l'api, le front, l'infrastructure et la documentation évoluent dans un même historique git, ce qui permet à une même pull request de porter une fonctionnalité de bout en bout (migration de base, endpoint, écran, test, manifeste de déploiement). La stratégie de branches que j'ai définie est documentée dans le [README.md](README.md) (« Méthode de travail ») .  **Le fonctionement de la pipeline CI** est adaptée à la stratégie de gestion des branches (la matrice de jobs cible l'API ou le front selon le préfixe de la branche — section 2) :
 
 ```mermaid
 gitGraph
@@ -266,7 +266,7 @@ La méthode de travail impose l'ordre « tests unitaires → code → documentat
 
 ## 2.1 Protocole d'intégration continue
 
-J'ai implémenté l'intégration continue avec GitHub Actions dans le workflow [.github/workflows/ci.yml](.github/workflows/ci.yml). Le protocole tient en une phrase : **aucun code ne progresse vers un environnement sans avoir passé build, tests et lint sur un runner neutre**. Le workflow se déclenche à chaque push sur les branches d'intégration (`main`, `staging`, `dev`) et sur les branches de travail (`dev_back_*`, `dev_front_*`, `*devops*`) :
+L'intégration continue fonctionne avec GitHub Actions dans le workflow [.github/workflows/ci.yml](.github/workflows/ci.yml). Le protocole passe par une phase de build, test et lint avant de progresser vers un environnement. Le workflow se déclenche à chaque push sur les branches d'intégration (`main`, `staging`, `dev`) et sur les branches de travail (`dev_back_*`, `dev_front_*`, `*devops*`) :
 
 ```yaml
 on:
@@ -280,11 +280,11 @@ on:
       - 'dev_front_*'
 ```
 
-Le déclenchement sur les branches de travail et les branches d'intégration est un choix délibéré : le développeur reçoit le verdict de la CI **avant** de fusionner dans `dev`, ce qui déplace la détection des régressions au plus tôt dans le cycle (principe *shift-left*). La fusion dans une branche d'intégration re-déclenche une validation complète, qui conditionne ensuite le déploiement (section 2.3).
+Pour détecter les régréssions au plus tôt, la CI se déclenche sur les branche de travail. Ce qui permet de recevoir le déceler et de corriger les regressions **avant** de fusionner dans `dev`. La fusion dans une branche d'intégration re-déclenche une validation complète, qui conditionne ensuite le déploiement (section 2.3).
 
 ## 2.2 matrice de jobs
 
-Afin de ne pas gaspiller du temps d'execution, j'ai un  job `setup` qui construit **dynamiquement la matrice de jobs selon le préfixe de la branche** ([.github/workflows/ci.yml](.github/workflows/ci.yml), job `setup`)  :
+Pour économiser du temps d'execution, j'ai un  job `setup` qui construit **dynamiquement la matrice de jobs selon le préfixe de la branche** ([.github/workflows/ci.yml](.github/workflows/ci.yml), job `setup`)  :
 
 ```yaml
       - id: set-matrix
@@ -299,7 +299,13 @@ Afin de ne pas gaspiller du temps d'execution, j'ai un  job `setup` qui construi
           fi
 ```
 
-Une branche `dev_front_*` ne valide que le front et une branche `dev_back_*` ne valide que l'API ; les branches d'intégration (`dev`, `staging`, `main`) valident **toujours les deux**, car c'est là que les contributions front et back se rencontrent — c'est précisément le moment où une régression d'interface entre les deux peut apparaître. La stratégie de nommage des branches (section 1.4) joue un rôle important dans le pilotage de l'outillage CI.
+Ainsi : 
+
+* Une branche `dev_front_*` ne valide que le front.
+* Une branche `dev_back_*` ne valide que l'API.
+* Les branches d'intégration (`dev`, `staging`, `main`) valident **toujours les deux**, car c'est là que les contributions front et back se rencontrent — c'est précisément le moment où une régression d'interface entre les deux peut apparaître.
+
+La stratégie de nommage des branches (section 1.4) joue un rôle important dans le pilotage de l'outillage CI.
 
 ## 2.3 Séquence de validation d'un bloc de code
 
@@ -319,11 +325,11 @@ Trois réglages du workflow méritent justification :
 - `fail-fast: false` sur la matrice : si l'API échoue, la validation du front va quand même au bout — le développeur reçoit le diagnostic complet en une passe au lieu de découvrir les échecs un par un ;
 - `permissions: contents: read` : le workflow ne dispose que du droit de lecture du dépôt, application du principe du moindre privilège aux jetons GitHub Actions.
 
-Le harnais est exécutable en CI sans aucun service externe : SQLite in-memory pour la base, mock du modèle d'IA (`moduleNameMapper` vers [my_memo_master_api/__mocks__/@xenova/transformers.js](my_memo_master_api/__mocks__/), déclaré dans [my_memo_master_api/package.json](my_memo_master_api/package.json)). C'est ce qui rend la boucle rapide et déterministe.
+Le CI est exécutable sans aucun service externe : SQLite in-memory pour la base, mock du modèle d'IA (`moduleNameMapper` vers [my_memo_master_api/__mocks__/@xenova/transformers.js](my_memo_master_api/__mocks__/), déclaré dans [my_memo_master_api/package.json](my_memo_master_api/package.json)). C'est ce qui rend la boucle rapide et déterministe.
 
 ## 2.4 La CI comme porte d'entrée du déploiement
 
-Le pipeline de déploiement ([.github/workflows/cd.yml](.github/workflows/cd.yml)) ne se déclenche pas sur push : il s'abonne à la **fin du workflow CI** et vérifie sa conclusion :
+Le pipeline de déploiement ([.github/workflows/cd.yml](.github/workflows/cd.yml)) se déclenche à la **fin du workflow CI** et vérifie sa conclusion :
 
 ```yaml
 on:
@@ -342,7 +348,7 @@ on:
       github.event.workflow_run.event == 'push'
 ```
 
-Cette architecture en deux workflows chaînés garantit structurellement qu'**aucune image Docker n'est construite ni déployée à partir d'un commit dont les tests ou le lint ont échoué**. C'est le cœur du protocole d'intégration continue : la séquence d'intégration (fusion → validation → livraison) est outillée, pas seulement conventionnelle.
+Cette architecture en deux workflows chaînés garantit structurellement qu'**aucune image Docker n'est construite ni déployée à partir d'un commit dont les tests ou le lint ont échoué**. C'est le cœur du protocole d'intégration continue.
 
 ## 2.5 Boucle de retour vers l'équipe
 
