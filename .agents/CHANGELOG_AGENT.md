@@ -5534,3 +5534,26 @@ Question de l'utilisateur sur la coexistence des profils du compose racine et du
 | Module | État |
 |--------|------|
 | Infrastructure Docker Compose (dev/test unifié) | Stable — un seul compose, 2 profils, CD adapté, doc alignée |
+
+---
+
+### [2026-07-12] IMP — Preprod K8s en pause : deploy_preprod derrière K8S_PREPROD_ENABLED
+
+#### Contexte
+Déploiements staging en échec quasi systématique et app preprod inaccessible. Diagnostic sur le cluster (kubeconfig local) : nœud unique 1 vCPU / 2 Go saturé (requests 90 % CPU / 95 % RAM), `NodeNotReady` ×15 en 21 h, rolling updates impossibles faute de marge (`helm --atomic` timeout → rollback), Prometheus ajouté la veille comme facteur aggravant, stack legacy en doublon dans le namespace `default`. Décision utilisateur : arrêter la preprod (coût), recréer plus tard.
+
+#### Fichiers modifiés
+- `.github/workflows/cd.yml` — `deploy_preprod` conditionné à `vars.K8S_PREPROD_ENABLED == 'true'` (même pattern que `K8S_PROD_ENABLED`) + commentaires
+- `README.md` — ligne `K8S_PREPROD_ENABLED` dans le tableau des variables GitHub Actions
+- `.agents/DECISIONS.md` — entrée « Preprod Kubernetes mise en pause »
+
+#### Ce qui est utilisable
+- Les pushes sur `staging` publient toujours les images `mymemomaster_preprod_*` mais skippent le déploiement K8s ; notification Discord verte (skipped ≠ failure dans le job notify)
+
+#### Checklist de recréation (quand le budget le permet)
+1. Recréer le cluster avec un nœud ≥ 4 Go (ou 2 nœuds) ; 2. Secret `KUBECONFIG_PREPROD` ; 3. Variable `K8S_PREPROD_ENABLED=true` ; 4. Ne pas redéployer la stack legacy du namespace `default`
+
+#### État
+| Module | État |
+|--------|------|
+| CD — deploy_preprod | En pause volontaire — job skippé tant que `K8S_PREPROD_ENABLED` absente ; chart Helm + values versionnés et prêts |

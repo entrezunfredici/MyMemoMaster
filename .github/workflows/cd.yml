@@ -29,7 +29,8 @@ permissions:
 #    VPS_PORT                — port SSH du VPS
 #    VPS_IP                  — adresse IP du VPS
 #
-#  Branche staging → environnement "preprod" (Kubernetes) :
+#  Branche staging → environnement "preprod" (Kubernetes — activé via variable
+#  K8S_PREPROD_ENABLED=true ; cluster en pause pour raisons de coût depuis 2026-07-12) :
 #    KUBECONFIG_PREPROD      — kubeconfig base64 pour le cluster K8s preprod
 #
 #  Branche main (Kubernetes prod — activé via variable K8S_PROD_ENABLED=true) :
@@ -231,6 +232,8 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   #  2b. DEPLOY PREPROD → Kubernetes via Helm
   #      Release : mmm-preprod  /  Namespace : mymemomaster-preprod
+  #      Désactivé jusqu'à K8S_PREPROD_ENABLED=true dans Settings → Variables
+  #      (cluster preprod supprimé pour raisons de coût — à recréer plus tard).
   #
   #  Première fois : exécuter k8s/helm-migrate.sh preprod pour adopter les
   #  ressources kubectl existantes avant de laisser Helm les gérer.
@@ -240,7 +243,7 @@ jobs:
     name: Deploy to Kubernetes (preprod)
     runs-on: ubuntu-latest
     needs: push_images
-    if: needs.push_images.outputs.branch == 'staging'
+    if: needs.push_images.outputs.branch == 'staging' && vars.K8S_PREPROD_ENABLED == 'true'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

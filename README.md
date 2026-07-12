@@ -272,6 +272,7 @@ base64 -w0 config-infomaniak-preprod
 | Variable             | Valeur   | Description                                                                             |
 | -------------------- | -------- | --------------------------------------------------------------------------------------- |
 | `K8S_PROD_ENABLED` | `true` | Active le déploiement prod. À ajouter uniquement quand le cluster prod K8s est prêt. |
+| `K8S_PREPROD_ENABLED` | `true` | Active le déploiement preprod. Absente = job skippé (cluster preprod en pause pour raisons de coût depuis 2026-07-12). |
 
 ---
 

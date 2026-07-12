@@ -923,3 +923,15 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : garder les deux fichiers en supprimant seulement les profils morts du racine — moins risqué mais conserve la double maintenance des variables d'environnement ; renommer les services test en `api`/`front` pour coller à l'ancien script CD — impossible, les noms sont déjà pris par les services du profil `dev` dans le même fichier.
 
 **Conséquences** : le `.env` du VPS doit recevoir `COMPOSE_PROFILES=test` (le CD n'en dépend pas grâce à `--profile test` explicite, mais les commandes manuelles du RUNBOOK oui). Au premier déploiement post-migration, les conteneurs changent de nom (`api` → `api_server`…) — les volumes nommés (postgres-data, backup-data…) sont conservés car le nom de projet ne change pas. Les commandes d'exploitation utilisent désormais les noms `*_server` (RUNBOOK et MANUEL_DEPLOIEMENT_VPS mis à jour). Le fichier déployé contient les blocs `build:` du profil dev — inertes sur le VPS tant que le profil dev n'y est pas activé. Révoque la décision du 2026-06-11.
+
+---
+
+### [2026-07-12] Preprod Kubernetes mise en pause — job deploy_preprod derrière la variable K8S_PREPROD_ENABLED
+
+**Contexte** : le cluster preprod Infomaniak tourne sur un unique nœud 1 vCPU / 2 Go, saturé par les réservations (850m CPU / 95 % RAM demandés) : `NodeNotReady` ×15 en 21 h, rolling updates impossibles faute de marge (le pod de surge reste Pending → `helm --atomic` timeout → rollback ; un seul déploiement récent a réussi, dans une fenêtre post-reboot), app inaccessible. L'ajout de Prometheus (2026-07-11) a aggravé la pression mémoire. L'utilisateur choisit d'arrêter la preprod pour raisons de coût et de la recréer plus tard sur un nœud correctement dimensionné.
+
+**Décision** : conditionner le job `deploy_preprod` de `cd.yml` à la variable GitHub Actions `K8S_PREPROD_ENABLED == 'true'` — même mécanisme que `K8S_PROD_ENABLED` pour la prod. Variable absente = job skippé proprement (le job `notify` ne compte que les `failure`, la notification Discord reste verte). Le job `push_images` continue de publier les images `mymemomaster_preprod_*` sur DockerHub à chaque push staging (gratuit, garde les images prêtes pour la recréation).
+
+**Alternative écartée** : supprimer le job du workflow — perd le squelette fonctionnel et l'historique de config pour la recréation ; réduire les requests/désactiver Prometheus pour faire tenir la stack sur 2 Go — pansement sur un nœud structurellement sous-dimensionné (2 stacks + ingress + cert-manager + CNI ne tiennent pas dans 1,37 Go allouables).
+
+**Conséquences** : à la recréation du cluster : (1) recréer le secret `KUBECONFIG_PREPROD`, (2) créer la variable `K8S_PREPROD_ENABLED=true`, (3) dimensionner le nœud à 4 Go minimum (ou 2 nœuds), (4) ne pas redéployer la stack legacy du namespace `default` (`mymemomaster-test-*`, doublon de l'époque test-sur-K8s qui consommait ~30 % du nœud). Le chart Helm et les values preprod restent versionnés et prêts.
