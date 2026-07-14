@@ -31,19 +31,21 @@
 
         <div v-else-if="!isFinished" class="space-y-4">
           <div class="w-full p-3 bg-white text-dark text-xl text-center font-semibold mt-1">
-            {{ currentCard.question?.statement }}
+            <FormulaText :text="currentCard.question?.statement || ''" />
           </div>
 
           <!-- Réponse ouverte -->
           <div v-if="currentCard.question?.type !== 'mcq'" class="py-2">
             <span class="text-sm font-medium text-gray-light uppercase">Ta Réponse</span>
-            <textarea aria-label="Saisissez votre réponse"
-              v-model="userAnswer"
-              :disabled="showFeedback || submitting"
-              placeholder="Saisissez votre réponse..."
-              class="w-full p-3 rounded-lg text-dark border-2 border-gray focus:border-primary outline-none transition mt-1"
-              rows="3"
-            />
+            <FormulaHelper v-model="userAnswer" :disabled="showFeedback || submitting">
+              <textarea aria-label="Saisissez votre réponse"
+                v-model="userAnswer"
+                :disabled="showFeedback || submitting"
+                placeholder="Saisissez votre réponse... (formules entre $…$)"
+                class="w-full p-3 rounded-lg text-dark border-2 border-gray focus:border-primary outline-none transition mt-1"
+                rows="3"
+              />
+            </FormulaHelper>
           </div>
 
           <!-- QCM -->
@@ -67,7 +69,7 @@
                   :disabled="showFeedback || submitting"
                   class="accent-primary shrink-0"
                 />
-                <span class="text-dark">{{ opt.text }}</span>
+                <span class="text-dark"><FormulaText :text="opt.text || ''" /></span>
               </label>
             </template>
             <p v-else class="text-sm text-red-400 italic py-2">
@@ -86,7 +88,7 @@
                 Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%
               </p>
               <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
-                Réponse attendue : {{ cardStore.lastCorrection?.correction }}
+                Réponse attendue : <FormulaText :text="cardStore.lastCorrection?.correction || ''" />
               </p>
               <p v-if="cardStore.lastCorrection?.explanation" class="text-sm mt-1 opacity-80">
                 {{ cardStore.lastCorrection?.explanation }}
@@ -120,7 +122,7 @@
         <h4 class="text-primary text-lg font-semibold pb-2">Dernières erreurs</h4>
         <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
           <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-primary/10 rounded-lg px-3 py-2 text-sm">
-            <span>{{ err.question?.statement }}</span>
+            <span><FormulaText :text="err.question?.statement || ''" /></span>
           </div>
         </div>
       </div>
@@ -149,6 +151,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Button from '@/components/ButtonComponent.vue'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
 import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
@@ -200,7 +205,7 @@ function mcqOptClass(oiStr, opt) {
 
 const handleValidation = async () => {
   submitting.value = true
-  const ok = await cardStore.submitResponse(currentCard.value.idCard, userAnswer.value)
+  const ok = await cardStore.submitResponse(currentCard.value.idCard, normalizeFormulaSyntax(userAnswer.value))
   submitting.value = false
 
   if (!ok) return  // le store a déjà affiché le notif d'erreur

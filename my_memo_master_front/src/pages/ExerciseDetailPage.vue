@@ -23,16 +23,18 @@
           class="bg-gray-50 p-6 rounded-lg border border-gray-200"
         >
           <h3 class="text-lg font-semibold text-heading mb-4">Question {{ idx + 1 }}</h3>
-          <p class="text-base text-body mb-5">{{ question.statement }}</p>
+          <p class="text-base text-body mb-5"><FormulaText :text="question.statement || ''" /></p>
 
           <!-- open -->
           <template v-if="question.type === 'open'">
-            <textarea aria-label="Entrez votre réponse ici"
-              v-model="userAnswers[idx]"
-              placeholder="Entrez votre réponse ici..."
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              rows="3"
-            />
+            <FormulaHelper v-model="userAnswers[idx]">
+              <textarea aria-label="Entrez votre réponse ici"
+                v-model="userAnswers[idx]"
+                placeholder="Entrez votre réponse ici... (formules entre $…$)"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                rows="3"
+              />
+            </FormulaHelper>
           </template>
 
           <!-- mcq -->
@@ -51,7 +53,7 @@
                   @change="userAnswers[idx] = oi"
                   class="accent-blue-600"
                 />
-                <span>{{ opt.text }}</span>
+                <span><FormulaText :text="opt.text || ''" /></span>
               </label>
             </div>
           </template>
@@ -63,7 +65,7 @@
                 v-for="(part, pi) in parsedTemplate(question)"
                 :key="pi"
               >
-                <span v-if="part.type === 'text'">{{ part.value }}</span>
+                <FormulaText v-if="part.type === 'text'" :text="part.value" />
                 <input :aria-label="`Réponse du trou ${part.index}`"
                   v-else
                   v-model="userAnswers[idx][part.index]"
@@ -88,7 +90,7 @@
                 class="px-3 py-1.5 border-2 rounded-lg text-sm font-medium transition"
                 :class="selectedFragments[idx].includes(fi) ? 'border-gray-200 text-gray-300 bg-gray-50 cursor-not-allowed' : 'border-blue-400 text-blue-700 hover:bg-blue-50'"
               >
-                {{ frag }}
+                <FormulaText :text="frag" />
               </button>
             </div>
             <div class="min-h-10 flex flex-wrap gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg">
@@ -101,7 +103,7 @@
                 class="px-3 py-1.5 border-2 border-green-400 text-green-700 rounded-lg text-sm font-medium hover:bg-red-50 hover:border-red-400 hover:text-red-700 transition"
                 title="Cliquer pour retirer"
               >
-                {{ shuffledFragments[idx][fi] }}
+                <FormulaText :text="shuffledFragments[idx][fi]" />
               </button>
             </div>
           </template>
@@ -143,16 +145,16 @@
               {{ questionResults[idx]?.correct ? 'Correct' : 'Incorrect' }}
             </span>
           </div>
-          <p class="text-base text-body mb-4">{{ question.statement }}</p>
+          <p class="text-base text-body mb-4"><FormulaText :text="question.statement || ''" /></p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-white p-4 rounded-lg border border-gray-200">
               <p class="font-semibold text-gray-700 mb-2 text-sm">Votre réponse</p>
-              <p class="text-gray-600 text-sm">{{ formatUserAnswer(question, idx) }}</p>
+              <p class="text-gray-600 text-sm"><FormulaText :text="formatUserAnswer(question, idx)" /></p>
             </div>
             <div class="bg-white p-4 rounded-lg border border-gray-200">
               <p class="font-semibold text-gray-700 mb-2 text-sm">Réponse attendue</p>
-              <p class="text-gray-600 text-sm">{{ formatCorrectAnswer(question) }}</p>
+              <p class="text-gray-600 text-sm"><FormulaText :text="formatCorrectAnswer(question)" /></p>
             </div>
           </div>
           <p
@@ -234,6 +236,9 @@ import { useTestStore } from '@/stores/tests'
 import { useTestResultStore } from '@/stores/testResults'
 import { useDeadlineStore } from '@/stores/deadlines'
 import { notif } from '@/helpers/notif'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
 const route = useRoute()
 const testStore = useTestStore()
@@ -341,10 +346,20 @@ function unselectFragment(qIdx, pos) {
 
 // ── correction ────────────────────────────────────────────────────────────────
 
+// Normalise la syntaxe des formules d'une réponse avant envoi (string ou
+// tableau de strings — les index MCQ restent intacts)
+function normalizeAnswer(answer) {
+  if (typeof answer === 'string') return normalizeFormulaSyntax(answer)
+  if (Array.isArray(answer)) {
+    return answer.map(a => (typeof a === 'string' ? normalizeFormulaSyntax(a) : a))
+  }
+  return answer
+}
+
 async function submitAnswers() {
   const answers = questions.value.map((q, idx) => ({
     questionId: q.idQuestion,
-    answer: userAnswers[idx] ?? null
+    answer: normalizeAnswer(userAnswers[idx] ?? null)
   }))
 
   const result = await testResultStore.submitTest(test.value.testId, answers)

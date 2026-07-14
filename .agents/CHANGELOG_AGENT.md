@@ -30,6 +30,7 @@
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-07-08 |
 | LeitnerSystemsUsers | Stable | init |
+| Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API | 2026-07-14 |
 | Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
@@ -5557,3 +5558,67 @@ Déploiements staging en échec quasi systématique et app preprod inaccessible.
 | Module | État |
 |--------|------|
 | CD — deploy_preprod | En pause volontaire — job skippé tant que `K8S_PREPROD_ENABLED` absente ; chart Helm + values versionnés et prêts |
+
+---
+
+### [2026-07-14] ADD — Formules mathématiques dans les systèmes de Leitner et les exercices
+
+#### Contexte
+Demande utilisateur : rendre l'interpréteur de formules (jusqu'ici réservé aux nœuds `formula` des cartes mentales) disponible dans les flashcards Leitner et les exercices, à la création comme au passage, pour pouvoir taper des formules dans les questions et les réponses.
+
+#### Fichiers créés
+- `my_memo_master_front/src/components/FormulaTextComponent.vue` — affiche un texte mixte : les segments entre `$…$` sont rendus en KaTeX inline, le reste est échappé (pas d'injection via v-html)
+- `my_memo_master_front/src/components/FormulaHelperComponent.vue` — assistant de saisie : bouton « ƒ Insérer une formule » ouvrant l'interpréteur complet (palette de symboles) dans une ModalComponent ; à l'application, la formule est ajoutée au champ entourée de `$…$` ; aperçu rendu dès que le champ contient une formule
+- `my_memo_master_front/test/components/FormulaText.test.js` — 19 tests (renderInlineMath : nominal, multi-formules, `$` non apparié, `$$` vide, échappement HTML, LaTeX invalide sans throw, null ; FormulaText ; FormulaHelper : ouverture modale, insertion, apply vide)
+
+#### Fichiers modifiés
+- `src/components/interpreter/interpreter.js` — ajout `escapeHtml`, `hasFormula`, `renderInlineMath` (découpe sur `$…$`, KaTeX inline via `renderMath` existant)
+- `src/pages/FlashcardsCardsPage.vue` — FormulaText sur la liste des cartes (question + réponse), FormulaHelper sous les champs Question et Réponse de la modale
+- `src/pages/FlashcardsSessionPage.vue` — FormulaText sur l'énoncé, les options QCM, la réponse attendue et la liste d'erreurs ; FormulaHelper sous la réponse ouverte (masqué pendant feedback/correction)
+- `src/pages/ExerciseDetailPage.vue` — FormulaText sur énoncés, options QCM, segments texte des fill_blank, fragments reorder, réponses utilisateur/attendue en mode résultats ; FormulaHelper sous la réponse ouverte
+- `src/pages/CreateTestPage.vue` — FormulaHelper sous Question et Réponse, FormulaText sur le récap
+
+#### Ce qui est utilisable
+- Taper `$sqrt(16)$`, `$over(1, 2)$`, etc. dans n'importe quel champ question/réponse/option → rendu KaTeX à l'affichage (mêmes raccourcis que l'interpréteur mindmap)
+- Bouton « ƒ Insérer une formule » sur les champs de création (cartes Leitner, exercices) et de réponse ouverte (session Leitner, passage d'exercice)
+- Vérifié : 593/593 tests front verts, lint OK, audit a11y `scripts/audit-a11y.mjs` : 0 non-conformité
+
+#### Hypothèses posées
+- Les formules sont stockées telles quelles (texte avec `$…$`) — aucun changement API/BDD
+- Les options QCM se saisissent en `$…$` manuel (pas de bouton ƒ par option, jugé trop lourd visuellement)
+
+#### Dette / non couvert
+- La correction sémantique (questions ouvertes) compare le texte brut : une réponse `$x^2$` face à une attente `x au carré` dépend de la similarité textuelle — non calibré pour les formules
+- La correction exacte (texte à trou, réponse exacte) compare les chaînes : `$over(1,2)$` ≠ `$frac(1,2)$` même si le rendu est identique
+
+#### État
+| Module | État |
+|--------|------|
+| Formules mathématiques (Leitner + exercices) | Stable — rendu + saisie assistée, 19 tests dédiés |
+
+---
+
+### [2026-07-14] IMP — Formules : syntaxe canonique unique + bouton ƒ latéral + insertion au curseur
+
+#### Contexte
+Suite immédiate du ticket formules : (1) deux écritures d'une même fraction (`frac`/`over`) cassaient l'équivalence à la correction (comparaison de chaînes) ; (2) le bouton d'insertion sous le champ prenait de la place ; (3) l'insertion se faisait en fin de champ, pas là où l'utilisateur écrit.
+
+#### Fichiers modifiés
+- `src/components/interpreter/interpreter.js` — ajout `normalizeFormulaSyntax()` (`frac(` → `over(`) ; `toLatex` continue d'interpréter `frac` pour le contenu historique (mindmaps)
+- `src/components/interpreter/Interpreter.vue` — bouton palette `frac(a, b)` (alias) supprimé, `over(a, b)` reste l'unique fraction
+- `src/components/FormulaHelperComponent.vue` — refonte : le champ passe en slot, bouton compact « ƒ » sur le côté du champ (aria-label + title), capture de la position du curseur à l'ouverture et **insertion à cette position** ; formule normalisée à l'insertion ; prop `disabled` (remplace le v-if côté page)
+- Les 4 pages (FlashcardsCardsPage, FlashcardsSessionPage, ExerciseDetailPage, CreateTestPage) — champs enveloppés dans `<FormulaHelper>` (slot) ; **normalisation avant tout envoi API** : énoncés, réponses, options MCQ à la création/édition, réponses utilisateur à la soumission (session Leitner, passage d'exercice — strings et tableaux de strings, index MCQ intacts)
+- `test/components/FormulaText.test.js` — 23 tests (+4) : normalizeFormulaSyntax, insertion au curseur, fallback fin de champ, normalisation à l'insertion, prop disabled
+
+#### Ce qui est utilisable
+- Une seule écriture stockée pour la fraction (`over`) : l'équivalence frac/over à la correction est résolue par construction pour tout contenu créé/répondu via le front
+- Vérifié : 597/597 tests front verts, lint OK, audit a11y 0 non-conformité
+
+#### Dette / non couvert
+- Le contenu déjà en base saisi en `frac(…)` reste tel quel (rendu OK, mais non normalisé) — une migration de données serait nécessaire pour l'uniformiser rétroactivement
+- Les autres équivalences d'écriture (`x^2` vs `x*x`, espaces dans `over(1,2)` vs `over(1, 2)`) ne sont pas traitées — normalisation limitée aux alias de syntaxe
+
+#### État
+| Module | État |
+|--------|------|
+| Formules mathématiques (Leitner + exercices) | Stable — syntaxe canonique, bouton latéral, insertion au curseur |

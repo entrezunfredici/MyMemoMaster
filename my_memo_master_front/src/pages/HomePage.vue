@@ -23,9 +23,6 @@
     <section class="home__alerts">
       <KpiAlertWidgetComponent />
     </section>
-    <section class="home__interpreter">
-      <Interpreter />
-    </section>
   </div>
 </template>
 

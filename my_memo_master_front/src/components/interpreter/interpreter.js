@@ -29,7 +29,9 @@ export function toLatex(src) {
     .replace(/\bsqrt\(([^()]*)\)/g, '\\sqrt{$1}')
     .replace(/\bnsqrt\(([^,]+),\s*([^()]+)\)/g, '\\sqrt[$1]{$2}')
 
-  // frac/over
+  // over — syntaxe canonique de la fraction ; frac reste interprété pour le
+  // contenu historique mais n'est plus proposé ni accepté à la saisie
+  // (normalizeFormulaSyntax le réécrit en over)
   s = s
     .replace(/\bfrac\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
     .replace(/\bover\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
@@ -97,4 +99,43 @@ export function renderMathMultiline(input) {
     .filter(Boolean)
 
   return lines.map(l => renderMath(l, { displayMode: true })).join('')
+}
+
+// Échappe le HTML des segments de texte brut (le résultat est injecté en v-html)
+export function escapeHtml(input) {
+  return String(input ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// true si le texte contient au moins une formule délimitée $…$
+export function hasFormula(input) {
+  return /\$[^$]+\$/.test(String(input ?? ''))
+}
+
+// Réécrit les alias de syntaxe vers la forme canonique unique (frac -> over),
+// pour qu'une même formule n'ait qu'une seule écriture stockée : la correction
+// des réponses compare des chaînes, deux écritures d'une même fraction seraient
+// sinon jugées différentes. Appliqué à l'insertion (FormulaHelper) et avant
+// tout envoi de question/réponse à l'API.
+export function normalizeFormulaSyntax(input) {
+  return String(input ?? '').replace(/\bfrac\(/g, 'over(')
+}
+
+// Texte mixte -> HTML : les segments entre $…$ sont rendus en KaTeX inline,
+// le reste est échappé tel quel. Un '$' non apparié reste littéral.
+// Utilisé pour les énoncés/réponses des flashcards Leitner et des exercices.
+export function renderInlineMath(input) {
+  const src = String(input ?? '')
+  if (!src.includes('$')) return escapeHtml(src)
+
+  // Les index impairs du split correspondent aux groupes capturés (formules)
+  return src
+    .split(/\$([^$]+)\$/g)
+    .map((segment, i) =>
+      i % 2 === 1 ? renderMath(segment, { displayMode: false }) : escapeHtml(segment)
+    )
+    .join('')
 }

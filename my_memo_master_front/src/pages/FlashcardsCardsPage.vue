@@ -52,8 +52,8 @@
               class="flex items-start justify-between bg-white border border-gray-200 rounded-lg p-4 shadow-xs"
             >
               <div class="flex-1 min-w-0 pr-4">
-                <p class="font-semibold text-heading">{{ card.question?.statement }}</p>
-                <p class="text-sm text-gray-500 mt-1 italic">{{ card.correctAnswer || '…' }}</p>
+                <p class="font-semibold text-heading"><FormulaText :text="card.question?.statement || ''" /></p>
+                <p class="text-sm text-gray-500 mt-1 italic"><FormulaText :text="card.correctAnswer || '…'" /></p>
               </div>
               <div class="flex gap-2 flex-shrink-0">
                 <button
@@ -115,25 +115,29 @@
 
           <div class="form-group">
             <label class="form-label">Question</label>
-            <textarea aria-label="Énoncé de la carte"
-              v-model="form.statement"
-              placeholder="Quelle est la loi d'Ohm ?"
-              class="form-input"
-              rows="3"
-              required
-            />
+            <FormulaHelper v-model="form.statement">
+              <textarea aria-label="Énoncé de la carte"
+                v-model="form.statement"
+                placeholder="Quelle est la loi d'Ohm ? (formules entre $…$)"
+                class="form-input"
+                rows="3"
+                required
+              />
+            </FormulaHelper>
           </div>
 
           <!-- Champ réponse : open uniquement -->
           <div v-if="form.type === 'open'" class="form-group--lg">
             <label class="form-label">Réponse correcte</label>
-            <textarea aria-label="Réponse de la carte"
-              v-model="form.answer"
-              placeholder="U = R × I"
-              class="form-input"
-              rows="2"
-              required
-            />
+            <FormulaHelper v-model="form.answer">
+              <textarea aria-label="Réponse de la carte"
+                v-model="form.answer"
+                placeholder="U = R × I"
+                class="form-input"
+                rows="2"
+                required
+              />
+            </FormulaHelper>
           </div>
 
           <!-- Options MCQ -->
@@ -253,6 +257,9 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -414,13 +421,13 @@ const handleCreate = async () => {
     }
   }
 
-  // 1. Créer la question (contenu selon le type)
+  // 1. Créer la question (contenu selon le type) — syntaxe de formule normalisée
   const questionPayload = {
-    statement: form.statement,
+    statement: normalizeFormulaSyntax(form.statement),
     questionPosition: 0,
     type: form.type,
     content: form.type === 'mcq'
-      ? { options: form.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+      ? { options: form.mcqOptions.map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) }
       : null,
   }
 
@@ -434,7 +441,7 @@ const handleCreate = async () => {
   // 2. Créer la réponse correcte (open uniquement — la correction MCQ est dans content)
   if (form.type === 'open') {
     const rResp = await api.post('responses', {
-      content: form.answer,
+      content: normalizeFormulaSyntax(form.answer),
       correction: true,
       idQuestion,
     })
@@ -467,9 +474,9 @@ const handleUpdate = async () => {
     return
   }
 
-  const qPayload = { statement: form.statement }
+  const qPayload = { statement: normalizeFormulaSyntax(form.statement) }
   if (isMcq) {
-    qPayload.content = { options: form.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+    qPayload.content = { options: form.mcqOptions.map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) }
   }
 
   const qResp = await api.put(`questions/edit/${card.idQuestion}`, qPayload)
@@ -481,14 +488,14 @@ const handleUpdate = async () => {
   // Réponse uniquement pour les cartes ouvertes
   if (!isMcq) {
     if (card.idResponse) {
-      const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: form.answer })
+      const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: normalizeFormulaSyntax(form.answer) })
       if (!rResp || rResp.status !== 200) {
         formError.value = rResp?.data?.message || 'Erreur lors de la mise à jour de la réponse.'
         return
       }
     } else if (form.answer.trim()) {
       const rResp = await api.post('responses', {
-        content: form.answer,
+        content: normalizeFormulaSyntax(form.answer),
         correction: true,
         idQuestion: card.idQuestion,
       })

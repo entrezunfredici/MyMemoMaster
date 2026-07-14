@@ -144,7 +144,6 @@ const extraPalette = [
   { label: 'sqrt(…)',      insert: 'sqrt(__CARET__)',                description: 'Racine carrée' },
   { label: 'nsqrt(n, …)',  insert: 'nsqrt(__CARET__)',               description: 'Racine n-ième', action: 'nsqrt' },
   { label: 'over(a, b)',   insert: 'over(__CARET__, )',              description: 'Fraction' },
-  { label: 'frac(a, b)',   insert: 'frac(__CARET__, )',              description: 'Fraction (alias)' },
   { label: 'widevec(…)',   insert: 'widevec(__CARET__)',             description: 'Vecteur' },
   { label: 'matrix(a;b)',  insert: 'matrix(__CARET__)',              description: 'Matrice (a,b; c,d; …)' },
   { label: 'mattrix([...])', insert: 'mattrix([__CARET__],[],[])',   description: 'Matrice 3×3' },

@@ -935,3 +935,27 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : supprimer le job du workflow — perd le squelette fonctionnel et l'historique de config pour la recréation ; réduire les requests/désactiver Prometheus pour faire tenir la stack sur 2 Go — pansement sur un nœud structurellement sous-dimensionné (2 stacks + ingress + cert-manager + CNI ne tiennent pas dans 1,37 Go allouables).
 
 **Conséquences** : à la recréation du cluster : (1) recréer le secret `KUBECONFIG_PREPROD`, (2) créer la variable `K8S_PREPROD_ENABLED=true`, (3) dimensionner le nœud à 4 Go minimum (ou 2 nœuds), (4) ne pas redéployer la stack legacy du namespace `default` (`mymemomaster-test-*`, doublon de l'époque test-sur-K8s qui consommait ~30 % du nœud). Le chart Helm et les values preprod restent versionnés et prêts.
+
+---
+
+### [2026-07-14] Formules dans Leitner/exercices — convention inline `$…$` réutilisant l'interpréteur mindmap, sans changement API
+
+**Contexte** : l'utilisateur veut des formules mathématiques dans les questions et réponses des flashcards Leitner et des exercices (création et passage). L'interpréteur KaTeX existe déjà (`src/components/interpreter/`) mais ne servait qu'aux nœuds `formula` des cartes mentales, où tout le contenu du nœud est une formule — alors qu'un énoncé de question est un texte mixte (prose + formules).
+
+**Décision** : convention de délimitation inline `$…$` dans les champs texte existants, rendue par un nouveau `renderInlineMath()` dans `interpreter.js` (segments hors formule échappés HTML, segments `$…$` passés au `renderMath()` existant en mode inline). Deux composants réutilisables : `FormulaTextComponent` (affichage) posé sur tous les points d'affichage des deux modules, et `FormulaHelperComponent` (saisie : bouton ouvrant l'interpréteur complet dans une `ModalComponent`, insertion de la formule entourée de `$…$`, aperçu live). Les données restent du texte brut — aucun changement de schéma, d'endpoint ou de validator.
+
+**Alternative écartée** : un champ « type formule » séparé côté modèle (comme les nœuds mindmap) — impose une migration, des changements de validators et une UI à deux champs pour un besoin qui est du texte mixte ; un éditeur riche (contenteditable avec rendu in-place) — disproportionné et fragile par rapport à la convention `$…$` + aperçu.
+
+**Conséquences** : n'importe quel champ affiché via `FormulaTextComponent` interprète `$…$` (délimiteur réservé ; un `$` isolé reste littéral). La correction des réponses compare toujours le texte brut : deux écritures différentes d'une même formule ne sont pas reconnues équivalentes (dette documentée dans CHANGELOG_AGENT). Tout nouvel affichage de question/réponse doit passer par `FormulaTextComponent` pour rester cohérent.
+
+---
+
+### [2026-07-14] Syntaxe de formule canonique unique — alias frac supprimé à la saisie, normalisé partout, toujours rendu
+
+**Contexte** : l'interpréteur acceptait deux écritures de la fraction (`over(a, b)` et son alias `frac(a, b)`). La correction des réponses comparant des chaînes brutes, `$over(1, 2)$` et `$frac(1, 2)$` étaient jugées différentes alors que leur rendu est identique.
+
+**Décision** : `over` devient la seule syntaxe canonique. Le bouton `frac` disparaît de la palette de l'interpréteur, et `normalizeFormulaSyntax()` (`frac(` → `over(`) est appliquée à trois points : à l'insertion via FormulaHelper, à la création/édition de contenu (cartes Leitner, questions/réponses/options d'exercices) et à la soumission des réponses (session Leitner, passage d'exercice). `toLatex()` continue en revanche d'interpréter `frac` à l'affichage, pour le contenu historique (nœuds formule des mindmaps notamment).
+
+**Alternative écartée** : normaliser côté API (middleware ou service) — plus robuste (couvre tout client) mais touche des services stables et le besoin est aujourd'hui exclusivement front ; supprimer `frac` aussi du rendu — casserait l'affichage du contenu existant.
+
+**Conséquences** : l'équivalence frac/over est résolue par construction pour tout contenu passant par le front. Toute nouvelle syntaxe à raccourcis dans l'interpréteur doit être ajoutée **sans alias** (une écriture = une forme stockée), ou l'alias doit être ajouté à `normalizeFormulaSyntax`. Le contenu historique en `frac` reste non normalisé en base (rendu correct ; migration de données si l'uniformisation rétroactive devient nécessaire).
