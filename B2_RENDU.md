@@ -70,7 +70,7 @@ MyMemoMaster/
 └── diagrams/                 # Spécifications : règles métier, schéma BDD, UI
 ```
 
-La mémoire du projet est synthétisée dans [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md), qui présente le dispositif et renvoie vers les fichiers sources de [.agents/](annexes/.agents/). Le choix du monorepo est une décision de conception, argumentée en section 1.4.
+La mémoire du projet est synthétisée dans [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md), qui présente le dispositif et renvoie vers les fichiers sources de [dev/](annexes/dev/). Le choix du monorepo est une décision de conception, argumentée en section 1.4.
 
 ## Architecture de l'application
 
@@ -192,7 +192,7 @@ Les tests Jest + Supertest côté API, Vitest + @vue/test-utils côté front son
 - **Healthchecks** à tous les étages : `pg_isready` (PostgreSQL), `redis-cli ping` (Redis), `wget --spider` (front) — utilisés par les dépendances de démarrage (`depends_on: condition: service_healthy`) et comme critère de succès du déploiement (section 6) ;
 - **Limites de ressources** : `limits`/`reservations` CPU-mémoire sur chaque service Compose, `requests`/`limits` Kubernetes par environnement, pool de connexions PostgreSQL dimensionné par configuration ([dbms.config.js](my_memo_master_api/config/dbms.config.js)) ;
 - **Logs structurés** : logger Winston + logs d'accès Morgan pipés dans Winston, format `combined` en production ([app.js](my_memo_master_api/app.js)) ;
-- **Métriques RED/USE (Prometheus)** : histogramme `http_request_duration_seconds` et compteur `http_requests_total` labellisés méthode/route/code, métriques process Node via `prom-client` ([helpers/metrics.js](my_memo_master_api/helpers/metrics.js)). L'endpoint `/metrics` est servi par un **serveur HTTP dédié** (port 9090) jamais exposé par l'Ingress — décision documentée dans [.agents/DECISIONS.md](annexes/.agents/DECISIONS.md) ; l'instrumentation a 9 tests dédiés ;
+- **Métriques RED/USE (Prometheus)** : histogramme `http_request_duration_seconds` et compteur `http_requests_total` labellisés méthode/route/code, métriques process Node via `prom-client` ([helpers/metrics.js](my_memo_master_api/helpers/metrics.js)). L'endpoint `/metrics` est servi par un **serveur HTTP dédié** (port 9090) jamais exposé par l'Ingress — décision documentée dans [dev/DECISIONS.md](annexes/dev/DECISIONS.md) ; l'instrumentation a 9 tests dédiés ;
 - **Notifications temps réel** : chaque exécution CI/CD notifie un canal Discord (succès/échec, branche concernée) — l'équipe est prévenue d'une régression sans surveiller GitHub (section 2.5).
 
 ### Analyse statique continue : SonarCloud (SonarQube Cloud)
@@ -350,7 +350,7 @@ La conception des interfaces suit quatre niveaux de raffinement successifs :
 
 Versionner ces maquettes avec le code est une décision de méthode : la spécification d'interface évolue dans les mêmes pull requests que son implémentation et distingue l'existant du nouveau — le prototype s'inscrit dans un incrément, pas dans une refonte.
 
-**Niveau 3 — Implémentation Vue.** Chaque maquette se concrétise en une page (`src/pages/[Name]Page.vue`) composée de composants réutilisables (`src/components/[Name]Component.vue`), conventions formalisées dans [.agents/CONVENTIONS.md](annexes/.agents/CONVENTIONS.md).
+**Niveau 3 — Implémentation Vue.** Chaque maquette se concrétise en une page (`src/pages/[Name]Page.vue`) composée de composants réutilisables (`src/components/[Name]Component.vue`), conventions formalisées dans [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md).
 
 ## 3.2 Un prototype fonctionnel couvrant les fonctionnalités attendues
 
@@ -379,7 +379,7 @@ Les médias ciblés sont le **navigateur web, desktop et mobile**. Trois disposi
 - **PWA (Progressive Web App)** : le front est installable sur mobile via `vite-plugin-pwa` ([vite.config.js](my_memo_master_front/vite.config.js)) — manifeste complet et mise à jour automatique du service worker. Décision de conception commentée dans le fichier : **aucun asset pré-caché** (`globPatterns: []`), car sur une application au contenu essentiellement dynamique, un pré-cache Workbox de plusieurs Mo dégraderait la première installation sans bénéfice réel.
 - **Guidage utilisateur** : l'ergonomie de prise en main est traitée comme une fonctionnalité à part entière — parcours d'onboarding persisté côté serveur (module `OnboardingState` de l'API), page de tutoriels, notifications toast (`vue-toastification`), états vides explicites (`NoItemComponent`), indicateurs de chargement (`LoaderComponent`), titres d'onglet dynamiques par page (`document.title` dans le guard de navigation, [src/router/index.js](my_memo_master_front/src/router/index.js)).
 
-Une règle d'ergonomie issue d'un défaut réellement rencontré est même codifiée dans les conventions du projet ([.agents/CONVENTIONS.md](annexes/.agents/CONVENTIONS.md)) : les popups et panneaux flottants doivent déclarer un fond opaque explicite pour rester lisibles quelle que soit la page en dessous.
+Une règle d'ergonomie issue d'un défaut réellement rencontré est même codifiée dans les conventions du projet ([dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)) : les popups et panneaux flottants doivent déclarer un fond opaque explicite pour rester lisibles quelle que soit la page en dessous.
 
 ## 3.4 Exigences de sécurité intégrées au prototype
 
@@ -407,7 +407,7 @@ if (to.meta.roles && to.meta.roles.length > 0) {
 
 Les routes déclarent leur exigence dans leurs métadonnées (`meta.private`, `meta.roles`) : ajouter un écran protégé ne demande aucune logique nouvelle, seulement une déclaration — le contrôle d'accès est systématique par construction. Ce contrôle côté client est un confort d'expérience utilisateur (redirection immédiate) ; l'autorité reste côté API, où chaque route privée est protégée par middleware JWT et RBAC (section 5.2).
 
-**Gestion de session sécurisée.** Le client HTTP centralisé ([src/helpers/api.js](my_memo_master_front/src/helpers/api.js)) implémente le renouvellement silencieux de session : sur une réponse 401, un intercepteur échange le refresh token puis rejoue la requête une seule fois (drapeau `_retried` contre les boucles infinies) ; si le renouvellement échoue, l'utilisateur est déconnecté proprement. C'est la contrepartie ergonomique d'une exigence de sécurité : elle rend acceptable un jeton d'accès de 15 minutes ([.agents/DECISIONS.md](annexes/.agents/DECISIONS.md), [docs/SECURITY_AUDIT_OWASP.md](annexes/docs/SECURITY_AUDIT_OWASP.md)) sans jamais imposer de reconnexion. Le front intègre aussi un indicateur de robustesse du mot de passe à l'inscription (`PasswordStrengthComponent.vue`).
+**Gestion de session sécurisée.** Le client HTTP centralisé ([src/helpers/api.js](my_memo_master_front/src/helpers/api.js)) implémente le renouvellement silencieux de session : sur une réponse 401, un intercepteur échange le refresh token puis rejoue la requête une seule fois (drapeau `_retried` contre les boucles infinies) ; si le renouvellement échoue, l'utilisateur est déconnecté proprement. C'est la contrepartie ergonomique d'une exigence de sécurité : elle rend acceptable un jeton d'accès de 15 minutes ([dev/DECISIONS.md](annexes/dev/DECISIONS.md), [docs/SECURITY_AUDIT_OWASP.md](annexes/docs/SECURITY_AUDIT_OWASP.md)) sans jamais imposer de reconnexion. Le front intègre aussi un indicateur de robustesse du mot de passe à l'inscription (`PasswordStrengthComponent.vue`).
 
 ---
 
@@ -463,7 +463,7 @@ Le fichier [test/setup.js](my_memo_master_api/test/setup.js) désactive par déf
 
 ## 4.3 Couverture d'une fonctionnalité : l'algorithme de Leitner
 
-Pour illustrer la couverture d'une fonctionnalité complète, je prends le cœur métier de l'application : la répétition espacée dispose de : 
+Pour illustrer la couverture d'une fonctionnalité complète, je prends le cœur métier de l'application : la répétition espacée dispose de :
 
 **Les tests unitaire — [test/services/LeitnerCard.service.test.js](my_memo_master_api/test/services/LeitnerCard.service.test.js) (23 tests).** Les tests suivent systématiquement le schéma *méthode – condition – comportement attendu* et couvrent le cas nominal, les cas limites et les erreurs attendues :
 
@@ -570,7 +570,7 @@ Le backlog de l'audit a été **résorbé par lots successifs**, tracés dans le
 
 Chaque étage du pipeline de la section 5.1 porte une mesure, rattachable à une catégorie OWASP :
 
-- **A01 — Contrôle d'accès** : middleware JWT systématique sur les routes privées ([Auth.middleware.js](my_memo_master_api/middlewares/Auth.middleware.js)) ; RBAC ([requireRole.middleware.js](my_memo_master_api/middlewares/requireRole.middleware.js)) qui revérifie le rôle **en base à chaque requête** — un rôle révoqué prend effet immédiatement ([.agents/DECISIONS.md](annexes/.agents/DECISIONS.md)) ;
+- **A01 — Contrôle d'accès** : middleware JWT systématique sur les routes privées ([Auth.middleware.js](my_memo_master_api/middlewares/Auth.middleware.js)) ; RBAC ([requireRole.middleware.js](my_memo_master_api/middlewares/requireRole.middleware.js)) qui revérifie le rôle **en base à chaque requête** — un rôle révoqué prend effet immédiatement ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)) ;
 - **A02 — Cryptographie** : mots de passe bcrypt ; access token 15 min ; refresh token opaque avec **rotation à chaque renouvellement** ; token de reset hashé SHA-256 en base, token brut envoyé par email uniquement ;
 - **A03 — Injection** : requêtes exclusivement via l'ORM (paramétrées) ; nettoyage HTML de tous les champs du body ([sanitize.middleware.js](my_memo_master_api/middlewares/sanitize.middleware.js)) ; validation déclarative par entité ;
 - **A04 — Conception** : anti-énumération d'emails (réponses génériques) ; rate limiting à trois étages ([rateLimit.middleware.js](my_memo_master_api/middlewares/rateLimit.middleware.js)) — global 500 req/15 min, login 10 tentatives **échouées**/15 min, inscription 10/h — avec keying du limiteur global par userId plutôt que par IP, pour éviter le problème du NAT scolaire (plusieurs élèves derrière la même IP), cas d'usage central de l'application ;
@@ -601,7 +601,7 @@ J'ai audité [my_memo_master_front/src/](my_memo_master_front/src/) critère par
 | 3.x — Information par la couleur | Feedback bonne/mauvaise réponse fondé sur vert/rouge                                       | ✅ Vérifié doublé d'un texte explicite (« Correct »/« Incorrect », score, correction)                                                                 |
 | 13.x — Zones dynamiques          | Aucune région`aria-live`                                                                  | ✅ Zones`aria-live="polite"` sur le feedback de session et le score d'exercice ; toasts en `role="alert"`                                                |
 
-La campagne (2026-07-06, tracée dans [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md)) est **outillée et reproductible** : un audit statique développé pour le projet ([scripts/audit-a11y.mjs](my_memo_master_front/scripts/audit-a11y.mjs)) vérifie les critères ci-dessus sur les 73 fichiers `.vue` — première exécution : **135 non-conformités**, ré-exécution après correction intégrale : **0**, les motifs légitimes (overlays de fermeture, `@click.stop`) étant documentés comme exceptions dans l'outil. La **non-régression** est assurée par 4 tests axe-core sur DOM réellement rendu, exécutés dans la suite Vitest à chaque push ([test/a11y/axe.test.js](my_memo_master_front/test/a11y/axe.test.js)). Restent hors périmètre, documentés dans l'audit : la mesure des contrastes (jsdom ne rend pas les styles) et un test lecteur d'écran réel (protocole NVDA planifié sur les trois parcours critiques).
+La campagne (2026-07-06, tracée dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)) est **outillée et reproductible** : un audit statique développé pour le projet ([scripts/audit-a11y.mjs](my_memo_master_front/scripts/audit-a11y.mjs)) vérifie les critères ci-dessus sur les 73 fichiers `.vue` — première exécution : **135 non-conformités**, ré-exécution après correction intégrale : **0**, les motifs légitimes (overlays de fermeture, `@click.stop`) étant documentés comme exceptions dans l'outil. La **non-régression** est assurée par 4 tests axe-core sur DOM réellement rendu, exécutés dans la suite Vitest à chaque push ([test/a11y/axe.test.js](my_memo_master_front/test/a11y/axe.test.js)). Restent hors périmètre, documentés dans l'audit : la mesure des contrastes (jsdom ne rend pas les styles) et un test lecteur d'écran réel (protocole NVDA planifié sur les trois parcours critiques).
 
 ## 5.4 Évolutivité du code
 
@@ -609,11 +609,11 @@ La campagne (2026-07-06, tracée dans [.agents/CHANGELOG_AGENT.md](annexes/.agen
 - **Schéma de base évolutif** : **61 migrations Sequelize** versionnées ([my_memo_master_api/migrations/](my_memo_master_api/migrations/)) documentent chaque évolution du schéma et se rejouent sur les deux dialectes (SQLite/PostgreSQL) ;
 - **Configuration externalisée** : aucun paramètre d'environnement en dur (section 1.1) — la même image Docker sert plusieurs environnements, y compris par injection runtime de la config front (`window.__APP_CONFIG__`, [docker-compose.yml](docker-compose.yml) service `front_server`) ;
 - **Contrat d'API documenté** : annotations Swagger sur chaque route, servies sur `/api-docs` (section 9.3) — un client tiers peut être développé contre le contrat, pas contre le code ;
-- **Mémoire du projet** : le dossier [.agents/](annexes/.agents/) (conventions, décisions, changelog d'état) est conçu pour qu'un nouveau développeur — humain ou agent — reprenne le travail sans contexte oral (synthèse : [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)) — de l'évolutivité organisationnelle, complémentaire de l'évolutivité technique.
+- **Mémoire du projet** : le dossier [dev/](annexes/dev/) (conventions, décisions, changelog d'état) est conçu pour qu'un nouveau développeur — humain ou agent — reprenne le travail sans contexte oral (synthèse : [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)) — de l'évolutivité organisationnelle, complémentaire de l'évolutivité technique.
 
 ## 5.5 Traçabilité des versions
 
-L'historique git est structuré par les conventions de commit `[ADD]/[IMP]/[REF]/[FIX]` (section 1.4), et doublé de deux journaux versionnés : [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md) (état global module par module + une entrée par ticket terminé, avec dette éventuelle) et [.agents/DECISIONS.md](annexes/.agents/DECISIONS.md) (chaque choix structurant avec l'alternative écartée). Les évolutions du prototype sont donc tracées à trois niveaux : le commit (quoi), le changelog (où en est-on), la décision (pourquoi).
+L'historique git est structuré par les conventions de commit `[ADD]/[IMP]/[REF]/[FIX]` (section 1.4), et doublé de deux journaux versionnés : [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) (état global module par module + une entrée par ticket terminé, avec dette éventuelle) et [dev/DECISIONS.md](annexes/dev/DECISIONS.md) (chaque choix structurant avec l'alternative écartée). Les évolutions du prototype sont donc tracées à trois niveaux : le commit (quoi), le changelog (où en est-on), la décision (pourquoi).
 
 ---
 
@@ -627,7 +627,7 @@ Chaque fusion sur une branche d'intégration déclenche un déploiement automati
 
 La **progressivité** du déploiement est structurelle, à deux niveaux :
 
-1. **Promotion entre environnements** : une modification atteint d'abord l'environnement de test (fusion dans `dev`), y est vérifiée, puis est promue en preprod (`staging`), et seulement ensuite en production (`main`). Le même code traverse trois déploiements successifs avant d'atteindre les utilisateurs finaux.
+1. **Promotion entre environnements** : une modification atteint d'abord l'environnement de test (fusion dans `dev`), y est vérifiée et testée manuellement d'un point de vue fonctionnel, puis est promue en preprod (`staging`) y est verifiée, et seulement ensuite en production (`main`). Le même code traverse trois déploiements successifs avant d'atteindre les utilisateurs finaux.
 2. **Garde-fou de production** : le job de déploiement prod est conditionné à une variable d'activation explicite, en plus de la branche ([cd.yml](.github/workflows/cd.yml)) :
 
 ```yaml
@@ -688,7 +688,7 @@ La chaîne d'environnements sert précisément à cela : l'environnement de **te
 
 ## 7.1 Démarche : un cahier de recettes exécutable
 
-J'ai fait le choix d'un cahier de recettes **exécutable** : chaque scénario de recette est formalisé sous forme d'un test fonctionnel automatisé versionné dans le dépôt, et le cahier ci-dessous en est la vue documentaire — chaque ligne référence le test qui l'implémente. Ce choix a une conséquence forte sur la détection des régressions : la recette n'est pas rejouée une fois par livraison, elle est rejouée **à chaque push** par la CI (section 2), et un scénario qui casse bloque le déploiement.
+Chaque scénario de recette est formalisé sous forme d'un test fonctionnel automatisé versionné dans le dépôt, et le cahier ci-dessous en est la vue documentaire — chaque ligne référence le test qui l'implémente. Ce choix a une conséquence forte sur la détection des régressions : la recette n'est pas rejouée une fois par livraison, elle est rejouée **à chaque push** par la CI (section 2).
 
 Le cahier s'organise en trois volets, conformément au critère (tests fonctionnels, structurels, de sécurité) :
 
@@ -764,7 +764,7 @@ Le circuit de traitement d'une anomalie suit cinq étapes outillées :
 
 ```mermaid
 flowchart LR
-    D["1. Détection<br/>recette CI · audit ·<br/>exploitation"] --> C["2. Consignation<br/>entrée CHANGELOG_AGENT<br/>(contexte, reproduction)"]
+    D["1. Détection<br/>recette CI · audit ·<br/>exploitation"] --> C["2. Consignation<br/>entrée CHANGELOG<br/>(contexte, reproduction)"]
     C --> Q["3. Qualification<br/>sévérité · cause racine ·<br/>périmètre"]
     Q --> F["4. Correction<br/>test d'abord, puis correctif<br/>commit [FIX]"]
     F --> V["5. Vérification<br/>recette complète rejouée<br/>+ CI + déploiement"]
@@ -772,7 +772,7 @@ flowchart LR
 ```
 
 - **Détection** : trois sources — la recette exécutable en CI (7.4), les audits (OWASP, revue de code) et l'exploitation (échecs de déploiement, logs) ;
-- **Consignation** : chaque anomalie donne lieu à une entrée structurée dans [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md) — contexte de reproduction, fichiers touchés, correction — la « fiche d'anomalie » du projet ;
+- **Consignation** : chaque anomalie donne lieu à une entrée structurée dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) — contexte de reproduction, fichiers touchés, correction — la « fiche d'anomalie » du projet ;
 - **Correction** : un test matérialise d'abord le bogue (et empêche sa réapparition), puis le correctif est commité en `[FIX]` — l'historique en compte **250**, ce qui rend le flux auditable ;
 - **Vérification** : la recette complète est rejouée localement puis par la CI, qui conditionne le redéploiement — le correctif emprunte le même chemin qu'une fonctionnalité.
 
@@ -780,13 +780,13 @@ Les trois cas suivants, tous réels et tracés dans le dépôt, illustrent le pr
 
 ## 8.2 Cas 1 — Régression fonctionnelle détectée par la recette (CI)
 
-**Anomalie** (consignée le 2026-07-04 dans [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md)) : le commit `f4d654e` (`[IMP] classgroup`) a modifié `ClassroomPage.vue` — le sélecteur de vue s'affichait pour les étudiants/enseignants (qui n'en ont pas l'usage) et **disparaissait pour l'admin plateforme**. **Détection** : les tests de [ClassroomPage.test.js](my_memo_master_front/test/components/ClassroomPage.test.js) ont échoué en CI sur la branche, avant toute fusion.
+**Anomalie** (consignée le 2026-07-04 dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)) : le commit `f4d654e` (`[IMP] classgroup`) a modifié `ClassroomPage.vue` — le sélecteur de vue s'affichait pour les étudiants/enseignants (qui n'en ont pas l'usage) et **disparaissait pour l'admin plateforme**. **Détection** : les tests de [ClassroomPage.test.js](my_memo_master_front/test/components/ClassroomPage.test.js) ont échoué en CI sur la branche, avant toute fusion.
 
-**Analyse et correction** : la condition `v-if="isAdmin"` avait été remplacée par `v-if="availableViews.length > 1"` avec un calcul devenu exclusif ; la fiche de consignation décrit le mécanisme pour chaque rôle — les « informations permettant de reproduire le bogue » exigées par le critère. Correction par restauration de la condition et du calcul additif, vérifiée par la suite front complète (548/548 verts à cette date).
+**Analyse et correction** : la condition `v-if="isAdmin"` avait été remplacée par `v-if="availableViews.length > 1"` avec un calcul devenu exclusif ; la fiche de consignation décrit le mécanisme pour chaque rôle — les "informations permettant de reproduire le bogue" exigées par le critère. Correction par restauration de la condition et du calcul additif, vérifiée par la suite front complète (548/548 verts à cette date).
 
 ## 8.3 Cas 2 — Anomalie d'exploitation : l'échec des déploiements preprod
 
-Ce cas déroule le processus complet sur une anomalie **détectée en exploitation** et corrigée pendant la rédaction de ce dossier (fiche complète : entrée du 2026-07-06 de [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md)).
+Ce cas déroule le processus complet sur une anomalie **détectée en exploitation** et corrigée pendant la rédaction de ce dossier (fiche complète : entrée du 2026-07-06 de [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)).
 
 **Symptôme** : les déploiements Kubernetes preprod échouaient — rollout `helm --atomic` en timeout puis rollback automatique.
 
@@ -810,7 +810,7 @@ app.get('/api/v1/health', async (_req, res) => {
 })
 ```
 
-Deux choix de conception accompagnent le correctif ([.agents/DECISIONS.md](annexes/.agents/DECISIONS.md)) : la route est déclarée **hors du rate limiter** (une sonde kubelet bloquée ferait passer les pods NotReady en cascade) et elle teste réellement la base (`authenticate()`) pour qu'un pod sans base de données ne reçoive pas de trafic.
+Deux choix de conception accompagnent le correctif ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)) : la route est déclarée **hors du rate limiter** (une sonde kubelet bloquée ferait passer les pods NotReady en cascade) et elle teste réellement la base (`authenticate()`) pour qu'un pod sans base de données ne reçoive pas de trafic.
 
 **Vérification** : 3 tests ajoutés ([Health.test.js](my_memo_master_api/test/controllers/Health.test.js) — 200 si base joignable, 503 sinon, accès sans authentification), suite complète rejouée (1 422/1 422 verts à cette date), correctif déployé par le pipeline CD standard, étape de debug temporaire **retirée**. **Ce que ce cas démontre** : le traitement « tire profit du processus d'intégration et de déploiement continu » (critère C2.3.2) — l'instrumentation du pipeline a servi d'outil de diagnostic, et le correctif a suivi le circuit standard test → CI → CD sans procédure d'exception.
 
@@ -844,17 +844,17 @@ La documentation du projet est **versionnée avec le code** — elle évolue dan
 | Manuel d'exploitation et de mise à jour  | [docs/RUNBOOK.md](annexes/docs/RUNBOOK.md)                                                                                                                                                                                                                                   | Ops / astreinte                                    | « Comment j'opère, je mets à jour, je restaure ? » |
 | Manuel d'utilisation                      | [docs/MANUEL_UTILISATION.md](annexes/docs/MANUEL_UTILISATION.md)                                                                                                                                                                                                             | Utilisateur final (étudiant, enseignant, gérant) | « Comment j'utilise l'application ? »                |
 | Contrat d'API                             | Swagger généré, servi sur`/api-docs`                                                                                                                                                                                                                                   | Développeur front / tiers                         | « Que fait chaque endpoint ? »                       |
-| Fonctionnement des modules                | [docs/DOC_administration_etablissements.md](annexes/docs/DOC_administration_etablissements.md), [.agents/DOC_mindmap_editor.md](annexes/.agents/DOC_mindmap_editor.md), [diagrams/](annexes/diagrams/)                                                                         | Développeur reprenant un module                   | « Comment ce module fonctionne-t-il et pourquoi ? »  |
-| Journal des décisions                    | [.agents/DECISIONS.md](annexes/.agents/DECISIONS.md)                                                                                                                                                                                                                         | Toute l'équipe, futur soi                         | « Pourquoi le code est-il comme ça ? »              |
-| Journal d'état                           | [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md)                                                                                                                                                                                                             | Toute l'équipe                                    | « Où en est chaque module ? »                       |
-| Conventions                               | [.agents/CONVENTIONS.md](annexes/.agents/CONVENTIONS.md), [.agents/AGENT.md](annexes/.agents/AGENT.md)                                                                                                                                                                        | Contributeur (humain ou agent IA)                  | « Comment on écrit le code ici ? »                  |
-| Synthèse de la mémoire du projet        | [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)                                                                                                                                                                                                                     | Jury, nouveau venu                                 | « Quel est ce dispositif et que contient-il ? »      |
+| Fonctionnement des modules                | [docs/DOC_administration_etablissements.md](annexes/docs/DOC_administration_etablissements.md), [dev/DOC_mindmap_editor.md](annexes/dev/DOC_mindmap_editor.md), [diagrams/](annexes/diagrams/)                                                                                 | Développeur reprenant un module                   | « Comment ce module fonctionne-t-il et pourquoi ? »  |
+| Journal des décisions                    | [dev/DECISIONS.md](annexes/dev/DECISIONS.md)                                                                                                                                                                                                                                 | Toute l'équipe, futur soi                         | « Pourquoi le code est-il comme ça ? »              |
+| Journal d'état                           | [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)                                                                                                                                                                                                                                 | Toute l'équipe                                    | « Où en est chaque module ? »                       |
+| Conventions                               | [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)                                                                                                                                                                                                                             | Contributeur (humain ou agent IA)                  | « Comment on écrit le code ici ? »                  |
+| Synthèse de la mémoire du projet        | [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)                                                                                                                                                                                                                     | Nouveau venu                                       | « Quel est ce dispositif et que contient-il ? »      |
 
 ## 9.2 Manuel de déploiement
 
 Le déploiement est documenté par deux manuels dédiés, un par type d'infrastructure :
 
-- [docs/MANUEL_DEPLOIEMENT_VPS.md](annexes/docs/MANUEL_DEPLOIEMENT_VPS.md) — environnement de **test** (VPS, Docker Compose, Traefik) : architecture, prérequis, préparation du `.env` serveur, premier déploiement, déroulé du déploiement continu, procédure de secours et vérifications post-déploiement ;
+- [docs/MANUEL_DEPLOIEMENT_VPS.md](annexes/docs/MANUEL_DEPLOIEMENT_VPS.md) — environnement de **test** (VPS, Docker Compose, Traefik) : architecture, prérequis, préparation du `.env` serveur, premier déploiement, déroulé du déploiement continu, procédure de secours et vérifications post-déploiement.
 - [docs/MANUEL_DEPLOIEMENT_KUBERNETES.md](annexes/docs/MANUEL_DEPLOIEMENT_KUBERNETES.md) — environnements **preprod et prod** (Kubernetes Infomaniak, Helm) : structure du chart et des valeurs, ségrégation ConfigMap (versionnée) / Secret (créé manuellement sur le cluster), adoption Helm de ressources existantes, déploiement continu, rollback.
 
 La partie 3 du [README.md](annexes/README.md) complète le volet CI/CD (correspondance branche → images → cible, secrets GitHub Actions, kubeconfig Infomaniak). Ces documents décrivent les **choix opérés** et pas seulement les commandes — par exemple la ségrégation configuration/secrets, ou `--atomic` qui restaure automatiquement la révision précédente en cas d'échec.
@@ -871,23 +871,23 @@ Trois points saillants pour la mise à jour :
 
 ## 9.4 Contrat d'API : documentation générée depuis le code
 
-La documentation de l'API est générée par swagger-jsdoc à partir des annotations portées par **chaque route** — la documentation Swagger fait partie de la *definition of done* d'une fonctionnalité ([README.md](annexes/README.md), étape 3). La configuration ([swagger.config.js](my_memo_master_api/config/swagger.config.js)) définit le schéma `bearerAuth` et l'applique globalement plutôt que route par route — choix et raison commentés dans le fichier. L'interface est servie sur `/api-docs` en développement et test, **désactivée en production** (correctif F-08 de l'audit OWASP). Générer le contrat depuis le code élimine la principale cause de mort des documentations d'API : la divergence avec l'implémentation.
+La documentation de l'API est générée par swagger-jsdoc à partir des annotations portées par **chaque route** — la documentation Swagger fait partie de la *definition of done* d'une fonctionnalité ([README.md](annexes/README.md), étape 3). La configuration ([swagger.config.js](my_memo_master_api/config/swagger.config.js)) définit le schéma `bearerAuth` et l'applique globalement.  L'interface est accéssible via la route `/api-docs` dans les environnements de développement et de test, **désactivée dans les environnements de production**. Générer le contrat depuis le code permet d'eviter le risque d'avoir une divergence entre la documentation et l'implémentation.
 
 [SCREENSHOT ICI : interface Swagger UI sur /api-docs montrant la liste des endpoints et le schéma bearerAuth]
 
 ## 9.5 Traçabilité pour les équipes et les évolutions futures
 
-Le critère « assurer une traçabilité pour le suivi des équipes et des futures évolutions » est traité par un dispositif que j'ai conçu explicitement pour la **reprise sans contexte oral** — le dossier [.agents/](annexes/.agents/) :
+Pour la traçabilité et le suivi des équipes et des futures évolutions j'ai mis en placve un hirtorique et un contexte dans le dossier [dev/](annexes/dev/) :
 
 - [docs/DECISIONS.md](annexes/docs/DECISIONS.md) impose un format à chaque décision structurante — *Contexte / Décision / Alternative écartée / Conséquences* — pour « comprendre "pourquoi" le code est comme il est, 2 mois plus tard » ; ce dossier en a cité plusieurs entrées réelles (SQLite/PostgreSQL, rotation des refresh tokens, RBAC en base, health endpoint) ;
-- [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md) maintient l'état module par module et une entrée par ticket (fichiers touchés, hypothèses, **dette éventuelle**) — les fiches d'anomalie de la section 8 en sont extraites ;
+- [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) maintient l'état module par module et une entrée par ticket (fichiers touchés, hypothèses, **dette éventuelle**) — les fiches d'anomalie de la section 8 en sont extraites ;
 - la documentation par module descend au niveau des règles métier : [docs/DOC_administration_etablissements.md](annexes/docs/DOC_administration_etablissements.md) (modèle de données, droits, endpoints, audit trail, **dette connue et limitations V1**), [diagrams/schema_bdd.md](annexes/diagrams/schema_bdd.md) (ERD), [diagrams/leitner_algo.md](annexes/diagrams/leitner_algo.md), etc.
 
 Documenter la **dette et les limitations** dans les livrables (et pas seulement les réussites) est un choix délibéré : c'est ce qui rend la documentation digne de confiance pour celui qui reprend le code.
 
 ## 9.6 Manuel d'utilisation
 
-L'aide à l'utilisateur final existe à deux niveaux complémentaires : **embarquée dans l'application** (parcours d'onboarding persisté côté serveur, page de tutoriels alimentée par l'API — module `Tutorials`) et en **manuel autonome** ([docs/MANUEL_UTILISATION.md](annexes/docs/MANUEL_UTILISATION.md)), versionné avec le code, couvrant les trois profils — étudiant, enseignant, gérant d'établissement — et une FAQ des blocages courants (email non vérifié, rate limiting, formats d'upload).
+Pour le manuel d'utilisation, sur l'application,  on retrouve un parcours d'onboarding, une page de tutoriels et un parcours guidé. Egalement un [docs/MANUEL_UTILISATION.md](annexes/docs/MANUEL_UTILISATION.md) qui couvre les trois profils étudiant, enseignant et gérant d'établissement, à été rédigé.
 
 [SCREENSHOT ICI : parcours d'onboarding et page Tutoriels dans l'application]
 
@@ -944,11 +944,11 @@ Chaque document versionné cité dans le dossier, avec la ou les sections qui s'
 | Audit de sécurité OWASP Top 10                     | [docs/SECURITY_AUDIT_OWASP.md](annexes/docs/SECURITY_AUDIT_OWASP.md)                                      | 5                   |
 | Audit d'accessibilité RGAA                          | [docs/AUDIT_RGAA.md](annexes/docs/AUDIT_RGAA.md)                                                          | 5                   |
 | Synthèse de la mémoire du projet                   | [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)                                                  | 0, 5, 9             |
-| Journal des décisions techniques                    | [.agents/DECISIONS.md](annexes/.agents/DECISIONS.md)                                                      | 5, 9                |
-| Journal d'état (changelog par ticket)               | [.agents/CHANGELOG_AGENT.md](annexes/.agents/CHANGELOG_AGENT.md)                                          | 5, 9                |
-| Conventions de code                                  | [.agents/CONVENTIONS.md](annexes/.agents/CONVENTIONS.md)                                                  | 5, 9                |
+| Journal des décisions techniques                    | [dev/DECISIONS.md](annexes/dev/DECISIONS.md)                                                              | 5, 9                |
+| Journal d'état (changelog par ticket)               | [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)                                                              | 5, 9                |
+| Conventions de code                                  | [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)                                                          | 5, 9                |
 | Documentation module Administration établissements  | [docs/DOC_administration_etablissements.md](annexes/docs/DOC_administration_etablissements.md)            | 9                   |
-| Documentation technique Éditeur de cartes mentales  | [.agents/DOC_mindmap_editor.md](annexes/.agents/DOC_mindmap_editor.md)                                    | 9                   |
+| Documentation technique Éditeur de cartes mentales  | [dev/DOC_mindmap_editor.md](annexes/dev/DOC_mindmap_editor.md)                                            | 9                   |
 | Schéma de base de données (ERD) et règles métier | [diagrams/](annexes/diagrams/)                                                                            | 0, 3, 9             |
 | Pipelines CI / CD                                    | [.github/workflows/ci.yml](.github/workflows/ci.yml), [.github/workflows/cd.yml](.github/workflows/cd.yml) | 2, 6                |
 | Chart Helm et manifests Kubernetes                   | [helm/](helm/), [k8s/](k8s/)                                                                               | 1, 6                |
@@ -977,7 +977,7 @@ Récapitulatif de la couverture du référentiel, une ligne par compétence ; le
 | C2.2.3 — Développement : évolutivité, sécurisation, accessibilité | 5       | Architecture en couches uniforme (36 controllers) ; audit OWASP versionné (8 corrections tracées, défense en profondeur) ; RGAA 4 : 135 non-conformités → 0, non-régression axe-core en CI ; API versionnée, 61 migrations ; double journal (état, décisions)                                          |
 | C2.2.4 — Déploiement continu et progressif                            | 6       | CD automatique conditionné à la CI verte ; promotion test → preprod → prod avec verrou`K8S_PROD_ENABLED` ; healthchecks bloquants, `helm --atomic` avec rollback auto ; images multi-stage reproductibles, migrations idempotentes                                                                      |
 | C2.3.1 — Cahier de recettes                                            | 7       | Volet structurel : contrat HTTP des 34 modules (791 tests) ; 59 scénarios formalisés avec résultat attendu ; trois volets (fonctionnel, structurel, sécurité) exécutés à chaque push ; régression réelle détectée et tracée (2026-07-04)                                                           |
-| C2.3.2 — Plan de correction des bogues                                 | 8       | 3 sources de détection illustrées par 3 cas réels ; fiches de consignation reproductibles (CHANGELOG_AGENT) ; analyse de cause racine ; correctifs avec tests anti-réapparition livrés par le circuit CI/CD ; 250 commits`[FIX]` auditables                                                              |
+| C2.3.2 — Plan de correction des bogues                                 | 8       | 3 sources de détection illustrées par 3 cas réels ; fiches de consignation reproductibles (CHANGELOG) ; analyse de cause racine ; correctifs avec tests anti-réapparition livrés par le circuit CI/CD ; 250 commits`[FIX]` auditables                                                                    |
 | C2.4.1 — Documentation technique d'exploitation                        | 9       | Manuels de déploiement (VPS, Kubernetes), d'exploitation (RUNBOOK), d'utilisation (3 profils + FAQ) ; décisions au format Contexte/Décision/Alternative/Conséquences ; contrat d'API Swagger généré depuis le code                                                                                       |
 
 ## Annexe F — Glossaire
