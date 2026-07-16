@@ -116,6 +116,31 @@ describe('OnboardingState Controller — validation', () => {
       expect(res.status).toBe(200)
     })
 
+    it('200 — met à jour avec tour_seen (format lu par le service)', async () => {
+      onboardingStateService.updateOnboarding.mockResolvedValue({
+        tour_seen: true,
+        checklist: {}
+      })
+
+      const res = await request(app)
+        .put(`${BASE}/onboardingState/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ tour_seen: true })
+
+      expect(res.status).toBe(200)
+      expect(onboardingStateService.updateOnboarding).toHaveBeenCalledWith(1, { tour_seen: true })
+    })
+
+    it("400 — tour_seen n'est pas un booléen", async () => {
+      const res = await request(app)
+        .put(`${BASE}/onboardingState/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ tour_seen: 'oui' })
+
+      expect(res.status).toBe(400)
+      expect(res.body.errors).toBeDefined()
+    })
+
     it("400 — tourSeen n'est pas un booléen", async () => {
       const res = await request(app)
         .put(`${BASE}/onboardingState/1`)

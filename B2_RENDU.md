@@ -369,7 +369,9 @@ Le « prototype » au sens du référentiel est ici l'application elle-même, fo
 
 Les composants d'interface génériques exigés par le critère (fenêtres, boutons, menus…) existent en tant que composants réutilisables : `ButtonComponent`, `ModalComponent`, `DropdownComponent`, `MenuItemComponent`, `LoaderComponent`, `PillComponent`, `ToggleButton`, etc. ([my_memo_master_front/src/components/](my_memo_master_front/src/components/)).
 
-[SCREENSHOT ICI : page FlashcardsSessionPage en cours de session de révision, montrant les composants réels (boutons, modale, indicateur de boîte Leitner)]
+![Session de révision Leitner — saisie de la réponse, avec la répartition par boîte affichée sous la carte](annexes/docs/leitner.png)
+
+![Session de révision Leitner — correction de la réponse (score, similarité) et mise à jour de la répartition par boîte](annexes/docs/leitner_2.png)
 
 ## 3.3 Spécificités ergonomiques et équipements ciblés
 
@@ -873,7 +875,7 @@ Trois points saillants pour la mise à jour :
 
 La documentation de l'API est générée par swagger-jsdoc à partir des annotations portées par **chaque route** — la documentation Swagger fait partie de la *definition of done* d'une fonctionnalité ([README.md](annexes/README.md), étape 3). La configuration ([swagger.config.js](my_memo_master_api/config/swagger.config.js)) définit le schéma `bearerAuth` et l'applique globalement.  L'interface est accéssible via la route `/api-docs` dans les environnements de développement et de test, **désactivée dans les environnements de production**. Générer le contrat depuis le code permet d'eviter le risque d'avoir une divergence entre la documentation et l'implémentation.
 
-[SCREENSHOT ICI : interface Swagger UI sur /api-docs montrant la liste des endpoints et le schéma bearerAuth]
+![Interface Swagger UI sur /api-docs — endpoints du module Users et bouton Authorize (schéma bearerAuth)](annexes/docs/swagger.png)
 
 ## 9.5 Traçabilité pour les équipes et les évolutions futures
 
@@ -889,7 +891,9 @@ Documenter la **dette et les limitations** dans les livrables (et pas seulement 
 
 Pour le manuel d'utilisation, sur l'application,  on retrouve un parcours d'onboarding, une page de tutoriels et un parcours guidé. Egalement un [docs/MANUEL_UTILISATION.md](annexes/docs/MANUEL_UTILISATION.md) qui couvre les trois profils étudiant, enseignant et gérant d'établissement, à été rédigé.
 
-[SCREENSHOT ICI : parcours d'onboarding et page Tutoriels dans l'application]
+![Page d'accueil — encart « Parcours guidé » proposant la prise en main pas à pas](annexes/docs/accoeuil.png)
+
+![Page Tutoriels — vidéos filtrables par sujet et tips de révision](annexes/docs/tutos.png)
 
 ---
 

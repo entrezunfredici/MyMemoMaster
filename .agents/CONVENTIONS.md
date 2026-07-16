@@ -198,6 +198,7 @@ router.get("/", authMiddleware, entity.findAll);
 | Notifications front | vue-toastification |
 | Math front | KaTeX / MathJax |
 | Graphiques front | chart.js + vue-chartjs |
+| Visite guidée front (onboarding) | driver.js (MIT) |
 | Accessibilité (tests front) | axe-core (dev) |
 
 ---

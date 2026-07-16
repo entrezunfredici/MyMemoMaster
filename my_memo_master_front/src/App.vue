@@ -22,33 +22,33 @@
             :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <TutorialIcon class="size-8" />
           </router-link>
-          <router-link to="/mindmaps"
+          <router-link to="/mindmaps" data-tour="mindmaps"
             :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <MindmapIcon class="size-8" />
           </router-link>
-          <router-link to="/flashcards"
+          <router-link to="/flashcards" data-tour="flashcards"
             :class="[route?.name && route.name.includes('flashcards') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <FlashardIcon class="size-8" />
           </router-link>
-          <router-link to="/exercises"
+          <router-link to="/exercises" data-tour="exercises"
             :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ExercisesIcon class="size-8" />
           </router-link>
-          <router-link to="/classroom"
+          <router-link to="/classroom" data-tour="classroom"
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
-          <router-link to="/calendar"
+          <router-link to="/calendar" data-tour="calendar"
             :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="Calendrier & rappels">
             <CalendarIcon class="size-8" />
           </router-link>
-          <router-link to="/todo"
+          <router-link to="/todo" data-tour="todo"
             :class="[route?.name === 'todo' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="To-do">
             <CheckCircleIcon class="size-8" />
           </router-link>
-          <router-link to="/kpi"
+          <router-link to="/kpi" data-tour="kpi"
             :class="[route?.name === 'kpi' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="Ma Progression">
             <KpiIcon class="size-8" />
@@ -71,9 +71,10 @@
       <header class="mt-20 lg:mt-16 xl:mt-12 mb-3 flex items-start justify-between pr-4">
         <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
           route.meta.title }}</h1>
-        <NotificationBell class="mt-3" />
+        <NotificationBell class="mt-3" data-tour="notifications" />
       </header>
       <GuidedTourBanner />
+      <OnboardingTour />
       <main class="mb-8 mr-4">
         <RouterView />
       </main>
@@ -84,10 +85,11 @@
     <header class="m-4 flex items-start justify-between">
       <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
         route.meta.title }}</h1>
-      <NotificationBell class="mt-3" />
+      <NotificationBell class="mt-3" data-tour="notifications" />
     </header>
     <div class="m-4 mb-0">
       <GuidedTourBanner />
+      <OnboardingTour />
     </div>
     <main class="m-4 pb-[75px]">
       <RouterView />
@@ -102,19 +104,19 @@
         :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <TutorialIcon class="size-8" />
       </router-link>
-      <router-link to="/mindmaps"
+      <router-link to="/mindmaps" data-tour="mindmaps"
         :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <MindmapIcon class="size-8" />
       </router-link>
-      <router-link to="/flashcards"
+      <router-link to="/flashcards" data-tour="flashcards"
         :class="[route?.name && route.name.includes('flashcards') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <FlashardIcon class="size-8" />
       </router-link>
-      <router-link to="/exercises"
+      <router-link to="/exercises" data-tour="exercises"
         :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
-      <router-link to="/classroom"
+      <router-link to="/classroom" data-tour="classroom"
         :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
@@ -123,17 +125,17 @@
         title="Administration">
         <ShieldCheckIcon class="size-8" />
       </router-link>
-      <router-link to="/calendar"
+      <router-link to="/calendar" data-tour="calendar"
         :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="Calendrier & rappels">
         <CalendarIcon class="size-8" />
       </router-link>
-      <router-link to="/todo"
+      <router-link to="/todo" data-tour="todo"
         :class="[route?.name === 'todo' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="To-do">
         <CheckCircleIcon class="size-8" />
       </router-link>
-      <router-link to="/kpi"
+      <router-link to="/kpi" data-tour="kpi"
         :class="[route?.name === 'kpi' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="Ma Progression">
         <KpiIcon class="size-8" />
@@ -168,6 +170,7 @@ import { VITE_APP_NAME } from '@/config';
 import { isMobile } from '@/helpers/functions';
 import NotificationBell from '@/components/NotificationBellComponent.vue'
 import GuidedTourBanner from '@/components/GuidedTourBannerComponent.vue'
+import OnboardingTour from '@/components/OnboardingTourComponent.vue'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 

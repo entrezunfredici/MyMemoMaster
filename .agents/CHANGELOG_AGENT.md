@@ -117,6 +117,7 @@
 | AuditLog (audit trail) | Stable — S-04.05 : log automatique activation/désactivation/rôle via User.service, service + controller + GET /audit-logs (roleId=1) + 7 tests service + 3 tests controller | 2026-07-01 |
 | API activation comptes (PATCH activate/deactivate) | Stable — S-04.05 : endpoints protégés requireRole(1,4), tests controller activate/deactivate ajoutés (12 cas) | 2026-07-01 |
 | Front — Parcours guidé (onboarding d'usage) | Stable — store guidedTour.js (persisté localStorage) + bandeau GuidedTourBannerComponent dans App.vue + bouton HomePage ; 4 étapes sur les vraies pages (mindmap → Leitner → exercices → planification) avec pré-liaison subjectId/idSystem ; 12 tests Vitest | 2026-07-11 |
+| Front — Visite guidée de l'interface (driver.js) | Stable — auto-lancée au premier login (tour_seen API OnboardingState), relançable depuis HomePage ; store onboarding.js + composable useOnboardingTour + OnboardingTourComponent + ancres data-tour dans App.vue ; driver.js (MIT, remplace intro.js AGPL) ; 20 tests Vitest + 2 tests Jest | 2026-07-16 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -5622,3 +5623,68 @@ Suite immédiate du ticket formules : (1) deux écritures d'une même fraction (
 | Module | État |
 |--------|------|
 | Formules mathématiques (Leitner + exercices) | Stable — syntaxe canonique, bouton latéral, insertion au curseur |
+
+---
+
+### [2026-07-16] ADD — Visite guidée de l'interface avec intro.js (onboarding)
+
+#### Contexte
+Le champ `UserOnboardingState.tourSeen` (API) existait sans aucune UI : aucun tour de l'interface n'était proposé au premier login. `package.json` front contenait par ailleurs `introjs@0.2.2` — un paquet npm **non officiel** jamais importé dans le code (l'officiel est `intro.js`).
+
+#### Fichiers créés
+- `my_memo_master_front/src/stores/onboarding.js` — store Pinia : `fetchState()` (GET /onboardingState/byUserId) + `markTourSeen()` idempotent (PUT /onboardingState/:userId, body `{ tour_seen: true }`)
+- `my_memo_master_front/src/composables/useOnboardingTour.js` — `ONBOARDING_TOUR_STEPS` (10 étapes FR : bienvenue, mindmaps, flashcards, exercices, classe, calendrier, todo, kpi, rappels, parcours guidé) + `startTour()` (construit les étapes depuis les ancres `[data-tour]` présentes dans le DOM, labels FR, persiste via `onexit`)
+- `my_memo_master_front/src/components/OnboardingTourComponent.vue` — composant sans rendu monté dans les layouts privés d'App.vue : auto-lance la visite si l'API répond `tour_seen=false` ; styles globaux `.onboarding-tooltip` (fond blanc explicite — règle projet)
+- `my_memo_master_front/test/stores/onboarding.store.test.js` — 14 tests (état initial, fetchState 200/404/réseau, markTourSeen nominal/idempotent/sans userId/500/réseau)
+- `my_memo_master_front/test/composables/useOnboardingTour.test.js` — 5 tests (filtrage DOM des étapes, étapes flottantes, labels FR, persistance onexit, intégrité des étapes)
+
+#### Fichiers modifiés
+- `my_memo_master_front/package.json` — **retrait `introjs@0.2.2`** (paquet non officiel, inutilisé) ; **ajout `intro.js@^7.2.0`** (officiel)
+- `my_memo_master_front/src/App.vue` — ancres `data-tour` sur les liens nav (desktop + mobile : mindmaps, flashcards, exercises, classroom, calendar, todo, kpi) + `data-tour="notifications"` sur NotificationBell + montage `<OnboardingTour />` dans les deux layouts privés
+- `my_memo_master_front/src/pages/HomePage.vue` — `data-tour="guided-tour"` sur le bouton parcours guidé + bouton discret « Revoir la visite de l'interface » (relance manuelle) ; retrait de l'import mort `Interpreter` (préexistant, bloquait `npm run lint`)
+- `my_memo_master_api/validators/OnboardingState.validators.js` — ajout validation `tour_seen` (booléen) : c'est le champ réellement lu par `OnboardingState.service` ; `tourSeen` reste validé pour compat
+- `my_memo_master_api/test/controllers/OnboardingState.controller.test.js` — +2 tests (200 avec `tour_seen`, 400 `tour_seen` non booléen)
+
+#### Ce qui est utilisable
+- Au premier login (tour_seen=false en base), la visite intro.js se lance automatiquement et met en surbrillance la navigation ; « Terminer » ou quitter marque `tour_seen=true` côté API → jamais relancée automatiquement, sur aucun navigateur
+- Bouton « Revoir la visite de l'interface » sur la HomePage (relance sans réécrire l'état si déjà vu)
+- Vérifié : 616/616 tests front verts, 11/11 tests Jest OnboardingState, lint front OK
+
+#### Hypothèses posées
+- La visite de l'interface (intro.js, tour_seen serveur) est distincte du « Parcours guidé » (store guidedTour localStorage) — les deux coexistent ; la dernière étape de la visite pointe vers le bouton du parcours guidé
+- Échec du fetch/save d'état : pas de toast (console.warn seulement) — la visite ne se lance simplement pas ; les utilisateurs créés avant la table UserOnboardingState provoquent un 500 silencieux (voir dette)
+
+#### Dette / non couvert
+- `OnboardingState.service.getOnboardingByUserId` **throw** quand la ligne est absente → le controller répond 500, jamais 404 (branche morte) ; les utilisateurs legacy sans ligne UserOnboardingState ne verront jamais la visite auto — hors périmètre de ce ticket, à corriger côté service (retourner null, voire créer la ligne à la volée)
+- Licence intro.js : AGPL / licence commerciale requise pour un usage commercial (voir DECISIONS.md)
+- Le tooltip intro.js n'est pas audité RGAA (pas une nouvelle page/formulaire) — à inclure si `scripts/audit-a11y.mjs` étend son périmètre
+
+#### État
+| Module | État |
+|--------|------|
+| Front — Visite guidée de l'interface (intro.js) | Stable — auto-lancement premier login + relance manuelle, synchronisée API OnboardingState |
+
+---
+
+### [2026-07-16] REF — Remplacement intro.js → driver.js (contrainte de licence)
+
+#### Contexte
+Suite immédiate du ticket visite guidée : intro.js est sous **AGPL avec licence commerciale payante** — inacceptable pour l'utilisateur. driver.js offre le même principe (surbrillance + popover, étapes flottantes) sous **licence MIT**.
+
+#### Fichiers modifiés
+- `my_memo_master_front/package.json` — retrait `intro.js`, ajout `driver.js@^1.3.1` (résolu 1.7.0)
+- `my_memo_master_front/src/composables/useOnboardingTour.js` — réécriture pour l'API driver.js : `driver({ steps, showProgress, nextBtnText/prevBtnText/doneBtnText, popoverClass, onDestroyed })` + `drive()` ; les étapes construites deviennent `{ element?, popover: { title, description } }` (étape sans element = popover flottant centré) ; persistance dans `onDestroyed` (couvre Terminer, croix, overlay, Échap)
+- `my_memo_master_front/src/components/OnboardingTourComponent.vue` — styles réécrits sur les classes driver.js (`.driver-popover.onboarding-popover`, `.driver-popover-title`, `.driver-popover-next-btn`) — fond blanc explicite conservé
+- `my_memo_master_front/test/composables/useOnboardingTour.test.js` — mocks adaptés (`driver` capturé + `drive()`), +1 test (structure popover des étapes)
+
+#### Inchangé
+- `stores/onboarding.js`, ancres `data-tour` (App.vue, HomePage), `ONBOARDING_TOUR_STEPS` (même forme `{selector, title, intro}`), validator/tests API, comportement fonctionnel complet
+
+#### Ce qui est utilisable
+- Identique au ticket précédent (auto-lancement premier login, relance HomePage), sans contrainte de licence
+- Vérifié : 20 tests onboarding verts, lint OK, `vite build` OK
+
+#### État
+| Module | État |
+|--------|------|
+| Front — Visite guidée de l'interface (driver.js) | Stable — driver.js 1.7 (MIT), comportement identique |
