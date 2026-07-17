@@ -117,7 +117,8 @@
 | AuditLog (audit trail) | Stable — S-04.05 : log automatique activation/désactivation/rôle via User.service, service + controller + GET /audit-logs (roleId=1) + 7 tests service + 3 tests controller | 2026-07-01 |
 | API activation comptes (PATCH activate/deactivate) | Stable — S-04.05 : endpoints protégés requireRole(1,4), tests controller activate/deactivate ajoutés (12 cas) | 2026-07-01 |
 | Front — Parcours guidé (onboarding d'usage) | Stable — store guidedTour.js (persisté localStorage) + bandeau GuidedTourBannerComponent dans App.vue + bouton HomePage ; 4 étapes sur les vraies pages (mindmap → Leitner → exercices → planification) avec pré-liaison subjectId/idSystem ; 12 tests Vitest | 2026-07-11 |
-| Front — Visite guidée de l'interface (driver.js) | Stable — auto-lancée au premier login (tour_seen API OnboardingState), relançable depuis HomePage ; store onboarding.js + composable useOnboardingTour + OnboardingTourComponent + ancres data-tour dans App.vue ; driver.js (MIT, remplace intro.js AGPL) ; 20 tests Vitest + 2 tests Jest | 2026-07-16 |
+| Front — Visite guidée de l'interface (driver.js) | Stable — auto-lancée au premier login (tour_seen API OnboardingState), relançable depuis HomePage ; store onboarding.js + composable useOnboardingTour + OnboardingTourComponent + ancres data-tour dans App.vue ; driver.js (MIT, remplace intro.js AGPL) ; 20 tests Vitest + 2 tests Jest ; **validée manuellement par l'utilisateur le 2026-07-17** | 2026-07-17 |
+| Dossier B2 (B2_RENDU.md) | À jour — onboarding documenté (§3.3, §9.6), chiffres de tests réels (1 450 API + 617 front), liens annexes corrigés, annexes/dev resynchronisées ; restent 3 placeholders d'assets (Figma, screenshots) + 2 réfs biblio à compléter | 2026-07-17 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -5688,3 +5689,114 @@ Suite immédiate du ticket visite guidée : intro.js est sous **AGPL avec licenc
 | Module | État |
 |--------|------|
 | Front — Visite guidée de l'interface (driver.js) | Stable — driver.js 1.7 (MIT), comportement identique |
+
+---
+
+### [2026-07-17] DOC — Onboarding validé et documenté dans le dossier B2 + relecture du dossier
+
+#### Contexte
+L'utilisateur a testé manuellement l'onboarding (visite guidée driver.js + parcours guidé) : fonctionnel. Demande : le documenter dans `B2_RENDU.md` et vérifier l'ensemble du contenu du dossier.
+
+#### Fichiers modifiés
+- `B2_RENDU.md` — section 3.3 « Guidage utilisateur » réécrite : dispositif d'onboarding à deux niveaux détaillé (visite guidée driver.js auto-lancée au premier login, persistance serveur `tour_seen` via OnboardingState ; parcours guidé 4 étapes sur les vraies pages, persistance localStorage) ; section 9.6 (manuel d'utilisation) reformulée en cohérence
+- `B2_RENDU.md` — chiffres de tests actualisés par exécution réelle : API 1 448 → **1 450** tests (80 suites), front 597 → **617** tests (41 fichiers) ; répartition par couche mise à jour (controllers 793, stores front 16/254, composables+router 6/80) ; total Annexe E 2 045 → 2 067 ; couverture branches 66,44 → 66,40 %
+- `B2_RENDU.md` — 6 liens cassés corrigés : `annexes/docs/CONVENTIONS.md` et `annexes/docs/DECISIONS.md` → `annexes/dev/…` (les fichiers sont dans `annexes/dev/`)
+- `B2_RENDU.md` — fautes corrigées (« mis en placve un hirtorique », « On y reconais », « accéssible », « d'eviter », « à été rédigé », « unique a chaque », « y est verifiée », « Les tests unitaire/Tests fonctionnel »)
+- `annexes/dev/CHANGELOG.md`, `annexes/dev/DECISIONS.md`, `annexes/dev/CONVENTIONS.md` — resynchronisés depuis `.agents/` (les copies s'arrêtaient au 2026-07-12 : entrées formules 07-14 et onboarding 07-16 absentes), en conservant les en-têtes adaptés (sans mention « agent IA », titre CHANGELOG.md)
+- `annexes/docs/DOC_mindmap_editor.md` — **supprimé** (doublon strict de `annexes/dev/DOC_mindmap_editor.md`, jamais référencé par B2_RENDU.md). Attention : le fichier n'existe plus qu'en annexe (`annexes/dev/`) — le canonique a disparu de `.agents/` et `docs/`, à restaurer si on veut qu'il reste « versionné dans le dépôt » comme l'indique l'Annexe C
+
+#### Reste à faire (signalé à l'utilisateur — nécessite des assets qu'il doit produire)
+- 3 placeholders dans B2_RENDU.md : exports Figma (section 3.1, dossier `annexes/docs/prototype/figma/` vide), screenshot test/preprod côte à côte (section 6.5), captures parcours complet (Annexe B)
+- Image `annexes/docs/prototype/miro-wireflow-overview.png` référencée (3.1 et Annexe A) mais absente du dépôt
+- Annexe D : 2 références bibliographiques « À COMPLÉTER » (ZIP_2022.pdf, Texe+4_pp.79-102.pdf)
+
+#### État
+| Module | État |
+|--------|------|
+| Dossier B2 (B2_RENDU.md) | À jour au 2026-07-17 — onboarding documenté (§3.3, §9.6), chiffres de tests réels (2 067 verts), liens annexes valides ; 3 placeholders d'assets restants côté utilisateur |
+
+---
+
+### [2026-07-17] DOC — Intégration des exports Figma et du wireflow Miro dans le dossier B2
+
+#### Contexte
+L'utilisateur a déposé les assets manquants dans `annexes/docs/prototype/` : 3 captures Figma (dans `figma/`) et le wireflow Miro (`wireframe_miro.png`).
+
+#### Fichiers modifiés
+- `annexes/docs/prototype/figma/*` — renommés (espaces/apostrophes → noms sûrs pour la conversion PDF) : `figma-01-leitner-setup-session.png`, `figma-02-mindmap-menu-editeur.png`, `figma-03-reglages-calendrier-messagerie.png`
+- `annexes/docs/prototype/wireframe_miro.png` — renommé `miro-wireflow-overview.png` (nom déjà référencé deux fois par B2_RENDU.md, section 3.1 et Annexe A)
+- `B2_RENDU.md` — placeholder `[EXPORTS FIGMA ICI]` (section 3.1) remplacé par les 3 planches légendées (Leitner setup/session, mindmap menu/éditeur, modules secondaires dont la messagerie écartée)
+
+#### Reste à faire (assets utilisateur)
+- Section 6.5 : screenshot test/preprod côte à côte — placeholder toujours présent
+- Annexe B : captures du parcours complet sur l'environnement de test — placeholder toujours présent
+- Annexe D : 2 références bibliographiques « À COMPLÉTER » (ZIP_2022.pdf, Texe+4_pp.79-102.pdf)
+
+#### État
+| Module | État |
+|--------|------|
+| Dossier B2 (B2_RENDU.md) | À jour — tous les liens du dossier résolvent ; restent 2 placeholders de screenshots (6.5, Annexe B) et 2 réfs biblio |
+
+---
+
+### [2026-07-17] DOC — B2 : suppression du placeholder screenshot multi-environnements, Annexe B convertie en démonstration vidéo
+
+#### Contexte
+Les environnements test/preprod ne sont pas déployés actuellement : le screenshot « test et preprod côte à côte » (section 6.5) est impossible à produire. Décision utilisateur : supprimer ce placeholder, et remplacer les captures « parcours complet » de l'Annexe B par une capture vidéo à venir, référencée par un lien.
+
+#### Fichiers modifiés
+- `B2_RENDU.md` — section 6.5 : placeholder screenshot supprimé, remplacé par un renvoi vers les preuves existantes (notifications Discord §2.5, pipeline §2.6) et vers la démo vidéo de l'Annexe B
+- `B2_RENDU.md` — Annexe B renommée « Démonstration de l'application » : tableau récapitulatif des 5 captures réelles déjà dans le corps du dossier (accueil, tutos, leitner ×2, swagger) + emplacement du lien vidéo (parcours inscription → email → connexion → visite guidée → Leitner → session)
+- `B2_RENDU.md` — plan du dossier (intro) : « B. Captures de l'application » → « B. Démonstration de l'application »
+
+#### Reste à faire (utilisateur)
+- Enregistrer la capture vidéo du parcours complet et fournir l'URL → remplacer `[LIEN VIDÉO À INSÉRER]` en Annexe B
+- Annexe D : 2 références bibliographiques « À COMPLÉTER » (ZIP_2022.pdf, Texe+4_pp.79-102.pdf)
+
+#### État
+| Module | État |
+|--------|------|
+| Dossier B2 (B2_RENDU.md) | À jour — plus aucun placeholder d'image ; restent le lien vidéo (Annexe B) et 2 réfs biblio (Annexe D) |
+
+---
+
+### [2026-07-17] DOC — B2 Annexe D : références bibliographiques complétées depuis le contenu des PDF
+
+#### Contexte
+Les deux références « À COMPLÉTER » de l'Annexe D ont été identifiées en extrayant le texte et les métadonnées des PDF sources (pypdf).
+
+#### Fichiers modifiés
+- `B2_RENDU.md` — Annexe D : ZIP_2022.pdf = Zung, Imundo & Pan (2022), *How do college students use digital flashcards during self-regulated learning?*, Memory, doi:10.1080/09658211.2022.2058553 ; Texe+4_pp.79-102.pdf = Corbin, Duguet, Berthaud & Morlaix (2023), *Les pratiques d'étude en première année universitaire…*, Évaluer. JIREF, 9(1), pp. 79–102. Colonne « Appuie » précisée pour chacun (flashcards numériques / enquête ~800 étudiants L1)
+
+#### Hypothèses posées
+- Année 2023 pour le vol. 9(1) de la revue Évaluer (JIREF) — déduite de la numérotation de la revue, le PDF (créé 2024-01) ne porte pas d'année explicite : à confirmer par l'utilisateur si possible
+
+#### État
+| Module | État |
+|--------|------|
+| Dossier B2 (B2_RENDU.md) | À jour — dernier élément manquant : le lien de la démonstration vidéo (Annexe B) |
+
+---
+
+### [2026-07-17] IMP — B2 : réduction de ~10 pages du corps du dossier (39 pages → cible ~29)
+
+#### Contexte
+Le PDF généré (VS Code Markdown PDF, rendu Chromium) faisait 39 pages hors annexes ; l'utilisateur en demande ~29. Coupes autorisées par l'utilisateur : images réduites, extraits de code raccourcis, tableaux de recette condensés, fusion de sous-sections, prose resserrée.
+
+#### Fichiers modifiés
+- `B2_RENDU.md` — **images** : les 12 images du corps passent en `<img width>` (compatible Markdown PDF/Chromium) ; 4 paires regroupées côte à côte en tableaux HTML (notifications Discord, captures prototype, session Leitner réelle, accueil+tutos, planches Figma 1-2) ; la planche Figma 3 n'est plus affichée (décrite dans la légende, fichier conservé en annexe)
+- `B2_RENDU.md` — **code** : supprimés ou condensés : en-tête compose (§1.1), gitGraph (§1.4), YAML workflow_run (§2.4), guard auth (§3.4), bloc jest.mock (§4.2), listes d'intitulés de tests (§4.3, §4.4), tableau de couverture → ligne (§4.5), wireframe ASCII ClassroomPage (§3.1), YAML deploy_prod (§6.1), YAML helm multi-lignes (§6.4), bloc JS health (§8.3)
+- `B2_RENDU.md` — **recette** : tableau des 12 scénarios Leitner (§7.2) fusionné dans le tableau de synthèse des parcours (4 lignes)
+- `B2_RENDU.md` — **structure** : 5.4+5.5 fusionnées en « 5.4 Évolutivité et traçabilité du code » ; 9.2+9.3 fusionnées en « 9.2 Manuels de déploiement et d'exploitation » ; renumérotation 9.4→9.3, 9.5→9.4, 9.6→9.5 ; renvois internes corrigés (Annexe B, §5.4) ; 8.2 et 8.4 condensés (8.3 intact) ; bullets 8.1 fusionnées en prose (le diagramme mermaid porte les étapes) ; 3 lignes mémoire-projet du tableau 9.1 fusionnées en 1
+- `B2_RENDU.md` — **prose** resserrée : §1.2, §1.3, §2.3, §3.1 (niveaux 0-2), §3.3, §4.2, §5.2, §5.3, §6.1-6.4, §7.1-7.2, §9.4
+- Bilan mesurable : corps 11 266 → 10 003 mots (−11 %), ~45 lignes de blocs de code en moins, 12 images pleine largeur → 3 simples réduites + 4 paires côte à côte
+- Vérifié : numérotation de sections continue, aucun renvoi interne obsolète, tous les liens/`img src` résolvent
+
+#### Reste à faire
+- L'utilisateur doit régénérer le PDF pour mesurer le gain réel ; nouvelle passe de coupe possible si l'objectif de 29 pages n'est pas atteint
+- Lien vidéo Annexe B toujours à insérer
+
+#### État
+| Module | État |
+|--------|------|
+| Dossier B2 (B2_RENDU.md) | Raccourci (−11 % de mots, images réduites) — en attente de la mesure PDF par l'utilisateur + lien vidéo |

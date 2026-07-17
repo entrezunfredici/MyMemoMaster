@@ -20,7 +20,7 @@
 | 7            | Cahier de recettes                                                                                                                                                                         | C2.3.1               |
 | 8            | Plan de correction des bogues                                                                                                                                                              | C2.3.2               |
 | 9            | Documentation technique d'exploitation                                                                                                                                                     | C2.4.1               |
-| Annexes      | A. Galerie du prototype · B. Captures de l'application · C. Index des documents du dépôt · D. Sources bibliographiques · E. Synthèse de couverture des compétences · F. Glossaire | —                   |
+| Annexes      | A. Galerie du prototype · B. Démonstration de l'application · C. Index des documents du dépôt · D. Sources bibliographiques · E. Synthèse de couverture des compétences · F. Glossaire | —                   |
 
 ---
 
@@ -39,7 +39,7 @@ Pour remédier à ces problèmes, MyMemoMaster propose une plateforme de révisi
 
 ## Stack technique
 
-La stack est documentée dans [docs/CONVENTIONS.md](annexes/docs/CONVENTIONS.md) et vérifiable dans le manifeste npm de l'api ([my_memo_master_api/package.json](my_memo_master_api/package.json)) et celui du front ([my_memo_master_front/package.json](my_memo_master_front/package.json)) :
+La stack est documentée dans [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md) et vérifiable dans le manifeste npm de l'api ([my_memo_master_api/package.json](my_memo_master_api/package.json)) et celui du front ([my_memo_master_front/package.json](my_memo_master_front/package.json)) :
 
 | Couche                      | Technologie                                                                      |
 | --------------------------- | -------------------------------------------------------------------------------- |
@@ -111,7 +111,7 @@ graph TD
     Worker -->|SMTP| Mail["Serveur SMTP<br/>(emails transactionnels)"]
 ```
 
-Chaque sous-graphe correspond à une couche d'infrastructure ; les flèches indiquent le sens des requêtes. Redis sert **exclusivement** de broker BullMQ, pas de cache applicatif (règle de [docs/CONVENTIONS.md](annexes/docs/CONVENTIONS.md)).
+Chaque sous-graphe correspond à une couche d'infrastructure ; les flèches indiquent le sens des requêtes. Redis sert **exclusivement** de broker BullMQ, pas de cache applicatif (règle de [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)).
 
 ---
 
@@ -121,25 +121,19 @@ Chaque sous-graphe correspond à une couche d'infrastructure ; les flèches indi
 
 ## 1.1 Environnement de développement local
 
-J'ai conçu l'environnement de développement pour qu'un contributeur soit opérationnel rapidement : créer le `.env` à partir du `.env.example` (URLs et clefs d'accès aux services externes — S3, serveur SMTP, token Cloudflare), puis lancer `docker compose up --build`. La procédure complète et l'outillage attendu (VS Code, Postman, Git, Docker) sont documentés dans le [README.md](annexes/README.md), partie "Bien commencer "
+J'ai conçu l'environnement de développement pour qu'un contributeur soit opérationnel rapidement : créer le `.env` à partir du `.env.example` (URLs et clefs d'accès aux services externes — S3, serveur SMTP, token Cloudflare), puis lancer `docker compose up --build`. La procédure complète et l'outillage attendu (VS Code, Postman, Git, Docker) sont documentés dans le [README.md](annexes/README.md), partie « Bien commencer ».
 
 ### Un docker-compose unifié piloté par profils
 
-Plutôt que d'avoir plusieurs docker compose divergents, j'ai unifié les environnements Docker dans un seul [docker-compose.yml](docker-compose.yml) piloté par les *profiles* qui sont documentés dans L'en-tête du fichier :
+Plutôt que d'avoir plusieurs docker compose divergents, j'ai unifié les environnements Docker dans un seul [docker-compose.yml](docker-compose.yml) piloté par les *profiles*, documentés dans l'en-tête du fichier :
 
 ```yaml
-#  Usage :
-#    Dev local : docker compose --env-file .env up --build
-#                (.env copié depuis .env.example — COMPOSE_PROFILES=dev)
-#    Test VPS  : déployé automatiquement par .github/workflows/cd.yml
-#                (job deploy_test — force --profile test sur toutes les commandes)
-#
 #  Profils (via COMPOSE_PROFILES dans le .env, ou --profile en CLI) :
 #    dev  — Traefik local HTTP, build depuis les sources, hot-reload API
 #    test — Images DockerHub, Traefik externe HTTPS Let's Encrypt, domaines de test
 ```
 
-Les services de données (`postgres`, `redis`), sans profil, démarrent dans les deux environnements ; le profil `dev` y ajoute Traefik local, PgAdmin, le front et l'API buildée depuis les sources, le profil `test` les images Docker Hub avec TLS Let's Encrypt (déployé par le CD). En dev, l'API monte le code source en volume pour le hot-reload nodemon, et le dashboard du Traefik local (`localhost:8080`) sert d'outil de diagnostic du routage ([docker-compose.yml](docker-compose.yml)).
+Les services de données (`postgres`, `redis`), sans profil, démarrent dans les deux environnements ; le profil `dev` y ajoute Traefik local, PgAdmin, le front et l'API buildée depuis les sources, le profil `test` les images Docker Hub avec TLS Let's Encrypt (déployé par le CD, job `deploy_test`). En dev, l'API monte le code source en volume pour le hot-reload nodemon, et le dashboard du Traefik local (`localhost:8080`) sert d'outil de diagnostic du routage.
 
 ### Développement hors Docker : la bascule SQLite / PostgreSQL
 
@@ -153,11 +147,11 @@ const dbConfig = require('../config/db.config')       // SQLite fichier local
 const instance = new Sequelize(process.env.PG_HOST ? dbmsConfig : dbConfig)
 ```
 
-Ce même mécanisme permet aux tests de tourner en SQLite in-memory, sans BDD externe (section 4.2) — décision documentée dans [docs/DECISIONS.md](annexes/docs/DECISIONS.md).
+Ce même mécanisme permet aux tests de tourner en SQLite in-memory, sans BDD externe (section 4.2) — décision documentée dans [dev/DECISIONS.md](annexes/dev/DECISIONS.md).
 
 ### Configuration par variables d'environnement
 
-Toute la configuration passe par des variables d'environnement, présentes dans le fichier .env qui est unique a chaque environnement et non versionné ([.gitignore](.gitignore)). Ces variables d'environnements sont documentées dans le fichier [.env.example](.env.example).  Côté API, les accès sont centralisés dans [my_memo_master_api/config/](my_memo_master_api/config/) (`db.config.js`, `dbms.config.js`, `redis.config.js`, `storage.config.js`, `swagger.config.js`) ; côté front dans `src/config.js` — règle formalisée dans [docs/CONVENTIONS.md](annexes/docs/CONVENTIONS.md). L'homogénéité de style entre contributeurs est en outre garantie par un [.editorconfig](.editorconfig) à la racine.
+Toute la configuration passe par des variables d'environnement, présentes dans le fichier .env qui est unique à chaque environnement et non versionné ([.gitignore](.gitignore)). Ces variables d'environnement sont documentées dans le fichier [.env.example](.env.example).  Côté API, les accès sont centralisés dans [my_memo_master_api/config/](my_memo_master_api/config/) (`db.config.js`, `dbms.config.js`, `redis.config.js`, `storage.config.js`, `swagger.config.js`) ; côté front dans `src/config.js` — règle formalisée dans [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md). L'homogénéité de style entre contributeurs est en outre garantie par un [.editorconfig](.editorconfig) à la racine.
 
 ## 1.2 Environnements de déploiements
 
@@ -171,11 +165,9 @@ Le projet est déployé dans trois environnements distincts, alimentés par des 
 
 Cette correspondance est documentée dans le [README.md](annexes/README.md) (partie 3) et implémentée dans le pipeline [.github/workflows/cd.yml](.github/workflows/cd.yml).
 
-**L'environnement de test** tourne sur un VPS avec le profil `test` du compose unifié, déployé automatiquement par le CD (section 6) : PostgreSQL et Redis avec healthchecks, API, front, PgAdmin, et un service `backup` que j'ai écrit pour produire un dump PostgreSQL quotidien avec rétention configurable.
+**L'environnement de test** tourne sur un VPS avec le profil `test` du compose unifié, déployé automatiquement par le CD (section 6) : PostgreSQL et Redis avec healthchecks, API, front, PgAdmin, et un service `backup` produisant un dump PostgreSQL quotidien avec rétention configurable. **La preprod et la prod** sont déployées sur Kubernetes par un chart Helm unique ([helm/](helm/)) : chaque environnement surcharge les templates communs par son fichier de valeurs ([helm/values-preprod.yaml](helm/values-preprod.yaml), [helm/values-prod.yaml](helm/values-prod.yaml)) — en preprod Redis sans volume persistant et PgAdmin activé, en prod persistance systématique et administration restreinte.
 
-**La preprod et la prod** sont déployées sur Kubernetes par un chart Helm unique ([helm/](helm/)) : chaque environnement ([helm/values-preprod.yaml](helm/values-preprod.yaml), [helm/values-prod.yaml](helm/values-prod.yaml)) surcharge les templates communs. Les différences sont des décisions de conception assumées : en preprod, Redis sans volume persistant (pertes de cache acceptables) et PgAdmin activé pour faciliter l'administration ; en prod, persistance systématique et outils d'administration restreints.
-
-**Isolation des environnements** : namespaces Kubernetes distincts, réseaux Docker nommés par environnement, images Docker Hub distinctes (`_test_`, `_preprod_`, sans suffixe en prod), secrets hors dépôt (secrets GitHub Actions et Secrets Kubernetes créés manuellement, [README.md](annexes/README.md) partie 3). Le pipeline CD vérifie même que le `.env` du VPS correspond à l'environnement attendu avant de déployer (`grep -q '^ENVIRONMENT=test$' .env`, [cd.yml](.github/workflows/cd.yml)).
+**Isolation des environnements** : namespaces Kubernetes distincts, réseaux Docker nommés par environnement, images Docker Hub distinctes, secrets hors dépôt. Le pipeline CD vérifie même que le `.env` du VPS correspond à l'environnement attendu avant de déployer (`grep -q '^ENVIRONMENT=test$' .env`).
 
 ## 1.3 Outils de suivi de qualité et de performance
 
@@ -192,33 +184,16 @@ Les tests Jest + Supertest côté API, Vitest + @vue/test-utils côté front son
 - **Healthchecks** à tous les étages : `pg_isready` (PostgreSQL), `redis-cli ping` (Redis), `wget --spider` (front) — utilisés par les dépendances de démarrage (`depends_on: condition: service_healthy`) et comme critère de succès du déploiement (section 6) ;
 - **Limites de ressources** : `limits`/`reservations` CPU-mémoire sur chaque service Compose, `requests`/`limits` Kubernetes par environnement, pool de connexions PostgreSQL dimensionné par configuration ([dbms.config.js](my_memo_master_api/config/dbms.config.js)) ;
 - **Logs structurés** : logger Winston + logs d'accès Morgan pipés dans Winston, format `combined` en production ([app.js](my_memo_master_api/app.js)) ;
-- **Métriques RED/USE (Prometheus)** : histogramme `http_request_duration_seconds` et compteur `http_requests_total` labellisés méthode/route/code, métriques process Node via `prom-client` ([helpers/metrics.js](my_memo_master_api/helpers/metrics.js)). L'endpoint `/metrics` est servi par un **serveur HTTP dédié** (port 9090) jamais exposé par l'Ingress — décision documentée dans [dev/DECISIONS.md](annexes/dev/DECISIONS.md) ; l'instrumentation a 9 tests dédiés ;
+- **Métriques RED/USE (Prometheus)** : histogramme de latence et compteur de requêtes labellisés méthode/route/code via `prom-client` ([helpers/metrics.js](my_memo_master_api/helpers/metrics.js)) ; l'endpoint `/metrics` est servi par un **serveur HTTP dédié** (port 9090) jamais exposé par l'Ingress ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)), instrumentation couverte par 9 tests ;
 - **Notifications temps réel** : chaque exécution CI/CD notifie un canal Discord (succès/échec, branche concernée) — l'équipe est prévenue d'une régression sans surveiller GitHub (section 2.5).
 
 ### Analyse statique continue : SonarCloud (SonarQube Cloud)
 
-Le projet intègre une analyse statique continue sur SonarCloud (SaaS de SonarQube) : configuration versionnée ([sonar-project.properties](sonar-project.properties)), job `sonarcloud` exécuté par la CI après le succès des tests et du lint à chaque push sur `main` — l'analyse multi-branches étant réservée aux plans payants, le suivi qualité porte sur le tronc. Le tableau de bord (bugs, code smells, duplication, quality gate) est consultable sur sonarcloud.io.
+Le projet intègre une analyse statique continue sur SonarCloud : configuration versionnée ([sonar-project.properties](sonar-project.properties)), job `sonarcloud` exécuté par la CI après le succès des tests et du lint à chaque push sur `main` (l'analyse multi-branches est réservée aux plans payants). Le tableau de bord (bugs, code smells, duplication, quality gate) est consultable sur sonarcloud.io.
 
 ## 1.4 Dépôt de gestion du code source
 
-Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`) en monorepo : API, front, infrastructure et documentation évoluent dans le même historique git, et une même pull request peut porter une fonctionnalité de bout en bout (migration, endpoint, écran, test, manifeste de déploiement). La stratégie de branches que j'ai définie ([README.md](annexes/README.md), « Méthode de travail ») pilote directement le pipeline CI (matrice de jobs par préfixe de branche — section 2) :
-
-```mermaid
-gitGraph
-    commit id: "…"
-    branch staging
-    branch dev
-    branch dev_back_feature
-    commit id: "[ADD] feature back"
-    checkout dev
-    merge dev_back_feature
-    checkout staging
-    merge dev id: "→ preprod"
-    checkout main
-    merge staging id: "→ prod"
-```
-
-Les branches de travail sont préfixées `dev_back_*` / `dev_front_*` selon le périmètre ; `dev`, `staging` et `main` alimentent respectivement les environnements de test, preprod et prod. Les commits suivent la convention `[ADD]` / `[IMP]` / `[REF]` / `[FIX]`, ce qui rend l'historique exploitable comme journal des évolutions et des correctifs (sections 8 et 9). La méthode impose enfin l'ordre « tests unitaires → code → documentation Swagger » pour chaque fonctionnalité ([README.md](annexes/README.md), étape 3) : l'environnement porte aussi le processus de développement.
+Le code source est hébergé sur GitHub (`entrezunfredici/MyMemoMaster`) en monorepo : API, front, infrastructure et documentation évoluent dans le même historique git, et une même pull request peut porter une fonctionnalité de bout en bout (migration, endpoint, écran, test, manifeste de déploiement). La stratégie de branches que j'ai définie ([README.md](annexes/README.md), « Méthode de travail ») pilote directement le pipeline CI (matrice de jobs par préfixe de branche — section 2) : les branches de travail sont préfixées `dev_back_*` / `dev_front_*` selon le périmètre et fusionnent dans `dev` ; `dev`, `staging` et `main` alimentent respectivement les environnements de test, preprod et prod, chaque promotion se faisant par fusion de la branche amont. Les commits suivent la convention `[ADD]` / `[IMP]` / `[REF]` / `[FIX]`, ce qui rend l'historique exploitable comme journal des évolutions et des correctifs (sections 8 et 9). La méthode impose enfin l'ordre « tests unitaires → code → documentation Swagger » pour chaque fonctionnalité ([README.md](annexes/README.md), étape 3) : l'environnement porte aussi le processus de développement.
 
 ---
 
@@ -249,21 +224,14 @@ Chaque entrée de la matrice exécute la même séquence, définie dans le job `
 | 4. Audit des dépendances     | `npm audit --omit=dev --audit-level=high` | **bloque** si une dépendance de production porte une vulnérabilité high/critical connue (OWASP A06) — les devDependencies, absentes des images déployées, sont exclues |
 | 5. Build (front uniquement)   | `npm run build`                           | vérifie que le bundle Vite de production se construit                                                                                                                             |
 
-Trois réglages méritent mention : `node-version: 22` (la même version de Node que les images Docker de production — on teste ce qu'on déploie), `fail-fast: false` (l'échec de l'API n'interrompt pas la validation du front : diagnostic complet en une passe) et `permissions: contents: read` (principe du moindre privilège pour les jetons GitHub Actions). La CI tourne enfin sans aucun service externe grâce à l'environnement de tests auto-suffisant (SQLite in-memory, mocks — section 4.2) : c'est ce qui rend la boucle rapide et déterministe.
+Trois réglages méritent mention : `node-version: 22` (la même version que les images de production — on teste ce qu'on déploie), `fail-fast: false` (diagnostic complet en une passe) et `permissions: contents: read` (moindre privilège pour les jetons GitHub Actions). La CI tourne sans aucun service externe grâce à l'environnement de tests auto-suffisant (SQLite in-memory, mocks — section 4.2) : boucle rapide et déterministe.
 
 ## 2.4 La CI comme porte d'entrée du déploiement
 
-Le pipeline de déploiement ([.github/workflows/cd.yml](.github/workflows/cd.yml)) se déclenche à la **fin du workflow CI** et vérifie sa conclusion :
+Le pipeline de déploiement ([.github/workflows/cd.yml](.github/workflows/cd.yml)) se déclenche à la **fin du workflow CI** (déclencheur `workflow_run` sur `main`/`staging`/`dev`) et chaque job vérifie sa conclusion :
 
 ```yaml
-on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main, staging, dev]
-# … puis chaque job vérifie :
-push_images:
-  if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
 ```
 
 Cette architecture en deux workflows chaînés garantit structurellement qu'**aucune image Docker n'est construite ni déployée à partir d'un commit dont les tests ou le lint ont échoué**. C'est le cœur du protocole d'intégration continue.
@@ -272,13 +240,12 @@ Cette architecture en deux workflows chaînés garantit structurellement qu'**au
 
 Le workflow [notify_ci.yml](.github/workflows/notify_ci.yml) notifie l'issue de la CI sur le canal Discord dédié, en nommant la branche fautive en cas d'échec (`"Tests failed on branch $BRANCH_NAME!"`) ; le pipeline CD envoie de son côté un bilan de déploiement (`✅/❌ Déploiement **<branche>** réussi/échoué`). Une régression introduite sur `dev` est connue de l'équipe en quelques minutes, sans surveillance active de GitHub.
 
-![Notification Discord d'échec CI](annexes/docs/CI_failed_in_discord.png)
+<table><tr>
+<td><img src="annexes/docs/CI_failed_in_discord.png" alt="Notification Discord d'échec CI" width="360"></td>
+<td><img src="annexes/docs/discordMessage.png" alt="Notifications Discord — succès CI sur staging puis bilan de déploiement" width="360"></td>
+</tr></table>
 
-*Notification d'échec CI : la branche fautive est nommée dans le message.*
-
-![Notifications Discord — succès CI sur staging puis bilan de déploiement](annexes/docs/discordMessage.png)
-
-*Succès CI sur `staging`, suivi du bilan de déploiement du pipeline CD (état du cluster, puis « ✅ Déploiement staging réussi »).*
+*À gauche : échec CI, la branche fautive est nommée dans le message. À droite : succès CI sur `staging`, suivi du bilan de déploiement du pipeline CD (« ✅ Déploiement staging réussi »).*
 
 ## 2.6 Vue d'ensemble du pipeline
 
@@ -307,7 +274,7 @@ flowchart LR
 
 La flèche CI → CD n'existe que si la CI conclut en succès.
 
-![Exécution réelle du workflow CD dans GitHub Actions](annexes/docs/CICD.png)
+<img src="annexes/docs/CICD.png" alt="Exécution réelle du workflow CD dans GitHub Actions" width="560">
 
 *Exécution réelle de `cd.yml` (push sur `staging`) : build et publication des images, puis seul « Deploy to Kubernetes (preprod) » s'exécute — les cibles test et prod sont ignorées — et la notification Discord conclut.*
 
@@ -321,34 +288,25 @@ La flèche CI → CD n'existe que si la CI conclut en succès.
 
 La conception des interfaces suit quatre niveaux de raffinement successifs :
 
-**Niveau 0 — Wireflow et exploration graphique (Miro, Figma).** La conception a démarré par un **wireflow Miro** — écrans filaires reliés par leurs flux de navigation — couvrant l'essentiel du périmètre fonctionnel (authentification, menus par rôle, groupes classe, cartes mentales, systèmes de Leitner, exercices, calendrier, to-do, KPI), puis des maquettes Figma ont précisé l'identité visuelle écran par écran. Elles ont fixé des invariants toujours visibles aujourd'hui : navigation latérale par icônes, palette bleu/blanc, et surtout l'éditeur de cartes mentales — palette d'outils latérale et nœuds à formules, retrouvés presque tels quels dans l'implémentation finale (`MindMapPalette.vue`, rendu KaTeX). Deux décisions d'interface ont en revanche été révisées depuis : flashcards et cartes mentales, couplées en vue scindée sur les maquettes, sont devenues deux modules autonomes ; et la session de révision, initialement une carte à retourner (auto-évaluation), exige finalement une **réponse saisie en texte libre corrigée sémantiquement par IA** ([diagrams/leitner_algo.md](annexes/diagrams/leitner_algo.md)) — rappel actif plutôt que reconnaissance, choix plus exigeant pédagogiquement et cohérent avec les sources bibliographiques du mémoire. Les maquettes tracent aussi les **arbitrages de périmètre** : tous les modules secondaires maquettés ont été retenus, sauf la messagerie interne. Ces traces de conception sont archivées ([docs/prototype/figma/](annexes/docs/prototype/figma/), [vue d&#39;ensemble du wireflow Miro](annexes/docs/prototype/miro-wireflow-overview.png)) mais ne sont **pas maintenues** : la spécification de référence est le prototype HTML du niveau 1.
+**Niveau 0 — Wireflow et exploration graphique (Miro, Figma).** La conception a démarré par un **wireflow Miro** (écrans filaires reliés par leurs flux de navigation, couvrant l'essentiel du périmètre fonctionnel), puis des maquettes Figma ont précisé l'identité visuelle écran par écran. Elles ont fixé des invariants toujours visibles aujourd'hui — navigation latérale par icônes, palette bleu/blanc, éditeur de cartes mentales à palette d'outils latérale et nœuds à formules — et tracent les décisions révisées depuis : flashcards et cartes mentales découplées en deux modules autonomes, et session de révision passée de la carte à retourner (auto-évaluation) à une **réponse en texte libre corrigée sémantiquement par IA** ([diagrams/leitner_algo.md](annexes/diagrams/leitner_algo.md)) — rappel actif plutôt que reconnaissance, cohérent avec les sources bibliographiques du mémoire. Tous les modules secondaires maquettés ont été retenus, sauf la messagerie interne. Ces traces sont archivées ([docs/prototype/figma/](annexes/docs/prototype/figma/), [wireflow Miro](annexes/docs/prototype/miro-wireflow-overview.png)) mais ne sont **pas maintenues** : la spécification de référence est le prototype HTML du niveau 1.
 
-[EXPORTS FIGMA ICI : déposer 3-4 écrans exportés depuis Figma (ex : LS Setup, LS In Use, MIND MAP MENU, MIND MAP éditeur) dans docs/prototype/figma/ puis les recopier dans annexes/docs/prototype/figma/]
+<table><tr>
+<td><img src="annexes/docs/prototype/figma/figma-01-leitner-setup-session.png" alt="Maquettes Figma — système de Leitner : configuration et session de révision" width="330"></td>
+<td><img src="annexes/docs/prototype/figma/figma-02-mindmap-menu-editeur.png" alt="Maquettes Figma — cartes mentales : menu et éditeur avec palette d'outils latérale" width="330"></td>
+</tr></table>
 
-**Niveau 1 — Un prototype interactif et navigable** des pages principales, créé et exporté en **HTML autonome** avec Claude design, versionné dans le dépôt ([docs/prototype/](annexes/docs/prototype/), procédure d'ouverture dans son README) : 16 écrans couvrant authentification, inscription, accueil, tutoriels, mindmaps, flashcards (liste, gestion, session Leitner), exercices, classe, calendrier, to-do, KPI, profil et réglages. Le prototype fixe l'identité visuelle et les parcours ; les captures sont **générées automatiquement depuis ce fichier** par script Puppeteer, donc reproductibles — galerie complète des 16 écrans en **Annexe A**, deux exemples :
+*Planches Figma ([docs/prototype/figma/](annexes/docs/prototype/figma/)) : système de Leitner (configuration, session avec états bonne/mauvaise réponse) et cartes mentales (liste, éditeur à palette latérale). Une troisième planche couvre les modules secondaires — réglages, profil, calendrier, et la messagerie, seul module écarté.*
 
-|                                                                               |                                                                             |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| ![Session Leitner](annexes/docs/prototype/captures/08-flashcards-session.png) | ![Détail exercice](annexes/docs/prototype/captures/10-exercice-detail.png) |
-| Session de révision (répartition par boîte)                                | Exercice — question ouverte + QCM                                          |
+**Niveau 1 — Un prototype interactif et navigable** des pages principales, créé et exporté en **HTML autonome** avec Claude design, versionné dans le dépôt ([docs/prototype/](annexes/docs/prototype/)) : 16 écrans couvrant l'ensemble des modules, de l'authentification aux réglages. Le prototype fixe l'identité visuelle et les parcours ; les captures sont **générées automatiquement depuis ce fichier** par script Puppeteer, donc reproductibles — galerie complète en **Annexe A**, deux exemples :
 
-**Niveau 2 — Spécifications UI versionnées.** Pour les fonctionnalités complexes, j'ai créé des documents de conception faisant le lien entre règles métier et interface, avec wireframes et contexte d'intégration ([diagrams/dashboard_enseignant_ui.md](annexes/diagrams/dashboard_enseignant_ui.md), [etablissement_admin_ui.md](annexes/diagrams/etablissement_admin_ui.md), [kpi_consent_ui.md](annexes/diagrams/kpi_consent_ui.md), [ui_navigation_sujet.md](annexes/diagrams/ui_navigation_sujet.md)). Extrait :
+<table><tr>
+<td><img src="annexes/docs/prototype/captures/08-flashcards-session.png" alt="Session Leitner" width="330"></td>
+<td><img src="annexes/docs/prototype/captures/10-exercice-detail.png" alt="Détail exercice" width="330"></td>
+</tr></table>
 
-```
-┌─ ClassroomPage ──────────────────────────────────────────────────────────┐
-│  [Sélecteur de groupe]                                                   │
-│  ┌─ Colonne principale (2/3) ──────────────────────────────────────────┐ │
-│  │  [A] Fiche groupe + KPI de base + Sections/Rendus  (existant)       │ │
-│  │  [B] Analyse pédagogique  ← NOUVEAU (S-01.02)                       │ │
-│  │  [C] Calendrier du groupe  (existant)                               │ │
-│  └─────────────────────────────────────────────────────────────────────┘ │
-│  ┌─ Sidebar droite (1/3) ──────────────────────────────────────────────┐ │
-│  │  [D] Formulaires enseignant  (existant)                             │ │
-│  └─────────────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+*À gauche : session de révision (répartition par boîte). À droite : exercice — question ouverte + QCM.*
 
-Versionner ces maquettes avec le code est une décision de méthode : la spécification d'interface évolue dans les mêmes pull requests que son implémentation et distingue l'existant du nouveau — le prototype s'inscrit dans un incrément, pas dans une refonte.
+**Niveau 2 — Spécifications UI versionnées.** Pour les fonctionnalités complexes, des documents de conception font le lien entre règles métier et interface, avec wireframes ASCII et contexte d'intégration distinguant l'existant du nouveau ([diagrams/dashboard_enseignant_ui.md](annexes/diagrams/dashboard_enseignant_ui.md), [etablissement_admin_ui.md](annexes/diagrams/etablissement_admin_ui.md), [kpi_consent_ui.md](annexes/diagrams/kpi_consent_ui.md), [ui_navigation_sujet.md](annexes/diagrams/ui_navigation_sujet.md)). Versionner ces maquettes avec le code est une décision de méthode : la spécification d'interface évolue dans les mêmes pull requests que son implémentation — le prototype s'inscrit dans un incrément, pas dans une refonte.
 
 **Niveau 3 — Implémentation Vue.** Chaque maquette se concrétise en une page (`src/pages/[Name]Page.vue`) composée de composants réutilisables (`src/components/[Name]Component.vue`), conventions formalisées dans [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md).
 
@@ -369,9 +327,12 @@ Le « prototype » au sens du référentiel est ici l'application elle-même, fo
 
 Les composants d'interface génériques exigés par le critère (fenêtres, boutons, menus…) existent en tant que composants réutilisables : `ButtonComponent`, `ModalComponent`, `DropdownComponent`, `MenuItemComponent`, `LoaderComponent`, `PillComponent`, `ToggleButton`, etc. ([my_memo_master_front/src/components/](my_memo_master_front/src/components/)).
 
-![Session de révision Leitner — saisie de la réponse, avec la répartition par boîte affichée sous la carte](annexes/docs/leitner.png)
+<table><tr>
+<td><img src="annexes/docs/leitner.png" alt="Session de révision Leitner — saisie de la réponse" width="330"></td>
+<td><img src="annexes/docs/leitner_2.png" alt="Session de révision Leitner — correction de la réponse (score, similarité)" width="330"></td>
+</tr></table>
 
-![Session de révision Leitner — correction de la réponse (score, similarité) et mise à jour de la répartition par boîte](annexes/docs/leitner_2.png)
+*Session de révision Leitner réelle : saisie de la réponse, puis correction (score, similarité) et mise à jour de la répartition par boîte.*
 
 ## 3.3 Spécificités ergonomiques et équipements ciblés
 
@@ -379,7 +340,11 @@ Les médias ciblés sont le **navigateur web, desktop et mobile**. Trois disposi
 
 - **Responsive design** : l'interface est construite avec Tailwind CSS et ses classes de points de rupture (`sm:`, `md:`, `lg:`) ; les maquettes de [diagrams/dashboard_enseignant_ui.md](annexes/diagrams/dashboard_enseignant_ui.md) spécifient d'ailleurs des colonnes 2/3 – 1/3 qui se replient sur mobile.
 - **PWA (Progressive Web App)** : le front est installable sur mobile via `vite-plugin-pwa` ([vite.config.js](my_memo_master_front/vite.config.js)) — manifeste complet et mise à jour automatique du service worker. Décision de conception commentée dans le fichier : **aucun asset pré-caché** (`globPatterns: []`), car sur une application au contenu essentiellement dynamique, un pré-cache Workbox de plusieurs Mo dégraderait la première installation sans bénéfice réel.
-- **Guidage utilisateur** : l'ergonomie de prise en main est traitée comme une fonctionnalité à part entière — parcours d'onboarding persisté côté serveur (module `OnboardingState` de l'API), page de tutoriels, notifications toast (`vue-toastification`), états vides explicites (`NoItemComponent`), indicateurs de chargement (`LoaderComponent`), titres d'onglet dynamiques par page (`document.title` dans le guard de navigation, [src/router/index.js](my_memo_master_front/src/router/index.js)).
+- **Guidage utilisateur** : l'ergonomie de prise en main est traitée comme une fonctionnalité à part entière, avec un dispositif d'onboarding à deux niveaux, testé et validé en conditions réelles :
+  - **la visite guidée de l'interface**, lancée automatiquement au premier login : 10 étapes en français mettent en surbrillance les modules de la navigation, via `driver.js` — retenue pour sa licence MIT après l'écartement d'intro.js, sous licence AGPL/commerciale ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)). L'état « visite vue » est **persisté côté serveur** (module `OnboardingState` de l'API, champ `tour_seen`) : jamais relancée automatiquement, y compris depuis un autre navigateur, mais relançable depuis la page d'accueil ([src/composables/useOnboardingTour.js](my_memo_master_front/src/composables/useOnboardingTour.js)) ;
+  - **le parcours guidé de création** : un bandeau persistant accompagne l'utilisateur sur les **vraies pages** de l'application en 4 étapes (carte mentale → Leitner → exercices → planification), chaque étape n'étant déverrouillée que par la création effective de l'élément, avec liaison automatique entre eux (matière pré-sélectionnée, séance rattachée au système créé) ; l'état survit au rechargement (store Pinia persisté en localStorage, [src/stores/guidedTour.js](my_memo_master_front/src/stores/guidedTour.js)).
+
+  Les deux dispositifs sont couverts par des tests dédiés (section 4.1) et complétés par une page de tutoriels, des notifications toast, des états vides explicites, des indicateurs de chargement et des titres d'onglet dynamiques par page.
 
 Une règle d'ergonomie issue d'un défaut réellement rencontré est même codifiée dans les conventions du projet ([dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)) : les popups et panneaux flottants doivent déclarer un fond opaque explicite pour rester lisibles quelle que soit la page en dessous.
 
@@ -387,27 +352,16 @@ Une règle d'ergonomie issue d'un défaut réellement rencontré est même codif
 
 La sécurité n'est pas reportée à la couche API : le prototype front l'intègre dès la navigation.
 
-**Contrôle d'accès à la navigation.** Le routeur applique deux guards à chaque changement de route ([my_memo_master_front/src/router/index.js](my_memo_master_front/src/router/index.js)) :
+**Contrôle d'accès à la navigation.** Le routeur applique deux guards à chaque changement de route ([my_memo_master_front/src/router/index.js](my_memo_master_front/src/router/index.js)) : un guard d'authentification (route `meta.private` sans session valide → déconnexion propre et redirection `/auth`) et un guard de rôles (`meta.roles = [1, 4]` signifie « admin plateforme ou admin établissement seulement » ; rôle non autorisé → redirection accueil) :
 
 ```javascript
-// Guard authentification
-if (to.meta.private === true) {
-  if (!authStore.authenticated || !authStore.token) {
-    authStore.logout(false, null)
-    return next({ path: '/auth' })
-  }
-}
-
-// Guard rôles : meta.roles = [1, 4] signifie "admin plateforme ou admin établissement seulement"
 if (to.meta.roles && to.meta.roles.length > 0) {
   const userRoleId = authStore.user?.roleId ?? null
-  if (!to.meta.roles.includes(userRoleId)) {
-    return next({ path: '/' })
-  }
+  if (!to.meta.roles.includes(userRoleId)) return next({ path: '/' })
 }
 ```
 
-Les routes déclarent leur exigence dans leurs métadonnées (`meta.private`, `meta.roles`) : ajouter un écran protégé ne demande aucune logique nouvelle, seulement une déclaration — le contrôle d'accès est systématique par construction. Ce contrôle côté client est un confort d'expérience utilisateur (redirection immédiate) ; l'autorité reste côté API, où chaque route privée est protégée par middleware JWT et RBAC (section 5.2).
+Les routes déclarent leur exigence dans leurs métadonnées : ajouter un écran protégé ne demande aucune logique nouvelle, seulement une déclaration — le contrôle d'accès est systématique par construction. Ce contrôle côté client est un confort d'expérience utilisateur (redirection immédiate) ; l'autorité reste côté API, où chaque route privée est protégée par middleware JWT et RBAC (section 5.2).
 
 **Gestion de session sécurisée.** Le client HTTP centralisé ([src/helpers/api.js](my_memo_master_front/src/helpers/api.js)) implémente le renouvellement silencieux de session : sur une réponse 401, un intercepteur échange le refresh token puis rejoue la requête une seule fois (drapeau `_retried` contre les boucles infinies) ; si le renouvellement échoue, l'utilisateur est déconnecté proprement. C'est la contrepartie ergonomique d'une exigence de sécurité : elle rend acceptable un jeton d'accès de 15 minutes ([dev/DECISIONS.md](annexes/dev/DECISIONS.md), [docs/SECURITY_AUDIT_OWASP.md](annexes/docs/SECURITY_AUDIT_OWASP.md)) sans jamais imposer de reconnexion. Le front intègre aussi un indicateur de robustesse du mot de passe à l'inscription (`PasswordStrengthComponent.vue`).
 
@@ -419,99 +373,73 @@ Les routes déclarent leur exigence dans leurs métadonnées (`meta.private`, `m
 
 ## 4.1 Répartition des tests unitaires
 
-Ci-dessous l'on retrouve les chiffres issus de l'exécution réelle des deux suites de tests sur le code actuel du dépôt (et non d'une déclaration) :
+Les chiffres ci-dessous sont issus de l'exécution réelle des deux suites de tests sur le code actuel du dépôt (et non d'une déclaration) :
 
 | Périmètre | Outillage                                 | Volume                           | Résultat               | Durée |
 | ----------- | ----------------------------------------- | -------------------------------- | ----------------------- | ------ |
-| API         | Jest + Supertest                          | **80 suites, 1 448 tests** | 1 448 passés, 0 échec | ~40 s  |
-| Front       | Vitest + @vue/test-utils + @pinia/testing | **39 fichiers, 597 tests** | 597 passés, 0 échec   | ~40 s  |
+| API         | Jest + Supertest                          | **80 suites, 1 450 tests** | 1 450 passés, 0 échec | ~40 s  |
+| Front       | Vitest + @vue/test-utils + @pinia/testing | **41 fichiers, 617 tests** | 617 passés, 0 échec   | ~40 s  |
 
 Répartition de la stratégie de test :
 
 | Couche testée                                                   | Fichiers | Tests | Ce qui est validé                                                                         |
 | ---------------------------------------------------------------- | -------- | ----- | ------------------------------------------------------------------------------------------ |
-| `test/controllers/` (API)                                      | 34       | 791   | contrat HTTP de chaque endpoint : codes de statut, corps de réponse, cas d'erreur         |
+| `test/controllers/` (API)                                      | 34       | 793   | contrat HTTP de chaque endpoint : codes de statut, corps de réponse, cas d'erreur         |
 | `test/services/` (API)                                         | 34       | 554   | logique métier isolée : algorithmes, règles de droits, cas limites                      |
 | `test/middlewares/` (API)                                      | 4        | 31    | JWT, RBAC, rate limiting, instrumentation métriques (tests de sécurité dédiés)        |
 | `test/models/` (API)                                           | 2        | 18    | contraintes de modèles sensibles (AuditLog, Etablissement)                                |
 | `test/helpers/` (API)                                          | 2        | 14    | helpers transverses : métriques Prometheus, signatures binaires des uploads (magic bytes) |
 | `test/bdd/` (API)                                              | 4        | 40    | scénarios fonctionnels de bout en bout (sessions complètes)                              |
 | `test/components/` (front)                                     | 18       | 279   | rendu et interactions des pages/composants critiques                                       |
-| `test/stores/` (front)                                         | 15       | 240   | state management Pinia : actions, mutations d'état, appels API mockés                    |
-| `test/router/`, `composables/`, `helpers/`, racine (front) | 5        | 74    | guards de navigation, logique réutilisable                                                |
+| `test/stores/` (front)                                         | 16       | 254   | state management Pinia : actions, mutations d'état, appels API mockés (dont onboarding et parcours guidé) |
+| `test/router/`, `composables/`, `helpers/`, racine (front) | 6        | 80    | guards de navigation, logique réutilisable (dont la visite guidée de l'interface)         |
 | `test/a11y/` (front)                                           | 1        | 4     | accessibilité runtime (axe-core) des composants critiques — non-régression RGAA         |
 
 L'essentiel des tests porte sur les couches controller et service de l'API — là où vit la logique métier —, complétées par des tests fonctionnels transverses (`test/bdd/`) qui valident les enchaînements réels.
 
 ## 4.2 Architecture de l'environnement de tests API
 
-L'environnement de tests de l'API est conçu pour tourner sans aucun service externe ; la configuration Jest tient dans [my_memo_master_api/package.json](my_memo_master_api/package.json) (`testMatch`, `moduleNameMapper` vers les mocks, `setupFiles`). Trois mécanismes d'isolation, visibles dans l'en-tête du test de session Leitner ([test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js)) :
+L'environnement de tests de l'API est conçu pour tourner sans aucun service externe ([my_memo_master_api/package.json](my_memo_master_api/package.json) : `testMatch`, `moduleNameMapper`, `setupFiles`), par trois mécanismes d'isolation visibles dans l'en-tête du test de session Leitner ([test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js)) :
 
-```javascript
-// Base SQLite en mémoire — seul Semantic.service est mocké (dépendance NLP externe ~30s).
-// Les autres couches (controller → service → model → DB) sont réelles.
-process.env.DB_STORAGE = ':memory:'
-
-jest.mock('../../services/Semantic.service', () => ({ gradeSemantic: jest.fn() }))
-jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
-jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
-```
-
-- **base de données** SQLite in-memory, une instance par fichier de test — aucune BDD externe, pas de pollution entre tests ;
-- **modèle d'IA** `@xenova/transformers` (~30 s de chargement) remplacé par un mock global ([__mocks__/](my_memo_master_api/__mocks__/)) — sauf dans les tests dédiés au service sémantique, qui contrôlent leur propre mock ;
+- **base de données** SQLite in-memory (`DB_STORAGE=':memory:'`), une instance par fichier de test — aucune BDD externe, pas de pollution entre tests ;
+- **modèle d'IA** `@xenova/transformers` (~30 s de chargement) remplacé par un mock global ([__mocks__/](my_memo_master_api/__mocks__/)) — les autres couches (controller → service → model → DB) restent réelles ;
 - **jobs asynchrones** (crons, worker BullMQ) neutralisés — pas de dépendance Redis ni de timing non déterministe.
 
-Le fichier [test/setup.js](my_memo_master_api/test/setup.js) désactive par défaut le rate limiting (`RATE_LIMIT_DISABLED = 'true'`), **sauf** pour les tests de sécurité qui le réactivent afin de valider précisément ce comportement ([test/middlewares/security.test.js](my_memo_master_api/test/middlewares/security.test.js)) — l'exception est documentée en commentaire dans le fichier même.
+Le fichier [test/setup.js](my_memo_master_api/test/setup.js) désactive par défaut le rate limiting, **sauf** pour les tests de sécurité qui le réactivent afin de valider précisément ce comportement ([test/middlewares/security.test.js](my_memo_master_api/test/middlewares/security.test.js)).
 
 ## 4.3 Couverture d'une fonctionnalité : l'algorithme de Leitner
 
-Pour illustrer la couverture d'une fonctionnalité complète, je prends le cœur métier de l'application : la répétition espacée dispose de :
+Pour illustrer la couverture d'une fonctionnalité complète, je prends le cœur métier de l'application : la répétition espacée dispose de deux niveaux de tests.
 
-**Les tests unitaire — [test/services/LeitnerCard.service.test.js](my_memo_master_api/test/services/LeitnerCard.service.test.js) (23 tests).** Les tests suivent systématiquement le schéma *méthode – condition – comportement attendu* et couvrent le cas nominal, les cas limites et les erreurs attendues :
+**Les tests unitaires — [test/services/LeitnerCard.service.test.js](my_memo_master_api/test/services/LeitnerCard.service.test.js) (23 tests).** Les tests suivent systématiquement le schéma *méthode – condition – comportement attendu* et couvrent le cas nominal, les cas limites et les erreurs attendues :
 
 ```
 correctResponse - bonne réponse - avance à la boîte suivante et incrémente correct_count
 correctResponse - mauvaise réponse - retour boîte 1 et incrémente incorrect_count
 correctResponse - bonne réponse en boîte 5 - reste en boîte 5 (plafonnement)
-correctResponse - carte introuvable - retourne null
-correctResponse - aucune réponse correcte en base - retourne null sans grading
-addCard - droits insuffisants - lève une erreur
-resolveUserRights - utilisateur partagé avec écriture - canAdd et canEdit true
 resolveUserRights - utilisateur sans accès - aucun droit
 ```
 
-On y reconais l'algorithme (progression, rétrogradation, plafonnement en boîte 5) **et** le modèle de droits (propriétaire / partagé en écriture / sans accès)
+On y reconnaît l'algorithme (progression, rétrogradation, plafonnement en boîte 5) **et** le modèle de droits (propriétaire / partagé en écriture / sans accès).
 
-**Les Tests fonctionnel — [test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js) (12 scénarios).** Une session réelle est déroulée via Supertest à travers toutes les couches (routes → controllers → services → modèles → base) : carte jamais révisée retournée comme due, avancement en boîte 2 après bonne réponse, réapparition après dépassement de `next_review_at`, et les erreurs de contrat (401 sans token, 404 carte inexistante, 400 corps invalide). Ce niveau attrape les régressions d'intégration que les tests unitaires par couche ne voient pas.
+**Les tests fonctionnels — [test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js) (12 scénarios).** Une session réelle est déroulée via Supertest à travers toutes les couches (routes → controllers → services → modèles → base) : carte jamais révisée retournée comme due, avancement en boîte 2 après bonne réponse, réapparition après dépassement de `next_review_at`, et les erreurs de contrat (401 sans token, 404 carte inexistante, 400 corps invalide). Ce niveau attrape les régressions d'intégration que les tests unitaires par couche ne voient pas.
 
 ## 4.4 Côté front : tester le comportement, pas l'implémentation
 
 Côté front, les tests montent réellement les composants (`mount` de @vue/test-utils) avec un store Pinia de test (`createTestingPinia`) et des dépendances stubbing explicites. Exemple des 13 cas de [test/components/FlashcardsSessionPage.test.js](my_memo_master_front/test/components/FlashcardsSessionPage.test.js), qui valident le parcours utilisateur complet d'une session de révision :
 
 ```
-affiche "Chargement" pendant onMounted, puis le masque après résolution
 affiche "Aucune carte à réviser" quand dueCards est vide
-le bouton Valider est désactivé quand la réponse est vide
 bonne réponse — affiche le feedback vert avec le score
 mauvaise réponse — affiche le feedback rouge avec la correction attendue
 affiche "Session terminée" après la dernière carte
-bouton Retour + confirmation — redirige vers /flashcards
 ```
 
 Ces intitulés décrivent des comportements observables par l'utilisateur (états affichés, boutons actifs, redirections) et non des détails d'implémentation : un refactoring interne du composant ne casse pas ces tests, une régression fonctionnelle les casse — c'est exactement le rôle d'un dispositif anti-régression.
 
 ## 4.5 Couverture et exécution systématique
 
-La couverture de code de l'API, mesurée par `npx jest --coverage` sur le code actuel du dépôt, s'établit à :
-
-| Métrique    | Couverture        |
-| ------------ | ----------------- |
-| Lignes       | **86,17 %** |
-| Instructions | 85,74 %           |
-| Fonctions    | 84,81 %           |
-| Branches     | 66,44 %           |
-
-La majorité du code développé est donc couverte, conformément au critère. La couverture de branches, plus basse, est typique d'un code défensif (branches d'erreur rares, garde-fous) ; les branches critiques — algorithme Leitner, droits, authentification — sont couvertes explicitement (4.3). L'ensemble des tests est exécuté **à chaque push** par la CI et conditionne tout déploiement (section 2.4) ; la méthode de travail place par ailleurs l'écriture des tests **avant** le code ([README.md](annexes/README.md), étape 3).
+La couverture de code de l'API, mesurée par `npx jest --coverage` sur le code actuel du dépôt, s'établit à : **lignes 86,17 %** · instructions 85,74 % · fonctions 84,81 % · branches 66,40 %. La majorité du code développé est donc couverte, conformément au critère. La couverture de branches, plus basse, est typique d'un code défensif (branches d'erreur rares, garde-fous) ; les branches critiques — algorithme Leitner, droits, authentification — sont couvertes explicitement (4.3). L'ensemble des tests est exécuté **à chaque push** par la CI et conditionne tout déploiement (section 2.4) ; la méthode de travail place par ailleurs l'écriture des tests **avant** le code ([README.md](annexes/README.md), étape 3).
 
 ---
 
@@ -525,7 +453,7 @@ La majorité du code développé est donc couverte, conformément au critère. L
 
 L'architecture de l'api est composée des couches : **route → middlewares → controller → service → model**
 
-Cette architecture est décrite dans [docs/CONVENTIONS.md](annexes/docs/CONVENTIONS.md) (« Pas de logique métier dans les controllers — tout passe par les services »). Chaque requête traverse le même pipeline :
+Cette architecture est décrite dans [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md) (« Pas de logique métier dans les controllers — tout passe par les services »). Chaque requête traverse le même pipeline :
 
 ```mermaid
 flowchart LR
@@ -566,7 +494,7 @@ Plutôt que d'égrener des mesures de sécurité au fil de l'eau, j'ai conduit u
 | F-07       | A02   | generateToken.js utilisait Math.random() (non-crypto)               | Faible      | ✅ Corrigé |
 | F-08       | A05   | Swagger UI accessible en production                                 | Moyenne     | ✅ Corrigé |
 
-Le backlog de l'audit a été **résorbé par lots successifs**, tracés dans le document : après M-00b.07b (priorités hautes), la passe du 2026-07-06 a corrigé les priorités moyennes restantes (CSP explicite, magic bytes sur les uploads, journalisation des échecs d'authentification et des refus d'accès, doublon d'email en 400, caractère spécial exigé dans les mots de passe, anti-injection de logs). L'audit assume ce qui **reste** : pas de révocation JWT, palliatif documenté — expiration 15 min + rotation du refresh token. Présenter au jury les risques résiduels fait partie de la démarche : la sécurité est un processus tracé, pas un état déclaré.
+Le backlog a été **résorbé par lots successifs**, tracés dans le document : priorités hautes (M-00b.07b), puis priorités moyennes (passe du 2026-07-06 : CSP explicite, magic bytes sur les uploads, journalisation des échecs d'authentification, anti-injection de logs…). L'audit assume ce qui **reste** : pas de révocation JWT, palliatif documenté — expiration 15 min + rotation du refresh token. La sécurité est un processus tracé, pas un état déclaré.
 
 ### La défense en profondeur implémentée
 
@@ -575,8 +503,8 @@ Chaque étage du pipeline de la section 5.1 porte une mesure, rattachable à une
 - **A01 — Contrôle d'accès** : middleware JWT systématique sur les routes privées ([Auth.middleware.js](my_memo_master_api/middlewares/Auth.middleware.js)) ; RBAC ([requireRole.middleware.js](my_memo_master_api/middlewares/requireRole.middleware.js)) qui revérifie le rôle **en base à chaque requête** — un rôle révoqué prend effet immédiatement ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)) ;
 - **A02 — Cryptographie** : mots de passe bcrypt ; access token 15 min ; refresh token opaque avec **rotation à chaque renouvellement** ; token de reset hashé SHA-256 en base, token brut envoyé par email uniquement ;
 - **A03 — Injection** : requêtes exclusivement via l'ORM (paramétrées) ; nettoyage HTML de tous les champs du body ([sanitize.middleware.js](my_memo_master_api/middlewares/sanitize.middleware.js)) ; validation déclarative par entité ;
-- **A04 — Conception** : anti-énumération d'emails (réponses génériques) ; rate limiting à trois étages ([rateLimit.middleware.js](my_memo_master_api/middlewares/rateLimit.middleware.js)) — global 500 req/15 min, login 10 tentatives **échouées**/15 min, inscription 10/h — avec keying du limiteur global par userId plutôt que par IP, pour éviter le problème du NAT scolaire (plusieurs élèves derrière la même IP), cas d'usage central de l'application ;
-- **A05 — Configuration** : `helmet` avec **CSP explicite** ; CORS en liste blanche ([app.js](my_memo_master_api/app.js)) ; Swagger désactivé en production ; body JSON limité à 10 ko ; `trust proxy` pour que le rate limiting voie la vraie IP derrière Traefik ; secrets hors dépôt ; HTTPS forcé + HSTS (labels Traefik) ;
+- **A04 — Conception** : anti-énumération d'emails (réponses génériques) ; rate limiting à trois étages ([rateLimit.middleware.js](my_memo_master_api/middlewares/rateLimit.middleware.js)) — global 500 req/15 min, login 10 tentatives **échouées**/15 min, inscription 10/h — le limiteur global étant keyé par userId plutôt que par IP (problème du NAT scolaire : plusieurs élèves derrière la même IP) ;
+- **A05 — Configuration** : `helmet` avec **CSP explicite** ; CORS en liste blanche ; Swagger désactivé en production ; body JSON limité à 10 ko ; `trust proxy` ; secrets hors dépôt ; HTTPS forcé + HSTS ;
 - **A06 — Composants vulnérables** : `npm audit` **bloquant en CI** sur les dépendances de production (section 2.3) ; driver SQLite déplacé en devDependencies pour sortir sa chaîne de build vulnérable des images déployées — **0 vulnérabilité high/critical** à la date du dossier ;
 - **A08 — Intégrité des données** : uploads vérifiés en **deux lignes de défense** ([helpers/fileSignature.js](my_memo_master_api/helpers/fileSignature.js)) — croisement extension ↔ MIME, puis **magic bytes lus sur le flux** avant écriture S3 : un exécutable renommé en `.png` est refusé même avec un MIME forgé ;
 - **A09 — Journalisation** : messages d'erreur internes masqués en production, échecs d'authentification et refus d'accès (401/403) journalisés en `warn` avec IP, anti log-injection.
@@ -587,11 +515,11 @@ Ces mesures sont **elles-mêmes testées** : [test/middlewares/security.test.js]
 
 ### Choix du référentiel
 
-Je retiens le **RGAA 4** (Référentiel Général d'Amélioration de l'Accessibilité) comme référentiel cible : c'est le standard officiel français, fondé sur WCAG 2.1, et le public visé (établissements scolaires, potentiellement soumis à obligation légale d'accessibilité) rend ce choix cohérent avec le produit. Pour un MVP, je l'applique en priorisant les critères à plus fort impact utilisateur (navigation clavier, alternatives textuelles, formulaires, structure), démarche d'échantillonnage inspirée de la checklist OPQUAST.
+Je retiens le **RGAA 4** comme référentiel cible : standard officiel français fondé sur WCAG 2.1, cohérent avec le public visé (établissements scolaires, potentiellement soumis à obligation légale d'accessibilité). Pour un MVP, je l'applique en priorisant les critères à plus fort impact utilisateur (navigation clavier, alternatives textuelles, formulaires, structure).
 
 ### Audit du code front : constats et mise en conformité
 
-J'ai audité [my_memo_master_front/src/](my_memo_master_front/src/) critère par critère (décomptes issus d'une analyse statique réelle des `.vue` du dépôt). **Points conformes d'emblée** : éléments interactifs natifs (208 `<button>` contre 21 `<div @click>`), `alt` sur toutes les images et icônes décoratives neutralisées (`aria-hidden`), modale avec `role="dialog"`/`aria-modal`, composants d'édition pilotables au clavier (TagSelector : Entrée, Échap, flèches — `aria-label` dynamiques), hiérarchie de titres et 84 `<label>`, titres d'onglet par page.
+J'ai audité [my_memo_master_front/src/](my_memo_master_front/src/) critère par critère (décomptes issus d'une analyse statique réelle des `.vue` du dépôt). **Points conformes d'emblée** : éléments interactifs natifs (208 `<button>`), `alt` sur toutes les images, modale avec `role="dialog"`/`aria-modal`, composants d'édition pilotables au clavier, hiérarchie de titres et 84 `<label>`, titres d'onglet par page.
 
 **Non-conformités relevées, toutes traitées ensuite** (détail, chiffres avant/après et commandes de reproduction dans **[docs/AUDIT_RGAA.md](annexes/docs/AUDIT_RGAA.md)**) :
 
@@ -603,19 +531,16 @@ J'ai audité [my_memo_master_front/src/](my_memo_master_front/src/) critère par
 | 3.x — Information par la couleur | Feedback bonne/mauvaise réponse fondé sur vert/rouge                                       | ✅ Vérifié doublé d'un texte explicite (« Correct »/« Incorrect », score, correction)                                                                 |
 | 13.x — Zones dynamiques          | Aucune région`aria-live`                                                                  | ✅ Zones`aria-live="polite"` sur le feedback de session et le score d'exercice ; toasts en `role="alert"`                                                |
 
-La campagne (2026-07-06, tracée dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)) est **outillée et reproductible** : un audit statique développé pour le projet ([scripts/audit-a11y.mjs](my_memo_master_front/scripts/audit-a11y.mjs)) vérifie les critères ci-dessus sur les 73 fichiers `.vue` — première exécution : **135 non-conformités**, ré-exécution après correction intégrale : **0**, les motifs légitimes (overlays de fermeture, `@click.stop`) étant documentés comme exceptions dans l'outil. La **non-régression** est assurée par 4 tests axe-core sur DOM réellement rendu, exécutés dans la suite Vitest à chaque push ([test/a11y/axe.test.js](my_memo_master_front/test/a11y/axe.test.js)). Restent hors périmètre, documentés dans l'audit : la mesure des contrastes (jsdom ne rend pas les styles) et un test lecteur d'écran réel (protocole NVDA planifié sur les trois parcours critiques).
+La campagne (2026-07-06) est **outillée et reproductible** : un audit statique développé pour le projet ([scripts/audit-a11y.mjs](my_memo_master_front/scripts/audit-a11y.mjs)) vérifie ces critères sur les 73 fichiers `.vue` — première exécution : **135 non-conformités**, ré-exécution après correction intégrale : **0**. La **non-régression** est assurée par 4 tests axe-core sur DOM réellement rendu, exécutés en CI à chaque push ([test/a11y/axe.test.js](my_memo_master_front/test/a11y/axe.test.js)). Restent hors périmètre, documentés dans l'audit : la mesure des contrastes (jsdom ne rend pas les styles) et un test lecteur d'écran réel (protocole NVDA planifié).
 
-## 5.4 Évolutivité du code
+## 5.4 Évolutivité et traçabilité du code
 
 - **API versionnée** : toutes les routes sont montées sous `/api/v1` ([app.js](my_memo_master_api/app.js)) — une v2 pourra coexister sans casser les clients existants ;
-- **Schéma de base évolutif** : **61 migrations Sequelize** versionnées ([my_memo_master_api/migrations/](my_memo_master_api/migrations/)) documentent chaque évolution du schéma et se rejouent sur les deux dialectes (SQLite/PostgreSQL) ;
-- **Configuration externalisée** : aucun paramètre d'environnement en dur (section 1.1) — la même image Docker sert plusieurs environnements, y compris par injection runtime de la config front (`window.__APP_CONFIG__`, [docker-compose.yml](docker-compose.yml) service `front_server`) ;
+- **Schéma de base évolutif** : **61 migrations Sequelize** versionnées ([my_memo_master_api/migrations/](my_memo_master_api/migrations/)), rejouables sur les deux dialectes (SQLite/PostgreSQL) ;
+- **Configuration externalisée** : aucun paramètre d'environnement en dur (section 1.1) — la même image Docker sert plusieurs environnements, y compris par injection runtime de la config front (`window.__APP_CONFIG__`) ;
 - **Contrat d'API documenté** : annotations Swagger sur chaque route, servies sur `/api-docs` (section 9.3) — un client tiers peut être développé contre le contrat, pas contre le code ;
-- **Mémoire du projet** : le dossier [dev/](annexes/dev/) (conventions, décisions, changelog d'état) est conçu pour qu'un nouveau développeur — humain ou agent — reprenne le travail sans contexte oral (synthèse : [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)) — de l'évolutivité organisationnelle, complémentaire de l'évolutivité technique.
-
-## 5.5 Traçabilité des versions
-
-L'historique git est structuré par les conventions de commit `[ADD]/[IMP]/[REF]/[FIX]` (section 1.4), et doublé de deux journaux versionnés : [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) (état global module par module + une entrée par ticket terminé, avec dette éventuelle) et [dev/DECISIONS.md](annexes/dev/DECISIONS.md) (chaque choix structurant avec l'alternative écartée). Les évolutions du prototype sont donc tracées à trois niveaux : le commit (quoi), le changelog (où en est-on), la décision (pourquoi).
+- **Mémoire du projet** : le dossier [dev/](annexes/dev/) (conventions, décisions, changelog d'état) est conçu pour qu'un nouveau développeur — humain ou agent — reprenne le travail sans contexte oral (synthèse : [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)) ;
+- **Traçabilité des versions** : historique git structuré par les conventions de commit `[ADD]/[IMP]/[REF]/[FIX]` (section 1.4), doublé de deux journaux versionnés — [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) (état module par module, une entrée par ticket, dette éventuelle) et [dev/DECISIONS.md](annexes/dev/DECISIONS.md) (chaque choix structurant avec l'alternative écartée). Trois niveaux de trace : le commit (quoi), le changelog (où en est-on), la décision (pourquoi).
 
 ---
 
@@ -629,24 +554,17 @@ Chaque fusion sur une branche d'intégration déclenche un déploiement automati
 
 La **progressivité** du déploiement est structurelle, à deux niveaux :
 
-1. **Promotion entre environnements** : une modification atteint d'abord l'environnement de test (fusion dans `dev`), y est vérifiée et testée manuellement d'un point de vue fonctionnel, puis est promue en preprod (`staging`) y est verifiée, et seulement ensuite en production (`main`). Le même code traverse trois déploiements successifs avant d'atteindre les utilisateurs finaux.
-2. **Garde-fou de production** : le job de déploiement prod est conditionné à une variable d'activation explicite, en plus de la branche ([cd.yml](.github/workflows/cd.yml)) :
-
-```yaml
-  deploy_prod:
-    if: needs.push_images.outputs.branch == 'main' && vars.K8S_PROD_ENABLED == 'true'
-```
-
-Ce double verrou permet de fusionner sur `main` (et donc de construire les images de prod) sans déployer, tant que la mise en production n'est pas explicitement décidée — utile pendant la phase de préparation du cluster dédié.
+1. **Promotion entre environnements** : une modification atteint d'abord l'environnement de test (fusion dans `dev`), y est vérifiée fonctionnellement, puis est promue en preprod (`staging`), et seulement ensuite en production (`main`) — trois déploiements successifs avant les utilisateurs finaux.
+2. **Garde-fou de production** : le job prod est conditionné à une variable d'activation explicite en plus de la branche (`if: branch == 'main' && vars.K8S_PROD_ENABLED == 'true'`, [cd.yml](.github/workflows/cd.yml)) — on peut fusionner sur `main` et construire les images sans déployer, tant que la mise en production n'est pas explicitement décidée.
 
 ## 6.2 Des artefacts de déploiement reproductibles
 
 Les images sont construites en **multi-stage** pour livrer des artefacts minimaux et identiques d'un environnement à l'autre :
 
-- **API** ([my_memo_master_api/Dockerfile](my_memo_master_api/Dockerfile)) : un stage `deps` installe les dépendances natives avec la toolchain de compilation (python3/make/g++, requis par le runtime ONNX du modèle d'IA), puis le stage `production` ne reçoit que les `node_modules` compilés — **aucun outil de build dans l'image finale**. Le commentaire d'en-tête trace la contrainte : « node:22-bookworm-slim est basé sur Debian (glibc) — requis par onnxruntime-node » ;
+- **API** ([my_memo_master_api/Dockerfile](my_memo_master_api/Dockerfile)) : un stage `deps` compile les dépendances natives (toolchain python3/make/g++ requise par le runtime ONNX du modèle d'IA), puis le stage `production` ne reçoit que les `node_modules` compilés — **aucun outil de build dans l'image finale** ;
 - **Front** ([my_memo_master_front/Dockerfile](my_memo_master_front/Dockerfile)) : stage 1 build Vite, stage 2 nginx statique avec `HEALTHCHECK` embarqué.
 
-Au démarrage, l'API applique elle-même ses migrations et ses seeds de référence ([entrypoint.sh](my_memo_master_api/entrypoint.sh) : `sequelize-cli db:migrate` puis seed des rôles). Une modification de schéma ne demande donc **aucune intervention manuelle** : la migration voyage avec le code (61 migrations versionnées, section 5.4) et `db:migrate` est idempotent — les migrations déjà appliquées sont ignorées.
+Au démarrage, l'API applique elle-même ses migrations et seeds de référence ([entrypoint.sh](my_memo_master_api/entrypoint.sh)) : une modification de schéma ne demande **aucune intervention manuelle** — la migration voyage avec le code (61 migrations versionnées, section 5.4) et `db:migrate` est idempotent.
 
 ## 6.3 Vérifier avant, pendant et après : le déploiement VPS (test)
 
@@ -661,26 +579,19 @@ Le job `deploy_test` de [cd.yml](.github/workflows/cd.yml) illustre la démarche
 Pour la preprod et la prod, le déploiement passe par Helm avec deux mécanismes de stabilité ([cd.yml](.github/workflows/cd.yml)) :
 
 ```yaml
-          helm upgrade --install mmm-preprod ./helm \
-            -f helm/values-preprod.yaml \
-            -n mymemomaster-preprod \
-            --create-namespace \
-            --set "rolloutTimestamp=$(date +%s)" \
-            --atomic \
-            --timeout 5m
+helm upgrade --install mmm-preprod ./helm -f helm/values-preprod.yaml \
+  -n mymemomaster-preprod --set "rolloutTimestamp=$(date +%s)" --atomic --timeout 5m
 ```
 
 - **`--atomic`** : si le rollout ne converge pas dans le délai (5 min en preprod, 8 min en prod), Helm **annule et restaure automatiquement la version précédente** — un déploiement raté ne laisse jamais l'environnement dans un état intermédiaire ;
 - **`rolloutTimestamp`** : les images étant taguées `latest` par environnement, cette annotation injectée dans le template de pod ([helm/templates/deployment-api.yaml](helm/templates/deployment-api.yaml)) change à chaque exécution et force un rolling update même à tag constant, combinée à `imagePullPolicy: Always` ;
 - **Readiness probes** : le chart déclare des sondes de disponibilité — HTTP `/` sur le front, HTTP `/api/v1/health` sur l'API — qui conditionnent la bascule du trafic vers les nouveaux pods.
 
-**Anomalie détectée lors de la rédaction de ce dossier** : en adossant cette section à des preuves, j'ai constaté que la route `/api/v1/health` ciblée par la readiness probe **n'existait pas dans le code Express** — le handler 404 y répondait, les pods n'étaient jamais déclarés prêts et le rollout `--atomic` échouait. Ce constat recoupe les échecs de déploiement preprod alors en cours d'investigation ; l'anomalie est analysée et corrigée en section 8.3, où elle sert d'exemple complet du processus de détection/correction.
+**Anomalie détectée lors de la rédaction de ce dossier** : la route `/api/v1/health` ciblée par la readiness probe **n'existait pas dans le code Express** — les pods n'étaient jamais déclarés prêts et le rollout `--atomic` échouait. L'anomalie est analysée et corrigée en section 8.3, où elle sert d'exemple complet du processus de détection/correction.
 
 ## 6.5 Vérification fonctionnelle auprès des utilisateurs
 
-La chaîne d'environnements sert précisément à cela : l'environnement de **test** (`test.my-memo-master.com`) est le lieu de vérification fonctionnelle par les utilisateurs du projet avant promotion — les domaines par environnement sont configurés dans les `.env` serveur et values Helm (sections 1.2, [README.md](annexes/README.md) partie 3). Chaque déploiement notifie le canal Discord de l'équipe (`✅ Déploiement **staging** réussi.`), qui sait ainsi quand une version est disponible pour vérification.
-
-[SCREENSHOT ICI : environnement de test test.my-memo-master.com et environnement de preprod preprod.my-memo-master.com côte à côte, montrant la même fonctionnalité en cours de validation]
+La chaîne d'environnements sert précisément à cela : l'environnement de **test** (`test.my-memo-master.com`) est le lieu de vérification fonctionnelle par les utilisateurs du projet avant promotion — les domaines par environnement sont configurés dans les `.env` serveur et values Helm (sections 1.2, [README.md](annexes/README.md) partie 3). Chaque déploiement notifie le canal Discord de l'équipe (`✅ Déploiement **staging** réussi.`), qui sait ainsi quand une version est disponible pour vérification (captures des notifications en section 2.5, exécution réelle du pipeline en section 2.6). Une démonstration vidéo du parcours utilisateur complet est fournie en Annexe B.
 
 ---
 
@@ -695,40 +606,18 @@ Chaque scénario de recette est formalisé sous forme d'un test fonctionnel auto
 Le cahier s'organise en trois volets, conformément au critère (tests fonctionnels, structurels, de sécurité) :
 
 - **fonctionnel de bout en bout** : parcours utilisateur complets — requêtes HTTP réelles traversant toutes les couches ([test/bdd/](my_memo_master_api/test/bdd/)) et tests de pages côté interface ;
-- **structurel** : contrat HTTP de chaque endpoint (codes de statut, corps, cas d'erreur) — 791 tests de [test/controllers/](my_memo_master_api/test/controllers/) couvrant les 34 modules de l'API ;
+- **structurel** : contrat HTTP de chaque endpoint (codes de statut, corps, cas d'erreur) — 793 tests de [test/controllers/](my_memo_master_api/test/controllers/) couvrant les 34 modules de l'API ;
 - **sécurité** : tests dédiés ([security.test.js](my_memo_master_api/test/middlewares/security.test.js)) et audit OWASP (section 5.2).
 
-**Statut de la recette** : les statuts « ✅ » des tableaux ci-dessous correspondent à la dernière exécution réelle des suites sur le code actuel du dépôt (1 448/1 448 tests API et 597/597 tests front passés — section 4.1).
+**Statut de la recette** : les statuts « ✅ » des tableaux ci-dessous correspondent à la dernière exécution réelle des suites sur le code actuel du dépôt (1 450/1 450 tests API et 617/617 tests front passés — section 4.1).
 
 ## 7.2 Recette fonctionnelle — parcours de bout en bout
 
-Chaque parcours ouvre sur la user story qu'il valide, pour tracer le besoin utilisateur jusqu'au scénario de test. Les intitulés de scénario et les résultats attendus ci-dessous sont **directement extraits des tests du dépôt** (les intitulés encodent systématiquement condition → résultat attendu, convention de nommage des tests, section 4.3).
-
-### Fonctionnalité cœur — Session de révision Leitner ([test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js))
-
-*En tant qu'étudiant, je veux réviser mes cartes par répétition espacée — les cartes échouées revenant plus souvent — afin de mémoriser durablement.*
-
-| ID   | Scénario                                                                          | Résultat attendu                                           | Statut |
-| ---- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------ |
-| L-01 | Récupération des cartes dues — carte jamais révisée (`next_review_at` null) | Carte retournée comme due                                  | ✅     |
-| L-02 | Récupération des cartes dues sans token                                          | 401                                                         | ✅     |
-| L-03 | Bonne réponse à une carte                                                        | Carte avance en boîte 2, compteurs mis à jour             | ✅     |
-| L-04 | Session vide — carte venant d'être révisée                                     | Aucune carte due retournée                                 | ✅     |
-| L-05 | Dépassement de`next_review_at`                                                  | La carte redevient disponible                               | ✅     |
-| L-06 | Mauvaise réponse                                                                  | Carte retourne en boîte 1,`incorrect_count` incrémenté | ✅     |
-| L-07 | Bonne réponse en boîte 5 (dernière)                                             | Reste en boîte 5 (plafonnement),`fifo=false`             | ✅     |
-| L-08 | Historique de session                                                              | Les compteurs reflètent l'ensemble des révisions          | ✅     |
-| L-09 | Session multi-cartes                                                               | Plusieurs cartes dues retournées ensemble                  | ✅     |
-| L-10 | Réponse sur carte inexistante                                                     | 404                                                         | ✅     |
-| L-11 | Réponse sans token                                                                | 401                                                         | ✅     |
-| L-12 | Corps invalide (`cardId` manquant)                                               | 400                                                         | ✅     |
-
-### Autres parcours — synthèse
-
-Les trois autres recettes fonctionnelles suivent le même formalisme (scénarios extraits des tests : cas nominal + cas limites + erreurs attendues) ; elles sont synthétisées ici, le détail scénario par scénario restant lisible dans les fichiers de test référencés :
+Chaque parcours ouvre sur la user story qu'il valide, pour tracer le besoin utilisateur jusqu'au scénario de test. Les scénarios et résultats attendus sont **directement extraits des tests du dépôt** (les intitulés encodent condition → résultat attendu, convention de nommage de la section 4.3) et couvrent systématiquement cas nominal + cas limites + erreurs attendues ; le détail scénario par scénario reste lisible dans les fichiers de test référencés :
 
 | Parcours (user story)                                                                                                                                                   | Scénarios couverts                                                                                                                                                                                                                  | Tests                                                                                                                               | Statut   |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| **Session de révision Leitner** (fonctionnalité cœur) — *en tant qu'étudiant, je veux réviser mes cartes par répétition espacée — les cartes échouées revenant plus souvent — afin de mémoriser durablement* | Cartes dues (jamais révisée, `next_review_at` dépassé, session vide, multi-cartes) ; bonne réponse → boîte 2, mauvaise → boîte 1, plafonnement boîte 5 ; compteurs d'historique ; erreurs 400 (corps invalide) / 401 (sans token) / 404 (carte inexistante) | [test/bdd/leitner.session.test.js](my_memo_master_api/test/bdd/leitner.session.test.js) (L-01 → L-12)                               | ✅ 12/12 |
 | **Passage d'une série d'exercices** — *en tant qu'étudiant, je veux m'entraîner sur des exercices corrigés automatiquement afin d'évaluer ma progression* | Parcours nominal 4/4 avec persistance du score ; 0/4 ; question non répondue traitée comme incorrecte ; correction par type de question (QCM, texte à trou insensible à la casse/espaces, remise en ordre) ; erreurs 400/401/404 | [test/bdd/exercise.session.test.js](my_memo_master_api/test/bdd/exercise.session.test.js) (E-01 → E-11)                             | ✅ 11/11 |
 | **Échéances et rappels** — *en tant qu'étudiant, je veux planifier des échéances avec rappels par email afin d'anticiper mes révisions*                  | Création d'un rappel → job BullMQ planifié ; date déjà passée refusée (400) ; liste avec statut`pending` ; suppression annulant le rappel **et** le job ; erreurs 400/401/404                                         | [test/bdd/deadline.reminder.test.js](my_memo_master_api/test/bdd/deadline.reminder.test.js) (D-01 → D-15)                           | ✅ 15/15 |
 | **Interface de session de révision** — *en tant qu'étudiant, je veux un retour immédiat sur chaque réponse pendant ma session de révision*                | Chargement, session vide, activation du bouton Valider, feedback bonne/mauvaise réponse, fin de session, sortie avec confirmation                                                                                                   | [test/components/FlashcardsSessionPage.test.js](my_memo_master_front/test/components/FlashcardsSessionPage.test.js) (UI-01 → UI-13) | ✅ 13/13 |
@@ -773,18 +662,11 @@ flowchart LR
     V -.->|"si décision structurante"| DEC["DECISIONS.md"]
 ```
 
-- **Détection** : trois sources — la recette exécutable en CI (7.4), les audits (OWASP, revue de code) et l'exploitation (échecs de déploiement, logs) ;
-- **Consignation** : chaque anomalie donne lieu à une entrée structurée dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) — contexte de reproduction, fichiers touchés, correction — la « fiche d'anomalie » du projet ;
-- **Correction** : un test matérialise d'abord le bogue (et empêche sa réapparition), puis le correctif est commité en `[FIX]` — l'historique en compte **250**, ce qui rend le flux auditable ;
-- **Vérification** : la recette complète est rejouée localement puis par la CI, qui conditionne le redéploiement — le correctif emprunte le même chemin qu'une fonctionnalité.
-
-Les trois cas suivants, tous réels et tracés dans le dépôt, illustrent le processus sur les trois sources de détection.
+La consignation prend la forme d'une entrée structurée dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) (contexte de reproduction, fichiers touchés, correction) — la « fiche d'anomalie » du projet. La correction commence par un test qui matérialise le bogue et empêche sa réapparition, puis le correctif est commité en `[FIX]` (l'historique en compte **250**) et emprunte le même chemin qu'une fonctionnalité : recette complète rejouée, CI, redéploiement. Les trois cas suivants, tous réels et tracés dans le dépôt, illustrent le processus sur les trois sources de détection.
 
 ## 8.2 Cas 1 — Régression fonctionnelle détectée par la recette (CI)
 
-**Anomalie** (consignée le 2026-07-04 dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)) : le commit `f4d654e` (`[IMP] classgroup`) a modifié `ClassroomPage.vue` — le sélecteur de vue s'affichait pour les étudiants/enseignants (qui n'en ont pas l'usage) et **disparaissait pour l'admin plateforme**. **Détection** : les tests de [ClassroomPage.test.js](my_memo_master_front/test/components/ClassroomPage.test.js) ont échoué en CI sur la branche, avant toute fusion.
-
-**Analyse et correction** : la condition `v-if="isAdmin"` avait été remplacée par `v-if="availableViews.length > 1"` avec un calcul devenu exclusif ; la fiche de consignation décrit le mécanisme pour chaque rôle — les "informations permettant de reproduire le bogue" exigées par le critère. Correction par restauration de la condition et du calcul additif, vérifiée par la suite front complète (548/548 verts à cette date).
+**Anomalie** (consignée le 2026-07-04 dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)) : le commit `f4d654e` a modifié `ClassroomPage.vue` — le sélecteur de vue s'affichait pour les étudiants/enseignants et **disparaissait pour l'admin plateforme**. **Détection** : échec des tests de [ClassroomPage.test.js](my_memo_master_front/test/components/ClassroomPage.test.js) en CI sur la branche, avant toute fusion. **Analyse et correction** : la condition `v-if="isAdmin"` avait été remplacée par un calcul devenu exclusif ; la fiche de consignation décrit le mécanisme pour chaque rôle — les « informations permettant de reproduire le bogue » exigées par le critère. Correction par restauration du calcul additif, vérifiée par la suite front complète (548/548 verts à cette date).
 
 ## 8.3 Cas 2 — Anomalie d'exploitation : l'échec des déploiements preprod
 
@@ -796,23 +678,7 @@ Ce cas déroule le processus complet sur une anomalie **détectée en exploitati
 
 **Cause racine** : la readiness probe de l'API cible `GET /api/v1/health` ([helm/templates/deployment-api.yaml](helm/templates/deployment-api.yaml)), mais cette route **n'existait pas** dans l'API — le handler 404 global répondait, les pods n'étaient jamais `Ready`, le rollout ne convergeait jamais. L'anomalie est structurelle (incohérence chart Helm ↔ code applicatif), pas environnementale — ce qui explique que l'investigation côté cluster (taints, PVC…) ne pouvait pas aboutir.
 
-**Correctif** (commit `515bf84 [FIX] readiness probe K8s — ajout endpoint /api/v1/health`) : ajout de la route dans [my_memo_master_api/app.js](my_memo_master_api/app.js) —
-
-```javascript
-// Health endpoint — ciblé par les readiness probes K8s (helm/templates/deployment-api.yaml)
-// CHOIX: déclaré avant le routeur v1 pour échapper au rate limiting global
-app.get('/api/v1/health', async (_req, res) => {
-  try {
-    await instance.authenticate()
-    res.status(200).json({ status: 'ok' })
-  } catch (error) {
-    logger.error(`Health check — base de données injoignable : ${error?.message || error}`)
-    res.status(503).json({ status: 'unavailable' })
-  }
-})
-```
-
-Deux choix de conception accompagnent le correctif ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)) : la route est déclarée **hors du rate limiter** (une sonde kubelet bloquée ferait passer les pods NotReady en cascade) et elle teste réellement la base (`authenticate()`) pour qu'un pod sans base de données ne reçoive pas de trafic.
+**Correctif** (commit `515bf84 [FIX] readiness probe K8s — ajout endpoint /api/v1/health`) : ajout de la route `GET /api/v1/health` dans [my_memo_master_api/app.js](my_memo_master_api/app.js) — 200 `{status:'ok'}` si la base répond, 503 sinon. Deux choix de conception accompagnent le correctif ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)) : la route est déclarée **hors du rate limiter** (une sonde kubelet bloquée ferait passer les pods NotReady en cascade) et elle teste réellement la base (`authenticate()`) pour qu'un pod sans base de données ne reçoive pas de trafic.
 
 **Vérification** : 3 tests ajoutés ([Health.test.js](my_memo_master_api/test/controllers/Health.test.js) — 200 si base joignable, 503 sinon, accès sans authentification), suite complète rejouée (1 422/1 422 verts à cette date), correctif déployé par le pipeline CD standard, étape de debug temporaire **retirée**. **Ce que ce cas démontre** : le traitement « tire profit du processus d'intégration et de déploiement continu » (critère C2.3.2) — l'instrumentation du pipeline a servi d'outil de diagnostic, et le correctif a suivi le circuit standard test → CI → CD sans procédure d'exception.
 
@@ -827,7 +693,7 @@ L'audit de sécurité (section 5.2) a produit un **plan de correction priorisé 
 | Priorité moyenne (2026-07-06)               | Magic bytes sur uploads, journalisation des échecs d'authentification et refus d'accès, CSP explicite, anti log-injection, doublon email en 400, caractère spécial mot de passe | ✅ Corrigé (tracé dans l'audit) |
 | Risque résiduel assumé                     | Révocation JWT (blacklist Redis) — palliatif : expiration 15 min + rotation refresh token                                                                                         | 📋 Documenté avec recommandation |
 
-Ce plan illustre la **qualification** : chaque constat porte une sévérité, un fichier, un correctif proposé — et ce qui n'est pas corrigé immédiatement constitue un backlog argumenté avec palliatif documenté.
+Chaque constat porte une sévérité, un fichier et un correctif proposé ; ce qui n'est pas corrigé immédiatement constitue un backlog argumenté avec palliatif documenté.
 
 ---
 
@@ -847,53 +713,34 @@ La documentation du projet est **versionnée avec le code** — elle évolue dan
 | Manuel d'utilisation                      | [docs/MANUEL_UTILISATION.md](annexes/docs/MANUEL_UTILISATION.md)                                                                                                                                                                                                             | Utilisateur final (étudiant, enseignant, gérant) | « Comment j'utilise l'application ? »                |
 | Contrat d'API                             | Swagger généré, servi sur`/api-docs`                                                                                                                                                                                                                                   | Développeur front / tiers                         | « Que fait chaque endpoint ? »                       |
 | Fonctionnement des modules                | [docs/DOC_administration_etablissements.md](annexes/docs/DOC_administration_etablissements.md), [dev/DOC_mindmap_editor.md](annexes/dev/DOC_mindmap_editor.md), [diagrams/](annexes/diagrams/)                                                                                 | Développeur reprenant un module                   | « Comment ce module fonctionne-t-il et pourquoi ? »  |
-| Journal des décisions                    | [dev/DECISIONS.md](annexes/dev/DECISIONS.md)                                                                                                                                                                                                                                 | Toute l'équipe, futur soi                         | « Pourquoi le code est-il comme ça ? »              |
-| Journal d'état                           | [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)                                                                                                                                                                                                                                 | Toute l'équipe                                    | « Où en est chaque module ? »                       |
-| Conventions                               | [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)                                                                                                                                                                                                                             | Contributeur (humain ou agent IA)                  | « Comment on écrit le code ici ? »                  |
-| Synthèse de la mémoire du projet        | [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md)                                                                                                                                                                                                                     | Nouveau venu                                       | « Quel est ce dispositif et que contient-il ? »      |
+| Mémoire du projet (décisions, état, conventions) | [dev/DECISIONS.md](annexes/dev/DECISIONS.md), [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md), [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md), synthèse : [docs/MEMOIRE_PROJET.md](annexes/docs/MEMOIRE_PROJET.md) | Toute l'équipe, contributeur (humain ou agent IA) | « Pourquoi le code est-il comme ça, où en est chaque module, comment on écrit ici ? » |
 
-## 9.2 Manuel de déploiement
+## 9.2 Manuels de déploiement et d'exploitation
 
-Le déploiement est documenté par deux manuels dédiés, un par type d'infrastructure :
+Le déploiement est documenté par deux manuels dédiés, un par type d'infrastructure : [docs/MANUEL_DEPLOIEMENT_VPS.md](annexes/docs/MANUEL_DEPLOIEMENT_VPS.md) pour l'environnement de **test** (VPS, Docker Compose, Traefik : prérequis, `.env` serveur, premier déploiement, déploiement continu, procédure de secours) et [docs/MANUEL_DEPLOIEMENT_KUBERNETES.md](annexes/docs/MANUEL_DEPLOIEMENT_KUBERNETES.md) pour **preprod et prod** (Kubernetes Infomaniak, Helm : structure du chart, ségrégation ConfigMap versionnée / Secret créé sur le cluster, rollback). La partie 3 du [README.md](annexes/README.md) complète le volet CI/CD (correspondance branche → images → cible, secrets GitHub Actions). Ces documents décrivent les **choix opérés** et pas seulement les commandes.
 
-- [docs/MANUEL_DEPLOIEMENT_VPS.md](annexes/docs/MANUEL_DEPLOIEMENT_VPS.md) — environnement de **test** (VPS, Docker Compose, Traefik) : architecture, prérequis, préparation du `.env` serveur, premier déploiement, déroulé du déploiement continu, procédure de secours et vérifications post-déploiement.
-- [docs/MANUEL_DEPLOIEMENT_KUBERNETES.md](annexes/docs/MANUEL_DEPLOIEMENT_KUBERNETES.md) — environnements **preprod et prod** (Kubernetes Infomaniak, Helm) : structure du chart et des valeurs, ségrégation ConfigMap (versionnée) / Secret (créé manuellement sur le cluster), adoption Helm de ressources existantes, déploiement continu, rollback.
+L'exploitation est couverte par le [docs/RUNBOOK.md](annexes/docs/RUNBOOK.md) (environnement VPS), dont la table des matières témoigne de la couverture opérationnelle : premier déploiement · **mise à jour** · **rollback** · logs · **sauvegarde et restauration PostgreSQL** · variables critiques · surveillance. Le cas nominal de mise à jour est **automatique** (pipeline CD, section 6) — le RUNBOOK documente le mode manuel de secours et le rollback ; les migrations de schéma sont documentées côté manuel comme côté automatique (entrypoint, section 6.2), et la migration d'infrastructure est elle-même outillée ([k8s/helm-migrate.sh](k8s/helm-migrate.sh)), référencée en commentaire du pipeline CD au moment exact où l'opérateur en a besoin.
 
-La partie 3 du [README.md](annexes/README.md) complète le volet CI/CD (correspondance branche → images → cible, secrets GitHub Actions, kubeconfig Infomaniak). Ces documents décrivent les **choix opérés** et pas seulement les commandes — par exemple la ségrégation configuration/secrets, ou `--atomic` qui restaure automatiquement la révision précédente en cas d'échec.
+## 9.3 Contrat d'API : documentation générée depuis le code
 
-## 9.3 Manuel d'exploitation et de mise à jour
+La documentation de l'API est générée par swagger-jsdoc à partir des annotations portées par **chaque route** — la documentation Swagger fait partie de la *definition of done* d'une fonctionnalité ([README.md](annexes/README.md), étape 3). La configuration ([swagger.config.js](my_memo_master_api/config/swagger.config.js)) définit le schéma `bearerAuth` et l'applique globalement.  L'interface est accessible via la route `/api-docs` dans les environnements de développement et de test, **désactivée dans les environnements de production**. Générer le contrat depuis le code permet d'éviter le risque d'avoir une divergence entre la documentation et l'implémentation.
 
-Le [docs/RUNBOOK.md](annexes/docs/RUNBOOK.md) est le manuel d'exploitation de l'environnement VPS. Sa table des matières témoigne de sa couverture opérationnelle réelle : Prérequis VPS · Premier déploiement · **Mise à jour (déploiement continu)** · **Rollback** · Logs · **Sauvegarde et restauration PostgreSQL** · Commandes utiles · Variables d'environnement critiques · Accès PgAdmin · Surveillance · Contacts et ressources.
+<img src="annexes/docs/swagger.png" alt="Interface Swagger UI sur /api-docs — endpoints du module Users et bouton Authorize (schéma bearerAuth)" width="480">
 
-Trois points saillants pour la mise à jour :
+## 9.4 Traçabilité pour les équipes et les évolutions futures
 
-- le cas nominal est **automatique** (pipeline CD, section 6) — le RUNBOOK documente le mode manuel de secours et le rollback ;
-- les migrations de schéma sont documentées côté manuel (RUNBOOK) comme côté automatique (entrypoint, section 6.2) ;
-- la migration d'infrastructure est elle-même outillée ([k8s/helm-migrate.sh](k8s/helm-migrate.sh)) et référencée en commentaire du pipeline CD, au moment exact où l'opérateur en a besoin.
+La traçabilité repose sur le dossier [dev/](annexes/dev/) : [dev/DECISIONS.md](annexes/dev/DECISIONS.md) impose un format à chaque décision structurante — *Contexte / Décision / Alternative écartée / Conséquences* — pour comprendre « pourquoi le code est comme il est, 2 mois plus tard » (plusieurs entrées réelles citées dans ce dossier : SQLite/PostgreSQL, rotation des refresh tokens, RBAC en base, health endpoint) ; [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) maintient l'état module par module et une entrée par ticket (fichiers touchés, hypothèses, **dette éventuelle**) — les fiches d'anomalie de la section 8 en sont extraites. La documentation par module descend au niveau des règles métier ([docs/DOC_administration_etablissements.md](annexes/docs/DOC_administration_etablissements.md), [diagrams/schema_bdd.md](annexes/diagrams/schema_bdd.md), [diagrams/leitner_algo.md](annexes/diagrams/leitner_algo.md)). Documenter la **dette et les limitations**, pas seulement les réussites, est un choix délibéré : c'est ce qui rend la documentation digne de confiance pour celui qui reprend le code.
 
-## 9.4 Contrat d'API : documentation générée depuis le code
+## 9.5 Manuel d'utilisation
 
-La documentation de l'API est générée par swagger-jsdoc à partir des annotations portées par **chaque route** — la documentation Swagger fait partie de la *definition of done* d'une fonctionnalité ([README.md](annexes/README.md), étape 3). La configuration ([swagger.config.js](my_memo_master_api/config/swagger.config.js)) définit le schéma `bearerAuth` et l'applique globalement.  L'interface est accéssible via la route `/api-docs` dans les environnements de développement et de test, **désactivée dans les environnements de production**. Générer le contrat depuis le code permet d'eviter le risque d'avoir une divergence entre la documentation et l'implémentation.
+L'aide à la prise en main est d'abord intégrée à l'application elle-même : visite guidée de l'interface lancée automatiquement au premier login, parcours guidé de création accessible depuis la page d'accueil et page de tutoriels (dispositif détaillé en section 3.3, testé et validé en conditions réelles). Elle est complétée par un manuel d'utilisation rédigé ([docs/MANUEL_UTILISATION.md](annexes/docs/MANUEL_UTILISATION.md)) qui couvre les trois profils : étudiant, enseignant et gérant d'établissement.
 
-![Interface Swagger UI sur /api-docs — endpoints du module Users et bouton Authorize (schéma bearerAuth)](annexes/docs/swagger.png)
+<table><tr>
+<td><img src="annexes/docs/accoeuil.png" alt="Page d'accueil — encart « Parcours guidé »" width="330"></td>
+<td><img src="annexes/docs/tutos.png" alt="Page Tutoriels — vidéos filtrables par sujet" width="330"></td>
+</tr></table>
 
-## 9.5 Traçabilité pour les équipes et les évolutions futures
-
-Pour la traçabilité et le suivi des équipes et des futures évolutions j'ai mis en placve un hirtorique et un contexte dans le dossier [dev/](annexes/dev/) :
-
-- [docs/DECISIONS.md](annexes/docs/DECISIONS.md) impose un format à chaque décision structurante — *Contexte / Décision / Alternative écartée / Conséquences* — pour « comprendre "pourquoi" le code est comme il est, 2 mois plus tard » ; ce dossier en a cité plusieurs entrées réelles (SQLite/PostgreSQL, rotation des refresh tokens, RBAC en base, health endpoint) ;
-- [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) maintient l'état module par module et une entrée par ticket (fichiers touchés, hypothèses, **dette éventuelle**) — les fiches d'anomalie de la section 8 en sont extraites ;
-- la documentation par module descend au niveau des règles métier : [docs/DOC_administration_etablissements.md](annexes/docs/DOC_administration_etablissements.md) (modèle de données, droits, endpoints, audit trail, **dette connue et limitations V1**), [diagrams/schema_bdd.md](annexes/diagrams/schema_bdd.md) (ERD), [diagrams/leitner_algo.md](annexes/diagrams/leitner_algo.md), etc.
-
-Documenter la **dette et les limitations** dans les livrables (et pas seulement les réussites) est un choix délibéré : c'est ce qui rend la documentation digne de confiance pour celui qui reprend le code.
-
-## 9.6 Manuel d'utilisation
-
-Pour le manuel d'utilisation, sur l'application,  on retrouve un parcours d'onboarding, une page de tutoriels et un parcours guidé. Egalement un [docs/MANUEL_UTILISATION.md](annexes/docs/MANUEL_UTILISATION.md) qui couvre les trois profils étudiant, enseignant et gérant d'établissement, à été rédigé.
-
-![Page d'accueil — encart « Parcours guidé » proposant la prise en main pas à pas](annexes/docs/accoeuil.png)
-
-![Page Tutoriels — vidéos filtrables par sujet et tips de révision](annexes/docs/tutos.png)
+*Page d'accueil (encart « Parcours guidé ») et page Tutoriels (vidéos filtrables par sujet, tips de révision).*
 
 ---
 
@@ -928,11 +775,23 @@ Le prototype lui-même est manipulable : [docs/prototype/MyMemoMaster - Standalo
 
 Les traces de conception antérieures au prototype (non maintenues — voir section 3.1, niveau 0) sont également conservées : maquettes Figma dans [docs/prototype/figma/](annexes/docs/prototype/figma/), vue d'ensemble du wireflow Miro dans [docs/prototype/miro-wireflow-overview.png](annexes/docs/prototype/miro-wireflow-overview.png).
 
-## Annexe B — Captures de l'application déployée
+## Annexe B — Démonstration de l'application
 
-Écrans de l'application réelle sur les environnements déployés, en complément des captures ciblées insérées dans le corps du dossier.
+L'application réelle est illustrée à deux niveaux, en complément de la galerie du prototype (Annexe A) :
 
-[CAPTURES ICI : parcours complet sur l'environnement de test — inscription → vérification email → connexion → création d'un système de Leitner → session de révision]
+**Captures dans le corps du dossier** — écrans de l'application en fonctionnement :
+
+| Écran | Fichier | Section |
+| ----- | ------- | ------- |
+| Accueil — encart « Parcours guidé » | [accoeuil.png](annexes/docs/accoeuil.png) | 9.5 |
+| Tutoriels — vidéos filtrables | [tutos.png](annexes/docs/tutos.png) | 9.5 |
+| Session Leitner — saisie de la réponse | [leitner.png](annexes/docs/leitner.png) | 3.2 |
+| Session Leitner — correction (score, similarité) | [leitner_2.png](annexes/docs/leitner_2.png) | 3.2 |
+| Swagger UI sur /api-docs | [swagger.png](annexes/docs/swagger.png) | 9.3 |
+
+**Démonstration vidéo** — parcours utilisateur complet : inscription → vérification email → connexion → visite guidée de l'interface → création d'un système de Leitner → session de révision :
+
+[LIEN VIDÉO À INSÉRER — déposer l'URL de la capture vidéo ici]
 
 ## Annexe C — Index des documents du dépôt
 
@@ -965,8 +824,8 @@ Chaque document versionné cité dans le dossier, avec la ou les sections qui s'
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [2009_Karpicke_Butler_Roediger.pdf](annexes/docs/sources/2009_Karpicke_Butler_Roediger.pdf) | Karpicke, Butler & Roediger (2009),*Metacognitive strategies in student learning: Do students practise retrieval when they study on their own?*, Memory, 17(4) | Prévalence des stratégies de révision passives (relecture) ; efficacité supérieure de la récupération en mémoire — fondement des systèmes de Leitner |
 | [Dunlosky_SciAmMind.pdf](annexes/docs/sources/Dunlosky_SciAmMind.pdf)                       | Dunlosky et al.,*What Works, What Doesn't*, Scientific American Mind                                                                                           | Comparaison de l'efficacité des techniques d'étude : entraînement par tests et répétition espacée en tête, relecture et surlignage en queue             |
-| [ZIP_2022.pdf](annexes/docs/sources/ZIP_2022.pdf)                                           | [À COMPLÉTER : référence exacte de l'enquête 2022]                                                                                                          | Statistiques citées en section 0.1                                                                                                                            |
-| [Texe+4_pp.79-102.pdf](annexes/docs/sources/Texe+4_pp.79-102.pdf)                           | [À COMPLÉTER : référence exacte, pp. 79–102]                                                                                                                | Statistiques citées en section 0.1                                                                                                                            |
+| [ZIP_2022.pdf](annexes/docs/sources/ZIP_2022.pdf)                                           | Zung, Imundo & Pan (2022),*How do college students use digital flashcards during self-regulated learning?*, Memory, doi:10.1080/09658211.2022.2058553      | Usage réel des flashcards numériques par les étudiants (pratique de récupération, répétition espacée) — appuie le choix du module Leitner numérique |
+| [Texe+4_pp.79-102.pdf](annexes/docs/sources/Texe+4_pp.79-102.pdf)                           | Corbin, Duguet, Berthaud & Morlaix (2023),*Les pratiques d'étude en première année universitaire : analyse descriptive et effets d'un dispositif « apprendre à apprendre »*, Évaluer. Journal international de recherche en éducation et formation, 9(1), pp. 79–102 | Enquête sur ~800 étudiants de première année — statistiques sur les pratiques d'étude citées en section 0.1                                             |
 
 ## Annexe E — Synthèse de couverture des compétences
 
@@ -977,10 +836,10 @@ Récapitulatif de la couverture du référentiel, une ligne par compétence ; le
 | C2.1.1 — Environnements de développement, test, déploiement          | 1       | Docker Compose à profils + mode hors Docker (SQLite) ; test = VPS Compose, preprod/prod = Kubernetes Helm ; ESLint ×2, Prettier, Jest/Vitest, npm audit bloquant ; healthchecks, métriques Prometheus RED/USE, logs Winston/Morgan ; monorepo GitHub, stratégie de branches alignée sur les environnements |
 | C2.1.2 — Intégration continue                                         | 2       | Workflow ci.yml (npm ci → test → lint → audit → build), matrice de jobs ciblée par préfixe de branche, environnement de tests hermétique (SQLite in-memory, mocks), CI bloquante en amont du CD (`workflow_run`), notification immédiate des échecs                                                  |
 | C2.2.1 — Prototypage                                                   | 3       | Prototype HTML interactif versionné (16 écrans) + application déployée ; bibliothèque de composants réutilisables ; responsive Tailwind, PWA, onboarding ; guards de navigation, refresh token silencieux, jauge de mot de passe                                                                          |
-| C2.2.2 — Harnais de tests unitaires                                    | 4       | 2 045 tests verts (1 448 API + 597 front) ; jeu complet sur la fonctionnalité cœur Leitner (23 unitaires + 12 fonctionnels + 13 UI) ; cas nominal/limites/erreurs systématiques ; exécution bloquante en CI à chaque push                                                                                  |
+| C2.2.2 — Harnais de tests unitaires                                    | 4       | 2 067 tests verts (1 450 API + 617 front) ; jeu complet sur la fonctionnalité cœur Leitner (23 unitaires + 12 fonctionnels + 13 UI) ; cas nominal/limites/erreurs systématiques ; exécution bloquante en CI à chaque push                                                                                  |
 | C2.2.3 — Développement : évolutivité, sécurisation, accessibilité | 5       | Architecture en couches uniforme (36 controllers) ; audit OWASP versionné (8 corrections tracées, défense en profondeur) ; RGAA 4 : 135 non-conformités → 0, non-régression axe-core en CI ; API versionnée, 61 migrations ; double journal (état, décisions)                                          |
 | C2.2.4 — Déploiement continu et progressif                            | 6       | CD automatique conditionné à la CI verte ; promotion test → preprod → prod avec verrou`K8S_PROD_ENABLED` ; healthchecks bloquants, `helm --atomic` avec rollback auto ; images multi-stage reproductibles, migrations idempotentes                                                                      |
-| C2.3.1 — Cahier de recettes                                            | 7       | Volet structurel : contrat HTTP des 34 modules (791 tests) ; 59 scénarios formalisés avec résultat attendu ; trois volets (fonctionnel, structurel, sécurité) exécutés à chaque push ; régression réelle détectée et tracée (2026-07-04)                                                           |
+| C2.3.1 — Cahier de recettes                                            | 7       | Volet structurel : contrat HTTP des 34 modules (793 tests) ; 59 scénarios formalisés avec résultat attendu ; trois volets (fonctionnel, structurel, sécurité) exécutés à chaque push ; régression réelle détectée et tracée (2026-07-04)                                                           |
 | C2.3.2 — Plan de correction des bogues                                 | 8       | 3 sources de détection illustrées par 3 cas réels ; fiches de consignation reproductibles (CHANGELOG) ; analyse de cause racine ; correctifs avec tests anti-réapparition livrés par le circuit CI/CD ; 250 commits`[FIX]` auditables                                                                    |
 | C2.4.1 — Documentation technique d'exploitation                        | 9       | Manuels de déploiement (VPS, Kubernetes), d'exploitation (RUNBOOK), d'utilisation (3 profils + FAQ) ; décisions au format Contexte/Décision/Alternative/Conséquences ; contrat d'API Swagger généré depuis le code                                                                                       |
 
