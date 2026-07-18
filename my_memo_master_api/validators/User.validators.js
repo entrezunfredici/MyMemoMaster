@@ -40,10 +40,8 @@ exports.resetPassword = [
   emailRules,
   body('code')
     .trim()
-    .isHexadecimal()
-    .withMessage('Token invalide')
-    .isLength({ min: 64, max: 64 })
-    .withMessage('Token invalide'),
+    .matches(/^\d{6}$/)
+    .withMessage('Code invalide'),
   newPasswordRules
 ]
 

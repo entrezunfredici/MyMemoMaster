@@ -5800,3 +5800,36 @@ Le PDF généré (VS Code Markdown PDF, rendu Chromium) faisait 39 pages hors an
 | Module | État |
 |--------|------|
 | Dossier B2 (B2_RENDU.md) | Raccourci (−11 % de mots, images réduites) — en attente de la mesure PDF par l'utilisateur + lien vidéo |
+
+---
+
+### [2026-07-18] FIX — Mot de passe oublié : code OTP 6 chiffres (hashé bcrypt) au lieu du token 64 chars
+
+#### Contexte
+L'email de réinitialisation envoyait un token hex de 64 caractères, illisible et pris pour un hash. Alignement sur le standard des plateformes (OWASP Forgot Password Cheat Sheet) : code à 6 chiffres dans l'email, stockage hashé, expiration courte, essais limités, anti-énumération, révocation de session.
+
+#### Fichiers créés
+- `my_memo_master_api/migrations/20260718000000-add-reset-password-attempts-to-user.js` — colonne `resetPasswordCodeAttempts` (INTEGER, défaut 0)
+
+#### Fichiers modifiés
+- `my_memo_master_api/services/User.service.js` — `setResetPasswordCode` : code 6 chiffres + hash bcrypt (coût 10) + expiration 15 min + remise à zéro des essais ; `verifyResetPasswordCode` : bcrypt.compare, 5 essais max puis invalidation, invalidation aussi sur succès/expiration ; `clearResetPasswordCode` efface désormais aussi l'expiration et le compteur
+- `my_memo_master_api/models/User.model.js` — champ `resetPasswordCodeAttempts`
+- `my_memo_master_api/controllers/User.controller.js` — email : code lisible + validité 15 min + mention « ignorez cet email » ; `resetPassword` : 401 « Code invalide » si email inconnu (anti-énumération, plus de 404) + `clearRefreshToken` après reset réussi
+- `my_memo_master_api/validators/User.validators.js` — `resetPassword.code` : `^\d{6}$`
+- `my_memo_master_api/routes/User.routes.js` — Swagger : réponses 200 générique (forgot) / 401 sans 404 (reset)
+- `my_memo_master_api/test/services/User.service.test.js` — tests réécrits : code 6 chiffres, hash bcrypt, compteur d'essais (incrément, invalidation au 5e), expiration, absence de code
+- `my_memo_master_api/test/controllers/User.controller.test.js` — code 6 chiffres, assertion `clearRefreshToken`, nouveau test 401 anti-énumération
+- `my_memo_master_front/src/pages/ResetPasswordPage.vue` — input numérique 6 chiffres (`inputmode="numeric"`, `autocomplete="one-time-code"`, maxlength 6) au lieu du textarea
+- `my_memo_master_front/src/pages/ForgotPasswordPage.vue` — libellés « code » au lieu de « token »
+
+#### Vérifié
+- 107 tests API passent (`User.service`, `User.controller`, `security`), `npm run lint` sans erreur
+
+#### Reste à faire / dette
+- Migration `20260718000000` à exécuter sur les environnements existants (`npx sequelize-cli db:migrate`)
+- `validEmailCode` reste stocké en clair (décision 2026-06-23 distincte, inchangée)
+
+#### État
+| Module | État |
+|--------|------|
+| Auth — mot de passe oublié | Flux OTP 6 chiffres conforme OWASP (bcrypt, 15 min, 5 essais, anti-énumération, révocation session) — migration à passer |

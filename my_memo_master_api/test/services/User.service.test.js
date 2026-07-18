@@ -187,77 +187,101 @@ describe('UserService', () => {
   })
 
   describe('setResetPasswordCode', () => {
-    it('stocke le hash SHA-256 en base et retourne le token brut', async () => {
+    it('stocke le hash bcrypt en base et retourne le code brut à 6 chiffres', async () => {
       User.update.mockResolvedValue([1])
 
-      const token = await UserService.setResetPasswordCode(1)
+      const code = await UserService.setResetPasswordCode(1)
 
-      expect(typeof token).toBe('string')
-      expect(token).toHaveLength(64)
-      expect(/^[0-9a-f]+$/.test(token)).toBe(true)
+      expect(typeof code).toBe('string')
+      expect(/^\d{6}$/.test(code)).toBe(true)
 
       const [fields] = User.update.mock.calls[0]
-      expect(fields.resetPasswordCode).not.toBe(token) // le hash ≠ le token brut
-      expect(fields.resetPasswordCode).toHaveLength(64)
+      expect(fields.resetPasswordCode).not.toBe(code) // le hash ≠ le code brut
+      expect(fields.resetPasswordCode.startsWith('$2')).toBe(true) // hash bcrypt
       expect(fields.resetPasswordCodeExpiresAt).toBeInstanceOf(Date)
+      expect(fields.resetPasswordCodeAttempts).toBe(0)
     })
   })
 
   describe('verifyResetPasswordCode', () => {
-    it('retourne true si le hash correspond et le token est non expiré', async () => {
-      const crypto = require('crypto')
-      const token = crypto.randomBytes(32).toString('hex')
-      const hash = crypto.createHash('sha256').update(token).digest('hex')
-      const future = new Date(Date.now() + 10 * 60 * 1000)
+    const bcrypt = require('bcryptjs')
+    const CODE = '123456'
+    const future = () => new Date(Date.now() + 10 * 60 * 1000)
 
-      const mockUser = {
-        resetPasswordCode: hash,
-        resetPasswordCodeExpiresAt: future,
-        save: jest.fn().mockResolvedValue()
-      }
-      User.findByPk.mockResolvedValue(mockUser)
+    it('retourne true si le code correspond et est non expiré, puis invalide le code', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: future(),
+        resetPasswordCodeAttempts: 0
+      })
 
-      const result = await UserService.verifyResetPasswordCode(1, token)
+      const result = await UserService.verifyResetPasswordCode(1, CODE)
 
       expect(result).toBe(true)
-      expect(mockUser.resetPasswordCode).toBeNull()
-      expect(mockUser.resetPasswordCodeExpiresAt).toBeNull()
-      expect(mockUser.save).toHaveBeenCalled()
+      // Usage unique : le code est effacé après un succès
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).toBeNull()
+      expect(fields.resetPasswordCodeExpiresAt).toBeNull()
+      expect(fields.resetPasswordCodeAttempts).toBe(0)
     })
 
-    it('retourne false si le token ne correspond pas', async () => {
-      const crypto = require('crypto')
-      const correctToken = crypto.randomBytes(32).toString('hex')
-      const hash = crypto.createHash('sha256').update(correctToken).digest('hex')
-      const future = new Date(Date.now() + 10 * 60 * 1000)
+    it('retourne false si le code ne correspond pas et incrémente le compteur d essais', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: future(),
+        resetPasswordCodeAttempts: 0
+      })
 
-      const mockUser = {
-        resetPasswordCode: hash,
-        resetPasswordCodeExpiresAt: future,
-        save: jest.fn().mockResolvedValue()
-      }
-      User.findByPk.mockResolvedValue(mockUser)
-
-      const wrongToken = crypto.randomBytes(32).toString('hex')
-      const result = await UserService.verifyResetPasswordCode(1, wrongToken)
+      const result = await UserService.verifyResetPasswordCode(1, '654321')
 
       expect(result).toBe(false)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCodeAttempts).toBe(1)
+      expect(fields.resetPasswordCode).toBeUndefined() // le code reste utilisable
     })
 
-    it('retourne false si le token est expiré', async () => {
-      const crypto = require('crypto')
-      const token = crypto.randomBytes(32).toString('hex')
-      const hash = crypto.createHash('sha256').update(token).digest('hex')
-      const past = new Date(Date.now() - 1000)
+    it('retourne false et invalide le code au 5e essai infructueux', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: future(),
+        resetPasswordCodeAttempts: 4
+      })
 
-      const mockUser = {
-        resetPasswordCode: hash,
-        resetPasswordCodeExpiresAt: past,
-        save: jest.fn().mockResolvedValue()
-      }
-      User.findByPk.mockResolvedValue(mockUser)
+      const result = await UserService.verifyResetPasswordCode(1, '654321')
 
-      const result = await UserService.verifyResetPasswordCode(1, token)
+      expect(result).toBe(false)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).toBeNull()
+      expect(fields.resetPasswordCodeAttempts).toBe(0)
+    })
+
+    it('retourne false si le code est expiré', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: new Date(Date.now() - 1000),
+        resetPasswordCodeAttempts: 0
+      })
+
+      const result = await UserService.verifyResetPasswordCode(1, CODE)
+
+      expect(result).toBe(false)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).toBeNull()
+    })
+
+    it('retourne false si aucun code n est en attente', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: null,
+        resetPasswordCodeExpiresAt: null,
+        resetPasswordCodeAttempts: 0
+      })
+
+      const result = await UserService.verifyResetPasswordCode(1, CODE)
 
       expect(result).toBe(false)
     })

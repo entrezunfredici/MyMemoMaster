@@ -138,10 +138,8 @@ router.post(
  *                 type: string
  *                 example: "mathieu@example.com"
  *     responses:
- *       201:
- *         description: Code de réinitialisation envoyé avec succès.
- *       404:
- *         description: Utilisateur introuvable.
+ *       200:
+ *         description: Réponse générique (envoyé si l'email existe — anti-énumération).
  *       500:
  *         description: Erreur serveur.
  */
@@ -180,9 +178,7 @@ router.post(
  *       201:
  *         description: Mot de passe réinitialisé avec succès.
  *       401:
- *         description: Code invalide.
- *       404:
- *         description: Utilisateur introuvable.
+ *         description: Code invalide (ou email inconnu — anti-énumération).
  *       500:
  *         description: Erreur serveur.
  */

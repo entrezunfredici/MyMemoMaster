@@ -356,11 +356,11 @@ describe('User Controller', () => {
 
   // ── POST /users/forgot-password ────────────────────────────────────────────
   describe('POST /users/forgot-password', () => {
-    const FAKE_TOKEN = 'a'.repeat(64)
+    const FAKE_CODE = '123456'
 
-    it("200 — envoie l'email avec le token (réponse générique)", async () => {
-      userService.findByEmail.mockResolvedValue({ userId: 1, email: 'bob@example.com' })
-      userService.setResetPasswordCode.mockResolvedValue(FAKE_TOKEN)
+    it("200 — envoie l'email avec le code à 6 chiffres (réponse générique)", async () => {
+      userService.findByEmail.mockResolvedValue({ userId: 1, name: 'Bob', email: 'bob@example.com' })
+      userService.setResetPasswordCode.mockResolvedValue(FAKE_CODE)
       sendEmail.mockResolvedValue()
 
       const res = await request(app)
@@ -370,7 +370,7 @@ describe('User Controller', () => {
       expect(res.status).toBe(200)
       expect(sendEmail).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining(FAKE_TOKEN),
+        expect.stringContaining(FAKE_CODE),
         'bob@example.com'
       )
     })
@@ -395,33 +395,46 @@ describe('User Controller', () => {
 
   // ── POST /users/reset-password ─────────────────────────────────────────────
   describe('POST /users/reset-password', () => {
-    const VALID_TOKEN = 'a'.repeat(64)
-    const WRONG_TOKEN = 'b'.repeat(64)
+    const VALID_CODE = '123456'
+    const WRONG_CODE = '654321'
 
-    it('201 — réinitialise le mot de passe', async () => {
+    it('201 — réinitialise le mot de passe et révoque le refresh token', async () => {
       userService.findByEmail.mockResolvedValue({ userId: 1 })
       userService.verifyResetPasswordCode.mockResolvedValue(true)
       userService.setPassword.mockResolvedValue()
+      userService.clearRefreshToken.mockResolvedValue()
 
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', code: VALID_TOKEN, newPassword: 'NewPass123!' })
+        .send({ email: 'bob@example.com', code: VALID_CODE, newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(201)
+      expect(userService.clearRefreshToken).toHaveBeenCalledWith(1)
     })
 
-    it('401 — token invalide (ne correspond pas)', async () => {
+    it('401 — code invalide (ne correspond pas)', async () => {
       userService.findByEmail.mockResolvedValue({ userId: 1 })
       userService.verifyResetPasswordCode.mockResolvedValue(false)
 
       const res = await request(app)
         .post('/api/v1/users/reset-password')
-        .send({ email: 'bob@example.com', code: WRONG_TOKEN, newPassword: 'NewPass123!' })
+        .send({ email: 'bob@example.com', code: WRONG_CODE, newPassword: 'NewPass123!' })
 
       expect(res.status).toBe(401)
     })
 
-    it('400 — token absent', async () => {
+    it('401 — email inconnu (anti-énumération : pas de 404)', async () => {
+      userService.findByEmail.mockResolvedValue(null)
+
+      const res = await request(app)
+        .post('/api/v1/users/reset-password')
+        .send({ email: 'unknown@example.com', code: VALID_CODE, newPassword: 'NewPass123!' })
+
+      expect(res.status).toBe(401)
+      expect(userService.verifyResetPasswordCode).not.toHaveBeenCalled()
+    })
+
+    it('400 — code absent', async () => {
       const res = await request(app)
         .post('/api/v1/users/reset-password')
         .send({ email: 'bob@example.com', newPassword: 'NewPass123!' })
@@ -429,7 +442,7 @@ describe('User Controller', () => {
       expect(res.status).toBe(400)
     })
 
-    it('400 — token format invalide (trop court)', async () => {
+    it('400 — code format invalide (pas 6 chiffres)', async () => {
       const res = await request(app)
         .post('/api/v1/users/reset-password')
         .send({ email: 'bob@example.com', code: 'abc123', newPassword: 'NewPass123!' })

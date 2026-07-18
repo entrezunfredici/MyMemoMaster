@@ -144,7 +144,7 @@ app.use(helmet({
 - ✅ Aucun SSRF détecté
 - ✅ Rate limiting sur routes d'auth (5 tentatives / 15 min)
 - ✅ Rotation des refresh tokens implémentée
-- ✅ Hash SHA-256 pour les reset tokens
+- ✅ Codes de réinitialisation à 6 chiffres hashés bcrypt (15 min, 5 essais max, usage unique, révocation du refresh token après reset)
 - ✅ Bcrypt coût 10 pour les mots de passe
 - ✅ CORS restreint aux origines connues
 - ✅ HSTS + HTTPS via Traefik en test/prod

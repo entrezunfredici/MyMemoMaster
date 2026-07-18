@@ -50,6 +50,11 @@ module.exports = (instance) => {
         type: DataTypes.DATE,
         allowNull: true
       },
+      resetPasswordCodeAttempts: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+      },
       hasValidatedEmail: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

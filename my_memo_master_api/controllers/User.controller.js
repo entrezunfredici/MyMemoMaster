@@ -166,7 +166,7 @@ exports.forgotPassword = async (req, res) => {
     const code = await userService.setResetPasswordCode(user.userId)
     await sendEmail(
       'Réinitialisation de mot de passe - MyMemoMaster',
-      `Votre token de réinitialisation est :\n\n${code}\n\nCopiez-collez ce token dans le formulaire de réinitialisation.\nIl est valable 30 minutes.`,
+      `Bonjour ${user.name},\n\nVotre code de réinitialisation est :\n\n${code}\n\nSaisissez ce code dans le formulaire de réinitialisation.\nIl est valable 15 minutes.\n\nSi vous n'avez pas demandé cette réinitialisation, ignorez cet email.`,
       email
     )
 
@@ -181,12 +181,16 @@ exports.resetPassword = async (req, res) => {
   const { email, code, newPassword } = req.body
   try {
     const user = await userService.findByEmail(email)
-    if (!user) return res.status(404).send({ message: 'Utilisateur introuvable.' })
+    // CHOIX: 401 "Code invalide" même si l'email est inconnu (pas de 404)
+    // RAISON: anti-énumération de comptes, aligné sur la réponse générique de forgot-password
+    if (!user) return res.status(401).send({ message: 'Code invalide.' })
 
     if (!(await userService.verifyResetPasswordCode(user.userId, code)))
       return res.status(401).send({ message: 'Code invalide.' })
 
     await userService.setPassword(user.userId, newPassword)
+    // Révocation des sessions actives après reset (standard OWASP) : le refresh token est invalidé
+    await userService.clearRefreshToken(user.userId)
 
     res.status(201).send({ message: 'Mot de passe réinitialisé avec succès.' })
   } catch (error) {
