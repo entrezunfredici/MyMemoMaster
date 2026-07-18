@@ -153,6 +153,31 @@
                       <label class="form-label--xs">Réponse attendue</label>
                       <textarea aria-label="Réponse correcte (utilisée pour la correction)" v-model="q.openAnswer" placeholder="Réponse correcte (utilisée pour la correction)" class="form-input form-input--sm" rows="2" required />
                     </div>
+                    <div>
+                      <label class="form-label--xs">Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span></label>
+                      <div v-for="(alt, ai) in q.openAltAnswers" :key="ai" class="flex items-center gap-2 mb-2">
+                        <input
+                          :aria-label="`Formulation acceptée ${ai + 1}`"
+                          v-model="q.openAltAnswers[ai]"
+                          type="text"
+                          placeholder="Ex : la formule si la réponse principale est en toutes lettres"
+                          class="form-input form-input--sm flex-1"
+                        />
+                        <button
+                          type="button"
+                          :aria-label="`Supprimer la formulation acceptée ${ai + 1}`"
+                          @click="q.openAltAnswers.splice(ai, 1)"
+                          class="text-gray-400 hover:text-red-500 text-lg leading-none"
+                        >✕</button>
+                      </div>
+                      <button
+                        type="button"
+                        @click="q.openAltAnswers.push('')"
+                        class="text-sm text-primary hover:underline font-medium"
+                      >
+                        + Ajouter une formulation acceptée
+                      </button>
+                    </div>
                   </template>
 
                   <!-- mcq -->
@@ -313,6 +338,7 @@ const defaultQuestion = () => ({
   statement: '',
   type: 'open',
   openAnswer: '',
+  openAltAnswers: [],
   mcqOptions: [{ text: '' }, { text: '' }],
   mcqCorrectIdx: 0,
   fillTemplate: '',
@@ -327,6 +353,7 @@ const editingTestUserId = ref(null)
 
 function onTypeChange(q) {
   q.openAnswer = ''
+  q.openAltAnswers = []
   q.mcqOptions = [{ text: '' }, { text: '' }]
   q.mcqCorrectIdx = 0
   q.fillTemplate = ''
@@ -357,7 +384,10 @@ function syncFillBlanks(q) {
 
 function buildContent(q) {
   switch (q.type) {
-    case 'open':      return { correct_answer: q.openAnswer }
+    case 'open': {
+      const alts = (q.openAltAnswers ?? []).map((a) => a.trim()).filter(Boolean)
+      return { correct_answer: q.openAnswer, ...(alts.length ? { accepted_answers: alts } : {}) }
+    }
     case 'mcq':       return { options: q.mcqOptions.map((o, i) => ({ text: o.text, correct: i === q.mcqCorrectIdx })) }
     case 'fill_blank':return { template: q.fillTemplate, blanks: q.fillBlanks }
     case 'reorder':   return { fragments: q.reorderFragments, solution: q.reorderFragments.map((_, i) => i) }
@@ -369,18 +399,18 @@ function contentToFormState(q) {
   const c = q.content ?? {}
   switch (q.type) {
     case 'open':
-      return { openAnswer: c.correct_answer ?? '', mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
+      return { openAnswer: c.correct_answer ?? '', openAltAnswers: [...(c.accepted_answers ?? [])], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
     case 'mcq': {
       const opts = c.options ?? [{ text: '', correct: true }, { text: '', correct: false }]
       const correctIdx = opts.findIndex(o => o.correct)
-      return { openAnswer: '', mcqOptions: opts.map(o => ({ text: o.text })), mcqCorrectIdx: correctIdx >= 0 ? correctIdx : 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
+      return { openAnswer: '', openAltAnswers: [], mcqOptions: opts.map(o => ({ text: o.text })), mcqCorrectIdx: correctIdx >= 0 ? correctIdx : 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
     }
     case 'fill_blank':
-      return { openAnswer: '', mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: c.template ?? '', fillBlanks: [...(c.blanks ?? [])], reorderFragments: ['', ''] }
+      return { openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: c.template ?? '', fillBlanks: [...(c.blanks ?? [])], reorderFragments: ['', ''] }
     case 'reorder':
-      return { openAnswer: '', mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: [...(c.fragments ?? ['', ''])] }
+      return { openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: [...(c.fragments ?? ['', ''])] }
     default:
-      return { openAnswer: '', mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
+      return { openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
   }
 }
 

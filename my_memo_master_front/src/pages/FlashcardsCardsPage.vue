@@ -140,6 +140,35 @@
             </FormulaHelper>
           </div>
 
+          <!-- Réponses acceptées supplémentaires : open, création uniquement -->
+          <div v-if="form.type === 'open' && !editingCard" class="form-group--lg">
+            <label class="form-label">
+              Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <div v-for="(alt, ai) in form.altAnswers" :key="ai" class="flex items-center gap-2 mb-2">
+              <input
+                :aria-label="`Formulation acceptée ${ai + 1}`"
+                v-model="form.altAnswers[ai]"
+                type="text"
+                placeholder="Ex : la formule si la réponse principale est en toutes lettres"
+                class="form-input flex-1"
+              />
+              <button
+                type="button"
+                :aria-label="`Supprimer la formulation acceptée ${ai + 1}`"
+                @click="form.altAnswers.splice(ai, 1)"
+                class="text-gray-400 hover:text-red-500 text-lg leading-none"
+              >✕</button>
+            </div>
+            <button
+              type="button"
+              @click="form.altAnswers.push('')"
+              class="text-sm text-primary hover:underline font-medium"
+            >
+              + Ajouter une formulation acceptée
+            </button>
+          </div>
+
           <!-- Nœud de la carte mentale liée (création uniquement) -->
           <div v-if="!editingCard && mindMapJson" class="form-group--lg">
             <label class="form-label">
@@ -294,6 +323,7 @@ const editingCard = ref(null)
 const form = reactive({
   statement: '',
   answer: '',
+  altAnswers: [],
   type: 'open',
   mcqOptions: [{ text: '', correct: true }, { text: '', correct: false }],
   mindMapNodeId: null,
@@ -390,6 +420,7 @@ const openAddModal = () => {
   editingCard.value = null
   form.statement = ''
   form.answer = ''
+  form.altAnswers = []
   form.type = 'open'
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
   form.mindMapNodeId = null
@@ -423,6 +454,7 @@ const closeModal = () => {
   editingCard.value = null
   form.statement = ''
   form.answer = ''
+  form.altAnswers = []
   form.type = 'open'
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
   form.mindMapNodeId = null
@@ -473,16 +505,23 @@ const handleCreate = async () => {
   }
   const idQuestion = qResp.data.idQuestion
 
-  // 2. Créer la réponse correcte (open uniquement — la correction MCQ est dans content)
+  // 2. Créer la ou les réponses acceptées (open uniquement — la correction MCQ est dans content).
+  // Plusieurs réponses correction=true sont supportées par la correction sémantique
+  // (meilleur score retenu) : utile pour accepter la formule ET son énoncé en toutes lettres.
   if (form.type === 'open') {
-    const rResp = await api.post('responses', {
-      content: normalizeFormulaSyntax(form.answer),
-      correction: true,
-      idQuestion,
-    })
-    if (!rResp || rResp.status !== 201) {
-      formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
-      return
+    const acceptedAnswers = [form.answer, ...form.altAnswers]
+      .map((a) => a.trim())
+      .filter(Boolean)
+    for (const answer of acceptedAnswers) {
+      const rResp = await api.post('responses', {
+        content: normalizeFormulaSyntax(answer),
+        correction: true,
+        idQuestion,
+      })
+      if (!rResp || rResp.status !== 201) {
+        formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
+        return
+      }
     }
   }
 

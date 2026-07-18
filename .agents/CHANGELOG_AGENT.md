@@ -5940,3 +5940,65 @@ Suite du test utilisateur (paraphrase correcte d'Archimède → 0,61 → « Inco
 #### Dette / limites connues (calibration)
 - Inversions non détectées (« volume divisé par la masse » accepté à tort — limite des embeddings)
 - Réponse attendue en formule symbolique vs réponse en toutes lettres : similarité faible — fournir la formule comme réponse attendue
+
+---
+
+### [2026-07-18] IMP — Correction sémantique : garde anti-inversion, formules symboliques, formulations acceptées multiples
+
+#### Contexte
+Correction des deux limites confirmées par la calibration (inversion acceptée à tort, formule vs prose rejetée à tort) — voir DECISIONS.md pour les mécanismes et alternatives.
+
+#### Fichiers modifiés
+- `my_memo_master_api/services/Semantic.service.js` — `normalizeSymbolic()` + court-circuit `exact` avant embedding ; `splitRatio()`/`detectInversion()` + garde anti-inversion après décision (`decision_zone: 'inversion'`)
+- `my_memo_master_api/services/Test.service.js` — questions ouvertes : `content.accepted_answers` (tableau) fusionné avec `correct_answer`, transmis en tableau à `gradeSemantic`
+- `my_memo_master_front/src/pages/ExercisesPage.vue` — UI « Autres formulations acceptées » par question ouverte (`openAltAnswers` ↔ `content.accepted_answers`, éditable)
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` — UI équivalente à la création de carte ouverte : chaque formulation crée une `Response correction=true` (le serveur Leitner supportait déjà le tableau)
+- Tests : `Semantic.service.test.js` 18 → **27** (normalizeSymbolic, detectInversion ×5, exact ×3, inversion intégrée — un test existant adapté à la nouvelle stratégie `exact` sur copie conforme) ; `Test.service.test.js` +1 (accepted_answers filtrées et transmises)
+
+#### Vérifié
+- Calibration en réel 7/7 : paraphrase démo 0,806 ✓ · faux même domaine rejeté ✓ · **inversion 0,889 rejetée** ✓ · **formules `u=r*i`/KaTeX → exact 1,0** ✓ · multi-réponses prose 0,936 ✓
+- Suites complètes : API verte (1 467 tests), front 627/627, lint verts, conteneur API sain
+
+#### Dette / non couvert
+- Garde anti-inversion limitée à la famille division/rapport (étendre `RATIO_SEPARATOR` au besoin)
+- Alternatives Leitner non éditables après création (l'édition de carte ne gère qu'une réponse)
+- La calibration en conteneur n'est plus possible en un `docker exec node` (2e process + modèle > 512 Mo) — exécuter sur l'hôte
+
+---
+
+### [2026-07-18] FIX — Vérification d'homogénéité des formules : fausses erreurs sur variables, boucle infinie, annotations d'unité
+
+#### Contexte
+Constat utilisateur : « Erreur d'homogénéité : "P = (F)/(S)" (UNK ≠ —) » sur une formule correcte. Trois défauts corrigés dans `interpreter/units.js` — voir DECISIONS.md.
+
+#### Fichiers modifiés
+- `my_memo_master_front/src/components/interpreter/units.js` — variables inconnues à identité propre (`VAR_x`) + signatures indéterminées jamais jugées ; syntaxe d'annotation `Var[unité]` → `(unité)` dans `sanitizeForUnits` ; opérateur `+`/`-` consommé dans `parseExpr` (boucle infinie corrigée) ; `sigToStr` affiche `x?` pour les variables (défensif)
+- `my_memo_master_front/src/components/interpreter/Interpreter.vue` — aide sous le résultat : syntaxe `P[Pa] = F[N] / S[m^2]`
+- `my_memo_master_front/test/helpers/units.test.js` — **nouveau**, 16 tests : formules symboliques sans erreur (dont le cas du bug), annotations homogènes/non homogènes/composées/dérivées (V=Ω·A), unités littérales préservées, boucles infinies (`2m+3m`, `3+2`), annulation `F/F`, sanitize
+
+#### Ce qui est utilisable
+- `P = over(F, S)` : plus aucune fausse erreur (indéterminé → abstention)
+- `P[Pa] = F[N] / S[m^2]` : vérification réelle — signale `P[Pa] = F[N] * S[m^2]`
+- `2m + 3m` ne gèle plus la page (boucle infinie corrigée)
+
+#### Dette / non couvert
+- La vérification symbolique est opt-in (annotations) — pas de dictionnaire symbole→grandeur (collisions unités/variables, voir DECISIONS) ; les tables API `Fields`/`Unit` restent non branchées
+- L'exposant hors annotation (`(m/s)^2`) n'est pas interprété par le parseur d'unités — utiliser l'exposant dans l'annotation (`c[m^2/s^2]`)
+
+---
+
+### [2026-07-18] FIX — Affichage des puissances négatives (et multi-chiffres) dans le rendu KaTeX
+
+#### Contexte
+Constat utilisateur : les puissances négatives s'affichent mal. Cause : `toLatex` transmettait `^` brut à KaTeX — en LaTeX, sans accolades, seul le premier caractère passe en exposant (`s^-2` affichait le signe en exposant et le 2 en taille normale ; `x^10` affichait le 1 en exposant et le 0 en normal).
+
+#### Fichiers modifiés
+- `my_memo_master_front/src/components/interpreter/interpreter.js` — `toLatex` pose systématiquement les accolades : `s^-2` → `s^{-2}`, `x^10` → `x^{10}`, `y^1.5` → `y^{1.5}`, `x^(n+1)` → `x^{n+1}` ; les exposants Unicode sont généralisés (table `SUPERSCRIPTS` : `⁰¹²³⁴⁵⁶⁷⁸⁹⁻`, suites converties d'un bloc : `s⁻¹²` → `s^{-12}`) — remplace l'ancien traitement limité à `²`/`³`
+- `my_memo_master_front/test/helpers/interpreterLatex.test.js` — **nouveau**, 10 tests (négatif, multi-chiffres, décimal, parenthésé, Unicode simple/négatif/suite, unités composées, formule complète)
+
+#### Ce qui est utilisable
+- Correctif central dans `toLatex` : profite à tous les rendus (mindmap, cartes Leitner, exercices, interpréteur, FormulaText)
+- Vérifié : 10 nouveaux tests + 23 tests FormulaText existants verts, suite front complète verte, lint vert
+
+#### Dette / non couvert
+- Les exposants alphabétiques multi-lettres (`x^ab`) restent non accolés (ambigu : `x^ab` peut vouloir dire `x^a·b`) — utiliser `x^(ab)`

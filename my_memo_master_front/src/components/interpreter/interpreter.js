@@ -2,14 +2,27 @@
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
+// Exposants Unicode -> chiffres (x2 -> x^{2}, s-1 -> s^{-1}, en exposant)
+const SUPERSCRIPTS = {
+  '\u2070': '0', '\u00B9': '1', '\u00B2': '2', '\u00B3': '3', '\u2074': '4',
+  '\u2075': '5', '\u2076': '6', '\u2077': '7', '\u2078': '8', '\u2079': '9',
+  '\u207B': '-'
+}
+
 // Convertit tes raccourcis en LaTeX
 export function toLatex(src) {
   let s = String(src ?? '').trim()
 
   // Normalisations rapides
   s = s
-    .replace(/\u00B2/g, '^2')     // x² -> x^2
-    .replace(/\u00B3/g, '^3')     // x³ -> x^3
+    // Suites d'exposants Unicode -> ^{...} accole (x2, s-1, m3 en exposant)
+    .replace(/[\u00B2\u00B3\u2070\u00B9\u2074-\u2079\u207B]+/g, (run) =>
+      '^{' + run.split('').map((c) => SUPERSCRIPTS[c] ?? c).join('') + '}'
+    )
+    // Accolades obligatoires : sans elles LaTeX ne met en exposant que le premier
+    // caractere (s^-2 affichait le 2 en taille normale, x^10 le 0)
+    .replace(/\^\(([^()]+)\)/g, '^{$1}')      // x^(n+1) -> x^{n+1}
+    .replace(/\^(-?\d+(?:\.\d+)?)/g, '^{$1}') // s^-2, x^10, y^1.5
     .replace(/->/g, '\\to ')
     .replace(/>=/g, '\\ge ')
     .replace(/<=/g, '\\le ')

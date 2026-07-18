@@ -17,12 +17,12 @@ export const ONBOARDING_TOUR_STEPS = [
     selector: null,
     title: 'Bienvenue 👋',
     intro:
-      "Bienvenue sur MyMemoMaster ! Suivez cette courte visite pour découvrir les principales fonctionnalités de l'interface."
+      "Bienvenue sur MyMemoMaster ! Suivez cette courte visite pour découvrir les principales fonctionnalités de l'application."
   },
   {
     selector: '[data-tour="mindmaps"]',
     title: 'Cartes mentales',
-    intro: 'Structurez vos connaissances sous forme de cartes mentales liées à vos matières.'
+    intro: 'Structurez vos connaissances sous forme de cartes mentales.'
   },
   {
     selector: '[data-tour="flashcards"]',
