@@ -6002,3 +6002,15 @@ Constat utilisateur : les puissances négatives s'affichent mal. Cause : `toLate
 
 #### Dette / non couvert
 - Les exposants alphabétiques multi-lettres (`x^ab`) restent non accolés (ambigu : `x^ab` peut vouloir dire `x^a·b`) — utiliser `x^(ab)`
+
+---
+
+### [2026-07-18] DOC — B2 : lien de la démonstration vidéo inséré (Annexe B)
+
+#### Fichiers modifiés
+- `B2_RENDU.md` — Annexe B : URL YouTube https://youtu.be/H8YEFxyZnXU insérée à la place du placeholder ; la description passe de « parcours utilisateur complet » à « présentation des principales fonctionnalités (~4 min) » (la vidéo ne couvre pas tout, dixit l'utilisateur) ; renvoi de la section 6.5 reformulé en cohérence
+
+#### État
+| Module | État |
+|--------|------|
+| Dossier B2 (B2_RENDU.md) | Complet — plus aucun placeholder ; PDF à régénérer pour mesurer la pagination (cible ~29 pages) |

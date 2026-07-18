@@ -591,7 +591,7 @@ helm upgrade --install mmm-preprod ./helm -f helm/values-preprod.yaml \
 
 ## 6.5 Vérification fonctionnelle auprès des utilisateurs
 
-La chaîne d'environnements sert précisément à cela : l'environnement de **test** (`test.my-memo-master.com`) est le lieu de vérification fonctionnelle par les utilisateurs du projet avant promotion — les domaines par environnement sont configurés dans les `.env` serveur et values Helm (sections 1.2, [README.md](annexes/README.md) partie 3). Chaque déploiement notifie le canal Discord de l'équipe (`✅ Déploiement **staging** réussi.`), qui sait ainsi quand une version est disponible pour vérification (captures des notifications en section 2.5, exécution réelle du pipeline en section 2.6). Une démonstration vidéo du parcours utilisateur complet est fournie en Annexe B.
+La chaîne d'environnements sert précisément à cela : l'environnement de **test** (`test.my-memo-master.com`) est le lieu de vérification fonctionnelle par les utilisateurs du projet avant promotion — les domaines par environnement sont configurés dans les `.env` serveur et values Helm (sections 1.2, [README.md](annexes/README.md) partie 3). Chaque déploiement notifie le canal Discord de l'équipe (`✅ Déploiement **staging** réussi.`), qui sait ainsi quand une version est disponible pour vérification (captures des notifications en section 2.5, exécution réelle du pipeline en section 2.6). Une démonstration vidéo des principales fonctionnalités est fournie en Annexe B.
 
 ---
 
@@ -789,9 +789,9 @@ L'application réelle est illustrée à deux niveaux, en complément de la galer
 | Session Leitner — correction (score, similarité) | [leitner_2.png](annexes/docs/leitner_2.png) | 3.2 |
 | Swagger UI sur /api-docs | [swagger.png](annexes/docs/swagger.png) | 9.3 |
 
-**Démonstration vidéo** — parcours utilisateur complet : inscription → vérification email → connexion → visite guidée de l'interface → création d'un système de Leitner → session de révision :
+**Démonstration vidéo** (~4 min) — présentation des principales fonctionnalités de l'application en fonctionnement :
 
-[LIEN VIDÉO À INSÉRER — déposer l'URL de la capture vidéo ici]
+[https://youtu.be/H8YEFxyZnXU](https://youtu.be/H8YEFxyZnXU)
 
 ## Annexe C — Index des documents du dépôt
 
