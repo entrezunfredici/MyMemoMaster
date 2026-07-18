@@ -131,6 +131,23 @@ describe('useGuidedTourStore', () => {
     expect(store.stepIndex).toBe(0)
   })
 
+  // ── reset (déconnexion) ──────────────────────────────────────────────────────
+
+  it('reset - parcours en cours avec liens - remet tout à zéro (état + liens)', () => {
+    const store = useGuidedTourStore()
+    store.start()
+    store.recordLinks({ subjectId: 1, mindMapId: 3 })
+    store.advance()
+
+    store.reset()
+
+    expect(store.active).toBe(false)
+    expect(store.stepIndex).toBe(0)
+    expect(store.links.subjectId).toBeNull()
+    expect(store.links.mindMapId).toBeNull()
+    expect(store.links.leitnerSystemId).toBeNull()
+  })
+
   // ── parcours complet ─────────────────────────────────────────────────────────
 
   it('parcours complet - enchaîne les 4 étapes dans le bon ordre puis se termine', () => {

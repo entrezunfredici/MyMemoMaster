@@ -192,6 +192,31 @@ describe('LeitnerCard Controller', () => {
       expect(res.status).toBe(400)
     })
 
+    it('201 — crée une carte liée à un nœud de carte mentale (mindMapNodeId)', async () => {
+      leitnerCardService.addCard.mockResolvedValue({ ...mockCard, mindMapNodeId: 'node-42' })
+
+      const res = await request(app)
+        .post(`${BASE}/leitnercards`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ idQuestion: 1, idSystem: 1, mindMapNodeId: 'node-42' })
+
+      expect(res.status).toBe(201)
+      expect(leitnerCardService.addCard).toHaveBeenCalledWith(
+        expect.objectContaining({ mindMapNodeId: 'node-42' }),
+        expect.anything()
+      )
+    })
+
+    it('400 — mindMapNodeId invalide (chaîne vide)', async () => {
+      const res = await request(app)
+        .post(`${BASE}/leitnercards`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ idQuestion: 1, idSystem: 1, mindMapNodeId: '' })
+
+      expect(res.status).toBe(400)
+      expect(leitnerCardService.addCard).not.toHaveBeenCalled()
+    })
+
     it('401 — pas de token', async () => {
       const res = await request(app).post(`${BASE}/leitnercards`).send({ idQuestion: 1 })
 

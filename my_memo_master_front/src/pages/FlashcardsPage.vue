@@ -94,6 +94,22 @@
               <label class="form-label">Sujet <span class="text-gray-400 font-normal">(optionnel)</span></label>
               <SubjectSelectorComponent v-model="form.subjectId" />
             </div>
+            <div class="mb-4">
+              <label class="form-label">Carte mentale liée <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <select
+                aria-label="Carte mentale liée au système"
+                v-model="form.idMindMap"
+                class="form-input bg-white"
+              >
+                <option :value="null">Aucune</option>
+                <option v-for="mm in availableMindMaps" :key="mm.idMindMap" :value="mm.idMindMap">
+                  {{ mm.mmName }}
+                </option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">
+                Permet de lier chaque carte à un nœud de la carte mentale lors de sa création.
+              </p>
+            </div>
             <div class="mb-6">
               <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
               <TagSelectorComponent v-model="form.tagIds" />
@@ -160,6 +176,7 @@ import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useSubjectStore } from '@/stores/subjects'
 import { useTagStore } from '@/stores/tags'
 import { useGuidedTourStore } from '@/stores/guidedTour'
+import { useDiagrammeStore } from '@/stores/diagrammes'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 
@@ -171,6 +188,7 @@ const sessionStore = useRevisionSessionStore()
 const subjectStore = useSubjectStore()
 const tagStore = useTagStore()
 const guidedTourStore = useGuidedTourStore()
+const diagrammeStore = useDiagrammeStore()
 
 const loading = ref(true)
 const searchQuery = ref('')
@@ -179,8 +197,15 @@ const showModal = ref(false)
 const submitting = ref(false)
 const editingId = ref(null)
 
-const form = reactive({ name: '', subjectId: null, tagIds: [] })
+const form = reactive({ name: '', subjectId: null, tagIds: [], idMindMap: null })
 const subjects = computed(() => subjectStore.subjects)
+
+// Cartes mentales proposées pour la liaison : celles de la matière choisie, sinon toutes
+const availableMindMaps = computed(() => {
+  const all = diagrammeStore.diagrammes || []
+  if (!form.subjectId) return all
+  return all.filter((mm) => mm.subjectId === form.subjectId)
+})
 
 const filteredSystems = computed(() => {
   let list = systemStore.systems
@@ -243,7 +268,11 @@ const loadStats = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([systemStore.fetchSystems(), subjectStore.fetchSubjects()])
+  await Promise.all([
+    systemStore.fetchSystems(),
+    subjectStore.fetchSubjects(),
+    diagrammeStore.fetchDiagrammes()
+  ])
   await Promise.all([loadStats(), boxStore.fetchBoxes()])
   loading.value = false
 })
@@ -257,8 +286,9 @@ const goToSession = (systemId) => {
 const openCreateModal = () => {
   editingId.value = null
   form.name = ''
-  // Parcours guidé : pré-sélectionne la matière de la carte mentale créée à l'étape précédente
+  // Parcours guidé : pré-sélectionne la matière et la carte mentale créées à l'étape précédente
   form.subjectId = guidedTourStore.active ? guidedTourStore.links.subjectId : null
+  form.idMindMap = guidedTourStore.active ? guidedTourStore.links.mindMapId : null
   form.tagIds = []
   showModal.value = true
 }
@@ -267,6 +297,7 @@ const openEditModal = (system) => {
   editingId.value = system.idSystem
   form.name = system.name
   form.subjectId = system.subjectId || null
+  form.idMindMap = system.idMindMap || null
   form.tagIds = (system.tags || []).map((t) => t.tagId)
   showModal.value = true
 }
@@ -276,12 +307,17 @@ const closeModal = () => {
   editingId.value = null
   form.name = ''
   form.subjectId = null
+  form.idMindMap = null
   form.tagIds = []
 }
 
 const submitForm = async () => {
   submitting.value = true
-  systemStore.system = { name: form.name, subjectId: form.subjectId || null }
+  systemStore.system = {
+    name: form.name,
+    subjectId: form.subjectId || null,
+    idMindMap: form.idMindMap || null
+  }
   const ok = editingId.value
     ? await systemStore.updateSystem(editingId.value)
     : await systemStore.createSystem()

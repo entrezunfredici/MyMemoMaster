@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia'
 
-// CHOIX: état du parcours guidé persisté côté front (localStorage via pinia-plugin-persistedstate)
-// plutôt que via l'API OnboardingState.
+// CHOIX: état du parcours guidé persisté côté front en sessionStorage (pinia-plugin-persistedstate)
+// plutôt qu'en localStorage ou via l'API OnboardingState.
 // RAISON: OnboardingState est réservé à l'onboarding utilisateur (autre fonctionnalité) ;
-// le parcours guidé est un guide d'usage ponctuel qui ne nécessite pas de synchronisation serveur.
+// le parcours est un guide ponctuel (~5 min) : l'état doit survivre à un rechargement de page
+// pendant la session, mais pas à la fermeture du site ni à une déconnexion (reset() appelé
+// par auth.logout) — un parcours ressuscité des jours plus tard référencerait des entités
+// potentiellement supprimées.
 
 /**
  * Définition ordonnée des étapes du parcours guidé.
@@ -41,8 +44,15 @@ export const GUIDED_TOUR_STEPS = [
   }
 ]
 
+// Purge l'ancienne persistance localStorage (remplacée par sessionStorage le 2026-07-18)
+try {
+  localStorage.removeItem('guidedTour')
+} catch {
+  /* stockage indisponible (SSR, tests) — rien à purger */
+}
+
 export const useGuidedTourStore = defineStore('guidedTour', {
-  persist: true,
+  persist: { storage: sessionStorage },
 
   state: () => ({
     active: false,
@@ -131,6 +141,22 @@ export const useGuidedTourStore = defineStore('guidedTour', {
     quit() {
       this.active = false
       this.stepIndex = 0
+    },
+
+    /**
+     * Réinitialise complètement le parcours (état + liens).
+     * Appelé à la déconnexion : l'état ne doit pas survivre à un changement d'utilisateur.
+     */
+    reset() {
+      this.active = false
+      this.stepIndex = 0
+      this.links = {
+        subjectId: null,
+        mindMapId: null,
+        leitnerSystemId: null,
+        testId: null,
+        revisionSessionId: null
+      }
     }
   }
 })

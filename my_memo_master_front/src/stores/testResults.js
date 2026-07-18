@@ -54,7 +54,9 @@ export const useTestResultStore = defineStore('testResults', {
 
     async submitTest(testId, answers) {
       try {
-        const resp = await api.post(`tests/${testId}/submit`, { answers })
+        // La correction sémantique des questions ouvertes peut être longue au premier
+        // appel après un démarrage — même timeout étendu que leitnercards/response
+        const resp = await api.post(`tests/${testId}/submit`, { answers }, { timeout: 90000 })
         if (!resp || resp.status !== 200) return null
         this.results.unshift({
           resultId: resp.data.resultId,

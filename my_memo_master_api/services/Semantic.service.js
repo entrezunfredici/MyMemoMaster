@@ -6,7 +6,88 @@ try {
   console.error(error)
 }
 
+// Stopwords anglais + français : l'application est francophone, la liste anglaise
+// seule laissait « une », « dans », « les »… compter comme mots-clés dans la zone grise
 const STOPWORDS = new Set([
+  // Français
+  'le',
+  'la',
+  'les',
+  'un',
+  'une',
+  'des',
+  'du',
+  'de',
+  'dans',
+  'sur',
+  'sous',
+  'par',
+  'pour',
+  'avec',
+  'sans',
+  'vers',
+  'chez',
+  'et',
+  'ou',
+  'mais',
+  'donc',
+  'car',
+  'ni',
+  'or',
+  'que',
+  'qui',
+  'quoi',
+  'dont',
+  'est',
+  'sont',
+  'être',
+  'était',
+  'étaient',
+  'sera',
+  'seront',
+  'fait',
+  'faire',
+  'avoir',
+  'ont',
+  'aux',
+  'ce',
+  'cet',
+  'cette',
+  'ces',
+  'son',
+  'ses',
+  'leur',
+  'leurs',
+  'ils',
+  'elles',
+  'nous',
+  'vous',
+  'tout',
+  'tous',
+  'toute',
+  'toutes',
+  'plus',
+  'moins',
+  'très',
+  'aussi',
+  'comme',
+  'alors',
+  'donc',
+  'ainsi',
+  'lors',
+  'pas',
+  'non',
+  'oui',
+  'se',
+  'sa',
+  'au',
+  'il',
+  'elle',
+  'on',
+  'lui',
+  'ne',
+  'en',
+  // Anglais
   'the',
   'a',
   'an',
@@ -98,8 +179,17 @@ class SemanticService {
       if (!pipeline) {
         throw new Error('Transformers library not available')
       }
-      console.log('[SemanticService] Loading embedding model: all-mpnet-base-v2...')
-      const extractor = await pipeline('feature-extraction', 'Xenova/all-mpnet-base-v2')
+      // CHOIX: modèle multilingue MiniLM (50+ langues dont le français) plutôt que
+      // all-mpnet-base-v2 (anglais) ou paraphrase-multilingual-mpnet-base-v2 (multilingue mais ~280 Mo)
+      // RAISON: l'application est francophone — le modèle anglais déprimait les similarités entre
+      // paraphrases françaises correctes (~0,61 pour une réponse juste reformulée) ; la variante
+      // mpnet multilingue dépasse la limite mémoire des conteneurs API (512 Mo → OOM en boucle),
+      // MiniLM (~120 Mo) tient dans le même gabarit que l'ancien modèle
+      console.log('[SemanticService] Loading embedding model: paraphrase-multilingual-MiniLM-L12-v2...')
+      const extractor = await pipeline(
+        'feature-extraction',
+        'Xenova/paraphrase-multilingual-MiniLM-L12-v2'
+      )
       console.log('[SemanticService] Model loaded successfully.')
       return extractor
     } catch (error) {

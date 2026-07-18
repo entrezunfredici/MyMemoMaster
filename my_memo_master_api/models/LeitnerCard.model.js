@@ -22,6 +22,12 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      // Nœud de la carte mentale liée au système (id interne au JSON MindMap.mindMapJson)
+      mindMapNodeId: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        defaultValue: null
+      },
       idBox: {
         type: DataTypes.INTEGER,
         allowNull: true,

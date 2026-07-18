@@ -985,3 +985,39 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : SHA-256 du code 6 chiffres — brute-forçable hors-ligne en quelques secondes (10^6 hachages) en cas de fuite de base ; bcrypt rend l'attaque coûteuse. / Conserver le token 64 chars avec lien cliquable dans l'email — plus d'entropie mais UX dépendante du client mail, et le formulaire existant est pensé pour une saisie de code.
 
 **Conséquences** : Migration `20260718000000-add-reset-password-attempts-to-user.js` à passer. Le validator `resetPassword` attend désormais `^\d{6}$`. `verifyResetPasswordCode` ne détruit plus le code au premier essai raté (jusqu'à 5 essais), contrairement au comportement précédent. Front : `ResetPasswordPage.vue` passe du textarea 64 chars à un input numérique 6 chiffres (`autocomplete="one-time-code"`). Le `validEmailCode` reste en clair (décision distincte du 2026-06-23, inchangée).
+
+---
+
+### [2026-07-18] Liaison Leitner ↔ carte mentale : câblage de la colonne dormante idMindMap + nœud lié par carte (mindMapNodeId sans FK)
+
+**Contexte** : Demande utilisateur : (1) le parcours guidé doit lier automatiquement le système de Leitner à la carte mentale créée à l'étape précédente ; (2) à la création d'une flashcard (uniquement la création), afficher une mini-vue de la carte mentale liée pour sélectionner le nœud rattaché à la question. La colonne `LeitnerSystem.idMindMap` existait déjà en base mais n'était renseignée nulle part (colonne dormante) ; les nœuds de mindmap vivent dans le JSON `MindMap.mindMapJson` (pas de table de nœuds).
+
+**Décision** : (1) Câbler `idMindMap` de bout en bout : validator (`optional isInt`), controller (create + update), sélecteur « Carte mentale liée » dans le modal de création de système (filtré par matière), pré-rempli par `links.mindMapId` quand le parcours guidé est actif. (2) Nouvelle colonne `LeitnerCard.mindMapNodeId` **STRING(64) nullable sans contrainte FK** (migration `20260718000001`) : les identifiants de nœuds sont des chaînes internes au JSON — une FK est impossible. Référence tolérante : la suppression du nœud dans la mindmap laisse un identifiant orphelin, sans erreur. (3) Nouveau composant `MindMapNodePickerComponent.vue` : rendu SVG **lecture seule** de la mindmap (normalisation + layout via les helpers `normalizeMindMap`/`applyRadialLayout`), nœuds cliquables et pilotables au clavier (`role="button"`, `tabindex`, Entrée/Espace, `aria-pressed`), affiché dans le modal « Nouvelle carte » uniquement en création et uniquement si le système a un `idMindMap`. Le libellé du nœud choisi pré-remplit l'énoncé s'il est vide.
+
+**Alternative écartée** : réutiliser `MindMapBoard.vue` en lecture seule — couplé au store global `mindmapBuilder` (sélection, pan/zoom, dirty state) : le monter dans le modal partagerait l'état avec l'éditeur ; extraire les nœuds dans une table dédiée avec FK — refonte du modèle mindmap disproportionnée pour une référence d'affichage ; stocker le lien dans `Question.content` — champ déjà utilisé par les types de questions (QCM…), risque de collision de format.
+
+**Conséquences** : Migration `20260718000001-add-mindmapnodeid-to-leitnercard.js` à passer. Toute exploitation future du lien carte↔nœud (surbrillance du nœud pendant la révision, statistiques de maîtrise par nœud) doit tolérer un `mindMapNodeId` orphelin (nœud supprimé). Le picker ne propose pas de pan/zoom : les grandes cartes sont réduites par le viewBox (lisibilité limitée au-delà de ~30 nœuds — à faire évoluer si besoin).
+
+---
+
+### [2026-07-18] Parcours guidé — sessionStorage + reset à la déconnexion (plutôt que persistance en base)
+
+**Contexte** : L'état du parcours guidé était persisté en localStorage : il ressuscitait après fermeture du site ou déconnexion, potentiellement des jours plus tard, avec des `links` pointant vers des entités qui n'existent plus. Question utilisateur : sauvegarder en base à la sortie, ou supprimer ?
+
+**Décision** : Supprimer. La persistance passe de localStorage à **sessionStorage** (`persist: { storage: sessionStorage }`) — l'état survit à un rechargement de page pendant la session mais pas à la fermeture de l'onglet — et `auth.logout()` appelle une nouvelle action `guidedTour.reset()` (état + liens remis à zéro) pour couvrir la déconnexion explicite et le changement d'utilisateur sur le même onglet.
+
+**Alternative écartée** : persistance serveur (nouvelle surface API ou détournement d'OnboardingState, réservé à la visite guidée) — disproportionnée pour un guide de ~5 minutes relançable à tout moment depuis l'accueil, et reprise différée risquée (liens orphelins).
+
+**Conséquences** : Le parcours ne peut plus être repris après fermeture du site — comportement voulu. sessionStorage étant par onglet, le bandeau ne suit pas dans un second onglet (acceptable : le parcours est linéaire mono-onglet).
+
+---
+
+### [2026-07-18] Correction sémantique — modèle multilingue MiniLM + stopwords français (remplace all-mpnet-base-v2, anglais)
+
+**Contexte** : Une réponse française correcte mais reformulée (« principe d'Archimède ») obtenait 0,61 de similarité → « Incorrect ». Double cause : `all-mpnet-base-v2` est entraîné sur de l'anglais (similarités déprimées entre paraphrases françaises), et la liste de stopwords du départage en zone grise était anglaise uniquement (« une », « dans », « les » comptaient comme mots-clés et diluaient le Jaccard).
+
+**Décision** : Modèle remplacé par `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (50+ langues, ~120 Mo quantisé) et stopwords français ajoutés. Seuils 0,78/0,55 **conservés** après calibration sur 8 paires françaises réelles dans le conteneur : copie exacte 1,00 ✓, paraphrase éloignée 0,806 ✓ (le cas qui échouait), paraphrase proche 0,89 ✓, réponse fausse même domaine 0,717 → zone grise correctement rejetée par mots-clés ✓, hors-sujet 0,15 ✓, reformulation courte 0,91 ✓.
+
+**Alternative écartée** : `paraphrase-multilingual-mpnet-base-v2` (meilleure qualité) — **~280 Mo de poids : OOM en boucle dans les conteneurs API limités à 512 Mo** (12 redémarrages constatés en dev ; mêmes limites en preprod/prod). L'upgrade reste possible en augmentant `API_LIMIT_MEMORY` et les limites Helm. / Augmenter la mémoire plutôt que réduire le modèle — touchait le dimensionnement de tous les environnements pour un gain marginal.
+
+**Conséquences** : Premier démarrage : téléchargement du nouveau modèle (~120 Mo), absorbé par le pre-warm. Deux limites structurelles des embeddings documentées par la calibration : les **inversions** (« le volume divisé par la masse » scoré 0,889 → accepté à tort) et les **formules symboliques** comparées à leur énoncé en toutes lettres (0,299 → rejeté à tort) — pour les réponses-formules, l'auteur de la carte doit fournir la formule comme réponse attendue, pas sa lecture en français. Nodemon + volume monté : toute écriture dans `my_memo_master_api/` pendant un téléchargement de modèle l'interrompt (redémarrage du process).

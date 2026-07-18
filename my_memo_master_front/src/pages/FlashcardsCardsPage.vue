@@ -140,8 +140,20 @@
             </FormulaHelper>
           </div>
 
+          <!-- Nœud de la carte mentale liée (création uniquement) -->
+          <div v-if="!editingCard && mindMapJson" class="form-group--lg">
+            <label class="form-label">
+              Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <MindMapNodePicker
+              v-model="form.mindMapNodeId"
+              :mind-map-json="mindMapJson"
+              @node-selected="onNodeSelected"
+            />
+          </div>
+
           <!-- Options MCQ -->
-          <div v-else class="form-group--lg">
+          <div v-if="form.type !== 'open'" class="form-group--lg">
             <label class="form-label">Options (sélectionne la bonne réponse)</label>
             <div class="space-y-2">
               <div v-for="(opt, oi) in form.mcqOptions" :key="oi" class="flex items-center gap-2">
@@ -259,6 +271,7 @@ import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
 import FormulaText from '@/components/FormulaTextComponent.vue'
 import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
 import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
 const router = useRouter()
@@ -270,6 +283,9 @@ const systemName = ref('')
 const allCards = ref([])
 const systemBoxes = ref([])
 
+// Carte mentale liée au système (LeitnerSystem.idMindMap) — alimente le sélecteur de nœud
+const mindMapJson = ref(null)
+
 // --- cartes ---
 const showModal = ref(false)
 const submitting = ref(false)
@@ -280,6 +296,7 @@ const form = reactive({
   answer: '',
   type: 'open',
   mcqOptions: [{ text: '', correct: true }, { text: '', correct: false }],
+  mindMapNodeId: null,
 })
 
 // --- boîtes ---
@@ -305,7 +322,16 @@ const loadCards = async () => {
     api.get('leitnerboxes'),
   ])
 
-  if (sysResp?.status === 200) systemName.value = sysResp.data.name
+  if (sysResp?.status === 200) {
+    systemName.value = sysResp.data.name
+    // Si le système est lié à une carte mentale, on la charge pour le sélecteur de nœud
+    if (sysResp.data.idMindMap) {
+      const mmResp = await api.get(`diagrammes/${sysResp.data.idMindMap}`)
+      mindMapJson.value = mmResp?.status === 200 ? mmResp.data?.mindMapJson || null : null
+    } else {
+      mindMapJson.value = null
+    }
+  }
   if (!boxResp || boxResp.status !== 200) return
 
   const boxes = boxResp.data.filter(b => b.idSystem === systemId).sort((a, b) => a.level - b.level)
@@ -366,8 +392,16 @@ const openAddModal = () => {
   form.answer = ''
   form.type = 'open'
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  form.mindMapNodeId = null
   formError.value = ''
   showModal.value = true
+}
+
+// Pré-remplit l'énoncé avec le libellé du nœud choisi si l'énoncé est encore vide
+const onNodeSelected = (node) => {
+  if (node && !form.statement.trim()) {
+    form.statement = node.label || ''
+  }
 }
 
 const openEditModal = async (card) => {
@@ -391,6 +425,7 @@ const closeModal = () => {
   form.answer = ''
   form.type = 'open'
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  form.mindMapNodeId = null
   formError.value = ''
 }
 
@@ -451,8 +486,12 @@ const handleCreate = async () => {
     }
   }
 
-  // 3. Créer la carte
-  const cResp = await api.post('leitnercards', { idQuestion, idSystem: systemId })
+  // 3. Créer la carte (avec le nœud de carte mentale lié le cas échéant)
+  const cResp = await api.post('leitnercards', {
+    idQuestion,
+    idSystem: systemId,
+    mindMapNodeId: form.mindMapNodeId || null,
+  })
   if (!cResp || cResp.status !== 201) {
     formError.value = cResp?.data?.message || 'Erreur lors de la création de la carte.'
     return

@@ -78,8 +78,15 @@ metricsServer.listen(METRICS_PORT, HOST, () => {
   logger.error('DB still unreachable; API keeps serving non-DB routes.')
 })()
 
-// Pre-warm the semantic model in the background so the first Leitner correction
-// doesn't block a user request for 30+ seconds (model download ~80 MB).
-semanticService.getModel().catch((err) => {
-  logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)
-})
+// Pre-warm the semantic model in the background so the first correction (Leitner
+// ou submit d'exercice) doesn't block a user request for 30+ seconds.
+// CHOIX: une vraie inférence (gradeSemantic) plutôt que getModel() seul
+// RAISON: charger le pipeline ne suffit pas — la première inférence paie encore
+// l'initialisation de la session ONNX (~30 s observés en conteneur), qui gelait
+// la première soumission d'exercice après chaque redémarrage.
+semanticService
+  .gradeSemantic('préchauffage du modèle', 'préchauffage du modèle')
+  .then(() => logger.info('[SemanticService] Pre-warm inference done.'))
+  .catch((err) => {
+    logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)
+  })

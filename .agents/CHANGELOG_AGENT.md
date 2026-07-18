@@ -5833,3 +5833,110 @@ L'email de réinitialisation envoyait un token hex de 64 caractères, illisible 
 | Module | État |
 |--------|------|
 | Auth — mot de passe oublié | Flux OTP 6 chiffres conforme OWASP (bcrypt, 15 min, 5 essais, anti-énumération, révocation session) — migration à passer |
+
+---
+
+### [2026-07-18] ADD — Liaison Leitner ↔ carte mentale + sélection d'un nœud à la création de flashcard
+
+#### Contexte
+Demande utilisateur : (1) le parcours guidé doit lier automatiquement le système de Leitner à la carte mentale créée à l'étape précédente ; (2) à la création d'une flashcard (uniquement la création), afficher une mini-mindmap (si le système est lié à une carte mentale) pour sélectionner le nœud rattaché à la question. Audit préalable : `LeitnerSystem.idMindMap` existait en base mais n'était câblé nulle part.
+
+#### Fichiers créés
+- `my_memo_master_api/migrations/20260718000001-add-mindmapnodeid-to-leitnercard.js` — colonne `LeitnerCard.mindMapNodeId` STRING(64) nullable, sans FK (id de nœud interne au JSON mindMapJson)
+- `my_memo_master_front/src/components/MindMapNodePickerComponent.vue` — mini-vue SVG lecture seule de la mindmap (normalizeMindMap + applyRadialLayout, sans le store mindmapBuilder) ; nœuds cliquables et pilotables au clavier (role="button", tabindex, Entrée/Espace, aria-pressed, aria-live), sélection/désélection, bouton « Retirer », fond blanc explicite (règle projet) ; émet `update:modelValue` (id) et `node-selected` (nœud)
+- `my_memo_master_front/test/components/MindMapNodePickerComponent.test.js` — 9 tests Vitest (rendu des nœuds, liens orphelins filtrés, clic/désélection, clavier, aria-pressed, Retirer, JSON string, message d'invite)
+
+#### Fichiers modifiés
+- `my_memo_master_api/models/LeitnerCard.model.js` — attribut `mindMapNodeId`
+- `my_memo_master_api/validators/LeitnerSystem.validators.js` — `idMindMap` optionnel (isInt) sur create/update
+- `my_memo_master_api/validators/LeitnerCard.validators.js` — `mindMapNodeId` optionnel (string 1–64) sur addCard
+- `my_memo_master_api/controllers/LeitnerSystem.controller.js` — `idMindMap` transmis au service (create + update) ; le service (spread) et `LeitnerCard.service.addCard` (spread) n'ont pas eu besoin de changer
+- `my_memo_master_api/test/controllers/LeitnerSystem.controller.test.js` — +2 tests (201 avec idMindMap transmis au service, 400 idMindMap non entier)
+- `my_memo_master_api/test/controllers/LeitnerCard.controller.test.js` — +2 tests (201 avec mindMapNodeId transmis, 400 chaîne vide)
+- `my_memo_master_front/src/pages/FlashcardsPage.vue` — sélect « Carte mentale liée (optionnel) » dans le modal système (options filtrées par matière via le store diagrammes), pré-rempli par `links.mindMapId` quand le parcours guidé est actif ; `idMindMap` envoyé à la création/màj ; fetchDiagrammes au montage
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` — chargement de la mindmap liée (`GET diagrammes/:id` si `system.idMindMap`) ; picker affiché dans le modal « Nouvelle carte » uniquement en création ; `mindMapNodeId` envoyé au POST leitnercards ; le libellé du nœud choisi pré-remplit l'énoncé s'il est vide
+
+#### Ce qui est utilisable
+- Parcours guidé : la carte mentale de l'étape 1 est automatiquement proposée comme carte liée à l'étape Leitner (liaison persistée en base)
+- Hors parcours : liaison manuelle possible à la création ou modification d'un système
+- Création de carte : si le système a une carte mentale liée, la mini-mindmap s'affiche dans le modal, un clic (ou Entrée) lie le nœud à la carte ; sélection optionnelle et retirable
+- Vérifié : 1 457/1 457 tests API, 626/626 tests front, lint API + front verts, audit RGAA statique 0 non-conformité
+
+#### Hypothèses posées
+- Le lien nœud↔carte est purement déclaratif à ce stade : il est stocké mais pas encore exploité à la révision (surbrillance, stats par nœud) — extensions futures possibles
+- La désélection d'un nœud ne vide pas l'énoncé pré-rempli (l'utilisateur peut l'avoir édité)
+
+#### Dette / non couvert
+- `mindMapNodeId` non modifiable à l'édition d'une carte (choix utilisateur : « uniquement la création »)
+- Pas de pan/zoom dans le picker : lisibilité limitée sur les très grandes cartes (~30+ nœuds)
+- Pas de test composant pour l'intégration dans FlashcardsCardsPage (le picker, qui porte la logique, est couvert ; l'intégration est du câblage de formulaire)
+- Référence orpheline possible si le nœud est supprimé de la mindmap ensuite — tolérée par conception (voir DECISIONS)
+
+#### État
+| Module | État |
+|--------|------|
+| Leitner ↔ mindmap (liaison + nœud par carte) | Stable — idMindMap câblé (parcours guidé + manuel), MindMapNodePicker au modal de création de carte ; 4 tests Jest + 9 tests Vitest |
+
+---
+
+### [2026-07-18] FIX — Parcours guidé : fin du cache persistant (sessionStorage + reset au logout)
+
+#### Contexte
+Constat utilisateur : « fort cache » du parcours guidé — l'état localStorage survivait à la fermeture du site et à la déconnexion. Décision (voir DECISIONS.md) : conserver l'état pendant la session uniquement, le supprimer à la sortie ou à la déconnexion — pas de sauvegarde en base.
+
+#### Fichiers modifiés
+- `my_memo_master_front/src/stores/guidedTour.js` — `persist: true` (localStorage) → `persist: { storage: sessionStorage }` ; nouvelle action `reset()` (état + liens) ; commentaire CHOIX/RAISON mis à jour
+- `my_memo_master_front/src/stores/auth.js` — `logout()` appelle `useGuidedTourStore().reset()` (le parcours ne survit pas à un changement d'utilisateur)
+- `my_memo_master_front/test/stores/guidedTour.store.test.js` — +1 test (`reset` remet tout à zéro), 13/13 verts
+
+#### Ce qui est utilisable
+- Rechargement de page en plein parcours : l'état est conservé (sessionStorage)
+- Fermeture de l'onglet/du site ou déconnexion : le parcours disparaît, relançable proprement depuis l'accueil
+- Vérifié : 627/627 tests front verts, lint vert
+
+#### État
+| Module | État |
+|--------|------|
+| Front — Parcours guidé | Stable — persistance sessionStorage + reset au logout ; 13 tests store |
+
+---
+
+### [2026-07-18] FIX — Soumission d'exercice gelée ~30 s au premier appel (erreur 500/timeout côté front)
+
+#### Contexte
+Constat utilisateur : erreur 500 en soumettant une série d'exercices. Diagnostic via les logs du conteneur API : le `POST /tests/:id/submit` de 13:05 n'a jamais abouti (loggé sans code de statut = connexion abandonnée par le client) et l'event loop est restée gelée ~34 s (les healthchecks eux-mêmes n'aboutissaient plus), avant reprise normale.
+
+#### Cause racine (double)
+1. Le pre-warm du modèle sémantique dans `server.js` appelait `getModel()` : le **pipeline** était chargé au démarrage, mais la **première inférence** payait encore l'initialisation de la session ONNX (~30 s en conteneur) — déclenchée par la première soumission d'un utilisateur après chaque redémarrage.
+2. Le front soumettait avec le **timeout axios par défaut (10 s)** de `helpers/api.js`, alors que `leitnercards/response` (même modèle) a un timeout de 90 s : la requête était abandonnée avant la fin de la correction, d'où l'erreur affichée.
+
+#### Fichiers modifiés
+- `my_memo_master_api/server.js` — pre-warm par **vraie inférence** (`gradeSemantic('préchauffage…')`) au lieu de `getModel()` ; log `Pre-warm inference done` à la fin
+- `my_memo_master_front/src/stores/testResults.js` — `submitTest` : `{ timeout: 90000 }`, aligné sur la correction Leitner
+- `my_memo_master_front/test/stores/testResults.store.test.js` — assertion mise à jour (3e argument timeout), 18/18 verts
+
+#### Vérifié
+- Redémarrage du conteneur API : `[SemanticService] Pre-warm inference done.` 9 s après le listen — le coût est payé au démarrage
+- 18/18 tests testResults, lint front + API verts ; front dev rebuildé (image nginx sans hot-reload)
+
+#### Dette / non couvert
+- L'inférence bloque toujours l'event loop pendant qu'elle tourne (quelques secondes par soumission sous limites CPU Docker) — un vrai découplage (worker thread ou file BullMQ) serait le correctif de fond si le volume augmente
+
+---
+
+### [2026-07-18] IMP — Correction sémantique en français : modèle multilingue + stopwords FR
+
+#### Contexte
+Suite du test utilisateur (paraphrase correcte d'Archimède → 0,61 → « Incorrect ») : bascule du modèle d'embedding vers une version multilingue. Voir DECISIONS.md pour la calibration et l'alternative mpnet écartée (OOM 512 Mo).
+
+#### Fichiers modifiés
+- `my_memo_master_api/services/Semantic.service.js` — modèle `Xenova/all-mpnet-base-v2` → `Xenova/paraphrase-multilingual-MiniLM-L12-v2` ; ~75 stopwords français ajoutés au départage de la zone grise ; seuils 0,78/0,55 conservés (validés par calibration sur 8 paires FR réelles en conteneur)
+- `B2_RENDU.md` — nom du modèle mis à jour dans la présentation
+
+#### Vérifié
+- Pre-warm OK après téléchargement (~120 Mo) ; le cas de la démo passe : paraphrase éloignée 0,806 → Correct ; réponse fausse même domaine rejetée en zone grise (stopwords FR effectifs)
+- 18/18 tests Semantic.service (le modèle est mocké), lint vert
+
+#### Dette / limites connues (calibration)
+- Inversions non détectées (« volume divisé par la masse » accepté à tort — limite des embeddings)
+- Réponse attendue en formule symbolique vs réponse en toutes lettres : similarité faible — fournir la formule comme réponse attendue
