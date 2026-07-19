@@ -10,7 +10,14 @@ export default defineConfig(({ mode }) => {
   return {
     base: process.env.BASE || '/',
     plugins: [
-      vue(),
+      vue({
+        template: {
+          compilerOptions: {
+            // <math-field> est le web component MathLive, pas un composant Vue
+            isCustomElement: (tag) => tag === 'math-field',
+          },
+        },
+      }),
       VitePWA({
         registerType: 'autoUpdate',
         workbox: {

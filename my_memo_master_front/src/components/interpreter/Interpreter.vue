@@ -1,64 +1,84 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="interpreter">
-    <label class="interpreter__toggle">
-      <input type="checkbox" v-model="showPalette" />
-      Afficher la palette
-    </label>
+    <!-- Zone rendue : éditeur principal (MathLive). Flèches = navigation entre
+         éléments et cellules de matrices, Tab = placeholder suivant. -->
+    <div>
+      <h2 class="interpreter__heading">Formule</h2>
+      <math-field
+        ref="mathfieldRef"
+        class="interpreter__mathfield"
+        math-virtual-keyboard-policy="manual"
+        aria-label="Éditeur de formule — utilisez les flèches pour naviguer entre les éléments"
+      ></math-field>
+      <p v-if="!mathliveReady" class="interpreter__hint">
+        Éditeur visuel indisponible — la zone brute ci-dessous reste utilisable.
+      </p>
+    </div>
 
-    <transition name="fade">
-      <div v-if="showPalette" class="interpreter__palette">
-        <h2>Symboles disponibles</h2>
-        <div class="palette__grid">
-          <button
-            v-for="item in paletteItems"
-            :key="item.label"
-            @click="appendToken(item)"
-          >
-            <span class="palette__token">{{ item.label }}</span>
-            <small>{{ item.description }}</small>
-          </button>
-        </div>
+    <!-- Palette à sections (diagrams/interpreteur_palette_v2.md §4) -->
+    <div class="interpreter__palette-v2">
+      <div class="interpreter__tabs" role="tablist" aria-label="Sections de symboles">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          :id="`interp-tab-${tab.key}`"
+          role="tab"
+          type="button"
+          :aria-selected="activeTab === tab.key"
+          :aria-controls="`interp-panel-${tab.key}`"
+          :tabindex="activeTab === tab.key ? 0 : -1"
+          :class="['interpreter__tab', { 'interpreter__tab--active': activeTab === tab.key }]"
+          @click="activeTab = tab.key"
+          @keydown.left.prevent="focusTab(-1)"
+          @keydown.right.prevent="focusTab(1)"
+        >
+          {{ tab.label }}
+        </button>
       </div>
-    </transition>
 
-    <div class="interpreter__toolbar">
-      <div class="interpreter__toolbar-group">
-        <h4>Opérateurs</h4>
-        <div class="interpreter__toolbar-grid">
-          <button
-            v-for="item in operatorButtons"
-            :key="item.label"
-            @click="appendToken(item)"
-          >
-            {{ item.label }}
-          </button>
-        </div>
-      </div>
-      <div class="interpreter__toolbar-group">
-        <h4>Ensembles</h4>
-        <div class="interpreter__toolbar-grid">
-          <button
-            v-for="item in setButtons"
-            :key="item.label"
-            @click="appendToken(item)"
-          >
-            {{ item.label }}
-          </button>
+      <div
+        v-for="tab in tabs"
+        v-show="activeTab === tab.key"
+        :key="tab.key"
+        :id="`interp-panel-${tab.key}`"
+        role="tabpanel"
+        :aria-labelledby="`interp-tab-${tab.key}`"
+        class="interpreter__panel"
+      >
+        <div v-for="group in tab.groups" :key="group.name" class="interpreter__group">
+          <p class="interpreter__group-name">{{ group.name }}</p>
+          <div class="interpreter__grid">
+            <button
+              v-for="item in group.items"
+              :key="item.aria"
+              type="button"
+              :aria-label="item.aria"
+              :title="item.aria"
+              :disabled="item.command && !mathliveReady"
+              class="interpreter__symbol"
+              @click="insertItem(item)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <h2>Zone de texte</h2>
-    <textarea aria-label="Saisir ou coller votre contenu mathématique"
-      ref="textareaRef"
-      v-model="userInput"
-      rows="6"
-      class="interpreter__textarea"
-      placeholder="Saisir ou coller votre contenu mathématique"
-    ></textarea>
+    <!-- Zone brute : mode expert (LaTeX ou raccourcis historiques over/sqrt/^) -->
+    <div>
+      <h2 class="interpreter__heading">Zone brute (mode expert)</h2>
+      <textarea aria-label="Saisir ou coller votre contenu mathématique"
+        ref="textareaRef"
+        v-model="userInput"
+        rows="3"
+        class="interpreter__textarea"
+        placeholder="LaTeX ou raccourcis : over(1, 2), sqrt(x), x^2…"
+      ></textarea>
+    </div>
 
-    <h3>Résultat</h3>
+    <h3 class="interpreter__heading">Résultat</h3>
     <div
       class="interpreter__preview"
       :style="{
@@ -67,10 +87,10 @@
       }"
       v-html="renderedContent"
     />
-    <div v-if="unitsError" style="margin-bottom:8px; padding:8px 12px; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:8px; font-weight:600;">
+    <div v-if="unitsError" class="interpreter__units-error">
       {{ unitsError }}
     </div>
-    <p style="margin-bottom:8px; font-size:12px; color:#64748b;">
+    <p class="interpreter__hint">
       Vérification d'homogénéité : déclarez l'unité d'une variable avec <code>P[Pa] = F[N] / S[m^2]</code> —
       sans déclaration, les formules symboliques ne sont pas jugées.
     </p>
@@ -81,9 +101,10 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch } from 'vue'
-import { renderMathMultiline } from './interpreter.js' // KaTeX bridge
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { renderMathMultiline, toLatex } from './interpreter.js'
 import { checkUnitHomogeneity } from './units.js'
+import { PALETTE_TABS } from './palette.js'
 
 const props = defineProps({
   modelValue: {
@@ -110,83 +131,14 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'apply'])
 
-/* --- Palette & boutons (inchangés / légères retouches utiles) --- */
-const formulaMapping = {
-  '√x': 'sqrt(__CARET__)',
-  'x²': '^',
-  'x/y': 'over(__CARET__, )',
-  'xₙ': '_',
-  'e^x': 'e^',
-  'ln(x)': 'ln(__CARET__)',
-  'ẋ': '̇',
-  'ẍ': '̈',
-  'x̅': '̅',
-  '→x': 'widevec(__CARET__)',
-  'ⁿ√x': 'nsqrt(__CARET__)',
-  '|x|': '|┤|',
-  '⌊x⌋': '⌊┤⌋',
-  '‖x‖': '‖┤‖',
-  '∅': '∅',
-  'ℕ': 'ℕ',
-  'ℤ': 'ℤ',
-  'ℚ': 'ℚ',
-  'ℝ': 'ℝ',
-  'ℂ': 'ℂ',
-  '∞': '∞',
-  '+': '+',
-  '-': '-',
-  '*': '*',
-  '/': '/',
-  '=': '=',
-  '≠': '≠',
-  '≈': '≈',
-  '≤': '≤',
-  '≥': '≥',
-}
-
-const extraPalette = [
-  { label: 'sqrt(…)',      insert: 'sqrt(__CARET__)',                description: 'Racine carrée' },
-  { label: 'nsqrt(n, …)',  insert: 'nsqrt(__CARET__)',               description: 'Racine n-ième', action: 'nsqrt' },
-  { label: 'over(a, b)',   insert: 'over(__CARET__, )',              description: 'Fraction' },
-  { label: 'widevec(…)',   insert: 'widevec(__CARET__)',             description: 'Vecteur' },
-  { label: 'matrix(a;b)',  insert: 'matrix(__CARET__)',              description: 'Matrice (a,b; c,d; …)' },
-  { label: 'mattrix([...])', insert: 'mattrix([__CARET__],[],[])',   description: 'Matrice 3×3' },
-  { label: '<text …>',     insert: '<text bold color:red>__CARET__</text>', description: 'Texte stylé' },
-]
-
-const paletteItems = [
-  ...Object.entries(formulaMapping)
-    .filter(([label, token]) => label && token && label !== token)
-    .map(([label, token]) => ({ label, insert: token, description: 'Insertion rapide' })),
-  ...extraPalette,
-]
-
-const operatorButtons = [
-  { label: '+', insert: '+' },
-  { label: '-', insert: '-' },
-  { label: '±', insert: '±' },
-  { label: '*', insert: '*' },
-  { label: '/', insert: '/' },
-  { label: '=', insert: '=' },
-  { label: '≠', insert: '≠' },
-  { label: '≈', insert: '≈' },
-  { label: '≤', insert: '≤' },
-  { label: '≥', insert: '≥' },
-]
-
-const setButtons = [
-  { label: 'ℕ', insert: 'ℕ' },
-  { label: 'ℤ', insert: 'ℤ' },
-  { label: 'ℚ', insert: 'ℚ' },
-  { label: 'ℝ', insert: 'ℝ' },
-  { label: 'ℂ', insert: 'ℂ' },
-  { label: '∅', insert: '∅' },
-]
+const tabs = PALETTE_TABS
+const activeTab = ref('carac')
 
 /* --- État & rendu --- */
-const showPalette = ref(false)
 const userInput = ref(props.modelValue || '')
 const textareaRef = ref(null)
+const mathfieldRef = ref(null)
+const mathliveReady = ref(false)
 
 watch(
   () => props.modelValue,
@@ -198,46 +150,89 @@ watch(
   }
 )
 
-watch(
-  userInput,
-  (value) => {
-    emit('update:modelValue', value)
-  }
-)
+watch(userInput, (value) => {
+  emit('update:modelValue', value)
+  syncMathfieldFromRaw(value)
+})
 
-// KaTeX: rendu HTML (computed -> auto-refresh)
-const unitsError = computed(() => checkUnitHomogeneity(userInput.value)) 
+// Le chargement est différé (l'éditeur n'est monté que dans la modale/palette) et
+// toléré en échec : sans MathLive (jsdom des tests, vieux navigateur), la zone
+// brute + l'aperçu KaTeX restent pleinement fonctionnels.
+onMounted(async () => {
+  try {
+    const { MathfieldElement } = await import('mathlive')
+    await import('mathlive/fonts.css')
+    MathfieldElement.soundsDirectory = null
+    MathfieldElement.fontsDirectory = null
+    const mf = mathfieldRef.value
+    if (!mf || typeof mf.getValue !== 'function') return
+    mf.addEventListener('input', () => {
+      // L'édition WYSIWYG fait foi : la zone brute suit en LaTeX (aller simple
+      // documenté — on ne reconvertit pas vers les raccourcis historiques)
+      const latex = mf.getValue('latex')
+      if (latex !== userInput.value && toLatex(userInput.value) !== latex) {
+        userInput.value = latex
+      }
+    })
+    mathliveReady.value = true
+    syncMathfieldFromRaw(userInput.value)
+  } catch {
+    mathliveReady.value = false
+  }
+})
+
+const syncMathfieldFromRaw = (value) => {
+  const mf = mathfieldRef.value
+  if (!mathliveReady.value || !mf) return
+  const latex = toLatex(value ?? '')
+  if (mf.getValue('latex') !== latex) {
+    mf.setValue(latex, { silenceNotifications: true })
+  }
+}
+
+// Le vérificateur convertit le LaTeX de l'éditeur en syntaxe plate (latexToPlain)
+// et s'abstient sur ce qu'il ne sait pas juger (variables sans annotation Var[unité])
+const unitsError = computed(() => checkUnitHomogeneity(userInput.value))
 const renderedContent = computed(() => renderMathMultiline(userInput.value))
 
-/* --- Insertion depuis la palette/toolbar --- */
-const appendToken = (item) => {
+/* --- Insertion depuis la palette --- */
+const insertItem = (item) => {
+  const mf = mathfieldRef.value
+  if (item.command) {
+    if (!mathliveReady.value || !mf) return
+    for (let i = 0; i < (item.repeat || 1); i++) mf.executeCommand(item.command)
+    userInput.value = mf.getValue('latex')
+    mf.focus()
+    return
+  }
+  if (mathliveReady.value && mf) {
+    mf.insert(item.latex, { focus: true })
+    userInput.value = mf.getValue('latex')
+    return
+  }
+  insertInTextarea(item.latex.replace(/\\placeholder\{\}/g, ''))
+}
+
+// Repli sans MathLive : insertion à la position du curseur de la zone brute
+const insertInTextarea = (token) => {
   const textarea = textareaRef.value
   if (!textarea) return
-
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
   const current = userInput.value
-
-  const tokenMeta = typeof item === 'string' ? { insert: item } : item
-  let token = tokenMeta.insert || ''
-
-  if (tokenMeta.action === 'nsqrt') {
-    const nValue = window.prompt('Valeur de n pour la racine ?', '2') || '2'
-    token = `nsqrt(${nValue}, __CARET__)`
-  }
-
-  let caretIndex = null
-  if (token.includes('__CARET__')) {
-    caretIndex = token.indexOf('__CARET__')
-    token = token.replace('__CARET__', '')
-  }
-
   userInput.value = `${current.slice(0, start)}${token}${current.slice(end)}`
   nextTick(() => {
     textarea.focus()
-    const cursor = caretIndex !== null ? start + caretIndex : start + token.length
+    const cursor = start + token.length
     textarea.setSelectionRange(cursor, cursor)
   })
+}
+
+const focusTab = (delta) => {
+  const index = tabs.findIndex((t) => t.key === activeTab.value)
+  const next = tabs[(index + delta + tabs.length) % tabs.length]
+  activeTab.value = next.key
+  nextTick(() => document.getElementById(`interp-tab-${next.key}`)?.focus())
 }
 
 const apply = () => {
@@ -256,64 +251,139 @@ const apply = () => {
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
 }
 
-.interpreter__toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
+.interpreter__heading {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
   color: #0f172a;
 }
 
-.interpreter__palette {
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 16px;
-  background: #f8fafc;
+.interpreter__mathfield {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #cbd5f5;
+  background: #f9fafb;
+  font-size: 20px;
+}
+.interpreter__mathfield:focus-within {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+/* La palette à onglets remplace le clavier virtuel et le menu MathLive */
+.interpreter__mathfield::part(virtual-keyboard-toggle),
+.interpreter__mathfield::part(menu-toggle) {
+  display: none;
 }
 
-.palette__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+.interpreter__palette-v2 {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.interpreter__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f1f5f9;
+}
+
+.interpreter__tab {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.interpreter__tab--active {
+  background: #f8fafc;
+  color: #1d4ed8;
+  box-shadow: inset 0 2px 0 #2563eb;
+}
+.interpreter__tab:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.interpreter__panel {
+  padding: 12px 16px 16px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.interpreter__group + .interpreter__group {
   margin-top: 12px;
 }
 
-.palette__grid button {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  background: #e0f2fe;
-  color: #0f172a;
-  font-weight: 600;
-  transition: transform 0.2s ease, background 0.2s ease;
+.interpreter__group-name {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
 }
-.palette__grid button:hover { background: #bfdbfe; transform: translateY(-1px); }
 
-.interpreter__toolbar { display: flex; flex-direction: column; gap: 16px; }
-.interpreter__toolbar-group h4 {
-  margin-bottom: 8px; font-size: 14px; font-weight: 600; color: #0f172a;
+.interpreter__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
-.interpreter__toolbar-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px;
+
+.interpreter__symbol {
+  min-width: 42px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid #cbd5f5;
+  background: #ffffff;
+  color: #1d4ed8;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
-.interpreter__toolbar-grid button {
-  padding: 6px 0; border-radius: 10px; border: 1px solid #cbd5f5; background: #f1f5f9;
-  color: #0f172a; cursor: pointer; font-weight: 600;
+.interpreter__symbol:hover:not(:disabled) { background: #dbeafe; }
+.interpreter__symbol:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
-.interpreter__toolbar-grid button:hover { background: #dbeafe; }
+.interpreter__symbol:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .interpreter__textarea {
-  width: 100%; min-height: 140px; padding: 12px; border-radius: 12px; border: 1px solid #cbd5f5;
+  width: 100%; min-height: 72px; padding: 12px; border-radius: 12px; border: 1px solid #cbd5f5;
   font-size: 14px; font-family: 'Fira Code', monospace; background: #f9fafb; color: #0f172a;
 }
 
 .interpreter__preview {
-  min-height: 120px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;
+  min-height: 80px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;
   background: #ffffff; font-size: 16px; color: #0f172a;
+}
+
+.interpreter__units-error {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.interpreter__hint {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .interpreter__actions {
@@ -337,7 +407,4 @@ const apply = () => {
   background: #1d4ed8;
   transform: translateY(-1px);
 }
-
-.fade-enter-active,.fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from,.fade-leave-to { opacity: 0; }
 </style>

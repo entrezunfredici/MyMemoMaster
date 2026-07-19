@@ -267,17 +267,53 @@ function normalizeFunctionalForms(txt) {
     return String(txt ?? '').replace(/\b(?:frac|over)\(\s*([^,()]+?)\s*,\s*([^()]+?)\s*\)/gi, '($1)/($2)');
 }
 
+// LaTeX (éditeur V2 MathLive) -> syntaxe plate comprise par le tokenizer.
+// Le LaTeX écrit la multiplication implicitement (\frac{1}{2}mv) : on insère les
+// « * » manquants — uniquement dans cette passe, pour ne pas changer la
+// sémantique des saisies V1.
+function latexToPlain(txt) {
+    let s = String(txt ?? '');
+    if (!s.includes('\\')) return s;
+    let prev;
+    s = s
+        .replace(/\\placeholder\{([^{}]*)\}/g, '$1')
+        .replace(/\\left|\\right/g, '')
+        .replace(/\\lbrack/g, '[')
+        .replace(/\\rbrack/g, ']')
+        .replace(/\\[,;!:]/g, ' ')
+        .replace(/\\cdot|\\times/g, '*')
+        .replace(/\\[dt]frac/g, '\\frac');
+    do {
+        prev = s;
+        s = s
+            .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '(($1)/($2))')
+            .replace(/\\sqrt\{([^{}]*)\}/g, 'sqrt($1)')
+            .replace(/\\(ln|log|exp|cos|sin|tan|vec|overrightarrow|overline|tilde|hat|dot|ddot|text|mathrm)\{([^{}]*)\}/g, '$1($2)');
+    } while (s !== prev);
+    s = s
+        .replace(/\^\{(-?\d+)\}/g, '^$1')     // v^{2} -> v^2 (forme attendue du tokenizer)
+        .replace(/([\^_])\{([^{}]*)\}/g, '$1($2)');
+    // Multiplication implicite : ")x", ")(", "]x", "2(" , "x(" -> insérer *
+    s = s
+        .replace(/\)\s*(?=[a-zA-Z0-9(])/g, ')*')
+        .replace(/\]\s*(?=[a-zA-Z0-9(])/g, ']*')
+        .replace(/([a-zA-Z0-9])\s*\(/g, '$1*(');
+    // "sqrt*(" recréé par la règle ci-dessus : rétablir les appels de fonctions
+    s = s.replace(/\b(sqrt|nsqrt|ln|log|exp|cos|sin|tan|vec|widevec|overrightarrow|overline|tilde|hat|dot|ddot|text|mathrm|matrix|mattrix)\*\(/gi, '$1(');
+    return s;
+}
+
 // Supprime tout ce qui n’est pas utile aux unités (fonctions, <text>, etc.)
 export function sanitizeForUnits(text) {
-    const t = normalizeFunctionalForms(text);
+    const t = normalizeFunctionalForms(latexToPlain(text));
     return String(t ?? '')
         .replace(/<text[^>]*>[\s\S]*?<\/text>/gi, ' ')
-        .replace(/\b(?:sqrt|nsqrt|ln|vec|widevec|matrix|mattrix|hat|overline)\s*\((?:[^()]|\([^()]*\))*\)/gi, ' ')
+        .replace(/\b(?:sqrt|nsqrt|ln|log|exp|cos|sin|tan|vec|widevec|overrightarrow|overline|tilde|hat|dot|ddot|text|mathrm|matrix|mattrix)\s*\((?:[^()]|\([^()]*\))*\)/gi, ' ')
         // Annotation d'unité sur une variable : « P[Pa] » → la variable prend la
         // dimension déclarée, seul moyen fiable de vérifier une formule symbolique
         .replace(/([a-zA-Z][a-zA-Z0-9]*)\s*\[\s*([^\][]+?)\s*\]/g, '($2)')
         .replace(/[{}]/g, ' ')
-        .replace(/\\[a-zA-Z]+/g, ' ');  // éventuelles commandes latex accidentelles
+        .replace(/\\[a-zA-Z]+/g, ' ');  // commandes latex restantes (grec, matrices…) -> ignorées
 }
 
 export function checkUnitHomogeneity(expression) {

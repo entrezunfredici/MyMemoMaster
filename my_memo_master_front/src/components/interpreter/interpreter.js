@@ -9,7 +9,10 @@ const SUPERSCRIPTS = {
   '\u207B': '-'
 }
 
-// Convertit tes raccourcis en LaTeX
+// Convertit tes raccourcis en LaTeX.
+// Idempotent sur du LaTeX : les lookbehind (?<!\\) empêchent de re-transformer
+// les commandes LaTeX (\ln(, \infty…) — depuis l'éditeur V2 (MathLive), la zone
+// brute et le contenu stocké peuvent contenir du LaTeX qui repasse par ici.
 export function toLatex(src) {
   let s = String(src ?? '').trim()
 
@@ -27,38 +30,38 @@ export function toLatex(src) {
     .replace(/>=/g, '\\ge ')
     .replace(/<=/g, '\\le ')
     .replace(/∞/g, '\\infty')
-    .replace(/\b(infty)\b/gi, '\\infty')
+    .replace(/(?<!\\)\b(infty)\b/gi, '\\infty')
 
   // abs(x) -> |x|
-  s = s.replace(/\babs\(([^()]*)\)/g, '\\left|$1\\right|')
+  s = s.replace(/(?<!\\)\babs\(([^()]*)\)/g, '\\left|$1\\right|')
 
   // vec(A) / widevec(A)
   s = s
-    .replace(/\bvec\(([^()]*)\)/g, '\\vec{$1}')
-    .replace(/\bwidevec\(([^()]*)\)/g, '\\overrightarrow{$1}')
+    .replace(/(?<!\\)\bvec\(([^()]*)\)/g, '\\vec{$1}')
+    .replace(/(?<!\\)\bwidevec\(([^()]*)\)/g, '\\overrightarrow{$1}')
 
   // sqrt(x) + nsqrt(n,x)
   s = s
-    .replace(/\bsqrt\(([^()]*)\)/g, '\\sqrt{$1}')
-    .replace(/\bnsqrt\(([^,]+),\s*([^()]+)\)/g, '\\sqrt[$1]{$2}')
+    .replace(/(?<!\\)\bsqrt\(([^()]*)\)/g, '\\sqrt{$1}')
+    .replace(/(?<!\\)\bnsqrt\(([^,]+),\s*([^()]+)\)/g, '\\sqrt[$1]{$2}')
 
   // over — syntaxe canonique de la fraction ; frac reste interprété pour le
   // contenu historique mais n'est plus proposé ni accepté à la saisie
   // (normalizeFormulaSyntax le réécrit en over)
   s = s
-    .replace(/\bfrac\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
-    .replace(/\bover\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
+    .replace(/(?<!\\)\bfrac\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
+    .replace(/(?<!\\)\bover\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
 
   // ln(x)
-  s = s.replace(/\bln\(([^()]*)\)/g, '\\ln\\left($1\\right)')
+  s = s.replace(/(?<!\\)\bln\(([^()]*)\)/g, '\\ln\\left($1\\right)')
 
   // overline/hat
   s = s
-    .replace(/\boverline\(([^()]*)\)/g, '\\overline{$1}')
-    .replace(/\bhat\(([^()]*)\)/g, '\\hat{$1}')
+    .replace(/(?<!\\)\boverline\(([^()]*)\)/g, '\\overline{$1}')
+    .replace(/(?<!\\)\bhat\(([^()]*)\)/g, '\\hat{$1}')
 
   // matrix(1,2;3,4) -> bmatrix
-  s = s.replace(/\bmat(?:rix)?\(([^()]*)\)/g, (_, inside) => {
+  s = s.replace(/(?<!\\)\bmat(?:rix)?\(([^()]*)\)/g, (_, inside) => {
     const rows = inside
       .split(';')
       .map(r => r.split(',').map(e => e.trim()).join(' & '))
@@ -99,9 +102,13 @@ export function toLatex(src) {
 }
 
 // Rend en HTML KaTeX (mode bloc par défaut)
+// output explicite : le MathML parallèle est requis pour les lecteurs d'écran (RGAA),
+// il ne doit pas dépendre du défaut de KaTeX.
 export function renderMath(input, { displayMode = true } = {}) {
-  const latex = toLatex(input)
-  return katex.renderToString(latex, { throwOnError: false, displayMode })
+  // \placeholder{} est une commande MathLive (trous de l'éditeur V2), inconnue de
+  // KaTeX : un trou rempli rend son contenu, un trou vide rend un carré
+  const latex = toLatex(input).replace(/\\placeholder\{([^{}]*)\}/g, (_, content) => content || '\\square')
+  return katex.renderToString(latex, { throwOnError: false, displayMode, output: 'htmlAndMathml' })
 }
 
 // Entrée multi-lignes -> plusieurs blocs KaTeX empilés

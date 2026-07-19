@@ -70,6 +70,36 @@ describe('checkUnitHomogeneity', () => {
   it('F + 3 m - somme avec variable indéterminée - aucune erreur', () => {
     expect(checkUnitHomogeneity('F + 3 m')).toBeNull()
   })
+
+  // ── LaTeX (éditeur V2 MathLive) : converti puis vérifié comme la syntaxe V1 ──
+
+  it('LaTeX homogène avec annotations et multiplication implicite - aucune erreur', () => {
+    expect(checkUnitHomogeneity('E[J] = \\frac{1}{2}m[kg]c[m^2/s^2]')).toBeNull()
+  })
+
+  it('LaTeX non homogène avec annotations - erreur signalée', () => {
+    const err = checkUnitHomogeneity('E[J] = \\frac{1}{2}m[kg]v[m/s]')
+    expect(err).toContain('homogénéité')
+  })
+
+  it('LaTeX symbolique sans annotation - abstention, aucune erreur', () => {
+    expect(checkUnitHomogeneity('\\frac{P}{S}')).toBeNull()
+    expect(checkUnitHomogeneity('E = \\frac{1}{2}mv^{2}')).toBeNull()
+  })
+
+  it('LaTeX avec annotations \\lbrack…\\rbrack (sérialisation MathLive) - vérifié', () => {
+    expect(checkUnitHomogeneity('P\\lbrack Pa\\rbrack = \\frac{F\\lbrack N\\rbrack}{S\\lbrack m^2\\rbrack}')).toBeNull()
+  })
+
+  it('LaTeX addition non homogène (espaces \\, ) - erreur signalée', () => {
+    const err = checkUnitHomogeneity('3\\,m + 2\\,s')
+    expect(err).toContain('Addition non homogène')
+  })
+
+  it('LaTeX hors périmètre (matrice, grec) - abstention, aucune erreur', () => {
+    expect(checkUnitHomogeneity('\\begin{pmatrix}1 & 2\\end{pmatrix}')).toBeNull()
+    expect(checkUnitHomogeneity('\\alpha + \\beta')).toBeNull()
+  })
 })
 
 describe('sanitizeForUnits', () => {

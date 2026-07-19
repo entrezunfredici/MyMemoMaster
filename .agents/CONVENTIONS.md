@@ -196,7 +196,7 @@ router.get("/", authMiddleware, entity.findAll);
 | Queue/jobs asynchrones | bullmq + ioredis |
 | HTTP client front | axios |
 | Notifications front | vue-toastification |
-| Math front | katex (seul — MathJax écarté, voir DECISIONS 2026-07-19) |
+| Math front | katex (rendu lecture seule — MathJax écarté) + mathlive (éditeur WYSIWYG, chargé lazy — voir DECISIONS 2026-07-19) |
 | Graphiques front | chart.js + vue-chartjs |
 | Visite guidée front (onboarding) | driver.js (MIT) |
 | Accessibilité (tests front) | axe-core (dev) |

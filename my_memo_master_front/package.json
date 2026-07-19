@@ -22,6 +22,7 @@
     "jsdom": "^25.0.1",
     "katex": "^0.16.23",
     "lodash": "^4.17.21",
+    "mathlive": "^0.110.0",
     "pinia": "^2.3.1",
     "pinia-plugin-persistedstate": "^3.2.1",
     "serve": "^14.2.4",

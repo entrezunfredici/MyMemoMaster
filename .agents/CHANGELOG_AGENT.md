@@ -30,9 +30,12 @@
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-07-08 |
 | LeitnerSystemsUsers | Stable | init |
-| Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API | 2026-07-14 |
+| Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API ; sortie MathML explicite pour lecteurs d'écran (2026-07-19) | 2026-07-19 |
 | Librairie de rendu formules (S-06.01) | Clôturé — benchmark MathJax/KaTeX formalisé dans DECISIONS (2026-07-19) : KaTeX seul retenu ; dépendance `mathjax` et helper mort `mathjax-config.js` supprimés, CONVENTIONS corrigé | 2026-07-19 |
 | Maquettes UI éditeur formules (S-06.02) | Clôturé — écran « Interpréteur de formules » ajouté au prototype interactif (15 écrans) : éditeur + palette de symboles + aperçu + badge homogénéité ; 17 captures régénérées (dont 17-interpreteur.png) | 2026-07-19 |
+| Interpréteur V2 — conception (analyse) | Livré — diagrams/interpreteur_palette_v2.md : éditeur WYSIWYG (zone rendue éditable, flèches, matrices), palette à onglets (inventaire complet des 8 planches utilisateur → LaTeX + a11y), MathLive recommandé, stockage LaTeX canonique dans `$…$` (texte conservé, pas de JSON), adaptation normalizeSymbolic, plan en 6 lots | 2026-07-19 |
+| Interpréteur V2 — éditeur (Lots 0-3) | Livré — MathLive 0.110 (lazy, chunk séparé 228 Ko gzip) : zone rendue éditable + zone brute expert (source de vérité v-model, contrat FormulaHelper/mindmap inchangé) + palette 4 onglets/117 boutons (palette.js) ; toLatex idempotent sur LaTeX ; \placeholder{} → □ au rendu KaTeX ; POC vérifié en navigateur réel (CDP) | 2026-07-19 |
+| Interpréteur V2 — dette (Lots 4-5) | Livré — correction `exact` : normalizeSymbolic fait converger V1/LaTeX/texte libre (migration de données abandonnée, normalisation des 2 côtés — voir DECISIONS) ; homogénéité des unités opérationnelle sur LaTeX (latexToPlain, gate levé) ; prototype : palette à onglets + capture 17 régénérée | 2026-07-19 |
 | Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
@@ -6058,3 +6061,106 @@ La tâche S-06.02 (« Maquettes UI éditeur de formules », V1, US-24) n'avait a
 #### Dette / non couvert
 - L'aperçu du prototype est statique (formule d'exemple rendue en CSS) — pas de parsing réel dans la maquette, assumé (même niveau de simplification que l'éditeur mindmap du prototype).
 - Les captures 01/02 pèsent ~400 Ko (fond dégradé plein écran) — poids acceptable, inchangé par rapport à l'existant.
+
+---
+
+### [2026-07-19] IMP — Sortie MathML explicite dans le rendu KaTeX (accessibilité lecteurs d'écran)
+
+#### Contexte
+Piste accessibilité issue de la clôture S-06 : garantir que chaque formule rendue embarque un arbre MathML parallèle, lisible par les lecteurs d'écran (RGAA). Constat : KaTeX 0.16 émet déjà le MathML **par défaut** (`output: 'htmlAndMathml'`) — la sortie était donc active mais implicite, non garantie contre un changement de défaut de la librairie et non couverte par les tests.
+
+#### Fichiers modifiés
+- `my_memo_master_front/src/components/interpreter/interpreter.js` — `renderMath` passe `output: 'htmlAndMathml'` explicitement à `katex.renderToString` (unique point d'appel KaTeX du projet : tous les rendus — interpréteur, mindmaps, FormulaText inline — en héritent)
+- `my_memo_master_front/test/helpers/interpreterLatex.test.js` — +3 tests : MathML présent en rendu bloc, en rendu inline, et dans les segments `$…$` d'un texte mixte (`renderInlineMath`)
+
+#### Ce qui est utilisable
+- Toute formule rendue contient `<math xmlns="…/MathML">` masqué visuellement, annoncé par les lecteurs d'écran
+- Vérifié : 656/656 tests front verts, lint vert
+
+#### Dette / non couvert
+- L'accessibilité avancée des formules (exploration pas-à-pas, menu contextuel, zoom — apanage de MathJax) reste hors périmètre — condition de réouverture documentée dans DECISIONS (2026-07-19)
+
+---
+
+### [2026-07-19] ADD — Conception Interpréteur V2 : éditeur WYSIWYG + palette à sections (analyse)
+
+#### Contexte
+Vision utilisateur pour la V2 du système de formules (« aussi complet que Word, simple à utiliser ») : la zone rendue devient éditable (écriture dans le rendu, déplacement aux flèches entre éléments et dans les matrices), la zone brute devient le mode expert, la palette passe en sections à onglets. L'utilisateur a fourni 8 planches de boutons (grec min/maj, chiffres & ensembles ℕℤℚℝℂ𝕂, structures ẋ/fraction/√/délimiteurs, opérateurs/logique, ensembles/intégrales/flèches, matrices +1C/+1L) et délégué les arbitrages stockage + correction sémantique.
+
+#### Fichiers créés
+- `diagrams/interpreteur_palette_v2.md` — document de conception complet : modèle d'édition (maquette ASCII, placeholders `□` navigables au Tab), benchmark librairies (**MathLive recommandé** vs MathQuill vs from scratch — tableau critères ; KaTeX conservé pour l'affichage lecture seule), inventaire des 4 onglets de palette avec mapping bouton → LaTeX → libellé a11y, **décision de stockage recommandée** (LaTeX canonique dans les `$…$` existants, conteneur texte conservé, pas de JSON — justification en 5 points, migration one-shot via `toLatex` existant), adaptation de `normalizeSymbolic` pour l'égalité `exact` sur LaTeX (aliases `\frac`/`\tfrac`, `\left`/`\right`, accolades…), points d'intégration front, accessibilité (tablist, aria-labels par symbole, lecture vocale MathLive), cas limites, plan en 6 lots, questions ouvertes (glyphes ambigus des planches à confirmer)
+
+#### Ce qui est utilisable
+- Base de travail complète pour démarrer le Lot 0 (POC MathLive) quand la V2 sera lancée ; l'utilisateur peut itérer sur le document pendant sa réflexion UI
+
+#### Hypothèses posées
+- Interprétation de glyphes ambigus des planches marquée « à confirmer » (§11) plutôt que devinée silencieusement
+- Chantier V2 (« éditeur scientifique complet » OUT V1) — aucune implémentation dans ce ticket, décisions à acter dans DECISIONS.md au Lot 0
+
+#### Dette / non couvert
+- Équivalences mathématiques profondes (a/b vs a·b⁻¹) hors normalisation textuelle — piste AST documentée §6, parade multi-réponses existante
+
+#### Mise à jour (même jour)
+- L'utilisateur a fourni `operateurs.md` (racine) : liste tapée des caractères opérateurs/ensembles — intégrée au §4 (ambiguïtés levées : ⊛ confirmé, ⋋/⋌ = produits semi-directs, ∧/⋀ confirmés, ⟺/⟼ formes longues, ⨁→`\oplus`) + nouveau bloc « Intégrales — gabarits à placeholders » (∫ ∫ₐᵇ ∬ ∭ ∮ ∯ : gabarits complets bornes→intégrande→différentielle parcourus au Tab, différentielle en `\mathrm{d}`) ; questions ouvertes §11 réduites aux glyphes de la planche formules. Second passage : doublon ℝ corrigé par l'utilisateur (𝕂 maintenu), miroirs validés et intégrés (∨ `\lor`, ⋁ `\bigvee`, ↘ `\searrow`, ↙ `\swarrow`)
+
+---
+
+### [2026-07-19] ADD — Interpréteur V2, Lots 0-3 : éditeur WYSIWYG MathLive + palette à sections
+
+#### Contexte
+Implémentation de la conception `diagrams/interpreteur_palette_v2.md` (Lots 0 à 3), demandée par l'utilisateur. Voir la décision structurante du même jour dans DECISIONS.md (MathLive, zone brute source de vérité, aller simple raccourcis→LaTeX).
+
+#### Fichiers créés
+- `my_memo_master_front/src/components/interpreter/palette.js` — définition de la palette : 4 onglets (`carac`, `form`, `operateurs`, `mat`), 117 boutons avec label / LaTeX (gabarits `\placeholder{}`) / `aria-label` français, générés depuis le doc de conception (grec complet, ensembles ℕℤℚℝℂ𝕂, structures, 6 gabarits d'intégrales, opérateurs d'`operateurs.md` + miroirs ∨⋁↘↙, matrices + commandes +1/2/3C/L)
+
+#### Fichiers modifiés
+- `src/components/interpreter/Interpreter.vue` — refonte : `<math-field>` MathLive en zone rendue éditable (flèches entre éléments/cellules, Tab entre placeholders), zone brute conservée en mode expert (accepte LaTeX + raccourcis V1, source de vérité du v-model — contrat parents inchangé), palette à onglets accessibles (tablist/tab/tabpanel, flèches gauche/droite, aria-labels, boutons commandes désactivés sans MathLive), aperçu KaTeX conservé (= rendu lecture seule réel), chargement MathLive lazy + repli fonctionnel sans lui, toggles clavier/menu MathLive masqués
+- `src/components/interpreter/interpreter.js` — `toLatex` idempotent sur LaTeX (lookbehind `(?<!\\)` sur infty/abs/vec/widevec/sqrt/nsqrt/frac/over/ln/overline/hat/matrix) ; `renderMath` convertit `\placeholder{}` (vide → `\square`, rempli → contenu) avant KaTeX
+- `vite.config.js` / `vitest.config.js` — `math-field` déclaré custom element
+- `package.json` / `package-lock.json` — + `mathlive@0.110` (MIT)
+
+#### Ce qui est utilisable
+- Éditeur complet partout où `Interpreter.vue` est monté (modale ƒ des flashcards/exercices, palette mindmap, accueil) : écriture dans le rendu, palette par sections, matrices éditables (+C/+L), zone brute expert synchronisée en LaTeX
+- Vérifié en **navigateur réel** (Edge headless piloté CDP sur harnais Vite) : `over(1, 2) + sqrt(x)` tapé en zone brute → `\frac{1}{2} + \sqrt{x}` dans l'éditeur ; bouton fraction → `\frac{\placeholder{}}{\placeholder{}}` inséré et zone brute synchronisée ; pmatrix + commande +1C → colonne ajoutée ; aperçu KaTeX sans erreur ; console propre
+- Vérifié : build Vite OK (MathLive en chunk lazy séparé, 228 Ko gzip, jamais chargé hors éditeur), suite front verte, lint vert
+
+#### Hypothèses posées
+- Sans MathLive (jsdom des tests, navigateur ancien), l'interpréteur reste fonctionnel en mode V1 (zone brute + aperçu) — les suites de tests existantes passent sans stub
+- L'édition WYSIWYG réécrit la zone brute en LaTeX (aller simple) — un utilisateur qui avait tapé des raccourcis les voit convertis dès qu'il touche à l'éditeur visuel
+
+#### Dette / non couvert
+- **Lot 4 non livré** : stockage LaTeX canonique (migration du contenu V1) + extension `normalizeSymbolic` côté API — les formules V2 stockées contiennent du LaTeX que la correction `exact` ne normalise pas encore face à du contenu V1 → **soldé le jour même, voir entrée Lots 4-5 ci-dessous**
+- **Lot 5 non livré** : vérificateur d'homogénéité inopérant sur LaTeX (il s'abstient — gate `\\`), prototype/captures non mis à jour avec la palette à onglets → **soldé le jour même, voir entrée Lots 4-5 ci-dessous**
+- Boutons +C/+L actifs même hors matrice (no-op sûr) — l'API publique MathLive n'expose pas la position « dans une matrice » ; à réévaluer à une montée de version
+- Glyphes non résolus de la planche formules (2ᵉ « T », « 𝔻 », flèche blanche) toujours absents de la palette
+
+---
+
+### [2026-07-19] IMP — Interpréteur V2, Lots 4-5 : la dette des Lots 0-3 est soldée
+
+#### Contexte
+Demande utilisateur : corriger la dette documentée à la livraison de l'éditeur V2. Décision structurante associée dans DECISIONS.md (« Lots 4-5 » du 2026-07-19) : **pas de migration de données** — la correction normalise les deux côtés de la comparaison, le corpus mixte V1/LaTeX devient inoffensif.
+
+#### Fichiers modifiés — API (Lot 4)
+- `my_memo_master_api/services/Semantic.service.js` — `normalizeSymbolic` étendu : raccourcis V1 (`over`/`frac`/`abs`), LaTeX MathLive (fractions/racines/fonctions itératives pour l'imbrication, `\left`/`\right`, `\placeholder{}`, `\lbrack`, espaces `\,`), matrices (`\begin{pmatrix}…` → `pmatrix(a,b;c,d)`, délimiteurs distincts), grec LaTeX↔Unicode, ensembles (`\mathbb{R}` ≡ `ℝ`), exposants (`x²` ≡ `x^{2}` ≡ `x^2`), relations (`\le`, `≤` → `<=`), parenthèses redondantes — et **suppression de la multiplication explicite** de la forme canonique (`r*i` ≡ `ri`, seul moyen de faire matcher la multiplication implicite du LaTeX)
+- `my_memo_master_api/test/services/Semantic.service.test.js` — test historique adapté à la nouvelle forme canonique (`u=ri`) + 7 tests de convergence (fraction V1≡V2, formule physique complète, exposants ×3 formes, racines/abs, grec/ensembles, placeholders, matrices avec délimiteurs distincts) — **34/34 verts**
+
+#### Fichiers modifiés — front (Lot 5)
+- `src/components/interpreter/units.js` — nouvelle passe `latexToPlain` (appliquée uniquement si l'entrée contient un backslash — la sémantique V1 est intacte) : fractions → `(a)/(b)`, `^{n}` → `^n`, annotations `\lbrack…\rbrack` → `[…]`, **insertion des multiplications implicites** (`)x`, `]x`, `x(`) ; liste des fonctions ignorées élargie (cos/sin/tan/log/exp/tilde/dot…)
+- `src/components/interpreter/Interpreter.vue` — gate d'abstention `\\` supprimé : l'homogénéité est vérifiée sur le LaTeX de l'éditeur (abstention conservée pour ce qui reste injugeable : matrices, grec, variables sans annotation)
+- `test/helpers/units.test.js` — +6 tests LaTeX (homogène avec multiplication implicite, non-homogène, symbolique → abstention, annotations `\lbrack`, espaces `\,`, hors périmètre → abstention) — **22/22 verts**
+- `docs/prototype/MyMemoMaster - Standalone.html` — écran interpréteur : palette à onglets (Caractères/Formules/Opérateurs/Matrices) alignée sur l'app ; `docs/prototype/captures/17-interpreteur.png` régénérée ; README mis à jour
+- `diagrams/interpreteur_palette_v2.md` — statut « implémenté », écarts documentés, §5 annoté (migration abandonnée)
+
+#### Ce qui est utilisable
+- Une réponse tapée dans l'éditeur V2 (`\frac{1}{2}mv^{2}`) matche en `exact` une réponse attendue V1 (`over(1, 2) * m * v^2`) et réciproquement
+- La vérification d'homogénéité fonctionne dans l'éditeur V2 : `E[J] = \frac{1}{2}m[kg]c[m^2/s^2]` est jugée, les formules sans annotation restent abstenues
+- Vérifié : front 675/675, API Semantic 34/34, lint verts
+
+#### Leçon d'outillage (session)
+- Le prototype standalone monte React **après** l'affichage du template brut : tout script d'automatisation doit attendre `sc-if` disparus avant d'interagir (les sélecteurs matchent aussi le template brut — faux positifs silencieux)
+
+#### Dette / non couvert
+- Équivalences mathématiques profondes (`a/b` ≡ `a·b⁻¹`, commutativité) : toujours hors périmètre (AST — voir DECISIONS), parade multi-réponses en place
+- Collision théorique de la forme canonique sans `*` (`2*3` ≡ `23`) — assumée, documentée dans DECISIONS
+- +C/+L hors matrice et glyphes « T »/« 𝔻 »/flèche blanche : inchangés (voir entrée précédente)

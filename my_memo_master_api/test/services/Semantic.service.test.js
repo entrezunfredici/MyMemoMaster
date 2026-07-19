@@ -194,11 +194,54 @@ describe('SemanticService', () => {
 
   describe('normalizeSymbolic', () => {
     it('unifie casse, espaces, opérateurs et délimiteurs KaTeX', () => {
-      expect(SemanticService.normalizeSymbolic('U = R × I')).toBe('u=r*i')
-      expect(SemanticService.normalizeSymbolic('$p = F \\cdot S$')).toBe('p=f*s')
+      // La multiplication explicite est supprimée de la forme canonique :
+      // le LaTeX de l'éditeur V2 écrit « ri » là où la V1 écrivait « r*i »
+      expect(SemanticService.normalizeSymbolic('U = R × I')).toBe('u=ri')
+      expect(SemanticService.normalizeSymbolic('$p = F \\cdot S$')).toBe('p=fs')
       expect(SemanticService.normalizeSymbolic('a ÷ b')).toBe('a/b')
       expect(SemanticService.normalizeSymbolic('')).toBe('')
       expect(SemanticService.normalizeSymbolic(null)).toBe('')
+    })
+
+    it('fait converger raccourcis V1 et LaTeX V2 vers la même forme (fractions)', () => {
+      const v1 = SemanticService.normalizeSymbolic('over(1, 2)')
+      const v2 = SemanticService.normalizeSymbolic('$\\frac{1}{2}$')
+      expect(v1).toBe('1/2')
+      expect(v2).toBe('1/2')
+    })
+
+    it('fait converger une formule physique complète V1 ≡ V2', () => {
+      const v1 = SemanticService.normalizeSymbolic('E = over(1, 2) * m * v^2')
+      const v2 = SemanticService.normalizeSymbolic('E = \\frac{1}{2}mv^{2}')
+      expect(v1).toBe(v2)
+      expect(v1).toBe('e=1/2mv^2')
+    })
+
+    it('unifie exposants Unicode, ^{…} et ^n', () => {
+      expect(SemanticService.normalizeSymbolic('x²')).toBe('x^2')
+      expect(SemanticService.normalizeSymbolic('x^{2}')).toBe('x^2')
+      expect(SemanticService.normalizeSymbolic('x^2')).toBe('x^2')
+    })
+
+    it('unifie racines, valeurs absolues et \\left/\\right', () => {
+      expect(SemanticService.normalizeSymbolic('sqrt(x)')).toBe(SemanticService.normalizeSymbolic('\\sqrt{x}'))
+      expect(SemanticService.normalizeSymbolic('abs(x)')).toBe(SemanticService.normalizeSymbolic('\\left|x\\right|'))
+    })
+
+    it('unifie grec LaTeX/Unicode et ensembles', () => {
+      expect(SemanticService.normalizeSymbolic('\\Delta = b^2 - 4ac')).toBe(SemanticService.normalizeSymbolic('Δ = b² - 4*a*c'))
+      expect(SemanticService.normalizeSymbolic('x \\in \\mathbb{R}')).toBe(SemanticService.normalizeSymbolic('x \\in ℝ'))
+    })
+
+    it('ignore les \\placeholder{} vides (trous non remplis de l’éditeur)', () => {
+      expect(SemanticService.normalizeSymbolic('\\frac{\\placeholder{1}}{\\placeholder{2}}')).toBe('1/2')
+    })
+
+    it('normalise les matrices LaTeX en gardant le délimiteur distinct', () => {
+      expect(SemanticService.normalizeSymbolic('\\begin{pmatrix}1 & 2 \\\\ 3 & 4\\end{pmatrix}'))
+        .toBe('pmatrix(1,2;3,4)')
+      expect(SemanticService.normalizeSymbolic('\\begin{vmatrix}1 & 2 \\\\ 3 & 4\\end{vmatrix}'))
+        .not.toBe(SemanticService.normalizeSymbolic('\\begin{pmatrix}1 & 2 \\\\ 3 & 4\\end{pmatrix}'))
     })
   })
 

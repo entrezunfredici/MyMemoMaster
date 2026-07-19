@@ -17,7 +17,7 @@ Connexion : n'importe quel email/mot de passe non vides (validation simulée).
 
 ## Écrans couverts (15)
 
-Connexion · Inscription · Accueil (alertes & suggestions) · Tutoriels · Mindmaps · Flashcards (systèmes de Leitner) · Gestion des cartes/boîtes · Session de révision (répartition par boîte) · Exercices · Détail d'exercice (question ouverte + QCM) · Interpréteur de formules (éditeur + palette de symboles + aperçu du rendu + vérification d'homogénéité) · Classe · Calendrier · To-do · Ma Progression (KPI) · Profil · Réglages.
+Connexion · Inscription · Accueil (alertes & suggestions) · Tutoriels · Mindmaps · Flashcards (systèmes de Leitner) · Gestion des cartes/boîtes · Session de révision (répartition par boîte) · Exercices · Détail d'exercice (question ouverte + QCM) · Interpréteur de formules (éditeur + palette à onglets Caractères/Formules/Opérateurs/Matrices + aperçu du rendu + vérification d'homogénéité) · Classe · Calendrier · To-do · Ma Progression (KPI) · Profil · Réglages.
 
 ## Captures (`captures/`)
 
