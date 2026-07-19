@@ -15,10 +15,10 @@ npx http-server -p 8123
 
 Connexion : n'importe quel email/mot de passe non vides (validation simulée).
 
-## Écrans couverts (14)
+## Écrans couverts (15)
 
-Connexion · Inscription · Accueil (alertes & suggestions) · Tutoriels · Mindmaps · Flashcards (systèmes de Leitner) · Gestion des cartes/boîtes · Session de révision (répartition par boîte) · Exercices · Détail d'exercice (question ouverte + QCM) · Classe · Calendrier · To-do · Ma Progression (KPI) · Profil · Réglages.
+Connexion · Inscription · Accueil (alertes & suggestions) · Tutoriels · Mindmaps · Flashcards (systèmes de Leitner) · Gestion des cartes/boîtes · Session de révision (répartition par boîte) · Exercices · Détail d'exercice (question ouverte + QCM) · Interpréteur de formules (éditeur + palette de symboles + aperçu du rendu + vérification d'homogénéité) · Classe · Calendrier · To-do · Ma Progression (KPI) · Profil · Réglages.
 
 ## Captures (`captures/`)
 
-Les PNG de `captures/` sont générés automatiquement depuis le prototype par script Puppeteer (Chrome headless, 1440×900) — elles sont donc reproductibles et fidèles au fichier versionné. Elles servent de preuves dans le dossier Bloc 2 (section 3.1).
+Les PNG de `captures/` sont générés automatiquement depuis le prototype par script d'automatisation navigateur (Chromium headless via CDP, 1440×900) — elles sont donc reproductibles et fidèles au fichier versionné. Elles servent de preuves dans le dossier Bloc 2 (section 3.1).

@@ -31,6 +31,8 @@
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-07-08 |
 | LeitnerSystemsUsers | Stable | init |
 | Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API | 2026-07-14 |
+| Librairie de rendu formules (S-06.01) | Clôturé — benchmark MathJax/KaTeX formalisé dans DECISIONS (2026-07-19) : KaTeX seul retenu ; dépendance `mathjax` et helper mort `mathjax-config.js` supprimés, CONVENTIONS corrigé | 2026-07-19 |
+| Maquettes UI éditeur formules (S-06.02) | Clôturé — écran « Interpréteur de formules » ajouté au prototype interactif (15 écrans) : éditeur + palette de symboles + aperçu + badge homogénéité ; 17 captures régénérées (dont 17-interpreteur.png) | 2026-07-19 |
 | Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
@@ -6014,3 +6016,45 @@ Constat utilisateur : les puissances négatives s'affichent mal. Cause : `toLate
 | Module | État |
 |--------|------|
 | Dossier B2 (B2_RENDU.md) | Complet — plus aucun placeholder ; PDF à régénérer pour mesurer la pagination (cible ~29 pages) |
+
+---
+
+### [2026-07-19] Clôture S-06.01 — Benchmark librairie rendu (MathJax/KaTeX) formalisé, dépendance mathjax retirée
+
+#### Contexte
+Vérification de la tâche S-06.01 (« Benchmark librairie rendu (MathJax/KaTeX) », V1, US-24) : le résultat du choix (KaTeX) était en production depuis longtemps (interpréteur, mindmaps, FormulaText), mais le livrable « benchmark » lui-même n'existait nulle part — aucune entrée DECISIONS, `CONVENTIONS.md` listait ambigument « KaTeX / MathJax », et `mathjax@3.2.2` restait en dépendance front alors que son seul point d'usage (`src/helpers/mathjax-config.js`) n'était importé par aucun fichier (code mort de la phase d'essai).
+
+#### Fichiers modifiés
+- `.agents/DECISIONS.md` — nouvelle entrée [2026-07-19] : critères du choix KaTeX (rendu synchrone exigé par l'aperçu live et `renderInlineMath`, poids ~280 Ko vs > 1 Mo, couverture suffisante pour le LaTeX généré par l'interpréteur, testabilité jsdom), MathJax écarté, conditions de réouverture
+- `.agents/CONVENTIONS.md` — ligne « Math front » : `KaTeX / MathJax` → `katex` seul avec renvoi vers DECISIONS
+- `my_memo_master_front/package.json` + `package-lock.json` — `mathjax@^3.2.2` désinstallé (npm uninstall)
+
+#### Fichiers supprimés
+- `my_memo_master_front/src/helpers/mathjax-config.js` — helper mort (aucun import dans src/ ni test/)
+
+#### Ce qui est utilisable
+- La décision de rendu est désormais traçable : tout nouveau rendu de formule passe par `interpreter.js` (`renderMath` / `renderInlineMath`), pas de librairie parallèle
+- Vérifié : `grep mathjax` ne matche plus que package-lock (métadonnées npm) ; suite front complète verte + lint vert après suppression
+
+#### Dette / non couvert
+- Aucune sur ce périmètre — le reste de S-06.01 (éditeur LaTeX, aperçu, stockage, tests formules complexes) était déjà livré (entrées 2026-07-14 et 2026-07-18)
+
+---
+
+### [2026-07-19] Clôture S-06.02 — Maquette UI éditeur de formules ajoutée au prototype interactif
+
+#### Contexte
+La tâche S-06.02 (« Maquettes UI éditeur de formules », V1, US-24) n'avait aucun livrable : pas de document dans `diagrams/`, pas d'écran dans le prototype (l'implémentation Vue réelle a précédé les maquettes). Choix utilisateur : intégrer la maquette au prototype interactif versionné (`docs/prototype/`) plutôt que produire un document ASCII rétroactif.
+
+#### Fichiers modifiés
+- `docs/prototype/MyMemoMaster - Standalone.html` — nouvel écran « Interpréteur de formules » (15ᵉ écran) fidèle à l'UI implémentée (`Interpreter.vue`/`FormulaHelperComponent`) : éditeur avec syntaxe raccourcie (`over`, `sqrt`, `^`, `Var[unité]`), palette de symboles cliquable (structures, lettres grecques, opérateurs, unités — insertion dans le champ), aperçu du rendu (simulé en CSS, KaTeX dans l'app réelle), badge de vérification d'homogénéité des grandeurs, encart « bouton ƒ + $…$ » (flashcards/exercices/mindmaps). Navigation : icône √x dans la sidebar (desktop + mobile) + 5ᵉ tuile sur l'Accueil. **Méthode** : bundle dépaqueté (manifest gzip+base64 → template), template édité, rebundlé — scripts extract/repack dans le scratchpad de session (ponctuels, non versionnés).
+- `docs/prototype/captures/` — **17 captures régénérées** (Chromium headless via CDP, 1440×900) : la sidebar ayant changé sur tous les écrans, les 16 existantes ont été refaites pour rester fidèles au fichier versionné + nouvelle `17-interpreteur.png`.
+- `docs/prototype/README.md` — 15 écrans, mention de l'écran interpréteur, méthode de capture généralisée (« script d'automatisation navigateur » au lieu de Puppeteer).
+
+#### Ce qui est utilisable
+- Prototype navigable : l'écran interpréteur est accessible depuis la sidebar (icône √x) et l'accueil ; palette interactive (insertion réelle dans le champ), bouton Effacer fonctionnel.
+- Vérifié visuellement sur les captures : nouvel écran conforme à l'identité (bleu #1E3BA1, cartes, typo), écrans existants intacts (accueil, session Leitner contrôlés).
+
+#### Dette / non couvert
+- L'aperçu du prototype est statique (formule d'exemple rendue en CSS) — pas de parsing réel dans la maquette, assumé (même niveau de simplification que l'éditeur mindmap du prototype).
+- Les captures 01/02 pèsent ~400 Ko (fond dégradé plein écran) — poids acceptable, inchangé par rapport à l'existant.
