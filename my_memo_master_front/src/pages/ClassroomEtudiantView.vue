@@ -5,7 +5,11 @@
     <div class="flex gap-3 overflow-x-auto pb-1">
       <div
         v-for="g in groups" :key="g.id"
+        role="button"
+        tabindex="0"
         @click="selectGroup(g.id)"
+        @keydown.enter.prevent="selectGroup(g.id)"
+        @keydown.space.prevent="selectGroup(g.id)"
         :class="[selectedId === g.id ? 'border-primary bg-light/70' : 'border-gray', 'min-w-[200px] cursor-pointer rounded-xl border-2 p-3 shadow-sm transition hover:-translate-y-0.5']">
         <p class="text-xs text-dark/60 uppercase tracking-wide">{{ g.level }}</p>
         <p class="text-lg font-semibold text-primary">{{ g.name }}</p>
@@ -18,12 +22,12 @@
 
       <!-- Barre de recherche -->
       <div class="relative">
-        <input
+        <input aria-label="Rechercher une section, un rendu, une ressource"
           v-model="search"
           type="text"
           placeholder="Rechercher une section, un rendu, une ressource..."
           class="w-full rounded-xl border-2 border-gray px-4 py-3 pr-10 text-sm focus:border-primary focus:outline-none transition" />
-        <button v-if="search" @click="search = ''"
+        <button aria-label="Effacer la recherche" v-if="search" @click="search = ''"
           class="absolute right-3 top-1/2 -translate-y-1/2 text-dark/40 hover:text-dark">✕</button>
       </div>
 
@@ -122,7 +126,7 @@
                   <p class="text-xs text-dark/40 mt-1">PDF, Word, Image — max 10 Mo</p>
                 </div>
               </div>
-              <input :ref="el => fileInputs[r.id] = el" type="file"
+              <input aria-label="Choisir un fichier à rendre" :ref="el => fileInputs[r.id] = el" type="file"
                 accept=".pdf,.doc,.docx,image/*"
                 class="hidden"
                 @change="(e) => onFileChangeRendu(e, r.id)" />
@@ -239,12 +243,12 @@
             </p>
             <template v-else>
               <div class="flex flex-col gap-2 sm:flex-row">
-                <select v-model="grantForm.teacherId" @change="grantForm.subjectId = null"
+                <select aria-label="Enseignant" v-model="grantForm.teacherId" @change="grantForm.subjectId = null"
                   class="flex-1 rounded-lg border-2 border-gray bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
                   <option :value="null">Choisir un enseignant du groupe</option>
                   <option v-for="t in availableTeachers" :key="t.userId" :value="t.userId">{{ t.user?.name }}</option>
                 </select>
-                <select v-model="grantForm.subjectId"
+                <select aria-label="Sujet" v-model="grantForm.subjectId"
                   class="flex-1 rounded-lg border-2 border-gray bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
                   <option :value="null">Toutes mes matières (accès global)</option>
                   <option v-for="s in availableSubjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>

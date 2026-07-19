@@ -2,7 +2,7 @@
 #  MyMemoMaster — Traefik (reverse proxy VPS)
 #
 #  Fichier indépendant du projet — à déployer une seule fois sur le VPS,
-#  avant de lancer le compose applicatif (server_docker_compose/docker-compose.yml).
+#  avant de lancer le compose applicatif (docker-compose.yml racine, profil test).
 #
 #  Usage :
 #    1. cp .env.example .env && nano .env   # renseigner LETSENCRYPT_EMAIL au minimum

@@ -200,7 +200,7 @@ describe('useTestResultStore', () => {
     const store = useTestResultStore()
     const result = await store.submitTest(1, ANSWERS)
 
-    expect(mockPost).toHaveBeenCalledWith('tests/1/submit', { answers: ANSWERS })
+    expect(mockPost).toHaveBeenCalledWith('tests/1/submit', { answers: ANSWERS }, { timeout: 90000 })
     expect(result).toEqual(SUBMIT_RESPONSE)
     expect(store.results[0].resultId).toBe(1)
     expect(store.results[0].score).toBe(7)

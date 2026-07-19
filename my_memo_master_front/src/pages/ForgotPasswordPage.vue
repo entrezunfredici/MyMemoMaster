@@ -1,7 +1,7 @@
 <template>
   <AuthFormLayout
     title="Mot de passe oublié"
-    description="Saisissez votre email, vous recevrez un token de réinitialisation."
+    description="Saisissez votre email, vous recevrez un code de réinitialisation à 6 chiffres."
   >
     <form @submit.prevent="submit" class="w-full max-w-md">
       <div class="mb-4">
@@ -23,7 +23,7 @@
           :disabled="submitting"
           class="w-full bg-[#1E3BA1] text-white hover:bg-[#162c7a] py-2 px-4 rounded disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {{ submitting ? 'Envoi...' : 'Envoyer le token' }}
+          {{ submitting ? 'Envoi...' : 'Envoyer le code' }}
         </button>
         <router-link to="/auth" class="text-sm text-blue-600 underline">Retour à la connexion</router-link>
       </div>
@@ -52,7 +52,7 @@ async function submit() {
       errorMessage.value = resp?.data?.message || 'Erreur lors de l\'envoi.'
       return
     }
-    notif.notify('Token envoyé ! Vérifiez votre email.', 'success')
+    notif.notify('Code envoyé ! Vérifiez votre email.', 'success')
     router.push({ path: '/reset-password', query: { email: email.value.trim() } })
   } finally {
     submitting.value = false

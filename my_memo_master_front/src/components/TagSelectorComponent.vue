@@ -34,7 +34,7 @@
       </span>
 
       <!-- Champ de recherche -->
-      <input
+      <input aria-label="Rechercher ou ajouter un tag"
         ref="inputRef"
         v-model="query"
         type="text"

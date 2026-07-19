@@ -10,6 +10,7 @@ const bodyParser = require('body-parser')
 const swaggerSpec = swaggerJsdoc(require('./config/swagger.config.js'))
 const morgan = require('morgan')
 const logger = require('./helpers/logger')
+const metricsMiddleware = require('./middlewares/metrics.middleware')
 const sanitize = require('./middlewares/sanitize.middleware')
 const errorHandler = require('./middlewares/errorHandler.middleware')
 const { apiLimiter } = require('./middlewares/rateLimit.middleware')
@@ -47,6 +48,7 @@ const tagRoutes = require('./routes/Tag.routes')
 const searchRoutes = require('./routes/Search.routes')
 const etablissementRoutes = require('./routes/Etablissement.routes')
 const auditLogRoutes = require('./routes/AuditLog.routes')
+const { instance } = require('./models')
 const { startFifoCron } = require('./jobs/fifo.cron')
 const { startReminderWorker } = require('./jobs/reminder.worker')
 const { startKpiAlertCron } = require('./jobs/kpiAlert.cron')
@@ -59,6 +61,10 @@ const app = express()
 // RAISON: sans ça, tous les clients partagent l'IP de Traefik — rate limiting inefficace en prod
 app.set('trust proxy', 1)
 
+// Métriques RED (Rate, Errors, Duration) — exposées sur un serveur HTTP séparé
+// (voir server.js, port METRICS_PORT), jamais via l'Ingress public
+app.use(metricsMiddleware)
+
 // HTTP access logs — Morgan piped into Winston (désactivé en test pour éviter le bruit)
 if (process.env.NODE_ENV !== 'test') {
   const isProd = process.env.NODE_ENV === 'production'
@@ -67,7 +73,20 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Security headers
-app.use(helmet())
+// CHOIX: CSP explicite (défauts Helmet + blob: pour les images) plutôt que helmet() nu
+// RAISON: audit OWASP A05-M4 — rendre la politique auditable dans le code ; les défauts
+//         Helmet v8 (default-src 'self', object-src 'none'…) conviennent à une API JSON
+//         + Swagger UI ; blob: requis pour les aperçus d'images uploadées
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        imgSrc: ["'self'", 'data:', 'blob:']
+      }
+    }
+  })
+)
 
 // CORS — supporte plusieurs origines via CORS_ORIGIN séparé par des virgules
 // CHOIX: origin en fonction plutôt qu'en string
@@ -107,6 +126,20 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'public', 'uploads')
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 }
+
+// Health endpoint — ciblé par les readiness probes K8s (helm/templates/deployment-api.yaml)
+// CHOIX: déclaré avant le routeur v1 pour échapper au rate limiting global
+// RAISON: une sonde kubelet consommant le bucket anonyme (ou bloquée par le limiteur)
+//         ferait passer les pods NotReady en cascade — le health check doit toujours répondre
+app.get('/api/v1/health', async (_req, res) => {
+  try {
+    await instance.authenticate()
+    res.status(200).json({ status: 'ok' })
+  } catch (error) {
+    logger.error(`Health check — base de données injoignable : ${error?.message || error}`)
+    res.status(503).json({ status: 'unavailable' })
+  }
+})
 
 // Routes v1
 const v1 = express.Router()

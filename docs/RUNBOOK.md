@@ -26,14 +26,18 @@
 ### 1. Préparer les fichiers sur le VPS
 
 ```sh
-mkdir -p /var/www/html/my_memo_master_prod
-cd /var/www/html/my_memo_master_prod
+mkdir -p /var/www/html/my_memo_master_test
+cd /var/www/html/my_memo_master_test
 
-# Copier le docker-compose.yml (fait automatiquement par le pipeline CD)
-# Copier manuellement le .env depuis .env.example :
-cp server_docker_compose/.env.example .env
+# Copier le docker-compose.yml racine du dépôt (fait automatiquement par le pipeline CD)
+# Copier manuellement le .env depuis le template .env.test.example du dépôt :
+cp .env.test.example .env
 nano .env   # remplir toutes les valeurs "change_me"
 ```
+
+> Le `docker-compose.yml` est le fichier unifié dev/test : `COMPOSE_PROFILES=test`
+> dans le `.env` active les services VPS (`api_server`, `front_server`,
+> `pgadmin_server`, `backup`) — toutes les commandes ci-dessous en dépendent.
 
 ### 2. Vérifier la configuration
 
@@ -46,24 +50,24 @@ Si aucune erreur n'est affichée, la configuration est valide.
 ### 3. Démarrer les services
 
 ```sh
-# PostgreSQL en premier (healthcheck garantit qu'il est prêt)
-docker compose --env-file .env up -d postgres
+# PostgreSQL et Redis en premier (healthcheck garantit qu'ils sont prêts)
+docker compose --env-file .env up -d postgres redis
 
 # Vérifier que postgres est healthy
 docker compose --env-file .env ps
 
-# Lancer l'API, le front et PgAdmin
-docker compose --env-file .env up -d pgadmin api front
+# Lancer l'API, le front, PgAdmin et le service de sauvegarde
+docker compose --env-file .env up -d pgadmin_server api_server front_server backup
 ```
 
 ### 4. Appliquer les migrations et les seeds
 
 ```sh
 # Migrations Sequelize
-docker compose --env-file .env exec api npx sequelize-cli db:migrate
+docker compose --env-file .env exec api_server npx sequelize-cli db:migrate
 
 # Seeds (rôles + user admin — une seule fois sur une base vide)
-docker compose --env-file .env exec api npx sequelize-cli db:seed:all
+docker compose --env-file .env exec api_server npx sequelize-cli db:seed:all
 ```
 
 ### 5. Vérifier que tout est up
@@ -79,19 +83,19 @@ docker compose --env-file .env ps
 Le pipeline CD (GitHub Actions) gère automatiquement la mise à jour à chaque push sur `main` (prod), `staging` (preprod) ou `dev` (test). En cas de déploiement manuel :
 
 ```sh
-cd /var/www/html/my_memo_master_prod
+cd /var/www/html/my_memo_master_test
 
 # Arrêter les services applicatifs (pas postgres — les données sont dans un volume)
-docker compose --env-file .env stop api front pgadmin
+docker compose --env-file .env stop api_server front_server pgadmin_server
 
 # Tirer les nouvelles images
-docker compose --env-file .env pull api front
+docker compose --env-file .env pull api_server front_server
 
 # Redémarrer
-docker compose --env-file .env up -d api front pgadmin
+docker compose --env-file .env up -d api_server front_server pgadmin_server
 
 # Appliquer les nouvelles migrations si nécessaire
-docker compose --env-file .env exec api npx sequelize-cli db:migrate
+docker compose --env-file .env exec api_server npx sequelize-cli db:migrate
 ```
 
 ---
@@ -106,18 +110,18 @@ docker compose --env-file .env exec api npx sequelize-cli db:migrate
 nano .env
 
 # Redéployer
-docker compose --env-file .env pull api front
-docker compose --env-file .env up -d api front
+docker compose --env-file .env pull api_server front_server
+docker compose --env-file .env up -d api_server front_server
 ```
 
 ### Rollback de migration
 
 ```sh
 # Annuler la dernière migration
-docker compose --env-file .env exec api npx sequelize-cli db:migrate:undo
+docker compose --env-file .env exec api_server npx sequelize-cli db:migrate:undo
 
 # Annuler toutes les migrations jusqu'à une version spécifique
-docker compose --env-file .env exec api npx sequelize-cli db:migrate:undo:all --to 20260605000001-add-indexes.js
+docker compose --env-file .env exec api_server npx sequelize-cli db:migrate:undo:all --to 20260605000001-add-indexes.js
 ```
 
 ---
@@ -129,12 +133,12 @@ docker compose --env-file .env exec api npx sequelize-cli db:migrate:undo:all --
 docker compose --env-file .env logs -f
 
 # Logs d'un service spécifique
-docker compose --env-file .env logs -f api
-docker compose --env-file .env logs -f front
+docker compose --env-file .env logs -f api_server
+docker compose --env-file .env logs -f front_server
 docker compose --env-file .env logs -f postgres
 
 # 100 dernières lignes
-docker compose --env-file .env logs --tail=100 api
+docker compose --env-file .env logs --tail=100 api_server
 ```
 
 ---
@@ -229,7 +233,7 @@ docker compose --env-file .env ps
 ### Redémarrer un service
 
 ```sh
-docker compose --env-file .env restart api
+docker compose --env-file .env restart api_server
 ```
 
 ### Accéder à la console PostgreSQL

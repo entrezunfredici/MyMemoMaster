@@ -1,0 +1,254 @@
+{{- if .Values.monitoring.enabled }}
+# =============================================================================
+#  Prometheus central (un par environnement/namespace)
+#
+#  Scrape les pods du namespace portant les annotations prometheus.io/scrape,
+#  prometheus.io/port et prometheus.io/path (posées sur le pod template de
+#  l'API — voir deployment-api.yaml).
+#
+#  Non exposé par l'Ingress (voir CONVENTIONS.md) — accès via :
+#    kubectl port-forward svc/<release>-prometheus 9090:9090 -n <namespace>
+# =============================================================================
+
+# ── ServiceAccount ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-prometheus
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+
+---
+
+# ── RBAC — lecture des pods du namespace uniquement ───────────────────────────
+# CHOIX: Role namespacé plutôt que ClusterRole
+# RAISON: le Prometheus ne scrape que son propre namespace ; pas besoin de
+#         droits cluster-wide, et le kubeconfig CI n'a pas forcément ces droits
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-prometheus
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-prometheus
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-prometheus
+    namespace: {{ .Release.Namespace }}
+
+---
+
+# ── Configuration Prometheus ───────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-prometheus-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ .Values.monitoring.scrapeInterval }}
+      evaluation_interval: {{ .Values.monitoring.scrapeInterval }}
+
+    scrape_configs:
+      # Auto-scrape de Prometheus lui-même
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+
+      # Découverte des pods annotés prometheus.io/* dans le namespace
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - {{ .Release.Namespace }}
+        relabel_configs:
+          # Ne garder que les pods annotés prometheus.io/scrape: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          # Chemin de scrape depuis l'annotation prometheus.io/path (défaut /metrics)
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            regex: (.+)
+            target_label: __metrics_path__
+          # Port de scrape depuis l'annotation prometheus.io/port
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          # Labels de contexte pour les dashboards / requêtes
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: replace
+            target_label: app
+
+---
+
+{{- if .Values.monitoring.persistent }}
+# StatefulSet avec PVC (prod — historique de métriques persisté)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-prometheus
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-prometheus
+spec:
+  serviceName: {{ .Release.Name }}-prometheus
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-prometheus
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-prometheus
+      annotations:
+        # Redémarre le pod quand la config monitoring change (pas de hot-reload)
+        checksum/config: {{ .Values.monitoring | toYaml | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-prometheus
+      securityContext:
+        # L'image prom/prometheus tourne en user nobody (65534) — fsGroup requis
+        # pour que le PVC soit accessible en écriture
+        fsGroup: 65534
+      containers:
+        - name: prometheus
+          image: prom/prometheus:{{ .Values.monitoring.imageTag }}
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time={{ .Values.monitoring.retention }}
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.monitoring.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: prometheus-data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-prometheus-config
+  volumeClaimTemplates:
+    - metadata:
+        name: prometheus-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.monitoring.storage }}
+{{- else }}
+# Deployment sans PVC (preprod — historique éphémère acceptable)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-prometheus
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-prometheus
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-prometheus
+      annotations:
+        # Redémarre le pod quand la config monitoring change (pas de hot-reload)
+        checksum/config: {{ .Values.monitoring | toYaml | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:{{ .Values.monitoring.imageTag }}
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time={{ .Values.monitoring.retention }}
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.monitoring.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: prometheus-data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-prometheus-config
+        - name: prometheus-data
+          emptyDir: {}
+{{- end }}
+
+---
+
+# ── Service ────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-prometheus
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Release.Name }}-prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
+{{- end }}

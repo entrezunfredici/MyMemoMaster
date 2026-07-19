@@ -16,12 +16,16 @@
 
         <div class="py-4">
           <span class="text-lg font-medium text-gray-light">Question</span>
-          <input v-model="question.statement" type="text" placeholder="Quelle est la loi de bernouilli ?" class="w-full p-2 rounded-lg text-dark" />
+          <FormulaHelper v-model="question.statement">
+            <input aria-label="Énoncé de la question" v-model="question.statement" type="text" placeholder="Quelle est la loi de bernouilli ? (formules entre $…$)" class="w-full p-2 rounded-lg text-dark" />
+          </FormulaHelper>
         </div>
 
         <div class="py-4">
           <span class="text-lg font-medium text-gray-light">Réponse</span>
-          <textarea v-model="response.content" placeholder="Quelle est la réponse ?" class="w-full p-2 rounded-lg text-dark" />
+          <FormulaHelper v-model="response.content">
+            <textarea aria-label="Réponse attendue" v-model="response.content" placeholder="Quelle est la réponse ?" class="w-full p-2 rounded-lg text-dark" />
+          </FormulaHelper>
         </div>
 
         <div class="py-4 flex justify-end">
@@ -41,7 +45,7 @@
           <div class="flex flex-col gap-4">
             <div v-for="(q) in questions" :key="q.idQuestion"
               class="flex justify-between border-2 bg-[#FFF] border-gray rounded-lg px-4 py-2">
-              <span class="text-lg text-dark">{{ q.statement }}</span>
+              <span class="text-lg text-dark"><FormulaText :text="q.statement || ''" /></span>
               <XMarkIcon class="size-6 text-dark cursor-pointer hover:brightness-50" @click="deleteQuestion(q.idQuestion)" />
             </div>
           </div>
@@ -66,6 +70,9 @@ import { XMarkIcon } from '@heroicons/vue/24/solid'
 import Mindmap from '@/components/MindmapComponent.vue'
 import Dropdown from '@/components/DropdownComponent.vue'
 import Button from '@/components/ButtonComponent.vue'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 import { useQuestionStore } from '@/stores/questions'
 import { useResponseStore } from '@/stores/responses'
 import { useTestStore } from '@/stores/tests'
@@ -95,7 +102,9 @@ const handleAddQuestion = async () => {
     question.value.idTest = testStore.test.id // Utilise l’ID renvoyé par l’API
   }
 
-  // Étape 2 - Ajouter la question
+  // Étape 2 - Ajouter la question (syntaxe de formule normalisée)
+  question.value.statement = normalizeFormulaSyntax(question.value.statement)
+  response.value.content = normalizeFormulaSyntax(response.value.content)
   question.value.questionPosition = questions.value.length + 1
   questionStore.question = question.value
   const questionCreated = await questionStore.createQuestion()

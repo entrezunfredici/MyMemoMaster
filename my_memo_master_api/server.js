@@ -3,6 +3,7 @@ const http = require('http')
 const db = require('./models')
 const app = require('./app')
 const logger = require('./helpers/logger')
+const { register } = require('./helpers/metrics')
 const semanticService = require('./services/Semantic.service')
 
 const DEFAULT_MAX_RETRIES = 10
@@ -21,6 +22,30 @@ const shouldSyncSchema = (process.env.ENVIRONMENT || '').trim().toLowerCase() !=
 const server = http.createServer(app)
 server.listen(PORT, HOST, () => {
   logger.info(`[API] Listening on ${HOST}:${PORT}`)
+})
+
+// CHOIX: serveur HTTP dédié aux métriques, sur un port distinct de l'API publique
+// RAISON: l'Ingress/Traefik ne route que le port applicatif (${PORT}) — un serveur
+//         séparé garantit que /metrics reste inatteignable de l'extérieur sans
+//         dépendre d'une règle d'exclusion fragile côté reverse-proxy
+const METRICS_PORT = Number(process.env.METRICS_PORT || 9090)
+const metricsServer = http.createServer(async (req, res) => {
+  if (req.method === 'GET' && req.url === '/metrics') {
+    try {
+      res.writeHead(200, { 'Content-Type': register.contentType })
+      res.end(await register.metrics())
+    } catch (error) {
+      logger.error(`Metrics endpoint error: ${error?.message || error}`)
+      res.writeHead(500)
+      res.end()
+    }
+  } else {
+    res.writeHead(404)
+    res.end()
+  }
+})
+metricsServer.listen(METRICS_PORT, HOST, () => {
+  logger.info(`[Metrics] Listening on ${HOST}:${METRICS_PORT}`)
 })
 
 ;(async () => {
@@ -53,8 +78,15 @@ server.listen(PORT, HOST, () => {
   logger.error('DB still unreachable; API keeps serving non-DB routes.')
 })()
 
-// Pre-warm the semantic model in the background so the first Leitner correction
-// doesn't block a user request for 30+ seconds (model download ~80 MB).
-semanticService.getModel().catch((err) => {
-  logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)
-})
+// Pre-warm the semantic model in the background so the first correction (Leitner
+// ou submit d'exercice) doesn't block a user request for 30+ seconds.
+// CHOIX: une vraie inférence (gradeSemantic) plutôt que getModel() seul
+// RAISON: charger le pipeline ne suffit pas — la première inférence paie encore
+// l'initialisation de la session ONNX (~30 s observés en conteneur), qui gelait
+// la première soumission d'exercice après chaque redémarrage.
+semanticService
+  .gradeSemantic('préchauffage du modèle', 'préchauffage du modèle')
+  .then(() => logger.info('[SemanticService] Pre-warm inference done.'))
+  .catch((err) => {
+    logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)
+  })

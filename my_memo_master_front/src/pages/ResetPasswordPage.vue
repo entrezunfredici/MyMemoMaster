@@ -1,19 +1,24 @@
 <template>
   <AuthFormLayout
     title="Nouveau mot de passe"
-    description="Collez le token reçu par email et choisissez un nouveau mot de passe."
+    description="Saisissez le code à 6 chiffres reçu par email et choisissez un nouveau mot de passe."
   >
     <form @submit.prevent="submit" class="w-full max-w-md">
       <div class="mb-4">
-        <label for="rp-token" class="block text-gray-700">Token reçu par email</label>
-        <textarea
-          id="rp-token"
+        <label for="rp-code" class="block text-gray-700">Code reçu par email</label>
+        <input
+          id="rp-code"
+          type="text"
           v-model="code"
           required
-          rows="2"
-          placeholder="Collez ici le token de 64 caractères..."
-          class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-xs resize-none"
-        />
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          pattern="\d{6}"
+          maxlength="6"
+          placeholder="123456"
+          class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-lg tracking-[0.5em] text-center"
+        >
+        <p class="text-xs text-gray-400 mt-1">Code valable 15 minutes</p>
       </div>
 
       <div class="mb-4">
@@ -38,7 +43,7 @@
         >
           {{ submitting ? 'Réinitialisation...' : 'Réinitialiser' }}
         </button>
-        <router-link to="/forgot-password" class="text-sm text-blue-600 underline">Renvoyer un token</router-link>
+        <router-link to="/forgot-password" class="text-sm text-blue-600 underline">Renvoyer un code</router-link>
       </div>
     </form>
   </AuthFormLayout>
@@ -74,7 +79,7 @@ async function submit() {
       newPassword: newPassword.value
     })
     if (!resp || resp.status !== 201) {
-      errorMessage.value = resp?.data?.message || 'Token invalide ou expiré.'
+      errorMessage.value = resp?.data?.message || 'Code invalide ou expiré.'
       return
     }
     notif.notify('Mot de passe réinitialisé avec succès !', 'success')

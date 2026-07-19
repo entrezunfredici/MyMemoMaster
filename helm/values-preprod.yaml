@@ -54,10 +54,12 @@ api:
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
+      # Le chargement du modèle sémantique (all-mpnet-base-v2) pique à ~800Mi :
+      # 512Mi de limite = OOMKill en boucle au démarrage (constaté le 2026-07-11)
+      memory: 512Mi
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 1Gi
 
 front:
   resources:
@@ -78,3 +80,16 @@ pgadmin:
     limits:
       cpu: 250m
       memory: 256Mi
+
+# Prometheus sans PVC — perte de l'historique acceptable en preprod
+monitoring:
+  enabled: true
+  persistent: false
+  retention: 7d
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi

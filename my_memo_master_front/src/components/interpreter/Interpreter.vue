@@ -50,7 +50,7 @@
     </div>
 
     <h2>Zone de texte</h2>
-    <textarea
+    <textarea aria-label="Saisir ou coller votre contenu mathématique"
       ref="textareaRef"
       v-model="userInput"
       rows="6"
@@ -70,6 +70,10 @@
     <div v-if="unitsError" style="margin-bottom:8px; padding:8px 12px; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:8px; font-weight:600;">
       {{ unitsError }}
     </div>
+    <p style="margin-bottom:8px; font-size:12px; color:#64748b;">
+      Vérification d'homogénéité : déclarez l'unité d'une variable avec <code>P[Pa] = F[N] / S[m^2]</code> —
+      sans déclaration, les formules symboliques ne sont pas jugées.
+    </p>
     <div v-if="props.showApply" class="interpreter__actions">
       <button type="button" @click="apply">{{ props.applyLabel }}</button>
     </div>
@@ -144,7 +148,6 @@ const extraPalette = [
   { label: 'sqrt(…)',      insert: 'sqrt(__CARET__)',                description: 'Racine carrée' },
   { label: 'nsqrt(n, …)',  insert: 'nsqrt(__CARET__)',               description: 'Racine n-ième', action: 'nsqrt' },
   { label: 'over(a, b)',   insert: 'over(__CARET__, )',              description: 'Fraction' },
-  { label: 'frac(a, b)',   insert: 'frac(__CARET__, )',              description: 'Fraction (alias)' },
   { label: 'widevec(…)',   insert: 'widevec(__CARET__)',             description: 'Vecteur' },
   { label: 'matrix(a;b)',  insert: 'matrix(__CARET__)',              description: 'Matrice (a,b; c,d; …)' },
   { label: 'mattrix([...])', insert: 'mattrix([__CARET__],[],[])',   description: 'Matrice 3×3' },

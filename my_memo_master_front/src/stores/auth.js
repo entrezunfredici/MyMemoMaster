@@ -4,6 +4,7 @@ import router from '@/router'
 import { api } from '@/helpers/api'
 import { isValidEmail } from '@/helpers/functions.js'
 import { missingsElementsPassword } from '@/helpers/functions.js'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 
 const decodeJwtPayload = (token) => {
   try {
@@ -289,6 +290,9 @@ export const useAuthStore = defineStore('auth', {
       this.user = {}
       this.token = null
       this.refreshToken = null
+
+      // Le parcours guidé ne doit pas survivre à un changement d'utilisateur
+      useGuidedTourStore().reset()
 
       // Révocation côté serveur — best effort, fire and forget
       if (rt) {

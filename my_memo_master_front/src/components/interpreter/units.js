@@ -101,9 +101,18 @@ function sigOfUnitToken(token) {
   if (m) { base = m[1]; if (m[2]) power = parseInt(m[2], 10); }
 
   const unit = canonUnit(base);
-  // Dimension inconnue -> on encode comme {UNK:1} pour détecter incompatibilités
-  const sig = U[unit] ? U[unit] : { UNK: 1 }; 
+  // Symbole inconnu = variable (P, F, S…) : dimension indéterminée, mais chaque
+  // variable garde sa propre identité (VAR_F/VAR_F s'annule, VAR_F/VAR_S non).
+  // CHOIX: signature indéterminée plutôt qu'un UNK commun qui s'annulait (F/S
+  // devenait « sans unité ») et produisait de fausses erreurs sur les formules
+  // symboliques — l'homogénéité de variables sans unité déclarée est injugeable.
+  const sig = U[unit] ? U[unit] : { ['VAR_' + unit]: 1 };
   return powSig(sig, power);
+}
+
+/** Une signature est déterminée si elle ne contient aucune variable de dimension inconnue. */
+function isDeterminate(sig) {
+  return Object.keys(sig).every((k) => !k.startsWith('VAR_'));
 }
 
 function sigOfUnitProduct(str) {
@@ -218,13 +227,16 @@ function parseTerm(tokens, idx) {
 function parseExpr(tokens, idx) {
   let { sig, i } = parseTerm(tokens, idx);
   while (i < tokens.length && (tokens[i].type === '+' || tokens[i].type === '-')) {
-    // const op = tokens[i].type; i++;
+    i++; // consomme l'opérateur (sinon boucle infinie sur les additions homogènes)
     const right = parseTerm(tokens, i); i = right.i;
 
-    // Addition/soustraction uniquement si signatures identiques
-    if (!equalSig(sig, right.sig)) {
+    // Addition/soustraction : signatures identiques requises — mais on ne juge
+    // que si les deux côtés sont déterminés (pas de variable sans unité)
+    if (isDeterminate(sig) && isDeterminate(right.sig) && !equalSig(sig, right.sig)) {
       throw { type: 'addition', left: sig, right: right.sig };
     }
+    // Une branche indéterminée rend la somme indéterminée
+    if (!isDeterminate(right.sig)) sig = { ...sig, 'VAR_?': 1 };
   }
   return { sig, i };
 }
@@ -243,6 +255,10 @@ function sigToStr(sig) {
     if (!e) continue;
     parts.push(e === 1 ? k : `${k}^${e}`);
   }
+  // Variables de dimension inconnue (défensif — normalement exclues des messages)
+  for (const [k, e] of Object.entries(sig)) {
+    if (k.startsWith('VAR_')) parts.push(`${k.slice(4)}?${e !== 1 ? `^${e}` : ''}`);
+  }
   return parts.length ? parts.join('·') : '—'; // — = sans unité
 }
 
@@ -257,6 +273,9 @@ export function sanitizeForUnits(text) {
     return String(t ?? '')
         .replace(/<text[^>]*>[\s\S]*?<\/text>/gi, ' ')
         .replace(/\b(?:sqrt|nsqrt|ln|vec|widevec|matrix|mattrix|hat|overline)\s*\((?:[^()]|\([^()]*\))*\)/gi, ' ')
+        // Annotation d'unité sur une variable : « P[Pa] » → la variable prend la
+        // dimension déclarée, seul moyen fiable de vérifier une formule symbolique
+        .replace(/([a-zA-Z][a-zA-Z0-9]*)\s*\[\s*([^\][]+?)\s*\]/g, '($2)')
         .replace(/[{}]/g, ' ')
         .replace(/\\[a-zA-Z]+/g, ' ');  // éventuelles commandes latex accidentelles
 }
@@ -266,7 +285,9 @@ export function checkUnitHomogeneity(expression) {
   const lines = src.split('\n').map(l => l.trim()).filter(Boolean);
 
   for (const line of lines) {
-    // Plusieurs segments séparés par '=' doivent avoir même signature
+    // Plusieurs segments séparés par '=' doivent avoir même signature.
+    // Les segments contenant une variable sans unité déclarée (« P » sans « P[Pa] »)
+    // sont indéterminés : on s'abstient de les juger plutôt que d'inventer une erreur.
     const segments = line.split('=').map(s => s.trim()).filter(Boolean);
     let ref = null;
 
@@ -274,6 +295,7 @@ export function checkUnitHomogeneity(expression) {
       for (const seg of segments) {
         const toks = tokenizer(seg);
         const { sig } = parseExpr(toks, 0);
+        if (!isDeterminate(sig)) continue;
         ref = ref || sig;
         if (!equalSig(ref, sig)) {
           return `Erreur d’homogénéité : "${line}"  (${sigToStr(ref)} ≠ ${sigToStr(sig)})`;

@@ -33,6 +33,7 @@ config:
   NODE_ENV: production
   ENVIRONMENT: ""           # "preprod" | "prod"
   API_PORT: "3000"
+  METRICS_PORT: "9090"
   API_BYPASS_AUTH: "false"
   AUTH_JWT_EXPIRES_IN: 1d
   PG_DB: mymemomasterdb
@@ -128,3 +129,23 @@ pgadmin:
     limits:
       cpu: 250m
       memory: 256Mi
+
+# ── Monitoring (Prometheus central par environnement) ────────────────────────
+# Scrape les pods annotés prometheus.io/* du namespace de la release.
+# Non exposé par l'Ingress — accès via kubectl port-forward (voir prometheus.yaml)
+monitoring:
+  enabled: true
+  imageTag: v3.5.0        # LTS — épingler explicitement, jamais :latest
+  scrapeInterval: 30s
+  retention: 15d
+  # false = Deployment + emptyDir (preprod, historique éphémère)
+  # true  = StatefulSet + PVC (prod, historique persisté)
+  persistent: false
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

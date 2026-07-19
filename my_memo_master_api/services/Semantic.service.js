@@ -6,7 +6,88 @@ try {
   console.error(error)
 }
 
+// Stopwords anglais + français : l'application est francophone, la liste anglaise
+// seule laissait « une », « dans », « les »… compter comme mots-clés dans la zone grise
 const STOPWORDS = new Set([
+  // Français
+  'le',
+  'la',
+  'les',
+  'un',
+  'une',
+  'des',
+  'du',
+  'de',
+  'dans',
+  'sur',
+  'sous',
+  'par',
+  'pour',
+  'avec',
+  'sans',
+  'vers',
+  'chez',
+  'et',
+  'ou',
+  'mais',
+  'donc',
+  'car',
+  'ni',
+  'or',
+  'que',
+  'qui',
+  'quoi',
+  'dont',
+  'est',
+  'sont',
+  'être',
+  'était',
+  'étaient',
+  'sera',
+  'seront',
+  'fait',
+  'faire',
+  'avoir',
+  'ont',
+  'aux',
+  'ce',
+  'cet',
+  'cette',
+  'ces',
+  'son',
+  'ses',
+  'leur',
+  'leurs',
+  'ils',
+  'elles',
+  'nous',
+  'vous',
+  'tout',
+  'tous',
+  'toute',
+  'toutes',
+  'plus',
+  'moins',
+  'très',
+  'aussi',
+  'comme',
+  'alors',
+  'donc',
+  'ainsi',
+  'lors',
+  'pas',
+  'non',
+  'oui',
+  'se',
+  'sa',
+  'au',
+  'il',
+  'elle',
+  'on',
+  'lui',
+  'ne',
+  'en',
+  // Anglais
   'the',
   'a',
   'an',
@@ -70,6 +151,11 @@ const HIGH_THRESHOLD = 0.78
 const LOW_THRESHOLD = 0.55
 const KEYWORD_OVERLAP_THRESHOLD = 0.3
 
+// Séparateurs antisymétriques de la famille division/rapport : l'ordre des opérandes
+// porte le sens (« masse par unité de volume » ≠ « volume par unité de masse »), mais
+// les embeddings y sont quasi insensibles — d'où une vérification déterministe dédiée.
+const RATIO_SEPARATOR = /\s(?:divisée?s? par|par unité de|rapportée?s? (?:à|au)|sur)\s/
+
 class SemanticService {
   constructor() {
     this.model = null
@@ -98,8 +184,17 @@ class SemanticService {
       if (!pipeline) {
         throw new Error('Transformers library not available')
       }
-      console.log('[SemanticService] Loading embedding model: all-mpnet-base-v2...')
-      const extractor = await pipeline('feature-extraction', 'Xenova/all-mpnet-base-v2')
+      // CHOIX: modèle multilingue MiniLM (50+ langues dont le français) plutôt que
+      // all-mpnet-base-v2 (anglais) ou paraphrase-multilingual-mpnet-base-v2 (multilingue mais ~280 Mo)
+      // RAISON: l'application est francophone — le modèle anglais déprimait les similarités entre
+      // paraphrases françaises correctes (~0,61 pour une réponse juste reformulée) ; la variante
+      // mpnet multilingue dépasse la limite mémoire des conteneurs API (512 Mo → OOM en boucle),
+      // MiniLM (~120 Mo) tient dans le même gabarit que l'ancien modèle
+      console.log('[SemanticService] Loading embedding model: paraphrase-multilingual-MiniLM-L12-v2...')
+      const extractor = await pipeline(
+        'feature-extraction',
+        'Xenova/paraphrase-multilingual-MiniLM-L12-v2'
+      )
       console.log('[SemanticService] Model loaded successfully.')
       return extractor
     } catch (error) {
@@ -114,6 +209,24 @@ class SemanticService {
   normalizeText(text) {
     if (!text || typeof text !== 'string') return ''
     return text.trim().toLowerCase().replace(/\s+/g, ' ')
+  }
+
+  /**
+   * Normalisation symbolique pour comparer des formules : casse, espaces,
+   * délimiteurs KaTeX ($…$) et variantes d'opérateurs (× ⋅ · * — ÷ /) unifiés.
+   * « U = R × I » ≡ « u=r*i » ≡ « $U=R \cdot I$ » une fois normalisés.
+   *
+   * @param {string} text - Texte ou formule à normaliser
+   * @returns {string} Forme canonique comparable
+   */
+  normalizeSymbolic(text) {
+    if (!text || typeof text !== 'string') return ''
+    return text
+      .toLowerCase()
+      .replace(/\\cdot|\\times/g, '*')
+      .replace(/[×⋅·]/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/[$\s]/g, '')
   }
 
   /**
@@ -142,6 +255,44 @@ class SemanticService {
     const union = new Set([...keywords1, ...keywords2])
 
     return intersection.size / union.size
+  }
+
+  /**
+   * Découpe une phrase de type rapport/division en opérandes gauche/droite.
+   *
+   * @param {string} text - Texte normalisé
+   * @returns {{ left: Set<string>, right: Set<string> }|null} Mots-clés de chaque côté, ou null si pas de séparateur
+   */
+  splitRatio(text) {
+    const normalized = this.normalizeText(text)
+    const match = normalized.match(RATIO_SEPARATOR)
+    if (!match) return null
+    return {
+      left: this.extractKeywords(normalized.slice(0, match.index)),
+      right: this.extractKeywords(normalized.slice(match.index + match[0].length))
+    }
+  }
+
+  /**
+   * Détecte une inversion d'opérandes entre la réponse attendue et celle de l'étudiant
+   * (ex : « le volume divisé par la masse » pour « la masse par unité de volume »).
+   * Conservateur : ne se déclenche que si les deux phrases contiennent un séparateur
+   * de rapport et que les opérandes sont strictement croisés.
+   *
+   * @param {string} reference - Réponse attendue (normalisée ou brute)
+   * @param {string} studentAnswer - Réponse de l'étudiant (normalisée ou brute)
+   * @returns {boolean} true si les opérandes sont inversés
+   */
+  detectInversion(reference, studentAnswer) {
+    const ref = this.splitRatio(reference)
+    const stu = this.splitRatio(studentAnswer)
+    if (!ref || !stu) return false
+    if (!ref.left.size || !ref.right.size || !stu.left.size || !stu.right.size) return false
+
+    const overlaps = (a, b) => [...a].some((k) => b.has(k))
+    const straight = overlaps(stu.left, ref.left) || overlaps(stu.right, ref.right)
+    const crossed = overlaps(stu.left, ref.right) && overlaps(stu.right, ref.left)
+    return crossed && !straight
   }
 
   /**
@@ -195,6 +346,20 @@ class SemanticService {
       }
     }
 
+    // Court-circuit symbolique : une formule identique à la normalisation près
+    // (« u=r*i » ≡ « U = R × I ») est correcte sans passer par l'embedding —
+    // les embeddings comparent mal les écritures symboliques.
+    const studentSym = this.normalizeSymbolic(studentAnswer)
+    if (studentSym && correctList.some((c) => this.normalizeSymbolic(c) === studentSym)) {
+      return {
+        is_correct: true,
+        score: 1.0,
+        strategy: 'exact',
+        explanation: 'Correct (correspondance exacte).',
+        decision_zone: 'high'
+      }
+    }
+
     try {
       // Load model
       const model = await this.getModel()
@@ -245,6 +410,18 @@ class SemanticService {
         const overlap = this.computeKeywordOverlap(studentKeywords, correctKeywords)
 
         isCorrect = overlap >= KEYWORD_OVERLAP_THRESHOLD
+      }
+
+      // Garde anti-inversion : les embeddings scorent haut sur « Y divisé par X »
+      // quand la réponse attendue est « X divisé par Y » — on rejette explicitement.
+      if (isCorrect && this.detectInversion(bestRef, studentNorm)) {
+        return {
+          is_correct: false,
+          score: parseFloat(bestScore.toFixed(4)),
+          strategy: 'semantic',
+          explanation: `Incorrect (ordre des termes inversé, similarity=${bestScore.toFixed(2)}).`,
+          decision_zone: 'inversion'
+        }
       }
 
       // generation d'explication

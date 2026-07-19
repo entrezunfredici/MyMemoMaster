@@ -131,17 +131,46 @@ describe('SemanticService', () => {
       expect(result.strategy).toBe('semantic')
     })
 
-    it('should always return strategy as "semantic"', async () => {
-      const tests = [
-        { correct: 'test', student: 'test' },
+    it('should return strategy "semantic" when answers differ, "exact" on symbolic match', async () => {
+      const semanticCases = [
         { correct: ['test1', 'test2'], student: 'student' },
-        { correct: 'correct', student: '' }
+        { correct: 'correct', student: 'different answer' }
       ]
-
-      for (const test of tests) {
+      for (const test of semanticCases) {
         const result = await SemanticService.gradeSemantic(test.correct, test.student)
         expect(result.strategy).toBe('semantic')
       }
+
+      // Copie exacte (à la normalisation symbolique près) : court-circuit sans embedding
+      const exact = await SemanticService.gradeSemantic('test', 'test')
+      expect(exact.strategy).toBe('exact')
+      expect(exact.is_correct).toBe(true)
+      expect(exact.score).toBe(1.0)
+    })
+
+    it('gradeSemantic - formule équivalente à la normalisation près - correcte sans embedding', async () => {
+      const result = await SemanticService.gradeSemantic('U = R × I', 'u=r*i')
+      expect(result.is_correct).toBe(true)
+      expect(result.strategy).toBe('exact')
+      expect(result.score).toBe(1.0)
+    })
+
+    it('gradeSemantic - formule en délimiteurs KaTeX ($…$, \\cdot) - correcte sans embedding', async () => {
+      const result = await SemanticService.gradeSemantic('$U = R \\cdot I$', 'U = R × I')
+      expect(result.is_correct).toBe(true)
+      expect(result.strategy).toBe('exact')
+    })
+
+    it('gradeSemantic - opérandes inversés avec similarité maximale - rejetés (garde anti-inversion)', async () => {
+      // Anagramme : même somme de char codes → le mock produit des vecteurs identiques
+      // (similarité 1.0), seule la garde anti-inversion peut rejeter.
+      const result = await SemanticService.gradeSemantic(
+        'la masse divisée par le volume',
+        'le volume divisée par la masse'
+      )
+      expect(result.is_correct).toBe(false)
+      expect(result.decision_zone).toBe('inversion')
+      expect(result.explanation).toContain('inversé')
     })
 
     it('should include decision_zone in response', async () => {
@@ -160,6 +189,60 @@ describe('SemanticService', () => {
       const result = await SemanticService.gradeSemantic('test answer', 'student answer')
       expect(result.explanation).toBeDefined()
       expect(typeof result.explanation).toBe('string')
+    })
+  })
+
+  describe('normalizeSymbolic', () => {
+    it('unifie casse, espaces, opérateurs et délimiteurs KaTeX', () => {
+      expect(SemanticService.normalizeSymbolic('U = R × I')).toBe('u=r*i')
+      expect(SemanticService.normalizeSymbolic('$p = F \\cdot S$')).toBe('p=f*s')
+      expect(SemanticService.normalizeSymbolic('a ÷ b')).toBe('a/b')
+      expect(SemanticService.normalizeSymbolic('')).toBe('')
+      expect(SemanticService.normalizeSymbolic(null)).toBe('')
+    })
+  })
+
+  describe('detectInversion', () => {
+    it('détecte une inversion stricte des opérandes (divisé par)', () => {
+      expect(
+        SemanticService.detectInversion(
+          'la masse divisée par le volume',
+          'le volume divisé par la masse'
+        )
+      ).toBe(true)
+    })
+
+    it('détecte une inversion entre séparateurs différents de la même famille', () => {
+      expect(
+        SemanticService.detectInversion(
+          'la masse par unité de volume',
+          'le volume sur la masse'
+        )
+      ).toBe(true)
+    })
+
+    it("ne se déclenche pas quand l'ordre est respecté", () => {
+      expect(
+        SemanticService.detectInversion(
+          'la masse par unité de volume',
+          'la masse divisée par le volume'
+        )
+      ).toBe(false)
+    })
+
+    it("ne se déclenche pas quand l'une des phrases n'a pas de séparateur de rapport", () => {
+      expect(
+        SemanticService.detectInversion('la masse par unité de volume', 'la masse volumique')
+      ).toBe(false)
+    })
+
+    it('ne se déclenche pas sur des opérandes sans recouvrement', () => {
+      expect(
+        SemanticService.detectInversion(
+          'la masse divisée par le volume',
+          'la tension divisée par la résistance'
+        )
+      ).toBe(false)
     })
   })
 

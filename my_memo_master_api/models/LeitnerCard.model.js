@@ -22,9 +22,21 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      // Nœud de la carte mentale liée au système (id interne au JSON MindMap.mindMapJson)
+      mindMapNodeId: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        defaultValue: null
+      },
       idBox: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: true,
+        references: {
+          model: 'LeitnerBox',
+          key: 'idBox'
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       next_review_at: {
         type: DataTypes.DATE,

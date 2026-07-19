@@ -60,32 +60,39 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run lint
 
+      # OWASP A06 — composants vulnérables : bloque si une dépendance de production
+      # a une vulnérabilité high/critical connue (les devDependencies sont exclues,
+      # elles n'entrent pas dans les images déployées)
+      - name: Audit Dependencies (OWASP A06)
+        working-directory: ${{ matrix.path }}
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Build
         if: matrix.service == 'front'
         working-directory: ${{ matrix.path }}
         run: npm run build
 
-  # sonar_analysis:
-  #   name: Run SonarQube Analysis
-  #   runs-on: ubuntu-latest
-  #   needs: [test, lint]
-  #   if: success()
-  #   steps:
-  #     - name: Checkout Code
-  #       uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
+  # Analyse statique continue sur SonarCloud (SonarQube Cloud) — remplace
+  # l'instance SonarQube auto-hébergée. Un seul projet (monorepo).
+  # Limité à main : l'analyse multi-branches est une fonctionnalité payante
+  # de SonarCloud — le plan gratuit n'accepte que la branche principale.
+  # Config du scanner : sonar-project.properties à la racine.
+  # Prérequis : secret SONAR_TOKEN (token généré sur sonarcloud.io) et
+  # Automatic Analysis désactivée sur le projet SonarCloud.
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    needs: test_and_lint
+    if: success() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # Historique complet requis par Sonar pour attribuer le "new code"
+          fetch-depth: 0
 
-  #     - name: Run SonarQube Prod Scan
-  #       if: github.ref == 'refs/heads/main'
-  #       uses: sonarsource/sonarqube-scan-action@v3
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_PROD_TOKEN }}
-  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-  #     - name: Run SonarQube PreProd Scan
-  #       if: github.ref != 'refs/heads/main'
-  #       uses: sonarsource/sonarqube-scan-action@v3
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_PREPROD_TOKEN }}
-  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io

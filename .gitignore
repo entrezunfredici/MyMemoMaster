@@ -9,8 +9,9 @@ node_modules
 cadrage
 yarn.lock
 
-server_docker_compose/server_proxy/
-
 # Secrets k8s — contiennent des tokens réels, ne jamais commiter
 k8s/cert-manager/cloudflare-secret.yml
 k8s/kubeconfig/
+
+# Dossier de rendu B2 — copie des docs pour livraison hors dépôt
+annexes/

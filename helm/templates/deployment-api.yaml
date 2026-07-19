@@ -15,15 +15,24 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-api
-      {{- if .Values.rolloutTimestamp }}
       annotations:
+        # Cibles découvertes par le Prometheus du chart (kubernetes_sd_configs role: pod)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /metrics
+        {{- if .Values.rolloutTimestamp }}
         rollout-timestamp: {{ .Values.rolloutTimestamp | quote }}
-      {{- end }}
+        {{- end }}
     spec:
       containers:
         - name: api
           image: {{ include "mmm.imageApi" . }}
           imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: metrics
+              containerPort: 9090
           envFrom:
             - configMapRef:
                 name: {{ include "mmm.configName" . }}

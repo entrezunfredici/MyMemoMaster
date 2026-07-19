@@ -152,11 +152,20 @@ spec:
     metadata:
       labels:
         app: mmm-prod-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: api
           image: fredissimo/mymemomaster_api:latest
           imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: metrics
+              containerPort: 9090
           envFrom:
             - configMapRef:
                 name: mmm-prod-config

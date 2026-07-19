@@ -2,14 +2,14 @@
 
 ## Partie 1: Présentation
 
-MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leur révisions. En centralisant diverses fonctionnalités visant à optimiser l’apprentissage. La ou MyMEmoMaster pourra se démarquer de ces concurrents c’est sur le fait de proposer un large éventail de fonctionnalités :
-[.env.example](.env.example)
-Les fonctionnalitées principales sont :
-⇒ un éditeur de cartes mentales
-⇒ un système de leitner
-⇒ une fonctionnalitée exercices
+MyMemoMaster est une plateforme qui a pour but d'aider les étudiants dans leurs révisions, en centralisant diverses fonctionnalités visant à optimiser l'apprentissage. Là où MyMemoMaster se démarque de ses concurrents, c'est par le large éventail de fonctionnalités proposées.
 
-L'applications disposera de fonctionnalitées interactives.
+Les fonctionnalités principales sont :
+⇒ un éditeur de cartes mentales
+⇒ un système de Leitner
+⇒ une fonctionnalité exercices
+
+L'application dispose de fonctionnalités interactives.
 
 ## Partie 2: À l'attention des collaborateurs
 
@@ -34,7 +34,7 @@ MyMemoMaster
 
 ### Bien commencer:
 
-1. Logiciels nécéssaires:
+1. Logiciels nécessaires :
 
 - Postman ⇒ https://www.postman.com
 - VS Code ⇒ https://code.visualstudio.com
@@ -65,7 +65,7 @@ cd MyMemoMaster
 docker-compose down ; docker-compose up --build
 ```
 
-A noter, le docker compose dispose d'un reverseproxy (traefik), lorsque vous demmarez le projet avec docker, le font est accéssible à l'adresse :
+À noter : le docker compose dispose d'un reverse proxy (Traefik). Lorsque vous démarrez le projet avec Docker, le front est accessible à l'adresse :
 
 ```
  http://localhost/
@@ -112,72 +112,72 @@ cd MyMemoMaster/my_memo_master_api
 npm run seed
 ```
 
-6. Configurer PGAdmin:
-   6.1. PgAdmin Docker:
-   Ouvrez votre navigateur et allez à l'adresse suivante: http://localhost:5050
-   entrer les identifiants définis dans le .env
-   une fois connecté, faire un clic droit sur "Servers" passer sa souris sur "nouveau" puis cliquer sur "Server"
-   remplir les champs comme suit:
-   dans l'ongle général:
+6. Configurer PgAdmin :
+   6.1. PgAdmin Docker :
+   Ouvrez votre navigateur et allez à l'adresse suivante : http://localhost:5050
+   Entrez les identifiants définis dans le .env.
+   Une fois connecté, faites un clic droit sur "Servers", passez la souris sur "Nouveau" puis cliquez sur "Server".
+   Remplissez les champs comme suit :
+   dans l'onglet Général :
 
-- Name: my memo master (ou le nom que vous voulez)
-  dans l'oglet Connexion
-- Nom d'hôte/Adresse: la valeur de PG_HOST dans le .env
-- Port: la valeur de PG_PORT dans le .env
-- identifiant de connexion: la valeur de PG_USER dans le .env
-- Mot de passe: la valeur de PG_PASS dans le .env
-  Pour finir cliquer sur "Enregistrer"
-  6.2. PgAdmin local:
-  Télerchargez Postgres SQL et PG admin sur votre machine
-  Ouvrez PGAdmin et connectez vous avec les identifiants définis dans le .env
-  creer la base de donnée "PG_DB"
+- Name : my memo master (ou le nom que vous voulez)
+  dans l'onglet Connexion :
+- Nom d'hôte/Adresse : la valeur de PG_HOST dans le .env
+- Port : la valeur de PG_PORT dans le .env
+- Identifiant de connexion : la valeur de PG_USER dans le .env
+- Mot de passe : la valeur de PG_PASS dans le .env
+  Pour finir, cliquez sur "Enregistrer".
+  6.2. PgAdmin local :
+  Téléchargez PostgreSQL et PgAdmin sur votre machine.
+  Ouvrez PgAdmin et connectez-vous avec les identifiants définis dans le .env.
+  Créez la base de données "PG_DB".
 
-### Methode de travail:
+### Méthode de travail :
 
-Etape 1, se caller sur la branche dev:
+Étape 1, se caler sur la branche dev :
 
 ```sh
 git checkout dev
 git pull
 ```
 
-Etape 2, créer une branche pour la feature que vous souhaitez ajouter:
+Étape 2, créer une branche pour la feature que vous souhaitez ajouter :
 
 ```sh
 git checkout -b dev_front/back_ma-feature
 ```
 
-Etape 3, travailler sur votre feature:
+Étape 3, travailler sur votre feature :
 
 1. tests unitaires
 2. code
 3. documentation swagger
 
-Etape 4, pusher sur votre branche (chaques fin de séance et quand votre feature est finie):
+Étape 4, pusher sur votre branche (à chaque fin de séance et quand votre feature est finie) :
 quand votre branche n'est pas encore sur git
 
 ```sh
 git add .
-git commmit -m "`<message>`"
+git commit -m "`<message>`"
 git push origin dev_front/back_ma-feature
 ```
 
-quand votre branche est déja sur git
+quand votre branche est déjà sur git
 
 ```sh
 git add .
-git commmit -m "`<message>`"
+git commit -m "`<message>`"
 git push
 ```
 
-Règles de nommage du commit:
-un adjectif:
+Règles de nommage du commit :
+un préfixe :
 
-- [ADD] pour les ajouts de fonctionnalitées
-- [IMP] pour les améliorations de fonctionnalitées
+- [ADD] pour les ajouts de fonctionnalités
+- [IMP] pour les améliorations de fonctionnalités
 - [REF] pour les refactorisations
 - [FIX] pour les corrections de bugs
-  suivi d'une courte description de la fonctionnalitée ajoutée ou modifiée
+  suivi d'une courte description de la fonctionnalité ajoutée ou modifiée
 
 Workflow
 
@@ -200,6 +200,9 @@ flowchart TD
 ---
 
 ## Partie 3 : Déploiement
+
+> **Manuels de déploiement détaillés** : [docs/MANUEL_DEPLOIEMENT_VPS.md](docs/MANUEL_DEPLOIEMENT_VPS.md) (environnement test) et [docs/MANUEL_DEPLOIEMENT_KUBERNETES.md](docs/MANUEL_DEPLOIEMENT_KUBERNETES.md) (preprod/prod via **Helm**).
+> Cette partie reste la référence pour les **secrets et variables GitHub Actions** (CI/CD). Les sections preprod/prod ci-dessous décrivent le déploiement historique par `kubectl apply -f k8s/…` : depuis la migration Helm (2026-06-30), le CD déploie via `helm upgrade --install` avec le chart [helm/](helm/) — seuls les prérequis cluster (cert-manager, secret Cloudflare, ClusterIssuers) et la création des Secrets applicatifs restent d'actualité tels quels.
 
 ### Vue d'ensemble
 
@@ -269,27 +272,30 @@ base64 -w0 config-infomaniak-preprod
 | Variable             | Valeur   | Description                                                                             |
 | -------------------- | -------- | --------------------------------------------------------------------------------------- |
 | `K8S_PROD_ENABLED` | `true` | Active le déploiement prod. À ajouter uniquement quand le cluster prod K8s est prêt. |
+| `K8S_PREPROD_ENABLED` | `true` | Active le déploiement preprod. Absente = job skippé (cluster preprod en pause pour raisons de coût depuis 2026-07-12). |
 
 ---
 
 ### Environnement TEST — VPS (docker compose)
 
 Le VPS fait tourner l'environnement de test via docker compose.
-Le fichier `server_docker_compose/docker-compose.yml` est déployé automatiquement par le CD.
+Le `docker-compose.yml` racine (unifié dev/test) est déployé automatiquement par le CD,
+qui n'y active que le profil `test` (`--profile test`).
 
 **Prérequis sur le VPS :**
 
-Créer le fichier `/var/www/html/my_memo_master_test/.env` en copiant et remplissant `server_docker_compose/.env.example` :
+Créer le fichier `/var/www/html/my_memo_master_test/.env` en copiant et remplissant `.env.test.example` :
 
 ```bash
 mkdir -p /var/www/html/my_memo_master_test
-cp server_docker_compose/.env.example /var/www/html/my_memo_master_test/.env
+cp .env.test.example /var/www/html/my_memo_master_test/.env
 nano /var/www/html/my_memo_master_test/.env
 ```
 
 Variables obligatoires à renseigner dans ce `.env` :
 
 ```env
+COMPOSE_PROFILES=test                     # active les services VPS du compose unifié
 ENVIRONMENT=test                          # NE PAS CHANGER — vérifié par le CD
 
 IMAGE_API=fredissimo/mymemomaster_test_api:latest
@@ -470,9 +476,9 @@ Puis dans GitHub **Settings → Variables → Actions**, ajouter `K8S_PROD_ENABL
 ├── ci.yml                  — Tests, lint, build (toutes les branches)
 └── cd.yml                  — Build Docker + déploiement (dev/staging/main)
 
-server_docker_compose/
-├── docker-compose.yml      — Déployé sur le VPS test par le CD
-└── .env.example            — Template à copier en .env sur le VPS
+docker-compose.yml          — Compose unifié : profil dev (local) + profil test (VPS, déployé par le CD)
+.env.example                — Template .env dev local
+.env.test.example           — Template à copier en .env sur le VPS test
 
 k8s/
 ├── cert-manager/           — ClusterIssuers Let's Encrypt + secret Cloudflare

@@ -153,7 +153,29 @@ describe('TestService', () => {
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: ' PARIS ' }])
       expect(result.results[0].correct).toBe(true)
       expect(result.results[0].explanation).toBe('Correct (similarity=0.99).')
-      expect(semanticService.gradeSemantic).toHaveBeenCalledWith('Paris', 'PARIS')
+      expect(semanticService.gradeSemantic).toHaveBeenCalledWith(['Paris'], 'PARIS')
+    })
+
+    it('open — formulations alternatives (accepted_answers) transmises à la correction', async () => {
+      Test.findByPk.mockResolvedValue({
+        userId: null,
+        question: [
+          makeQuestion(1, 'open', {
+            correct_answer: 'U = R × I',
+            accepted_answers: ["la tension est égale à la résistance multipliée par l'intensité", '  ']
+          })
+        ]
+      })
+      TestResult.create.mockResolvedValue({ resultId: 1 })
+      semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 1, explanation: 'Correct (correspondance exacte).', decision_zone: 'high' })
+
+      const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: 'u=r*i' }])
+      expect(result.results[0].correct).toBe(true)
+      // Les vides sont filtrés, la principale et l'alternative sont transmises ensemble
+      expect(semanticService.gradeSemantic).toHaveBeenCalledWith(
+        ['U = R × I', "la tension est égale à la résistance multipliée par l'intensité"],
+        'u=r*i'
+      )
     })
 
     it('open — réponse vide est incorrecte', async () => {

@@ -2,14 +2,27 @@
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
+// Exposants Unicode -> chiffres (x2 -> x^{2}, s-1 -> s^{-1}, en exposant)
+const SUPERSCRIPTS = {
+  '\u2070': '0', '\u00B9': '1', '\u00B2': '2', '\u00B3': '3', '\u2074': '4',
+  '\u2075': '5', '\u2076': '6', '\u2077': '7', '\u2078': '8', '\u2079': '9',
+  '\u207B': '-'
+}
+
 // Convertit tes raccourcis en LaTeX
 export function toLatex(src) {
   let s = String(src ?? '').trim()
 
   // Normalisations rapides
   s = s
-    .replace(/\u00B2/g, '^2')     // x² -> x^2
-    .replace(/\u00B3/g, '^3')     // x³ -> x^3
+    // Suites d'exposants Unicode -> ^{...} accole (x2, s-1, m3 en exposant)
+    .replace(/[\u00B2\u00B3\u2070\u00B9\u2074-\u2079\u207B]+/g, (run) =>
+      '^{' + run.split('').map((c) => SUPERSCRIPTS[c] ?? c).join('') + '}'
+    )
+    // Accolades obligatoires : sans elles LaTeX ne met en exposant que le premier
+    // caractere (s^-2 affichait le 2 en taille normale, x^10 le 0)
+    .replace(/\^\(([^()]+)\)/g, '^{$1}')      // x^(n+1) -> x^{n+1}
+    .replace(/\^(-?\d+(?:\.\d+)?)/g, '^{$1}') // s^-2, x^10, y^1.5
     .replace(/->/g, '\\to ')
     .replace(/>=/g, '\\ge ')
     .replace(/<=/g, '\\le ')
@@ -29,7 +42,9 @@ export function toLatex(src) {
     .replace(/\bsqrt\(([^()]*)\)/g, '\\sqrt{$1}')
     .replace(/\bnsqrt\(([^,]+),\s*([^()]+)\)/g, '\\sqrt[$1]{$2}')
 
-  // frac/over
+  // over — syntaxe canonique de la fraction ; frac reste interprété pour le
+  // contenu historique mais n'est plus proposé ni accepté à la saisie
+  // (normalizeFormulaSyntax le réécrit en over)
   s = s
     .replace(/\bfrac\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
     .replace(/\bover\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
@@ -97,4 +112,43 @@ export function renderMathMultiline(input) {
     .filter(Boolean)
 
   return lines.map(l => renderMath(l, { displayMode: true })).join('')
+}
+
+// Échappe le HTML des segments de texte brut (le résultat est injecté en v-html)
+export function escapeHtml(input) {
+  return String(input ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// true si le texte contient au moins une formule délimitée $…$
+export function hasFormula(input) {
+  return /\$[^$]+\$/.test(String(input ?? ''))
+}
+
+// Réécrit les alias de syntaxe vers la forme canonique unique (frac -> over),
+// pour qu'une même formule n'ait qu'une seule écriture stockée : la correction
+// des réponses compare des chaînes, deux écritures d'une même fraction seraient
+// sinon jugées différentes. Appliqué à l'insertion (FormulaHelper) et avant
+// tout envoi de question/réponse à l'API.
+export function normalizeFormulaSyntax(input) {
+  return String(input ?? '').replace(/\bfrac\(/g, 'over(')
+}
+
+// Texte mixte -> HTML : les segments entre $…$ sont rendus en KaTeX inline,
+// le reste est échappé tel quel. Un '$' non apparié reste littéral.
+// Utilisé pour les énoncés/réponses des flashcards Leitner et des exercices.
+export function renderInlineMath(input) {
+  const src = String(input ?? '')
+  if (!src.includes('$')) return escapeHtml(src)
+
+  // Les index impairs du split correspondent aux groupes capturés (formules)
+  return src
+    .split(/\$([^$]+)\$/g)
+    .map((segment, i) =>
+      i % 2 === 1 ? renderMath(segment, { displayMode: false }) : escapeHtml(segment)
+    )
+    .join('')
 }

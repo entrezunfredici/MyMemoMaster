@@ -10,12 +10,17 @@ const optionalSubjectId = body('subjectId')
   .isInt({ min: 1 })
   .withMessage('subjectId doit être un entier positif')
 
+const optionalIdMindMap = body('idMindMap')
+  .optional({ nullable: true })
+  .isInt({ min: 1 })
+  .withMessage('idMindMap doit être un entier positif')
+
 const boolRight = (field) =>
   body(field).optional({ nullable: true }).isBoolean().withMessage(`${field} doit être un booléen`)
 
-exports.create = [nameRules, optionalSubjectId]
+exports.create = [nameRules, optionalSubjectId, optionalIdMindMap]
 
-exports.update = [nameRules, optionalSubjectId]
+exports.update = [nameRules, optionalSubjectId, optionalIdMindMap]
 
 exports.share = [
   body('idUserShared').isInt({ min: 1 }).withMessage('idUserShared doit être un entier positif'),

@@ -20,6 +20,12 @@ exports.register = async (req, res) => {
     )
     res.status(201).send({ message: 'Inscription réussie ! Vérifiez votre email pour activer votre compte.' })
   } catch (error) {
+    // OWASP F-M4 — doublon d'email : cas attendu (pré-check du service) et race condition
+    // entre findByEmail et create (contrainte UNIQUE de la base) → 400, pas 500
+    if (error?.name === 'SequelizeUniqueConstraintError' || error?.message === 'Email déjà utilisé') {
+      logger.warn(`Inscription refusée — email déjà utilisé : ${req.body?.email} (IP ${req.ip})`)
+      return res.status(400).send({ message: 'Cet email est déjà utilisé.' })
+    }
     logger.error(error?.message || error)
     if (newUser) {
       await userService.delete(newUser.userId).catch((e) => logger.error(e?.message || e))
@@ -33,16 +39,26 @@ exports.login = async (req, res) => {
     const { email, password } = req.body
 
     const user = await userService.findByEmail(email)
-    if (!user) return res.status(401).send({ message: 'Identifiants invalides.' })
+    if (!user) {
+      // OWASP A09 : les échecs d'authentification sont journalisés (détection bruteforce a posteriori)
+      logger.warn(`Échec de connexion — email inconnu : ${email} (IP ${req.ip})`)
+      return res.status(401).send({ message: 'Identifiants invalides.' })
+    }
 
     const isPasswordValid = await userService.verifyPassword(user.userId, password)
-    if (!isPasswordValid) return res.status(401).send({ message: 'Identifiants invalides.' })
+    if (!isPasswordValid) {
+      logger.warn(`Échec de connexion — mot de passe invalide pour ${email} (IP ${req.ip})`)
+      return res.status(401).send({ message: 'Identifiants invalides.' })
+    }
 
     if (!user.hasValidatedEmail) {
+      // OWASP F-M8 : les refus d'accès (403) sont journalisés
+      logger.warn(`Connexion refusée — email non vérifié : ${email} (IP ${req.ip})`)
       return res.status(403).send({ message: 'Veuillez vérifier votre adresse email avant de vous connecter.' })
     }
 
     if (user.isActive === false) {
+      logger.warn(`Connexion refusée — compte désactivé : ${email} (IP ${req.ip})`)
       return res.status(403).send({ message: 'Votre compte a été désactivé. Contactez un administrateur.' })
     }
 
@@ -150,7 +166,7 @@ exports.forgotPassword = async (req, res) => {
     const code = await userService.setResetPasswordCode(user.userId)
     await sendEmail(
       'Réinitialisation de mot de passe - MyMemoMaster',
-      `Votre token de réinitialisation est :\n\n${code}\n\nCopiez-collez ce token dans le formulaire de réinitialisation.\nIl est valable 30 minutes.`,
+      `Bonjour ${user.name},\n\nVotre code de réinitialisation est :\n\n${code}\n\nSaisissez ce code dans le formulaire de réinitialisation.\nIl est valable 15 minutes.\n\nSi vous n'avez pas demandé cette réinitialisation, ignorez cet email.`,
       email
     )
 
@@ -165,12 +181,16 @@ exports.resetPassword = async (req, res) => {
   const { email, code, newPassword } = req.body
   try {
     const user = await userService.findByEmail(email)
-    if (!user) return res.status(404).send({ message: 'Utilisateur introuvable.' })
+    // CHOIX: 401 "Code invalide" même si l'email est inconnu (pas de 404)
+    // RAISON: anti-énumération de comptes, aligné sur la réponse générique de forgot-password
+    if (!user) return res.status(401).send({ message: 'Code invalide.' })
 
     if (!(await userService.verifyResetPasswordCode(user.userId, code)))
       return res.status(401).send({ message: 'Code invalide.' })
 
     await userService.setPassword(user.userId, newPassword)
+    // Révocation des sessions actives après reset (standard OWASP) : le refresh token est invalidé
+    await userService.clearRefreshToken(user.userId)
 
     res.status(201).send({ message: 'Mot de passe réinitialisé avec succès.' })
   } catch (error) {

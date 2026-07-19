@@ -6,7 +6,7 @@
       <h4 class="palette__section-title">Créer</h4>
       <div class="palette__field palette__field--row">
         <label class="palette__label">Type par défaut</label>
-        <select class="palette__select palette__select--inline" :value="store.nodeType" @change="store.setNodeType($event.target.value)">
+        <select aria-label="Type par défaut" class="palette__select palette__select--inline" :value="store.nodeType" @change="store.setNodeType($event.target.value)">
           <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
         </select>
       </div>
@@ -47,7 +47,7 @@
       <!-- Type du nœud -->
       <div class="palette__field palette__field--row">
         <label class="palette__label">Type</label>
-        <select class="palette__select palette__select--inline" :value="selectedNode.type" @change="updateNodeType($event.target.value)">
+        <select aria-label="Type du nœud" class="palette__select palette__select--inline" :value="selectedNode.type" @change="updateNodeType($event.target.value)">
           <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
         </select>
       </div>
@@ -55,7 +55,7 @@
       <!-- Maîtrise -->
       <div class="palette__field">
         <label class="palette__label">Maîtrise</label>
-        <select class="palette__select" :value="selectedNode.mastery" @change="updateMastery($event.target.value)">
+        <select aria-label="Niveau de maîtrise" class="palette__select" :value="selectedNode.mastery" @change="updateMastery($event.target.value)">
           <option v-for="level in masteryLevels" :key="level.id" :value="level.id">{{ level.label }}</option>
         </select>
       </div>
@@ -63,7 +63,7 @@
       <!-- Couleur de fond + forme -->
       <div class="palette__field palette__field--row">
         <label class="palette__label">Fond</label>
-        <input type="color" class="palette__color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
+        <input aria-label="Couleur de fond" type="color" class="palette__color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
       </div>
 
       <div class="palette__field">
@@ -82,11 +82,11 @@
       <template v-if="isTextNodeSelected">
         <div class="palette__field palette__field--row">
           <label class="palette__label">Couleur texte</label>
-          <input type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
+          <input aria-label="Couleur du texte" type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
         </div>
         <div class="palette__field palette__field--row">
           <label class="palette__label">Taille (px)</label>
-          <input
+          <input aria-label="Taille du texte en pixels"
             type="number"
             class="palette__number"
             min="10" max="48"
@@ -111,7 +111,7 @@
       <template v-if="isFormulaNodeSelected">
         <div class="palette__field palette__field--row">
           <label class="palette__label">Couleur texte</label>
-          <input type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
+          <input aria-label="Couleur du texte" type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
         </div>
         <div class="palette__field">
           <label class="palette__label">Formule</label>
@@ -128,7 +128,7 @@
       <template v-if="isImageNodeSelected">
         <div class="palette__field">
           <label class="palette__label">Image</label>
-          <input ref="imageInputRef" type="file" accept="image/*" class="palette__file-hidden" @change="handleImageSelection" />
+          <input aria-label="Choisir un fichier image" ref="imageInputRef" type="file" accept="image/*" class="palette__file-hidden" @change="handleImageSelection" />
           <div class="palette__actions-row">
             <button class="palette__btn" type="button" @click="triggerImageSelection" :disabled="isUploadingImage">
               {{ isUploadingImage ? 'Envoi…' : 'Choisir une image' }}
@@ -165,7 +165,7 @@
 
         <!-- Picker inline -->
         <div v-if="showCardPicker" class="palette__card-picker">
-          <select
+          <select aria-label="Système de Leitner source"
             class="palette__select"
             :value="pickerSystemId"
             @change="onPickerSystemChange($event.target.value)"
@@ -178,7 +178,7 @@
 
           <div v-if="pickerLoading" class="palette__hint">Chargement…</div>
 
-          <select
+          <select aria-label="Carte à lier"
             v-else-if="pickerCards.length"
             class="palette__select"
             v-model="pickerCardId"
@@ -221,11 +221,11 @@
     <section class="palette__section">
       <h4 class="palette__section-title">Zones</h4>
       <div class="palette__field">
-        <input class="palette__input" v-model="zoneName" placeholder="Nom de la zone" />
+        <input aria-label="Nom de la zone" class="palette__input" v-model="zoneName" placeholder="Nom de la zone" />
       </div>
       <div class="palette__field palette__field--row">
         <label class="palette__label">Couleur</label>
-        <input type="color" class="palette__color" v-model="zoneColor" />
+        <input aria-label="Couleur de la zone" type="color" class="palette__color" v-model="zoneColor" />
       </div>
       <button class="palette__btn" @click="createZone">Créer une zone</button>
       <div v-if="zones.length && selectedNode" class="palette__zone-assign">
@@ -250,7 +250,7 @@
       <div class="interp-modal__dialog">
         <div class="interp-modal__header">
           <h3>Interpréteur de formules</h3>
-          <button type="button" class="interp-modal__close" @click="closeInterpreter">&times;</button>
+          <button aria-label="Fermer l'interpréteur" type="button" class="interp-modal__close" @click="closeInterpreter">&times;</button>
         </div>
         <Interpreter
           v-model="interpreterValue"

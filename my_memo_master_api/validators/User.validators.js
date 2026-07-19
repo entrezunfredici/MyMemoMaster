@@ -1,5 +1,6 @@
 const { body } = require('express-validator')
 
+// OWASP F-M2 — le caractère spécial est exigé en plus de la majuscule et du chiffre
 const passwordRules = body('password')
   .isLength({ min: 10 })
   .withMessage('Le mot de passe doit contenir au moins 10 caractères')
@@ -7,6 +8,8 @@ const passwordRules = body('password')
   .withMessage('Le mot de passe doit contenir au moins une majuscule')
   .matches(/[0-9]/)
   .withMessage('Le mot de passe doit contenir au moins un chiffre')
+  .matches(/[^a-zA-Z0-9]/)
+  .withMessage('Le mot de passe doit contenir au moins un caractère spécial')
 
 const newPasswordRules = body('newPassword')
   .isLength({ min: 10 })
@@ -15,6 +18,8 @@ const newPasswordRules = body('newPassword')
   .withMessage('Le mot de passe doit contenir au moins une majuscule')
   .matches(/[0-9]/)
   .withMessage('Le mot de passe doit contenir au moins un chiffre')
+  .matches(/[^a-zA-Z0-9]/)
+  .withMessage('Le mot de passe doit contenir au moins un caractère spécial')
 
 const emailRules = body('email').isEmail().withMessage('Email invalide').normalizeEmail()
 
@@ -35,15 +40,13 @@ exports.resetPassword = [
   emailRules,
   body('code')
     .trim()
-    .isHexadecimal()
-    .withMessage('Token invalide')
-    .isLength({ min: 64, max: 64 })
-    .withMessage('Token invalide'),
+    .matches(/^\d{6}$/)
+    .withMessage('Code invalide'),
   newPasswordRules
 ]
 
+// OWASP F-M3 — pas de règle body('id') : le controller utilise req.user.id (JWT), jamais le body
 exports.changePassword = [
-  body('id').isInt({ min: 1 }).withMessage('ID invalide'),
   body('oldPassword').notEmpty().withMessage('Ancien mot de passe requis'),
   newPasswordRules
 ]

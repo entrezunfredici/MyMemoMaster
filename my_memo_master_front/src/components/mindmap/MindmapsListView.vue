@@ -5,6 +5,7 @@ import { useToast } from 'vue-toastification'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
+import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 import { useTagStore } from '@/stores/tags'
 
 const props = defineProps({
@@ -161,21 +162,16 @@ onMounted(fetchDiagrams)
       <!-- Modal créer -->
       <div v-if="showCreateModal" class="modal-overlay" @click="showCreateModal = false">
         <div class="modal-panel" @click.stop>
-          <button @click="showCreateModal = false" class="modal-close">&times;</button>
+          <button aria-label="Fermer" @click="showCreateModal = false" class="modal-close">&times;</button>
           <h2 class="modal-title">Nouvelle carte mentale</h2>
           <form @submit.prevent="confirmCreate">
             <div class="mb-4">
               <label class="form-label">Nom</label>
-              <input v-model="createName" type="text" class="form-input" required autofocus />
+              <input aria-label="Nom de la carte mentale" v-model="createName" type="text" class="form-input" required autofocus />
             </div>
             <div class="mb-4">
               <label class="form-label">Matière</label>
-              <select v-model="createSubjectId" class="form-input">
-                <option :value="null">— Aucune matière —</option>
-                <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">
-                  {{ s.name }}
-                </option>
-              </select>
+              <SubjectSelectorComponent v-model="createSubjectId" />
             </div>
             <div class="btn-row">
               <button type="submit" class="btn-modal-submit">Créer</button>
@@ -190,16 +186,16 @@ onMounted(fetchDiagrams)
       <!-- Modal renommer -->
       <div v-if="showRenameModal" class="modal-overlay" @click="showRenameModal = false">
         <div class="modal-panel" @click.stop>
-          <button @click="showRenameModal = false" class="modal-close">&times;</button>
+          <button aria-label="Fermer" @click="showRenameModal = false" class="modal-close">&times;</button>
           <h2 class="modal-title">Modifier la carte</h2>
           <form @submit.prevent="confirmRename">
             <div class="mb-4">
               <label class="form-label">Nom</label>
-              <input v-model="editedName" type="text" class="form-input" required autofocus />
+              <input aria-label="Nouveau nom de la carte mentale" v-model="editedName" type="text" class="form-input" required autofocus />
             </div>
             <div class="mb-4">
               <label class="form-label">Matière</label>
-              <select v-model="editedSubjectId" class="form-input">
+              <select aria-label="Sujet associé" v-model="editedSubjectId" class="form-input">
                 <option :value="null">— Aucune matière —</option>
                 <option v-for="s in subjects" :key="s.subjectId" :value="s.subjectId">
                   {{ s.name }}

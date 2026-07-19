@@ -52,8 +52,8 @@
               class="flex items-start justify-between bg-white border border-gray-200 rounded-lg p-4 shadow-xs"
             >
               <div class="flex-1 min-w-0 pr-4">
-                <p class="font-semibold text-heading">{{ card.question?.statement }}</p>
-                <p class="text-sm text-gray-500 mt-1 italic">{{ card.correctAnswer || '…' }}</p>
+                <p class="font-semibold text-heading"><FormulaText :text="card.question?.statement || ''" /></p>
+                <p class="text-sm text-gray-500 mt-1 italic"><FormulaText :text="card.correctAnswer || '…'" /></p>
               </div>
               <div class="flex gap-2 flex-shrink-0">
                 <button
@@ -115,40 +115,85 @@
 
           <div class="form-group">
             <label class="form-label">Question</label>
-            <textarea
-              v-model="form.statement"
-              placeholder="Quelle est la loi d'Ohm ?"
-              class="form-input"
-              rows="3"
-              required
-            />
+            <FormulaHelper v-model="form.statement">
+              <textarea aria-label="Énoncé de la carte"
+                v-model="form.statement"
+                placeholder="Quelle est la loi d'Ohm ? (formules entre $…$)"
+                class="form-input"
+                rows="3"
+                required
+              />
+            </FormulaHelper>
           </div>
 
           <!-- Champ réponse : open uniquement -->
           <div v-if="form.type === 'open'" class="form-group--lg">
             <label class="form-label">Réponse correcte</label>
-            <textarea
-              v-model="form.answer"
-              placeholder="U = R × I"
-              class="form-input"
-              rows="2"
-              required
+            <FormulaHelper v-model="form.answer">
+              <textarea aria-label="Réponse de la carte"
+                v-model="form.answer"
+                placeholder="U = R × I"
+                class="form-input"
+                rows="2"
+                required
+              />
+            </FormulaHelper>
+          </div>
+
+          <!-- Réponses acceptées supplémentaires : open, création uniquement -->
+          <div v-if="form.type === 'open' && !editingCard" class="form-group--lg">
+            <label class="form-label">
+              Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <div v-for="(alt, ai) in form.altAnswers" :key="ai" class="flex items-center gap-2 mb-2">
+              <input
+                :aria-label="`Formulation acceptée ${ai + 1}`"
+                v-model="form.altAnswers[ai]"
+                type="text"
+                placeholder="Ex : la formule si la réponse principale est en toutes lettres"
+                class="form-input flex-1"
+              />
+              <button
+                type="button"
+                :aria-label="`Supprimer la formulation acceptée ${ai + 1}`"
+                @click="form.altAnswers.splice(ai, 1)"
+                class="text-gray-400 hover:text-red-500 text-lg leading-none"
+              >✕</button>
+            </div>
+            <button
+              type="button"
+              @click="form.altAnswers.push('')"
+              class="text-sm text-primary hover:underline font-medium"
+            >
+              + Ajouter une formulation acceptée
+            </button>
+          </div>
+
+          <!-- Nœud de la carte mentale liée (création uniquement) -->
+          <div v-if="!editingCard && mindMapJson" class="form-group--lg">
+            <label class="form-label">
+              Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <MindMapNodePicker
+              v-model="form.mindMapNodeId"
+              :mind-map-json="mindMapJson"
+              @node-selected="onNodeSelected"
             />
           </div>
 
           <!-- Options MCQ -->
-          <div v-else class="form-group--lg">
+          <div v-if="form.type !== 'open'" class="form-group--lg">
             <label class="form-label">Options (sélectionne la bonne réponse)</label>
             <div class="space-y-2">
               <div v-for="(opt, oi) in form.mcqOptions" :key="oi" class="flex items-center gap-2">
-                <input
+                <input :aria-label="`Marquer l'option ${oi + 1} comme correcte`"
                   type="radio"
                   :name="`mcq-correct-card`"
                   :checked="opt.correct"
                   @change="setMcqCorrect(oi)"
                   class="accent-primary shrink-0"
                 />
-                <input
+                <input :aria-label="`Texte de l'option ${oi + 1}`"
                   :value="opt.text"
                   @input="setOptionText(oi, $event.target.value)"
                   type="text"
@@ -201,14 +246,14 @@
       @click="closeBoxModal"
     >
       <div class="modal-panel modal-panel--sm" @click.stop>
-        <button @click="closeBoxModal" class="modal-close">&times;</button>
+        <button aria-label="Fermer" @click="closeBoxModal" class="modal-close">&times;</button>
         <h2 class="modal-title">
           {{ editingBox ? 'Modifier la boîte' : 'Nouvelle boîte' }}
         </h2>
         <form @submit.prevent="submitBoxForm">
           <div class="form-group">
             <label class="form-label">Niveau</label>
-            <input
+            <input aria-label="Niveau de la boîte"
               v-model="boxForm.level"
               type="number"
               min="1"
@@ -219,7 +264,7 @@
           </div>
           <div class="form-group--lg">
             <label class="form-label">Intervalle (secondes)</label>
-            <input
+            <input aria-label="Intervalle en secondes"
               v-model="boxForm.intervall"
               type="number"
               min="1"
@@ -253,6 +298,10 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -263,6 +312,9 @@ const systemName = ref('')
 const allCards = ref([])
 const systemBoxes = ref([])
 
+// Carte mentale liée au système (LeitnerSystem.idMindMap) — alimente le sélecteur de nœud
+const mindMapJson = ref(null)
+
 // --- cartes ---
 const showModal = ref(false)
 const submitting = ref(false)
@@ -271,8 +323,10 @@ const editingCard = ref(null)
 const form = reactive({
   statement: '',
   answer: '',
+  altAnswers: [],
   type: 'open',
   mcqOptions: [{ text: '', correct: true }, { text: '', correct: false }],
+  mindMapNodeId: null,
 })
 
 // --- boîtes ---
@@ -298,7 +352,16 @@ const loadCards = async () => {
     api.get('leitnerboxes'),
   ])
 
-  if (sysResp?.status === 200) systemName.value = sysResp.data.name
+  if (sysResp?.status === 200) {
+    systemName.value = sysResp.data.name
+    // Si le système est lié à une carte mentale, on la charge pour le sélecteur de nœud
+    if (sysResp.data.idMindMap) {
+      const mmResp = await api.get(`diagrammes/${sysResp.data.idMindMap}`)
+      mindMapJson.value = mmResp?.status === 200 ? mmResp.data?.mindMapJson || null : null
+    } else {
+      mindMapJson.value = null
+    }
+  }
   if (!boxResp || boxResp.status !== 200) return
 
   const boxes = boxResp.data.filter(b => b.idSystem === systemId).sort((a, b) => a.level - b.level)
@@ -357,10 +420,19 @@ const openAddModal = () => {
   editingCard.value = null
   form.statement = ''
   form.answer = ''
+  form.altAnswers = []
   form.type = 'open'
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  form.mindMapNodeId = null
   formError.value = ''
   showModal.value = true
+}
+
+// Pré-remplit l'énoncé avec le libellé du nœud choisi si l'énoncé est encore vide
+const onNodeSelected = (node) => {
+  if (node && !form.statement.trim()) {
+    form.statement = node.label || ''
+  }
 }
 
 const openEditModal = async (card) => {
@@ -382,8 +454,10 @@ const closeModal = () => {
   editingCard.value = null
   form.statement = ''
   form.answer = ''
+  form.altAnswers = []
   form.type = 'open'
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  form.mindMapNodeId = null
   formError.value = ''
 }
 
@@ -414,13 +488,13 @@ const handleCreate = async () => {
     }
   }
 
-  // 1. Créer la question (contenu selon le type)
+  // 1. Créer la question (contenu selon le type) — syntaxe de formule normalisée
   const questionPayload = {
-    statement: form.statement,
+    statement: normalizeFormulaSyntax(form.statement),
     questionPosition: 0,
     type: form.type,
     content: form.type === 'mcq'
-      ? { options: form.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+      ? { options: form.mcqOptions.map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) }
       : null,
   }
 
@@ -431,21 +505,32 @@ const handleCreate = async () => {
   }
   const idQuestion = qResp.data.idQuestion
 
-  // 2. Créer la réponse correcte (open uniquement — la correction MCQ est dans content)
+  // 2. Créer la ou les réponses acceptées (open uniquement — la correction MCQ est dans content).
+  // Plusieurs réponses correction=true sont supportées par la correction sémantique
+  // (meilleur score retenu) : utile pour accepter la formule ET son énoncé en toutes lettres.
   if (form.type === 'open') {
-    const rResp = await api.post('responses', {
-      content: form.answer,
-      correction: true,
-      idQuestion,
-    })
-    if (!rResp || rResp.status !== 201) {
-      formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
-      return
+    const acceptedAnswers = [form.answer, ...form.altAnswers]
+      .map((a) => a.trim())
+      .filter(Boolean)
+    for (const answer of acceptedAnswers) {
+      const rResp = await api.post('responses', {
+        content: normalizeFormulaSyntax(answer),
+        correction: true,
+        idQuestion,
+      })
+      if (!rResp || rResp.status !== 201) {
+        formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
+        return
+      }
     }
   }
 
-  // 3. Créer la carte
-  const cResp = await api.post('leitnercards', { idQuestion, idSystem: systemId })
+  // 3. Créer la carte (avec le nœud de carte mentale lié le cas échéant)
+  const cResp = await api.post('leitnercards', {
+    idQuestion,
+    idSystem: systemId,
+    mindMapNodeId: form.mindMapNodeId || null,
+  })
   if (!cResp || cResp.status !== 201) {
     formError.value = cResp?.data?.message || 'Erreur lors de la création de la carte.'
     return
@@ -467,9 +552,9 @@ const handleUpdate = async () => {
     return
   }
 
-  const qPayload = { statement: form.statement }
+  const qPayload = { statement: normalizeFormulaSyntax(form.statement) }
   if (isMcq) {
-    qPayload.content = { options: form.mcqOptions.map(o => ({ text: o.text, correct: o.correct })) }
+    qPayload.content = { options: form.mcqOptions.map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) }
   }
 
   const qResp = await api.put(`questions/edit/${card.idQuestion}`, qPayload)
@@ -481,14 +566,14 @@ const handleUpdate = async () => {
   // Réponse uniquement pour les cartes ouvertes
   if (!isMcq) {
     if (card.idResponse) {
-      const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: form.answer })
+      const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: normalizeFormulaSyntax(form.answer) })
       if (!rResp || rResp.status !== 200) {
         formError.value = rResp?.data?.message || 'Erreur lors de la mise à jour de la réponse.'
         return
       }
     } else if (form.answer.trim()) {
       const rResp = await api.post('responses', {
-        content: form.answer,
+        content: normalizeFormulaSyntax(form.answer),
         correction: true,
         idQuestion: card.idQuestion,
       })

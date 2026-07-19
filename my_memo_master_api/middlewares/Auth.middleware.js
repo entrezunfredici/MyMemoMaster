@@ -9,9 +9,12 @@ module.exports = (req, res, next) => {
     return
   }
 
-  const token = authHeader.split(' ')[1] || authHeader || null // * authHeader as 'Bearer <token>'
+  // RFC 6750 : seul le schéma "Bearer <token>" est accepté — un token nu est refusé.
+  // Tous les clients légitimes (front via helpers/api.js, Swagger UI bearerAuth)
+  // envoient le préfixe ; accepter un token sans schéma élargirait la surface d'attaque.
+  const [scheme, token, ...rest] = authHeader.split(' ')
 
-  if (!token) {
+  if (scheme !== 'Bearer' || !token || rest.length > 0) {
     res.status(401).send({ message: 'Token manquant.' })
     return
   }

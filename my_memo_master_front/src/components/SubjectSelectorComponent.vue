@@ -1,6 +1,6 @@
 <template>
   <div>
-    <select
+    <select aria-label="Sujet"
       v-model="selected"
       class="form-input"
       :required="required"
@@ -22,7 +22,7 @@
       </button>
     </div>
     <div v-else class="subject-inline-form">
-      <input
+      <input aria-label="Nom du sujet (ex : Physique)"
         ref="nameInputRef"
         v-model="newName"
         type="text"

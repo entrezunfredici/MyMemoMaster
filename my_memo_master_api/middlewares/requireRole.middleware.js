@@ -12,6 +12,10 @@ module.exports = (...allowedRoleIds) =>
     try {
       const user = await User.findByPk(req.user.id, { attributes: ['roleId', 'isActive'] })
       if (!user || !allowedRoleIds.includes(user.roleId)) {
+        // OWASP F-M8 : les refus d'accès RBAC (403) sont journalisés
+        logger.warn(
+          `Accès RBAC refusé — userId ${req.user.id} (roleId ${user?.roleId ?? 'inconnu'}) sur ${req.method} ${req.originalUrl} (IP ${req.ip})`
+        )
         return res.status(403).json({ message: 'Accès refusé. Permissions insuffisantes.' })
       }
       if (user.isActive === false) {

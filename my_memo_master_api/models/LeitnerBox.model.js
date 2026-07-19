@@ -24,7 +24,13 @@ module.exports = (instance) => {
       },
       idSystem: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: true,
+        references: {
+          model: 'LeitnerSystem',
+          key: 'idSystem'
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       }
     },
     {

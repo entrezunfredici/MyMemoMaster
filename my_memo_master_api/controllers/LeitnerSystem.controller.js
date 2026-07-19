@@ -44,13 +44,14 @@ exports.findOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, subjectId } = req.body
+    const { name, subjectId, idMindMap } = req.body
     const idUser = req.user.id
 
     const newSystem = await leitnerSystemService.create({
       name,
       idUser,
-      subjectId: subjectId || null
+      subjectId: subjectId || null,
+      idMindMap: idMindMap || null
     })
 
     // Réponse avec le nouveau système créé
@@ -64,14 +65,15 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params
-    const { name, subjectId } = req.body
+    const { name, subjectId, idMindMap } = req.body
     const idUser = req.user.id
 
     const updated = await leitnerSystemService.update({
       idSystem: id,
       idUser,
       name,
-      subjectId: subjectId !== undefined ? subjectId : undefined
+      subjectId: subjectId !== undefined ? subjectId : undefined,
+      idMindMap: idMindMap !== undefined ? idMindMap : undefined
     })
 
     if (!updated) {

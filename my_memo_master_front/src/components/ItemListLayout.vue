@@ -4,7 +4,7 @@
     <!-- Barre de recherche + bouton créer -->
     <div class="mb-6 flex gap-4 items-center">
       <div class="relative flex-1 max-w-2xl">
-        <input
+        <input aria-label="Rechercher"
           :value="search"
           @input="$emit('update:search', $event.target.value)"
           type="text"

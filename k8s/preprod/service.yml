@@ -47,8 +47,14 @@ spec:
   selector:
     app: mmm-preprod-api
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 3000
+    # Port métriques Prometheus (RED/USE) — non référencé par l'Ingress,
+    # donc injoignable depuis l'extérieur du cluster
+    - name: metrics
+      port: 9090
+      targetPort: 9090
 
 ---
 

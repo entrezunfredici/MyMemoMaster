@@ -33,6 +33,8 @@
 **Alternative écartée** : Stocker le refresh token hashé en base (sha256) — plus sécurisé si la DB est compromise, mais ajoute de la complexité sans bénéfice MVP. Le token en clair est cohérent avec l'approche des codes `validEmailCode` déjà en clair. / Refresh token dans un httpOnly cookie — pas de XSS, mais ajoute de la complexité CORS hors MVP.
 **Conséquences** : Migration `20260614000002` à passer. Si la DB est compromise, les refresh tokens actifs sont lisibles. La rotation limite la fenêtre d'exploitation. `AUTH_JWT_EXPIRES_IN=15m` et `AUTH_REFRESH_TOKEN_EXPIRES_DAYS=7` sont les nouvelles valeurs par défaut (ancienne valeur: 24h pour l'access token).
 
+> **Mise à jour [2026-07-06]** : l'alternative « stocké en clair » a été révisée par le correctif OWASP A02-H1 (ticket M-00b.07b) : `setRefreshToken` hache désormais le token en SHA-256 avant stockage, et `verifyRefreshToken` hache le token entrant avant comparaison (voir `.agents/SECURITY_AUDIT_OWASP.md`). Le token en clair ne transite que vers le client.
+
 ---
 
 ### [2026-06-15] Reset password token — hashé SHA-256, token brut envoyé par email
@@ -72,6 +74,8 @@
 **Décision** : Utiliser `better-sqlite3` comme driver SQLite principal.  
 **Alternative écartée** : `sqlite3` (api asynchrone, moins performant) — conservé dans `package.json` par précaution mais potentiellement inutilisé.  
 **Conséquences** : `better-sqlite3` est un module natif (compilation C++) — problématique sur Windows sans Windows SDK. L'image Docker Alpine compile nativement lors du build.
+
+> **Mise à jour [2026-07-06]** : cette décision ne reflète plus le code. `better-sqlite3` a disparu de `package.json`, et `config/db.config.js` ne déclare aucun `dialectModule` — Sequelize v6 utilise donc le driver par défaut `sqlite3`, qui est **requis** et ne doit pas être retiré des dépendances. Repasser à `better-sqlite3` demanderait de le réinstaller et d'ajouter `dialectModule: require('better-sqlite3')` — non justifié aujourd'hui (usage dev/test uniquement).
 
 ---
 
@@ -292,6 +296,8 @@
 ---
 
 ### [2026-06-11] server_docker_compose/ séparé du docker-compose.yml racine
+
+> ⚠️ **Révoquée le 2026-07-12** — `server_docker_compose/` a été supprimé ; le VPS test est déployé avec le compose racine et `--profile test` (voir l'entrée du 2026-07-12).
 
 **Contexte** : Le pipeline CD (`cd.yml`) déploie sur un VPS en copiant un fichier compose dédié et en le validant via `docker compose config -q`. Le `docker-compose.yml` racine contient le profil `dev` avec `build:` et un Traefik local sans HTTPS — inutilisable directement sur le VPS.
 **Décision** : Créer `server_docker_compose/docker-compose.yml` avec uniquement les 4 services VPS (`postgres`, `pgadmin`, `api`, `front`), images DockerHub, Traefik HTTPS Let's Encrypt. Les noms de services correspondent à ce que le script de déploiement CD appelle (`up -d pgadmin api front`).
@@ -763,3 +769,279 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Le sélecteur reste conditionné strictement sur `isAdmin` (roleId 1 ou 4), pas sur le nombre de vues. `availableViews` redevient additif : `plateforme` s'ajoute aux vues (étalissement/enseignant/étudiant) pour l'admin plateforme au lieu de les remplacer — un admin plateforme peut donc basculer entre les 4 vues, un admin établissement entre 3, et un enseignant/étudiant n'a pas de sélecteur (vue fixe imposée par son rôle).
 **Alternative écartée** : Garder `availableViews.length > 1` en poussant conditionnellement enseignant/étudiant selon le rôle — plus de complexité pour un gain nul, et risque de recréer la même régression au prochain ajout de vue.
 **Conséquences** : Toute nouvelle vue ajoutée à `ClassroomPage.vue` doit être poussée dans `availableViews` de façon additive (jamais en remplacement d'une vue existante) pour ne pas rompre l'invariant "le sélecteur n'apparaît que pour `isAdmin`".
+
+---
+
+### [2026-07-06] Health endpoint déclaré hors du routeur v1 (avant le rate limiter)
+**Contexte** : La readinessProbe K8s cible `/api/v1/health` toutes les 10 s. Toutes les routes v1 passent par `apiLimiter` (500 req/15 min, clé IP pour le trafic non authentifié) : la sonde kubelet aurait consommé le bucket anonyme, voire été bloquée — pods NotReady en cascade lors d'un pic.
+**Décision** : Déclarer `app.get('/api/v1/health')` directement dans `app.js`, avant le montage du routeur v1 et donc hors rate limiting. L'endpoint vérifie réellement la disponibilité de la base (`instance.authenticate()`) : 200 si OK, 503 sinon — un pod dont la DB est injoignable ne doit pas recevoir de trafic.
+**Alternative écartée** : Route dans `routes/Health.routes.js` comme les entités — rejeté car le montage via le routeur v1 la placerait derrière `apiLimiter` ; un `skip` conditionnel dans le limiteur ajouterait de la complexité pour un endpoint d'infrastructure sans logique métier.
+
+---
+
+### [2026-07-06] LeitnerBox.idSystem — FK corrigée en ON DELETE CASCADE (constraint sans nom explicite retrouvée dynamiquement)
+**Contexte** : Suppression d'un système de Leitner → 500 en prod. La FK `LeitnerBox.idSystem` (migration `20260226152200`) n'avait aucun `onDelete` défini, contrairement aux 3 autres tables enfants de `LeitnerSystem` (`LeitnerSystemsUsers`, `LeitnerSystemTag`, `cardSystems`, toutes en `CASCADE`). PostgreSQL applique `NO ACTION` par défaut → violation FK dès qu'un système (qui a toujours 5 `LeitnerBox` créées automatiquement) est supprimé.
+**Décision** : Nouvelle migration `20260706000001` qui remplace la contrainte par `ON DELETE CASCADE ON UPDATE CASCADE`, + ajout de `references`/`onDelete` sur l'attribut `idSystem` dans `LeitnerBox.model.js` (absent jusqu'ici, alors que les autres modèles comme `LeitnerSystem.model.js` déclarent systématiquement ce couple). Sur PostgreSQL, la contrainte créée par `CREATE TABLE ... REFERENCES` n'a pas de nom explicite — son nom auto-généré est retrouvé via `information_schema.table_constraints`/`key_column_usage` dans un bloc `DO $$` avant `DROP CONSTRAINT`, plutôt que de supposer `LeitnerBox_idSystem_fkey` en dur (fragile si PostgreSQL change un jour sa convention de nommage, ou si la contrainte a été recréée manuellement entre-temps).
+**Alternative écartée** : `ON DELETE SET NULL` — écarté car des `LeitnerBox` orphelines (sans système parent) n'ont aucun sens métier ; `SET NULL` est justement le comportement implicite qu'appliquait Sequelize `sync()` en dev/SQLite via les défauts de l'association `belongsTo` (FK nullable), ce qui explique pourquoi le bug ne s'est jamais manifesté en local/tests — seul PostgreSQL en prod (schéma piloté par les migrations, indépendant des associations Sequelize) était affecté.
+**Conséquences** : La suppression d'un système de Leitner supprime désormais aussi ses boîtes en cascade (comportement identique en dev/SQLite et prod/PostgreSQL). Migration testée dans les deux sens sur SQLite et sur un conteneur PostgreSQL 17 jetable avant merge. Test de non-régression `test/bdd/leitner.delete.test.js` vérifie la suppression réelle par `idBox` (pas seulement l'absence d'erreur, qu'un simple `SET NULL` aurait aussi satisfaite).
+**Conséquences** : Exception documentée au pattern controller→service (endpoint infra, pas une entité). L'endpoint est public par conception (aucune donnée sensible retournée). Le healthcheck Compose côté VPS peut désormais s'appuyer dessus.
+
+---
+
+### [2026-07-06] Métriques RED/USE — prom-client, serveur HTTP dédié sur un port séparé
+**Contexte** : Aucune métrique applicative n'existait (seulement logs Winston/Morgan + AuditLog métier). Besoin d'exposer des métriques RED (Rate, Errors, Duration) sur les requêtes HTTP et USE (Utilization, Saturation, Errors) sur le process Node, pour un futur scraping Prometheus — sans savoir encore si une stack Prometheus/Grafana existe déjà sur le cluster.
+**Décision** :
+- Dépendance `prom-client` (nouvelle, à ajouter à la liste approuvée — fait dans `CONVENTIONS.md`).
+- `helpers/metrics.js` : `Registry` dédiée (pas le registre global de prom-client), `collectDefaultMetrics()` pour l'USE (CPU, mémoire, event-loop-lag, handles — désactivé si `NODE_ENV=test` pour ne pas laisser de `setInterval` actif après les tests Jest), + 2 métriques custom pour le RED : `http_request_duration_seconds` (Histogram) et `http_requests_total` (Counter), labellisées `method`/`route`/`status_code` (Errors = filtrer `status_code >= 500` côté requête PromQL, pas une métrique séparée).
+- `middlewares/metrics.middleware.js` : instrumente chaque requête via `res.on('finish')`. Le label `route` utilise `req.route.path` (nom de route Express, ex. `/users/:id`) et non `req.originalUrl`, pour éviter l'explosion de cardinalité Prometheus si un attaquant ou un bot génère des URLs arbitraires ; les requêtes non matchées (404) sont regroupées sous le label `non_route`.
+- `GET /metrics` n'est **pas** une route Express de l'app publique : c'est un second serveur `http.createServer` démarré dans `server.js` sur `METRICS_PORT` (défaut 9090), en dehors de l'app Express/Helmet/CORS. Les Services K8s (`k8s/prod/service.yml`, `k8s/preprod/service.yml`) exposent ce port en ClusterIP, mais aucun Ingress ne le référence — le port 9090 est donc structurellement injoignable depuis l'extérieur du cluster (contrairement à un chemin `/metrics` sur le port applicatif, qui aurait été routé par l'Ingress `path: /` catch-all existant). Annotations `prometheus.io/scrape|port|path` ajoutées sur les Deployments pour un scraping par découverte de pods, sans dépendre d'un CRD `ServiceMonitor` (pas encore su si `prometheus-operator` est installé).
+- Endpoint non authentifié (choix utilisateur) : la protection vient de l'isolation réseau (port séparé, non exposé), pas d'un token applicatif.
+**Alternative écartée** : `express-prom-bundle` (wrapper tout-en-un) — écarté pour garder le contrôle explicite sur le label `route` (cardinalité) et ne pas ajouter une dépendance quand ~30 lignes suffisent. `/api/v1/metrics` sur le port applicatif existant — écarté car l'Ingress prod/preprod route tout (`path: /`, `pathType: Prefix`) vers le service API : un chemin dédié aurait nécessité soit un `configuration-snippet` nginx (annotation désactivée par défaut sur les installations récentes d'ingress-nginx, fragile), soit une règle Ingress explicite de refus — plus complexe et plus fragile qu'un port physiquement séparé. Exporters dédiés Postgres/Redis (USE infra) — hors périmètre de ce ticket (validé avec l'utilisateur), à faire si besoin dans un ticket dédié.
+**Conséquences** : Nouvelle dépendance `prom-client` en prod. `METRICS_PORT` (9090) ajouté aux ConfigMaps K8s prod/preprod ; `docker-compose.yml` n'a rien à changer (Traefik ne route déjà que le port `API_PORT`, donc 9090 n'est jamais publié côté VPS Docker). Dette : pas encore de Prometheus/Grafana déployé pour consommer ces métriques (scope à valider) ; USE limité au process Node (pas de vision CPU/mémoire host ni Postgres/Redis).
+
+---
+
+### [2026-07-06] Magic bytes uploads — signatures codées à la main plutôt que le package file-type
+**Contexte** : L'audit OWASP (A08-M2) demandait de ne plus faire confiance au MIME déclaré par le client sur les uploads. La recommandation initiale citait le package `file-type`.
+**Décision** : Implémenter `helpers/fileSignature.js` : table de signatures binaires pour les 11 types autorisés (JPEG/PNG/GIF/WebP/PDF/OOXML/CFB), croisement extension ↔ MIME au `fileFilter`, et vérification des magic bytes **sur le flux** via une fonction `contentType` custom pour multer-s3 (lit le premier chunk, rejette ou relaie via PassThrough — même mécanique que `AUTO_CONTENT_TYPE`, qui détectait sans jamais rejeter).
+**Alternative écartée** : Package `file-type` — les versions ≥17 sont ESM-only (projet CommonJS) et la v16 CJS n'est plus maintenue. Les types autorisés étant peu nombreux et leurs signatures stables, la table maison est plus simple à auditer (12 tests dédiés).
+**Conséquences** : Tout nouveau type MIME autorisé doit être ajouté dans `SIGNATURES` **et** `EXTENSIONS_BY_MIME`, sinon il sera rejeté. Le fallback disque (dev sans S3) ne vérifie que extension ↔ MIME (pas de hook de flux dans diskStorage) — acceptable, la prod est sur S3.
+
+---
+
+### [2026-07-06] sqlite3 déplacé en devDependencies + npm audit bloquant en CI (OWASP A06)
+**Contexte** : `npm audit` remontait 5 vulnérabilités high sur l'API, toutes dans la chaîne de build de `sqlite3` (node-gyp/tar/make-fetch-happen). Or SQLite ne sert qu'en dev/tests — la prod, la preprod et le VPS de test sont sur PostgreSQL.
+**Décision** : (1) `sqlite3` passe en devDependencies : `npm ci --omit=dev` (Dockerfile) et `npm install` sous `NODE_ENV=production` ne l'installent plus — la chaîne vulnérable sort des images déployées. (2) Étape CI bloquante `npm audit --omit=dev --audit-level=high` sur les deux applications. (3) `npm audit fix` appliqué au front (form-data).
+**Alternative écartée** : Forcer la mise à jour de la chaîne sqlite3 (`npm audit fix --force` → sqlite3@6) — breaking change inutile pour une dépendance de dev ; ignorer les findings — indéfendable pour le critère OWASP du référentiel.
+**Conséquences** : 0 high/critical sur les dépendances de prod à date. Résiduel : `uuid` moderate (transitive de Sequelize), sous le seuil du job. Un développeur qui fait `npm install --omit=dev` en local n'aura pas SQLite — utiliser l'install complète en local.
+
+---
+
+### [2026-07-06] Campagne accessibilité — aria-label systématique plutôt que refonte label for/id
+**Contexte** : L'audit statique (`scripts/audit-a11y.mjs`, développé pour l'occasion) relevait 135 non-conformités RGAA : 111 champs sans nom accessible, 14 boutons symboles sans nom, 10 éléments cliquables sans équivalent clavier.
+**Décision** : (1) Champs : `aria-label` (statique ou `:aria-label` dynamique pour les champs en boucle), libellé aligné sur le label visible ou le placeholder — appliqué par codemod, vérifié par ré-audit. (2) Éléments cliquables : lien natif quand la sémantique s'y prête (TutorialItem), sinon pattern ARIA `role="button"`/`tabindex="0"`/`@keydown.enter/.space`. (3) Motifs justifiés encodés comme exceptions dans l'outil (overlays de fermeture, `@click.stop`, wrapper `cursor-text`). (4) Non-régression : tests axe-core dans Vitest (CI).
+**Alternative écartée** : Association `label for`/`id` généralisée — plus canonique mais exige des ids uniques dans des composants répétés (v-for) et une refonte des templates ; `aria-label` donne le même nom accessible sans restructuration. Un `<button>` natif pour les blocs mois du calendrier — invalide (contenu non-phrasing : h3 + grille).
+**Conséquences** : Les libellés visibles et les aria-label doivent rester synchronisés lors des évolutions (WCAG 2.5.3 label-in-name). Tout nouveau formulaire doit passer `node scripts/audit-a11y.mjs` (0 attendu) ; les contrastes et un test lecteur d'écran réel restent hors périmètre outillé (docs/AUDIT_RGAA.md §5).
+
+---
+
+### [2026-07-08] LeitnerCard.idBox — FK corrigée en ON DELETE CASCADE (2ᵉ niveau de la cascade Leitner)
+**Contexte** : Malgré le fix du 2026-07-06 (`LeitnerBox.idSystem` en CASCADE), la suppression d'un système contenant des cartes renvoyait toujours un 500 : la cascade système → boîtes déclenchait une violation de `LeitnerCard_idBox_fkey` (`NO ACTION`, migration `20260226152300` sans `onDelete`). L'audit du fix précédent s'était limité aux enfants directs de `LeitnerSystem` sans suivre la cascade en profondeur. Reproduit sur le Postgres dev Docker.
+**Décision** : Migration `20260708000001` sur le pattern exact de `20260706000001` (Postgres : contrainte retrouvée dynamiquement via `information_schema` dans un bloc `DO $$` ; SQLite : recréation de table) + `references`/`onDelete: 'CASCADE'` sur `idBox` dans `LeitnerCard.model.js`. Particularité SQLite : `PRAGMA foreign_keys = OFF` pendant le rebuild (réactivé en `finally`), car le `DROP TABLE "LeitnerCard"` aurait sinon cascadé sur `cardSystems` (FK `idCard` en CASCADE) et détruit les liaisons cartes↔systèmes pendant la copie.
+**Alternative écartée** : `ON DELETE SET NULL` — des cartes sans boîte resteraient orphelines en base (invisibles dans l'UI, jamais révisées) alors que la carte n'a de sens que dans une boîte de son système ; suppression applicative dans `LeitnerSystem.service#delete` (transaction) — écarté pour rester cohérent avec le choix DB-level du 2026-07-06 et couvrir aussi les suppressions de boîtes isolées.
+**Conséquences** : Cascade complète `LeitnerSystem → LeitnerBox → LeitnerCard` (les Questions, elles, survivent — vérifiées par le test de non-régression). Audit refait sur toute la profondeur du sous-arbre Leitner : plus aucune FK bloquante (`cardSystems.idCard` CASCADE, `RevisionSession.idSystem` SET NULL). Leçon retenue : lors d'un fix de cascade, auditer les FK **transitivement**, pas seulement les enfants directs.
+
+### [2026-07-11] Mémoire du projet hors .agents/ — synthèse avec renvois plutôt que duplication
+
+**Contexte** : besoin de rendre la mémoire du projet (conventions, décisions, changelog, audit OWASP) visible hors du dossier caché `.agents/`, notamment pour le jury B2.
+
+**Décision** : un document de synthèse unique `docs/MEMOIRE_PROJET.md` (présentation du dispositif + essentiel de chaque fichier + date de synchronisation), avec renvois vers les sources `.agents/` qui restent canoniques.
+
+**Alternative écartée** : copier les fichiers dans `docs/` — ~530 Ko de doublons (CHANGELOG seul : 402 Ko) qui divergeraient dès le ticket suivant, le CLAUDE.md ne pointant que vers `.agents/`.
+
+**Conséquences** : le document n'est pas mis à jour à chaque ticket ; seule la date de synchronisation et les chiffres clés sont à rafraîchir si l'écart devient significatif. En cas de contradiction, `.agents/` fait foi (règle écrite en tête du document).
+
+### [2026-07-11] Manuels de déploiement dédiés par infrastructure (docs/) — le README garde le volet CI/CD
+
+**Contexte** : la documentation de déploiement était éclatée (README partie 3 + RUNBOOK) et la partie Kubernetes du README décrivait le flux `kubectl apply` abandonné lors de la migration Helm du 2026-06-30 — risque qu'un opérateur (ou le jury B2) suive une procédure obsolète.
+
+**Décision** : deux manuels dédiés — `docs/MANUEL_DEPLOIEMENT_VPS.md` (test) et `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` (preprod/prod, Helm) — qui décrivent le cas nominal actuel et renvoient au RUNBOOK pour l'exploitation. Le README partie 3 reste la référence des secrets/variables GitHub Actions, avec un encart signalant que ses sections `kubectl apply` sont le flux historique pré-Helm.
+
+**Alternative écartée** : réécrire la partie 3 du README — elle est citée telle quelle dans B2_RENDU.md et son historique `kubectl apply` documente la migration ; un encart de recadrage évite la réécriture et conserve la trace.
+
+**Conséquences** : toute évolution du déploiement se documente dans les manuels de `docs/`, pas dans le README (sauf secrets CI/CD). La cartographie 9.1 et le §9.2 de B2_RENDU.md pointent les manuels en premier.
+
+---
+
+### [2026-07-11] Annexes du dossier B2 — liens vers les fichiers du dépôt plutôt que contenu embarqué
+
+**Contexte** : besoin d'annexes pour le dossier B2 (galerie du prototype, captures de l'application, documents de preuve). La fiche RNCP39583 n'impose aucune forme (pas de limite de pages, pas de soutenance pour le bloc 2) et exige que le dossier contienne « le code source et la documentation associée » — le dépôt fait partie du livrable.
+
+**Décision** : trois annexes en fin de B2_RENDU.md — A. galerie du prototype (tableau de liens vers les 16 PNG de prototype/captures/), B. captures de l'application déployée (à insérer), C. index des documents du dépôt (document → chemin → sections). Les documents volumineux (audit OWASP, RGAA, changelog…) ne sont **pas recopiés** : ils sont référencés, l'utilisateur partage les fichiers/dossiers avec le dossier.
+
+**Alternative écartée** : embarquer les images et recopier les audits dans le PDF — dossier autoporteur mais volumineux, et doublons divergeant des sources versionnées.
+
+**Conséquences** : le rendu doit être accompagné du dépôt (ou des dossiers partagés) pour que les liens des annexes soient résolubles ; chaque annexe est appelée depuis le corps du dossier.
+
+### [2026-07-11] docs/ = dossier unique de documentation ; .agents/ réservé à la mémoire agent
+
+**Contexte** : le prototype (HTML + captures) vivait à la racine (`prototype/`) et l'audit OWASP dans `.agents/`, alors que les autres livrables documentaires (RUNBOOK, manuels, audit RGAA) étaient dans `docs/`. L'utilisateur veut un point d'entrée documentaire unique et visible.
+
+**Décision** : `docs/` regroupe toute la documentation livrable : manuels, audits (OWASP déplacé à côté du RGAA), `docs/prototype/` (HTML + README + captures), `docs/sources/` (références scientifiques du constat produit), synthèse mémoire. `.agents/` ne conserve que la mémoire de travail de l'agent (AGENT, CONVENTIONS, CHANGELOG_AGENT, DECISIONS, DOC_mindmap_editor, référentiel). Déplacements en `git mv` (historique préservé), liens de B2_RENDU.md et MEMOIRE_PROJET.md mis à jour.
+
+**Alternative écartée** : fichiers à plat à la racine de `docs/` (état intermédiaire créé manuellement) — un `README.md` de prototype à la racine de `docs/` se lirait comme le README du dossier docs, et les copies manuelles étaient des exports plus anciens que les versions git.
+
+**Conséquences** : tout nouveau livrable documentaire va dans `docs/` ; `.agents/DOC_mindmap_editor.md` reste l'exception (doc technique interne citée par le B2) et pourra suivre le même chemin si besoin.
+
+---
+
+### [2026-07-11] Parcours guidé — état front persisté (Pinia + localStorage), pas de nouveau backend, formulaires réels plutôt qu'overlay
+
+**Contexte** : ajout d'un parcours guidé (carte mentale → système de Leitner → exercices → planification) déclenché par un bouton. L'API `OnboardingState` existe (tourSeen + checklist JSONB) mais l'utilisateur a précisé qu'elle est réservée à une autre fonctionnalité (onboarding). L'utilisateur veut « peu de modifs » : les vrais formulaires + un bouton pour passer à l'étape suivante + liaison des éléments.
+
+**Décision** :
+- État du parcours dans un store Pinia `guidedTour.js` persisté en localStorage (`persist: true`, plugin déjà en place) — `active`, `stepIndex`, et `links` (IDs des entités créées) pour lier les étapes : la matière de l'étape 1 pré-remplit les formulaires Leitner/exercice, la séance planifiée reçoit `idSystem`.
+- UI = un bandeau unique (`GuidedTourBannerComponent`) monté dans `App.vue`, visible sur toutes les pages tant que le parcours est actif ; le bouton « Étape suivante » est déverrouillé par la création effective de l'élément (détectée aux points de succès des POST existants via `recordLinks`, no-op hors parcours).
+- Le parcours s'appuie sur les pages réelles (MindmapsPage, FlashcardsPage, ExercisesPage, CalendarPage) — pas de page wizard dédiée ni d'overlay.
+
+**Alternative écartée** : (1) réutiliser `OnboardingState.checklist` — exclu par l'utilisateur (réservé à l'onboarding) ; (2) visite guidée en overlay (driver.js / intro.js) — dépendance hors liste approuvée et sélecteurs CSS fragiles ; (3) un bouton « suivant » ajouté dans chaque formulaire — plus invasif que le bandeau global pour le même résultat, et l'utilisateur perdrait le fil hors des pages d'étape.
+
+**Conséquences** : le parcours est par-appareil (localStorage), non synchronisé entre appareils — acceptable pour un guide d'usage ponctuel ; si un jour il faut le synchroniser, prévoir une entité dédiée (ne pas squatter OnboardingState). Toute page qui crée une entité du parcours doit appeler `guidedTourStore.recordLinks(...)` au point de succès. L'ordre des étapes est centralisé dans `GUIDED_TOUR_STEPS` (stores/guidedTour.js).
+
+---
+
+### [2026-07-11] Analyse statique — SonarCloud (SaaS) plutôt que ré-hébergement SonarQube ou abandon
+
+**Contexte** : le job SonarQube de la CI était commenté depuis la panne du serveur auto-hébergé. Trois options : ré-héberger, supprimer l'analyse statique (couverture qualité déjà assurée par lint + tests + npm audit + axe-core bloquants), ou migrer vers SonarCloud.
+
+**Décision** : SonarCloud (SonarQube Cloud), gratuit pour les dépôts publics. Un seul projet pour le monorepo (`sonar.sources` couvre api + front/src) — l'analyse de branches native de SonarCloud remplace l'ancienne distinction prod/preprod par tokens séparés. Job CI `sonarcloud` via `SonarSource/sonarqube-scan-action@v5` (action unifiée qui a remplacé `sonarcloud-github-action`), exécuté après tests + lint, non bloquant.
+
+**Alternative écartée** : ré-héberger SonarQube — charge d'exploitation (JVM, base, maintenance, disponibilité) disproportionnée pour l'apport, la panne l'a démontré ; suppression pure — perd l'axe « analyse statique continue » du dossier B2 alors que le SaaS l'offre à coût quasi nul ; Automatic Analysis SonarCloud (sans job CI) — écarté car incompatible avec l'analyse par scanner CI (il faut choisir) et sans contrôle sur le déclenchement post-tests.
+
+**Conséquences** : dépôt public requis (plan gratuit) ; secret unique `SONAR_TOKEN` (les anciens SONAR_PROD_TOKEN/SONAR_PREPROD_TOKEN/SONAR_HOST_URL sont obsolètes) ; l'Automatic Analysis doit rester désactivée sur SonarCloud sinon le job CI échoue ; la couverture lcov et le quality gate bloquant sont des extensions possibles documentées dans le CHANGELOG.
+
+---
+
+### [2026-07-11] Monitoring — Prometheus central par environnement dans le chart Helm (pas de sidecar, pas de kube-prometheus-stack)
+
+**Contexte** : l'instrumentation RED/USE existe depuis le 2026-07-06 (prom-client, `GET /metrics` sur port 9090) mais aucun scraper n'était déployé — les annotations `prometheus.io/*` étaient inertes. L'idée initiale (un sidecar + un Prometheus par pod) inversait le modèle pull de Prometheus : métriques éclatées par pod, RAM démultipliée, historique perdu au crash du pod. Constat additionnel : la migration Helm (2026-06-30) avait perdu le port metrics — ni `containerPort` 9090, ni annotations `prometheus.io/*`, ni `METRICS_PORT` dans le chart, alors que les manifests historiques `k8s/prod|preprod/` les avaient.
+
+**Décision** : un Prometheus **central par environnement/namespace**, intégré au chart Helm (`helm/templates/prometheus.yaml`, activable via `monitoring.enabled`) et donc déployé par le CD existant sans étape manuelle. Découverte des cibles par `kubernetes_sd_configs` (role: pod) limitée au namespace de la release, filtrée sur l'annotation `prometheus.io/scrape: "true"` — pas de CRD `ServiceMonitor`. RBAC minimal : Role/RoleBinding namespacés (pods get/list/watch), pas de ClusterRole. Même dualité que Redis : Deployment + emptyDir en preprod (rétention 7 j), StatefulSet + PVC 5 Gi en prod (rétention 15 j). Redémarrage sur changement de config via annotation `checksum/config` (hash des values monitoring) plutôt que `rolloutTimestamp` (qui aurait redémarré Prometheus à chaque déploiement applicatif). UI non exposée par l'Ingress (conforme à la règle CONVENTIONS.md sur `/metrics`) — accès par `kubectl port-forward`. Image épinglée `prom/prometheus:v3.5.0` (LTS). Le port metrics perdu à la migration Helm est restauré dans le même ticket (ports nommés + annotations sur `deployment-api.yaml`, `METRICS_PORT: "9090"` dans `values.yaml`).
+
+**Alternative écartée** : un Prometheus/sidecar par pod — anti-pattern (voir Contexte) ; kube-prometheus-stack (Helm) — complet (Grafana, Alertmanager, operator, node-exporter) mais ~1-2 Gi de RAM et des dizaines de CRD pour un cluster mono-application, disproportionné à ce stade ; Prometheus cluster-wide dans un namespace `monitoring` dédié — écarté car hors du cycle de déploiement Helm du CD (installation manuelle comme cert-manager), nécessite un ClusterRole que le kubeconfig CI n'a pas forcément, et empêche d'isoler preprod/prod si les clusters sont distincts (deux kubeconfigs distincts dans le CD).
+
+**Conséquences** : chaque release (mmm-preprod, mmm-prod) embarque son Prometheus (`<release>-prometheus`, ClusterIP 9090). Aucune dépendance applicative nouvelle. Dette : pas de Grafana (visualisation via l'UI Prometheus en port-forward), pas d'Alertmanager, pas d'exporters Postgres/Redis (USE infra toujours limité au process Node — ticket dédié si besoin). Si un Grafana est ajouté plus tard, le brancher sur `http://<release>-prometheus:9090`.
+
+---
+
+### [2026-07-12] docker-compose unifié dev/test — server_docker_compose/ supprimé, le CD déploie le compose racine avec --profile test
+
+**Contexte** : la décision du 2026-06-11 avait créé `server_docker_compose/docker-compose.yml` (fichier VPS dédié) en plus du compose racine à profils. Résultat constaté : les profils `test`/`prod` du compose racine étaient du code mort (aucun `.env.test`/`.env.prod`, CD sur le fichier dédié), les deux fichiers divergeaient (noms de services `api` vs `api_server`, service `backup` absent du racine), et chaque variable d'environnement devait être maintenue aux deux endroits — exactement la duplication que les profils devaient éviter. L'utilisateur a tranché : revenir au fichier unique.
+
+**Décision** : le `docker-compose.yml` racine devient l'unique compose du projet, avec **deux profils** : `dev` (comportement local inchangé : build sources, Traefik local HTTP, hot-reload) et `test` (images DockerHub, Traefik externe HTTPS Let's Encrypt — services `api_server`, `front_server`, `pgadmin_server`, `backup`). Le profil `prod` est supprimé (prod/preprod sont sur Kubernetes via Helm). Le service `backup` (pg_dump quotidien) et les `restart: unless-stopped` du fichier VPS sont migrés dans le compose racine. Le CD (`cd.yml`, job `deploy_test`) téléverse le compose racine et force `--profile test` sur toutes ses commandes docker compose ; les noms de services du script sont alignés (`api_server`/`front_server`/`pgadmin_server`). Le template VPS devient `.env.test.example` à la racine, avec `COMPOSE_PROFILES=test` pour les commandes manuelles sur le VPS.
+
+**Alternative écartée** : garder les deux fichiers en supprimant seulement les profils morts du racine — moins risqué mais conserve la double maintenance des variables d'environnement ; renommer les services test en `api`/`front` pour coller à l'ancien script CD — impossible, les noms sont déjà pris par les services du profil `dev` dans le même fichier.
+
+**Conséquences** : le `.env` du VPS doit recevoir `COMPOSE_PROFILES=test` (le CD n'en dépend pas grâce à `--profile test` explicite, mais les commandes manuelles du RUNBOOK oui). Au premier déploiement post-migration, les conteneurs changent de nom (`api` → `api_server`…) — les volumes nommés (postgres-data, backup-data…) sont conservés car le nom de projet ne change pas. Les commandes d'exploitation utilisent désormais les noms `*_server` (RUNBOOK et MANUEL_DEPLOIEMENT_VPS mis à jour). Le fichier déployé contient les blocs `build:` du profil dev — inertes sur le VPS tant que le profil dev n'y est pas activé. Révoque la décision du 2026-06-11.
+
+---
+
+### [2026-07-12] Preprod Kubernetes mise en pause — job deploy_preprod derrière la variable K8S_PREPROD_ENABLED
+
+**Contexte** : le cluster preprod Infomaniak tourne sur un unique nœud 1 vCPU / 2 Go, saturé par les réservations (850m CPU / 95 % RAM demandés) : `NodeNotReady` ×15 en 21 h, rolling updates impossibles faute de marge (le pod de surge reste Pending → `helm --atomic` timeout → rollback ; un seul déploiement récent a réussi, dans une fenêtre post-reboot), app inaccessible. L'ajout de Prometheus (2026-07-11) a aggravé la pression mémoire. L'utilisateur choisit d'arrêter la preprod pour raisons de coût et de la recréer plus tard sur un nœud correctement dimensionné.
+
+**Décision** : conditionner le job `deploy_preprod` de `cd.yml` à la variable GitHub Actions `K8S_PREPROD_ENABLED == 'true'` — même mécanisme que `K8S_PROD_ENABLED` pour la prod. Variable absente = job skippé proprement (le job `notify` ne compte que les `failure`, la notification Discord reste verte). Le job `push_images` continue de publier les images `mymemomaster_preprod_*` sur DockerHub à chaque push staging (gratuit, garde les images prêtes pour la recréation).
+
+**Alternative écartée** : supprimer le job du workflow — perd le squelette fonctionnel et l'historique de config pour la recréation ; réduire les requests/désactiver Prometheus pour faire tenir la stack sur 2 Go — pansement sur un nœud structurellement sous-dimensionné (2 stacks + ingress + cert-manager + CNI ne tiennent pas dans 1,37 Go allouables).
+
+**Conséquences** : à la recréation du cluster : (1) recréer le secret `KUBECONFIG_PREPROD`, (2) créer la variable `K8S_PREPROD_ENABLED=true`, (3) dimensionner le nœud à 4 Go minimum (ou 2 nœuds), (4) ne pas redéployer la stack legacy du namespace `default` (`mymemomaster-test-*`, doublon de l'époque test-sur-K8s qui consommait ~30 % du nœud). Le chart Helm et les values preprod restent versionnés et prêts.
+
+---
+
+### [2026-07-14] Formules dans Leitner/exercices — convention inline `$…$` réutilisant l'interpréteur mindmap, sans changement API
+
+**Contexte** : l'utilisateur veut des formules mathématiques dans les questions et réponses des flashcards Leitner et des exercices (création et passage). L'interpréteur KaTeX existe déjà (`src/components/interpreter/`) mais ne servait qu'aux nœuds `formula` des cartes mentales, où tout le contenu du nœud est une formule — alors qu'un énoncé de question est un texte mixte (prose + formules).
+
+**Décision** : convention de délimitation inline `$…$` dans les champs texte existants, rendue par un nouveau `renderInlineMath()` dans `interpreter.js` (segments hors formule échappés HTML, segments `$…$` passés au `renderMath()` existant en mode inline). Deux composants réutilisables : `FormulaTextComponent` (affichage) posé sur tous les points d'affichage des deux modules, et `FormulaHelperComponent` (saisie : bouton ouvrant l'interpréteur complet dans une `ModalComponent`, insertion de la formule entourée de `$…$`, aperçu live). Les données restent du texte brut — aucun changement de schéma, d'endpoint ou de validator.
+
+**Alternative écartée** : un champ « type formule » séparé côté modèle (comme les nœuds mindmap) — impose une migration, des changements de validators et une UI à deux champs pour un besoin qui est du texte mixte ; un éditeur riche (contenteditable avec rendu in-place) — disproportionné et fragile par rapport à la convention `$…$` + aperçu.
+
+**Conséquences** : n'importe quel champ affiché via `FormulaTextComponent` interprète `$…$` (délimiteur réservé ; un `$` isolé reste littéral). La correction des réponses compare toujours le texte brut : deux écritures différentes d'une même formule ne sont pas reconnues équivalentes (dette documentée dans CHANGELOG_AGENT). Tout nouvel affichage de question/réponse doit passer par `FormulaTextComponent` pour rester cohérent.
+
+---
+
+### [2026-07-14] Syntaxe de formule canonique unique — alias frac supprimé à la saisie, normalisé partout, toujours rendu
+
+**Contexte** : l'interpréteur acceptait deux écritures de la fraction (`over(a, b)` et son alias `frac(a, b)`). La correction des réponses comparant des chaînes brutes, `$over(1, 2)$` et `$frac(1, 2)$` étaient jugées différentes alors que leur rendu est identique.
+
+**Décision** : `over` devient la seule syntaxe canonique. Le bouton `frac` disparaît de la palette de l'interpréteur, et `normalizeFormulaSyntax()` (`frac(` → `over(`) est appliquée à trois points : à l'insertion via FormulaHelper, à la création/édition de contenu (cartes Leitner, questions/réponses/options d'exercices) et à la soumission des réponses (session Leitner, passage d'exercice). `toLatex()` continue en revanche d'interpréter `frac` à l'affichage, pour le contenu historique (nœuds formule des mindmaps notamment).
+
+**Alternative écartée** : normaliser côté API (middleware ou service) — plus robuste (couvre tout client) mais touche des services stables et le besoin est aujourd'hui exclusivement front ; supprimer `frac` aussi du rendu — casserait l'affichage du contenu existant.
+
+**Conséquences** : l'équivalence frac/over est résolue par construction pour tout contenu passant par le front. Toute nouvelle syntaxe à raccourcis dans l'interpréteur doit être ajoutée **sans alias** (une écriture = une forme stockée), ou l'alias doit être ajouté à `normalizeFormulaSyntax`. Le contenu historique en `frac` reste non normalisé en base (rendu correct ; migration de données si l'uniformisation rétroactive devient nécessaire).
+
+---
+
+### [2026-07-16] Visite guidée de l'interface — paquet officiel `intro.js` (remplace `introjs`), état synchronisé via l'API OnboardingState
+
+**Contexte** : demande utilisateur d'un onboarding avec intro.js. Le `package.json` front contenait `introjs@0.2.2` — un paquet npm non officiel (l'officiel s'appelle `intro.js`), figé à une version 2013, jamais importé dans le code. Par ailleurs le backend expose déjà `UserOnboardingState.tourSeen` (créé à l'inscription), sans aucune UI branchée dessus, et un « Parcours guidé » local (store guidedTour) existe déjà pour l'accompagnement à la création de contenu.
+
+**Décision** : (1) retirer `introjs@0.2.2` et installer le paquet officiel `intro.js@^7.2.0` (API classique `introJs().setOptions().start()`, épinglée v7 — la v8 a réécrit l'API). (2) Persister la visite via l'API (`tour_seen` d'UserOnboardingState) et non en localStorage : la visite auto ne doit se jouer qu'une fois par utilisateur, tous navigateurs confondus. (3) Étapes ancrées sur des attributs `data-tour` posés dans App.vue et construites dynamiquement en filtrant les éléments absents du DOM (layouts desktop/mobile différents, bouton parcours guidé présent uniquement sur la HomePage). (4) Persistance dans le seul callback `onexit` (déclenché aussi après « Terminer ») avec un `markTourSeen()` idempotent.
+
+**Alternative écartée** : conserver le paquet `introjs` existant — non officiel, obsolète (0.2.2), risque de typosquatting ; localStorage pour `tour_seen` — perdu au changement de navigateur, et le champ API existait déjà ; driver.js/shepherd.js (MIT) — écartés car la demande visait explicitement intro.js et le champ tourSeen existait, mais voir conséquences licence.
+
+**Conséquences** : `intro.js` s'ajoute aux dépendances front approuvées (CONVENTIONS.md à compléter). **Licence : intro.js est AGPL-3.0, une licence commerciale payante est requise pour un usage commercial** — acceptable pour un projet étudiant/personnel, à réévaluer (migration driver.js/shepherd.js, MIT) si le produit est commercialisé. Les nouveaux éléments de navigation majeurs devraient recevoir une ancre `data-tour` + une étape dans `ONBOARDING_TOUR_STEPS`. Le service backend `getOnboardingByUserId` répond 500 (et non 404) pour les utilisateurs sans ligne UserOnboardingState (créés avant la table) : la visite auto ne se lance pas pour eux — dette documentée dans CHANGELOG_AGENT.
+
+> **Mise à jour [2026-07-16]** : intro.js a été remplacé le jour même par **driver.js 1.7 (MIT)** à la demande de l'utilisateur — la contrainte de licence AGPL/commerciale d'intro.js n'était pas acceptable. Périmètre du remplacement : `package.json` (intro.js retiré, driver.js ajouté), réécriture de `useOnboardingTour.js` (API `driver({ steps, onDestroyed })` + `drive()` ; les étapes deviennent `{ element, popover: { title, description } }`), styles `.onboarding-popover` dans `OnboardingTourComponent.vue`. Le store `onboarding.js`, les ancres `data-tour`, `ONBOARDING_TOUR_STEPS` (même forme `{selector, title, intro}`) et le comportement (auto-lancement premier login, persistance idempotente à la sortie) sont inchangés. Alternative écartée : shepherd.js — passé lui aussi sous AGPL sur ses versions récentes.
+
+---
+
+### [2026-07-18] Reset password — retour au code OTP 6 chiffres, hashé bcrypt, avec essais limités (remplace le token 64 chars du 2026-06-15)
+
+**Contexte** : Le token opaque 64 chars hex (décision du 2026-06-15) était envoyé brut par email : illisible, impossible à saisir à la main, et perçu comme « le hash » par les utilisateurs. Demande utilisateur : aligner le flux sur le standard des plateformes (code court saisissable) sans réintroduire la faille d'origine (code 6 chiffres stocké en clair).
+
+**Décision** : Code OTP à 6 chiffres (`crypto.randomInt(100000, 1000000)`) envoyé brut par email, **hashé bcrypt (coût 10)** en base (`resetPasswordCode`, la colonne STRING(64) accueille les 60 chars bcrypt sans migration). Contre-mesures compensant la faible entropie (10^6 valeurs) : expiration **15 min** (au lieu de 30), **5 essais max** par code (nouvelle colonne `resetPasswordCodeAttempts`, migration `20260718000000`), usage unique, invalidation par toute nouvelle demande, rate limiting `authLimiter` déjà en place. En complément (standards OWASP Forgot Password) : `POST /users/reset-password` répond 401 « Code invalide » même si l'email est inconnu (anti-énumération, le 404 est supprimé), et le refresh token est révoqué après un reset réussi (invalidation des sessions actives).
+
+**Alternative écartée** : SHA-256 du code 6 chiffres — brute-forçable hors-ligne en quelques secondes (10^6 hachages) en cas de fuite de base ; bcrypt rend l'attaque coûteuse. / Conserver le token 64 chars avec lien cliquable dans l'email — plus d'entropie mais UX dépendante du client mail, et le formulaire existant est pensé pour une saisie de code.
+
+**Conséquences** : Migration `20260718000000-add-reset-password-attempts-to-user.js` à passer. Le validator `resetPassword` attend désormais `^\d{6}$`. `verifyResetPasswordCode` ne détruit plus le code au premier essai raté (jusqu'à 5 essais), contrairement au comportement précédent. Front : `ResetPasswordPage.vue` passe du textarea 64 chars à un input numérique 6 chiffres (`autocomplete="one-time-code"`). Le `validEmailCode` reste en clair (décision distincte du 2026-06-23, inchangée).
+
+---
+
+### [2026-07-18] Liaison Leitner ↔ carte mentale : câblage de la colonne dormante idMindMap + nœud lié par carte (mindMapNodeId sans FK)
+
+**Contexte** : Demande utilisateur : (1) le parcours guidé doit lier automatiquement le système de Leitner à la carte mentale créée à l'étape précédente ; (2) à la création d'une flashcard (uniquement la création), afficher une mini-vue de la carte mentale liée pour sélectionner le nœud rattaché à la question. La colonne `LeitnerSystem.idMindMap` existait déjà en base mais n'était renseignée nulle part (colonne dormante) ; les nœuds de mindmap vivent dans le JSON `MindMap.mindMapJson` (pas de table de nœuds).
+
+**Décision** : (1) Câbler `idMindMap` de bout en bout : validator (`optional isInt`), controller (create + update), sélecteur « Carte mentale liée » dans le modal de création de système (filtré par matière), pré-rempli par `links.mindMapId` quand le parcours guidé est actif. (2) Nouvelle colonne `LeitnerCard.mindMapNodeId` **STRING(64) nullable sans contrainte FK** (migration `20260718000001`) : les identifiants de nœuds sont des chaînes internes au JSON — une FK est impossible. Référence tolérante : la suppression du nœud dans la mindmap laisse un identifiant orphelin, sans erreur. (3) Nouveau composant `MindMapNodePickerComponent.vue` : rendu SVG **lecture seule** de la mindmap (normalisation + layout via les helpers `normalizeMindMap`/`applyRadialLayout`), nœuds cliquables et pilotables au clavier (`role="button"`, `tabindex`, Entrée/Espace, `aria-pressed`), affiché dans le modal « Nouvelle carte » uniquement en création et uniquement si le système a un `idMindMap`. Le libellé du nœud choisi pré-remplit l'énoncé s'il est vide.
+
+**Alternative écartée** : réutiliser `MindMapBoard.vue` en lecture seule — couplé au store global `mindmapBuilder` (sélection, pan/zoom, dirty state) : le monter dans le modal partagerait l'état avec l'éditeur ; extraire les nœuds dans une table dédiée avec FK — refonte du modèle mindmap disproportionnée pour une référence d'affichage ; stocker le lien dans `Question.content` — champ déjà utilisé par les types de questions (QCM…), risque de collision de format.
+
+**Conséquences** : Migration `20260718000001-add-mindmapnodeid-to-leitnercard.js` à passer. Toute exploitation future du lien carte↔nœud (surbrillance du nœud pendant la révision, statistiques de maîtrise par nœud) doit tolérer un `mindMapNodeId` orphelin (nœud supprimé). Le picker ne propose pas de pan/zoom : les grandes cartes sont réduites par le viewBox (lisibilité limitée au-delà de ~30 nœuds — à faire évoluer si besoin).
+
+---
+
+### [2026-07-18] Parcours guidé — sessionStorage + reset à la déconnexion (plutôt que persistance en base)
+
+**Contexte** : L'état du parcours guidé était persisté en localStorage : il ressuscitait après fermeture du site ou déconnexion, potentiellement des jours plus tard, avec des `links` pointant vers des entités qui n'existent plus. Question utilisateur : sauvegarder en base à la sortie, ou supprimer ?
+
+**Décision** : Supprimer. La persistance passe de localStorage à **sessionStorage** (`persist: { storage: sessionStorage }`) — l'état survit à un rechargement de page pendant la session mais pas à la fermeture de l'onglet — et `auth.logout()` appelle une nouvelle action `guidedTour.reset()` (état + liens remis à zéro) pour couvrir la déconnexion explicite et le changement d'utilisateur sur le même onglet.
+
+**Alternative écartée** : persistance serveur (nouvelle surface API ou détournement d'OnboardingState, réservé à la visite guidée) — disproportionnée pour un guide de ~5 minutes relançable à tout moment depuis l'accueil, et reprise différée risquée (liens orphelins).
+
+**Conséquences** : Le parcours ne peut plus être repris après fermeture du site — comportement voulu. sessionStorage étant par onglet, le bandeau ne suit pas dans un second onglet (acceptable : le parcours est linéaire mono-onglet).
+
+---
+
+### [2026-07-18] Correction sémantique — modèle multilingue MiniLM + stopwords français (remplace all-mpnet-base-v2, anglais)
+
+**Contexte** : Une réponse française correcte mais reformulée (« principe d'Archimède ») obtenait 0,61 de similarité → « Incorrect ». Double cause : `all-mpnet-base-v2` est entraîné sur de l'anglais (similarités déprimées entre paraphrases françaises), et la liste de stopwords du départage en zone grise était anglaise uniquement (« une », « dans », « les » comptaient comme mots-clés et diluaient le Jaccard).
+
+**Décision** : Modèle remplacé par `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (50+ langues, ~120 Mo quantisé) et stopwords français ajoutés. Seuils 0,78/0,55 **conservés** après calibration sur 8 paires françaises réelles dans le conteneur : copie exacte 1,00 ✓, paraphrase éloignée 0,806 ✓ (le cas qui échouait), paraphrase proche 0,89 ✓, réponse fausse même domaine 0,717 → zone grise correctement rejetée par mots-clés ✓, hors-sujet 0,15 ✓, reformulation courte 0,91 ✓.
+
+**Alternative écartée** : `paraphrase-multilingual-mpnet-base-v2` (meilleure qualité) — **~280 Mo de poids : OOM en boucle dans les conteneurs API limités à 512 Mo** (12 redémarrages constatés en dev ; mêmes limites en preprod/prod). L'upgrade reste possible en augmentant `API_LIMIT_MEMORY` et les limites Helm. / Augmenter la mémoire plutôt que réduire le modèle — touchait le dimensionnement de tous les environnements pour un gain marginal.
+
+**Conséquences** : Premier démarrage : téléchargement du nouveau modèle (~120 Mo), absorbé par le pre-warm. Deux limites structurelles des embeddings documentées par la calibration : les **inversions** (« le volume divisé par la masse » scoré 0,889 → accepté à tort) et les **formules symboliques** comparées à leur énoncé en toutes lettres (0,299 → rejeté à tort) — pour les réponses-formules, l'auteur de la carte doit fournir la formule comme réponse attendue, pas sa lecture en français. Nodemon + volume monté : toute écriture dans `my_memo_master_api/` pendant un téléchargement de modèle l'interrompt (redémarrage du process).
+
+---
+
+### [2026-07-18] Correction sémantique — garde anti-inversion, correspondance symbolique et formulations acceptées multiples
+
+**Contexte** : La calibration du modèle multilingue a confirmé deux limites structurelles des embeddings : une inversion d'opérandes (« le volume divisé par la masse ») scorée 0,889 → acceptée à tort, et une formule symbolique (« U = R × I ») comparée à son énoncé en toutes lettres scorée 0,299 → rejetée à tort. Demande utilisateur : corriger les deux.
+
+**Décision** : Trois mécanismes déterministes en amont/aval de l'embedding dans `Semantic.service` : (1) **court-circuit symbolique** — normalisation (casse, espaces, `$…$`, `\cdot`/`×`/`⋅`/`·`→`*`, `÷`→`/`) puis égalité stricte → correct (stratégie `exact`, score 1) sans passer par le modèle ; (2) **garde anti-inversion** — pour la famille division/rapport (`divisé par`, `par unité de`, `sur`, `rapporté à`), si les mots-clés des opérandes sont strictement croisés entre réponse attendue et réponse étudiante, le verdict correct est renversé (`decision_zone: 'inversion'`) ; conservateur : ne se déclenche que si les deux phrases portent un séparateur et aucun recouvrement « droit » ; (3) **formulations acceptées multiples** — l'auteur peut fournir la formule ET son énoncé en prose : côté Leitner via plusieurs `Response correction=true` (déjà supporté serveur, UI ajoutée au modal de création), côté exercices via `content.accepted_answers` (tableau, en plus de `correct_answer` ; UI dans le modal exercice, éditable). Le meilleur score est retenu (comportement existant de `gradeSemantic`).
+
+**Alternative écartée** : passer au modèle mpnet multilingue avec plus de RAM — ne corrige aucune des deux limites (l'insensibilité à l'ordre et le fossé symbole/prose sont communs à tous les modèles d'embedding de phrases) ; parsing NLP général des relations ordonnées — disproportionné, la famille division/rapport couvre le cas réel (grandeurs physiques).
+
+**Conséquences** : Calibration revalidée 7/7 (paraphrase démo 0,806 ✓, inversion rejetée ✓, formules `exact` 1,0 ✓, multi-réponses 0,936 ✓). La garde anti-inversion ne couvre que la famille division/rapport — les autres relations antisymétriques (soustraction, comparaisons) restent non couvertes ; étendre `RATIO_SEPARATOR` si un cas réel apparaît. Nouvelle valeur possible de `decision_zone` : `'inversion'` (consommateurs actuels : affichage du champ `explanation` uniquement). Les alternatives Leitner ne sont pas éditables après création (l'édition ne gère qu'une réponse) — dette UI.
+
+---
+
+### [2026-07-18] Homogénéité des formules — abstention sur les variables non annotées + syntaxe d'annotation d'unité `Var[unité]`
+
+**Contexte** : Le vérificateur d'homogénéité (`interpreter/units.js`) traitait chaque lettre comme une unité : dans `P = F/S`, `P`/`F`/`S` (variables) devenaient `{UNK:1}`, et `UNK/UNK` s'annulait — d'où l'erreur absurde « UNK ≠ — » signalée par l'utilisateur sur une formule correcte. Deux bugs supplémentaires découverts à l'audit : la consommation de l'opérateur `+`/`-` était commentée dans `parseExpr` (boucle infinie — gel de la page — sur toute addition homogène, ex. `2m + 3m`), et le message d'erreur d'addition comparait le membre gauche à une signature vide.
+
+**Décision** : (1) Chaque variable inconnue reçoit une identité propre (`VAR_F`) : `F/F` s'annule correctement, `F/S` reste **indéterminé**, et toute comparaison (égalité entre segments, homogénéité d'addition) impliquant une signature indéterminée est **ignorée** — le vérificateur s'abstient plutôt que d'inventer un verdict. (2) Nouvelle syntaxe d'annotation `P[Pa] = F[N] / S[m^2]` : la variable déclare son unité (remplacée par `(unité)` avant analyse), ce qui rend la vérification réelle et fiable sur les formules symboliques — annotations composées supportées (`c[m^2/s^2]`). (3) Correction de la boucle infinie (opérateur consommé) et du message d'addition. Aide affichée sous l'interpréteur.
+
+**Alternative écartée** : table de correspondance symbole physique → dimension (P=pression, F=force…) — collisions insolubles avec les unités (`m` mètre/masse, `s` seconde/surface, `A`, `V`, `N`…) sans annotation explicite ; brancher les tables `Fields`/`Unit` de l'API — le vérificateur tourne aussi hors contexte de champ (playground, mindmap), et les tables ne sont pas peuplées ; à reconsidérer si les Fields sont un jour exploités.
+
+**Conséquences** : Les formules symboliques sans annotation ne sont plus jamais signalées en erreur (ni vérifiées) ; la vérification devient opt-in via `[unité]`. Les expressions à unités littérales (`3 m + 2 s`, `1 N = 1 kg*m/s^2`) restent vérifiées comme avant. 16 tests Vitest couvrent les trois correctifs (`test/helpers/units.test.js`).

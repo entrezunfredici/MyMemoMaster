@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { api } from '@/helpers/api'
 import { useToast } from 'vue-toastification'
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue'
 
 const props = defineProps({
@@ -14,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['back'])
 const toast = useToast()
 const mindmapStore = useMindMapBuilderStore()
+const guidedTourStore = useGuidedTourStore()
 
 // ── État interne ──────────────────────────────────────────────────────────────
 const currentDiagramId = ref(props.diagramId)
@@ -82,6 +84,7 @@ const performAutoSave = async () => {
       if (newId) {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
+        guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
         pendingPayload.value = null
         pendingCreate.value = false
@@ -174,6 +177,7 @@ const confirmExportModal = async () => {
       if (newId) {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
+        guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
         toast.success('Carte créée.')
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
       }
@@ -240,16 +244,16 @@ onBeforeUnmount(() => {
   <!-- Modal nom (première création / export) -->
   <div v-if="showExportModal" class="modal-overlay" @click="showExportModal = false">
     <div class="modal-panel" @click.stop>
-      <button @click="showExportModal = false" class="modal-close">&times;</button>
+      <button aria-label="Fermer" @click="showExportModal = false" class="modal-close">&times;</button>
       <h2 class="modal-title">Enregistrer la carte mentale</h2>
       <form @submit.prevent="confirmExportModal">
         <div class="mb-4">
           <label class="form-label">Nom</label>
-          <input v-model="exportName" type="text" class="form-input" required autofocus />
+          <input aria-label="Nom de la carte mentale" v-model="exportName" type="text" class="form-input" required autofocus />
         </div>
         <div class="mb-4">
           <label class="form-label">Matière</label>
-          <select
+          <select aria-label="Sujet associé"
             :value="currentDiagramMeta?.subjectId"
             @change="currentDiagramMeta && (currentDiagramMeta.subjectId = Number($event.target.value) || null)"
             class="form-input"

@@ -175,46 +175,68 @@ class UserService {
   }
 
   /**
-   * Génère un token de réinitialisation, stocke son hash SHA-256 en base et retourne le token brut.
+   * Génère un code de réinitialisation à 6 chiffres, stocke son hash bcrypt en base et retourne le code brut.
    *
    * @param {number} userId - ID de l'utilisateur
-   * @returns {Promise<string>} Token brut à envoyer par email (32 octets hex, 64 chars)
+   * @returns {Promise<string>} Code brut à 6 chiffres à envoyer par email
    */
   async setResetPasswordCode(userId) {
-    const token = crypto.randomBytes(32).toString('hex')
-    const hash = crypto.createHash('sha256').update(token).digest('hex')
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
+    // CHOIX: code OTP 6 chiffres + hash bcrypt plutôt que token 64 chars + SHA-256
+    // RAISON: UX standard des plateformes (code saisissable) — la faible entropie (10^6)
+    // est compensée par bcrypt (brute force offline coûteux), 15 min d'expiration,
+    // 5 essais max et le rate limiting authLimiter déjà posé sur la route.
+    const code = crypto.randomInt(100000, 1000000).toString()
+    const hash = await bcrypt.hash(code, 10)
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
     await User.update(
-      { resetPasswordCode: hash, resetPasswordCodeExpiresAt: expiresAt },
+      { resetPasswordCode: hash, resetPasswordCodeExpiresAt: expiresAt, resetPasswordCodeAttempts: 0 },
       { where: { userId } }
     )
-    return token
+    return code
   }
 
   /**
-   * Vérifie un token de réinitialisation en comparant son hash SHA-256 avec celui stocké en base.
+   * Vérifie un code de réinitialisation (comparaison bcrypt + expiration + essais limités).
+   * Le code est invalidé après un succès, après expiration ou après 5 essais infructueux.
    *
    * @param {number} userId - ID de l'utilisateur
-   * @param {string} token - Token brut reçu depuis le formulaire
-   * @returns {Promise<boolean>} true si le token est valide et non expiré
+   * @param {string} code - Code à 6 chiffres reçu depuis le formulaire
+   * @returns {Promise<boolean>} true si le code est valide et non expiré
    */
-  async verifyResetPasswordCode(userId, token) {
+  async verifyResetPasswordCode(userId, code) {
+    const MAX_RESET_CODE_ATTEMPTS = 5
     const user = await User.findByPk(userId)
-    const hash = crypto.createHash('sha256').update(token).digest('hex')
     const now = new Date()
-    const isValid =
-      user.resetPasswordCode === hash &&
+
+    const isUsable =
+      user.resetPasswordCode &&
       user.resetPasswordCodeExpiresAt &&
       user.resetPasswordCodeExpiresAt > now
-    user.resetPasswordCode = null
-    user.resetPasswordCodeExpiresAt = null
-    await user.save()
-    return isValid
+
+    if (!isUsable) {
+      await this.clearResetPasswordCode(userId)
+      return false
+    }
+
+    const matches = await bcrypt.compare(String(code), user.resetPasswordCode)
+    const attempts = (user.resetPasswordCodeAttempts || 0) + 1
+
+    if (matches || attempts >= MAX_RESET_CODE_ATTEMPTS) {
+      // CHOIX: invalidation après succès OU 5 essais infructueux
+      // RAISON: un code à 6 chiffres ne doit pas être brute-forçable en ligne
+      await this.clearResetPasswordCode(userId)
+    } else {
+      await User.update(
+        { resetPasswordCodeAttempts: attempts },
+        { where: { userId } }
+      )
+    }
+    return matches
   }
 
   async clearResetPasswordCode(userId) {
     await User.update(
-      { resetPasswordCode: null },
+      { resetPasswordCode: null, resetPasswordCodeExpiresAt: null, resetPasswordCodeAttempts: 0 },
       {
         where: { userId: userId }
       }

@@ -14,7 +14,7 @@
 | HSTS | Labels Docker Compose | Middleware Traefik CRD |
 | Redirect HTTP→HTTPS | Labels Docker Compose | Middleware Traefik CRD + Ingress HTTP |
 | Automatisation | `scripts/setup-traefik.sh` | `k8s/setup.sh` |
-| Config HTTPS app | `server_docker_compose/docker-compose.yml` | `k8s/app/ingress.yml` |
+| Config HTTPS app | `docker-compose.yml` (racine, profil `test`) | `k8s/app/ingress.yml` |
 
 ---
 
@@ -69,7 +69,7 @@ bash scripts/setup-traefik.sh
 |---------|------|
 | `traefik/docker-compose.yml` | Compose Traefik (copié sur le VPS par le script) |
 | `traefik/.env.example` | Template de config Traefik |
-| `server_docker_compose/docker-compose.yml` | Compose applicatif (HSTS + redirect via labels) |
+| `docker-compose.yml` (racine, profil `test`) | Compose applicatif (HSTS + redirect via labels) |
 
 ### Comment les certificats sont générés
 

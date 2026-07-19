@@ -22,7 +22,7 @@
     <foreignObject :x="-width / 2 + 12" :y="-height / 2 + 10" :width="width - 24" :height="height - 20">
       <div class="mindmap-node__content">
         <!-- Titre -->
-        <input
+        <input aria-label="Titre du nœud"
           v-if="editingField === 'label'"
           ref="labelInputRef"
           class="mindmap-node__inline-input mindmap-node__inline-input--title"
@@ -63,7 +63,7 @@
         />
         <!-- Texte inline -->
         <template v-else>
-          <textarea
+          <textarea aria-label="Contenu du nœud"
             v-if="editingField === 'content'"
             ref="contentInputRef"
             class="mindmap-node__inline-input mindmap-node__inline-input--content"

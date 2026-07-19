@@ -80,16 +80,27 @@ describe('Auth.middleware — vérification JWT', () => {
     expect(res.status).not.toHaveBeenCalled()
   })
 
-  it('token valide sans préfixe "Bearer" → next() appelé et req.user peuplé', () => {
+  it('token valide sans préfixe "Bearer" → 401 "Token manquant." (RFC 6750 : schéma requis)', () => {
     const payload = { id: 2, name: 'Alice', email: 'alice@example.com' }
     const token = jwt.sign(payload, 'test-secret', { expiresIn: '1h' })
     req.headers['authorization'] = token
 
     AuthMiddleware(req, res, next)
 
-    expect(next).toHaveBeenCalledTimes(1)
-    expect(req.user.id).toBe(2)
-    expect(req.user.name).toBe('Alice')
+    expect(res.status).toHaveBeenCalledWith(401)
+    expect(res.send).toHaveBeenCalledWith({ message: 'Token manquant.' })
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('schéma "Bearer" avec segments surnuméraires → 401 "Token manquant."', () => {
+    const token = jwt.sign({ id: 3 }, 'test-secret', { expiresIn: '1h' })
+    req.headers['authorization'] = `Bearer ${token} extra`
+
+    AuthMiddleware(req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(401)
+    expect(res.send).toHaveBeenCalledWith({ message: 'Token manquant.' })
+    expect(next).not.toHaveBeenCalled()
   })
 
   it('req.user contient exactement le payload encodé (sans créer de champs parasites)', () => {

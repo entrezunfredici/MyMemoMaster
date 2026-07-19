@@ -5,7 +5,11 @@
     <div class="flex gap-3 overflow-x-auto pb-1">
       <div
         v-for="g in groups" :key="g.id"
+        role="button"
+        tabindex="0"
         @click="selectGroup(g.id)"
+        @keydown.enter.prevent="selectGroup(g.id)"
+        @keydown.space.prevent="selectGroup(g.id)"
         :class="[selectedId === g.id ? 'border-primary bg-light/70' : 'border-gray', 'min-w-[220px] cursor-pointer rounded-xl border-2 p-3 shadow-sm transition hover:-translate-y-0.5']">
         <p class="text-xs text-dark/60 uppercase tracking-wide">{{ g.level }}</p>
         <p class="text-lg font-semibold text-primary">{{ g.name }}</p>
@@ -63,8 +67,13 @@
               <div v-if="analytics.students.length > 0" class="space-y-2">
                 <p class="text-sm font-medium text-dark/80">Étudiants ({{ analytics.students.length }})</p>
                 <div v-for="s in analytics.students" :key="s.userId"
+                  role="button"
+                  tabindex="0"
+                  :aria-expanded="!!expandedAnalyticsStudents[s.userId]"
                   :class="['rounded-xl border transition cursor-pointer', expandedAnalyticsStudents[s.userId] ? 'border-primary bg-light/50' : 'border-gray']"
-                  @click="toggleStudentAndLoadKpis(s.userId)">
+                  @click="toggleStudentAndLoadKpis(s.userId)"
+                  @keydown.enter.prevent="toggleStudentAndLoadKpis(s.userId)"
+                  @keydown.space.prevent="toggleStudentAndLoadKpis(s.userId)">
                   <div class="flex items-center justify-between px-3 py-2">
                     <div class="flex items-center gap-2">
                       <span :class="['rounded-full px-2 py-0.5 text-xs font-semibold', s.atRisk ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success']">
@@ -273,8 +282,12 @@
                 class="rounded-xl border border-gray overflow-hidden">
                 <!-- En-tête de la section -->
                 <div
+                  :role="s.type === 'rendu' ? 'button' : undefined"
+                  :tabindex="s.type === 'rendu' ? 0 : undefined"
                   :class="['px-4 py-3 flex items-center justify-between', s.type === 'rendu' ? 'cursor-pointer hover:bg-light/60 transition' : '']"
-                  @click="s.type === 'rendu' && toggleRenduSection(s.id)">
+                  @click="s.type === 'rendu' && toggleRenduSection(s.id)"
+                  @keydown.enter.prevent="s.type === 'rendu' && toggleRenduSection(s.id)"
+                  @keydown.space.prevent="s.type === 'rendu' && toggleRenduSection(s.id)">
                   <div>
                     <div class="flex items-center gap-2">
                       <span :class="s.type === 'rendu' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'"
@@ -371,7 +384,7 @@
           <!-- Formulaire nouvelle section -->
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Créer une section / un rendu</h3>
-            <input v-model="sectionForm.title" type="text" placeholder="Titre *"
+            <input aria-label="Titre" v-model="sectionForm.title" type="text" placeholder="Titre *"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
             <div class="flex gap-2">
               <button @click="sectionForm.type = 'section'"
@@ -379,9 +392,9 @@
               <button @click="sectionForm.type = 'rendu'"
                 :class="[sectionForm.type === 'rendu' ? 'bg-secondary text-light' : 'bg-light text-secondary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm flex-1']">Rendu</button>
             </div>
-            <input v-model="sectionForm.description" type="text" placeholder="Description"
+            <input aria-label="Description" v-model="sectionForm.description" type="text" placeholder="Description"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <input v-model="sectionForm.dueDate" type="date" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            <input aria-label="Date limite" v-model="sectionForm.dueDate" type="date" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
             <button @click="submitSection"
               class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
               Créer
@@ -392,9 +405,9 @@
           <!-- Formulaire partage ressource — drag & drop -->
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Partager un document</h3>
-            <input v-model="resourceForm.title" type="text" placeholder="Titre *"
+            <input aria-label="Titre" v-model="resourceForm.title" type="text" placeholder="Titre *"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <select v-model="resourceForm.type" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+            <select aria-label="Type de ressource" v-model="resourceForm.type" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
               <option value="cours">Cours</option>
               <option value="carte_mentale">Carte mentale</option>
               <option value="sujet">Sujet / DS</option>
@@ -403,10 +416,15 @@
 
             <!-- Zone drag & drop -->
             <div
+              role="button"
+              tabindex="0"
+              aria-label="Déposer ou choisir un fichier"
               @dragover.prevent="resourceForm.dragOver = true"
               @dragleave.prevent="resourceForm.dragOver = false"
               @drop.prevent="onFileDrop"
-              @click="() => $refs.fileInput.click()"
+              @click="$refs.fileInput.click()"
+              @keydown.enter.prevent="$refs.fileInput.click()"
+              @keydown.space.prevent="$refs.fileInput.click()"
               :class="[
                 'cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition',
                 resourceForm.dragOver ? 'border-primary bg-primary/5' : 'border-gray hover:border-primary/50'
@@ -421,7 +439,7 @@
                 <p class="text-xs text-dark/40 mt-1">PDF, Word, PowerPoint, Excel — max 10 Mo</p>
               </div>
             </div>
-            <input ref="fileInput" type="file"
+            <input aria-label="Choisir un fichier à partager" ref="fileInput" type="file"
               accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*"
               class="hidden"
               @change="onFileChange" />
@@ -448,7 +466,7 @@
               </div>
               <div class="flex gap-2">
                 <button v-if="r.fileKey" @click="openFile(r.fileKey)" class="text-xs text-primary underline">Ouvrir</button>
-                <button @click="resourceStore.delete(selectedId, r.id)" class="text-xs text-secondary hover:underline">×</button>
+                <button aria-label="Supprimer la ressource" @click="resourceStore.delete(selectedId, r.id)" class="text-xs text-secondary hover:underline">×</button>
               </div>
             </div>
           </div>
@@ -456,25 +474,25 @@
           <!-- Formulaire nouvelle échéance -->
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Ajouter une échéance</h3>
-            <input v-model="deadlineForm.name" type="text" placeholder="Titre *"
+            <input aria-label="Titre" v-model="deadlineForm.name" type="text" placeholder="Titre *"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <select v-model="deadlineForm.type" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+            <select aria-label="Type d'échéance" v-model="deadlineForm.type" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
               <option value="ds">DS</option>
               <option value="devoir">Devoir / DM</option>
               <option value="exposé">Exposé</option>
               <option value="autre">Autre</option>
             </select>
-            <select v-model="deadlineForm.occurrenceId" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+            <select aria-label="Séance concernée" v-model="deadlineForm.occurrenceId" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
               <option value="">Séance concernée *</option>
               <option v-for="occ in allOccurrences" :key="occ.id" :value="occ.id">
                 {{ occ.calendarEvent?.name }} — {{ formatDate(occ.date) }}
               </option>
             </select>
-            <input v-model="deadlineForm.dueDate" type="date" placeholder="Date limite *"
+            <input aria-label="Date limite" v-model="deadlineForm.dueDate" type="date" placeholder="Date limite *"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <input v-model="deadlineForm.dueTime" type="time"
+            <input aria-label="Heure limite" v-model="deadlineForm.dueTime" type="time"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <select v-model="deadlineForm.testId" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+            <select aria-label="Exercice associé" v-model="deadlineForm.testId" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
               <option :value="null">Exercice associé (optionnel)</option>
               <option v-for="t in testStore.tests" :key="t.testId" :value="t.testId">{{ t.name }}</option>
             </select>
@@ -488,7 +506,7 @@
           <!-- Inviter un étudiant -->
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Inviter un étudiant</h3>
-            <input v-model="inviteForm.targetEmail" type="email" placeholder="Email *"
+            <input aria-label="Email" v-model="inviteForm.targetEmail" type="email" placeholder="Email *"
               class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
             <button @click="submitInvite"
               class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
@@ -514,7 +532,7 @@
                     class="rounded-full px-2 py-0.5 text-xs font-semibold">
                     {{ m.role === 'teacher' ? 'Enseignant' : 'Étudiant' }}
                   </span>
-                  <button v-if="m.role === 'student'"
+                  <button aria-label="Retirer le membre" v-if="m.role === 'student'"
                     @click="classGroupStore.removeMember(selectedId, m.userId)"
                     class="text-secondary text-xs hover:underline">×</button>
                 </div>

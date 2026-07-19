@@ -23,7 +23,18 @@
           </div>
 
           <div class="year-grid">
-            <div v-for="(m, idx) in MONTHS" :key="idx" class="month-block" @click="goToMonth(idx)">
+            <!-- RGAA 7.x — pattern bouton ARIA (un <button> natif est invalide ici : contient h3 + grille) -->
+            <div
+              v-for="(m, idx) in MONTHS"
+              :key="idx"
+              class="month-block"
+              role="button"
+              tabindex="0"
+              :aria-label="`Afficher le mois de ${m}`"
+              @click="goToMonth(idx)"
+              @keydown.enter.prevent="goToMonth(idx)"
+              @keydown.space.prevent="goToMonth(idx)"
+            >
               <h3>{{ m.toUpperCase() }}</h3>
               <div class="mini-grid">
                 <span v-for="d in DAYS_SHORT" :key="d" class="mini-label">{{ d[0] }}</span>
@@ -82,7 +93,12 @@
                 today: isToday(currentYear, currentMonth, day),
                 weekend: isWeekend(currentYear, currentMonth, day)
               }"
+              role="button"
+              tabindex="0"
+              :aria-label="`Créer une séance le ${day} ${MONTHS[currentMonth]}`"
               @click="openCreateModal(currentYear, currentMonth, day)"
+              @keydown.enter.prevent="openCreateModal(currentYear, currentMonth, day)"
+              @keydown.space.prevent="openCreateModal(currentYear, currentMonth, day)"
             >
               <div class="day-num">{{ day }}</div>
               <div
@@ -90,7 +106,11 @@
                 :key="ei"
                 class="event-pill"
                 :class="`event-pill--${ev.type}`"
+                role="button"
+                tabindex="0"
+                :aria-label="`Détail de ${ev.label}`"
                 @click.stop="openDetail(ev)"
+                @keydown.enter.stop.prevent="openDetail(ev)"
               >
                 {{ ev.label }}
               </div>
@@ -129,30 +149,30 @@
           <form class="create-form" @submit.prevent="submitCreate">
             <div class="create-form__field">
               <label>Nom <span class="required">*</span></label>
-              <input v-model="createForm.name" type="text" placeholder="Ex: Maths — Chapitre 3" maxlength="150" required />
+              <input aria-label="Nom de la séance" v-model="createForm.name" type="text" placeholder="Ex: Maths — Chapitre 3" maxlength="150" required />
             </div>
 
             <div class="create-form__row">
               <div class="create-form__field">
                 <label>Date <span class="required">*</span></label>
-                <input v-model="createForm.date" type="date" required />
+                <input aria-label="Date de la séance" v-model="createForm.date" type="date" required />
               </div>
             </div>
 
             <div class="create-form__row">
               <div class="create-form__field">
                 <label>Début <span class="required">*</span></label>
-                <input v-model="createForm.startTime" type="time" required />
+                <input aria-label="Heure de début" v-model="createForm.startTime" type="time" required />
               </div>
               <div class="create-form__field">
                 <label>Fin <span class="required">*</span></label>
-                <input v-model="createForm.endTime" type="time" required />
+                <input aria-label="Heure de fin" v-model="createForm.endTime" type="time" required />
               </div>
             </div>
 
             <div class="create-form__field">
               <label>Description</label>
-              <textarea v-model="createForm.description" placeholder="Notes optionnelles…" rows="2" maxlength="1000" />
+              <textarea aria-label="Notes optionnelles" v-model="createForm.description" placeholder="Notes optionnelles…" rows="2" maxlength="1000" />
             </div>
 
             <div class="create-form__actions">
@@ -313,6 +333,7 @@ import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useDeadlineStore } from '@/stores/deadlines'
 import { usePlanningStore } from '@/stores/planning'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 import ReminderWidget from '@/components/ReminderWidget.vue'
 import TodoWidget from '@/components/TodoWidget.vue'
 
@@ -321,6 +342,7 @@ const calendarStore = useCalendarEventStore()
 const revisionStore = useRevisionSessionStore()
 const deadlineStore = useDeadlineStore()
 const planningStore = usePlanningStore()
+const guidedTourStore = useGuidedTourStore()
 
 /* ── Constantes ── */
 const MONTHS = [
@@ -372,10 +394,16 @@ async function submitCreate() {
     startTime: createForm.value.startTime,
     endTime: createForm.value.endTime,
     ...(createForm.value.description ? { description: createForm.value.description } : {}),
+    // Parcours guidé : lie la séance au système de Leitner créé pendant le parcours
+    ...(guidedTourStore.active && guidedTourStore.links.leitnerSystemId
+      ? { idSystem: guidedTourStore.links.leitnerSystemId }
+      : {}),
   }
   const ok = await revisionStore.createSession(payload)
   creating.value = false
   if (ok) {
+    const created = revisionStore.sessions[revisionStore.sessions.length - 1]
+    guidedTourStore.recordLinks({ revisionSessionId: created?.id ?? -1 })
     showCreateModal.value = false
     revisionStore.fetchSessions()
     planningStore.fetchPriorities()

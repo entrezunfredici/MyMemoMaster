@@ -29,7 +29,8 @@ permissions:
 #    VPS_PORT                — port SSH du VPS
 #    VPS_IP                  — adresse IP du VPS
 #
-#  Branche staging → environnement "preprod" (Kubernetes) :
+#  Branche staging → environnement "preprod" (Kubernetes — activé via variable
+#  K8S_PREPROD_ENABLED=true ; cluster en pause pour raisons de coût depuis 2026-07-12) :
 #    KUBECONFIG_PREPROD      — kubeconfig base64 pour le cluster K8s preprod
 #
 #  Branche main (Kubernetes prod — activé via variable K8S_PROD_ENABLED=true) :
@@ -69,38 +70,42 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build and Push — test images
-        if: github.event.workflow_run.head_branch == 'dev'
+      # Préfixe d'image selon la branche : dev → _test_, staging → _preprod_, main → (aucun)
+      - name: Compute image names
+        id: images
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest \
-            -f my_memo_master_api/Dockerfile my_memo_master_api/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_api:latest
+          case "${{ github.event.workflow_run.head_branch }}" in
+            dev)     PREFIX="mymemomaster_test_" ;;
+            staging) PREFIX="mymemomaster_preprod_" ;;
+            main)    PREFIX="mymemomaster_" ;;
+            *)       echo "Branche inattendue" ; exit 1 ;;
+          esac
+          echo "api=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}api:latest" >> $GITHUB_OUTPUT
+          echo "front=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}front:latest" >> $GITHUB_OUTPUT
 
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest \
-            -f my_memo_master_front/Dockerfile my_memo_master_front/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_test_front:latest
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push — preprod images
-        if: github.event.workflow_run.head_branch == 'staging'
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_api:latest \
-            -f my_memo_master_api/Dockerfile my_memo_master_api/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_api:latest
+      # cache-from/to gha : les couches Docker (npm ci, apt, onnxruntime…) sont réutilisées
+      # entre les runs — seul ce qui change est rebuildé. En cas de cache miss (éviction),
+      # le build repart simplement de zéro, sans échec.
+      - name: Build and Push — API
+        uses: docker/build-push-action@v6
+        with:
+          context: my_memo_master_api
+          push: true
+          tags: ${{ steps.images.outputs.api }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
 
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_front:latest \
-            -f my_memo_master_front/Dockerfile my_memo_master_front/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_preprod_front:latest
-
-      - name: Build and Push — prod images
-        if: github.event.workflow_run.head_branch == 'main'
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest \
-            -f my_memo_master_api/Dockerfile my_memo_master_api/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_api:latest
-
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest \
-            -f my_memo_master_front/Dockerfile my_memo_master_front/
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mymemomaster_front:latest
+      - name: Build and Push — Front
+        uses: docker/build-push-action@v6
+        with:
+          context: my_memo_master_front
+          push: true
+          tags: ${{ steps.images.outputs.front }}
+          cache-from: type=gha,scope=front
+          cache-to: type=gha,scope=front,mode=max
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  2a. DEPLOY TEST → VPS (docker compose)
@@ -117,11 +122,11 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # Valide le compose racine avec le profil test et le template d'env VPS
       - name: Validate docker-compose syntax
         run: |
-          cp server_docker_compose/.env.example server_docker_compose/.env
-          docker compose -f server_docker_compose/docker-compose.yml \
-            --env-file server_docker_compose/.env config -q
+          docker compose -f docker-compose.yml --profile test \
+            --env-file .env.test.example config -q
 
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -138,16 +143,18 @@ jobs:
             mkdir -p /var/www/html/my_memo_master_test
             cd /var/www/html/my_memo_master_test
             if [ -f .env ]; then
-              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env down || true
+              env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env down || true
             else
               echo "No .env found — skipping docker compose down."
             fi
           EOF
 
+      # Le compose racine (unifié dev/test) est déployé tel quel sur le VPS ;
+      # seuls les services du profil test y sont démarrés (--profile test)
       - name: Upload docker-compose
         run: |
           scp -P ${{ secrets.VPS_PORT }} \
-            server_docker_compose/docker-compose.yml \
+            docker-compose.yml \
             ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_test/docker-compose.yml
 
       - name: Validate test server env
@@ -164,7 +171,7 @@ jobs:
               grep '^ENVIRONMENT=' .env || true
               exit 1
             fi
-            env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env config -q
+            env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env config -q
           EOF
 
       - name: Deploy to VPS
@@ -172,18 +179,20 @@ jobs:
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
             cd /var/www/html/my_memo_master_test
+            # --profile test : n'active que les services VPS du compose unifié
+            # (api_server, front_server, pgadmin_server, backup) + postgres/redis (sans profil)
             compose() {
-              env -i HOME="$HOME" PATH="$PATH" docker compose --env-file .env "$@"
+              env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env "$@"
             }
 
             compose pull
             compose up -d postgres redis
-            compose up -d pgadmin api front backup
+            compose up -d pgadmin_server api_server front_server backup
             compose ps
 
             attempt=1
             max_attempts=24
-            services="postgres api front"
+            services="postgres api_server front_server"
             all_ready=0
 
             while [ "$attempt" -le "$max_attempts" ]; do
@@ -223,6 +232,8 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   #  2b. DEPLOY PREPROD → Kubernetes via Helm
   #      Release : mmm-preprod  /  Namespace : mymemomaster-preprod
+  #      Désactivé jusqu'à K8S_PREPROD_ENABLED=true dans Settings → Variables
+  #      (cluster preprod supprimé pour raisons de coût — à recréer plus tard).
   #
   #  Première fois : exécuter k8s/helm-migrate.sh preprod pour adopter les
   #  ressources kubectl existantes avant de laisser Helm les gérer.
@@ -232,7 +243,7 @@ jobs:
     name: Deploy to Kubernetes (preprod)
     runs-on: ubuntu-latest
     needs: push_images
-    if: needs.push_images.outputs.branch == 'staging'
+    if: needs.push_images.outputs.branch == 'staging' && vars.K8S_PREPROD_ENABLED == 'true'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

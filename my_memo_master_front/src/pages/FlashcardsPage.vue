@@ -82,7 +82,7 @@
           <form @submit.prevent="submitForm">
             <div class="mb-4">
               <label class="form-label">Nom du système</label>
-              <input
+              <input aria-label="Nom du système de Leitner"
                 v-model="form.name"
                 type="text"
                 placeholder="Ex : Maths S1, Vocabulaire anglais..."
@@ -93,6 +93,22 @@
             <div class="mb-4">
               <label class="form-label">Sujet <span class="text-gray-400 font-normal">(optionnel)</span></label>
               <SubjectSelectorComponent v-model="form.subjectId" />
+            </div>
+            <div class="mb-4">
+              <label class="form-label">Carte mentale liée <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <select
+                aria-label="Carte mentale liée au système"
+                v-model="form.idMindMap"
+                class="form-input bg-white"
+              >
+                <option :value="null">Aucune</option>
+                <option v-for="mm in availableMindMaps" :key="mm.idMindMap" :value="mm.idMindMap">
+                  {{ mm.mmName }}
+                </option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">
+                Permet de lier chaque carte à un nœud de la carte mentale lors de sa création.
+              </p>
             </div>
             <div class="mb-6">
               <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
@@ -111,26 +127,26 @@
       <!-- Modal planification de session -->
       <div v-if="showPlanModal" class="modal-overlay" @click="closePlanModal">
         <div class="modal-panel" @click.stop>
-          <button @click="closePlanModal" class="modal-close">&times;</button>
+          <button aria-label="Fermer" @click="closePlanModal" class="modal-close">&times;</button>
           <h2 class="modal-title" style="margin-bottom: 0.25rem">Planifier une session</h2>
           <p class="text-sm text-gray-500 mb-6">Système : <span class="font-semibold text-primary">{{ planningSystem?.name }}</span></p>
           <form @submit.prevent="submitPlanForm">
             <div class="form-group">
               <label class="form-label">Nom de la session</label>
-              <input v-model="planForm.name" type="text" class="form-input" required />
+              <input aria-label="Nom de la session" v-model="planForm.name" type="text" class="form-input" required />
             </div>
             <div class="form-group">
               <label class="form-label">Date</label>
-              <input v-model="planForm.date" type="date" class="form-input" required />
+              <input aria-label="Date de la session" v-model="planForm.date" type="date" class="form-input" required />
             </div>
             <div class="flex gap-4 mb-6">
               <div class="flex-1">
                 <label class="form-label">Heure de début</label>
-                <input v-model="planForm.startTime" type="time" class="form-input" required />
+                <input aria-label="Heure de début" v-model="planForm.startTime" type="time" class="form-input" required />
               </div>
               <div class="flex-1">
                 <label class="form-label">Heure de fin</label>
-                <input v-model="planForm.endTime" type="time" class="form-input" required />
+                <input aria-label="Heure de fin" v-model="planForm.endTime" type="time" class="form-input" required />
               </div>
             </div>
             <p v-if="planError" class="text-red-600 text-sm mb-4">{{ planError }}</p>
@@ -159,6 +175,8 @@ import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useSubjectStore } from '@/stores/subjects'
 import { useTagStore } from '@/stores/tags'
+import { useGuidedTourStore } from '@/stores/guidedTour'
+import { useDiagrammeStore } from '@/stores/diagrammes'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 
@@ -169,6 +187,8 @@ const boxStore = useLeitnerBoxStore()
 const sessionStore = useRevisionSessionStore()
 const subjectStore = useSubjectStore()
 const tagStore = useTagStore()
+const guidedTourStore = useGuidedTourStore()
+const diagrammeStore = useDiagrammeStore()
 
 const loading = ref(true)
 const searchQuery = ref('')
@@ -177,8 +197,15 @@ const showModal = ref(false)
 const submitting = ref(false)
 const editingId = ref(null)
 
-const form = reactive({ name: '', subjectId: null, tagIds: [] })
+const form = reactive({ name: '', subjectId: null, tagIds: [], idMindMap: null })
 const subjects = computed(() => subjectStore.subjects)
+
+// Cartes mentales proposées pour la liaison : celles de la matière choisie, sinon toutes
+const availableMindMaps = computed(() => {
+  const all = diagrammeStore.diagrammes || []
+  if (!form.subjectId) return all
+  return all.filter((mm) => mm.subjectId === form.subjectId)
+})
 
 const filteredSystems = computed(() => {
   let list = systemStore.systems
@@ -225,8 +252,12 @@ const submitPlanForm = async () => {
     idSystem: planningSystem.value.idSystem
   })
   submittingPlan.value = false
-  if (ok) closePlanModal()
-  else planError.value = 'Erreur lors de la création de la session.'
+  if (ok) {
+    // Parcours guidé : planifier une session valide aussi l'étape « planification »
+    const created = sessionStore.sessions[sessionStore.sessions.length - 1]
+    guidedTourStore.recordLinks({ revisionSessionId: created?.id ?? -1 })
+    closePlanModal()
+  } else planError.value = 'Erreur lors de la création de la session.'
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -237,7 +268,11 @@ const loadStats = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([systemStore.fetchSystems(), subjectStore.fetchSubjects()])
+  await Promise.all([
+    systemStore.fetchSystems(),
+    subjectStore.fetchSubjects(),
+    diagrammeStore.fetchDiagrammes()
+  ])
   await Promise.all([loadStats(), boxStore.fetchBoxes()])
   loading.value = false
 })
@@ -251,7 +286,9 @@ const goToSession = (systemId) => {
 const openCreateModal = () => {
   editingId.value = null
   form.name = ''
-  form.subjectId = null
+  // Parcours guidé : pré-sélectionne la matière et la carte mentale créées à l'étape précédente
+  form.subjectId = guidedTourStore.active ? guidedTourStore.links.subjectId : null
+  form.idMindMap = guidedTourStore.active ? guidedTourStore.links.mindMapId : null
   form.tagIds = []
   showModal.value = true
 }
@@ -260,6 +297,7 @@ const openEditModal = (system) => {
   editingId.value = system.idSystem
   form.name = system.name
   form.subjectId = system.subjectId || null
+  form.idMindMap = system.idMindMap || null
   form.tagIds = (system.tags || []).map((t) => t.tagId)
   showModal.value = true
 }
@@ -269,17 +307,23 @@ const closeModal = () => {
   editingId.value = null
   form.name = ''
   form.subjectId = null
+  form.idMindMap = null
   form.tagIds = []
 }
 
 const submitForm = async () => {
   submitting.value = true
-  systemStore.system = { name: form.name, subjectId: form.subjectId || null }
+  systemStore.system = {
+    name: form.name,
+    subjectId: form.subjectId || null,
+    idMindMap: form.idMindMap || null
+  }
   const ok = editingId.value
     ? await systemStore.updateSystem(editingId.value)
     : await systemStore.createSystem()
   if (ok) {
     const systemId = editingId.value || systemStore.system.idSystem
+    if (!editingId.value) guidedTourStore.recordLinks({ leitnerSystemId: systemId })
     await tagStore.setEntityTags('leitnersystem', systemId, form.tagIds)
     closeModal()
     await systemStore.fetchSystems()

@@ -169,9 +169,16 @@ class TestService {
       case 'open': {
         const user = (answer ?? '').trim()
         if (!user) return { correct: false, explanation: null, semanticScore: null, points: 0 }
-        const correctAnswer = (content.correct_answer ?? '').trim()
-        if (!correctAnswer) return { correct: false, explanation: null, semanticScore: null, points: 0 }
-        const result = await semanticService.gradeSemantic(correctAnswer, user)
+        // Toutes les formulations acceptées : la principale + les alternatives
+        // (ex : la formule symbolique et son énoncé en toutes lettres)
+        const accepted = [
+          content.correct_answer,
+          ...(Array.isArray(content.accepted_answers) ? content.accepted_answers : [])
+        ]
+          .map((s) => (s ?? '').trim())
+          .filter(Boolean)
+        if (accepted.length === 0) return { correct: false, explanation: null, semanticScore: null, points: 0 }
+        const result = await semanticService.gradeSemantic(accepted, user)
         return { correct: result.is_correct, explanation: result.explanation, semanticScore: result.score, points: result.score }
       }
       case 'mcq': {

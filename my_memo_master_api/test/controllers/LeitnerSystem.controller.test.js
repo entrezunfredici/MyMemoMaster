@@ -157,6 +157,30 @@ describe('LeitnerSystem Controller', () => {
       expect(res.status).toBe(400)
     })
 
+    it('201 — crée un système lié à une carte mentale (idMindMap)', async () => {
+      leitnerSystemService.create.mockResolvedValue({ ...mockSystem, idMindMap: 7 })
+
+      const res = await request(app)
+        .post('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Leitner Maths', idMindMap: 7 })
+
+      expect(res.status).toBe(201)
+      expect(leitnerSystemService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ idMindMap: 7 })
+      )
+    })
+
+    it('400 — idMindMap invalide (non entier)', async () => {
+      const res = await request(app)
+        .post('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Leitner Maths', idMindMap: 'abc' })
+
+      expect(res.status).toBe(400)
+      expect(leitnerSystemService.create).not.toHaveBeenCalled()
+    })
+
     it('500 — le service échoue', async () => {
       leitnerSystemService.create.mockRejectedValue(new Error('DB error'))
 
