@@ -144,6 +144,39 @@ export function normalizeFormulaSyntax(input) {
   return String(input ?? '').replace(/\bfrac\(/g, 'over(')
 }
 
+// Ajout de ligne/colonne à une matrice — en manipulation de chaîne LaTeX, pas
+// via l'API de commande MathLive (addColumnAfter/addRowAfter). Constat empirique
+// (2026-07-19) : ces commandes ne fonctionnent proprement que dans une fenêtre
+// très étroite (juste après insertion, curseur encore dans le placeholder) ;
+// dans tout autre cas — curseur au bord de la matrice, matrice mêlée à d'autre
+// contenu, champ vide — elles enveloppent TOUT le champ dans un \begin{split}
+// parasite, non réversible par setValue une fois fait (le champ reste corrompu).
+// Cette implémentation textuelle est déterministe et ne touche jamais rien
+// d'autre qu'une matrice reconnue comme telle.
+// Portée assumée : seule une formule entièrement constituée d'UNE matrice/cas
+// est modifiable ainsi (voir DECISIONS.md 2026-07-19, « commandes de matrice »).
+const SOLE_MATRIX_RE = /^\\begin\{([a-zA-Z]*matrix|cases)\}([\s\S]*)\\end\{\1\}$/
+
+const splitMatrixRows = (body) => body.split('\\\\').map((row) => row.trim())
+
+export function addMatrixColumn(latex) {
+  const m = String(latex ?? '').trim().match(SOLE_MATRIX_RE)
+  if (!m) return null
+  const [, env, body] = m
+  const rows = splitMatrixRows(body).map((row) => `${row} & \\placeholder{}`)
+  return `\\begin{${env}}${rows.join(' \\\\ ')}\\end{${env}}`
+}
+
+export function addMatrixRow(latex) {
+  const m = String(latex ?? '').trim().match(SOLE_MATRIX_RE)
+  if (!m) return null
+  const [, env, body] = m
+  const rows = splitMatrixRows(body)
+  const colCount = (rows[0].match(/&/g) || []).length + 1
+  rows.push(Array(colCount).fill('\\placeholder{}').join(' & '))
+  return `\\begin{${env}}${rows.join(' \\\\ ')}\\end{${env}}`
+}
+
 // Texte mixte -> HTML : les segments entre $…$ sont rendus en KaTeX inline,
 // le reste est échappé tel quel. Un '$' non apparié reste littéral.
 // Utilisé pour les énoncés/réponses des flashcards Leitner et des exercices.

@@ -55,7 +55,6 @@
               type="button"
               :aria-label="item.aria"
               :title="item.aria"
-              :disabled="item.command && !mathliveReady"
               class="interpreter__symbol"
               @click="insertItem(item)"
             >
@@ -64,6 +63,9 @@
           </div>
         </div>
       </div>
+      <p v-if="matrixHint" class="interpreter__hint interpreter__hint--matrix" aria-live="polite">
+        {{ matrixHint }}
+      </p>
     </div>
 
     <!-- Zone brute : mode expert (LaTeX ou raccourcis historiques over/sqrt/^) -->
@@ -102,7 +104,7 @@
 
 <script setup>
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
-import { renderMathMultiline, toLatex } from './interpreter.js'
+import { renderMathMultiline, toLatex, addMatrixColumn, addMatrixRow } from './interpreter.js'
 import { checkUnitHomogeneity } from './units.js'
 import { PALETTE_TABS } from './palette.js'
 
@@ -139,6 +141,10 @@ const userInput = ref(props.modelValue || '')
 const textareaRef = ref(null)
 const mathfieldRef = ref(null)
 const mathliveReady = ref(false)
+// Message temporaire affiché quand une commande de matrice (+1C…+3L) n'a pas
+// pu s'appliquer — voir insertItem pour la garde qui protège ces commandes.
+const matrixHint = ref('')
+let matrixHintTimer = null
 
 watch(
   () => props.modelValue,
@@ -195,14 +201,33 @@ const syncMathfieldFromRaw = (value) => {
 const unitsError = computed(() => checkUnitHomogeneity(userInput.value))
 const renderedContent = computed(() => renderMathMultiline(userInput.value))
 
+const MATRIX_TRANSFORMS = { addColumnAfter: addMatrixColumn, addRowAfter: addMatrixRow }
+
+const showMatrixHint = (message) => {
+  matrixHint.value = message
+  clearTimeout(matrixHintTimer)
+  matrixHintTimer = setTimeout(() => { matrixHint.value = '' }, 5000)
+}
+
 /* --- Insertion depuis la palette --- */
 const insertItem = (item) => {
   const mf = mathfieldRef.value
   if (item.command) {
-    if (!mathliveReady.value || !mf) return
-    for (let i = 0; i < (item.repeat || 1); i++) mf.executeCommand(item.command)
-    userInput.value = mf.getValue('latex')
-    mf.focus()
+    const transform = MATRIX_TRANSFORMS[item.command]
+    let latex = mathliveReady.value && mf ? mf.getValue('latex') : toLatex(userInput.value)
+    let ok = true
+    for (let i = 0; i < (item.repeat || 1); i++) {
+      const next = transform(latex)
+      if (next === null) { ok = false; break }
+      latex = next
+    }
+    if (ok) {
+      userInput.value = latex
+      matrixHint.value = ''
+    } else {
+      showMatrixHint('Cette commande ne s’applique que si la formule est entièrement une matrice (ou un système de cas).')
+    }
+    if (mathliveReady.value && mf) mf.focus()
     return
   }
   if (mathliveReady.value && mf) {
@@ -384,6 +409,13 @@ const apply = () => {
   margin-bottom: 8px;
   font-size: 12px;
   color: #64748b;
+}
+
+.interpreter__hint--matrix {
+  margin: 0;
+  padding: 8px 16px 12px;
+  font-weight: 600;
+  color: #b45309;
 }
 
 .interpreter__actions {

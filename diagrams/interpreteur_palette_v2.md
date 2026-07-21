@@ -2,8 +2,13 @@
 
 > **Statut** : implémenté (Lots 0-5 livrés le 2026-07-19 — voir DECISIONS.md même date et CHANGELOG_AGENT).
 > Écarts vs conception : migration de données abandonnée au profit de la normalisation des deux côtés
-> à la comparaison (décision Lots 4-5) ; boutons +C/+L actifs même hors matrice (no-op sûr, l'API
-> MathLive n'expose pas la position) ; glyphes « T »/« 𝔻 »/flèche blanche toujours à confirmer (§11).
+> à la comparaison (décision Lots 4-5) ; équivalences algébriques (commutativité, a/b ≡ a·b⁻¹, termes
+> semblables) ajoutées à la correction `exact` (voir DECISIONS 2026-07-19 « équivalences algébriques »).
+> Commandes de matrice +C/+L réécrites en manipulation de chaîne LaTeX déterministe — l'API de
+> commande MathLive s'est révélée peu fiable et pouvait corrompre le champ hors du cas « matrice
+> fraîchement insérée » (voir DECISIONS 2026-07-19 « commandes de matrice »). Glyphes de la planche
+> formules résolus (2026-07-19) : les deux boutons « T » et la flèche blanche étaient des erreurs de
+> planche, retirés ; le glyphe « 𝔻 » devient une section « Lettres fraktur » complète (`\mathfrak{}`).
 > **Source** : maquettes de palette fournies par l'utilisateur le 2026-07-19 (8 planches de boutons, listes non exhaustives) + échanges de conception.
 > **Prérequis de lecture** : décisions DECISIONS.md du 2026-07-19 (KaTeX seul en rendu), 2026-07-14 (convention `$…$`, syntaxe canonique unique), 2026-07-18 (correction sémantique : stratégie `exact` sur formules).
 
@@ -254,12 +259,24 @@ LaTeX avant comparaison. Extension de `normalizeSymbolic` (ordre d'application) 
    les marqueurs LaTeX (`\`, `^{`, `_{`, environnements) — aujourd'hui il se déclenche sur
    `$…$` et les opérateurs.
 
-**Limite assumée (dette)** : la normalisation textuelle ne reconnaît pas les équivalences
-mathématiques profondes (`\frac{a}{b}` vs `a/b` vs `a \cdot b^{-1}`, commutativité). Si le besoin
-apparaît en usage réel : passer à une comparaison d'**AST** (parser le LaTeX des deux côtés et
-comparer les arbres normalisés) — chantier séparé, à ne pas embarquer dans le lot V2 initial.
-En attendant, la parade existante reste valable : l'auteur fournit plusieurs formulations
-acceptées (`accepted_answers` / multi-Response, décision 2026-07-18).
+> **Mise à jour [2026-07-19]** : la limite ci-dessous est **partiellement comblée**. Un second
+> mécanisme, `algebraicallyEqual` (`helpers/algebraicEquivalence.js`), complète `normalizeSymbolic`
+> dans le court-circuit `exact` : il parse chaque côté en arbre (AST), le canonicalise (fractions
+> ramenées à une puissance inverse, commutativité de `+`/`*`, combinaison de termes/facteurs
+> semblables, racines en exposant, équations aux côtés symétriques) et compare les deux arbres.
+> Reconnaît désormais `a/b` ≡ `a·b⁻¹`, `a+b` ≡ `b+a`, `x+x` ≡ `2x`, `sqrt(x)` ≡ `x^(1/2)`,
+> `U=RI` ≡ `RI=U`. **Reste hors périmètre** (assumé, ce n'est pas un CAS — pas de résolution ni de
+> simplification) : la distributivité/expansion (`2*(a+b)` ≠ `2a+2b`) et les inéquations. Voir
+> DECISIONS.md 2026-07-19 « équivalences algébriques » et `helpers/algebraicEquivalence.js` (tests :
+> `test/helpers/algebraicEquivalence.test.js`).
+
+**Limite assumée (dette résiduelle)** : la comparaison par forme canonique ne fait pas de
+distributivité/expansion de produits — une équivalence qui nécessiterait de développer
+`2*(a+b)` en `2a+2b` n'est pas reconnue. Si ce besoin apparaît en usage réel, c'est un chantier
+séparé (expansion contrôlée dans `canon`), à ne pas confondre avec un solveur/CAS complet
+(explicitement hors périmètre du projet). En attendant, la parade existante reste valable :
+l'auteur fournit plusieurs formulations acceptées (`accepted_answers` / multi-Response,
+décision 2026-07-18).
 
 ---
 
@@ -326,9 +343,12 @@ dans DECISIONS.md.
 
 ## 11. Questions ouvertes
 
-1. Glyphes restant à confirmer (planche 5 uniquement — les opérateurs/ensembles sont réglés
-   par `operateurs.md`) : 2ᵉ bouton « T », « 𝔻 » stylisé, flèche blanche « → » (symbole ou
-   bouton d'action ?).
+1. ~~Glyphes à confirmer (planche 5) : 2ᵉ bouton « T », « 𝔻 » stylisé, flèche blanche « → ».~~
+   **Résolu 2026-07-19** : les deux boutons « T » (`\text{}`) et la flèche blanche étaient des
+   erreurs de planche sans signification — retirés de `palette.js`. Le glyphe « 𝔻 » devient une
+   section complète « Lettres fraktur » (`\mathfrak{A}`…`\mathfrak{Z}`, `\mathfrak{a}`…`\mathfrak{z}`,
+   labels en lettres latines simples comme pour `GREEK_UPPER`) ajoutée à l'onglet `carac`, « au cas
+   où » (idéaux, algèbres de Lie…) — pas de cas d'usage identifié dans le projet à ce jour.
 2. L'onglet `opérateurs` regroupe-t-il les planches 6 **et** 7, ou « ensembles & flèches »
    devient-il un 5ᵉ onglet ? (Les onglets vides des maquettes suggèrent de la place.)
 3. La zone brute est-elle visible par défaut ou repliée (mode expert à déplier) ?

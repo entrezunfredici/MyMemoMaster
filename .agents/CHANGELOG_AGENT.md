@@ -36,6 +36,9 @@
 | Interpréteur V2 — conception (analyse) | Livré — diagrams/interpreteur_palette_v2.md : éditeur WYSIWYG (zone rendue éditable, flèches, matrices), palette à onglets (inventaire complet des 8 planches utilisateur → LaTeX + a11y), MathLive recommandé, stockage LaTeX canonique dans `$…$` (texte conservé, pas de JSON), adaptation normalizeSymbolic, plan en 6 lots | 2026-07-19 |
 | Interpréteur V2 — éditeur (Lots 0-3) | Livré — MathLive 0.110 (lazy, chunk séparé 228 Ko gzip) : zone rendue éditable + zone brute expert (source de vérité v-model, contrat FormulaHelper/mindmap inchangé) + palette 4 onglets/117 boutons (palette.js) ; toLatex idempotent sur LaTeX ; \placeholder{} → □ au rendu KaTeX ; POC vérifié en navigateur réel (CDP) | 2026-07-19 |
 | Interpréteur V2 — dette (Lots 4-5) | Livré — correction `exact` : normalizeSymbolic fait converger V1/LaTeX/texte libre (migration de données abandonnée, normalisation des 2 côtés — voir DECISIONS) ; homogénéité des unités opérationnelle sur LaTeX (latexToPlain, gate levé) ; prototype : palette à onglets + capture 17 régénérée | 2026-07-19 |
+| Interpréteur V2 — équivalences algébriques | Livré — helpers/algebraicEquivalence.js (AST canonicalisé) complète normalizeSymbolic dans le court-circuit `exact` : commutativité, a/b ≡ a·b⁻¹, termes semblables, racines en exposant, équations symétriques ; pas un CAS (pas de distributivité) | 2026-07-19 |
+| Interpréteur V2 — commandes matrice (+C/+L) | Corrigé — l'API de commande MathLive s'est révélée peu fiable (corruption `\begin{split}` possible, y compris matrice seule) ; remplacée par addMatrixColumn/addMatrixRow (manipulation LaTeX déterministe, interpreter.js) ; portée : formule = uniquement une matrice/cas | 2026-07-19 |
+| Interpréteur V2 — palette (glyphes résolus) | Livré — les 2 boutons « T » et la flèche blanche de la planche formules retirés (erreurs de planche) ; section « Lettres fraktur » (\mathfrak{}, 52 lettres) ajoutée à l'onglet Caractères | 2026-07-19 |
 | Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
@@ -6164,3 +6167,37 @@ Demande utilisateur : corriger la dette documentée à la livraison de l'éditeu
 - Équivalences mathématiques profondes (`a/b` ≡ `a·b⁻¹`, commutativité) : toujours hors périmètre (AST — voir DECISIONS), parade multi-réponses en place
 - Collision théorique de la forme canonique sans `*` (`2*3` ≡ `23`) — assumée, documentée dans DECISIONS
 - +C/+L hors matrice et glyphes « T »/« 𝔻 »/flèche blanche : inchangés (voir entrée précédente)
+
+---
+
+### [2026-07-19] IMP — Interpréteur V2 : équivalences algébriques (AST) + refonte des commandes de matrice + glyphes de palette résolus
+
+#### Contexte
+Trois demandes utilisateur sur la dette restante de l'interpréteur V2 : (1) les commandes +C/+L de l'onglet Matrices doivent être scopées strictement aux matrices, sans jamais rien créer/modifier d'autre ; (2) ajouter les équivalences mathématiques (au-delà de la normalisation textuelle déjà livrée) à la correction ; (3) trancher les 3 glyphes ambigus de la planche formules (question posée, réponses obtenues). Décisions détaillées dans DECISIONS.md (trois entrées du 2026-07-19).
+
+#### Fichiers créés
+- `my_memo_master_api/helpers/formulaNotation.js` — `unifyFormulaNotation` extraite de `Semantic.service.normalizeSymbolic` (source de vérité partagée avec le module d'équivalence algébrique) ; corrige au passage un bug de la parenthèse-cleanup qui avalait les appels de fonction à argument simple (`sqrt(x)` → `sqrtx`)
+- `my_memo_master_api/helpers/algebraicEquivalence.js` — `algebraicallyEqual(a, b)` : tokenizer + parseur récursif descendant (nombres, variables à une lettre avec multiplication implicite, fonctions sin/cos/tan/ln/log/exp/sqrt/nsqrt, abs via `|…|`) → AST → canonicalisation (division en puissance inverse, aplatissement + tri des sommes/produits pour la commutativité, combinaison de termes/facteurs semblables, racines en exposant, équations aux côtés triés) → comparaison stricte. Échec de parsing → `false` silencieux (jamais d'exception), garde-fous performance (mots 4+ lettres non-fonction, longueur max, inéquations exclues)
+- `my_memo_master_api/test/helpers/algebraicEquivalence.test.js` — 22 tests (commutativité, division≡puissance inverse, termes semblables, racines, équations symétriques, faux positifs à éviter, repli silencieux sur prose/matrices/inéquations/entrées invalides)
+
+#### Fichiers modifiés
+- `my_memo_master_api/services/Semantic.service.js` — `normalizeSymbolic` délègue à `unifyFormulaNotation` ; nouvelle méthode `algebraicallyEqual` (délégation) ; court-circuit `exact` de `gradeSemantic` étendu : `this.normalizeSymbolic(c) === studentSym || this.algebraicallyEqual(studentAnswer, c)`
+- `my_memo_master_api/test/services/Semantic.service.test.js` — 8 nouveaux tests (convergence normalizeSymbolic étendue + 2 tests d'intégration gradeSemantic pour l'équivalence algébrique)
+- `my_memo_master_front/src/components/interpreter/interpreter.js` — `addMatrixColumn`/`addMatrixRow` (nouvelles fonctions pures, exportées) : manipulation de chaîne LaTeX déterministe remplaçant l'API de commande MathLive pour +C/+L, jugée peu fiable après investigation en navigateur réel (voir DECISIONS — corruption `\begin{split}` possible même avec une matrice seule si le curseur n'est pas resté dans le placeholder d'insertion, et non réversible dans la session)
+- `my_memo_master_front/src/components/interpreter/Interpreter.vue` — `insertItem` : les items `command` passent désormais par `MATRIX_TRANSFORMS` (fonctions pures ci-dessus) au lieu de `mf.executeCommand` ; message `matrixHint` (`aria-live="polite"`, 5 s) si la commande ne s'applique pas ; suppression du gate `:disabled` (les boutons fonctionnent aussi en mode repli sans MathLive)
+- `my_memo_master_front/src/components/interpreter/palette.js` — retrait du bouton `\text{}` (« T », erreur de planche) ; ajout de la section « Lettres fraktur » (`FRAKTUR_UPPER`/`FRAKTUR_LOWER`, `\mathfrak{}`, 52 boutons, labels en lettres latines simples) à l'onglet Caractères ; commentaire du groupe matrices mis à jour (« la formule doit être uniquement une matrice » plutôt que « curseur dans une matrice »)
+- `my_memo_master_front/test/helpers/interpreterLatex.test.js` — 7 tests `addMatrixColumn`/`addMatrixRow` (ajout colonne/ligne, types d'environnement préservés, refus sur contenu mixte ou vide, chaînage déterministe)
+
+#### Ce qui est utilisable
+- Une réponse `a+b` matche `b+a`, `over(F, S)` matche `F*S^-1`, `x+x` matche `2x` dans la correction `exact`, sans passer par les embeddings
+- Les boutons +1/2/3C et +1/2/3L fonctionnent de façon fiable et déterministe sur une formule qui est uniquement une matrice ; sur toute autre formule (vide, mêlée à d'autre contenu), ils affichent un message explicatif et ne touchent à rien
+- Palette enrichie de 52 lettres fraktur ; les deux boutons « T » et la flèche blanche (erreurs de planche) ont disparu
+- Vérifié : navigateur réel (Edge headless/CDP) pour les 4 scénarios de matrice (vide, seule + plusieurs appels chaînés, mêlée à du texte, capture d'écran du message) ; API 34+22+2 tests verts, front 675+7 tests verts (682 total), lint API et front verts
+
+#### Leçon d'outillage (session)
+- Sur MathLive 0.110, les commandes de tableau (`addColumnAfter`/`addRowAfter`) ne sont fiables que juste après une insertion via `selectionMode:'placeholder'` ; toute navigation ultérieure (même Home/End sur une matrice seule) déclenche un wrapping `\begin{split}` correcteur-de-rien, et cette corruption a résisté à toutes les tentatives de restauration (`setValue`, `undo`, délais) dans la même session — un motif à surveiller si une montée de version MathLive est envisagée
+
+#### Dette / non couvert
+- Distributivité/expansion (`2*(a+b)` ≠ `2a+2b`) toujours hors périmètre de l'équivalence algébrique — assumé, ce n'est pas un CAS
+- Extension de matrice imbriquée dans une formule plus large non supportée (portée réduite à « formule = uniquement une matrice ») — chantier futur si le besoin apparaît, nécessiterait soit une API MathLive plus mature soit un parseur LaTeX maison avec position de curseur
+- Section « Lettres fraktur » ajoutée sans cas d'usage identifié dans le projet à ce jour (« au cas où » demandé par l'utilisateur)

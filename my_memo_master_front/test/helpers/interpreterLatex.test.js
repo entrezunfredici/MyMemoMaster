@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toLatex, renderMath, renderInlineMath } from '@/components/interpreter/interpreter.js'
+import { toLatex, renderMath, renderInlineMath, addMatrixColumn, addMatrixRow } from '@/components/interpreter/interpreter.js'
 
 // Exposants : sans accolades, LaTeX ne met en exposant que le premier caractère
 // (s^-2 affichait le 2 en taille normale) — toLatex doit toujours les poser.
@@ -107,5 +107,50 @@ describe('renderMath — placeholders MathLive', () => {
     const html = renderMath('\\frac{\\placeholder{x}}{2}')
     expect(html).not.toContain('katex-error')
     expect(html).not.toContain('\\square')
+  })
+})
+
+// Commandes de matrice (+1C…+3L) : implémentation texte déterministe qui
+// remplace l'API de commande MathLive (addColumnAfter/addRowAfter), jugée peu
+// fiable hors du cas « matrice fraîchement insérée » — voir DECISIONS.md
+// 2026-07-19. null = la commande ne s'applique pas (jamais d'exception).
+describe('addMatrixColumn / addMatrixRow', () => {
+  it('addMatrixColumn ajoute un placeholder à chaque ligne d’une matrice 1×1', () => {
+    expect(addMatrixColumn('\\begin{pmatrix}\\placeholder{}\\end{pmatrix}'))
+      .toBe('\\begin{pmatrix}\\placeholder{} & \\placeholder{}\\end{pmatrix}')
+  })
+
+  it('addMatrixColumn ajoute un placeholder à CHAQUE ligne d’une matrice 2×2', () => {
+    expect(addMatrixColumn('\\begin{pmatrix}1 & 2 \\\\ 3 & 4\\end{pmatrix}'))
+      .toBe('\\begin{pmatrix}1 & 2 & \\placeholder{} \\\\ 3 & 4 & \\placeholder{}\\end{pmatrix}')
+  })
+
+  it('addMatrixRow ajoute une ligne avec le même nombre de colonnes', () => {
+    expect(addMatrixRow('\\begin{pmatrix}1 & 2\\end{pmatrix}'))
+      .toBe('\\begin{pmatrix}1 & 2 \\\\ \\placeholder{} & \\placeholder{}\\end{pmatrix}')
+  })
+
+  it('respecte le type d’environnement (bmatrix reste bmatrix, cases reste cases)', () => {
+    expect(addMatrixColumn('\\begin{bmatrix}1\\end{bmatrix}')).toBe('\\begin{bmatrix}1 & \\placeholder{}\\end{bmatrix}')
+    expect(addMatrixRow('\\begin{cases}1\\end{cases}')).toBe('\\begin{cases}1 \\\\ \\placeholder{}\\end{cases}')
+  })
+
+  it('refuse (null) une matrice mêlée à d’autre contenu — ne touche à rien d’autre qu’une matrice', () => {
+    expect(addMatrixColumn('x+\\begin{pmatrix}1 & 2\\end{pmatrix}')).toBeNull()
+    expect(addMatrixRow('\\begin{pmatrix}1\\end{pmatrix}+y')).toBeNull()
+  })
+
+  it('refuse (null) un champ vide ou sans matrice — jamais d’exception', () => {
+    expect(addMatrixColumn('')).toBeNull()
+    expect(addMatrixRow('x + y')).toBeNull()
+    expect(() => addMatrixColumn(null)).not.toThrow()
+    expect(addMatrixColumn(null)).toBeNull()
+  })
+
+  it('déterministe : plusieurs appels chaînés font grandir la matrice de façon prévisible', () => {
+    let latex = '\\begin{pmatrix}\\placeholder{}\\end{pmatrix}'
+    latex = addMatrixColumn(latex)
+    latex = addMatrixRow(latex)
+    expect(latex).toBe('\\begin{pmatrix}\\placeholder{} & \\placeholder{} \\\\ \\placeholder{} & \\placeholder{}\\end{pmatrix}')
   })
 })

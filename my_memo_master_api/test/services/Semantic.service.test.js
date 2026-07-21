@@ -161,6 +161,21 @@ describe('SemanticService', () => {
       expect(result.strategy).toBe('exact')
     })
 
+    it('gradeSemantic - équivalence algébrique (commutativité) - correcte sans embedding', async () => {
+      // "R*I" et "I*R" ne matchent pas en comparaison textuelle stricte
+      // (ordre différent) — seule l'équivalence algébrique les rapproche
+      const result = await SemanticService.gradeSemantic('U = R*I', 'U = I*R')
+      expect(result.is_correct).toBe(true)
+      expect(result.strategy).toBe('exact')
+      expect(result.score).toBe(1.0)
+    })
+
+    it('gradeSemantic - équivalence algébrique (division ≡ puissance inverse) - correcte sans embedding', async () => {
+      const result = await SemanticService.gradeSemantic('over(F, S)', 'F*S^-1')
+      expect(result.is_correct).toBe(true)
+      expect(result.strategy).toBe('exact')
+    })
+
     it('gradeSemantic - opérandes inversés avec similarité maximale - rejetés (garde anti-inversion)', async () => {
       // Anagramme : même somme de char codes → le mock produit des vecteurs identiques
       // (similarité 1.0), seule la garde anti-inversion peut rejeter.

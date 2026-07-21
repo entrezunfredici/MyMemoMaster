@@ -63,7 +63,6 @@ const STRUCTURES = [
   sym('cos', `\\cos(${PH})`, 'cosinus'),
   sym('sin', `\\sin(${PH})`, 'sinus'),
   sym('tan', `\\tan(${PH})`, 'tangente'),
-  sym('T', `\\text{${PH}}`, 'texte droit dans la formule'),
   sym('( )', `\\left(${PH}\\right)`, 'parenthèses ajustables'),
   sym('[ ]', `\\left[${PH}\\right]`, 'crochets'),
   sym('|x|', `\\left|${PH}\\right|`, 'valeur absolue'),
@@ -122,6 +121,16 @@ const ARROWS = [
   sym('↘', '\\searrow', 'flèche diagonale descendante'), sym('↙', '\\swarrow', 'flèche diagonale descendante gauche'),
 ]
 
+// Lettres fraktur (\mathfrak{}) — section ajoutée « au cas où » (idéaux,
+// algèbres de Lie…) suite à la clarification du glyphe 𝔇 de la planche
+// formules (2026-07-19). Labels en lettres latines simples (même convention
+// que GREEK_UPPER ci-dessus) : le rendu fraktur réel s'affiche dans l'aperçu
+// une fois inséré, pas besoin des glyphes Unicode exacts sur le bouton.
+const FRAKTUR_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+  .map((l) => sym(l, `\\mathfrak{${l}}`, `${l} fraktur majuscule`))
+const FRAKTUR_LOWER = 'abcdefghijklmnopqrstuvwxyz'.split('')
+  .map((l) => sym(l, `\\mathfrak{${l}}`, `${l} fraktur minuscule`))
+
 const matrixEnv = (env, rows, cols) => {
   const row = Array(cols).fill(PH).join(' & ')
   const body = Array(rows).fill(row).join(' \\\\ ')
@@ -137,7 +146,13 @@ const MATRICES = [
   sym('▦', matrixEnv('matrix', 3, 3), 'tableau sans délimiteur'),
 ]
 
-// Commandes contextuelles : agissent sur la matrice sous le curseur (API MathLive)
+// Commandes de matrice : n'agissent QUE si la formule entière est une matrice
+// reconnue (voir addMatrixColumn/addMatrixRow dans Interpreter.vue). Implémentées
+// en manipulation de chaîne LaTeX, pas via l'API de commande MathLive — celle-ci
+// s'est révélée peu fiable hors du cas « matrice fraîchement insérée » (elle peut
+// envelopper tout le champ dans un \begin{split} parasite, y compris avec une
+// matrice seule si le curseur n'est pas resté dans une cellule) : voir DECISIONS.md
+// 2026-07-19 (« Interpréteur V2 — commandes de matrice »).
 const MATRIX_COMMANDS = [1, 2, 3].flatMap((n) => ([
   { label: `+${n}C`, command: 'addColumnAfter', repeat: n, aria: `ajouter ${n} colonne${n > 1 ? 's' : ''} à la matrice` },
   { label: `+${n}L`, command: 'addRowAfter', repeat: n, aria: `ajouter ${n} ligne${n > 1 ? 's' : ''} à la matrice` },
@@ -151,6 +166,7 @@ export const PALETTE_TABS = [
       { name: 'Grec minuscules', items: GREEK_LOWER },
       { name: 'Grec majuscules', items: GREEK_UPPER },
       { name: 'Chiffres & ensembles', items: DIGITS_SETS },
+      { name: 'Lettres fraktur', items: [...FRAKTUR_UPPER, ...FRAKTUR_LOWER] },
     ],
   },
   {
@@ -178,7 +194,7 @@ export const PALETTE_TABS = [
     label: 'Matrices',
     groups: [
       { name: 'Insérer', items: MATRICES },
-      { name: 'Modifier (curseur dans une matrice)', items: MATRIX_COMMANDS },
+      { name: 'Modifier (la formule doit être uniquement une matrice)', items: MATRIX_COMMANDS },
     ],
   },
 ]
