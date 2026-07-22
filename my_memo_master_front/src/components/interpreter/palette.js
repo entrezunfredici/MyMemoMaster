@@ -123,13 +123,19 @@ const ARROWS = [
 
 // Lettres fraktur (\mathfrak{}) — section ajoutée « au cas où » (idéaux,
 // algèbres de Lie…) suite à la clarification du glyphe 𝔇 de la planche
-// formules (2026-07-19). Labels en lettres latines simples (même convention
-// que GREEK_UPPER ci-dessus) : le rendu fraktur réel s'affiche dans l'aperçu
-// une fois inséré, pas besoin des glyphes Unicode exacts sur le bouton.
-const FRAKTUR_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-  .map((l) => sym(l, `\\mathfrak{${l}}`, `${l} fraktur majuscule`))
-const FRAKTUR_LOWER = 'abcdefghijklmnopqrstuvwxyz'.split('')
-  .map((l) => sym(l, `\\mathfrak{${l}}`, `${l} fraktur minuscule`))
+// formules (2026-07-19). Glyphes Unicode réels (bloc Mathematical Alphanumeric
+// Symbols) générés par point de code plutôt que transcrits à la main — 5
+// majuscules (C, H, I, R, Z) ont une exception historique vers un ancien bloc
+// Unicode ; vérifié par script avant intégration (26 glyphes uniques par casse).
+const FRAKTUR_LEGACY_UPPER = { C: 0x212D, H: 0x210C, I: 0x2111, R: 0x211C, Z: 0x2128 }
+const FRAKTUR_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => {
+  const glyph = String.fromCodePoint(FRAKTUR_LEGACY_UPPER[l] ?? 0x1D504 + (l.charCodeAt(0) - 65))
+  return sym(glyph, `\\mathfrak{${l}}`, `${l} fraktur majuscule`)
+})
+const FRAKTUR_LOWER = 'abcdefghijklmnopqrstuvwxyz'.split('').map((l) => {
+  const glyph = String.fromCodePoint(0x1D51E + (l.charCodeAt(0) - 97))
+  return sym(glyph, `\\mathfrak{${l}}`, `${l} fraktur minuscule`)
+})
 
 const matrixEnv = (env, rows, cols) => {
   const row = Array(cols).fill(PH).join(' & ')
