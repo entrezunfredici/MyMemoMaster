@@ -1125,3 +1125,11 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : Deviner un sens pour « 𝔻 » (ensemble domaine `\mathbb{D}`, différentielle `\mathrm{d}`) sans confirmation — risque de livrer un bouton qui ne correspond à aucun besoin réel de l'utilisateur. / Utiliser les glyphes Unicode fraktur réels comme labels de bouton — nécessite de dériver correctement les points de code du bloc « Mathematical Alphanumeric Symbols » avec ses exceptions historiques (C, H, I, R, Z empruntent des blocs Unicode legacy distincts) ; risque de transcription non négligeable pour un gain visuel mineur.
 
 **Conséquences** : Palette à 117+52 = 169 boutons. `\mathfrak{}` vérifié pris en charge par KaTeX (`renderToString` sans erreur). Section « Lettres fraktur » sans utilisation connue actuellement dans le projet — à retirer si elle s'avère inutile en usage réel, ou à enrichir (variantes calligraphiques `\mathcal{}`) si le besoin se précise.
+
+---
+
+### [2026-07-25] Journal des versions reconstitué en `AAAA.MM.n`, adossé au CHANGELOG_AGENT
+**Contexte** : Le Bloc 4 du référentiel (C4.3.2) exige un journal des versions déployées. Le dépôt n'a aucun tag git et les images Docker sont poussées en `:latest` — il n'existe pas d'identifiant de version exploitable.
+**Décision** : Créer `docs/JOURNAL_VERSIONS.md` avec une convention datée `AAAA.MM.n` (année.mois.itération), une « version » = un jalon mergé sur une branche de déploiement. Le journal est la vue synthétique orientée exploitation ; le détail technique reste dans `.agents/CHANGELOG_AGENT.md` (pas de duplication). Les livrables Bloc 4 sont placés dans `docs/` (préfixe `MCO_`), cohérent avec les manuels et audits existants.
+**Alternative écartée** : Introduire immédiatement des tags semver rétroactifs — réécrire un versionnage a posteriori sur l'historique serait artificiel ; la mise en place de semver est proposée pour les **futures** livraisons (recommandation R1 de `docs/MCO_MAINTENANCE_EVOLUTIONS.md`).
+**Conséquences** : `docs/JOURNAL_VERSIONS.md` doit recevoir une entrée à chaque merge sur `dev`/`staging`/`main`. Si la recommandation R1 (tags semver + images taguées) est adoptée, la convention `AAAA.MM.n` sera remplacée par `vX.Y.Z` à partir de ce point, sans réécrire les entrées passées.

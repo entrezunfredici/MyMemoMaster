@@ -6201,3 +6201,27 @@ Trois demandes utilisateur sur la dette restante de l'interpréteur V2 : (1) les
 - Distributivité/expansion (`2*(a+b)` ≠ `2a+2b`) toujours hors périmètre de l'équivalence algébrique — assumé, ce n'est pas un CAS
 - Extension de matrice imbriquée dans une formule plus large non supportée (portée réduite à « formule = uniquement une matrice ») — chantier futur si le besoin apparaît, nécessiterait soit une API MathLive plus mature soit un parseur LaTeX maison avec position de curseur
 - Section « Lettres fraktur » ajoutée sans cas d'usage identifié dans le projet à ce jour (« au cas où » demandé par l'utilisateur)
+
+---
+
+### [2026-07-25] ADD — Livrables Bloc 4 (MCO) : dépendances/supervision, anomalies, maintenance/versions
+
+#### Contexte
+Demande utilisateur : produire les livrables du Bloc 4 du référentiel YNOV (« Maintenir l'application logicielle en condition opérationnelle », `.agents/2024 Référentiel….md`). Documents rédigés à partir de l'existant réel du projet (pipelines CI/CD, commits `[FIX]`, DECISIONS, RUNBOOK) — aucune modification de code.
+
+#### Fichiers créés
+- `docs/MCO_DEPENDANCES_SUPERVISION.md` — A4.1 (C4.1.1/C4.1.2) : processus de mise à jour des dépendances (audit npm bloquant du CI, exemple réel `057cbfe` — 21 vulnérabilités → 0) + description du système de supervision (health endpoint, healthchecks compose, probes K8s, boucle post-déploiement du CD, Prometheus, notifications Discord) avec seuils et limites connues
+- `docs/MCO_TRAITEMENT_ANOMALIES.md` — A4.2 (C4.2.1/C4.2.2) : canaux de détection, processus de consignation (fiche + commit `[FIX]` + CHANGELOG + DECISIONS), modèle de fiche, **fiche réelle ANO-2026-06-10-01** (commit `0935e05`, addCard 403/500), schéma du traitement d'un correctif via CI/CD
+- `docs/JOURNAL_VERSIONS.md` — C4.3.2 : journal des versions déployées, convention `AAAA.MM.n`, 6 versions reconstituées (socle 06.1 → interpréteur V2 07.3) avec fonctionnalités et anomalies corrigées par version
+- `docs/MCO_MAINTENANCE_EVOLUTIONS.md` — A4.3 (C4.3.1/C4.3.3) : 5 recommandations argumentées gain/coût (tags semver + images taguées, persistance Redis BullMQ, alerting proactif, lien cliquable reset password, cache droits différé) + exemple réel de retour utilisateur résolu (forgot password, `fe9c0a9`)
+
+#### Ce qui est utilisable
+- Les 4 documents couvrent l'ensemble des modalités d'évaluation du Bloc 4 ; chaque affirmation est adossée à un commit, un fichier ou une décision documentée du dépôt
+- `docs/JOURNAL_VERSIONS.md` est conçu comme document vivant : ajouter une entrée à chaque merge sur une branche de déploiement
+
+#### Hypothèses posées
+- Versions nommées `AAAA.MM.n` faute de tags git (aucun tag dans le dépôt) — la recommandation R1 propose de passer à semver
+- L'exemple C4.3.3 (support) s'appuie sur le canal Discord du projet et le fix forgot-password du 2026-07-18 ; le scénario « remontée testeur » est la reconstruction la plus plausible du contexte de ce commit
+
+#### Dette / non couvert
+- Le journal de versions n'est pas branché sur un mécanisme automatique (release GitHub) — dépend de la recommandation R1
