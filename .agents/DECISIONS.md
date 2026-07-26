@@ -1133,3 +1133,11 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Décision** : Créer `docs/JOURNAL_VERSIONS.md` avec une convention datée `AAAA.MM.n` (année.mois.itération), une « version » = un jalon mergé sur une branche de déploiement. Le journal est la vue synthétique orientée exploitation ; le détail technique reste dans `.agents/CHANGELOG_AGENT.md` (pas de duplication). Les livrables Bloc 4 sont placés dans `docs/` (préfixe `MCO_`), cohérent avec les manuels et audits existants.
 **Alternative écartée** : Introduire immédiatement des tags semver rétroactifs — réécrire un versionnage a posteriori sur l'historique serait artificiel ; la mise en place de semver est proposée pour les **futures** livraisons (recommandation R1 de `docs/MCO_MAINTENANCE_EVOLUTIONS.md`).
 **Conséquences** : `docs/JOURNAL_VERSIONS.md` doit recevoir une entrée à chaque merge sur `dev`/`staging`/`main`. Si la recommandation R1 (tags semver + images taguées) est adoptée, la convention `AAAA.MM.n` sera remplacée par `vX.Y.Z` à partir de ce point, sans réécrire les entrées passées.
+
+---
+
+### [2026-07-26] Bloc 4 rendu comme document unique (B4_RENDU.md), aligné sur le format B2
+**Contexte** : Les livrables Bloc 4 avaient d'abord été rédigés en 4 fichiers séparés dans `docs/` (un par sous-bloc + journal de version). L'utilisateur a demandé de les fusionner pour rester cohérent avec le Bloc 2, déjà déposé comme un document unique (`B2_RENDU.md`).
+**Décision** : Fusionner les 4 documents en un seul `B4_RENDU.md` à la racine du dépôt, avec la même structure que `B2_RENDU.md` (plan, sections par compétence, annexes). Les 4 fichiers `docs/MCO_*.md` et `docs/JOURNAL_VERSIONS.md` sont supprimés — aucune duplication de contenu conservée.
+**Alternative écartée** : Garder les 4 fichiers séparés en les référençant depuis un `B4_RENDU.md` court — rejeté car le référentiel n'exige pas cette granularité et la cohérence de format entre blocs facilite le dépôt sur la plateforme YNOV.
+**Conséquences** : Le journal de version (§3.2 de `B4_RENDU.md`) n'est plus un document vivant à part — il faudra le mettre à jour manuellement dans `B4_RENDU.md` si de nouvelles versions significatives sont livrées avant le dépôt final du dossier.

@@ -6225,3 +6225,22 @@ Demande utilisateur : produire les livrables du Bloc 4 du référentiel YNOV («
 
 #### Dette / non couvert
 - Le journal de versions n'est pas branché sur un mécanisme automatique (release GitHub) — dépend de la recommandation R1
+
+---
+
+### [2026-07-26] REF — Bloc 4 (MCO) fusionné en un seul dossier B4_RENDU.md
+
+#### Contexte
+Demande utilisateur : aligner le format du Bloc 4 sur celui du Bloc 2 (`B2_RENDU.md`, un seul document de dossier) plutôt que 4 fichiers séparés dans `docs/`. Le référentiel n'impose aucun format, mais la cohérence avec le rendu déjà déposé pour le Bloc 2 est préférable pour la plateforme YNOV.
+
+#### Fichiers créés
+- `B4_RENDU.md` — dossier de certification unique du Bloc 4, structuré comme `B2_RENDU.md` (plan, sections par sous-bloc A4.1/A4.2/A4.3, annexes index/synthèse compétences/glossaire). Contenu repris intégralement des 4 documents précédents, réorganisé en prose à la première personne.
+
+#### Fichiers supprimés
+- `docs/MCO_DEPENDANCES_SUPERVISION.md`, `docs/MCO_TRAITEMENT_ANOMALIES.md`, `docs/MCO_MAINTENANCE_EVOLUTIONS.md`, `docs/JOURNAL_VERSIONS.md` — contenu fusionné dans `B4_RENDU.md`, aucune perte d'information.
+
+#### Ce qui est utilisable
+- `B4_RENDU.md` est le document unique à déposer pour le Bloc 4, au même niveau que `B2_RENDU.md` à la racine du dépôt.
+
+#### Dette / non couvert
+- Le journal de version (§3.2 de `B4_RENDU.md`) reste figé au moment de la rédaction — contrairement à `docs/JOURNAL_VERSIONS.md` qui était pensé comme document vivant, une mise à jour de `B4_RENDU.md` sera nécessaire à chaque nouvelle version significative si le dossier doit rester à jour jusqu'au dépôt final.
