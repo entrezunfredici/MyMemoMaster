@@ -33,6 +33,11 @@
 | Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API ; sortie MathML explicite pour lecteurs d'écran (2026-07-19) | 2026-07-19 |
 | Librairie de rendu formules (S-06.01) | Clôturé — benchmark MathJax/KaTeX formalisé dans DECISIONS (2026-07-19) : KaTeX seul retenu ; dépendance `mathjax` et helper mort `mathjax-config.js` supprimés, CONVENTIONS corrigé | 2026-07-19 |
 | Maquettes UI éditeur formules (S-06.02) | Clôturé — écran « Interpréteur de formules » ajouté au prototype interactif (15 écrans) : éditeur + palette de symboles + aperçu + badge homogénéité ; 17 captures régénérées (dont 17-interpreteur.png) | 2026-07-19 |
+| Stockage formules LaTeX en BDD (S-06.03) | Clôturé — vérification 2026-07-26 : texte brut dans les colonnes existantes (convention `$…$`), décision déjà actée les 2026-07-14/2026-07-19, aucune migration ni table dédiée | 2026-07-26 |
+| Intégration librairie rendu dans éditeurs (S-06.04) | Clôturé — vérification 2026-07-26 : KaTeX (`renderMath`/`renderMathMultiline`/`renderInlineMath`) intégré dans tous les éditeurs — Interpreter.vue (aperçu live), FormulaHelperComponent (aperçu du champ), MindMapNode (nœuds formule), FormulaTextComponent (Leitner/exercices) | 2026-07-26 |
+| Composant éditeur formule LaTeX + aperçu (S-06.05) | Clôturé — vérification 2026-07-26 : Interpreter.vue (zone MathLive éditable + zone brute LaTeX/raccourcis + aperçu KaTeX live + homogénéité) ; testé via FormulaText.test.js (montage réel, non stubbé) + interpreterLatex.test.js + units.test.js | 2026-07-26 |
+| Tests fonctionnels formules complexes (S-06.06) | Clôturé — vérification 2026-07-26 : ~128 tests dédiés (Semantic.service 37, algebraicEquivalence 22, interpreterLatex 33, units 22, FormulaText 23) couvrant matrices, fractions imbriquées, exposants, racines, équivalences algébriques, homogénéité des grandeurs | 2026-07-26 |
+| Revue de code & merge — Interpréteur V2 (S-06.07) | Clôturé — revue 2026-07-26 du diff `main...dev_front_interpreteur` (13 fichiers interpréteur) : 172/172 tests verts (114 front + 58 API), lint vert, aucun bug bloquant ; merge vers `main` à faire séparément | 2026-07-26 |
 | Interpréteur V2 — conception (analyse) | Livré — diagrams/interpreteur_palette_v2.md : éditeur WYSIWYG (zone rendue éditable, flèches, matrices), palette à onglets (inventaire complet des 8 planches utilisateur → LaTeX + a11y), MathLive recommandé, stockage LaTeX canonique dans `$…$` (texte conservé, pas de JSON), adaptation normalizeSymbolic, plan en 6 lots | 2026-07-19 |
 | Interpréteur V2 — éditeur (Lots 0-3) | Livré — MathLive 0.110 (lazy, chunk séparé 228 Ko gzip) : zone rendue éditable + zone brute expert (source de vérité v-model, contrat FormulaHelper/mindmap inchangé) + palette 4 onglets/117 boutons (palette.js) ; toLatex idempotent sur LaTeX ; \placeholder{} → □ au rendu KaTeX ; POC vérifié en navigateur réel (CDP) | 2026-07-19 |
 | Interpréteur V2 — dette (Lots 4-5) | Livré — correction `exact` : normalizeSymbolic fait converger V1/LaTeX/texte libre (migration de données abandonnée, normalisation des 2 côtés — voir DECISIONS) ; homogénéité des unités opérationnelle sur LaTeX (latexToPlain, gate levé) ; prototype : palette à onglets + capture 17 régénérée | 2026-07-19 |
@@ -6244,3 +6249,127 @@ Demande utilisateur : aligner le format du Bloc 4 sur celui du Bloc 2 (`B2_RENDU
 
 #### Dette / non couvert
 - Le journal de version (§3.2 de `B4_RENDU.md`) reste figé au moment de la rédaction — contrairement à `docs/JOURNAL_VERSIONS.md` qui était pensé comme document vivant, une mise à jour de `B4_RENDU.md` sera nécessaire à chaque nouvelle version significative si le dossier doit rester à jour jusqu'au dépôt final.
+
+---
+
+### [2026-07-26] Clôture S-06.03 — Stockage formules LaTeX en BDD (vérification)
+
+#### Contexte
+Vérification de la tâche S-06.03 (« Stockage formules LaTeX en BDD », V1, US-24, back-end) : contrairement à S-06.01/S-06.02 (clôturées le 2026-07-19), cette sous-tâche n'apparaissait dans aucune ligne de l'État global alors que le stockage est en production depuis longtemps. Cette entrée acte la clôture, sans nouveau développement.
+
+#### Constat
+- Les formules — raccourcis V1 et LaTeX de l'éditeur V2 — sont stockées en **texte brut dans les colonnes existantes** (`Question.content`, données JSON des cartes Leitner, nœuds `formula` des mindmaps), encadrées par la convention `$…$`. Aucune table, colonne ou schéma JSON dédié aux formules ; aucune migration nécessaire.
+- Décision déjà actée à deux reprises dans `DECISIONS.md` : [2026-07-14] (convention `$…$`, alternative « champ type formule séparé » explicitement écartée car elle imposerait migration + validators + UI à deux champs pour un besoin de texte mixte) et [2026-07-19] « Interpréteur V2 — éditeur (Lots 0-3) » (point 4 : `toLatex` rendu idempotent sur du LaTeX, mécanisme qui permet de stocker le LaTeX canonique dans le même conteneur texte sans migration immédiate) puis « Lots 4-5 » (confirmation : pas de migration de données, `normalizeSymbolic` fait converger V1/LaTeX/texte libre pour que le stockage mixte reste inoffensif à la correction).
+
+#### Fichiers modifiés
+- `.agents/CHANGELOG_AGENT.md` — ligne État global ajoutée (S-06.03) + présente entrée de clôture
+
+#### Ce qui est utilisable
+- Stockage fonctionnel en production depuis le 2026-07-14 (texte brut `$…$`), couvrant le LaTeX de l'éditeur V2 depuis le 2026-07-19 ; aucune action de développement requise pour clore cette tâche.
+
+#### Dette / non couvert
+- Aucune sur ce périmètre précis — la dette restante de l'interpréteur V2 (équivalences algébriques, matrices imbriquées, etc.) est déjà documentée dans les entrées du 2026-07-19 et n'est pas spécifique au stockage.
+
+---
+
+### [2026-07-26] Clôture S-06.04 — Intégration librairie rendu dans éditeurs (vérification)
+
+#### Contexte
+Vérification de la tâche S-06.04 (« Intégration librairie rendu dans éditeurs », V1, US-24, front-end) : comme S-06.03, aucune ligne dédiée dans l'État global alors que l'intégration est en production depuis longtemps. Cette entrée acte la clôture, sans nouveau développement.
+
+#### Constat
+KaTeX (seule librairie de rendu retenue, cf. clôture S-06.01) est intégré, via les helpers uniques `renderMath`/`renderMathMultiline`/`renderInlineMath` de `interpreter.js`, dans les quatre points d'édition/affichage du projet :
+- `Interpreter.vue` — aperçu KaTeX live sous la zone d'édition (rendu à chaque frappe, y compris depuis l'éditeur WYSIWYG MathLive) ; sortie MathML explicite pour l'accessibilité (entrée 2026-07-19).
+- `FormulaHelperComponent.vue` — embarque `Interpreter` dans une modale + aperçu KaTeX inline (`FormulaText`) du champ dès qu'il contient une formule.
+- `MindMapNode.vue` — nœuds de type `formula` rendus via `renderMathMultiline` (`my_memo_master_front/src/components/mindmap/MindMapNode.vue:127,156`).
+- `FormulaTextComponent.vue` — segments `$…$` d'un texte mixte rendus via `renderInlineMath` (utilisé dans les pages Leitner/exercices : `FlashcardsCardsPage`, `FlashcardsSessionPage`, `ExerciseDetailPage`, `CreateTestPage`).
+
+Aucun point de rendu parallèle (pas de second appel KaTeX ni de résidu MathJax) — cohérent avec la décision de librairie unique actée à la clôture S-06.01.
+
+#### Fichiers modifiés
+- `.agents/CHANGELOG_AGENT.md` — ligne État global ajoutée (S-06.04) + présente entrée de clôture
+
+#### Ce qui est utilisable
+- L'intégration est fonctionnelle en production sur les quatre éditeurs/afficheurs listés ci-dessus ; aucune action de développement requise pour clore cette tâche.
+
+#### Dette / non couvert
+- Aucune sur ce périmètre précis — la dette restante de l'interpréteur V2 (équivalences algébriques, matrices imbriquées, accessibilité avancée MathJax-like) est déjà documentée dans les entrées du 2026-07-19 et n'est pas spécifique à l'intégration du rendu.
+
+---
+
+### [2026-07-26] Clôture S-06.05 — Composant éditeur formule (LaTeX + aperçu) (vérification)
+
+#### Contexte
+Vérification de la tâche S-06.05 (« Composant éditeur formule (LaTeX + aperçu) », V1, US-24, front-end) : comme S-06.03/S-06.04, aucune ligne dédiée dans l'État global alors que le composant est en production depuis longtemps. Cette entrée acte la clôture, sans nouveau développement.
+
+#### Constat
+Le composant est `Interpreter.vue` (`my_memo_master_front/src/components/interpreter/Interpreter.vue`), qui couvre l'intégralité du périmètre demandé :
+- **Éditeur LaTeX** : zone rendue éditable MathLive (`<math-field>`, navigation flèches/Tab entre éléments et cellules de matrices) + zone brute "mode expert" (`textarea`, source de vérité du v-model) acceptant LaTeX **et** raccourcis historiques (`over(1,2)`, `sqrt(x)`, `x^2`…) via `toLatex` ; repli fonctionnel intégral si MathLive ne charge pas (chargement lazy tolérant l'échec).
+- **Aperçu rendu** : bloc "Résultat" en KaTeX live (`renderMathMultiline`, recalculé à chaque frappe), plus message de vérification d'homogénéité des grandeurs (`checkUnitHomogeneity`).
+- **Palette** : 4 onglets/117 boutons (`palette.js`), insertion à la position du curseur, commandes matrice déterministes (`addMatrixColumn`/`addMatrixRow`).
+
+**Tests / stratégie documentée** (DoD) :
+- `test/helpers/interpreterLatex.test.js` — `toLatex`, exposants, commandes matrice, sortie MathML
+- `test/helpers/units.test.js` — vérification d'homogénéité (22 tests)
+- `test/components/FormulaText.test.js` — le composant est **monté réellement** (non stubbé) via `FormulaHelperComponent` : ouverture modale, saisie dans la zone brute, aperçu KaTeX vérifié (`toContain('katex')`), application, cas limites (formule vide, normalisation frac→over)
+- Interactions MathLive non mockables en jsdom (matrices, wrapping) : stratégie documentée = vérification manuelle en navigateur réel (CDP), tracée dans les entrées du 2026-07-19 (Lots 0-3 et commandes matrice)
+
+Note : `MindMapPalette` stubbe `Interpreter` dans ses propres tests pour isoler le panneau des dépendances KaTeX (entrée existante, ligne 2539) — ce choix concerne les tests de `MindMapPalette`, pas une lacune de test du composant lui-même, déjà couvert par `FormulaText.test.js`.
+
+#### Fichiers modifiés
+- `.agents/CHANGELOG_AGENT.md` — ligne État global ajoutée (S-06.05) + présente entrée de clôture
+
+#### Ce qui est utilisable
+- Le composant éditeur (LaTeX + aperçu) est fonctionnel en production, monté dans l'interpréteur autonome, la modale `FormulaHelperComponent` (Leitner/exercices) et la palette mindmap ; aucune action de développement requise pour clore cette tâche.
+
+#### Dette / non couvert
+- Aucune sur ce périmètre précis — la dette restante de l'interpréteur V2 (équivalences algébriques, matrices imbriquées, glyphes de planche) est déjà documentée dans les entrées du 2026-07-19 et n'est pas spécifique au composant éditeur lui-même.
+
+---
+
+### [2026-07-26] Clôture S-06.06 — Tests fonctionnels formules complexes (vérification)
+
+#### Contexte
+Vérification de la tâche S-06.06 (« Tests fonctionnels formules complexes », V1, US-24, tests) : comme les précédentes clôtures S-06.0x, aucune ligne dédiée dans l'État global alors que la couverture existe depuis longtemps. Cette entrée acte la clôture, sans nouveau développement.
+
+#### Constat
+~128 tests couvrent précisément les formules complexes (matrices, fractions imbriquées, exposants, racines, équivalences algébriques, homogénéité des grandeurs) :
+- `my_memo_master_api/test/services/Semantic.service.test.js` (37) — `normalizeSymbolic` : fractions, exposants (Unicode/`^{}`/`^n`), racines, valeurs absolues, grec, ensembles, matrices (délimiteurs pmatrix/vmatrix distincts), placeholders ; `gradeSemantic` : équivalence V1↔LaTeX↔KaTeX, algébrique, garde anti-inversion
+- `my_memo_master_api/test/helpers/algebraicEquivalence.test.js` (22) — commutativité, division ≡ puissance inverse, combinaison de termes, racines, formule physique complète
+- `my_memo_master_front/test/helpers/interpreterLatex.test.js` (33 au 2026-07-26) — exposants, idempotence LaTeX, MathML, matrices (ajout ligne/colonne, refus sur contenu mixte)
+- `my_memo_master_front/test/helpers/units.test.js` (22) — homogénéité de formules symboliques
+- `my_memo_master_front/test/components/FormulaText.test.js` (23) — rendu/insertion end-to-end
+
+Suite complète exécutée le 2026-07-26 dans le cadre de la revue S-06.07 : 172/172 tests verts (114 front + 58 API), confirmant que la couverture n'a pas régressé.
+
+#### Fichiers modifiés
+- `.agents/CHANGELOG_AGENT.md` — ligne État global ajoutée (S-06.06) + présente entrée de clôture
+
+#### Ce qui est utilisable
+- La couverture des formules complexes est fonctionnelle et vérifiée ; aucune action de développement requise pour clore cette tâche.
+
+#### Dette / non couvert
+- Aucune sur ce périmètre précis.
+
+---
+
+### [2026-07-26] Clôture S-06.07 — Revue de code & merge (Interpréteur de formules et grandeurs)
+
+#### Contexte
+Tâche S-06.07 (« Revue de code & merge », V1, US-24, tests) : revue du code de la fonctionnalité Interpréteur de formules et grandeurs avant merge de `dev_front_interpreteur` vers `main`.
+
+#### Périmètre revu
+Diff complet `main...dev_front_interpreteur` restreint aux fichiers de l'interpréteur (13 fichiers, 2385 insertions / 1149 suppressions) : `Interpreter.vue`, `interpreter.js`, `palette.js`, `units.js`, `algebraicEquivalence.js`, `formulaNotation.js`, `Semantic.service.js`, `diagrams/interpreteur_palette_v2.md`, configs `vite.config.js`/`vitest.config.js` (déclaration du web component `math-field`), suites de tests associées.
+
+#### Vérifications effectuées
+- **Tests** : 172/172 verts (`interpreterLatex` 33, `units` 22, `FormulaText` 23, `MindMapNode` 18, `MindMapPalette` 18 côté front ; `Semantic.service` 37, `algebraicEquivalence` 22 côté API)
+- **Lint** : `eslint` vert sur l'ensemble des fichiers front et API de l'interpréteur
+- **Lecture de code** : `toLatex`/`renderMath`/`addMatrixColumn`/`addMatrixRow` (interpreter.js), parseur d'unités et garde d'indétermination (units.js), tokenizer/canonicalisation AST (algebraicEquivalence.js), court-circuit symbolique et garde anti-inversion (Semantic.service.js), palette générée (palette.js — arias uniques par groupe, glyphes fraktur vérifiés) : rien d'anormal, cohérent avec les décisions déjà actées (DECISIONS.md 2026-07-14/2026-07-19)
+- **Point investigué et écarté** : `B2_RENDU.md`/`B2_RENDU.docx` supprimés sur la branche par rapport à `main` (commit `0d038cb`) — suppression **volontaire** confirmée par l'utilisateur (dossier de certification Bloc 2 déjà rendu, plus nécessaire), pas une régression
+
+#### Ce qui est utilisable
+- Aucun bug bloquant identifié sur le périmètre de l'interpréteur ; la branche est jugée prête pour un merge vers `main` du point de vue code/tests.
+
+#### Dette / non couvert
+- Le merge effectif `dev_front_interpreteur` → `main` reste une action distincte, à réaliser séparément (git merge/PR), non incluse dans cette revue.
+- La dette déjà documentée de l'interpréteur V2 (distributivité non gérée par l'équivalence algébrique, matrices imbriquées, glyphes « au cas où ») reste valable et n'est pas reprise ici.
