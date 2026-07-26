@@ -8,13 +8,13 @@
 
 ### Plan du dossier
 
-| Section      | Contenu                                                                 | Compétence couverte      |
-| ------------ | ------------------------------------------------------------------------ | -------------------------- |
-| Introduction | Contexte du bloc MCO                                                    | —                          |
-| 1            | Monitorer l'application                                                 | C4.1.1, C4.1.2              |
-| 2            | Traitement des anomalies                                                | C4.2.1, C4.2.2              |
-| 3            | Maintenance du logiciel                                                 | C4.3.1, C4.3.2, C4.3.3      |
-| Annexes      | A. Index des documents du dépôt · B. Synthèse de couverture des compétences · C. Glossaire | —                          |
+| Section      | Contenu                                                                                          | Compétence couverte   |
+| ------------ | ------------------------------------------------------------------------------------------------ | ---------------------- |
+| Introduction | Contexte du bloc MCO                                                                             | —                     |
+| 1            | Monitorer l'application                                                                          | C4.1.1, C4.1.2         |
+| 2            | Traitement des anomalies                                                                         | C4.2.1, C4.2.2         |
+| 3            | Maintenance du logiciel                                                                          | C4.3.1, C4.3.2, C4.3.3 |
+| Annexes      | A. Index des documents du dépôt · B. Synthèse de couverture des compétences · C. Glossaire | —                     |
 
 ---
 
@@ -28,19 +28,22 @@ Les preuves apportées ici sont toutes vérifiables dans le dépôt : pipelines 
 
 # Section 1 — Monitorer l'application
 
-**Compétences couvertes : C4.1.1** — Gérer les mises à jour des dépendances et des bibliothèques tiers, en surveillant régulièrement les nouvelles versions, en évaluant les impacts des mises à jour, et en les intégrant de manière sécurisée pour maintenir l'application à jour et sécurisée. **C4.1.2** — Concevoir un système de supervision et d'alerte en déterminant le périmètre de supervision et en identifiant les indicateurs de suivi pertinents, en mettant en place des sondes, en configurant la modalité des signalements afin de garantir une disponibilité permanente du logiciel.
+**Compétences couvertes :** 
+
+* **C4.1.1** — Gérer les mises à jour des dépendances et des bibliothèques tiers, en surveillant régulièrement les nouvelles versions, en évaluant les impacts des mises à jour, et en les intégrant de manière sécurisée pour maintenir l'application à jour et sécurisée.
+*  **C4.1.2** — Concevoir un système de supervision et d'alerte en déterminant le périmètre de supervision et en identifiant les indicateurs de suivi pertinents, en mettant en place des sondes, en configurant la modalité des signalements afin de garantir une disponibilité permanente du logiciel.
 
 ## 1.1 Processus de mise à jour des dépendances
 
-Le périmètre couvre l'API (Express, Sequelize, BullMQ, bcryptjs, jsonwebtoken…), le front (Vue 3, Vite, Pinia, Axios, MathLive…), les images Docker de base (Node 22, nginx, PostgreSQL, Redis) et les actions GitHub du pipeline CI/CD. Toute nouvelle dépendance doit figurer dans la liste approuvée de [.agents/CONVENTIONS.md](.agents/CONVENTIONS.md) — je ne me suis jamais autorisé d'ajout de dépendance non signalé.
+    Le périmètre couvre l'API (Express, Sequelize, BullMQ, bcryptjs, jsonwebtoken…), le front (Vue 3, Vite, Pinia, Axios, MathLive…), les images Docker de base (Node 22, nginx, PostgreSQL, Redis) et les actions GitHub du pipeline CI/CD. Toute nouvelle dépendance doit figurer dans la liste approuvée de[.agents/CONVENTIONS.md](.agents/CONVENTIONS.md).
 
-J'ai combiné un **garde-fou automatique continu** à des **mises à jour manuelles maîtrisées**, plutôt qu'un bot de mise à jour en auto-merge :
+J'ai mis en place un système de **vérification automatique continu** et de **mises à jour manuelles maîtrisées** :
 
 - **À chaque push**, le job `test_and_lint` du CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) exécute `npm audit --omit=dev --audit-level=high` : le build **échoue** si une dépendance de *production* a une vulnérabilité `high`/`critical` connue (contrôle OWASP A06). Les `devDependencies` sont exclues car elles n'entrent jamais dans les images déployées.
 - Quand l'audit remonte une vulnérabilité, j'applique le correctif sur une branche dédiée, je rejoue la suite de tests complète pour vérifier l'absence de régression, puis le pipeline CI/CD redéploie normalement.
 - Les montées de version fonctionnelles (au-delà du correctif de sécurité) sont évaluées au cas par cas : lecture du changelog de la librairie, impact sur les décisions déjà prises ([.agents/DECISIONS.md](.agents/DECISIONS.md)), exécution des tests API + front + lint avant fusion.
 
-Ce choix — manuel avec garde-fou automatique — garantit qu'aucune mise à jour n'est validée sans passer par les tests, tout en empêchant qu'une vulnérabilité haute reste silencieusement en production.
+Ce choix — verification automatique — garantit qu'aucune mise à jour n'est validée sans passer par les tests, tout en empêchant qu'une vulnérabilité haute reste silencieusement en production.
 
 **Exemple réel** (commit `057cbfe`, 2026-06-10) : `npm audit` avait remonté **21 vulnérabilités** sur le front (1 critique, 12 high, 8 moderate). J'ai appliqué `npm audit fix --legacy-peer-deps` (flag requis par la peer dependency de `@pinia/testing`), ce qui a mis à jour `vite`, `vitest`, `ws`, `yaml` et `ajv`. Résultat : 21 vulnérabilités → **0**, et les 41 tests Vitest existants sont restés verts — la preuve que le correctif n'a rien cassé avant même le redéploiement.
 
@@ -48,14 +51,14 @@ Ce choix — manuel avec garde-fou automatique — garantit qu'aucune mise à jo
 
 La typologie du logiciel (application web client/serveur, API centrale, PostgreSQL + Redis, déployée sur VPS et Kubernetes selon l'environnement) m'a conduit à superviser quatre choses : la disponibilité de l'API et de sa base, la santé des conteneurs, le succès des builds/déploiements, et l'intégrité des sauvegardes.
 
-| Sonde | Emplacement | Ce qu'elle vérifie |
-| --- | --- | --- |
-| `GET /api/v1/health` | [my_memo_master_api/app.js](my_memo_master_api/app.js) | Teste réellement `sequelize.authenticate()` — `200 {status: ok}` si la base répond, `503` sinon. Déclarée **avant** le rate limiter global : une sonde limitée ferait passer les pods `NotReady` en cascade. |
-| Healthchecks Docker Compose | [docker-compose.yml](docker-compose.yml) | PostgreSQL et Redis exposent un healthcheck ; l'API n'est démarrée qu'une fois la base `healthy`. |
-| Readiness probes Kubernetes | [helm/templates/deployment-api.yaml](helm/templates/deployment-api.yaml) | Ciblent `/api/v1/health` ; un pod dont la base est injoignable est retiré du Service, plus de trafic routé vers lui. |
-| Vérification post-déploiement | [.github/workflows/cd.yml](.github/workflows/cd.yml) | Après chaque déploiement VPS, une boucle interroge l'état des conteneurs (24 tentatives × 5 s = 2 min max) ; si un service critique n'est pas `healthy`/`running`, le déploiement échoue et les 100 dernières lignes de logs sont affichées. |
-| Prometheus par namespace | [helm/templates/prometheus.yaml](helm/templates/prometheus.yaml) | Scrape les pods annotés `prometheus.io/scrape` à intervalle configurable (`monitoring.scrapeInterval`) ; non exposé publiquement, accès par `kubectl port-forward`. |
-| Service `backup` | [docker-compose.yml](docker-compose.yml) | `pg_dump -Fc` au démarrage puis chaque jour à `BACKUP_HOUR` (3h UTC par défaut), rétention `BACKUP_RETENTION_DAYS` (7 jours). |
+| Sonde                           | Emplacement                                                             | Ce qu'elle vérifie                                                                                                                                                                                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/health`          | [my_memo_master_api/app.js](my_memo_master_api/app.js)                   | Teste réellement`sequelize.authenticate()` — `200 {status: ok}` si la base répond, `503` sinon. Déclarée **avant** le rate limiter global : une sonde limitée ferait passer les pods `NotReady` en cascade.                         |
+| Healthchecks Docker Compose     | [docker-compose.yml](docker-compose.yml)                                 | PostgreSQL et Redis exposent un healthcheck ; l'API n'est démarrée qu'une fois la base`healthy`.                                                                                                                                                    |
+| Readiness probes Kubernetes     | [helm/templates/deployment-api.yaml](helm/templates/deployment-api.yaml) | Ciblent`/api/v1/health` ; un pod dont la base est injoignable est retiré du Service, plus de trafic routé vers lui.                                                                                                                                 |
+| Vérification post-déploiement | [.github/workflows/cd.yml](.github/workflows/cd.yml)                     | Après chaque déploiement VPS, une boucle interroge l'état des conteneurs (24 tentatives × 5 s = 2 min max) ; si un service critique n'est pas`healthy`/`running`, le déploiement échoue et les 100 dernières lignes de logs sont affichées. |
+| Prometheus par namespace        | [helm/templates/prometheus.yaml](helm/templates/prometheus.yaml)         | Scrape les pods annotés`prometheus.io/scrape` à intervalle configurable (`monitoring.scrapeInterval`) ; non exposé publiquement, accès par `kubectl port-forward`.                                                                            |
+| Service`backup`               | [docker-compose.yml](docker-compose.yml)                                 | `pg_dump -Fc` au démarrage puis chaque jour à `BACKUP_HOUR` (3h UTC par défaut), rétention `BACKUP_RETENTION_DAYS` (7 jours).                                                                                                                 |
 
 Les seuils que j'ai fixés sont volontairement stricts et bloquants : zéro vulnérabilité `high`/`critical` en production, tous les services critiques `healthy` en moins de 2 minutes après déploiement, sinon le pipeline échoue plutôt que de livrer un état incertain. J'ai aussi branché une analyse statique continue (SonarCloud, job `sonarcloud` du CI, limité à `main`) pour suivre dette et duplication dans le temps.
 
@@ -67,19 +70,22 @@ Le signalement passe par **Discord** (webhook `DISCORD_LOG`) : chaque fin de CI 
 
 # Section 2 — Traitement des anomalies
 
-**Compétences couvertes : C4.2.1** — Consigner les anomalies détectées en élaborant un processus de collecte et consignation, en utilisant des outils de collecte et en y intégrant toutes les informations pertinentes, afin de déterminer le correctif à mettre en place. **C4.2.2** — Créer et déployer un correctif en respectant le processus d'intégration et de déploiement continu afin de résoudre l'anomalie.
+**Compétences couvertes :** 
+
+* **C4.2.1** — Consigner les anomalies détectées en élaborant un processus de collecte et consignation, en utilisant des outils de collecte et en y intégrant toutes les informations pertinentes, afin de déterminer le correctif à mettre en place.
+* **C4.2.2** — Créer et déployer un correctif en respectant le processus d'intégration et de déploiement continu afin de résoudre l'anomalie.
 
 ## 2.1 Processus de collecte et de consignation
 
 J'ai identifié cinq canaux de détection, chacun avec son mode de signalement :
 
-| Canal | Ce qu'il détecte | Signalement |
-| --- | --- | --- |
-| Pipeline CI (tests, lint, `npm audit`) | Régressions, vulnérabilités de dépendances | Message Discord automatique à chaque échec |
-| Vérification post-déploiement du CD | Service qui ne démarre pas / base injoignable après une mise à jour | Échec du pipeline + logs des conteneurs + Discord |
-| Sonde `GET /api/v1/health` | Indisponibilité de la base en production | `503` + log Winston avec contexte |
-| Retours utilisateurs | Bugs fonctionnels constatés à l'usage | Canal Discord du projet |
-| Audits ciblés (OWASP, RGAA) | Failles de sécurité, défauts d'accessibilité | Rapport dédié ([docs/SECURITY_AUDIT_OWASP.md](docs/SECURITY_AUDIT_OWASP.md), [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)) |
+| Canal                                   | Ce qu'il détecte                                                      | Signalement                                                                                                            |
+| --------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Pipeline CI (tests, lint,`npm audit`) | Régressions, vulnérabilités de dépendances                         | Message Discord automatique à chaque échec                                                                           |
+| Vérification post-déploiement du CD   | Service qui ne démarre pas / base injoignable après une mise à jour | Échec du pipeline + logs des conteneurs + Discord                                                                     |
+| Sonde`GET /api/v1/health`             | Indisponibilité de la base en production                              | `503` + log Winston avec contexte                                                                                    |
+| Retours utilisateurs                    | Bugs fonctionnels constatés à l'usage                                | Canal Discord du projet                                                                                                |
+| Audits ciblés (OWASP, RGAA)            | Failles de sécurité, défauts d'accessibilité                       | Rapport dédié ([docs/SECURITY_AUDIT_OWASP.md](docs/SECURITY_AUDIT_OWASP.md), [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)) |
 
 Chaque anomalie est consignée avec les informations nécessaires à sa **reproduction**, puis tracée de bout en bout selon un modèle constant :
 
@@ -137,7 +143,11 @@ Sur Kubernetes, `helm upgrade --atomic` annule automatiquement un déploiement r
 
 # Section 3 — Maintenance du logiciel
 
-**Compétences couvertes : C4.3.1** — Proposer des axes d'amélioration en prenant en compte les indicateurs de performance et en analysant les retours utilisateurs. **C4.3.2** — Établir un journal des versions déployées en y intégrant la documentation des correctifs réalisés. **C4.3.3** — Collaborer avec les équipes de support, en fournissant une expertise technique, en répondant aux retours clients, en résolvant des problèmes complexes afin d'améliorer le logiciel.
+**Compétences couvertes :** 
+
+* **C4.3.1** — Proposer des axes d'amélioration en prenant en compte les indicateurs de performance et en analysant les retours utilisateurs.
+* **C4.3.2** — Établir un journal des versions déployées en y intégrant la documentation des correctifs réalisés.
+* **C4.3.3** — Collaborer avec les équipes de support, en fournissant une expertise technique, en répondant aux retours clients, en résolvant des problèmes complexes afin d'améliorer le logiciel.
 
 ## 3.1 Recommandations d'amélioration argumentées
 
@@ -181,39 +191,39 @@ Le projet étant porté par une petite équipe, le rôle de support est assuré 
 
 ## Annexe A — Index des documents du dépôt (Bloc 4)
 
-| Document | Contenu |
-| --- | --- |
-| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Procédures d'exploitation : déploiement, mise à jour, rollback, logs, sauvegarde/restauration |
-| [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md) | Détail technique exhaustif de chaque livraison (fichiers, hypothèses, dette) |
-| [.agents/DECISIONS.md](.agents/DECISIONS.md) | Journal des décisions techniques structurantes (Contexte/Décision/Alternative/Conséquences) |
-| [docs/SECURITY_AUDIT_OWASP.md](docs/SECURITY_AUDIT_OWASP.md) | Audit de sécurité OWASP Top 10 |
-| [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md) | Audit d'accessibilité RGAA |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) / [cd.yml](.github/workflows/cd.yml) / [notify_ci.yml](.github/workflows/notify_ci.yml) | Pipelines d'intégration, de déploiement et de notification |
-| [helm/](helm/) | Chart Helm (déploiement, probes, Prometheus) |
+| Document                                                                                                                                  | Contenu                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md)                                                                                                         | Procédures d'exploitation : déploiement, mise à jour, rollback, logs, sauvegarde/restauration |
+| [.agents/CHANGELOG_AGENT.md](.agents/CHANGELOG_AGENT.md)                                                                                   | Détail technique exhaustif de chaque livraison (fichiers, hypothèses, dette)                   |
+| [.agents/DECISIONS.md](.agents/DECISIONS.md)                                                                                               | Journal des décisions techniques structurantes (Contexte/Décision/Alternative/Conséquences)   |
+| [docs/SECURITY_AUDIT_OWASP.md](docs/SECURITY_AUDIT_OWASP.md)                                                                               | Audit de sécurité OWASP Top 10                                                                 |
+| [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)                                                                                                   | Audit d'accessibilité RGAA                                                                      |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) / [cd.yml](.github/workflows/cd.yml) / [notify_ci.yml](.github/workflows/notify_ci.yml) | Pipelines d'intégration, de déploiement et de notification                                     |
+| [helm/](helm/)                                                                                                                             | Chart Helm (déploiement, probes, Prometheus)                                                    |
 
 ## Annexe B — Synthèse de couverture des compétences
 
-| Compétence | Section | Réponse apportée (preuves clés) |
-| --- | --- | --- |
-| C4.1.1 — Mise à jour des dépendances | 1.1 | `npm audit` bloquant en CI (high/critical) ; correctif réel de 21 vulnérabilités front (commit `057cbfe`) sans régression |
-| C4.1.2 — Supervision et alerte | 1.2 | Endpoint `/api/v1/health` testant la base, healthchecks Compose, readiness probes K8s, boucle de vérification post-déploiement, Prometheus par namespace, notifications Discord |
-| C4.2.1 — Consignation des anomalies | 2.1, 2.2 | Processus à 5 canaux de détection, modèle de fiche, fiche réelle ANO-2026-06-10-01 reproductible |
-| C4.2.2 — Correctif via CI/CD | 2.3 | Schéma complet du circuit fix → CI → CD, healthchecks bloquants, rollback `--atomic` |
-| C4.3.1 — Axes d'amélioration | 3.1 | 5 recommandations argumentées gain/coût, priorisées, appuyées sur la dette documentée |
-| C4.3.2 — Journal de version | 3.2 | 6 versions reconstituées avec fonctionnalités et anomalies corrigées, adossées au CHANGELOG_AGENT |
-| C4.3.3 — Collaboration support | 3.3 | Canal Discord unique retours/CI-CD, cas réel résolu de bout en bout (forgot password, commit `fe9c0a9`) |
+| Compétence                             | Section  | Réponse apportée (preuves clés)                                                                                                                                                 |
+| --------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C4.1.1 — Mise à jour des dépendances | 1.1      | `npm audit` bloquant en CI (high/critical) ; correctif réel de 21 vulnérabilités front (commit `057cbfe`) sans régression                                                  |
+| C4.1.2 — Supervision et alerte         | 1.2      | Endpoint`/api/v1/health` testant la base, healthchecks Compose, readiness probes K8s, boucle de vérification post-déploiement, Prometheus par namespace, notifications Discord |
+| C4.2.1 — Consignation des anomalies    | 2.1, 2.2 | Processus à 5 canaux de détection, modèle de fiche, fiche réelle ANO-2026-06-10-01 reproductible                                                                               |
+| C4.2.2 — Correctif via CI/CD           | 2.3      | Schéma complet du circuit fix → CI → CD, healthchecks bloquants, rollback`--atomic`                                                                                           |
+| C4.3.1 — Axes d'amélioration          | 3.1      | 5 recommandations argumentées gain/coût, priorisées, appuyées sur la dette documentée                                                                                         |
+| C4.3.2 — Journal de version            | 3.2      | 6 versions reconstituées avec fonctionnalités et anomalies corrigées, adossées au CHANGELOG_AGENT                                                                              |
+| C4.3.3 — Collaboration support         | 3.3      | Canal Discord unique retours/CI-CD, cas réel résolu de bout en bout (forgot password, commit`fe9c0a9`)                                                                         |
 
 ## Annexe C — Glossaire
 
-| Terme | Définition dans le contexte du projet |
-| --- | --- |
-| **CD (déploiement continu)** | Pipeline qui construit les images et déploie automatiquement à chaque fusion validée ([cd.yml](.github/workflows/cd.yml)). |
-| **CI (intégration continue)** | Validation automatique (tests, lint, audit, build) de chaque push ([ci.yml](.github/workflows/ci.yml)). |
-| **Fiche de consignation** | Description structurée d'une anomalie (symptôme, reproduction, analyse, correctif) permettant de la traiter et de la tracer. |
-| **Healthcheck / readiness probe** | Sonde vérifiant qu'un conteneur/pod est apte à recevoir du trafic ; conditionne démarrages et rollouts. |
-| **MCO** | Maintien en Condition Opérationnelle — l'ensemble des activités assurant la disponibilité et la fiabilité d'un logiciel après sa mise en production. |
-| **npm audit** | Commande détectant les vulnérabilités connues des dépendances installées ; exécutée avec seuil bloquant en CI. |
-| **Rollback** | Retour automatique ou manuel à la version précédente après un déploiement échoué (`helm --atomic`, RUNBOOK). |
+| Terme                                   | Définition dans le contexte du projet                                                                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CD (déploiement continu)**     | Pipeline qui construit les images et déploie automatiquement à chaque fusion validée ([cd.yml](.github/workflows/cd.yml)).                               |
+| **CI (intégration continue)**    | Validation automatique (tests, lint, audit, build) de chaque push ([ci.yml](.github/workflows/ci.yml)).                                                     |
+| **Fiche de consignation**         | Description structurée d'une anomalie (symptôme, reproduction, analyse, correctif) permettant de la traiter et de la tracer.                             |
+| **Healthcheck / readiness probe** | Sonde vérifiant qu'un conteneur/pod est apte à recevoir du trafic ; conditionne démarrages et rollouts.                                                 |
+| **MCO**                           | Maintien en Condition Opérationnelle — l'ensemble des activités assurant la disponibilité et la fiabilité d'un logiciel après sa mise en production. |
+| **npm audit**                     | Commande détectant les vulnérabilités connues des dépendances installées ; exécutée avec seuil bloquant en CI.                                      |
+| **Rollback**                      | Retour automatique ou manuel à la version précédente après un déploiement échoué (`helm --atomic`, RUNBOOK).                                      |
 
 ---
 
