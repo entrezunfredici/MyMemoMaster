@@ -70,6 +70,18 @@ data:
     global:
       scrape_interval: {{ .Values.monitoring.scrapeInterval }}
       evaluation_interval: {{ .Values.monitoring.scrapeInterval }}
+{{- if .Values.monitoring.alerting.enabled }}
+
+    # Alertes évaluées depuis rules.yml, routées vers l'Alertmanager du chart
+    # (voir alertmanager.yaml — webhook Discord du projet)
+    rule_files:
+      - /etc/prometheus/rules.yml
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ["{{ .Release.Name }}-alertmanager:9093"]
+{{- end }}
 
     scrape_configs:
       # Auto-scrape de Prometheus lui-même
@@ -110,6 +122,57 @@ data:
           - source_labels: [__meta_kubernetes_pod_label_app]
             action: replace
             target_label: app
+{{- if .Values.monitoring.alerting.enabled }}
+
+  # Règles d'alerte évaluées toutes les evaluation_interval, routées vers
+  # l'Alertmanager (alertmanager.yaml). Seuils ajustables par values.
+  rules.yml: |
+    groups:
+      - name: mmm-api
+        rules:
+          # Un pod scrapé ne répond plus — complète la sonde d'uptime externe
+          # (vue intérieure : le pod est présent mais son /metrics est mort)
+          - alert: CibleInjoignable
+            expr: up{job="kubernetes-pods"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Cible {{ "{{" }} $labels.pod {{ "}}" }} injoignable depuis 2 min ({{ .Release.Namespace }})"
+
+          # RED / Errors — part de réponses 5xx au-delà du seuil
+          - alert: TauxErreursEleve
+            expr: >
+              sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+              / sum(rate(http_requests_total[5m]))
+              > {{ .Values.monitoring.alerting.errorRateThreshold }}
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Plus de {{ .Values.monitoring.alerting.errorRateThreshold }} de réponses 5xx sur 5 min ({{ .Release.Namespace }})"
+
+          # RED / Duration — latence p95 au-delà du seuil
+          - alert: LatenceP95Elevee
+            expr: >
+              histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))
+              > {{ .Values.monitoring.alerting.latencyP95Seconds }}
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Latence p95 > {{ .Values.monitoring.alerting.latencyP95Seconds }}s depuis 10 min ({{ .Release.Namespace }})"
+
+          # USE / Saturation — event loop Node.js saturée (métrique par défaut
+          # de prom-client, voir my_memo_master_api/helpers/metrics.js)
+          - alert: EventLoopSaturee
+            expr: nodejs_eventloop_lag_seconds > 0.5
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Event loop Node.js > 500 ms de lag sur {{ "{{" }} $labels.pod {{ "}}" }} ({{ .Release.Namespace }})"
+{{- end }}
 
 ---
 

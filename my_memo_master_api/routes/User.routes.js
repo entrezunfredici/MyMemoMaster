@@ -43,6 +43,28 @@ router.post('/register', registerLimiter, userValidators.register, validate, use
 
 /**
  * @swagger
+ * /users/registration-status:
+ *   get:
+ *     summary: Vérifier si les inscriptions sont encore ouvertes (limite MAX_USERS)
+ *     tags: [Users]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Statut des inscriptions.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 open:
+ *                   type: boolean
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.get('/registration-status', user.registrationStatus)
+
+/**
+ * @swagger
  * /users/login:
  *   post:
  *     summary: Connecter un utilisateur et obtenir un Token JWT

@@ -9,7 +9,8 @@ jest.mock('../../models/index', () => ({
     findByPk: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
-    destroy: jest.fn()
+    destroy: jest.fn(),
+    count: jest.fn()
   },
   Role: {
     findByPk: jest.fn()
@@ -32,8 +33,12 @@ const bcrypt = require('bcryptjs')
 const UserService = require('../../services/User.service')
 
 describe('UserService', () => {
+  const originalMaxUsers = process.env.MAX_USERS
+
   afterEach(() => {
     jest.clearAllMocks()
+    if (originalMaxUsers === undefined) delete process.env.MAX_USERS
+    else process.env.MAX_USERS = originalMaxUsers
   })
 
   describe('findAll', () => {
@@ -101,8 +106,47 @@ describe('UserService', () => {
     })
   })
 
+  describe('isRegistrationOpen', () => {
+    it('isRegistrationOpen - MAX_USERS non défini - retourne true sans requêter la base', async () => {
+      delete process.env.MAX_USERS
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(true)
+      expect(User.count).not.toHaveBeenCalled()
+    })
+
+    it('isRegistrationOpen - MAX_USERS à 0 - retourne true (limite désactivée)', async () => {
+      process.env.MAX_USERS = '0'
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(true)
+      expect(User.count).not.toHaveBeenCalled()
+    })
+
+    it('isRegistrationOpen - total sous la limite - retourne true', async () => {
+      process.env.MAX_USERS = '10'
+      User.count.mockResolvedValue(9)
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(true)
+    })
+
+    it('isRegistrationOpen - limite atteinte - retourne false', async () => {
+      process.env.MAX_USERS = '10'
+      User.count.mockResolvedValue(10)
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(false)
+    })
+  })
+
   describe('create', () => {
     it('should create a new user', async () => {
+      delete process.env.MAX_USERS
       User.findOne.mockResolvedValue(null)
       User.create.mockResolvedValue({
         userId: 1,
@@ -147,6 +191,7 @@ describe('UserService', () => {
     })
 
     it('should throw an error if email is already used', async () => {
+      delete process.env.MAX_USERS
       User.findOne.mockResolvedValue({ userId: 1, email: 'test@example.com' })
 
       await expect(
@@ -158,6 +203,22 @@ describe('UserService', () => {
       ).rejects.toThrow('Email déjà utilisé')
 
       expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } })
+    })
+
+    it('create - MAX_USERS atteint - lève une erreur avant de vérifier l\'email', async () => {
+      process.env.MAX_USERS = '5'
+      User.count.mockResolvedValue(5)
+
+      await expect(
+        UserService.create({
+          email: 'test@example.com',
+          name: 'Test User',
+          password: 'securepassword'
+        })
+      ).rejects.toThrow('Limite d\'utilisateurs atteinte')
+
+      expect(User.findOne).not.toHaveBeenCalled()
+      expect(User.create).not.toHaveBeenCalled()
     })
   })
 

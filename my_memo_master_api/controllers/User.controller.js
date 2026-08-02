@@ -26,11 +26,25 @@ exports.register = async (req, res) => {
       logger.warn(`Inscription refusée — email déjà utilisé : ${req.body?.email} (IP ${req.ip})`)
       return res.status(400).send({ message: 'Cet email est déjà utilisé.' })
     }
+    if (error?.message === "Limite d'utilisateurs atteinte") {
+      logger.warn(`Inscription refusée — limite d'utilisateurs atteinte (IP ${req.ip})`)
+      return res.status(403).send({ message: "Le nombre maximal d'utilisateurs a été atteint. Les inscriptions sont temporairement fermées." })
+    }
     logger.error(error?.message || error)
     if (newUser) {
       await userService.delete(newUser.userId).catch((e) => logger.error(e?.message || e))
     }
     res.status(500).send({ message: "Erreur lors de l'inscription." })
+  }
+}
+
+exports.registrationStatus = async (req, res) => {
+  try {
+    const open = await userService.isRegistrationOpen()
+    res.status(200).send({ open })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur serveur.' })
   }
 }
 

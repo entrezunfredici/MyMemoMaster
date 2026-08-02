@@ -21,7 +21,7 @@
 | Module | État | Dernière modif |
 |--------|------|----------------|
 | Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués | 2026-07-06 |
-| User (CRUD, profil) | Stable | init |
+| User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet | 2026-07-31 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
 | Test / Question / Response | Stable — M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-06-30 |
@@ -6373,3 +6373,95 @@ Diff complet `main...dev_front_interpreteur` restreint aux fichiers de l'interpr
 #### Dette / non couvert
 - Le merge effectif `dev_front_interpreteur` → `main` reste une action distincte, à réaliser séparément (git merge/PR), non incluse dans cette revue.
 - La dette déjà documentée de l'interpréteur V2 (distributivité non gérée par l'équivalence algébrique, matrices imbriquées, glyphes « au cas où ») reste valable et n'est pas reprise ici.
+
+---
+
+### [2026-07-31] Limite du nombre d'utilisateurs (MAX_USERS)
+
+#### Contexte
+Demande utilisateur : éviter la surcharge de l'application en limitant le nombre total de comptes, avec un plafond paramétrable via `.env`. Quand la limite est atteinte, l'utilisateur qui tente de s'inscrire ne doit pas voir le formulaire d'inscription mais une page dédiée l'informant qu'il n'y a plus de place.
+
+#### Fichiers créés/modifiés
+- `my_memo_master_api/services/User.service.js` — `isRegistrationOpen()` (lit `MAX_USERS`, compare à `User.count()`, retourne `true` si la variable est absente/vide/≤0) ; `create()` lève `"Limite d'utilisateurs atteinte"` en tout premier (avant le pré-check email) si la limite est atteinte
+- `my_memo_master_api/controllers/User.controller.js` — `register` : intercepte le message d'erreur ci-dessus → 403 ; nouveau handler `registrationStatus` → `GET /users/registration-status` (`{ open: boolean }`, route publique)
+- `my_memo_master_api/routes/User.routes.js` — route `GET /users/registration-status` (publique, avant `/login`)
+- `.env.example`, `.env` (racine) — nouvelle variable `MAX_USERS` (vide/0 = pas de limite)
+- `my_memo_master_api/test/services/User.service.test.js` — 4 tests `isRegistrationOpen` + 1 test `create` (limite atteinte, court-circuite avant `findOne`/`User.create`)
+- `my_memo_master_api/test/controllers/User.controller.test.js` — test 403 sur `/register`, 3 tests sur `GET /registration-status`
+- `my_memo_master_front/src/pages/register/RegistrationFullPage.vue` — nouvelle page "Inscriptions complètes" (retour accueil / lien connexion)
+- `my_memo_master_front/src/router/routes.js` — nouvelle route `/registration-full` ; `beforeEnter` sur `/register` qui appelle `GET users/registration-status` et redirige vers `/registration-full` si `open === false`
+- `my_memo_master_front/test/router/router.guard.test.js` — 3 tests sur le `beforeEnter` de `/register` (ouvert / fermé / échec réseau)
+
+#### Ce qui est utilisable
+- Limite désactivée par défaut (`MAX_USERS` vide) — comportement inchangé tant que la variable n'est pas positionnée.
+- Une fois `MAX_USERS` positionné : au `MAX_USERS`-ième compte, toute tentative d'inscription (front ou appel direct à l'API) est bloquée en 403 côté serveur (source de vérité), et le front redirige préventivement vers `/registration-full` avant même d'afficher le formulaire.
+
+#### Choix techniques
+- Défense en profondeur : le contrôle serveur (`User.service.create`) est la source de vérité anti-contournement ; le guard front n'est qu'une optimisation UX (évite d'afficher un formulaire vain).
+- Fail-open : si l'appel `GET /users/registration-status` échoue (réseau/backend down), le guard front laisse passer la navigation vers `/register` plutôt que de bloquer les inscriptions sur un faux positif — le 403 serveur reste le filet de sécurité final.
+- `isRegistrationOpen()` ne fait pas de `User.count()` si `MAX_USERS` est absent/0 — pas de coût DB supplémentaire quand la fonctionnalité est désactivée.
+
+#### Dette / non couvert
+- Pas de purge automatique ni de file d'attente quand la limite est atteinte — un admin doit soit augmenter `MAX_USERS`, soit désactiver des comptes (`PATCH /:id/deactivate`) pour libérer de la place (`isRegistrationOpen` compte tous les `User`, actifs ou non).
+
+---
+
+### [2026-08-02] Restructuration du dossier Bloc 4 — une section par compétence
+
+#### Contexte
+Alignement de `B4_RENDU.md` sur la structure de `B2_RENDU.md` : une section de premier niveau par compétence RNCP, chacune ouvrant sur l'énoncé complet de la compétence, pour une correspondance immédiate section ↔ compétence à la lecture du jury.
+
+#### Fichiers créés/modifiés
+- `B4_RENDU.md` — passage de 3 sections (Monitorer / Anomalies / Maintenance) à 7 sections : 1 C4.1.1 (dépendances), 2 C4.1.2 (supervision), 3 C4.2.1 (consignation, avec §3.1 processus et §3.2 fiche réelle), 4 C4.2.2 (correctif CI/CD), 5 C4.3.1 (recommandations), 6 C4.3.2 (journal de versions), 7 C4.3.3 (support). Plan du dossier, renvois internes (§/section) et annexe B renumérotés en conséquence. Contenu inchangé.
+
+#### Ce qui est utilisable
+- Dossier Bloc 4 avec la même convention de lecture que le Bloc 2 (« Compétence couverte : C4.x.x — … » en tête de chaque section).
+
+#### Dette / non couvert
+- Néant. Les coquilles préexistantes du corps du texte ont été corrigées dans la foulée (« procvessus », « nimages », « pmise », « pourde », « My mem master », « cahche », « vulnérabilitées », accents manquants, bloc indenté rendu comme code en tête de section 1, liste de supervision réalignée sur les « quatre choses » annoncées).
+
+---
+
+### [2026-08-02] Sonde d'uptime externe (recommandation R3 du Bloc 4)
+
+#### Contexte
+La supervision n'alertait pas en dehors des déploiements : une panne survenant entre deux passages du pipeline CD n'était vue qu'au prochain usage. Mise en œuvre de la première moitié de la recommandation R3 de `B4_RENDU.md` (sonde d'uptime externe ; l'Alertmanager Prometheus reste différé).
+
+#### Fichiers créés/modifiés
+- `.github/workflows/uptime.yml` — nouveau workflow planifié (`cron */5 * * * *` + `workflow_dispatch`) : ping de chaque URL listée dans la variable de dépôt `UPTIME_URLS`, 3 tentatives espacées de 10 s, alerte Discord (`secrets.DISCORD_LOG`, même webhook que `notify_ci.yml`/`cd.yml`) et job en échec si un endpoint ne répond pas 200
+- `B4_RENDU.md` — section 2 : ligne « Sonde d'uptime externe » ajoutée au tableau des sondes, « Limite assumée » réécrite (seul l'Alertmanager reste non couvert) ; section 5 : R3 marquée réalisée pour la sonde, Alertmanager différé ; annexes A et B mises à jour
+
+#### Ce qui est utilisable
+- Détection d'une panne de `/api/v1/health` ramenée à ≤ ~10 min (granularité réelle du cron GitHub incluse), indépendante du VPS/cluster supervisé.
+- **Action requise pour activer** : définir la variable de dépôt `UPTIME_URLS` (Settings → Secrets and variables → Actions → Variables) avec les URLs de santé séparées par des espaces. Sans elle, le job sort en succès sans rien sonder. Le cron ne tourne que sur la branche par défaut (`main`) — la sonde ne sera active qu'après merge.
+
+#### Choix techniques
+- GitHub Actions comme sondeur externe plutôt qu'un service dédié (UptimeRobot, uptime-kuma) — voir DECISIONS.md du 2026-08-02.
+
+#### Dette / non couvert
+- Pas de déduplication d'alerte : tant que la panne dure, un message Discord part à chaque passage (~5 min) — assumé comme relance.
+- Alertmanager sur le Prometheus Kubernetes toujours différé (métriques fines : latence, saturation).
+
+---
+
+### [2026-08-02] Alertmanager sur métriques Prometheus (second volet R3 du Bloc 4)
+
+#### Contexte
+La sonde d'uptime externe couvre le up/down vu de l'extérieur ; il manquait l'alerting sur les métriques fines collectées par le Prometheus du chart (les métriques RED/USE de l'API étaient consultables mais ne déclenchaient rien).
+
+#### Fichiers créés/modifiés
+- `helm/templates/alertmanager.yaml` — nouveau : ConfigMap (route Discord via `webhook_url_file`, `repeat_interval: 4h`), Deployment `prom/alertmanager` (webhook monté en fichier depuis la clé `DISCORD_WEBHOOK_URL` du Secret manuel `<release>-secrets`, storage `emptyDir`), Service ClusterIP 9093 ; le tout gaté par `monitoring.enabled && monitoring.alerting.enabled`
+- `helm/templates/prometheus.yaml` — ConfigMap : bloc `alerting.alertmanagers` + `rule_files` (gatés) et nouveau `rules.yml` avec 4 règles : `CibleInjoignable` (up==0, 2 min), `TauxErreursEleve` (part de 5xx > seuil, 5 min), `LatenceP95Elevee` (p95 > seuil, 10 min), `EventLoopSaturee` (lag > 500 ms, 5 min) — métriques de `my_memo_master_api/helpers/metrics.js`
+- `helm/values.yaml` — bloc `monitoring.alerting` : `enabled: false` par défaut, `imageTag: v0.28.1` épinglé, seuils `errorRateThreshold: 0.05` et `latencyP95Seconds: 1`, resources dédiées
+- `B4_RENDU.md` — section 2 : ligne Alertmanager dans le tableau des sondes, « Limite assumée » remplacée par « Condition d'activation » ; section 5 : R3 marquée réalisée (deux volets) ; annexes A et B
+
+#### Ce qui est utilisable
+- `helm lint` vert ; `helm template` validé alerting on/off (23 manifestes valides, configs embarquées parsées, échappements `{{ $labels.* }}` corrects).
+- **Activation** : ajouter la clé `DISCORD_WEBHOOK_URL` au Secret `<release>-secrets` du namespace puis passer `monitoring.alerting.enabled=true` (values d'env ou `--set`). Sans la clé, le pod ne monte pas son volume → échec explicite du déploiement `--atomic`.
+
+#### Choix techniques
+- Voir DECISIONS.md du 2026-08-02 (Alertmanager du chart vs kube-prometheus-stack ; webhook en fichier vs en clair).
+
+#### Dette / non couvert
+- Alerting inactif tant qu'aucun cluster n'est durablement actif et que la clé secret n'est pas posée (verrou assumé).
+- Pas de silences persistés (`emptyDir`) : une alerte active est ré-émise après redémarrage du pod — acceptable à cette échelle.

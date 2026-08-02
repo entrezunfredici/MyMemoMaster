@@ -149,3 +149,23 @@ monitoring:
     limits:
       cpu: 500m
       memory: 512Mi
+  # ── Alertes (Alertmanager → Discord) ────────────────────────────────────────
+  # Second volet de la recommandation R3 du Bloc 4 : alertes sur métriques
+  # fines (5xx, latence p95, event loop) évaluées par le Prometheus du chart.
+  # Prérequis avant d'activer : ajouter la clé DISCORD_WEBHOOK_URL au Secret
+  # manuel <release>-secrets (sinon le pod Alertmanager ne démarre pas et le
+  # déploiement --atomic rollback).
+  alerting:
+    enabled: false
+    imageTag: v0.28.1     # épingler explicitement, jamais :latest
+    # Part de réponses 5xx sur 5 min au-delà de laquelle on alerte (0.05 = 5 %)
+    errorRateThreshold: 0.05
+    # Latence p95 (secondes) au-delà de laquelle on alerte
+    latencyP95Seconds: 1
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi

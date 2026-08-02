@@ -32,7 +32,22 @@ class UserService {
     return userWithoutPassword
   }
 
+  /**
+   * Indique si de nouvelles inscriptions sont encore possibles.
+   * La limite est désactivée si MAX_USERS est absent, vide ou <= 0.
+   *
+   * @returns {Promise<boolean>} true si l'inscription est ouverte
+   */
+  async isRegistrationOpen() {
+    const maxUsers = parseInt(process.env.MAX_USERS, 10)
+    if (!maxUsers || maxUsers <= 0) return true
+
+    const total = await User.count()
+    return total < maxUsers
+  }
+
   async create(user) {
+    if (!(await this.isRegistrationOpen())) throw new Error('Limite d\'utilisateurs atteinte')
     if (await this.findByEmail(user.email)) throw new Error('Email déjà utilisé')
     if (!user.name || !user.password || !user.email) throw new Error('Champs manquants')
 

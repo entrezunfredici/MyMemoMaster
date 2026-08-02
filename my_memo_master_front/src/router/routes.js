@@ -1,3 +1,5 @@
+import { api } from '@/helpers/api'
+
 const routes = [
   {
     path: '/',
@@ -202,8 +204,23 @@ const routes = [
     path: '/register',
     name: 'register',
     component: () => import('../pages/register/InscriptionPage.vue'),
+    // Vérifie la limite MAX_USERS avant d'afficher le formulaire d'inscription
+    beforeEnter: async () => {
+      const resp = await api.get('users/registration-status')
+      if (resp?.data?.open === false) return { path: '/registration-full' }
+      return true
+    },
     meta: {
       title: 'register',
+      private: false
+    }
+  },
+  {
+    path: '/registration-full',
+    name: 'registration-full',
+    component: () => import('../pages/register/RegistrationFullPage.vue'),
+    meta: {
+      title: 'Inscriptions complètes',
       private: false
     }
   },

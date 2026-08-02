@@ -1,0 +1,76 @@
+name: Uptime
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  Sonde d'uptime externe (recommandation R3 du Bloc 4)
+#
+#  Ping périodique des endpoints /api/v1/health depuis l'infrastructure GitHub
+#  (donc hors du VPS/cluster supervisé) : une panne survenant entre deux
+#  déploiements est détectée sans attendre le prochain passage du pipeline CD.
+#
+#  Configuration :
+#    - Variable de dépôt UPTIME_URLS (Settings → Secrets and variables →
+#      Actions → Variables) : liste d'URLs séparées par des espaces, ex :
+#        https://api.test.example.com/api/v1/health https://api.example.com/api/v1/health
+#      Si absente, le job sort en succès sans rien sonder (environnements éteints).
+#    - Secret DISCORD_LOG : webhook déjà utilisé par notify_ci.yml et cd.yml.
+#
+#  Limites connues :
+#    - Le cron GitHub Actions ne s'exécute que sur la branche par défaut (main)
+#      et sa granularité réelle peut dériver de quelques minutes aux heures de
+#      pointe — acceptable pour un objectif de détection ≤ ~10 min.
+#    - Alerte ré-émise à chaque passage tant que la panne dure (pas de
+#      déduplication) : comportement assumé, sert de relance.
+# ═════════════════════════════════════════════════════════════════════════════
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Sonde /api/v1/health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping des endpoints de santé
+        env:
+          UPTIME_URLS: ${{ vars.UPTIME_URLS }}
+          DISCORD_LOG: ${{ secrets.DISCORD_LOG }}
+        run: |
+          if [ -z "$UPTIME_URLS" ]; then
+            echo "UPTIME_URLS non définie — aucune URL à sonder, sortie en succès."
+            exit 0
+          fi
+
+          FAILED=""
+          for url in $UPTIME_URLS; do
+            ok=false
+            code="000"
+            # 3 tentatives espacées de 10 s pour absorber un incident transitoire
+            # (redémarrage de pod, coupure réseau ponctuelle) sans fausse alerte.
+            for attempt in 1 2 3; do
+              # curl écrit lui-même 000 quand la connexion échoue ; || true évite
+              # seulement que set -e (shell GitHub Actions) ne coupe la boucle.
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" || true)
+              [ -z "$code" ] && code="000"
+              if [ "$code" = "200" ]; then
+                ok=true
+                break
+              fi
+              echo "Tentative $attempt/3 sur $url : HTTP $code"
+              [ "$attempt" -lt 3 ] && sleep 10
+            done
+            if [ "$ok" = true ]; then
+              echo "OK : $url"
+            else
+              echo "ÉCHEC : $url (HTTP $code)"
+              FAILED="$FAILED\n- \`$url\` → HTTP $code"
+            fi
+          done
+
+          if [ -n "$FAILED" ]; then
+            curl -s -X POST -H "Content-Type: application/json" \
+              -d "{\"content\": \"🔴 **Sonde d'uptime** — endpoint(s) de santé injoignable(s) :${FAILED}\"}" \
+              "$DISCORD_LOG"
+            exit 1
+          fi

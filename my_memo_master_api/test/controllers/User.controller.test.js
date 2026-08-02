@@ -25,6 +25,7 @@ jest.mock('../../helpers/sendEmail', () => jest.fn())
 jest.mock('../../services/User.service', () => ({
   findByEmail: jest.fn(),
   create: jest.fn(),
+  isRegistrationOpen: jest.fn().mockResolvedValue(true),
   findOne: jest.fn(),
   update: jest.fn(),
   delete: jest.fn().mockResolvedValue(true),
@@ -152,6 +153,46 @@ describe('User Controller', () => {
       const res = await request(app)
         .post('/api/v1/users/register')
         .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123!' })
+
+      expect(res.status).toBe(500)
+    })
+
+    it("403 — limite d'utilisateurs atteinte (MAX_USERS)", async () => {
+      userService.create.mockRejectedValue(new Error("Limite d'utilisateurs atteinte"))
+
+      const res = await request(app)
+        .post('/api/v1/users/register')
+        .send({ name: 'Bob', email: 'bob@example.com', password: 'Password123!' })
+
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBe("Le nombre maximal d'utilisateurs a été atteint. Les inscriptions sont temporairement fermées.")
+    })
+  })
+
+  // ── GET /users/registration-status ─────────────────────────────────────────
+  describe('GET /users/registration-status', () => {
+    it('200 — inscriptions ouvertes', async () => {
+      userService.isRegistrationOpen.mockResolvedValue(true)
+
+      const res = await request(app).get('/api/v1/users/registration-status')
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ open: true })
+    })
+
+    it('200 — inscriptions fermées (limite atteinte)', async () => {
+      userService.isRegistrationOpen.mockResolvedValue(false)
+
+      const res = await request(app).get('/api/v1/users/registration-status')
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ open: false })
+    })
+
+    it('500 — le service échoue', async () => {
+      userService.isRegistrationOpen.mockRejectedValue(new Error('DB down'))
+
+      const res = await request(app).get('/api/v1/users/registration-status')
 
       expect(res.status).toBe(500)
     })

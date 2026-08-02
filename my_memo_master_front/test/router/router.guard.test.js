@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
+import { api } from '@/helpers/api'
 
 // ── Mocks globaux ─────────────────────────────────────────────────────────────
 // api et notif sont importés par auth.js (logout) — on les neutralise
@@ -104,6 +105,29 @@ describe('Router guard — beforeEach', () => {
     loginAs()
     await router.push('/register')
     expect(router.currentRoute.value.path).toBe('/profile')
+  })
+
+  // ── Limite MAX_USERS (beforeEnter de /register) ───────────────────────────
+
+  it('/register + inscriptions ouvertes → navigation acceptée', async () => {
+    logout()
+    api.get.mockResolvedValueOnce({ status: 200, data: { open: true } })
+    await router.push('/register')
+    expect(router.currentRoute.value.path).toBe('/register')
+  })
+
+  it('/register + inscriptions fermées (MAX_USERS atteint) → redirige vers /registration-full', async () => {
+    logout()
+    api.get.mockResolvedValueOnce({ status: 200, data: { open: false } })
+    await router.push('/register')
+    expect(router.currentRoute.value.path).toBe('/registration-full')
+  })
+
+  it('/register + échec de la vérification (résultat indéfini) → navigation acceptée (fail-open)', async () => {
+    logout()
+    api.get.mockResolvedValueOnce(undefined)
+    await router.push('/register')
+    expect(router.currentRoute.value.path).toBe('/register')
   })
 
   // ── Guard meta.roles ──────────────────────────────────────────────────────
