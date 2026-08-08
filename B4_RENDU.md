@@ -65,7 +65,9 @@ Le processus de mise à jour des dépendances couvre l'ensemble des couches appl
 * l'API (Express, Sequelize, BullMQ, bcryptjs, jsonwebtoken…)
 * le front (Vue 3, Vite, Pinia, Axios, MathLive…)
 * les images Docker de base (Node 22, nginx, PostgreSQL, Redis)
-* les pipelines CI/CD. Toute nouvelle dépendance doit figurer dans la liste approuvée de [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md).
+* les pipelines CI/CD
+
+Toute nouvelle dépendance doit d'abord figurer dans la liste approuvée de [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md).
 
 J'ai mis en place un système de **vérification automatique continue** et de **mises à jour manuelles maîtrisées** :
 
@@ -85,9 +87,9 @@ La vérification automatique garantit qu'aucune mise à jour n'est validée sans
 
 **Compétence couverte : C4.1.2** — Concevoir un système de supervision et d'alerte en déterminant le périmètre de supervision et en identifiant les indicateurs de suivi pertinents, en mettant en place des sondes, en configurant la modalité des signalements afin de garantir une disponibilité permanente du logiciel.
 
-MyMemoMaster est une application web, avec un front, une API, une base de données PostgreSQL et un cache Redis. Elle est déployée sur VPS et Kubernetes selon l'environnement.
+MyMemoMaster est une application web composée d'un front, d'une API, d'une base de données PostgreSQL et d'un cache Redis, déployée sur VPS ou sur Kubernetes selon l'environnement.
 
-Ainsi, pour superviser l'application, il faut surveiller quatre choses :
+Superviser l'application revient donc à surveiller quatre axes :
 
 * la disponibilité de l'API et de sa base
 * la santé des conteneurs
@@ -105,12 +107,10 @@ Ainsi, pour superviser l'application, il faut surveiller quatre choses :
 | Sonde d'uptime externe          | [.github/workflows/uptime.yml](.github/workflows/uptime.yml)             | Depuis l'infrastructure GitHub (donc hors du VPS/cluster supervisé), ping de`/api/v1/health` toutes les 5 minutes — 3 tentatives espacées de 10 s pour absorber un incident transitoire, alerte Discord en cas d'échec confirmé. URLs sondées configurées par la variable de dépôt `UPTIME_URLS`.                          |
 | Alertmanager sur métriques     | [helm/templates/alertmanager.yaml](helm/templates/alertmanager.yaml)     | Alertes évaluées par le Prometheus du chart sur les métriques RED/USE de l'API : cible injoignable (2 min), taux de 5xx > 5 % (5 min), latence p95 > 1 s (10 min), event loop Node.js > 500 ms (5 min) — seuils ajustables par values. Routées vers le même webhook Discord, relance toutes les 4 h tant que l'alerte est active. |
 
-Les seuils que j'ai fixés sont volontairement stricts et bloquants :
+Les seuils que j'ai fixés sont volontairement stricts : tout dépassement bloque le pipeline.
 
 * zéro vulnérabilité `high`/`critical` en production
 * tous les services critiques `healthy` en moins de 2 minutes après déploiement
-
-Si ces seuils ne sont pas respectés, le pipeline échoue.
 
 J'ai aussi branché une analyse statique continue (SonarCloud, job `sonarcloud` du CI, limité à `main`) pour suivre dette et duplication dans le temps.
 
@@ -206,7 +206,7 @@ Sur Kubernetes, `helm upgrade --atomic` annule automatiquement un déploiement r
 
 **Compétence couverte : C4.3.1** — Proposer des axes d'amélioration en prenant en compte les indicateurs de performance et en analysant les retours utilisateurs.
 
-Chaque recommandation est issue soit des indicateurs du projet (pipeline, supervision), soit de la dette explicitement documentée dans [dev/DECISIONS.md](annexes/dev/DECISIONS.md), et évaluée en gain / coût.
+Chaque recommandation part soit des indicateurs du projet (pipeline, supervision), soit de la dette explicitement documentée dans [dev/DECISIONS.md](annexes/dev/DECISIONS.md), et s'évalue selon un rapport gain / coût.
 
 **R1 — Tags git semver + images Docker taguées (priorité haute).** Les images sont poussées en `:latest` par environnement ; le rollback VPS demande d'« identifier le tag de l'image précédente sur DockerHub », impossible avec un tag unique écrasé. Je recommande de taguer chaque merge sur `staging`/`main` (`vX.Y.Z`), de pousser les images avec ce tag en plus de `:latest`, et de publier une release GitHub reprenant l'entrée du journal de version (section 6). Gain : rollback fiable en moins de 5 minutes ; coût : environ un jour, sans impact runtime.
 
@@ -224,7 +224,7 @@ Chaque recommandation est issue soit des indicateurs du projet (pipeline, superv
 
 **Compétence couverte : C4.3.2** — Établir un journal des versions déployées en y intégrant la documentation des correctifs réalisés.
 
-J'ai établi un journal des versions déployées, une « version » correspondant à un jalon mergé sur une branche de déploiement (`dev` → test, `staging` → preprod, `main` → prod). Faute de tags git à ce jour (recommandation R1), je nomme les versions `AAAA.MM.n` (année.mois.itération). Le détail technique exhaustif de chaque livraison reste dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) ; ce journal en est la vue synthétique orientée exploitation.
+Une « version » correspond ici à un jalon mergé sur une branche de déploiement (`dev` → test, `staging` → preprod, `main` → prod). Faute de tags git à ce jour (recommandation R1), je nomme les versions `AAAA.MM.n` (année.mois.itération). Le détail technique exhaustif de chaque livraison reste dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) ; ce journal en est la vue synthétique orientée exploitation.
 
 **2026.07.3 — Interpréteur de formules V2** (2026-07-19 → 2026-07-25). Nouvelles fonctionnalités : éditeur MathLive à palette (caractères, formules, opérateurs, matrices), équivalences algébriques par AST pour la correction sémantique, vérification d'homogénéité des unités sur formules LaTeX annotées. Anomalies corrigées : comparaison V1/LaTeX échouant sur corpus mixte ; corruption de matrices via l'API de commande MathLive (remplacée par des fonctions pures testées).
 
