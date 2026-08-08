@@ -6465,3 +6465,29 @@ La sonde d'uptime externe couvre le up/down vu de l'extérieur ; il manquait l'a
 #### Dette / non couvert
 - Alerting inactif tant qu'aucun cluster n'est durablement actif et que la clé secret n'est pas posée (verrou assumé).
 - Pas de silences persistés (`emptyDir`) : une alerte active est ré-émise après redémarrage du pod — acceptable à cette échelle.
+
+---
+
+### [2026-08-08] Relecture du dossier Bloc 4 — corrections de cohérence
+
+#### Contexte
+Relecture de `B4_RENDU.md` face aux critères RNCP39583 (fiche France Compétences : aucun nombre de pages imposé, évaluation sur la couverture des critères). Cinq défauts identifiés et corrigés.
+
+#### Fichiers créés/modifiés
+- `B4_RENDU.md` —
+  - liens cassés `annexes/dev/CHANGELOG_AGENT.md` → `annexes/dev/CHANGELOG.md` (le fichier annexé s'appelle CHANGELOG.md) ; mention « CHANGELOG_AGENT » de l'annexe B alignée
+  - « Annexe D » référencée en introduction mais absente : annexe D « Sources bibliographiques » ajoutée (reprise de celle de `B2_RENDU.md`, 4 références), plan du dossier mis à jour
+  - paragraphe d'intro de la section 2 désindenté (rendu comme bloc de code en Markdown)
+  - section 1 : phrase de synthèse explicitant la **fréquence** et le **type** (automatique/manuel) de chaque mise à jour — critère RNCP « le processus précise la fréquence » sécurisé
+  - harmonisation des liens documentation : `docs/RUNBOOK.md`, `docs/SECURITY_AUDIT_OWASP.md`, `docs/AUDIT_RGAA.md` visent désormais `annexes/docs/…` ; les liens vers le code (`.github/`, `helm/`, `my_memo_master_*`, `docker-compose.yml`) restent des chemins du dépôt (choix utilisateur : le rendu inclut le dépôt complet)
+
+  - captures Discord intégrées comme preuves visuelles : `annexes/docs/discordMessage.png` (section 2 — notification CD : tests verts sur staging, état du cluster, déploiement confirmé) et `annexes/docs/CI_failed_in_discord.png` (section 3 — échec de tests notifié automatiquement)
+  - incohérence R4/réalité corrigée : R4 disait encore « copier-coller un token de 64 caractères » alors que le commit `fe9c0a9` (2026-07-18) a remplacé ce flux par un code OTP 6 chiffres (bcrypt, 15 min, 5 essais). R4 reformulée (priorité moyenne → basse, lien pré-remplissant le champ code) ; §7 réécrit pour décrire le vrai correctif (OWASP, anti-énumération, brute-force du *code*) ; entrée 2026.07.2 du journal de versions précisée
+  - Odoo intégré comme registre officiel de consignation (confirmé par l'utilisateur) : §3.1 — chaque anomalie détectée devient une tâche Odoo au statut « à corriger » et avance dans le kanban jusqu'au correctif ; traçabilité double (tâche Odoo côté pilotage, commit `[FIX]` + CHANGELOG côté code) ; §7 et annexe B (ligne C4.2.1) alignés
+
+#### Ce qui est utilisable
+- Dossier Bloc 4 sans lien mort ni renvoi fantôme, critère « fréquence des mises à jour » couvert explicitement, sections 2 et 3 illustrées par des captures réelles.
+- Vérifié à cette date : tous les liens relatifs de `B2_RENDU.md` et `B4_RENDU.md` pointent vers des fichiers existants du dépôt ; les 4 commits cités dans le B4 (`057cbfe`, `fe9c0a9`, `0935e05`, `515bf84`) existent dans l'historique git.
+
+#### Dette / non couvert
+- Néant.

@@ -8,17 +8,17 @@
 
 ### Plan du dossier
 
-| Section      | Contenu                                                                                          | Compétence couverte |
-| ------------ | ------------------------------------------------------------------------------------------------ | -------------------- |
-| Introduction | Présentation du projet                                                                          | —                   |
-| 1            | Mise à jour des dépendances et bibliothèques tierces                                          | C4.1.1               |
-| 2            | Système de supervision et d'alerte                                                              | C4.1.2               |
-| 3            | Collecte et consignation des anomalies                                                           | C4.2.1               |
-| 4            | Création et déploiement du correctif via CI/CD                                                 | C4.2.2               |
-| 5            | Recommandations d'amélioration argumentées                                                     | C4.3.1               |
-| 6            | Journal des versions déployées                                                                 | C4.3.2               |
-| 7            | Collaboration avec le support et les retours utilisateurs                                        | C4.3.3               |
-| Annexes      | A. Index des documents du dépôt · B. Synthèse de couverture des compétences · C. Glossaire | —                   |
+| Section      | Contenu                                                                                                                         | Compétence couverte |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Introduction | Présentation du projet                                                                                                         | —                   |
+| 1            | Mise à jour des dépendances et bibliothèques tierces                                                                         | C4.1.1               |
+| 2            | Système de supervision et d'alerte                                                                                             | C4.1.2               |
+| 3            | Collecte et consignation des anomalies                                                                                          | C4.2.1               |
+| 4            | Création et déploiement du correctif via CI/CD                                                                                | C4.2.2               |
+| 5            | Recommandations d'amélioration argumentées                                                                                    | C4.3.1               |
+| 6            | Journal des versions déployées                                                                                                | C4.3.2               |
+| 7            | Collaboration avec le support et les retours utilisateurs                                                                       | C4.3.3               |
+| Annexes      | A. Index des documents du dépôt · B. Synthèse de couverture des compétences · C. Glossaire · D. Sources bibliographiques | —                   |
 
 ---
 
@@ -73,6 +73,8 @@ J'ai mis en place un système de **vérification automatique continue** et de **
 - Quand l'audit remonte une vulnérabilité, j'applique le correctif sur une branche dédiée, je rejoue la suite de tests complète pour vérifier l'absence de régression, puis le pipeline CI/CD redéploie normalement.
 - Les montées de version fonctionnelles (au-delà du correctif de sécurité) sont évaluées au cas par cas : lecture du changelog de la librairie, impact sur les décisions déjà prises ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)), exécution des tests API + front + lint avant fusion.
 
+En synthèse, la fréquence et le type de chaque mise à jour sont les suivants : **audit de sécurité à chaque push** (automatique, bloquant) ; **correctif de sécurité dès détection** d'une vulnérabilité `high`/`critical` (manuel, prioritaire sur le reste du développement) ; **revue des montées de version fonctionnelles à chaque jalon de livraison** (manuelle, au cas par cas après lecture du changelog).
+
 La vérification automatique garantit qu'aucune mise à jour n'est validée sans passer par les tests et empêche qu'une vulnérabilité haute soit mise en production par erreur.
 
 **Exemple réel** — Pendant le push du 2026-06-10, le `npm audit` du commit `057cbfe` avait remonté **21 vulnérabilités** sur le front (1 critique, 12 high, 8 moderate). Afin de résoudre les 21 vulnérabilités, j'ai appliqué un `npm audit fix --legacy-peer-deps` (flag requis par la peer dependency de `@pinia/testing`) pour mettre à jour `vite`, `vitest`, `ws`, `yaml` et `ajv`. Cela a résolu les vulnérabilités et, par la suite, les 41 tests Vitest existants sont restés verts, validant que le correctif n'a rien cassé avant même le redéploiement.
@@ -83,7 +85,7 @@ La vérification automatique garantit qu'aucune mise à jour n'est validée sans
 
 **Compétence couverte : C4.1.2** — Concevoir un système de supervision et d'alerte en déterminant le périmètre de supervision et en identifiant les indicateurs de suivi pertinents, en mettant en place des sondes, en configurant la modalité des signalements afin de garantir une disponibilité permanente du logiciel.
 
-    MyMemoMaster est une application web, avec un front, une API, une base de données PostgreSQL et un cache Redis. Elle est déployée sur VPS et Kubernetes selon l'environnement.
+MyMemoMaster est une application web, avec un front, une API, une base de données PostgreSQL et un cache Redis. Elle est déployée sur VPS et Kubernetes selon l'environnement.
 
 Ainsi, pour superviser l'application, il faut surveiller quatre choses :
 
@@ -112,7 +114,11 @@ Si ces seuils ne sont pas respectés, le pipeline échoue.
 
 J'ai aussi branché une analyse statique continue (SonarCloud, job `sonarcloud` du CI, limité à `main`) pour suivre dette et duplication dans le temps.
 
-À chaque fin de CI, le pipeline ([.github/workflows/notify_ci.yml](.github/workflows/notify_ci.yml)) notifie la branche et le résultat succès/échec (job `notify` de `cd.yml`) sur **Discord** (webhook `DISCORD_LOG`). La sonde d'uptime externe et l'Alertmanager alertent sur ce même webhook dès qu'un endpoint de santé ne répond plus ou qu'un seuil de métrique est franchi ; le signalement ne dépend donc pas uniquement des passages du pipeline CI/CD. Les échecs du health check sont logués côté serveur via Winston avec contexte et sont consultables par les procédures détaillées dans [docs/RUNBOOK.md](docs/RUNBOOK.md).
+À chaque fin de CI, le pipeline ([.github/workflows/notify_ci.yml](.github/workflows/notify_ci.yml)) notifie la branche et le résultat succès/échec (job `notify` de `cd.yml`) sur **Discord** (webhook `DISCORD_LOG`). La sonde d'uptime externe et l'Alertmanager alertent sur ce même webhook dès qu'un endpoint de santé ne répond plus ou qu'un seuil de métrique est franchi ; le signalement ne dépend donc pas uniquement des passages du pipeline CI/CD. Les échecs du health check sont logués côté serveur via Winston avec contexte et sont consultables par les procédures détaillées dans [docs/RUNBOOK.md](annexes/docs/RUNBOOK.md).
+
+![Notification Discord émise par le pipeline CD : tests réussis sur staging, état des nœuds et pods du cluster Kubernetes, déploiement confirmé](annexes/docs/discordMessage.png)
+
+*Capture réelle — notification Discord de fin de déploiement sur `staging` : tests verts, résumé de l'état du cluster (nœuds, conditions kubelet, pods par statut) et confirmation « Déploiement staging réussi ».*
 
 **Condition d'activation** : l'Alertmanager est livré dans le chart mais désactivé par défaut (`monitoring.alerting.enabled: false`). Pour l'activer il faut ajouter la clé `DISCORD_WEBHOOK_URL` au Secret manuel `<release>-secrets` du namespace, faute de quoi le pod ne démarre pas et le déploiement `--atomic` rollback. Ce verrou est volontaire, il permet d'éviter d'avoir un système d'alerte silencieusement inopérant.
 
@@ -126,15 +132,19 @@ J'ai aussi branché une analyse statique continue (SonarCloud, job `sonarcloud` 
 
 J'ai mis en place cinq canaux de détection, chacun avec son mode de signalement :
 
-| Canal                                   | Ce qu'il détecte                                                      | Signalement                                                                                                            |
-| --------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Pipeline CI (tests, lint,`npm audit`) | Régressions, vulnérabilités de dépendances                         | Message Discord automatique à chaque échec                                                                           |
-| Vérification post-déploiement du CD   | Service qui ne démarre pas / base injoignable après une mise à jour | Échec du pipeline + logs des conteneurs + Discord                                                                     |
-| Sonde`GET /api/v1/health`             | Indisponibilité de la base en production                              | `503` + log Winston avec contexte                                                                                    |
-| Retours utilisateurs                    | Bugs fonctionnels constatés à l'usage                                | Canal Discord du projet                                                                                                |
-| Audits ciblés (OWASP, RGAA)            | Failles de sécurité, défauts d'accessibilité                       | Rapport dédié ([docs/SECURITY_AUDIT_OWASP.md](docs/SECURITY_AUDIT_OWASP.md), [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)) |
+| Canal                                   | Ce qu'il détecte                                                      | Signalement                                                                                                                            |
+| --------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipeline CI (tests, lint,`npm audit`) | Régressions, vulnérabilités de dépendances                         | Message Discord automatique à chaque échec                                                                                           |
+| Vérification post-déploiement du CD   | Service qui ne démarre pas / base injoignable après une mise à jour | Échec du pipeline + logs des conteneurs + Discord                                                                                     |
+| Sonde`GET /api/v1/health`             | Indisponibilité de la base en production                              | `503` + log Winston avec contexte                                                                                                    |
+| Retours utilisateurs                    | Bugs fonctionnels constatés à l'usage                                | Canal Discord du projet                                                                                                                |
+| Audits ciblés (OWASP, RGAA)            | Failles de sécurité, défauts d'accessibilité                       | Rapport dédié ([docs/SECURITY_AUDIT_OWASP.md](annexes/docs/SECURITY_AUDIT_OWASP.md), [docs/AUDIT_RGAA.md](annexes/docs/AUDIT_RGAA.md)) |
 
-Chaque anomalie est consignée avec les informations nécessaires à sa **reproduction**, puis tracée de bout en bout selon un modèle constant :
+![Notification Discord automatique d'un échec de tests sur la branche dev_back_student_kpi](annexes/docs/CI_failed_in_discord.png)
+
+*Capture réelle — signalement automatique du premier canal : échec des tests sur la branche `dev_back_student_kpi`, notifié sur le canal Discord du projet à la fin du run CI.*
+
+Quel que soit le canal de détection, chaque anomalie est ensuite consignée comme **tâche dans Odoo**, l'outil de pilotage du projet : elle entre au statut **« à corriger »** avec les informations nécessaires à sa **reproduction**, puis avance dans le kanban au fil du traitement jusqu'à la livraison du correctif. La fiche portée par la tâche suit un modèle constant :
 
 ```markdown
 ## Fiche anomalie [ID]
@@ -147,7 +157,7 @@ Chaque anomalie est consignée avec les informations nécessaires à sa **reprod
 - Déploiement — commit, branche, résultat CI/CD
 ```
 
-La consignation elle-même passe par un commit conventionné `[FIX]` (règle [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)) et notée dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) (fichiers modifiés, hypothèses, dette éventuelle) et, si le correctif implique un choix structurant, il est noté dans [dev/DECISIONS.md](annexes/dev/DECISIONS.md).
+La traçabilité est ainsi double. Côté pilotage, la tâche Odoo porte l'état d'avancement de l'anomalie, de « à corriger » jusqu'à la livraison du correctif. Côté code, la consignation passe par un commit conventionné `[FIX]` (règle [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md)) et est notée dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) (fichiers modifiés, hypothèses, dette éventuelle) et, si le correctif implique un choix structurant, dans [dev/DECISIONS.md](annexes/dev/DECISIONS.md).
 
 ## 3.2 Fiche d'anomalie réelle — exposition d'erreurs internes sur `addCard`
 
@@ -188,7 +198,7 @@ promotion staging → preprod (Helm --atomic, rollback auto)
 promotion main → prod (Helm --atomic, rollback auto)
 ```
 
-Sur Kubernetes, `helm upgrade --atomic` annule automatiquement un déploiement raté ; sur le VPS, la procédure de rollback d'image et de migration est documentée dans [docs/RUNBOOK.md](docs/RUNBOOK.md). Un correctif qui casserait le démarrage de l'API serait détecté par la boucle de healthcheck du CD **avant** d'être considéré comme livré — jamais de correctif « à moitié déployé » silencieusement.
+Sur Kubernetes, `helm upgrade --atomic` annule automatiquement un déploiement raté ; sur le VPS, la procédure de rollback d'image et de migration est documentée dans [docs/RUNBOOK.md](annexes/docs/RUNBOOK.md). Un correctif qui casserait le démarrage de l'API serait détecté par la boucle de healthcheck du CD **avant** d'être considéré comme livré — jamais de correctif « à moitié déployé » silencieusement.
 
 ---
 
@@ -204,7 +214,7 @@ Chaque recommandation est issue soit des indicateurs du projet (pipeline, superv
 
 **R3 — Alerting proactif sur la disponibilité (réalisée).** La supervision détectait mais n'alertait pas en dehors des déploiements (section 2) — une panne entre deux déploiements n'était vue qu'au prochain usage. Les deux volets de la recommandation ont été **mis en œuvre**. Premier volet : une sonde d'uptime externe ([.github/workflows/uptime.yml](.github/workflows/uptime.yml)) pingue `/api/v1/health` toutes les 5 minutes depuis l'infrastructure GitHub — donc indépendante du VPS et du cluster supervisés — avec 3 tentatives espacées de 10 s pour absorber les incidents transitoires, et alerte sur le webhook Discord déjà en place ; détection ramenée à ≤ 10 min (granularité du cron GitHub incluse) sans nouvel outil d'équipe. Second volet : un Alertmanager ([helm/templates/alertmanager.yaml](helm/templates/alertmanager.yaml)) branché sur le Prometheus du chart évalue des règles sur les métriques RED/USE de l'API — cible injoignable, taux de 5xx, latence p95, saturation de l'event loop — et route vers le même webhook Discord ; désactivé par défaut (`monitoring.alerting.enabled`), son activation exige la clé `DISCORD_WEBHOOK_URL` dans le Secret du namespace (section 2). Les deux vues sont complémentaires : la sonde observe le service de l'extérieur (up/down), l'Alertmanager de l'intérieur (dégradations avant la panne).
 
-**R4 — Lien cliquable dans l'email de reset password (priorité moyenne).** L'utilisateur doit copier-coller un token de 64 caractères depuis l'email (limite UX identifiée dès la conception du correctif sécurité du 2026-06-15). Un email avec lien `https://<front>/reset-password?token=…` supprimerait cette friction sur un parcours critique, sans toucher au modèle de sécurité (le token reste hashé côté serveur). Coût : environ un jour front + template email.
+**R4 — Lien cliquable dans l'email de reset password (priorité basse).** La friction majeure identifiée à la conception (copier-coller un token de 64 caractères depuis l'email) a déjà été levée par le correctif du 2026-07-18 (commit `fe9c0a9`, §7) : l'email envoie désormais un code à 6 chiffres, hashé bcrypt côté serveur, expirant après 15 minutes et limité à 5 tentatives. Il reste une saisie manuelle : un email proposant en complément un lien `https://<front>/reset-password?code=…` pré-remplissant le champ supprimerait cette dernière étape sur un parcours critique, sans toucher au modèle de sécurité (mêmes hash, expiration et limite d'essais côté serveur). Coût : environ un jour front + template email.
 
 **R5 — Cache des droits Leitner si la charge augmente (différée).** Chaque écriture sur une carte et chaque endpoint `requireRole` déclenchent 1-2 requêtes DB de résolution de droits — choix assumé pour le MVP mono-instance. Je ne recommande **pas** d'agir tant que les temps de réponse restent bons ; si la latence se dégrade, un cache Redis courte durée (30-60 s) supprimerait la majorité de ces requêtes, au prix d'une invalidation à gérer (partages, changements de rôle) — c'est précisément pourquoi elle est différée jusqu'à un besoin mesuré.
 
@@ -214,11 +224,11 @@ Chaque recommandation est issue soit des indicateurs du projet (pipeline, superv
 
 **Compétence couverte : C4.3.2** — Établir un journal des versions déployées en y intégrant la documentation des correctifs réalisés.
 
-J'ai établi un journal des versions déployées, une « version » correspondant à un jalon mergé sur une branche de déploiement (`dev` → test, `staging` → preprod, `main` → prod). Faute de tags git à ce jour (recommandation R1), je nomme les versions `AAAA.MM.n` (année.mois.itération). Le détail technique exhaustif de chaque livraison reste dans [dev/CHANGELOG_AGENT.md](annexes/dev/CHANGELOG_AGENT.md) ; ce journal en est la vue synthétique orientée exploitation.
+J'ai établi un journal des versions déployées, une « version » correspondant à un jalon mergé sur une branche de déploiement (`dev` → test, `staging` → preprod, `main` → prod). Faute de tags git à ce jour (recommandation R1), je nomme les versions `AAAA.MM.n` (année.mois.itération). Le détail technique exhaustif de chaque livraison reste dans [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md) ; ce journal en est la vue synthétique orientée exploitation.
 
 **2026.07.3 — Interpréteur de formules V2** (2026-07-19 → 2026-07-25). Nouvelles fonctionnalités : éditeur MathLive à palette (caractères, formules, opérateurs, matrices), équivalences algébriques par AST pour la correction sémantique, vérification d'homogénéité des unités sur formules LaTeX annotées. Anomalies corrigées : comparaison V1/LaTeX échouant sur corpus mixte ; corruption de matrices via l'API de commande MathLive (remplacée par des fonctions pures testées).
 
-**2026.07.2 — Correctif reset password + consolidation docs** (2026-07-18). Anomalies corrigées : parcours « mot de passe oublié » réparé de bout en bout (commit `fe9c0a9`), limitation des tentatives de reset ajoutée. Maintenance : documentation dédupliquée (suppression des copies obsolètes de `docs/CONVENTIONS.md` et `docs/DECISIONS.md` au profit des versions `.agents/`).
+**2026.07.2 — Correctif reset password + consolidation docs** (2026-07-18). Anomalies corrigées : parcours « mot de passe oublié » réparé de bout en bout — token 64 caractères remplacé par un code à 6 chiffres hashé bcrypt (commit `fe9c0a9`) —, limitation des tentatives de reset ajoutée. Maintenance : documentation dédupliquée (suppression des copies obsolètes de `docs/CONVENTIONS.md` et `docs/DECISIONS.md` au profit des versions `.agents/`).
 
 **2026.07.1 — Durcissement sécurité + observabilité K8s** (2026-07-06 → 2026-07-12). Nouvelles fonctionnalités : endpoint de santé `/api/v1/health` (commit `515bf84`), déploiement Helm unifié avec `--atomic`, Prometheus par namespace. Anomalies corrigées : refresh token désormais hashé SHA-256 en base (audit OWASP, ticket M-00b.07b) ; flag Helm inexistant `--rollback-on-failure` remplacé par `--atomic`.
 
@@ -234,9 +244,15 @@ J'ai établi un journal des versions déployées, une « version » correspondan
 
 **Compétence couverte : C4.3.3** — Collaborer avec les équipes de support, en fournissant une expertise technique, en répondant aux retours clients, en résolvant des problèmes complexes afin d'améliorer le logiciel.
 
-Le projet étant porté par une petite équipe, le rôle de support est assuré via le **serveur Discord du projet** : les testeurs y remontent leurs problèmes sur le même canal qui reçoit les notifications CI/CD — retours et état de la plateforme visibles au même endroit. Je qualifie le problème (fiche d'anomalie, §3.1), le corrige, puis notifie le testeur au déploiement du correctif.
+Le projet étant porté par une petite équipe, le rôle de support est assuré via le **serveur Discord du projet** : les testeurs y remontent leurs problèmes sur le même canal qui reçoit les notifications CI/CD — retours et état de la plateforme visibles au même endroit. Je qualifie le problème (tâche Odoo « à corriger » portant la fiche d'anomalie, §3.1), le corrige, puis notifie le testeur au déploiement du correctif.
 
-**Exemple réel — parcours « mot de passe oublié » (2026-07-18, commit `fe9c0a9`).** Un testeur ne parvenait pas à réinitialiser son mot de passe : le parcours échouait entre la demande (`ForgotPasswordPage`) et la saisie du nouveau mot de passe (`ResetPasswordPage`). J'ai reproduit le parcours complet en environnement de test et identifié un désalignement entre le front et l'API sur le flux de vérification du token, ainsi que l'absence de limite de tentatives. Résolution : `User.service.js`, `User.controller.js` et `User.validators.js` réalignés côté API, ajout d'un compteur de tentatives de reset (migration `20260718000000-add-reset-password-attempts-to-user`) pour empêcher le brute-force du token ; `ForgotPasswordPage.vue` et `ResetPasswordPage.vue` corrigées côté front ; suites `User.service.test.js` et `User.controller.test.js` adaptées (cas nominal, tentatives épuisées, token invalide). Le testeur a fourni le scénario de reproduction et validé le correctif sur l'environnement de test une fois le déploiement automatique terminé — la boucle a été fermée sur le même canal Discord que la remontée initiale.
+**Exemple réel — parcours « mot de passe oublié » (2026-07-18, commit `fe9c0a9`).** Un testeur ne parvenait pas à réinitialiser son mot de passe, le parcours échouait entre la demande (`ForgotPasswordPage`) et la saisie du nouveau mot de passe (`ResetPasswordPage`).
+
+J'ai reproduit le parcours complet en environnement de test et identifié un désalignement entre le front et l'API sur le flux de vérification alors en place (token hexadécimal de 64 caractères envoyé par email), ainsi que l'absence de limite de tentatives.
+
+Pour résoudre le problème, j'ai remplacé ce flux côté API par un code de réinitialisation à 6 chiffres conforme aux recommandations OWASP : `User.service.js` (génération du code, hash bcrypt, expiration 15 minutes), `User.controller.js` (email réécrit avec le code lisible, réponse 401 anti-énumération) et `User.validators.js` (validation stricte `^\d{6}$`), plus un compteur de tentatives de reset (migration `20260718000000-add-reset-password-attempts-to-user`, 5 essais maximum) pour empêcher le brute-force du code. Ensuite j'ai corrigé `ForgotPasswordPage.vue` et `ResetPasswordPage.vue` côté front (saisie numérique à 6 chiffres, alignée sur ce que les validators de l'API acceptent). Enfin j'ai adapté les suites de tests `User.service.test.js` et `User.controller.test.js` (cas nominal, tentatives épuisées, code invalide). 
+
+Enfin, le testeur a fourni le scénario de reproduction et validé le correctif sur l'environnement de test une fois le déploiement automatique terminé — la boucle a été fermée sur le même canal Discord que la remontée initiale.
 
 ---
 
@@ -246,11 +262,11 @@ Le projet étant porté par une petite équipe, le rôle de support est assuré 
 
 | Document                                                                                                                                                                              | Contenu                                                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [docs/RUNBOOK.md](docs/RUNBOOK.md)                                                                                                                                                     | Procédures d'exploitation : déploiement, mise à jour, rollback, logs, sauvegarde/restauration |
-| [dev/CHANGELOG_AGENT.md](annexes/dev/CHANGELOG_AGENT.md)                                                                                                                               | Détail technique exhaustif de chaque livraison (fichiers, hypothèses, dette)                   |
+| [docs/RUNBOOK.md](annexes/docs/RUNBOOK.md)                                                                                                                                             | Procédures d'exploitation : déploiement, mise à jour, rollback, logs, sauvegarde/restauration |
+| [dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)                                                                                                                                           | Détail technique exhaustif de chaque livraison (fichiers, hypothèses, dette)                   |
 | [dev/DECISIONS.md](annexes/dev/DECISIONS.md)                                                                                                                                           | Journal des décisions techniques structurantes (Contexte/Décision/Alternative/Conséquences)   |
-| [docs/SECURITY_AUDIT_OWASP.md](docs/SECURITY_AUDIT_OWASP.md)                                                                                                                           | Audit de sécurité OWASP Top 10                                                                 |
-| [docs/AUDIT_RGAA.md](docs/AUDIT_RGAA.md)                                                                                                                                               | Audit d'accessibilité RGAA                                                                      |
+| [docs/SECURITY_AUDIT_OWASP.md](annexes/docs/SECURITY_AUDIT_OWASP.md)                                                                                                                   | Audit de sécurité OWASP Top 10                                                                 |
+| [docs/AUDIT_RGAA.md](annexes/docs/AUDIT_RGAA.md)                                                                                                                                       | Audit d'accessibilité RGAA                                                                      |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) / [cd.yml](.github/workflows/cd.yml) / [notify_ci.yml](.github/workflows/notify_ci.yml) / [uptime.yml](.github/workflows/uptime.yml) | Pipelines d'intégration, de déploiement, de notification et sonde d'uptime externe             |
 | [helm/](helm/)                                                                                                                                                                         | Chart Helm (déploiement, probes, Prometheus, Alertmanager)                                      |
 
@@ -260,10 +276,10 @@ Le projet étant porté par une petite équipe, le rôle de support est assuré 
 | --------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C4.1.1 — Mise à jour des dépendances | 1       | `npm audit` bloquant en CI (high/critical) ; correctif réel de 21 vulnérabilités front (commit `057cbfe`) sans régression                                                                                                                                |
 | C4.1.2 — Supervision et alerte         | 2       | Endpoint`/api/v1/health` testant la base, healthchecks Compose, readiness probes K8s, boucle de vérification post-déploiement, Prometheus par namespace, sonde d'uptime externe (`uptime.yml`), Alertmanager sur métriques RED/USE, notifications Discord |
-| C4.2.1 — Consignation des anomalies    | 3       | Processus à 5 canaux de détection, modèle de fiche, fiche réelle ANO-2026-06-10-01 reproductible                                                                                                                                                             |
+| C4.2.1 — Consignation des anomalies    | 3       | Processus à 5 canaux de détection, consignation en tâches Odoo (statut « à corriger », suivi kanban), modèle de fiche, fiche réelle ANO-2026-06-10-01 reproductible                                                                                          |
 | C4.2.2 — Correctif via CI/CD           | 4       | Schéma complet du circuit fix → CI → CD, healthchecks bloquants, rollback`--atomic`                                                                                                                                                                         |
 | C4.3.1 — Axes d'amélioration          | 5       | 5 recommandations argumentées gain/coût, priorisées, appuyées sur la dette documentée                                                                                                                                                                       |
-| C4.3.2 — Journal de version            | 6       | 6 versions reconstituées avec fonctionnalités et anomalies corrigées, adossées au CHANGELOG_AGENT                                                                                                                                                            |
+| C4.3.2 — Journal de version            | 6       | 6 versions reconstituées avec fonctionnalités et anomalies corrigées, adossées au journal détaillé[dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)                                                                                                              |
 | C4.3.3 — Collaboration support         | 7       | Canal Discord unique retours/CI-CD, cas réel résolu de bout en bout (forgot password, commit`fe9c0a9`)                                                                                                                                                       |
 
 ## Annexe C — Glossaire
@@ -277,6 +293,17 @@ Le projet étant porté par une petite équipe, le rôle de support est assuré 
 | **MCO**                           | Maintien en Condition Opérationnelle — l'ensemble des activités assurant la disponibilité et la fiabilité d'un logiciel après sa mise en production. |
 | **npm audit**                     | Commande détectant les vulnérabilités connues des dépendances installées ; exécutée avec seuil bloquant en CI.                                      |
 | **Rollback**                      | Retour automatique ou manuel à la version précédente après un déploiement échoué (`helm --atomic`, RUNBOOK).                                      |
+
+## Annexe D — Sources bibliographiques
+
+Études et enquêtes à l'appui du constat de départ (présentation du projet : méthodes de révision passives, préparation tardive) et du choix de méthodes pédagogiques actives (répétition espacée, entraînement par exercices). Fichiers versionnés dans [docs/sources/](annexes/docs/sources/) :
+
+| Fichier                                                                                    | Référence                                                                                                                                                                                                                                                                     | Appuie                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [2009_Karpicke_Butler_Roediger.pdf](annexes/docs/sources/2009_Karpicke_Butler_Roediger.pdf) | Karpicke, Butler & Roediger (2009),*Metacognitive strategies in student learning: Do students practise retrieval when they study on their own?*, Memory, 17(4)                                                                                                                | Prévalence des stratégies de révision passives (relecture) ; efficacité supérieure de la récupération en mémoire — fondement des systèmes de Leitner |
+| [Dunlosky_SciAmMind.pdf](annexes/docs/sources/Dunlosky_SciAmMind.pdf)                       | Dunlosky et al.,*What Works, What Doesn't*, Scientific American Mind                                                                                                                                                                                                          | Comparaison de l'efficacité des techniques d'étude : entraînement par tests et répétition espacée en tête, relecture et surlignage en queue             |
+| [ZIP_2022.pdf](annexes/docs/sources/ZIP_2022.pdf)                                           | Zung, Imundo & Pan (2022),*How do college students use digital flashcards during self-regulated learning?*, Memory, doi:10.1080/09658211.2022.2058553                                                                                                                         | Usage réel des flashcards numériques par les étudiants (pratique de récupération, répétition espacée) — appuie le choix du module Leitner numérique  |
+| [Texe+4_pp.79-102.pdf](annexes/docs/sources/Texe+4_pp.79-102.pdf)                           | Corbin, Duguet, Berthaud & Morlaix (2023),*Les pratiques d'étude en première année universitaire : analyse descriptive et effets d'un dispositif « apprendre à apprendre »*, Évaluer. Journal international de recherche en éducation et formation, 9(1), pp. 79–102 | Enquête sur ~800 étudiants de première année — statistiques sur les pratiques d'étude citées dans la présentation du projet                            |
 
 ---
 
