@@ -60,22 +60,24 @@ La stack est documentée dans [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md) e
 
 **Compétence couverte : C4.1.1** — Gérer les mises à jour des dépendances et des bibliothèques tiers, en surveillant régulièrement les nouvelles versions, en évaluant les impacts des mises à jour, et en les intégrant de manière sécurisée pour maintenir l'application à jour et sécurisée.
 
-Le processus de mise à jour des dépendances couvre l'ensemble des couches applicatives :
+Le processus de mise à jour des dépendances couvre l'ensemble des couches applicatives : 
 
-* l'API (Express, Sequelize, BullMQ, bcryptjs, jsonwebtoken…)
-* le front (Vue 3, Vite, Pinia, Axios, MathLive…)
-* les images Docker de base (Node 22, nginx, PostgreSQL, Redis)
-* les pipelines CI/CD
+* L'API (Express, Sequelize, BullMQ, bcryptjs, jsonwebtoken…)
+* Le front (Vue 3, Vite, Pinia, Axios, MathLive…)
 
-Toute nouvelle dépendance doit d'abord figurer dans la liste approuvée de [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md).
+Les images Docker de base (Node 22, nginx, PostgreSQL, Redis), et les pipelines CI/CD eux-mêmes. Toute nouvelle dépendance doit d'abord figurer dans la liste approuvée de [dev/CONVENTIONS.md](annexes/dev/CONVENTIONS.md).
 
 J'ai mis en place un système de **vérification automatique continue** et de **mises à jour manuelles maîtrisées** :
 
 - **À chaque push**, le job `test_and_lint` du CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) exécute `npm audit --omit=dev --audit-level=high` afin de vérifier les vulnérabilités des dépendances de *production*. Si une dépendance de *production* a une vulnérabilité `high`/`critical` connue (contrôle OWASP A06) alors le build **échoue**. Les `devDependencies` sont exclues car elles n'entrent jamais dans les images déployées.
 - Quand l'audit remonte une vulnérabilité, j'applique le correctif sur une branche dédiée, je rejoue la suite de tests complète pour vérifier l'absence de régression, puis le pipeline CI/CD redéploie normalement.
-- Les montées de version fonctionnelles (au-delà du correctif de sécurité) sont évaluées au cas par cas : lecture du changelog de la librairie, impact sur les décisions déjà prises ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)), exécution des tests API + front + lint avant fusion.
+- Les montées de version fonctionnelles (au-delà du correctif de sécurité) sont évaluées au cas par cas. Je lis le changelog de la librairie, je mesure l'impact sur les décisions déjà prises ([dev/DECISIONS.md](annexes/dev/DECISIONS.md)), puis j'exécute les tests (API et front) et le lint avant de fusionner.
 
-En synthèse, la fréquence et le type de chaque mise à jour sont les suivants : **audit de sécurité à chaque push** (automatique, bloquant) ; **correctif de sécurité dès détection** d'une vulnérabilité `high`/`critical` (manuel, prioritaire sur le reste du développement) ; **revue des montées de version fonctionnelles à chaque jalon de livraison** (manuelle, au cas par cas après lecture du changelog).
+En synthèse, la fréquence et le type de chaque mise à jour sont les suivants :
+
+* **audit de sécurité à chaque push** (automatique, bloquant) ;
+* **correctif de sécurité dès détection** d'une vulnérabilité `high`/`critical` (manuel, prioritaire sur le reste du développement) ;
+* **revue des montées de version fonctionnelles à chaque jalon de livraison** (manuelle, au cas par cas après lecture du changelog).
 
 La vérification automatique garantit qu'aucune mise à jour n'est validée sans passer par les tests et empêche qu'une vulnérabilité haute soit mise en production par erreur.
 
@@ -89,12 +91,7 @@ La vérification automatique garantit qu'aucune mise à jour n'est validée sans
 
 MyMemoMaster est une application web composée d'un front, d'une API, d'une base de données PostgreSQL et d'un cache Redis, déployée sur VPS ou sur Kubernetes selon l'environnement.
 
-Superviser l'application revient donc à surveiller quatre axes :
-
-* la disponibilité de l'API et de sa base
-* la santé des conteneurs
-* le succès des builds et des déploiements
-* l'intégrité des sauvegardes.
+Superviser l'application revient donc à surveiller quatre axes, la disponibilité de l'API et de sa base, la santé des conteneurs, le succès des builds et des déploiements et l'intégrité des sauvegardes.
 
 | Sonde                           | Emplacement                                                             | Ce qu'elle vérifie                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -107,10 +104,7 @@ Superviser l'application revient donc à surveiller quatre axes :
 | Sonde d'uptime externe          | [.github/workflows/uptime.yml](.github/workflows/uptime.yml)             | Depuis l'infrastructure GitHub (donc hors du VPS/cluster supervisé), ping de`/api/v1/health` toutes les 5 minutes — 3 tentatives espacées de 10 s pour absorber un incident transitoire, alerte Discord en cas d'échec confirmé. URLs sondées configurées par la variable de dépôt `UPTIME_URLS`.                          |
 | Alertmanager sur métriques     | [helm/templates/alertmanager.yaml](helm/templates/alertmanager.yaml)     | Alertes évaluées par le Prometheus du chart sur les métriques RED/USE de l'API : cible injoignable (2 min), taux de 5xx > 5 % (5 min), latence p95 > 1 s (10 min), event loop Node.js > 500 ms (5 min) — seuils ajustables par values. Routées vers le même webhook Discord, relance toutes les 4 h tant que l'alerte est active. |
 
-Les seuils que j'ai fixés sont volontairement stricts : tout dépassement bloque le pipeline.
-
-* zéro vulnérabilité `high`/`critical` en production
-* tous les services critiques `healthy` en moins de 2 minutes après déploiement
+Les seuils que j'ai fixés sont volontairement stricts, aucune vulnérabilité `high`/`critical` en production et tous les services critiques doivent êtres `healthy` en moins de 2 minutes après déploiement, tout dépassement bloque le pipeline.
 
 J'ai aussi branché une analyse statique continue (SonarCloud, job `sonarcloud` du CI, limité à `main`) pour suivre dette et duplication dans le temps.
 
@@ -120,7 +114,7 @@ J'ai aussi branché une analyse statique continue (SonarCloud, job `sonarcloud` 
 
 *Capture réelle — notification Discord de fin de déploiement sur `staging` : tests verts, résumé de l'état du cluster (nœuds, conditions kubelet, pods par statut) et confirmation « Déploiement staging réussi ».*
 
-**Condition d'activation** : l'Alertmanager est livré dans le chart mais désactivé par défaut (`monitoring.alerting.enabled: false`). Pour l'activer il faut ajouter la clé `DISCORD_WEBHOOK_URL` au Secret manuel `<release>-secrets` du namespace, faute de quoi le pod ne démarre pas et le déploiement `--atomic` rollback. Ce verrou est volontaire, il permet d'éviter d'avoir un système d'alerte silencieusement inopérant.
+**Condition d'activation** : l'Alertmanager est livré dans le chart mais désactivé par défaut (`monitoring.alerting.enabled: false`). Pour l'activer il faut ajouter la clé `DISCORD_WEBHOOK_URL` au Secret manuel `<release>-secrets` du namespace, faute de quoi le pod ne démarre pas et le déploiement `--atomic` rollback. Ce verrou est volontaire : il évite d'avoir un système d'alerte silencieusement inopérant.
 
 ---
 
@@ -144,7 +138,9 @@ J'ai mis en place cinq canaux de détection, chacun avec son mode de signalement
 
 *Capture réelle — signalement automatique du premier canal : échec des tests sur la branche `dev_back_student_kpi`, notifié sur le canal Discord du projet à la fin du run CI.*
 
-Quel que soit le canal de détection, chaque anomalie est ensuite consignée comme **tâche dans Odoo**, l'outil de pilotage du projet : elle entre au statut **« à corriger »** avec les informations nécessaires à sa **reproduction**, puis avance dans le kanban au fil du traitement jusqu'à la livraison du correctif. La fiche portée par la tâche suit un modèle constant :
+Quel que soit le canal de détection, chaque anomalie est ensuite consignée comme **tâche dans Odoo** (l'outil de pilotage du projet). Elle entre au statut **« à corriger »** avec les informations nécessaires à sa **reproduction**, puis avance dans le kanban au fil du traitement (en cours, en validation, validé) jusqu'à la livraison du correctif.
+
+La fiche portée par la tâche suit un modèle constant :
 
 ```markdown
 ## Fiche anomalie [ID]
@@ -177,7 +173,7 @@ La traçabilité est ainsi double. Côté pilotage, la tâche Odoo porte l'état
 
 **Compétence couverte : C4.2.2** — Créer et déployer un correctif en respectant le processus d'intégration et de déploiement continu afin de résoudre l'anomalie.
 
-Le traitement d'une anomalie suit exactement le même chemin que toute livraison — aucun déploiement manuel n'est nécessaire, le correctif profite intégralement de la chaîne CI/CD :
+Le traitement d'une anomalie suit exactement le même chemin que toute autre livraison : aucun déploiement manuel n'est nécessaire, le correctif profite intégralement de la chaîne CI/CD, résumée ci-dessous :
 
 ```
 branche fix (dev_back_* / dev_front_*)
@@ -246,13 +242,21 @@ Une « version » correspond ici à un jalon mergé sur une branche de déploiem
 
 Le projet étant porté par une petite équipe, le rôle de support est assuré via le **serveur Discord du projet** : les testeurs y remontent leurs problèmes sur le même canal qui reçoit les notifications CI/CD — retours et état de la plateforme visibles au même endroit. Je qualifie le problème (tâche Odoo « à corriger » portant la fiche d'anomalie, §3.1), le corrige, puis notifie le testeur au déploiement du correctif.
 
-**Exemple réel — parcours « mot de passe oublié » (2026-07-18, commit `fe9c0a9`).** Un testeur ne parvenait pas à réinitialiser son mot de passe, le parcours échouait entre la demande (`ForgotPasswordPage`) et la saisie du nouveau mot de passe (`ResetPasswordPage`).
+**Exemple réel — parcours « mot de passe oublié » (2026-07-18, commit `fe9c0a9`).** Un testeur ne parvenait pas à réinitialiser son mot de passe : le parcours échouait entre la demande (`ForgotPasswordPage`) et la saisie du nouveau mot de passe (`ResetPasswordPage`).
 
 J'ai reproduit le parcours complet en environnement de test et identifié un désalignement entre le front et l'API sur le flux de vérification alors en place (token hexadécimal de 64 caractères envoyé par email), ainsi que l'absence de limite de tentatives.
 
-Pour résoudre le problème, j'ai remplacé ce flux côté API par un code de réinitialisation à 6 chiffres conforme aux recommandations OWASP : `User.service.js` (génération du code, hash bcrypt, expiration 15 minutes), `User.controller.js` (email réécrit avec le code lisible, réponse 401 anti-énumération) et `User.validators.js` (validation stricte `^\d{6}$`), plus un compteur de tentatives de reset (migration `20260718000000-add-reset-password-attempts-to-user`, 5 essais maximum) pour empêcher le brute-force du code. Ensuite j'ai corrigé `ForgotPasswordPage.vue` et `ResetPasswordPage.vue` côté front (saisie numérique à 6 chiffres, alignée sur ce que les validators de l'API acceptent). Enfin j'ai adapté les suites de tests `User.service.test.js` et `User.controller.test.js` (cas nominal, tentatives épuisées, code invalide). 
+Pour résoudre le problème, j'ai remplacé ce flux côté API par un code de réinitialisation à 6 chiffres conforme aux recommandations OWASP :
 
-Enfin, le testeur a fourni le scénario de reproduction et validé le correctif sur l'environnement de test une fois le déploiement automatique terminé — la boucle a été fermée sur le même canal Discord que la remontée initiale.
+* `User.service.js` (génération du code, hash bcrypt, expiration 15 minutes)
+* `User.controller.js` (email réécrit avec le code lisible, réponse 401 anti-énumération)
+* `User.validators.js` (validation stricte `^\d{6}$`)
+
+Une migration (`20260718000000-add-reset-password-attempts-to-user`) ajoute par ailleurs un compteur de tentatives, limité à 5 essais, pour empêcher le brute-force du code.
+
+Ensuite j'ai corrigé `ForgotPasswordPage.vue` et `ResetPasswordPage.vue` côté front (saisie numérique à 6 chiffres, alignée sur ce que les validators de l'API acceptent). Enfin j'ai adapté les suites de tests `User.service.test.js` et `User.controller.test.js` (cas nominal, tentatives épuisées, code invalide).
+
+Le testeur a fourni le scénario de reproduction et validé le correctif sur l'environnement de test une fois le déploiement automatique terminé — la boucle a été fermée sur le même canal Discord que la remontée initiale.
 
 ---
 
@@ -276,7 +280,7 @@ Enfin, le testeur a fourni le scénario de reproduction et validé le correctif 
 | --------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C4.1.1 — Mise à jour des dépendances | 1       | `npm audit` bloquant en CI (high/critical) ; correctif réel de 21 vulnérabilités front (commit `057cbfe`) sans régression                                                                                                                                |
 | C4.1.2 — Supervision et alerte         | 2       | Endpoint`/api/v1/health` testant la base, healthchecks Compose, readiness probes K8s, boucle de vérification post-déploiement, Prometheus par namespace, sonde d'uptime externe (`uptime.yml`), Alertmanager sur métriques RED/USE, notifications Discord |
-| C4.2.1 — Consignation des anomalies    | 3       | Processus à 5 canaux de détection, consignation en tâches Odoo (statut « à corriger », suivi kanban), modèle de fiche, fiche réelle ANO-2026-06-10-01 reproductible                                                                                          |
+| C4.2.1 — Consignation des anomalies    | 3       | Processus à 5 canaux de détection, consignation en tâches Odoo (statut « à corriger », suivi kanban), modèle de fiche, fiche réelle ANO-2026-06-10-01 reproductible                                                                                      |
 | C4.2.2 — Correctif via CI/CD           | 4       | Schéma complet du circuit fix → CI → CD, healthchecks bloquants, rollback`--atomic`                                                                                                                                                                         |
 | C4.3.1 — Axes d'amélioration          | 5       | 5 recommandations argumentées gain/coût, priorisées, appuyées sur la dette documentée                                                                                                                                                                       |
 | C4.3.2 — Journal de version            | 6       | 6 versions reconstituées avec fonctionnalités et anomalies corrigées, adossées au journal détaillé[dev/CHANGELOG.md](annexes/dev/CHANGELOG.md)                                                                                                              |
