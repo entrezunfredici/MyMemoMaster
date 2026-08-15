@@ -65,6 +65,9 @@ config:
   # ── Auth refresh token ────────────────────────────────────────────────────
   AUTH_REFRESH_TOKEN_EXPIRES_DAYS: "7"
 
+  # ── Inscriptions ───────────────────────────────────────────────────────────
+  MAX_USERS: ""              # vide/0 = pas de limite ; sinon plafond de comptes
+
 # ── Domaines & Ingress ────────────────────────────────────────────────────────
 domain:
   api: ""         # défini dans values-{env}.yaml

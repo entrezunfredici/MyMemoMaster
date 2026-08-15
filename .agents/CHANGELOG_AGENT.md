@@ -21,7 +21,7 @@
 | Module | État | Dernière modif |
 |--------|------|----------------|
 | Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués | 2026-07-06 |
-| User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet | 2026-07-31 |
+| User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
 | Test / Question / Response | Stable — M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-06-30 |
@@ -6496,3 +6496,29 @@ Relecture de `B4_RENDU.md` face aux critères RNCP39583 (fiche France Compétenc
 
 #### Dette / non couvert
 - Néant.
+
+---
+
+### [2026-08-15] FIX — MAX_USERS jamais transmis aux conteneurs Docker
+
+#### Contexte
+Signalement utilisateur : `MAX_USERS=2` posé dans le `.env` racine, deux comptes créés, mais l'inscription reste ouverte au-delà. La logique de `User.service.js` (`isRegistrationOpen`, `total < maxUsers`) est correcte et testée ; le problème est en amont.
+
+#### Diagnostic
+`docker-compose.yml` liste explicitement, service par service, les variables transmises au conteneur (`environment:`) — seules celles-ci atteignent `process.env` côté Node, peu importe le contenu du `.env` racine. `MAX_USERS` n'a jamais été ajoutée à ce bloc lors de son introduction (2026-07-31, entrée ci-dessus), ni pour le service `api` (profil `dev`) ni pour `api_server` (profil `test`/VPS). En environnement Docker, `process.env.MAX_USERS` était donc toujours `undefined` → `isRegistrationOpen()` retournait toujours `true`. `.env.test.example` ne documentait pas non plus la variable.
+
+#### Fichiers modifiés
+- `docker-compose.yml` — `MAX_USERS: ${MAX_USERS:-}` ajouté à `environment:` des services `api` et `api_server`
+- `.env.test.example` — `MAX_USERS=` ajoutée pour cohérence avec `.env.example`
+- `helm/values.yaml` — `MAX_USERS: ""` ajoutée au bloc `config` (ConfigMap Helm, preprod/prod) ; aucun changement de template requis, `deployment-api.yaml` consomme la ConfigMap via `envFrom.configMapRef` qui absorbe automatiquement toute nouvelle clé
+
+#### Vérification
+- `docker compose --env-file .env config` : confirme `MAX_USERS: "2"` résolu pour le service `api`
+- `helm lint helm/` : vert ; `helm template … -f helm/values-preprod.yaml` : confirme `MAX_USERS: ""` dans la ConfigMap rendue
+
+#### Ce qui est utilisable
+- La limite fonctionne désormais en Docker (dev et test/VPS) et sera active en Kubernetes (preprod/prod) dès qu'une valeur sera positionnée dans `helm/values-preprod.yaml`/`values-prod.yaml` (ou `--set config.MAX_USERS=…`) et le chart redéployé.
+- En Docker, recréer le conteneur `api` après modification du `.env` (`docker compose up -d --force-recreate api` ou `down`/`up --build`) — une variable d'environnement n'est prise en compte qu'au démarrage du conteneur.
+
+#### Dette / non couvert
+- `k8s/preprod/configmap.yml` et `k8s/prod/configmap.yml` (manifests bruts pré-Helm) n'ont pas reçu `MAX_USERS` — délibérément : ces fichiers sont déjà obsolètes (README, migration Helm du 2026-06-30), il leur manque une dizaine d'autres variables introduites depuis (ADMIN_SEED_*, S3_*, RATE_LIMIT_DISABLED…), les modifier isolément aurait suggéré à tort qu'ils sont maintenus en parallèle du chart Helm.
