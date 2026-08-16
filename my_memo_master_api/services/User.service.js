@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const logger = require('../helpers/logger')
 const AuditLogService = require('./AuditLog.service')
+const tokenBlacklist = require('../helpers/tokenBlacklist')
 
 class UserService {
   async findAll() {
@@ -35,6 +36,8 @@ class UserService {
   /**
    * Indique si de nouvelles inscriptions sont encore possibles.
    * La limite est désactivée si MAX_USERS est absent, vide ou <= 0.
+   * Seuls les comptes actifs comptent dans le plafond : désactiver un compte
+   * (PATCH /:id/deactivate) libère donc une place.
    *
    * @returns {Promise<boolean>} true si l'inscription est ouverte
    */
@@ -42,7 +45,7 @@ class UserService {
     const maxUsers = parseInt(process.env.MAX_USERS, 10)
     if (!maxUsers || maxUsers <= 0) return true
 
-    const total = await User.count()
+    const total = await User.count({ where: { isActive: true } })
     return total < maxUsers
   }
 
@@ -291,6 +294,10 @@ class UserService {
     const user = await User.findOne({ where: { refreshToken: hash } })
     if (!user) return null
     if (!user.refreshTokenExpiresAt || user.refreshTokenExpiresAt < new Date()) return null
+    // Un compte désactivé après coup ne doit pas pouvoir renouveler un token d'accès via son
+    // refresh token encore valide — sans cette vérification, la révocation A07-M1 de setActive()
+    // serait contournable en appelant /refresh-token juste après la désactivation.
+    if (user.isActive === false) return null
     return user
   }
 
@@ -316,6 +323,12 @@ class UserService {
     // Un admin plateforme (1) ne peut pas désactiver un autre admin plateforme (1)
     if (target.roleId === 1 && requesterRoleId === 1) return false
     await User.update({ isActive: active }, { where: { userId: targetUserId } })
+    if (!active) {
+      // A07-M1 : coupe l'accès immédiatement plutôt que d'attendre l'expiration naturelle du token
+      // (jusqu'à AUTH_JWT_EXPIRES_IN). verifyRefreshToken() bloque déjà le renouvellement du token
+      // d'accès pour un compte désactivé — ceci révoque en plus celui déjà émis et encore valide.
+      await tokenBlacklist.revokeUserTokens(targetUserId)
+    }
     try {
       await AuditLogService.log(
         actorId,
@@ -337,8 +350,24 @@ class UserService {
     for (const inv of pending) {
       if (inv.role === 'admin_etablissement' && inv.etablissementId) {
         // Invitation gérant établissement → promouvoir le compte et l'associer
-        await User.update({ roleId: 4 }, { where: { userId } })
-        await Etablissement.update({ adminId: userId }, { where: { id: inv.etablissementId } })
+        // (même garde-fou qu'EtablissementService.assignAdmin : transaction + révocation de l'ancien gérant)
+        const etab = await Etablissement.findByPk(inv.etablissementId)
+        if (etab) {
+          await Etablissement.sequelize.transaction(async (t) => {
+            if (etab.adminId && etab.adminId !== userId) {
+              await User.update({ roleId: 2 }, { where: { userId: etab.adminId }, transaction: t })
+            }
+            await User.update({ roleId: 4 }, { where: { userId }, transaction: t })
+            await etab.update({ adminId: userId }, { transaction: t })
+          })
+          try {
+            await AuditLogService.log(userId, 'ADMIN_ETABLISSEMENT_ASSIGNED', 'Etablissement', inv.etablissementId, {
+              adminId: userId, viaInvitation: true
+            })
+          } catch (auditErr) {
+            logger.warn(`Audit log échoué (_processPendingEmailInvitations): ${auditErr.message}`)
+          }
+        }
       } else if (inv.classGroupId) {
         await ClassGroupUsers.findOrCreate({
           where: { classGroupId: inv.classGroupId, userId },

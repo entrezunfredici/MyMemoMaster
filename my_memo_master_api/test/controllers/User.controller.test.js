@@ -47,6 +47,11 @@ jest.mock('../../services/User.service', () => ({
 
 jest.mock('../../services/Role.service', () => ({ findOne: jest.fn() }))
 
+jest.mock('../../helpers/tokenBlacklist', () => ({
+  revokeUserTokens: jest.fn().mockResolvedValue(undefined),
+  isTokenRevoked: jest.fn().mockResolvedValue(false)
+}))
+
 process.env.AUTH_JWT_SECRET = 'test-secret'
 process.env.AUTH_JWT_EXPIRES_IN = '1d'
 process.env.VITE_FRONT_URL = 'http://localhost:5173'
@@ -58,6 +63,7 @@ const app = require('../../app')
 const userService = require('../../services/User.service')
 const roleService = require('../../services/Role.service')
 const sendEmail = require('../../helpers/sendEmail')
+const tokenBlacklist = require('../../helpers/tokenBlacklist')
 const { User } = require('../../models/index')
 
 const makeToken = (payload = { id: 1, name: 'Test', email: 'test@example.com' }) =>
@@ -315,7 +321,7 @@ describe('User Controller', () => {
   describe('POST /users/logout', () => {
     const FAKE_RT = 'b'.repeat(128)
 
-    it('200 — révoque le refresh token en base', async () => {
+    it('200 — révoque le refresh token en base et le token d\'accès en cours (A07-M1)', async () => {
       userService.verifyRefreshToken.mockResolvedValue({ userId: 1 })
       userService.clearRefreshToken.mockResolvedValue()
 
@@ -325,9 +331,10 @@ describe('User Controller', () => {
 
       expect(res.status).toBe(200)
       expect(userService.clearRefreshToken).toHaveBeenCalledWith(1)
+      expect(tokenBlacklist.revokeUserTokens).toHaveBeenCalledWith(1)
     })
 
-    it('200 — idempotent si le token est inconnu (pas de clearRefreshToken)', async () => {
+    it('200 — idempotent si le token est inconnu (pas de clearRefreshToken ni de révocation)', async () => {
       userService.verifyRefreshToken.mockResolvedValue(null)
 
       const res = await request(app)
@@ -336,6 +343,7 @@ describe('User Controller', () => {
 
       expect(res.status).toBe(200)
       expect(userService.clearRefreshToken).not.toHaveBeenCalled()
+      expect(tokenBlacklist.revokeUserTokens).not.toHaveBeenCalled()
     })
 
     it('400 — refreshToken absent du body', async () => {
@@ -353,6 +361,67 @@ describe('User Controller', () => {
         .send({ refreshToken: FAKE_RT })
 
       expect(res.status).toBe(500)
+    })
+  })
+
+  // ── POST /users/reset-password ────────────────────────────────────────────
+  describe('POST /users/reset-password', () => {
+    const VALID_BODY = { email: 'test@example.com', code: '123456', newPassword: 'NewPassw0rd!' }
+
+    it('201 — révoque le refresh token et le token d\'accès en cours (A07-M1)', async () => {
+      userService.findByEmail.mockResolvedValue({ userId: 1, email: VALID_BODY.email })
+      userService.verifyResetPasswordCode.mockResolvedValue(true)
+      userService.setPassword.mockResolvedValue()
+      userService.clearRefreshToken.mockResolvedValue()
+
+      const res = await request(app).post('/api/v1/users/reset-password').send(VALID_BODY)
+
+      expect(res.status).toBe(201)
+      expect(userService.clearRefreshToken).toHaveBeenCalledWith(1)
+      expect(tokenBlacklist.revokeUserTokens).toHaveBeenCalledWith(1)
+    })
+
+    it('401 — code invalide, aucune révocation', async () => {
+      userService.findByEmail.mockResolvedValue({ userId: 1, email: VALID_BODY.email })
+      userService.verifyResetPasswordCode.mockResolvedValue(false)
+
+      const res = await request(app).post('/api/v1/users/reset-password').send(VALID_BODY)
+
+      expect(res.status).toBe(401)
+      expect(tokenBlacklist.revokeUserTokens).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── PUT /users/:id/change-password ────────────────────────────────────────
+  describe('PUT /users/:id/change-password', () => {
+    const VALID_BODY = { oldPassword: 'OldPassw0rd!', newPassword: 'NewPassw0rd!' }
+
+    it('200 — révoque le token d\'accès en cours (A07-M1), sans toucher au refresh token', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, email: 'test@example.com' })
+      userService.verifyPassword.mockResolvedValue(true)
+      userService.setPassword.mockResolvedValue()
+
+      const res = await request(app)
+        .put('/api/v1/users/1/change-password')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(VALID_BODY)
+
+      expect(res.status).toBe(200)
+      expect(tokenBlacklist.revokeUserTokens).toHaveBeenCalledWith(1)
+      expect(userService.clearRefreshToken).not.toHaveBeenCalled()
+    })
+
+    it('401 — ancien mot de passe incorrect, aucune révocation', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, email: 'test@example.com' })
+      userService.verifyPassword.mockResolvedValue(false)
+
+      const res = await request(app)
+        .put('/api/v1/users/1/change-password')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send(VALID_BODY)
+
+      expect(res.status).toBe(401)
+      expect(tokenBlacklist.revokeUserTokens).not.toHaveBeenCalled()
     })
   })
 

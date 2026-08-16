@@ -2,6 +2,10 @@ jest.mock('../../services/AuditLog.service', () => ({
   log: jest.fn().mockResolvedValue({})
 }))
 
+jest.mock('../../helpers/tokenBlacklist', () => ({
+  revokeUserTokens: jest.fn().mockResolvedValue(undefined)
+}))
+
 jest.mock('../../models/index', () => ({
   User: {
     findAll: jest.fn(),
@@ -25,10 +29,14 @@ jest.mock('../../models/index', () => ({
   },
   ClassGroupUsers: {
     findOrCreate: jest.fn()
+  },
+  Etablissement: {
+    findByPk: jest.fn(),
+    sequelize: { transaction: jest.fn((cb) => cb({})) }
   }
 }))
 
-const { User, Role, UserOnboardingState, Invitation } = require('../../models/index')
+const { User, Role, UserOnboardingState, Invitation, Etablissement } = require('../../models/index')
 const bcrypt = require('bcryptjs')
 const UserService = require('../../services/User.service')
 
@@ -141,6 +149,15 @@ describe('UserService', () => {
       const open = await UserService.isRegistrationOpen()
 
       expect(open).toBe(false)
+    })
+
+    it('isRegistrationOpen - ne compte que les comptes actifs (désactiver un compte libère une place)', async () => {
+      process.env.MAX_USERS = '10'
+      User.count.mockResolvedValue(3)
+
+      await UserService.isRegistrationOpen()
+
+      expect(User.count).toHaveBeenCalledWith({ where: { isActive: true } })
     })
   })
 
@@ -466,6 +483,18 @@ describe('UserService', () => {
       expect(User.findOne).not.toHaveBeenCalled()
       expect(result).toBeNull()
     })
+
+    it('retourne null si le compte est désactivé (isActive: false) même si le token est valide', async () => {
+      const crypto = require('crypto')
+      const rawToken = crypto.randomBytes(64).toString('hex')
+      const future = new Date(Date.now() + 86400000)
+
+      User.findOne.mockResolvedValue({ userId: 1, refreshTokenExpiresAt: future, isActive: false })
+
+      const result = await UserService.verifyRefreshToken(rawToken)
+
+      expect(result).toBeNull()
+    })
   })
 
   // ── validEmailCode — expiration ────────────────────────────────────────────
@@ -568,6 +597,79 @@ describe('UserService', () => {
     })
   })
 
+  // ── _processPendingEmailInvitations ─────────────────────────────────────────
+
+  describe('create — invitation admin_etablissement en attente', () => {
+    const baseUser = { email: 'gerant@example.com', name: 'Gérant', password: 'securepassword' }
+
+    beforeEach(() => {
+      User.findOne.mockResolvedValue(null)
+      User.create.mockResolvedValue({ userId: 10, email: baseUser.email, name: baseUser.name })
+      UserOnboardingState.create.mockResolvedValue({})
+    })
+
+    it('promeut le nouveau compte en transaction et révoque l\'ancien gérant', async () => {
+      const etabUpdate = jest.fn().mockResolvedValue()
+      const invUpdate = jest.fn().mockResolvedValue()
+      Etablissement.findByPk.mockResolvedValue({ id: 3, adminId: 99, update: etabUpdate })
+      Invitation.findAll.mockResolvedValue([
+        { role: 'admin_etablissement', etablissementId: 3, update: invUpdate }
+      ])
+
+      await UserService.create(baseUser)
+
+      // Transaction utilisée pour les 3 écritures liées
+      expect(Etablissement.sequelize.transaction).toHaveBeenCalledTimes(1)
+      // Ancien gérant (99) rétrogradé, nouveau (10) promu
+      expect(User.update).toHaveBeenCalledWith(
+        { roleId: 2 },
+        expect.objectContaining({ where: { userId: 99 } })
+      )
+      expect(User.update).toHaveBeenCalledWith(
+        { roleId: 4 },
+        expect.objectContaining({ where: { userId: 10 } })
+      )
+      expect(etabUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ adminId: 10 }),
+        expect.anything()
+      )
+      expect(invUpdate).toHaveBeenCalledWith({ status: 'accepted', targetUserId: 10 })
+    })
+
+    it('ne rétrograde personne si l\'établissement n\'avait pas encore de gérant', async () => {
+      const etabUpdate = jest.fn().mockResolvedValue()
+      const invUpdate = jest.fn().mockResolvedValue()
+      Etablissement.findByPk.mockResolvedValue({ id: 3, adminId: null, update: etabUpdate })
+      Invitation.findAll.mockResolvedValue([
+        { role: 'admin_etablissement', etablissementId: 3, update: invUpdate }
+      ])
+
+      await UserService.create(baseUser)
+
+      expect(User.update).not.toHaveBeenCalledWith(
+        { roleId: 2 },
+        expect.anything()
+      )
+      expect(User.update).toHaveBeenCalledWith(
+        { roleId: 4 },
+        expect.objectContaining({ where: { userId: 10 } })
+      )
+    })
+
+    it('n\'écrit rien si l\'établissement de l\'invitation n\'existe plus', async () => {
+      const invUpdate = jest.fn().mockResolvedValue()
+      Etablissement.findByPk.mockResolvedValue(null)
+      Invitation.findAll.mockResolvedValue([
+        { role: 'admin_etablissement', etablissementId: 999, update: invUpdate }
+      ])
+
+      await UserService.create(baseUser)
+
+      expect(Etablissement.sequelize.transaction).not.toHaveBeenCalled()
+      expect(invUpdate).toHaveBeenCalledWith({ status: 'accepted', targetUserId: 10 })
+    })
+  })
+
   // ── setActive ──────────────────────────────────────────────────────────────
 
   describe('setActive', () => {
@@ -607,6 +709,28 @@ describe('UserService', () => {
 
       expect(User.update).not.toHaveBeenCalled()
       expect(result).toBe(false)
+    })
+
+    it('révoque les tokens en cours (A07-M1) quand le compte est désactivé', async () => {
+      const tokenBlacklist = require('../../helpers/tokenBlacklist')
+      User.findByPk.mockResolvedValueOnce({ userId: 5, roleId: 2, isActive: true })
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 5, isActive: false } })
+
+      await UserService.setActive(5, false, 1)
+
+      expect(tokenBlacklist.revokeUserTokens).toHaveBeenCalledWith(5)
+    })
+
+    it('ne révoque rien quand le compte est (ré)activé', async () => {
+      const tokenBlacklist = require('../../helpers/tokenBlacklist')
+      User.findByPk.mockResolvedValueOnce({ userId: 5, roleId: 2, isActive: false })
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 5, isActive: true } })
+
+      await UserService.setActive(5, true, 1)
+
+      expect(tokenBlacklist.revokeUserTokens).not.toHaveBeenCalled()
     })
   })
 })

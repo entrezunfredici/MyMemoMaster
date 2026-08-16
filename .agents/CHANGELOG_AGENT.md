@@ -20,8 +20,8 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
-| Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués | 2026-07-06 |
-| User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml | 2026-08-15 |
+| Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués ; [ADD] 2026-08-15 : révocation JWT (A07-M1, `helpers/tokenBlacklist.js`), `verifyRefreshToken` rejette un compte désactivé | 2026-08-15 |
+| User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
 | Test / Question / Response | Stable — M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-06-30 |
@@ -49,13 +49,15 @@
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
-| OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) | 2026-06-06 |
+| OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) ; [FIX] 2026-08-15 : `getOnboardingByUserId`/`updateOnboarding` retournent `null` au lieu de `throw` (le controller traduisait déjà en 404, mais recevait un 500) | 2026-08-15 |
 | Kpi | Stable — M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-06-24 |
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
 | Monitoring (Prometheus central) | Stable — Prometheus par environnement dans le chart Helm (`monitoring.enabled`), scrape par annotations pod, Deployment/emptyDir preprod vs StatefulSet/PVC prod, non exposé par l'Ingress ; port metrics restauré dans le chart (perdu à la migration Helm) | 2026-07-11 |
 | Accessibilité RGAA (front) | Stable — campagne 135→0 non-conformités, outil scripts/audit-a11y.mjs, 4 tests axe-core en CI, preuve docs/AUDIT_RGAA.md | 2026-07-06 |
-| Sécurité dépendances (OWASP A06) | Stable — npm audit bloquant en CI, sqlite3 en devDeps, 0 high/critical en prod | 2026-07-06 |
+| Sécurité dépendances (OWASP A06) | Stable — npm audit bloquant en CI (`--audit-level=high`), sqlite3 en devDeps ; [FIX] 2026-08-15 (x2) : `brace-expansion`/`fast-uri`/`ip-address`/`js-yaml` corrigés (non-breaking), puis `protobufjs`/`sharp`/`uuid` via `overrides` ciblés dans package.json (`@xenova/transformers` bloqué à 2.17.2, dernière version publiée, embarque des transitifs vulnérables) — `npm audit --omit=dev` : 0 vulnérabilité, vérifié aussi hors Jest avec le vrai modèle chargé | 2026-08-15 |
+| Redis (BullMQ + révocation JWT) | Stable — broker BullMQ (2026-06-12) ; [FIX] 2026-08-15 : persistance AOF activée en docker-compose (`--appendonly yes`, R2 du Bloc 4 — le chart Helm prod l'avait déjà) ; sert aussi de backend à `helpers/tokenBlacklist.js` (révocation JWT, réglages de résilience dédiés — voir DECISIONS) | 2026-08-15 |
+| CD — tagging de version (R1 du Bloc 4) | Livré — job `tag_release` dans cd.yml (staging/main) : tag git + images Docker Hub + Release GitHub en AAAA.MM.n, automatique à chaque merge, non bloquant pour le déploiement ; non vérifié en conditions réelles (pas de push déclenché depuis cette session) | 2026-08-15 |
 | Manuel d'utilisation | Stable — docs/MANUEL_UTILISATION.md (3 profils + FAQ), captures à insérer | 2026-07-06 |
 | Synthèse mémoire du projet (hors .agents/) | Stable — docs/MEMOIRE_PROJET.md : présentation du dispositif + synthèse conventions/décisions/changelog/audit OWASP, sources .agents/ font foi | 2026-07-11 |
 | Documentation API (OpenAPI / Swagger) | Stable — M-00.14 : bearerAuth défini, sécurité globale, annotations complètes | 2026-06-06 |
@@ -6522,3 +6524,73 @@ Signalement utilisateur : `MAX_USERS=2` posé dans le `.env` racine, deux compte
 
 #### Dette / non couvert
 - `k8s/preprod/configmap.yml` et `k8s/prod/configmap.yml` (manifests bruts pré-Helm) n'ont pas reçu `MAX_USERS` — délibérément : ces fichiers sont déjà obsolètes (README, migration Helm du 2026-06-30), il leur manque une dizaine d'autres variables introduites depuis (ADMIN_SEED_*, S3_*, RATE_LIMIT_DISABLED…), les modifier isolément aurait suggéré à tort qu'ils sont maintenus en parallèle du chart Helm.
+
+---
+
+### [2026-08-15] FIX — Résorption de dette sécurité/fiabilité (audit du 2026-08-15)
+
+#### Contexte
+Demande utilisateur : corriger les points de dette technique classés « sécurité/fiabilité » et « produit/fonctionnel » identifiés lors d'un audit de `.agents/CHANGELOG_AGENT.md` (45 entrées « Dette » passées en revue, recoupées avec l'état réel du code). Décisions d'approche validées par l'utilisateur avant codage : implémenter une blacklist Redis pour la révocation JWT (A07-M1, plutôt que laisser le risque résiduel assumé) et automatiser le tagging de version AAAA.MM.n dans le CD (R1 du Bloc 4, plutôt que documentation seule ou semver manuel).
+
+#### Fichiers créés
+- `my_memo_master_api/helpers/tokenBlacklist.js` — `revokeUserTokens(userId)` / `isTokenRevoked(userId, iat)`, backés par une clé Redis `jwt:revoked-since:<userId>` (TTL 2 jours). Client ioredis **indépendant** de `config/redis.config.js` (BullMQ) sur les réglages de résilience : `maxRetriesPerRequest: 1`, `connectTimeout: 800`, `enableOfflineQueue: false`, `retryStrategy` bornée — voir Dette ci-dessous pour la raison (config BullMQ = retries illimités, inadaptée à un appel synchrone par requête HTTP).
+- `my_memo_master_api/test/helpers/tokenBlacklist.test.js`, `test/services/OnboardingState.service.test.js` — nouveaux tests unitaires (aucun fichier de test de service n'existait pour OnboardingState avant ce ticket).
+
+#### Fichiers modifiés — Sécurité (A07-M1, révocation JWT)
+- `my_memo_master_api/middlewares/Auth.middleware.js` — devient `async` ; après `jwt.verify`, interroge `tokenBlacklist.isTokenRevoked(decoded.id, decoded.iat)` → 401 « Session révoquée » si le token a été émis avant la dernière révocation de l'utilisateur.
+- `my_memo_master_api/controllers/User.controller.js` — `revokeUserTokens` appelé à `logout` (avec le refresh token), `resetPassword` (en plus du `clearRefreshToken` déjà en place) et `changePassword` (refresh token intact — le front revalide via l'intercepteur 401→refresh déjà existant, transparent pour l'utilisateur).
+- `my_memo_master_api/services/User.service.js` — `setActive(false)` révoque désormais aussi les tokens en cours ; `verifyRefreshToken` rejette un compte `isActive: false` (sans ce correctif, un compte désactivé pouvait contourner la révocation en appelant `/refresh-token`).
+
+#### Fichiers modifiés — Fiabilité
+- `docker-compose.yml` — service `redis` : `--appendonly yes` (persistance AOF sur `redis-data`, recommandation R2 du Bloc 4 ; le chart Helm l'avait déjà côté StatefulSet prod).
+- `my_memo_master_api/Dockerfile` — `npm install -g npm@latest` dans les deux stages (`deps` et `production`, `entrypoint.sh` invoque npm/npx au démarrage du conteneur, pas seulement au build) : corrige le CVE critique `tar` (CVE-2026-59873) embarqué par le npm de l'image `node:22-bookworm-slim`.
+- `my_memo_master_api/package-lock.json` — `npm audit fix` (sans `--force`) : `brace-expansion`, `fast-uri`, `ip-address`, `js-yaml` mis à jour (transitifs, `package.json` inchangé, aucune breaking change).
+- `.github/workflows/cd.yml` — nouveau job `tag_release` (staging/main uniquement, en parallèle des jobs de déploiement — un échec ne bloque jamais une mise en prod) : calcule le prochain tag `vAAAA.MM.n` (préfixe `staging-` pour staging), re-tague les images Docker Hub déjà poussées via `docker buildx imagetools create` (pas de rebuild), crée le tag git et une Release GitHub via `gh` (pré-installé sur les runners, aucune nouvelle Action tierce).
+
+#### Fichiers modifiés — Produit/fonctionnel
+- `my_memo_master_api/services/OnboardingState.service.js` — `getOnboardingByUserId`/`updateOnboarding` retournent `null` au lieu de `throw` quand la ligne est absente ; les controllers traduisaient déjà `null` en 404 mais recevaient une exception → 500.
+- `my_memo_master_api/services/User.service.js` — `isRegistrationOpen()` compte `User.count({ where: { isActive: true } })` au lieu de tous les comptes : désactiver un utilisateur libère désormais réellement une place sous `MAX_USERS`.
+
+#### Tests
+- `_processPendingEmailInvitations` (transaction + révocation ancien gérant), `verifyRefreshToken` (isActive), `isRegistrationOpen` (filtre isActive), `setActive` (révocation), `OnboardingStateService` (retour null), `Auth.middleware` (révocation + interrogation blacklist avec `iat`), `tokenBlacklist` (TTL/clé, fail-open sur erreur Redis), `logout`/`reset-password`/`change-password` (révocation appelée ou non selon le cas) : tous nouveaux ou étendus.
+- Suite complète API vérifiée : **83 suites / 1530 tests verts** (26 s).
+
+#### Choix techniques
+- Voir DECISIONS.md (3 nouvelles entrées 2026-08-15) : stratégie de révocation par cutoff `iat` plutôt que blacklist par token individuel ; réglages Redis dédiés du client `tokenBlacklist` (piège découvert en cours de ticket, voir Dette) ; convention de tag AAAA.MM.n automatisée plutôt que semver manuel.
+
+#### Dette / non couvert
+- **Piège découvert et corrigé en cours de ticket** : le premier jet de `tokenBlacklist.js` réutilisait `config/redis.config.js` tel quel (pensé pour BullMQ, `maxRetriesPerRequest: null` = retries illimités). Comme `Auth.middleware.js` appelle ce client sur **chaque requête authentifiée**, tous les tests de controllers qui ne mockent que leur propre service (la grande majorité — ils ne mockaient pas `helpers/tokenBlacklist`, aucune raison de le faire avant ce ticket) tentaient une vraie connexion Redis en boucle infinie dès qu'ils traversaient une route protégée : suite complète bloquée (workers Jest tués, timeouts de 60 s en cascade). Corrigé par : (1) des réglages Redis propres au client `tokenBlacklist` (fail-open rapide, ci-dessus) et (2) un mock global de `helpers/tokenBlacklist` dans `test/setup.js` (appliqué à tous les tests, à l'image du mock global déjà existant pour `@xenova/transformers`), avec `jest.unmock(...)` dans `tokenBlacklist.test.js` pour tester le vrai module. Aucun fichier de test de controller n'a eu besoin d'être modifié individuellement.
+- A l'inverse, un fichier de test qui mockait déjà `services/User.service` en entier (ex. `User.controller.test.js`) reste protégé de la même façon par le mock global — les mocks explicites ajoutés dans les 3 fichiers qui testent la révocation elle-même (`User.service.test.js`, `User.controller.test.js`, `Auth.middleware.test.js`) prennent le pas sur le mock global sans conflit.
+- ~~CVE restantes non corrigées dans ce ticket… `npm audit --omit=dev --audit-level=high` reste en échec…~~ **Corrigé le jour même, voir entrée suivante.**
+- Vulnérabilités OS de l'image `node:22-bookworm-slim` (22 au total, 17 hautes + 5 critiques, scan `trivy` du 2026-08-15) non corrigées : l'image est déjà sur le dernier tag disponible (aucune image plus récente à tirer), et les CVE elles-mêmes sont soit non corrigées en amont (`bsdutils`), soit `fix_deferred`/`will_not_fix` côté Debian (`perl-base`, `zlib1g`) — hors de portée d'une mise à jour d'image ou de dépendance côté projet.
+- `helpers/tokenBlacklist.js` du npm CLI embarqué dans l'image garde 2 findings HIGH résiduels sur `brace-expansion` même après `npm install -g npm@latest` : le npm le plus récent publié à ce jour n'a pas encore mis à jour cette dépendance interne — hors de contrôle du projet, à re-scanner périodiquement.
+- Le job `tag_release` de `cd.yml` n'a pas pu être testé en conditions réelles (déclenchement uniquement sur un vrai push GitHub) — validé par relecture attentive + parsing YAML (`js-yaml`), à surveiller au premier déploiement réel sur `staging`/`main`.
+
+---
+
+### [2026-08-15] FIX — npm audit CI (protobufjs critique, sharp haute) résolu par `overrides` ciblés
+
+#### Contexte
+Suite de l'entrée précédente : demande utilisateur de traiter les CVE restantes plutôt que de les laisser en dette. `@xenova/transformers` est déjà à sa dernière version publiée (2.17.2 — aucune 3.x n'existe sous ce nom de paquet à ce jour) et embarque en dur `onnxruntime-web@1.14.0` → `onnx-proto@4.0.4` → `protobufjs@^6.8.8` (critique) et `sharp@^0.32.0` (haute) : impossible de corriger en amont sans que l'auteur du paquet ne bouge, et `npm audit fix --force` ne proposait qu'une **rétrogradation** vers `@xenova/transformers@1.4.2` (antérieure à la version installée) pour contourner la chaîne vulnérable — inutilisable.
+
+#### Fichiers modifiés
+- `my_memo_master_api/package.json` — nouveau champ `overrides` : `protobufjs: 7.6.5` (dernier correctif connu ≤ 7.x — `onnx-proto` exige `^6.8.8`, forcé au-delà via `overrides` malgré le warning de peer range), `sharp: 0.35.0`, `uuid: 11.1.1` (transitif de `sequelize`, aucun modèle du projet n'utilise `DataTypes.UUIDV4` directement).
+- `my_memo_master_api/package-lock.json` — régénéré (`npm install`).
+
+#### Vérifications effectuées
+- `npm audit --omit=dev --audit-level=high` (commande exacte du job CI) : **0 vulnérabilité** (était 1 critique + 4 hautes).
+- `npm audit --omit=dev` (tous niveaux) : **0 vulnérabilité**.
+- Suite complète : 83 suites / 1530 tests verts — mais `@xenova/transformers` est mocké globalement en Jest (`moduleNameMapper`), donc ça ne validait pas le vrai chargement du modèle avec les libs surchargées.
+- **Vérification hors Jest, avec le vrai module** : script Node autonome chargeant `pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-MiniLM-L12-v2')` (le modèle réellement utilisé par `Semantic.service.js`) et calculant un embedding — chargé en ~16,7 s, embedding 384 dimensions obtenu sans erreur. Confirme que `protobufjs@7.6.5`/`sharp@0.35.0` fonctionnent réellement avec `onnxruntime-web@1.14.0`, pas seulement que les tests (mockés) passent.
+- Image Docker reconstruite (`--no-cache`) et versions installées vérifiées directement dans l'image (`brace-expansion@5.0.9`, `ip-address@10.5.0` — déjà à jour via d'autres dépendances prod, `express-rate-limit`/`swagger-jsdoc`, sans lien avec les `overrides` de ce ticket).
+
+#### Ce qui est utilisable
+- Le gate CI `npm audit --omit=dev --audit-level=high` (job `test_and_lint`, `ci.yml`) devrait désormais passer.
+
+#### Choix techniques
+- Voir DECISIONS.md (2026-08-15, entrée `overrides` ciblés) : pourquoi `overrides` plutôt que d'attendre une montée de version de `@xenova/transformers`, et pourquoi une vérification hors Jest était nécessaire malgré une suite 100 % verte.
+
+#### Dette / non couvert
+- `protobufjs@7.6.5` reste en dehors de la plage `^6.8.8` déclarée par `onnx-proto` — `npm install` affiche un warning `EOVERRIDE`/`invalid` à chaque install ; sans conséquence fonctionnelle constatée (vérifié ci-dessus) mais à surveiller si `onnx-proto`/`onnxruntime-web` publient une version qui dépend d'une API protobufjs 6.x spécifique disparue en 7.x.
+- Résidu dev-only déjà documenté et accepté (`CONVENTIONS.md`) : `sqlite3` (devDependency) tire une chaîne `tar`/`cacache` avec 1 critique + 6 hautes — jamais dans l'image Docker (`npm ci --omit=dev`), jamais dans le scope de l'audit CI ; non touché.
+- CVE OS de l'image de base et résidu `brace-expansion` du npm CLI (voir entrée précédente) : inchangés, hors de portée.

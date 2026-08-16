@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const sendEmail = require('../helpers/sendEmail')
 const logger = require('../helpers/logger')
+const tokenBlacklist = require('../helpers/tokenBlacklist')
 
 exports.register = async (req, res) => {
   let newUser = null
@@ -120,7 +121,11 @@ exports.logout = async (req, res) => {
     const { refreshToken } = req.body
     if (refreshToken) {
       const user = await userService.verifyRefreshToken(refreshToken)
-      if (user) await userService.clearRefreshToken(user.userId)
+      if (user) {
+        await userService.clearRefreshToken(user.userId)
+        // A07-M1 : le token d'accès encore valide (jusqu'à 15 min) est révoqué immédiatement
+        await tokenBlacklist.revokeUserTokens(user.userId)
+      }
     }
     res.status(200).send({ message: 'Déconnexion réussie.' })
   } catch (error) {
@@ -203,8 +208,10 @@ exports.resetPassword = async (req, res) => {
       return res.status(401).send({ message: 'Code invalide.' })
 
     await userService.setPassword(user.userId, newPassword)
-    // Révocation des sessions actives après reset (standard OWASP) : le refresh token est invalidé
+    // Révocation des sessions actives après reset (standard OWASP) : refresh token invalidé
+    // + token d'accès en cours révoqué immédiatement (A07-M1), pas seulement à sa propre expiration
     await userService.clearRefreshToken(user.userId)
+    await tokenBlacklist.revokeUserTokens(user.userId)
 
     res.status(201).send({ message: 'Mot de passe réinitialisé avec succès.' })
   } catch (error) {
@@ -255,6 +262,11 @@ exports.changePassword = async (req, res) => {
     if (!isPasswordValid) return res.status(401).send({ message: 'Mot de passe incorrect.' })
 
     await userService.setPassword(user.userId, newPassword)
+    // A07-M1 : révoque tout token d'accès émis avant ce changement (autre onglet/appareil avec
+    // un token dérobé) ; le refresh token courant n'est pas touché, donc le front qui vient d'appeler
+    // cette route obtient juste un nouveau token d'accès via /refresh-token à son prochain appel
+    // (intercepteur 401 déjà en place côté front, helpers/api.js) — transparent pour l'utilisateur.
+    await tokenBlacklist.revokeUserTokens(user.userId)
 
     res.status(200).send({ message: 'Mot de passe modifié avec succès.' })
   } catch (error) {

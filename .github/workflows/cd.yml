@@ -108,6 +108,97 @@ jobs:
           cache-to: type=gha,scope=front,mode=max
 
   # ═══════════════════════════════════════════════════════════════════════════
+  #  1b. TAG DE VERSION + RELEASE GITHUB (staging/main uniquement)
+  #      Recommandation R1 du Bloc 4 (B4_RENDU.md §5) : les images :latest sont écrasées à
+  #      chaque merge, un rollback ne peut pas cibler une version précise. Convention AAAA.MM.n
+  #      déjà utilisée par le journal de versions (B4_RENDU.md §6) — incrémentée par mois et par
+  #      environnement, préfixée "staging-" pour ce dernier afin de ne jamais entrer en collision
+  #      avec les tags git de main sur le même dépôt.
+  #      N'affecte pas le déploiement : tourne en parallèle de deploy_preprod/deploy_prod, jamais
+  #      en amont — un échec de tag/release ne doit pas bloquer une mise en prod.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  tag_release:
+    name: Tag de version + Release GitHub
+    runs-on: ubuntu-latest
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'staging' || needs.push_images.outputs.branch == 'main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0 # historique complet requis pour lister les tags existants
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image names
+        id: images
+        run: |
+          case "${{ needs.push_images.outputs.branch }}" in
+            staging) PREFIX="mymemomaster_preprod_" ;;
+            main)    PREFIX="mymemomaster_" ;;
+          esac
+          echo "api=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}api" >> "$GITHUB_OUTPUT"
+          echo "front=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}front" >> "$GITHUB_OUTPUT"
+
+      - name: Compute next version tag (AAAA.MM.n)
+        id: version
+        run: |
+          BRANCH="${{ needs.push_images.outputs.branch }}"
+          PREFIX=""
+          if [ "$BRANCH" = "staging" ]; then PREFIX="staging-"; fi
+          YM=$(date -u +%Y.%m)
+          LAST=$(git tag -l "${PREFIX}v${YM}.*" | sed -E "s/^${PREFIX}v${YM}\.//" | sort -n | tail -1)
+          NEXT=$(( ${LAST:-0} + 1 ))
+          VERSION="${PREFIX}v${YM}.${NEXT}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version calculée : $VERSION"
+
+      # Retague les images :latest déjà poussées par push_images sans rebuild (même manifeste/digest) —
+      # un rollback VPS/Helm peut ainsi cibler explicitement ":${VERSION}" plutôt que le ":latest" mouvant.
+      - name: Tag Docker images with the version (no rebuild)
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.images.outputs.api }}:${{ steps.version.outputs.version }} \
+            ${{ steps.images.outputs.api }}:latest
+          docker buildx imagetools create \
+            --tag ${{ steps.images.outputs.front }}:${{ steps.version.outputs.version }} \
+            ${{ steps.images.outputs.front }}:latest
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.version }}" \
+            -m "Déploiement ${{ needs.push_images.outputs.branch }} — ${{ steps.version.outputs.version }}" \
+            "${{ github.event.workflow_run.head_sha }}"
+          git push origin "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --title "${{ steps.version.outputs.version }}" \
+            --notes "Déploiement automatique — branche \`${{ needs.push_images.outputs.branch }}\`, commit \`${{ github.event.workflow_run.head_sha }}\`.
+
+          Images Docker Hub :
+          - \`${{ steps.images.outputs.api }}:${{ steps.version.outputs.version }}\`
+          - \`${{ steps.images.outputs.front }}:${{ steps.version.outputs.version }}\`
+
+          Détail fonctionnel : journal de versions (B4_RENDU.md §6)."
+
+  # ═══════════════════════════════════════════════════════════════════════════
   #  2a. DEPLOY TEST → VPS (docker compose)
   # ═══════════════════════════════════════════════════════════════════════════
 
@@ -325,7 +416,7 @@ jobs:
   notify:
     name: Notify Discord
     runs-on: ubuntu-latest
-    needs: [push_images, deploy_test, deploy_preprod, deploy_prod]
+    needs: [push_images, tag_release, deploy_test, deploy_preprod, deploy_prod]
     if: always() && needs.push_images.result == 'success'
     steps:
       - name: Send notification

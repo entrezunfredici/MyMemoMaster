@@ -54,8 +54,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    # --appendonly yes : persistance AOF sur le volume redis-data (recommandation R2 du Bloc 4) —
+    # sans elle, un redémarrage du conteneur perd silencieusement les rappels BullMQ en attente.
+    # Le chart Helm (helm/templates/redis.yaml) l'a déjà côté StatefulSet prod.
     command: >
-      sh -c "if [ -n '${REDIS_PASS}' ]; then redis-server --requirepass ${REDIS_PASS}; else redis-server; fi"
+      sh -c "if [ -n '${REDIS_PASS}' ]; then redis-server --requirepass ${REDIS_PASS} --appendonly yes; else redis-server --appendonly yes; fi"
     volumes:
       - redis-data:/data
     healthcheck:

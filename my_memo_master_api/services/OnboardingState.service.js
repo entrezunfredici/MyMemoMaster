@@ -6,9 +6,10 @@ class OnboardingStateService {
       where: { userId }
     })
 
-    if (!onboardingState) {
-      throw new Error("État d'onboarding introuvable.")
-    }
+    // Pas de ligne (ex. compte legacy créé avant l'ajout de l'onboarding) : le controller
+    // traduit `null` en 404, à distinguer d'une vraie erreur serveur (500).
+    if (!onboardingState) return null
+
     return {
       tour_seen: onboardingState.tourSeen,
       checklist: onboardingState.checklist
@@ -20,9 +21,7 @@ class OnboardingStateService {
       where: { userId }
     })
 
-    if (!onboarding) {
-      throw new Error("État d'onboarding introuvable")
-    }
+    if (!onboarding) return null
 
     if (data.tour_seen !== undefined) {
       onboarding.tourSeen = data.tour_seen

@@ -2,6 +2,10 @@
 # ---- Stage 1: build native dependencies ----
 # node:22-bookworm-slim est basé sur Debian (glibc) — requis par onnxruntime-node (@xenova/transformers)
 FROM node:22-bookworm-slim AS deps
+# CVE image de base (Bloc 4) : le npm embarqué dans l'image officielle traîne souvent des versions
+# vulnérables de ses propres dépendances (tar, brace-expansion) ; se réaligner sur le dernier npm
+# les corrige sans attendre une nouvelle publication de l'image node elle-même.
+RUN npm install -g npm@latest
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
@@ -12,6 +16,9 @@ RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 # ---- Stage 2: production image (no build tools) ----
 FROM node:22-bookworm-slim AS production
+# entrypoint.sh exécute npm/npx au démarrage du conteneur (pas seulement au build) — même correctif
+# CVE que le stage deps, sur cette image indépendante.
+RUN npm install -g npm@latest
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
