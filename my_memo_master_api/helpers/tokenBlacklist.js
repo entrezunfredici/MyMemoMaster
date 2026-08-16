@@ -1,5 +1,4 @@
-const Redis = require('ioredis')
-const redisConfig = require('../config/redis.config')
+const { createFailFastClient } = require('./redisClient')
 const logger = require('./logger')
 
 // Marge large au-dessus de tout AUTH_JWT_EXPIRES_IN raisonnable (15m par défaut, jamais > qq heures) :
@@ -9,22 +8,7 @@ const REVOCATION_TTL_SECONDS = 2 * 24 * 60 * 60 // 2 jours
 let client = null
 
 function getClient() {
-  if (!client) {
-    client = new Redis({
-      ...redisConfig,
-      // redisConfig vient de BullMQ (maxRetriesPerRequest: null = retries illimités, requis pour ses
-      // commandes bloquantes) — repris tel quel ici, ça transformerait chaque requête HTTP en attente
-      // infinie tant que Redis est injoignable, à l'opposé du fail-open recherché. Ce client applique
-      // ses propres réglages : échec rapide par commande, reconnexion en tâche de fond bornée.
-      maxRetriesPerRequest: 1,
-      connectTimeout: 800,
-      enableOfflineQueue: false,
-      retryStrategy: (times) => Math.min(times * 500, 5000)
-    })
-    client.on('error', (err) => {
-      logger.warn(`[token-blacklist] Erreur de connexion Redis : ${err?.message || err}`)
-    })
-  }
+  if (!client) client = createFailFastClient('token-blacklist')
   return client
 }
 

@@ -34,7 +34,13 @@ jest.mock('../../services/Semantic.service', () => ({
   gradeSemantic: jest.fn()
 }))
 
+jest.mock('../../helpers/leitnerRightsCache', () => ({
+  getCachedRights: jest.fn().mockResolvedValue(null),
+  setCachedRights: jest.fn().mockResolvedValue(undefined)
+}))
+
 const semanticService = require('../../services/Semantic.service')
+const rightsCache = require('../../helpers/leitnerRightsCache')
 
 describe('LeitnerCardService', () => {
   beforeEach(() => {
@@ -437,6 +443,38 @@ describe('LeitnerCardService', () => {
     const rights = await LeitnerCardService.resolveUserRights(99, 1)
 
     expect(rights).toEqual({ canAdd: false, canEdit: false, canDelete: false })
+  })
+
+  // ─── resolveUserRights — cache (R5) ─────────────────────────────────────────
+
+  test('resolveUserRights - droits en cache - ne requête pas la DB', async () => {
+    rightsCache.getCachedRights.mockResolvedValueOnce({
+      canAdd: true,
+      canEdit: true,
+      canDelete: false
+    })
+
+    const rights = await LeitnerCardService.resolveUserRights(2, 1)
+
+    expect(rightsCache.getCachedRights).toHaveBeenCalledWith(2, 1)
+    expect(LeitnerSystem.findOne).not.toHaveBeenCalled()
+    expect(LeitnerSystemsUsers.findOne).not.toHaveBeenCalled()
+    expect(rights).toEqual({ canAdd: true, canEdit: true, canDelete: false })
+  })
+
+  test('resolveUserRights - cache absent (miss) - résout depuis la DB puis met en cache', async () => {
+    rightsCache.getCachedRights.mockResolvedValueOnce(null)
+    LeitnerSystem.findOne.mockResolvedValue({ idSystem: 1, idUser: 2 })
+
+    const rights = await LeitnerCardService.resolveUserRights(2, 1)
+
+    expect(LeitnerSystem.findOne).toHaveBeenCalledWith({ where: { idSystem: 1, idUser: 2 } })
+    expect(rightsCache.setCachedRights).toHaveBeenCalledWith(2, 1, {
+      canAdd: true,
+      canEdit: true,
+      canDelete: true
+    })
+    expect(rights).toEqual({ canAdd: true, canEdit: true, canDelete: true })
   })
 
   // ─── getCardSystem ──────────────────────────────────────────────────────────

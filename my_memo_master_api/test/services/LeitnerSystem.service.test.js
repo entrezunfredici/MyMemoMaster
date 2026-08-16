@@ -1,5 +1,6 @@
-const { LeitnerSystem, LeitnerBox, Subject, Tag, instance } = require('../../models/index')
+const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, Subject, Tag, instance } = require('../../models/index')
 const LeitnerSystemService = require('../../services/LeitnerSystem.service')
+const rightsCache = require('../../helpers/leitnerRightsCache')
 
 const mockTransaction = { commit: jest.fn(), rollback: jest.fn() }
 
@@ -16,12 +17,19 @@ jest.mock('../../models/index', () => ({
   LeitnerBox: {
     bulkCreate: jest.fn()
   },
-  LeitnerSystemsUsers: {},
+  LeitnerSystemsUsers: {
+    findOne: jest.fn(),
+    upsert: jest.fn()
+  },
   Subject: {},
   Tag: {},
   instance: {
     transaction: jest.fn()
   }
+}))
+
+jest.mock('../../helpers/leitnerRightsCache', () => ({
+  invalidateRights: jest.fn().mockResolvedValue(undefined)
 }))
 
 const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
@@ -180,5 +188,54 @@ describe('LeitnerSystemService', () => {
     expect(LeitnerSystem.findByPk).toHaveBeenCalledWith(1)
     expect(mockSystem.destroy).not.toHaveBeenCalled()
     expect(result).toBe(false)
+  })
+
+  // ─── share ──────────────────────────────────────────────────────────────────
+
+  test('share - propriétaire avec shareRight - upsert le partage et invalide le cache de droits (R5)', async () => {
+    LeitnerSystemsUsers.findOne.mockResolvedValue({ shareRight: true })
+    LeitnerSystemsUsers.upsert.mockResolvedValue([{}, true])
+
+    const result = await LeitnerSystemService.share({
+      idUserOwner: 1,
+      idUserShared: 2,
+      idSystem: 10,
+      writeRight: true,
+      shareRight: false,
+      shareWithWriteRightRight: false,
+      shareWithAllRights: true
+    })
+
+    expect(LeitnerSystemsUsers.upsert).toHaveBeenCalledWith({
+      idUser: 2,
+      idSystem: 10,
+      writeRight: true,
+      shareRight: false,
+      shareWithWriteRightRight: false,
+      shareWithAllRights: true
+    })
+    expect(rightsCache.invalidateRights).toHaveBeenCalledWith(2, 10)
+    expect(result).toEqual({ message: 'Système partagé avec succès.' })
+  })
+
+  test('share - sans droit de partage - lève une erreur sans écrire ni invalider le cache', async () => {
+    LeitnerSystemsUsers.findOne.mockResolvedValue({ shareRight: false })
+
+    await expect(
+      LeitnerSystemService.share({ idUserOwner: 1, idUserShared: 2, idSystem: 10 })
+    ).rejects.toThrow("Vous n'avez pas les droits pour partager ce système.")
+
+    expect(LeitnerSystemsUsers.upsert).not.toHaveBeenCalled()
+    expect(rightsCache.invalidateRights).not.toHaveBeenCalled()
+  })
+
+  test("share - aucune relation existante pour l'auteur du partage - lève une erreur", async () => {
+    LeitnerSystemsUsers.findOne.mockResolvedValue(null)
+
+    await expect(
+      LeitnerSystemService.share({ idUserOwner: 1, idUserShared: 2, idSystem: 10 })
+    ).rejects.toThrow("Vous n'avez pas les droits pour partager ce système.")
+
+    expect(LeitnerSystemsUsers.upsert).not.toHaveBeenCalled()
   })
 })

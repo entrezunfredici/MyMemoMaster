@@ -6610,3 +6610,39 @@ Question utilisateur : les correctifs des deux entrées précédentes (révocati
 
 #### Dette / non couvert
 - Néant.
+
+---
+
+### [2026-08-15] ADD — R5 : cache Redis des droits Leitner (demande utilisateur, anticipée)
+
+#### Contexte
+Demande utilisateur : réaliser la recommandation R5 de `B4_RENDU.md` §5, jusque-là volontairement différée (« je ne recommande pas d'agir tant que les temps de réponse restent bons »). Chaque écriture sur une carte (`addCard`/`updateCard`/`deleteCard`) résolvait 1-2 requêtes DB via `LeitnerCardService.resolveUserRights()` (`LeitnerSystem.findOne` propriétaire, puis `LeitnerSystemsUsers.findOne` si partagé).
+
+#### Fichiers créés
+- `my_memo_master_api/helpers/redisClient.js` — factorisation du client Redis « fail-fast » introduit dans `tokenBlacklist.js` (voir entrée précédente) : `createFailFastClient(logPrefix)`, réutilisé par `tokenBlacklist.js` et le nouveau `leitnerRightsCache.js` pour ne pas dupliquer ces réglages non triviaux.
+- `my_memo_master_api/helpers/leitnerRightsCache.js` — `getCachedRights`/`setCachedRights`/`invalidateRights`, clé `leitner:rights:<userId>:<idSystem>`, TTL 30 s (borne basse de la fourchette 30-60 s recommandée), fail-open sur toute erreur Redis (retombe sur la DB).
+- `my_memo_master_api/test/helpers/leitnerRightsCache.test.js`, `test/services/*` complétés.
+
+#### Fichiers modifiés
+- `my_memo_master_api/services/LeitnerCard.service.js` — `resolveUserRights()` : lit le cache, retombe sur `_resolveUserRightsFromDb()` (nouvelle méthode, ancienne logique inchangée) si absent, écrit le résultat en cache.
+- `my_memo_master_api/services/LeitnerSystemsUsers.service.js` — `create`/`update`/`delete` invalident le cache du couple `(idUser, idSystem)` concerné.
+- `my_memo_master_api/services/LeitnerSystem.service.js` — `share()` (upsert direct sur `LeitnerSystemsUsers`, contourne le service ci-dessus) invalide aussi le cache.
+- `my_memo_master_api/helpers/tokenBlacklist.js` — reprend `createFailFastClient('token-blacklist')` au lieu de dupliquer la config Redis inline (comportement inchangé).
+
+#### Ce qui est utilisable
+- Les écritures répétées sur les cartes d'un même système (session d'ajout/édition en rafale) ne déclenchent plus qu'une résolution DB par 30 s au lieu d'une par requête.
+- Un partage créé/modifié/retiré est immédiatement visible (invalidation explicite) — la TTL de 30 s n'est qu'un filet de sécurité pour les chemins non couverts, pas le mécanisme de fraîcheur principal.
+- L'appartenance (`LeitnerSystem.idUser`) n'est jamais réassignée après création (vérifié dans `LeitnerSystem.service.js` — `update()` ignore toute tentative de changer `idUser`) : aucun point d'invalidation dédié nécessaire pour ce cas.
+
+#### Choix techniques
+- Voir DECISIONS.md (2026-08-15, entrée R5) : TTL 30 s vs 60 s, invalidation explicite + TTL courte plutôt que TTL seule.
+
+#### Vérifications effectuées
+- Suite complète : 84 suites / 1545 tests verts (dont 5 nouveaux fichiers/blocs couvrant cache hit/miss, invalidation sur les 3 écritures `LeitnerSystemsUsers` et sur `share()`, fail-open Redis sur les 3 opérations du cache).
+- Lint API vert.
+
+#### Dette / non couvert
+- `requireRole.middleware.js` (résolution du rôle plateforme, `User.findByPk`) n'est pas concerné par ce cache — périmètre volontairement limité aux droits Leitner explicitement visés par R5, non étendu au RBAC général.
+
+#### Mise à jour (même jour)
+- `B4_RENDU.md` §5 : R5 marquée « réalisée par anticipation » (même traitement que R1/R2), avec la précision que `requireRole` reste hors périmètre.

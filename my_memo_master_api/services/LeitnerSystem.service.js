@@ -1,4 +1,5 @@
 const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, Subject, Tag, instance } = require('../models/index')
+const rightsCache = require('../helpers/leitnerRightsCache')
 
 const DEFAULT_BOXES = [
   { level: 1, intervall: 5, color: 123456 },
@@ -83,6 +84,9 @@ class LeitnerSystemService {
       shareWithWriteRightRight,
       shareWithAllRights
     })
+    // R5 (B4_RENDU.md §5) : voir LeitnerSystemsUsers.service.js — même invalidation, ce chemin
+    // (upsert direct) contourne ce service.
+    await rightsCache.invalidateRights(idUserShared, idSystem)
 
     return { message: 'Système partagé avec succès.' }
   }

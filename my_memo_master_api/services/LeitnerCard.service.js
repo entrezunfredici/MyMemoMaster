@@ -9,6 +9,7 @@ const {
   LeitnerSystemsUsers
 } = require('../models')
 const semanticService = require('./Semantic.service')
+const rightsCache = require('../helpers/leitnerRightsCache')
 
 class LeitnerCardService {
   /**
@@ -200,11 +201,32 @@ class LeitnerCardService {
    * Résout les droits d'un utilisateur sur un système Leitner.
    * Propriétaire du système → droits complets. Utilisateur partagé → droits depuis LeitnerSystemsUsers.
    *
+   * Mis en cache 30 s (Redis, `helpers/leitnerRightsCache.js` — recommandation R5, B4_RENDU.md §5) :
+   * chaque écriture sur une carte (ajout/édition/suppression) résolvait 1-2 requêtes DB à chaque appel.
+   * Invalidé explicitement à chaque changement de partage (`LeitnerSystemsUsers`/`LeitnerSystem.share`),
+   * la TTL courte n'est qu'un filet de sécurité pour les cas non couverts par l'invalidation explicite.
+   *
    * @param {number} userId - ID de l'utilisateur
    * @param {number} idSystem - ID du système Leitner
    * @returns {Promise<{ canAdd: boolean, canEdit: boolean, canDelete: boolean }>}
    */
   async resolveUserRights(userId, idSystem) {
+    const cached = await rightsCache.getCachedRights(userId, idSystem)
+    if (cached) return cached
+
+    const rights = await this._resolveUserRightsFromDb(userId, idSystem)
+    await rightsCache.setCachedRights(userId, idSystem, rights)
+    return rights
+  }
+
+  /**
+   * Résolution des droits directement depuis la DB, sans passer par le cache (source de vérité).
+   *
+   * @param {number} userId
+   * @param {number} idSystem
+   * @returns {Promise<{ canAdd: boolean, canEdit: boolean, canDelete: boolean }>}
+   */
+  async _resolveUserRightsFromDb(userId, idSystem) {
     const owned = await LeitnerSystem.findOne({ where: { idSystem, idUser: userId } })
     if (owned) return { canAdd: true, canEdit: true, canDelete: true }
 
