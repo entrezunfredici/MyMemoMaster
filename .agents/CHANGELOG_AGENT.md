@@ -6594,3 +6594,19 @@ Suite de l'entrée précédente : demande utilisateur de traiter les CVE restant
 - `protobufjs@7.6.5` reste en dehors de la plage `^6.8.8` déclarée par `onnx-proto` — `npm install` affiche un warning `EOVERRIDE`/`invalid` à chaque install ; sans conséquence fonctionnelle constatée (vérifié ci-dessus) mais à surveiller si `onnx-proto`/`onnxruntime-web` publient une version qui dépend d'une API protobufjs 6.x spécifique disparue en 7.x.
 - Résidu dev-only déjà documenté et accepté (`CONVENTIONS.md`) : `sqlite3` (devDependency) tire une chaîne `tar`/`cacache` avec 1 critique + 6 hautes — jamais dans l'image Docker (`npm ci --omit=dev`), jamais dans le scope de l'audit CI ; non touché.
 - CVE OS de l'image de base et résidu `brace-expansion` du npm CLI (voir entrée précédente) : inchangés, hors de portée.
+
+---
+
+### [2026-08-15] DOC — B4_RENDU.md aligné sur les correctifs sécurité/fiabilité + R1/R2
+
+#### Contexte
+Question utilisateur : les correctifs des deux entrées précédentes (révocation JWT, R1/R2, npm audit) doivent-ils apparaître dans le dossier Bloc 4 ? Oui — R1 et R2 sont des recommandations *explicites* de `B4_RENDU.md` §5, désormais réalisées (même traitement que R3 lors de sa mise en œuvre le 2026-08-02).
+
+#### Fichiers modifiés
+- `B4_RENDU.md` — §5 : R1 et R2 passées de recommandation à « réalisée », avec renvoi vers `cd.yml`/`docker-compose.yml`/`helm/templates/redis.yaml` ; §1 : second « exemple réel » (C4.1.1) sur le cas `protobufjs`/`sharp` via `overrides` (dépendance tierce non maintenue, correctif standard inapplicable) ; §6 : nouvelle entrée `2026.08.1` (JWT, MAX_USERS Docker/Helm, isRegistrationOpen, OnboardingState, transaction invitations, CVE image + npm audit) ; phrase d'intro de §6 et Annexe B (C4.3.2, 6→7 versions) mises à jour pour refléter le tagging désormais automatique.
+
+#### Ce qui est utilisable
+- Le dossier Bloc 4 reflète l'état réel du code à la date de rédaction ; les 3 sections modifiées (§1, §5, §6) restent cohérentes entre elles (plus de mention de R1 « à faire » en §6 alors que réalisée en §5).
+
+#### Dette / non couvert
+- Néant.
