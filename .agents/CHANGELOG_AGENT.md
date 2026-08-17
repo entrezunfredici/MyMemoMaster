@@ -6646,3 +6646,23 @@ Demande utilisateur : réaliser la recommandation R5 de `B4_RENDU.md` §5, jusqu
 
 #### Mise à jour (même jour)
 - `B4_RENDU.md` §5 : R5 marquée « réalisée par anticipation » (même traitement que R1/R2), avec la précision que `requireRole` reste hors périmètre.
+
+---
+
+### [2026-08-15] FIX — npm audit CI côté front (axios, brace-expansion, fast-uri, nanoid, postcss)
+
+#### Contexte
+Échec `npm audit --omit=dev --audit-level=high` signalé par l'utilisateur depuis un run GitHub Actions réel (job `test_and_lint`, matrice `front`) : 5 vulnérabilités hautes fraîchement publiées (`axios`, `brace-expansion`, `fast-uri`, `nanoid`, `postcss`). À distinguer du correctif précédent (`protobufjs`/`sharp`/`uuid`), qui portait sur `my_memo_master_api` — celui-ci porte sur `my_memo_master_front`.
+
+#### Fichiers modifiés
+- `my_memo_master_front/package-lock.json` — `npm audit fix` (sans `--force`, aucune montée de version majeure) : `axios` 1.19.0, `postcss` 8.5.26, `nanoid` 3.3.18, `brace-expansion`/`fast-uri` sur leurs transitifs (eslint, vite, tailwind…). `package.json` inchangé.
+
+#### Vérifications effectuées
+- `npm audit --omit=dev --audit-level=high` (commande exacte du CI) : **0 vulnérabilité** (était 5 hautes).
+- Lint front vert, `npm run build` réussi (bundle généré, PWA), suite Vitest complète : 44 fichiers / 685 tests verts.
+
+#### Ce qui est utilisable
+- Le job CI `test_and_lint` (matrice `front`) devrait désormais passer.
+
+#### Dette / non couvert
+- Néant — correctif non-cassant sans compromis, contrairement au ticket `protobufjs`/`sharp` côté API qui avait nécessité des `overrides`.
