@@ -20,13 +20,15 @@ config:
   TRUST_PROXY_HOPS: "2"
   ENVIRONMENT: prod
   API_PUBLIC_URL: https://api.my-memo-master.com
-  CORS_ORIGIN: https://my-memo-master.com
+  CORS_ORIGIN: https://app.my-memo-master.com
   VITE_API_URL: https://api.my-memo-master.com/api/v1
-  VITE_FRONT_URL: https://my-memo-master.com
+  VITE_FRONT_URL: https://app.my-memo-master.com
 
 domain:
   api: api.my-memo-master.com
-  front: my-memo-master.com
+  # L'apex my-memo-master.com sert la landing page, hébergée hors cluster.
+  # L'application Kubernetes répond sur le sous-domaine app.
+  front: app.my-memo-master.com
 
 # Données de production : le volume survit à la suppression du PVC.
 storageClass: csi-cinder-sc-retain

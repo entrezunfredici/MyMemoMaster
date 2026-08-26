@@ -16,7 +16,7 @@ Un seul chart Helm sert les deux environnements ; les différences sont portées
 |---|---|
 | [helm/values.yaml](../helm/values.yaml) | Base commune : config applicative, ressources CPU/mémoire, domaines et images vides (à surcharger) |
 | [helm/values-preprod.yaml](../helm/values-preprod.yaml) | Surcharges preprod : images `mymemomaster_preprod_*`, domaines `preprod*.my-memo-master.com`, Redis **éphémère** (Deployment sans PVC), PgAdmin **activé** |
-| [helm/values-prod.yaml](../helm/values-prod.yaml) | Surcharges prod : images `mymemomaster_*`, domaines `my-memo-master.com`, Redis **persistant** (StatefulSet + PVC), PgAdmin désactivé |
+| [helm/values-prod.yaml](../helm/values-prod.yaml) | Surcharges prod : images `mymemomaster_*`, domaines `app.my-memo-master.com` / `api.my-memo-master.com` (l'apex sert la landing page, hors cluster), Redis **persistant** (StatefulSet + PVC), PgAdmin désactivé |
 
 Composants déployés par le chart ([helm/templates/](../helm/templates/)) :
 

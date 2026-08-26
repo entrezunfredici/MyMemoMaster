@@ -6699,7 +6699,7 @@ Provisionnement du cluster de production chez Infomaniak Public Cloud (OpenStack
 
 #### Fichiers modifiés
 - `helm/values.yaml` — nouvelles clés `storageClass`, `priorityClassName`, `resourceQuota`, et `config.TRUST_PROXY_HOPS`.
-- `helm/values-prod.yaml` — `storageClass: csi-cinder-sc-retain`, `priorityClassName: mmm-prod` ; requête mémoire API 256Mi → **512Mi** (alignée sur la preprod, l'ancienne valeur était sous le besoin réel du pod).
+- `helm/values-prod.yaml` — **`domain.front` corrigé `my-memo-master.com` → `app.my-memo-master.com`** (+ `CORS_ORIGIN` et `VITE_FRONT_URL`) : l'apex sert une landing page hébergée hors cluster, l'Ingress ne doit pas le revendiquer — précision utilisateur du 2026-08-26. `TRUST_PROXY_HOPS: "2"` (proxy Cloudflare vérifié actif sur les domaines le 2026-08-26). `storageClass: csi-cinder-sc-retain`, `priorityClassName: mmm-prod` ; requête mémoire API 256Mi → **512Mi** (alignée sur la preprod, l'ancienne valeur était sous le besoin réel du pod).
 - `helm/values-preprod.yaml` — `storageClass: csi-cinder-sc-delete`, `priorityClassName: mmm-preprod`, `resourceQuota.enabled: true` ; commentaire obsolète corrigé (il justifiait 512Mi par le modèle `all-mpnet-base-v2`, remplacé depuis par `paraphrase-multilingual-MiniLM-L12-v2`, ~120 Mo).
 - `helm/templates/{statefulset-postgres,redis,prometheus}.yaml` — `storageClassName` conditionnel dans les `volumeClaimTemplates` ; `priorityClassName` sur tous les pods.
 - `helm/templates/{deployment-api,deployment-front}.yaml` — `topologySpreadConstraints` (`maxSkew: 1` sur `kubernetes.io/hostname`, `ScheduleAnyway`) + `priorityClassName`.
@@ -6707,6 +6707,10 @@ Provisionnement du cluster de production chez Infomaniak Public Cloud (OpenStack
 - `.github/workflows/cd.yml` — `azure/setup-kubectl@v4` épinglé sur `v1.36.3` dans les deux jobs de déploiement.
 - `my_memo_master_api/app.js` — `trust proxy` piloté par `TRUST_PROXY_HOPS` (défaut 1) au lieu de la constante 1.
 - `my_memo_master_api/middlewares/rateLimit.middleware.js` — **correctif de sécurité** (voir ci-dessous) + résolution d'IP via `CF-Connecting-IP`.
+
+- `k8s/cert-manager/cloudflare-secret.yml` — champ `data:` (qui exige du base64) remplacé par `stringData:` : le token y était stocké **en clair**, `kubectl apply` échouait donc systématiquement sur `illegal base64 data at input byte 4`. Les tokens Cloudflare contiennent `-` et `_`, invalides en base64 standard — `stringData` supprime l'étape d'encodage et le piège avec.
+- `k8s/secrets.env.example` (créé) — modèle des 11 clés du Secret manuel, déduit des `envFrom`/`secretKeyRef` du chart et des `process.env` du code ; `k8s/secrets.env` ajouté au `.gitignore`.
+- `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` — domaines prod corrigés.
 
 #### Correctif de sécurité : rate limiting par IP totalement inopérant
 `userKeyFromJwt` appelait `ipKeyGenerator(req)`. Depuis **express-rate-limit v8** (v8.5.2 installée), la signature est `ipKeyGenerator(ip: string, ipv6Subnet?)` — la v7 acceptait la requête. Passer l'objet `req` faisait retourner cet objet tel quel comme clé de bucket ; le `MemoryStore` étant une `Map`, chaque requête produisait une clé unique par identité de référence et **le compteur ne dépassait jamais 1**. Conséquence : `authLimiter` (login, mot de passe oublié, réinitialisation) et le fallback IP d'`apiLimiter` n'ont jamais limité quoi que ce soit pour les requêtes **non authentifiées** — précisément la surface de brute-force. Les requêtes authentifiées n'étaient pas touchées (clé `uid_<id>`, une chaîne).
