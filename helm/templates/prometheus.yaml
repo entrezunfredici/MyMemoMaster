@@ -200,6 +200,9 @@ spec:
         # Redémarre le pod quand la config monitoring change (pas de hot-reload)
         checksum/config: {{ .Values.monitoring | toYaml | sha256sum }}
     spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       serviceAccountName: {{ .Release.Name }}-prometheus
       securityContext:
         # L'image prom/prometheus tourne en user nobody (65534) — fsGroup requis
@@ -238,6 +241,9 @@ spec:
         name: prometheus-data
       spec:
         accessModes: [ReadWriteOnce]
+        {{- if .Values.storageClass }}
+        storageClassName: {{ .Values.storageClass }}
+        {{- end }}
         resources:
           requests:
             storage: {{ .Values.monitoring.storage }}
@@ -264,6 +270,9 @@ spec:
         # Redémarre le pod quand la config monitoring change (pas de hot-reload)
         checksum/config: {{ .Values.monitoring | toYaml | sha256sum }}
     spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       serviceAccountName: {{ .Release.Name }}-prometheus
       containers:
         - name: prometheus

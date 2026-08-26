@@ -341,6 +341,14 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # Épinglé sur la version du cluster (v1.36.x) : le kubectl préinstallé
+      # sur ubuntu-latest n'est pas figé et peut dériver hors de l'écart ±1
+      # mineure supporté, avec des comportements silencieusement différents.
+      - name: Pin kubectl version
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.3
+
       - name: Set up kubectl
         run: |
           mkdir -p ~/.kube
@@ -403,6 +411,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Épinglé sur la version du cluster (v1.36.x) : le kubectl préinstallé
+      # sur ubuntu-latest n'est pas figé et peut dériver hors de l'écart ±1
+      # mineure supporté, avec des comportements silencieusement différents.
+      - name: Pin kubectl version
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.3
 
       - name: Set up kubectl
         run: |

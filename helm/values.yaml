@@ -35,6 +35,12 @@ config:
   API_PORT: "3000"
   METRICS_PORT: "9090"
   API_BYPASS_AUTH: "false"
+  # Profondeur de la chaîne de proxies devant l'API (voir app.js).
+  #   "1" — ingress-nginx seul (Cloudflare en DNS-only / nuage gris)
+  #   "2" — Cloudflare en proxy (nuage orange) + ingress-nginx
+  # À passer à "2" EN MÊME TEMPS que l'activation du proxy Cloudflare : le mettre
+  # à 2 sans Cloudflare devant rend l'en-tête X-Forwarded-For falsifiable.
+  TRUST_PROXY_HOPS: "1"
   AUTH_JWT_EXPIRES_IN: 1d
   PG_DB: mymemomasterdb
   PG_PORT: "5432"
@@ -76,6 +82,33 @@ domain:
 
 certManager:
   clusterIssuer: letsencrypt-prod-cloudflare
+
+# ── Stockage (PVC) ────────────────────────────────────────────────────────────
+# Classe de stockage des volumes persistants. Vide = classe par défaut du cluster.
+# Cluster Infomaniak (pck-*), classes disponibles :
+#   csi-cinder-sc-retain  (défaut du cluster) — le volume Cinder SURVIT à la
+#     suppression du PVC : protection contre la perte de données, mais le volume
+#     continue d'être facturé tant qu'il n'est pas supprimé à la main.
+#   csi-cinder-sc-delete — le volume est supprimé avec le PVC.
+storageClass: ""
+
+# ── Ordonnancement / priorité ────────────────────────────────────────────────
+# PriorityClass appliquée à tous les pods de la release. Vide = priorité 0.
+# Les classes sont créées une fois sur le cluster : k8s/priorityclasses.yml
+priorityClassName: ""
+
+# ── Quota de namespace ───────────────────────────────────────────────────────
+# Plafonne ce que la release peut consommer sur un cluster partagé avec un autre
+# environnement. Désactivé par défaut : à n'activer que sur l'environnement que
+# l'on accepte de voir bridé (la preprod), jamais sur celui que l'on protège.
+resourceQuota:
+  enabled: false
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "3"
+    memory: 4Gi
 
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
 postgres:

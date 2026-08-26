@@ -25,6 +25,18 @@ domain:
   api: api.my-memo-master.com
   front: my-memo-master.com
 
+# Données de production : le volume survit à la suppression du PVC.
+storageClass: csi-cinder-sc-retain
+
+# Priorité haute : sous pression mémoire d'un nœud, la preprod est évincée avant
+# la prod. Prérequis : kubectl apply -f k8s/priorityclasses.yml
+priorityClassName: mmm-prod
+
+# Pas de quota sur la prod : c'est l'environnement que l'on protège, le plafonner
+# reviendrait à bloquer sa propre montée en charge.
+resourceQuota:
+  enabled: false
+
 postgres:
   storage: 20Gi
   resources:
@@ -50,8 +62,12 @@ redis:
 api:
   resources:
     requests:
+      # Aligné sur la preprod : 256Mi était en dessous du besoin réel du pod
+      # (modèle sémantique chargé en mémoire), ce qui pousse le scheduler à
+      # surbooker le nœud et expose à l'OOMKill sous charge. À réajuster après
+      # mesure réelle (`kubectl top pods -n mymemomaster --containers`).
       cpu: 200m
-      memory: 256Mi
+      memory: 512Mi
     limits:
       cpu: 1000m
       memory: 1Gi

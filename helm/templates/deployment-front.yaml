@@ -20,6 +20,19 @@ spec:
         rollout-timestamp: {{ .Values.rolloutTimestamp | quote }}
       {{- end }}
     spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      # Répartit les replicas sur des nœuds distincts : la perte d'un nœud ne peut
+      # pas emporter tous les pods à la fois. ScheduleAnyway (et non DoNotSchedule)
+      # pour qu'un cluster réduit à un seul nœud disponible reste déployable.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-front
       containers:
         - name: front
           image: {{ include "mmm.imageFront" . }}

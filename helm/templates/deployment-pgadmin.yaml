@@ -17,6 +17,9 @@ spec:
       labels:
         app: {{ .Release.Name }}-pgadmin
     spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       containers:
         - name: pgadmin
           image: dpage/pgadmin4:8

@@ -104,6 +104,7 @@
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
 | Infrastructure Docker Compose (dev/test unifié) | Stable — compose racine unique à 2 profils (dev local / test VPS), `server_docker_compose/` supprimé, CD sur `--profile test`, template VPS `.env.test.example` | 2026-07-12 |
 | CI/CD — branches de déploiement | Stable — branches Git renommées `test`→`dev`, `preprod`→`staging` (main inchangée) ; noms internes d'infra (images DockerHub, namespace K8s, chemin VPS) non touchés | 2026-07-01 |
+| Cluster Kubernetes (Infomaniak PCK) | Provisionné — cluster `pck-dkoyol2`, 2 workers 4 vCPU / 8 Go (allocatable réel : 3,92 vCPU / 5,5 Gi par nœud), K8s v1.36.3, CNI Cilium, CSI Cinder + OpenStack CCM. Addons installés le 2026-08-26 : ingress-nginx (2 replicas, LB Octavia `83.228.249.190`, real-IP Cloudflare, `externalTrafficPolicy: Local`), cert-manager, PriorityClasses `mmm-prod`/`mmm-preprod`. **metrics-server non fonctionnel** (certificats kubelet sans IP SAN) et **aucune release applicative déployée** à ce jour | 2026-08-26 |
 | Refresh token (rotation, révocation) | Stable — M-00b.07 H1 : hash SHA-256 stocké en base (même pattern reset password), brut envoyé au client | 2026-06-23 |
 | Reset mot de passe (token hashé) | Stable — M-05.06 : token 64-char hex brut envoyé par email, hash SHA-256 stocké en base | 2026-06-15 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
@@ -6666,3 +6667,60 @@ Demande utilisateur : réaliser la recommandation R5 de `B4_RENDU.md` §5, jusqu
 
 #### Dette / non couvert
 - Néant — correctif non-cassant sans compromis, contrairement au ticket `protobufjs`/`sharp` côté API qui avait nécessité des `overrides`.
+
+---
+
+### [2026-08-15] DOC — B4_RENDU.md aligné sur R5 et le correctif npm audit front
+
+#### Contexte
+Demande utilisateur : mettre à jour le dossier Bloc 4 après les deux derniers tickets (cache de droits Leitner R5, correctif npm audit front détecté en CI réelle).
+
+#### Fichiers modifiés
+- `B4_RENDU.md` — §6 : entrée `2026.08.1` complétée avec R5 (cache Leitner, déjà marquée réalisée en §5 mais absente du journal) ; nouvelle entrée `2026.08.2` pour le correctif front, explicitement rattachée au canal de détection « Pipeline CI » (§3.1) puisque découverte via un run GitHub Actions réel signalé par l'utilisateur ; Annexe B (C4.3.2, 7→8 versions).
+
+#### Ce qui est utilisable
+- Le journal des versions (§6) est maintenant cohérent avec §5 (R5) et reflète un exemple réel et récent de détection d'anomalie par le canal CI (§3.1), pas seulement par revue de code ou retour utilisateur comme les fiches déjà présentes.
+
+#### Dette / non couvert
+- Néant.
+
+---
+
+### [2026-08-26] INFRA — Cluster Kubernetes Infomaniak : addons, durcissement du chart, correctif rate limiting
+
+#### Contexte
+Provisionnement du cluster de production chez Infomaniak Public Cloud (OpenStack). Le cluster `pck-dkoyol2` était livré nu : ni ingress controller, ni cert-manager, ni metrics-server — contrairement à ce qu'affirmait le commentaire de `k8s/app/ingress.yml` (« ingress-nginx installé (fourni par Infomaniak) »), écrit pour un cluster antérieur. Le chart Helm n'était donc pas déployable en l'état. Session pilotée par l'utilisateur sur le dimensionnement (2 nœuds 4 vCPU / 8 Go retenus après arbitrage coût / résilience).
+
+#### Fichiers créés
+- `helm/templates/pdb.yaml` — PodDisruptionBudget API et front, rendus uniquement si `replicas > 1`.
+- `helm/templates/resourcequota.yaml` — ResourceQuota de namespace, activé par `resourceQuota.enabled`.
+- `k8s/priorityclasses.yml` — PriorityClass `mmm-prod` (1000) et `mmm-preprod` (100), cluster-scoped, hors chart.
+- `k8s/ingress-nginx-values.yaml` — valeurs du contrôleur : 2 replicas, `externalTrafficPolicy: Local`, `proxy-real-ip-cidr` limité aux 22 plages Cloudflare.
+
+#### Fichiers modifiés
+- `helm/values.yaml` — nouvelles clés `storageClass`, `priorityClassName`, `resourceQuota`, et `config.TRUST_PROXY_HOPS`.
+- `helm/values-prod.yaml` — `storageClass: csi-cinder-sc-retain`, `priorityClassName: mmm-prod` ; requête mémoire API 256Mi → **512Mi** (alignée sur la preprod, l'ancienne valeur était sous le besoin réel du pod).
+- `helm/values-preprod.yaml` — `storageClass: csi-cinder-sc-delete`, `priorityClassName: mmm-preprod`, `resourceQuota.enabled: true` ; commentaire obsolète corrigé (il justifiait 512Mi par le modèle `all-mpnet-base-v2`, remplacé depuis par `paraphrase-multilingual-MiniLM-L12-v2`, ~120 Mo).
+- `helm/templates/{statefulset-postgres,redis,prometheus}.yaml` — `storageClassName` conditionnel dans les `volumeClaimTemplates` ; `priorityClassName` sur tous les pods.
+- `helm/templates/{deployment-api,deployment-front}.yaml` — `topologySpreadConstraints` (`maxSkew: 1` sur `kubernetes.io/hostname`, `ScheduleAnyway`) + `priorityClassName`.
+- `helm/templates/deployment-pgadmin.yaml` — `priorityClassName`.
+- `.github/workflows/cd.yml` — `azure/setup-kubectl@v4` épinglé sur `v1.36.3` dans les deux jobs de déploiement.
+- `my_memo_master_api/app.js` — `trust proxy` piloté par `TRUST_PROXY_HOPS` (défaut 1) au lieu de la constante 1.
+- `my_memo_master_api/middlewares/rateLimit.middleware.js` — **correctif de sécurité** (voir ci-dessous) + résolution d'IP via `CF-Connecting-IP`.
+
+#### Correctif de sécurité : rate limiting par IP totalement inopérant
+`userKeyFromJwt` appelait `ipKeyGenerator(req)`. Depuis **express-rate-limit v8** (v8.5.2 installée), la signature est `ipKeyGenerator(ip: string, ipv6Subnet?)` — la v7 acceptait la requête. Passer l'objet `req` faisait retourner cet objet tel quel comme clé de bucket ; le `MemoryStore` étant une `Map`, chaque requête produisait une clé unique par identité de référence et **le compteur ne dépassait jamais 1**. Conséquence : `authLimiter` (login, mot de passe oublié, réinitialisation) et le fallback IP d'`apiLimiter` n'ont jamais limité quoi que ce soit pour les requêtes **non authentifiées** — précisément la surface de brute-force. Les requêtes authentifiées n'étaient pas touchées (clé `uid_<id>`, une chaîne).
+
+#### Ce qui est utilisable
+- Le cluster accepte désormais un déploiement du chart : `IngressClass nginx` présente, LB Octavia actif sur `83.228.249.190`, cert-manager prêt pour les `ClusterIssuer` Cloudflare DNS-01 existants.
+- `helm template` valide pour les deux environnements (19 objets prod, 21 preprod) ; PDB rendus en prod uniquement (replicas 2), quota en preprod uniquement.
+- Lint vert et 33 tests middlewares verts après le correctif rate limiting.
+
+#### Dette / non couvert
+- **metrics-server installé mais non fonctionnel** : les certificats kubelet du cluster ne portent pas d'IP SAN, le scrape échoue (`x509: cannot validate certificate ... because it doesn't contain any IP SANs`). Le correctif standard (`--kubelet-insecure-tls`) n'a pas été appliqué — commande refusée par le classifier de l'agent, décision laissée à l'utilisateur. Tant qu'il n'est pas résolu : pas de `kubectl top`, donc **la requête mémoire de l'API reste non mesurée** (512Mi est une valeur conservative, pas une mesure), et pas de HPA possible.
+- **Secrets GitHub `KUBECONFIG_PREPROD` / `KUBECONFIG_PROD` périmés** : ils pointent sur l'ancien cluster `pck-xolteoz` (endpoint `:30922`), le nouveau est `pck-dkoyol2` (`:31159`). Le CD échouera tant qu'ils ne sont pas régénérés.
+- **`TRUST_PROXY_HOPS` laissé à `"1"`** : à passer à `"2"` en même temps que l'activation du proxy Cloudflare (nuage orange), pas avant — sinon `X-Forwarded-For` devient falsifiable.
+- **Filtrage des plages Cloudflare sur 80/443 non appliqué** : nécessite les security groups Neutron, donc un accès OpenStack (application credential non fournie à ce jour). `proxy-real-ip-cidr` limite déjà la confiance accordée à `X-Forwarded-For`, mais l'origine reste joignable en direct.
+- **Liste d'accès IP de l'API Kubernetes laissée ouverte**, sciemment : le CD déploie depuis des runners GitHub-hosted dont les IP ne sont pas allowlistables. Fermeture conditionnée à un bastion à IP fixe (le VPS de `cd.yml` est candidat).
+- Le commentaire trompeur de `k8s/app/ingress.yml:5` n'a pas été corrigé (fichier hérité, non utilisé par le chart).
+- **Kubeconfig `cluster-admin` dans les secrets GitHub — à remplacer par un ServiceAccount CI dédié (reporté, décision utilisateur du 2026-08-26).** `KUBECONFIG_PREPROD` / `KUBECONFIG_PROD` contiennent le certificat client admin du cluster : toute exécution de workflow capable de lire ces secrets obtient les pleins pouvoirs sur `pck-dkoyol2`, prod comprise. Correctif prévu : ServiceAccount dédié au CI + `Role`/`RoleBinding` limités aux namespaces `mymemomaster` et `mymemomaster-preprod`, token monté dans un kubeconfig réduit — le déploiement fonctionne à l'identique, mais un secret compromis ne permet plus de toucher au reste du cluster. À faire après la validation du premier déploiement réel.

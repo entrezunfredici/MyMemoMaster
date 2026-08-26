@@ -6,15 +6,30 @@ const { ipKeyGenerator } = require('express-rate-limit')
 // Les tests qui vérifient le rate limiting (security.test.js) le désactivent au niveau du test.
 const skipRateLimit = () => process.env.RATE_LIMIT_DISABLED === 'true'
 
+// Résout l'IP réelle du client.
+// Derrière Cloudflare, CF-Connecting-IP porte l'IP du visiteur et est réécrit par
+// Cloudflare à chaque requête (une valeur envoyée par le client est écrasée).
+// FIABLE UNIQUEMENT si l'origine n'accepte que les plages Cloudflare (security
+// group OpenStack) : sans ce filtrage, un attaquant joignant l'origine en direct
+// forge l'en-tête et s'octroie un bucket neuf à chaque requête.
+function clientIp(req) {
+  const cf = req.headers['cf-connecting-ip']
+  if (typeof cf === 'string' && cf.length > 0 && cf.length <= 45) return cf
+  return req.ip || req.socket?.remoteAddress || 'unknown'
+}
+
 // Extrait l'userId du JWT sans vérifier la signature — usage exclusif : clé de rate limiting.
 // Vérifie le type de l'id et l'expiration pour limiter le bucket poisoning (DoS ciblé par userId).
-// CHOIX: fallback via ipKeyGenerator (pas req.ip direct) — requis par express-rate-limit v7+ pour IPv6.
+// CHOIX: fallback via ipKeyGenerator, qui attend une CHAÎNE IP depuis express-rate-limit v8
+// (la v7 acceptait la requête). Lui passer `req` renvoyait l'objet requête lui-même comme clé :
+// le MemoryStore étant une Map, chaque requête produisait une clé unique et le compteur ne
+// dépassait jamais 1 — le rate limiting par IP était totalement inopérant.
 function userKeyFromJwt(req) {
   const auth = req.headers.authorization
   if (auth?.startsWith('Bearer ')) {
     try {
       const b64 = auth.slice(7).split('.')[1]
-      if (!b64 || b64.length > 512) return ipKeyGenerator(req)
+      if (!b64 || b64.length > 512) return ipKeyGenerator(clientIp(req))
       const payload = JSON.parse(Buffer.from(b64, 'base64url').toString())
       const now = Math.floor(Date.now() / 1000)
       if (
@@ -25,7 +40,7 @@ function userKeyFromJwt(req) {
       // parse error — fallback to IP key
     }
   }
-  return ipKeyGenerator(req)
+  return ipKeyGenerator(clientIp(req))
 }
 
 /**

@@ -29,6 +29,24 @@ domain:
   front: preprod.my-memo-master.com
   pgadmin: preprod-pgadmin.my-memo-master.com
 
+# Données jetables : le volume Cinder est supprimé avec le PVC, pas de volume
+# orphelin facturé après un `helm uninstall` de la preprod.
+storageClass: csi-cinder-sc-delete
+
+# Priorité basse : la preprod cède la place à la prod sous pression.
+priorityClassName: mmm-preprod
+
+# Plafond calé au-dessus de la somme des limites de la preprod (1,95 vCPU /
+# 3,1 Gi) : une fuite mémoire en preprod ne peut plus faire évincer la prod.
+resourceQuota:
+  enabled: true
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "3"
+    memory: 4Gi
+
 postgres:
   storage: 5Gi
   resources:
@@ -54,8 +72,11 @@ api:
   resources:
     requests:
       cpu: 100m
-      # Le chargement du modèle sémantique (all-mpnet-base-v2) pique à ~800Mi :
-      # 512Mi de limite = OOMKill en boucle au démarrage (constaté le 2026-07-11)
+      # Le modèle sémantique est chargé en mémoire par le pod (Semantic.service.js).
+      # NOTE : le chiffre de ~800Mi qui justifiait cette valeur datait du modèle
+      # all-mpnet-base-v2, remplacé depuis par paraphrase-multilingual-MiniLM-L12-v2
+      # (~120 Mo). Valeur conservative en attendant une mesure réelle via
+      # `kubectl top pods` (metrics-server installé le 2026-08-26).
       memory: 512Mi
     limits:
       cpu: 500m

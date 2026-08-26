@@ -57,9 +57,14 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') }) // .env is placed in
 
 const app = express()
 
-// CHOIX: trust proxy activé pour que req.ip reflète le vrai client derrière Traefik
-// RAISON: sans ça, tous les clients partagent l'IP de Traefik — rate limiting inefficace en prod
-app.set('trust proxy', 1)
+// CHOIX: nombre de proxies de confiance devant l'API, configurable par environnement.
+// RAISON: la profondeur de la chaîne dépend du déploiement —
+//   1 (défaut) : Traefik seul (docker-compose), ou ingress-nginx seul (K8s sans Cloudflare)
+//   2          : Cloudflare + ingress-nginx (K8s derrière le proxy Cloudflare)
+// Mal calibré, req.ip pointe sur un proxy au lieu du client : tous les visiteurs
+// partagent alors un même bucket de rate limiting et les logs de sécurité
+// (échecs de connexion, refus RBAC) enregistrent l'IP du proxy.
+app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS, 10) || 1)
 
 // Métriques RED (Rate, Errors, Duration) — exposées sur un serveur HTTP séparé
 // (voir server.js, port METRICS_PORT), jamais via l'Ingress public

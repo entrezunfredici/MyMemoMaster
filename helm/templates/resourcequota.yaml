@@ -1,0 +1,25 @@
+# =============================================================================
+#  ResourceQuota — plafond de consommation du namespace
+#
+#  Prod et preprod partagent le même cluster : l'isolation par namespace est
+#  logique, pas matérielle. Sans quota, une fuite mémoire en preprod crée de la
+#  pression sur le nœud et fait évincer des pods de production.
+#
+#  ATTENTION : dès qu'un quota porte sur requests.*/limits.*, TOUT pod créé dans
+#  ce namespace doit déclarer requests ET limits, sinon il est rejeté.
+# =============================================================================
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ .Release.Name }}-quota
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resourceQuota.requests.cpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.requests.memory | quote }}
+    limits.cpu: {{ .Values.resourceQuota.limits.cpu | quote }}
+    limits.memory: {{ .Values.resourceQuota.limits.memory | quote }}
+{{- end }}

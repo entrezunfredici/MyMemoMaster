@@ -1,0 +1,40 @@
+# =============================================================================
+#  PodDisruptionBudget — API et frontend
+#
+#  Protège contre les interruptions VOLONTAIRES : `kubectl drain` d'un nœud pour
+#  une montée de version, consolidation par un autoscaler. Sans PDB, un drain
+#  évince les deux replicas d'un coup et coupe le service malgré `replicas: 2`.
+#
+#  Créé uniquement quand replicas > 1 : un `minAvailable: 1` sur un replica
+#  unique bloquerait définitivement tout drain de nœud.
+# =============================================================================
+{{- if gt (int .Values.replicas.api) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-api
+{{- end }}
+{{- if gt (int .Values.replicas.front) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-front
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-front
+{{- end }}

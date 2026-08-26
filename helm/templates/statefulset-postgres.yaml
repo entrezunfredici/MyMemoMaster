@@ -17,6 +17,9 @@ spec:
       labels:
         app: {{ .Release.Name }}-postgres
     spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
       containers:
         - name: postgres
           image: postgres:17-alpine
@@ -55,6 +58,9 @@ spec:
         name: postgres-data
       spec:
         accessModes: [ReadWriteOnce]
+        {{- if .Values.storageClass }}
+        storageClassName: {{ .Values.storageClass }}
+        {{- end }}
         resources:
           requests:
             storage: {{ .Values.postgres.storage }}

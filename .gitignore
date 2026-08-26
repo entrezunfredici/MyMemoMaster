@@ -13,5 +13,4 @@ yarn.lock
 k8s/cert-manager/cloudflare-secret.yml
 k8s/kubeconfig/
 
-# Dossier de rendu B2 — copie des docs pour livraison hors dépôt
-annexes/
+PCU-N6AJX6E-openrc.txt
