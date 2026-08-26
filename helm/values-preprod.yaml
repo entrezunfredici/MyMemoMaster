@@ -15,6 +15,9 @@ replicas:
   front: 1
 
 config:
+  # Proxy Cloudflare actif (nuage orange, verifie le 2026-08-26) : 2 sauts
+  # devant l'API (Cloudflare + ingress-nginx).
+  TRUST_PROXY_HOPS: "2"
   ENVIRONMENT: preprod
   API_PUBLIC_URL: https://preprod-api.my-memo-master.com
   CORS_ORIGIN: https://preprod.my-memo-master.com
