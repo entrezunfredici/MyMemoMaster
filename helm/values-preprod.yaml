@@ -39,16 +39,18 @@ storageClass: csi-cinder-sc-delete
 # Priorité basse : la preprod cède la place à la prod sous pression.
 priorityClassName: mmm-preprod
 
-# Plafond calé au-dessus de la somme des limites de la preprod (1,95 vCPU /
-# 3,1 Gi) : une fuite mémoire en preprod ne peut plus faire évincer la prod.
+# Somme des limites en régime établi : 1,95 vCPU / 3,2 Gi. Le plafond doit
+# laisser en plus la place d'un pod de surge pendant un rolling update — le plus
+# gros est l'API (1 Gi). 4 Gi ne suffisait pas (3,2 + 1 = 4,125 Gi) et bloquait
+# tout redéploiement ; 6 Gi laisse la marge sans rendre le garde-fou inopérant.
 resourceQuota:
   enabled: true
   requests:
-    cpu: "1"
-    memory: 2Gi
+    cpu: "2"
+    memory: 3Gi
   limits:
-    cpu: "3"
-    memory: 4Gi
+    cpu: "4"
+    memory: 6Gi
 
 postgres:
   storage: 5Gi

@@ -51,10 +51,18 @@ config:
   PG_POOL_ACQUIRE: "30000"
   PG_POOL_IDLE: "10000"
   REDIS_PORT: "6379"
-  SMTP_HOST: smtp.hostinger.com
+  # Relais SMTP Brevo. Domaine authentifié (brevo-code + DKIM brevo1/brevo2 + DMARC).
+  # SMTP_USER est un login dédié Brevo (…@smtp-brevo.com), PAS l'email du compte ;
+  # SMTP_PASS est la clé SMTP « xsmtpsib-… », pas une clé API v3 « xkeysib-… ».
+  # Hostinger reste l'hébergeur des MX pour la RÉCEPTION sur support@.
+  SMTP_HOST: smtp-relay.brevo.com
   SMTP_PORT: "587"
   SMTP_SECURE: "false"
-  EMAIL_FROM: noreply@my-memo-master.com
+  # Aligné sur l'expéditeur vérifié dans Brevo (« support », DKIM + DMARC validés).
+  # Le domaine étant authentifié, un noreply@my-memo-master.com fonctionnerait aussi
+  # (vérifié par un envoi réel le 2026-08-27) ; on garde support@ pour que les
+  # réponses des utilisateurs arrivent dans une boîte réellement relevée.
+  EMAIL_FROM: support@my-memo-master.com
   API_PUBLIC_URL: ""        # défini dans values-{env}.yaml
   CORS_ORIGIN: ""           # défini dans values-{env}.yaml
   VITE_API_URL: ""          # défini dans values-{env}.yaml
@@ -101,14 +109,18 @@ priorityClassName: ""
 # Plafonne ce que la release peut consommer sur un cluster partagé avec un autre
 # environnement. Désactivé par défaut : à n'activer que sur l'environnement que
 # l'on accepte de voir bridé (la preprod), jamais sur celui que l'on protège.
+# IMPORTANT : dimensionner AU-DESSUS de la somme des limites en régime établi
+# PLUS le pod supplémentaire créé pendant un rolling update (maxSurge). Un quota
+# calé au plus juste bloque sa propre mise à jour : le nouveau pod est refusé,
+# l'ancien n'est jamais retiré, le déploiement reste bloqué (constaté 2026-08-27).
 resourceQuota:
   enabled: false
   requests:
-    cpu: "1"
-    memory: 2Gi
+    cpu: "2"
+    memory: 3Gi
   limits:
-    cpu: "3"
-    memory: 4Gi
+    cpu: "4"
+    memory: 6Gi
 
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
 postgres:
