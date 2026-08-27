@@ -20,7 +20,7 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
-| Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués ; [ADD] 2026-08-15 : révocation JWT (A07-M1, `helpers/tokenBlacklist.js`), `verifyRefreshToken` rejette un compte désactivé | 2026-08-15 |
+| Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués ; [ADD] 2026-08-15 : révocation JWT (A07-M1, `helpers/tokenBlacklist.js`), `verifyRefreshToken` rejette un compte désactivé ; [FIX] 2026-08-27 : `APP_FRONT_URL` (lien de vérification email) n'était transmise à aucun conteneur API — ajoutée à docker-compose.yml (`api`, `api_server`) et au `.env` ; hors Docker les liens partaient vers `http://localhost` | 2026-08-27 |
 | User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
@@ -135,6 +135,8 @@
 | Front — Parcours guidé (onboarding d'usage) | Stable — store guidedTour.js (persisté localStorage) + bandeau GuidedTourBannerComponent dans App.vue + bouton HomePage ; 4 étapes sur les vraies pages (mindmap → Leitner → exercices → planification) avec pré-liaison subjectId/idSystem ; 12 tests Vitest | 2026-07-11 |
 | Front — Visite guidée de l'interface (driver.js) | Stable — auto-lancée au premier login (tour_seen API OnboardingState), relançable depuis HomePage ; store onboarding.js + composable useOnboardingTour + OnboardingTourComponent + ancres data-tour dans App.vue ; driver.js (MIT, remplace intro.js AGPL) ; 20 tests Vitest + 2 tests Jest ; **validée manuellement par l'utilisateur le 2026-07-17** | 2026-07-17 |
 | Dossier B2 (B2_RENDU.md) | À jour — onboarding documenté (§3.3, §9.6), chiffres de tests réels (1 450 API + 617 front), liens annexes corrigés, annexes/dev resynchronisées ; restent 3 placeholders d'assets (Figma, screenshots) + 2 réfs biblio à compléter | 2026-07-17 |
+| Connecteur Odoo (`odoo-plugin/`, hors périmètre applicatif) | Opérationnel — plugin Hermes `odoo-plugin` rendu utilisable en autonome : CLI JSON `odoo_cli.py` + façade `connector.OdooConnector`, accès lus dans le `.env` (`URL`/`BDD`/`MAIL`/`PASSWORD`), droits fournis par `local_rights/rights_plugin_api.py` (le plugin frère `rights-plugin` est absent du dépôt) ; CRUD vérifié en réel sur `bleu-canard.odoo.com` ; dossier gitignoré | 2026-08-27 |
+| Tableau de bord de pilotage (7 indicateurs) | Livré — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % (169/183), coût consommé 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, charge 444 % sur un contributeur, couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -6733,3 +6735,193 @@ Provisionnement du cluster de production chez Infomaniak Public Cloud (OpenStack
 - **Liste d'accès IP de l'API Kubernetes laissée ouverte**, sciemment : le CD déploie depuis des runners GitHub-hosted dont les IP ne sont pas allowlistables. Fermeture conditionnée à un bastion à IP fixe (le VPS de `cd.yml` est candidat).
 - Le commentaire trompeur de `k8s/app/ingress.yml:5` n'a pas été corrigé (fichier hérité, non utilisé par le chart).
 - **Kubeconfig `cluster-admin` dans les secrets GitHub — à remplacer par un ServiceAccount CI dédié (reporté, décision utilisateur du 2026-08-26).** `KUBECONFIG_PREPROD` / `KUBECONFIG_PROD` contiennent le certificat client admin du cluster : toute exécution de workflow capable de lire ces secrets obtient les pleins pouvoirs sur `pck-dkoyol2`, prod comprise. Correctif prévu : ServiceAccount dédié au CI + `Role`/`RoleBinding` limités aux namespaces `mymemomaster` et `mymemomaster-preprod`, token monté dans un kubeconfig réduit — le déploiement fonctionne à l'identique, mais un secret compromis ne permet plus de toucher au reste du cluster. À faire après la validation du premier déploiement réel.
+
+---
+
+### [2026-08-27] INFRA — Bascule de l'envoi d'emails vers le relais SMTP Brevo
+
+#### Contexte
+Suite du 500 à l'inscription (corrigé le matin même en alignant `EMAIL_FROM` sur le compte SMTP Hostinger). Demande utilisateur de passer à une solution d'envoi dédiée. Voir l'entrée correspondante de `DECISIONS.md` pour l'arbitrage (auto-hébergement et Infomaniak Service Mail écartés).
+
+#### Fichiers modifiés
+- `helm/values.yaml` — `SMTP_HOST: smtp-relay.brevo.com`, `EMAIL_FROM: support@my-memo-master.com` (expéditeur vérifié dans Brevo), commentaires documentant les formats de `SMTP_USER` (`…@smtp-brevo.com`) et `SMTP_PASS` (`xsmtpsib-…`, pas `xkeysib-…`).
+- `.env` — identifiants Brevo ; suppression d'un **doublon `EMAIL_FROM` invalide** (`EMAIL_FROM=mymemomaster.com`, sans tirets et sans `@`) ; correction d'`ADMIN_SEED_EMAIL`.
+- Secrets K8s `mmm-prod-secrets` / `mmm-preprod-secrets` — `SMTP_USER`, `SMTP_PASS`, `ADMIN_SEED_EMAIL` (patch `kubectl`, hors chart).
+
+#### Correction de données (prod + preprod)
+`ADMIN_SEED_EMAIL` valait `admin@mymemomaster.com` — **domaine sans aucun enregistrement MX**, donc incapable de recevoir : le compte administrateur de production n'aurait jamais pu recevoir de réinitialisation de mot de passe. Faute de frappe de la même famille que le doublon `EMAIL_FROM`. Après correction du Secret, le redéploiement a rejoué le seeder et créé un **second** compte admin à la bonne adresse, la contrainte d'unicité interdisant un simple `UPDATE`. Le compte périmé (`userId=1`) a donc été supprimé, après vérification que **les 18 tables référençant `User` étaient toutes vides** dans les deux bases. Reste un unique admin par environnement, sur `support@my-memo-master.com`.
+
+#### Vérifications effectuées
+- DNS : `brevo-code`, DKIM `brevo1._domainkey` (TXT) + `brevo2._domainkey` (CNAME), DMARC `p=none` — tous publiés. SPF volontairement **non modifié** (Brevo utilise son propre Return-Path, l'alignement DMARC passe par DKIM ; un `include:spf.brevo.com` serait inutile et consommerait un lookup).
+- `nodemailer.verify()` exécuté dans les pods des deux environnements : authentification SMTP OK.
+- Envoi réel depuis le pod de production vers `support@my-memo-master.com` : accepté.
+
+#### Ce qui est utilisable
+- Envoi d'emails opérationnel en prod et preprod via Brevo, signé DKIM, avec suivi des bounces côté Brevo.
+- Réception inchangée : les MX de `my-memo-master.com` pointent toujours sur Hostinger.
+
+#### Dette / non couvert
+- **`83.228.249.91` — IP de sortie du cluster, autorisée dans Brevo.** Information d'infrastructure critique : si elle change, tous les envois s'arrêtent avec `525 5.7.1 Unauthorized IP address`, et le symptôme visible sera l'impossibilité de s'inscrire. À revérifier après toute opération touchant le routeur OpenStack ou le pool de nœuds (`kubectl exec … -- node -e "fetch('https://api.ipify.org')…"`).
+- **Envoi impossible depuis un poste de développement** tant que le filtrage IP Brevo est actif (IP résidentielle dynamique non autorisée).
+- **Délivrabilité confirmée côté Brevo** (tableau de bord, 2026-08-27) : 2 envois, 1 délivré, 0 bloqué. Le second envoi est le test raté vers `admin@mymemomaster.com` (domaine sans MX) et finira en hard bounce — sans conséquence. Nuance : « délivré » signifie que le serveur destinataire a accepté le message, pas qu'il est en boîte de réception plutôt qu'en indésirables. La réputation d'une IP mutualisée se construit sur les premiers envois.
+- DMARC en `p=none` (observation seule) — à durcir en `quarantine` une fois les rapports Brevo exploités.
+
+---
+
+### [2026-08-27] ADD — Connecteur Odoo : adaptation du plugin `odoo-plugin` hors Hermes
+
+#### Contexte
+Le dossier `odoo-plugin/` (déposé dans le dépôt, gitignoré) est le portage Hermes d'un plugin connecteur Odoo : accès CRUD borné par des droits par champ, plus de la génération de documents bureautiques. Il n'était pas utilisable en l'état hors d'un conteneur Hermes. Le `.env` du projet porte par ailleurs les accès à l'environnement Odoo du projet (`bleu-canard.odoo.com`, section « odoo accès »). Demande : rendre le plugin utilisable comme connecteur, alimenté par ces accès, en préparation d'une tâche à venir.
+
+Trois obstacles constatés à l'audit du code :
+1. `sdk_main`/`sdk_odoo` s'importent en paquets de **premier niveau** — c'est Hermes qui préparait `sys.path` (voir le commentaire de `odoo-plugin/__init__.py`).
+2. `sdk_odoo/odoo_profile.py` construit sa `SDKTable` **au chargement du module**, sur un chemin par défaut `/workspace/openclaw-config/odoo-profiles.json` hérité d'OpenClaw, inexistant ici.
+3. `sdk_odoo/rights_bridge.py` délègue **toute** décision d'autorisation à un plugin frère `rights-plugin`, absent du dépôt (seul `odoo-plugin/` a été copié) : `RIGHTS_AVAILABLE = False` fait échouer en refus **chaque** appel CRUD.
+
+#### Fichiers créés (tous dans `odoo-plugin/`, dossier gitignoré)
+- `connector/env_loader.py` — parseur `.env` maison + résolution/validation des accès Odoo (`OdooSettings`). Priorité : `ODOO_*` d'environnement, puis clés du `.env` (`ODOO_URL`/`URL`, `ODOO_DB`/`BDD`, `ODOO_LOGIN`/`MAIL`, `ODOO_PASSWORD`/`PASSWORD`). Les noms génériques ne sont jamais lus depuis `os.environ`.
+- `connector/bootstrap.py` — prépare `sys.path` + les variables d'environnement du SDK, puis enregistre le profil de connexion. Idempotent.
+- `connector/api.py` — façade `OdooConnector` (`check`, `profile`, `rights`, `list_models`, `list_fields`, `allowed_models`, `allowed_fields`, `read`, `create`, `update`, `delete`).
+- `connector/__init__.py` — exports publics.
+- `local_rights/rights_plugin_api.py` — implémentation locale du contrat `rights_plugin_api` (voir DECISIONS du jour).
+- `odoo_cli.py` — CLI argparse, sortie JSON, code de retour 0/1.
+- `CONNECTEUR.md` — mode d'emploi complet (commandes, droits, variables, limites).
+- `tests/test_connector_env_loader.py`, `tests/test_local_rights.py`, `tests/test_connector_cli.py` — 54 tests, sans connexion Odoo.
+
+#### Fichiers modifiés
+- `odoo-plugin/README.md` — bandeau de 4 lignes renvoyant vers `CONNECTEUR.md`. **Aucun autre fichier du plugin d'origine n'a été touché** (`sdk_main/`, `sdk_odoo/`, `sdk_docs/`, `tools.py`, `cli.py`, `__init__.py`, `dashboard/` inchangés).
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md` — ce ticket.
+
+#### Ce qui est utilisable
+```bash
+cd odoo-plugin
+python odoo_cli.py check                      # valide URL + base + login + mot de passe
+python odoo_cli.py models --grep project
+python odoo_cli.py fields project.task
+python odoo_cli.py read res.partner --domain '[["id","=",1]]' --fields id,name
+python odoo_cli.py create res.partner --values '{"name":"X"}' --yes
+```
+En Python : `from connector import OdooConnector`.
+
+Vérifié en conditions réelles sur `bleu-canard.odoo.com` (base `bleu-canard`, 272 modèles) : `check` authentifie bien l'utilisateur du `.env`, et un cycle complet création → lecture → modification → suppression a été exécuté sur un `res.partner` de test (id 30), **supprimé à l'issue du test**. La normalisation HTML du plugin est active (un `\n` écrit dans un champ `html` ressort en `<p>…<br>…</p>`).
+
+#### Hypothèses posées
+- **Un seul profil de connexion**, nommé `default` (surchargeable par `ODOO_PROFILE_ID`) : le `.env` ne décrit qu'une instance.
+- **Politique de droits par défaut** : lecture libre sur tous les modèles, écriture/suppression autorisées **mais sous confirmation explicite** (`--yes` / `confirmed=True`). Le refus reste le défaut pour tout ce qui sort de ces deux droits. Restriction fine possible en éditant `.local/odoo-rights.json`.
+- **Le mot de passe n'est jamais recopié sur disque** : le profil est persisté sans son secret, injecté dans `os.environ` sous `ODOO_SECRET_DEFAULT.PASSWORD` (chemin de résolution natif de `SecretService`). Aucun trousseau système n'est écrit.
+
+#### Dette / points d'attention
+- **HTTPS uniquement** : `sdk_odoo/odoo_client.py` force le protocole `jsonrpcs`. Une URL en `http://` est refusée avec un message explicite plutôt que de partir en erreur de transport obscure — une instance Odoo locale en HTTP demanderait de modifier `odoo_client.py` (hors périmètre : on ne modifie pas le plugin d'origine).
+- **La suite de tests d'origine du plugin est partiellement rouge, et l'était déjà** : mesuré avant intervention à 27 échecs / 101 succès / 53 erreurs. Deux causes, toutes deux antérieures : `python-pptx` n'est pas installé (`test_docs_pptx`, et par ricochet tout ce qui importe `tools.py` → `sdk_docs`), et `rights-plugin` est absent (`test_rights_bridge`, `test_odoo_cli_for_ai`, `test_odoo_cli_for_config`). Après ajout de la couche : 22 échecs / 160 succès / 53 erreurs — les 5 tests passés au vert sont des tests de `rights_bridge` qui trouvent désormais une implémentation de `rights_plugin_api`. **Effet de bord assumé** : `connector/bootstrap.py` ajoute `local_rights/` à `sys.path` à l'import, ce qui rend la suite d'origine sensible à l'ordre de collecte. Aucun test ne régresse.
+- **`allowed` affiche le modèle `"*"`** tant que la politique par défaut est en place : `rights_bridge.rights_for_profile()` renvoie le motif du droit, pas la liste des modèles réels. Reflet fidèle d'un droit portant sur tous les modèles, mais peu lisible.
+- Le dossier `odoo-plugin/` étant dans `.gitignore`, **rien de tout cela n'est versionné** — une réinstallation depuis un autre poste demandera de recopier le dossier.
+
+---
+
+### [2026-08-27] DOC — Odoo : création de la tâche manquante [M-06.15] Correction sémantique par IA
+
+#### Contexte
+Recherche demandée dans le projet Odoo `MyMemoMasterRNCP` (id 15, 278 tâches, 25 blocs) d'une tâche dédiée à la correction sémantique par IA : **aucune n'existait**, et le terme « sémantique » n'apparaissait ni dans un nom ni dans une description. La mention n'existait qu'en négatif — les 15 tâches du bloc M-06 « Séries d'exercices » portent toutes `OUT : Correction IA avancée`. Aucun autre bloc ne la reprend en `IN` (C-01/C-02/C-05/W-01 portent sur la génération, la suggestion et le chatbot, pas sur la correction).
+
+Écart constaté : le code correspondant est **livré et testé** (`services/Semantic.service.js`, `controllers/Semantic.controller.js`, `routes/Semantic.routes.js`, consommés par `LeitnerCard.service.js` et `Test.service.js` ; tests dans `test/services/Semantic.service.test.js` + parcours BDD exercices/Leitner) alors que le registre officiel ne le couvrait pas.
+
+#### Ce qui a été fait
+Création de la tâche Odoo **id 1337** — `[M-06.15] Séries d'exercices — Correction sémantique par IA (réponses ouvertes)`, sur le gabarit exact des 14 sous-tâches existantes du bloc (relevé avant écriture) : `parent_id` = 1204 (Synthèse M-06), `stage_id` = 156 « en cours », `user_ids` = [2], `tag_ids` = [22 moscow_must, 31 priority_P0, 25 type_dev], `priority` 0, `sequence` 24, `allocated_hours` 70, `display_in_project` false, description HTML reprenant les sections Liens / Contexte / Objectif / Périmètre IN-OUT / DoD (checklist cochée, comme le gabarit) / Notes-Journal.
+
+Dates : `planned_date_begin` 2025-10-02, `date_deadline` 2026-01-23 — soit octobre → janvier comme demandé, ce qui recouvre exactement l'amplitude de la tâche Synthèse M-06 (2025-10-02 → 2026-01-23). La tâche traverse donc les sprints 4 à 7 du bloc.
+
+#### Hypothèses posées
+- **Rattachement à M-06** plutôt que création d'un nouveau bloc : une seule tâche était demandée, et les blocs existants sont tous constitués d'une Synthèse + N sous-tâches.
+- **Étape « en cours »** : c'est celle de toutes les tâches de développement livrées du bloc (M-06.04 à M-06.09, M-06.13), y compris M-06.05 « Moteur de correction ». Passer directement en « validé » aurait été le seul cas du bloc.
+- **70 h** : barème des tâches back-end du bloc (M-06.04 à M-06.07).
+- La ligne `OUT : Correction IA avancée` des 14 autres tâches **n'a pas été modifiée** (hors demande). La frontière est tranchée dans le « Point d'attention » de la nouvelle tâche — voir DECISIONS du jour.
+
+#### Dette / points d'attention
+- `allocated_hours` de la Synthèse M-06 (645 h) est une valeur stockée, égale à la somme des 14 anciennes sous-tâches : elle **n'a pas été réajustée** à 715 h. À corriger si ce total est exploité dans un rendu.
+- Les 14 tâches sœurs continuent d'afficher `OUT : Correction IA avancée` sans qualificatif : un lecteur qui ouvre M-06.05 avant M-06.15 peut encore conclure à tort que toute correction IA est hors périmètre.
+
+#### Suite (même jour) — visibilité Gantt de la tâche 1337
+`display_in_project` est un champ **calculé et readonly** sur `project.task` : une tâche n'apparaît dans les vues projet (dont le Gantt) que si elle n'a **pas** de parent (ou si son projet diffère de celui du parent). Impossible donc de le forcer par écriture directe.
+
+Sur les 279 tâches du projet, 29 seulement ont `display_in_project = True`, et toutes sont à la racine. Trois d'entre elles portent pourtant un nom de sous-tâche — `[M-00.10]` (1126), `[M-01.02]` (1335), `[M-01.03]` (1336) : c'est la pratique déjà en place dans ce projet pour faire remonter une sous-tâche dans le Gantt, le rattachement au bloc restant porté par le préfixe du nom et par le `Feature list ID` de la description. La Synthèse M-01 n'a d'ailleurs plus que 12 enfants pour cette raison.
+
+`parent_id` de la tâche 1337 mis à `False` en conséquence : `display_in_project` est repassé à `True`, dates conservées (2025-10-02 → 2026-01-23), la tâche apparaît dans le Gantt. La Synthèse M-06 (1204) retrouve ses 14 enfants — cohérent avec la ligne « Nombre de sous-tâches: 14 » de sa description, que l'ajout d'une 15ᵉ sous-tâche avait rendue fausse.
+
+**Modification externe constatée sur 1337** : entre la création (14:36) et cette vérification (14:41), la tâche a été modifiée depuis le compte `Frederic Macabiau` (uid 2) hors du connecteur — `stage_id` « en cours » → **« validé »**, `allocated_hours` 70 → **645**, `user_ids` [2] → **[10, 17, 14]** (Achouak Dairak, Isra Guesmi, Ouassim D.). Ces valeurs n'ont pas été rétablies (édition possiblement volontaire). À noter : 645 h est exactement le total de la Synthèse M-06 — la tâche étant désormais à la racine, ces heures se cumulent au total du projet.
+
+**Précision utilisateur du 2026-08-27** : l'amplitude 02/10/2025 → 23/01/2026 est **volontaire** — l'équipe n'a pas travaillé sur ce périmètre en continu, le travail s'est étalé par intermittence sur les sprints 4 à 7. La durée affichée dans le Gantt n'est donc pas une charge continue, contrairement aux autres sous-tâches du bloc qui couvrent un créneau resserré. Précision consignée dans le Notes / Journal de la tâche 1337 pour éviter une relecture erronée. Les assignations à trois membres de l'équipe (uids 10, 17, 14) relèvent de la même logique et sont conservées.
+
+---
+
+### [2026-08-27] DOC — Compte rendu de pilotage : les 7 indicateurs mesurés (docs/COMPTE_RENDU_METRIQUES.md)
+
+#### Contexte
+Demande d'un compte rendu au format Markdown sur sept indicateurs de pilotage (avancement, coûts, délais, risques, RH, couverture SonarQube, non-conformités RGAA). Aucun tableau de bord n'existait : les données étaient dispersées entre le projet Odoo `MyMemoMasterRNCP` (registre officiel), le dépôt Git, SonarCloud et les suites de tests. Toutes les valeurs ont été **mesurées** le jour même, aucune reprise de chiffre documentaire sans re-vérification.
+
+#### Fichiers créés
+- `docs/COMPTE_RENDU_METRIQUES.md` — tableau de bord des 7 indicateurs + une section d'analyse par dimension + plan d'actions priorisé P0→P3 + annexe de reproductibilité (commande ou source pour chaque chiffre).
+
+#### Mesures relevées (2026-08-27)
+- **Avancement** — 279 tâches Odoo : 16 en étape « validé » (5,7 %), 169 à l'état « Terminé » (60,6 %), **169/183 sur le périmètre MVP `M-*`/`S-*` (92,3 %)**. Les 95 tâches `C-*`/`W-*` sont toutes en spécification et non chiffrées.
+- **Coûts** — charge planifiée des tâches élémentaires : 9 099 h après correction (1 137,4 JH, 341 212 €) ; terminé : 8 819 h (1 102,4 JH, **330 712 €**) ; reste MVP : 280 h (10 500 €).
+- **Délais** — Gantt 2025-05-20 → 2026-05-08 (254 j ouvrés) ; écart médian **+127 j** sur les 8 tickets appariables (min +73, max +216) ; fin de Gantt dépassée de 111 j.
+- **Risques** — 185 liens de dépendance non levés, 79 verrous, 92 tâches immobilisées (toutes hors MVP) ; + 6 dépendances d'infrastructure ouvertes issues du présent journal.
+- **RH** — 252 des 254 tâches élémentaires sur un seul contributeur : 1 128,6 JH pour 254 JH de capacité (**444 %**).
+- **Couverture SonarQube** — **0,0 %** (analyse du 2026-08-27 09:39 UTC) : aucun `lcov` publié. Couverture réelle mesurée localement : **API 86,6 % instructions / 87,21 % lignes / 68,99 % branches, 1 545 tests / 84 suites verts**. Front : **685 tests / 44 fichiers verts**, couverture non mesurable (`@vitest/coverage-v8` absent).
+- **RGAA** — **0 non-conformité** sur les 5 critères outillés, `scripts/audit-a11y.mjs` ré-exécuté sur 79 fichiers `.vue` (73 lors de la campagne du 2026-07-06 : la conformité tient sur les 6 fichiers ajoutés depuis).
+- **Autres relevés SonarCloud** : 33 940 ncloc, 9 bugs, 28 vulnérabilités, 704 code smells, 2,5 % duplication, dette 4 594 min ; notes maintenabilité A, fiabilité D, sécurité D.
+
+#### Hypothèses posées
+- **1 JH = 8 h**, lu dans le calendrier de ressource Odoo (`resource.calendar` « Standard 40 hours/week »), et non supposé.
+- **« JH consommés » = charge planifiée des tâches terminées** : aucune feuille de temps n'existe (`date_end` et heures effectives vides sur les 279 tâches). L'hypothèse est explicitée dans le rendu.
+- **Assiette de coût = tâches élémentaires uniquement** (les Synthèses agrègent et feraient double compte).
+- **Correction de la tâche 1337** ramenée de 645 h à 70 h dans le calcul (voir DECISIONS du jour).
+
+#### Ce qui est utilisable
+- Le rendu est autoportant pour un jury ou un comité de pilotage : chaque chiffre est daté, sourcé, et accompagné de sa réserve de fiabilité.
+- L'annexe permet de rejouer les 6 mesures à l'identique.
+
+#### Dette / points d'attention
+- **Aucune donnée Odoo n'a été modifiée** : les corrections identifiées (tâche 1337, étapes Kanban des 169 tâches terminées, totaux des Synthèses) sont recommandées dans le §8 mais non appliquées — le registre officiel reste en l'état.
+- **La couverture front n'est pas mesurée** : elle exigerait la devDependency `@vitest/coverage-v8`, non ajoutée (règle sur les dépendances externes).
+- **L'appariement délais est fragile** : 8 tickets seulement sur 252 codés portent à la fois une entrée datée dans ce journal et une échéance Odoo. La médiane +127 j est indicative.
+- Le rendu fige une photo au 2026-08-27 ; il n'est pas régénéré automatiquement.
+
+---
+
+### [2026-08-27] FIX — Lien de vérification email : `APP_FRONT_URL` jamais transmise aux conteneurs API
+
+#### Contexte
+Signalement d'une erreur à la validation du code de vérification : le lien reçu par email (`http://localhost/verify-email?email=…&code=…`) renvoyait `ERR_CONNECTION_REFUSED` dans le navigateur.
+
+#### Diagnostic
+Deux causes distinctes, mesurées avant toute correction :
+
+1. **Cause immédiate — aucun service n'écoutait sur le port 80.** Le démon Docker était arrêté (`docker info` en échec) ; relevé des ports en écoute : seuls 5432 (PostgreSQL natif) et 8080 (`httpd`, hors projet) étaient occupés, rien sur 80, 3000 ni 5173. Les six conteneurs du projet étaient en `Exited (137)`. Le navigateur ne pouvait donc joindre ni le front ni Traefik — l'erreur affichée n'est pas une erreur applicative.
+2. **Cause de fond — `APP_FRONT_URL` n'était câblée nulle part.** `User.controller.js:15` et `:163` lisent `process.env.APP_FRONT_URL || 'http://localhost'`. La variable est documentée dans `.env.example:37` mais était **absente du `.env`** et **absente des blocs `environment` des deux services API** du `docker-compose.yml` (`api`, profil dev, ligne ~156 ; `api_server`, profils test/prod, ligne ~307), **ni des `values` Helm, ni des ConfigMaps Kubernetes** (`helm/values*.yaml`, `k8s/preprod/configmap.yml`, `k8s/prod/configmap.yml` — les déploiements API consomment pourtant la ConfigMap entière via `envFrom`). Les conteneurs retombaient donc toujours sur le repli codé en dur, sur les trois chemins de déploiement. Invisible en dev (Traefik sert bien le front sur `http://localhost:80`), mais en test/preprod/prod chaque email serait parti avec un lien vers `http://localhost`. Même nature que le défaut `MAX_USERS` corrigé le 2026-08-15 : variable lue par le code, documentée, mais jamais injectée.
+
+Le code applicatif lui-même est **hors de cause** : le contrôleur, `User.service.js` (`setValidEmailCode` / `verifyValidEmailCode`, code 6 chiffres + expiration 30 min, consommation à usage unique), la route `POST /users/verify-email`, le store `auth.js:200` et `VerifyEmailPage.vue` (auto-vérification depuis `?email` + `?code` au `onMounted`) ont été relus et sont cohérents.
+
+#### Fichiers modifiés
+- `docker-compose.yml` — `APP_FRONT_URL: ${APP_FRONT_URL:-${VITE_FRONT_URL}}` ajouté au service `api` (dev) ; `APP_FRONT_URL: ${APP_FRONT_URL:-https://${FRONT_DOMAIN}}` ajouté au service `api_server` (test/prod). Adossés aux variables déjà utilisées par `CORS_ORIGIN` dans chaque profil.
+- `.env` — `APP_FRONT_URL=http://localhost` ajouté à la section Backend (aligné sur `.env.example`).
+- `helm/values.yaml` — clé `APP_FRONT_URL: ""` déclarée (définie par environnement, comme `CORS_ORIGIN`).
+- `helm/values-preprod.yaml` / `helm/values-prod.yaml` — `APP_FRONT_URL` = `https://preprod.my-memo-master.com` / `https://app.my-memo-master.com`.
+- `k8s/preprod/configmap.yml` / `k8s/prod/configmap.yml` — `APP_FRONT_URL` = `https://preprod.my-memo-master.com` / `https://my-memo-master.com`.
+
+#### Vérifications effectuées
+- `helm template mmm helm -f helm/values-prod.yaml` : `APP_FRONT_URL: "https://app.my-memo-master.com"` bien rendu dans la ConfigMap. Les 5 fichiers YAML touchés repassent au parseur sans erreur.
+- `docker compose config` : la valeur résolue est bien `APP_FRONT_URL: http://localhost` (l'expansion imbriquée `${A:-${B}}` est supportée) ; `docker compose exec api sh -c 'echo $APP_FRONT_URL'` → `http://localhost` dans le conteneur.
+- Stack dev relancée (`docker compose up -d`) : les six conteneurs démarrent, Traefik prend bien `0.0.0.0:80->80/tcp` **et** `8080` malgré `httpd` sur 8080 (pas de conflit constaté).
+- Chaîne HTTP complète, ~30 s après démarrage : `GET http://localhost/` → 200, `GET http://localhost/verify-email?email=…&code=…` → 200, `GET http://localhost/api/v1/health` → 200 `{"status":"ok"}`.
+- Endpoint de vérification testé de bout en bout via Traefik, code posé en base puis consommé : `POST /api/v1/users/verify-email` → **201 « Email vérifié avec succès. »**, puis rejeu du même code → **401 « Code invalide. »** (usage unique confirmé). État de la base restauré à l'identique après le test.
+
+#### Constats relevés en base (non modifiés)
+- `superfred2468@gmail.com` (userId 2, créé le 2026-07-18) est **déjà en `hasValidatedEmail = true`**, `validEmailCode` à `null`. Le lien de l'email en cours de test (code `545164`) ne peut donc plus aboutir : il retournerait « Code invalide. » même une fois le front joignable — le code a été consommé ou a expiré. C'est un lien périmé, pas un défaut de la chaîne.
+- **Les inscriptions sont fermées** : `MAX_USERS=3` dans le `.env` pour **4 utilisateurs actifs** en base. `User.service.js:44` (`isRegistrationOpen`) refuse donc toute nouvelle inscription avec un 403 « Le nombre maximal d'utilisateurs a été atteint. ». Valeur volontaire, laissée en l'état — à relever si un compte de test doit être créé.
+
+#### Dette / points d'attention
+- **La base PostgreSQL native du poste (port 5432) et celle du conteneur divergent** : la native ne contient qu'un `admin@mymemomaster.local` daté du 2026-06-21, la Docker porte les comptes réels. Une exécution de l'API hors Docker (`npm run start`, `PG_HOST=localhost`) taperait sur la base native, avec un jeu de données sans rapport. `my_memo_master_api/db.sqlite` (2026-07-05) est un vestige d'un schéma antérieur — il n'a pas la colonne `validEmailCodeExpiresAt` — alors que `dbms.config.js` ne déclare que le dialecte `postgres`.
+- **Le domaine du front diverge entre les deux descripteurs de production** : `helm/values-prod.yaml` déclare `app.my-memo-master.com`, `k8s/prod/configmap.yml` déclare `my-memo-master.com` (l'apex, qui sert la landing page hors cluster d'après le commentaire de `values-prod.yaml`). `APP_FRONT_URL` a été aligné sur le `VITE_FRONT_URL`/`CORS_ORIGIN` **de chaque fichier**, sans trancher lequel fait foi — divergence antérieure, à arbitrer.
+- **Aucun test ne couvre la construction du lien de vérification** : ni la présence de `APP_FRONT_URL` dans l'environnement, ni le format de l'URL produite. La même régression pourrait repasser silencieusement.
+- **Le port 80 est une ressource partagée du poste** : Traefik ne démarrera pas si un autre serveur le prend, et le symptôme sera exactement celui rencontré ici (`ERR_CONNECTION_REFUSED` sur un lien pourtant correct).

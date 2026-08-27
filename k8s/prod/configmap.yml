@@ -52,6 +52,7 @@ data:
   # ── Domaines ─────────────────────────────────────────────────────────────────
   API_PUBLIC_URL: "https://api.my-memo-master.com"
   CORS_ORIGIN: "https://my-memo-master.com"
+  APP_FRONT_URL: "https://my-memo-master.com"
   VITE_API_URL: "https://api.my-memo-master.com/api/v1"
   VITE_FRONT_URL: "https://my-memo-master.com"
 

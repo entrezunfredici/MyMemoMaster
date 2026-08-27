@@ -154,6 +154,8 @@ services:
       AUTH_JWT_EXPIRES_IN: ${AUTH_JWT_EXPIRES_IN:-1d}
       API_BYPASS_AUTH: ${API_BYPASS_AUTH:-false}
       API_PUBLIC_URL: http://${API_DOMAIN}
+      # Lien de vérification email envoyé aux utilisateurs — doit pointer sur le front (Traefik :80)
+      APP_FRONT_URL: ${APP_FRONT_URL:-${VITE_FRONT_URL}}
       CORS_ORIGIN: ${VITE_FRONT_URL}
       EMAIL_FROM: ${EMAIL_FROM}
       SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}
@@ -305,6 +307,8 @@ services:
       AUTH_JWT_EXPIRES_IN: ${AUTH_JWT_EXPIRES_IN:-1d}
       API_BYPASS_AUTH: ${API_BYPASS_AUTH:-false}
       API_PUBLIC_URL: https://${API_DOMAIN}
+      # Lien de vérification email envoyé aux utilisateurs — doit pointer sur le front public
+      APP_FRONT_URL: ${APP_FRONT_URL:-https://${FRONT_DOMAIN}}
       CORS_ORIGIN: https://${FRONT_DOMAIN}
       EMAIL_FROM: ${EMAIL_FROM}
       SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}

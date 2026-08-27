@@ -65,6 +65,8 @@ config:
   EMAIL_FROM: support@my-memo-master.com
   API_PUBLIC_URL: ""        # défini dans values-{env}.yaml
   CORS_ORIGIN: ""           # défini dans values-{env}.yaml
+  # URL publique du front — sert à construire le lien de vérification email
+  APP_FRONT_URL: ""         # défini dans values-{env}.yaml
   VITE_API_URL: ""          # défini dans values-{env}.yaml
   VITE_FRONT_URL: ""        # défini dans values-{env}.yaml
   PGADMIN_DEFAULT_EMAIL: admin@my-memo-master.com

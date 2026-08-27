@@ -8,6 +8,7 @@
 node_modules
 cadrage
 yarn.lock
+odoo-plugin
 
 # Secrets k8s — contiennent des tokens réels, ne jamais commiter
 k8s/cert-manager/cloudflare-secret.yml

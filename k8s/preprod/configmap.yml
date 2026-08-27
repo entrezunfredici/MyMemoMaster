@@ -53,6 +53,7 @@ data:
   # ── Domaines ─────────────────────────────────────────────────────────────────
   API_PUBLIC_URL: "https://preprod-api.my-memo-master.com"
   CORS_ORIGIN: "https://preprod.my-memo-master.com"
+  APP_FRONT_URL: "https://preprod.my-memo-master.com"
   VITE_API_URL: "https://preprod-api.my-memo-master.com/api/v1"
   VITE_FRONT_URL: "https://preprod.my-memo-master.com"
 
