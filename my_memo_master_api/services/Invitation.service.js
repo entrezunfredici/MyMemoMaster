@@ -1,5 +1,6 @@
 const { Invitation, ClassGroup, ClassGroupUsers, Etablissement, User } = require('../models/index')
 const sendEmail = require('../helpers/sendEmail')
+const getFrontUrl = require('../helpers/frontUrl')
 const logger = require('../helpers/logger')
 const AuditLogService = require('./AuditLog.service')
 
@@ -72,7 +73,7 @@ class InvitationService {
     })
 
     const roleLabel = role === 'teacher' ? 'enseignant' : 'étudiant'
-    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
+    const frontUrl = getFrontUrl()
 
     try {
       await sendEmail(

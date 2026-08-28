@@ -3,6 +3,7 @@
 > **Périmètre** : déploiement des environnements **preprod** (cluster Infomaniak mutualisé) et **prod** (cluster Infomaniak dédié) via **Helm**.
 > Branches git : `staging` → preprod · `main` → prod · Chart : [helm/](../helm/) · Déploiement automatisé par [.github/workflows/cd.yml](../.github/workflows/cd.yml) (jobs `deploy_preprod` / `deploy_prod`).
 > Pour l'environnement de test (VPS Docker Compose), voir [MANUEL_DEPLOIEMENT_VPS.md](MANUEL_DEPLOIEMENT_VPS.md).
+> Pour l'outillage déployé sur le même cluster (SonarQube, nœud dédié), voir [MANUEL_SONARQUBE_K8S.md](MANUEL_SONARQUBE_K8S.md).
 
 > ⚠️ **Note historique** : les manifests bruts [k8s/preprod/](../k8s/preprod/) et [k8s/prod/](../k8s/prod/) sont conservés en référence mais **ne sont plus appliqués par le CD** depuis la migration vers Helm (décision du 2026-06-30, [.agents/DECISIONS.md](../.agents/DECISIONS.md)). Toute modification de déploiement passe par le chart `helm/`.
 
