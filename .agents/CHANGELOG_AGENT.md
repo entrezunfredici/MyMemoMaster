@@ -137,7 +137,8 @@
 | Dossier B2 (B2_RENDU.md) | À jour — onboarding documenté (§3.3, §9.6), chiffres de tests réels (1 450 API + 617 front), liens annexes corrigés, annexes/dev resynchronisées ; restent 3 placeholders d'assets (Figma, screenshots) + 2 réfs biblio à compléter | 2026-07-17 |
 | Connecteur Odoo (`odoo-plugin/`, hors périmètre applicatif) | Opérationnel — plugin Hermes `odoo-plugin` rendu utilisable en autonome : CLI JSON `odoo_cli.py` + façade `connector.OdooConnector`, accès lus dans le `.env` (`URL`/`BDD`/`MAIL`/`PASSWORD`), droits fournis par `local_rights/rights_plugin_api.py` (le plugin frère `rights-plugin` est absent du dépôt) ; CRUD vérifié en réel sur `bleu-canard.odoo.com` ; dossier gitignoré ; première écriture de masse le 2026-08-27 (137 tâches repositionnées à l'étape « validé ») | 2026-08-27 |
 | Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
-| Tableau de bord de pilotage (7 indicateurs) | Livré — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
+| Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28** sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
+| Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Reste à faire : poser les secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR`** (valeurs prêtes dans `helm-sonarqube/credentials.local`, non commité) — sans eux le job échoue au premier push sur `main` | 2026-08-28 |
 
 **Modules implémentés et stables :**
@@ -7341,3 +7342,42 @@ Sont donc en attente : les 24 tâches `IA`, plus `QA.03` et `QA.05` (tests E2E P
 - **La chaîne CI complète n'a pas été éprouvée** : le tunnel `port-forward` depuis un runner GitHub et l'exécution réelle du scanner restent non vérifiés. Seuls les maillons pris séparément le sont (instance UP, token valide, projet créé).
 - Le projet a été créé en visibilité **`public`** (défaut de l'instance). Sans effet tant que rien n'est exposé, à revoir si un Ingress est ajouté un jour.
 - Les 4 pods applicatifs restés sur `…-5sx65` y tourneront jusqu'à leur prochain rollout — état transitoire normal, mais le nœud n'est pas encore réellement vidé.
+
+---
+
+### [2026-08-28] DOC — Compte rendu de pilotage réédité sur le registre remis à plat
+
+**Demande** : mettre à jour le rapport maintenant que le planning est à plat dans Odoo.
+
+#### Remises en état préalables, nécessaires au calcul
+Deux défauts rendaient les mesures fausses et ont été corrigés avant de recalculer :
+- **Trois sous-tâches racine avaient perdu les valeurs écrites** — `1126` (`[M-00.10]`), `1335` (`[M-01.02]`), `1336` (`[M-01.03]`). Elles étaient bien dans le lot du report et la relecture immédiate ne montrait aucun écart, mais elles étaient revenues à leurs anciennes charges et dates. Point commun : ce sont les trois tâches **détachées de leur parent** (`parent_id = False`) pour être visibles dans le Gantt. Valeurs réécrites et revérifiées.
+- **Les 31 Synthèses portaient encore leurs anciennes charges et dates** (`M-00b` : 1 901 h déclarées pour 520 h d'enfants ; `MKT` : 1 461 h pour 216 h). Elles sont désormais **alignées : dates = min/max des enfants, charge propre = 0**. Le total du bloc reste lisible via `subtask_allocated_hours`, calculé par Odoo — ce qui supprime tout risque de double compte dans une somme naïve, contrairement à un report de la somme sur le parent.
+
+#### Les sept indicateurs recalculés
+| Dimension | Valeur |
+|---|---|
+| Avancement | **87,0 %** (241/277 sur le périmètre engagé) ; 68,9 % rapporté aux 350 sous-tâches |
+| Coûts | **100 275 €** validés (334,2 JH) sur **124 050 €** planifiés (413,5 JH) ; reste 23 775 € |
+| Délais | **63 tâches** au-delà de leur échéance, 1 058 h — dont **30 sur le seul bloc `IA`** et 20 sur `C-01`/`C-02` |
+| Risques | **183 liens** ouverts, 78 verrous, 91 tâches immobilisées — dont **89 hors périmètre engagé** |
+| RH | **411 JH / 483 JH = 85 %**, ventilé sur **7 profils** ; pointe SysAdmin à 113 % |
+| Couverture SonarQube | **0 %** — inchangé |
+| Non-conformités RGAA | **0** sur les 5 critères outillés — inchangé |
+
+#### Ce que la réédition change dans la nature des indicateurs
+- **Avancement** : les trois lectures divergentes de l'arrêté précédent (5,7 % / 60,6 % / 92,3 %) sont réduites à une seule. **0 tâche à l'état « Terminé » sans l'étape « validé »**.
+- **RH** : l'indicateur « charge par profil », déclaré *non alimentable* aux deux arrêtés précédents faute de profil renseigné, l'est enfin — les rôles viennent du planning d'équipe. Et le plan **tient dans la capacité** (85 %) là où le précédent demandait 2,8× le produisible.
+- **Délais** : l'écart cesse d'être un vice de construction du plan pour devenir un écart d'exécution. Le rapport précise en revanche qu'un écart **jour pour jour** n'a aucun sens contre un plan volontairement condensé (deux ans ramenés à dix mois) — l'indicateur mesure le reste-à-faire dont l'échéance est passée, pas une dérive chronologique.
+- **Coûts** : deux réserves nouvelles écrites noir sur blanc — les durées sont une estimation « junior » (×1,74 sur le planning d'équipe), et la répartition dans un bloc est une convention (parts égales, grain différent entre les 192 lignes du planning et les 350 sous-tâches Odoo).
+
+#### Section nouvelle — §7.3 « Qualité de la déclaration »
+Les 27 tâches déclarées faites mais non confirmées par le dépôt (24 du bloc `IA`, 3 de `QA`) sont documentées dans une section propre, avec la confrontation déclaration / contenu du dépôt. Elles sont **comptées comme non validées** dans tous les indicateurs — choix prudent, qui explique 30 des 63 retards. L'arbitrage est en **P0** du plan d'action : soit le service IA existe dans un dépôt séparé et il faut le référencer, soit le planning déclare un périmètre non livré.
+
+#### Mis à jour aussi
+`§7.1` : l'analyse a migré de SonarCloud vers une **instance SonarQube auto-hébergée** sur le cluster (commit `17e8cc0` du jour, chart `helm-sonarqube/`). La migration ne résout pas le problème de fond — `sonar.javascript.lcov.reportPaths` reste non renseigné, la couverture affiche toujours 0 %.
+
+#### Dette / points d'attention
+- Le bandeau « arrêté périmé » posé plus tôt dans la journée est retiré : le document décrit à nouveau l'état réel.
+- Les indicateurs de qualité (couverture, RGAA) sont repris de l'arrêté du 2026-08-27 : le code applicatif n'a pas changé depuis (seuls `.agents/`, `docs/` et le chart SonarQube ont bougé).
+- L'action P2 « réassigner les 181 sous-tâches de développement » reste ouverte : elles sont toutes au chef de projet alors que les 6 blocs transverses ont des assignés nominatifs.

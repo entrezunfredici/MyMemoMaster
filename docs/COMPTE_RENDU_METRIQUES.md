@@ -1,11 +1,12 @@
 # Compte rendu de pilotage — MyMemoMaster
 
-> ⚠️ **Ce compte rendu est un arrêté au 2026-08-27. Les chiffres de charge et de délais qu'il contient ne décrivent plus l'état d'Odoo.** Le 2026-08-28, les 181 sous-tâches des blocs couverts par le planning d'équipe ont été redatées et rechiffrées sur des durées « dev junior » (voir `.agents/CHANGELOG_AGENT.md`) : la charge élémentaire passe de **1 209 JH à 262 JH** et la fenêtre de **2025-05-20 → 2026-05-08** à **2025-10-07 → 2026-07-21**. Les §3 (coûts), §4 (délais) et §6 (RH) sont à recalculer sur cette base ; les §2 (avancement), §5 (risques) et §7 (qualité) restent valables.
+**Date d'arrêté des mesures** : 2026-08-28
+**Périmètre** : projet Odoo `MyMemoMasterRNCP` (id 15, 381 tâches) + planning d'équipe `17_planning_MyMemoMaster.xlsx` + dépôt Git + SonarQube + suites de tests locales.
+**Taux journalier retenu** : 300 €/JH. **Conversion** : 1 JH = 8 h.
+**Calendrier de référence** : plan condensé — 3 jours travaillés (mardi, mercredi, jeudi) toutes les 3 semaines, du **07/10/2025** au **18/06/2026** (13 cycles, 39 JH par personne), puis reprise par le seul chef de projet à taux plein jusqu'au **21/07/2026**.
+**Durées** : estimation « développeur junior », établie tâche par tâche sur les 192 lignes du planning d'équipe. **C'est un jugement argumenté, pas une mesure** — voir la réserve du §3.
 
-**Date d'arrêté des mesures** : 2026-08-27
-**Périmètre** : projet Odoo `MyMemoMasterRNCP` (id 15, 279 tâches) + dépôt Git + SonarCloud + suites de tests locales.
-**Taux journalier retenu** : 300 €/JH. **Conversion** : 1 JH = 8 h (calendrier de ressource Odoo « Standard 40 hours/week », `hours_per_day = 8`).
-**Régime de travail retenu** (déclaré par le porteur du projet, non déductible des données Odoo — le calendrier de ressource y est à temps plein pour tout le monde) : **Frederic Macabiau à temps plein** ; **tous les autres contributeurs à 1 jour toutes les 3 semaines**. C'est cette asymétrie, et non le calendrier Odoo, qui sert de base à l'indicateur RH (§6) et à la lecture des délais (§4).
+> **Ce qui a changé depuis l'arrêté du 2026-08-27.** Le registre Odoo a été remis à plat : gabarit à 70 h/tâche remplacé par les durées du planning d'équipe, dates reposées sur le calendrier condensé, 6 blocs transverses créés (marketing, design, service IA, recette, pilotage, documentation), Synthèses alignées sur leurs enfants, étapes Kanban validées sur preuve. **Les sept indicateurs sont recalculés sur cette base.** Les valeurs de l'arrêté précédent (330 712 €, 1 137 JH, 281 % de surcharge) reposaient sur un chiffrage de gabarit et ne sont plus comparables.
 
 ---
 
@@ -13,112 +14,105 @@
 
 | Dimension | Indicateur | Unité | Valeur mesurée | Fiabilité |
 |---|---|---|---|---|
-| Avancement | Tâches validées / total | % | **83,6 %** sur le périmètre MVP au sens de l'étape Odoo « validé » (153/183) — **54,8 %** rapporté aux 279 tâches (153/279) — **92,3 %** au sens de l'état « Terminé » sur le MVP (169/183) | ⚠️ Deux lectures divergentes, écart résiduel de 16 tâches (voir §2) |
-| Coûts | JH consommés × 300 €/j | € | **330 712 €** (1 102,4 JH — charge planifiée des tâches terminées) ; enveloppe totale planifiée **341 212 €** (1 137,4 JH) | ❌ Sans source : aucune saisie de temps, module Feuilles de temps absent de l'instance |
-| Délais | Dates réelles vs Gantt prévisionnel | jours d'écart | **+127 j (médiane)** sur les 8 tickets appariables ; amplitude +73 à +216 j. Fin de Gantt 2026-05-08 dépassée de **111 jours** | ⚠️ Plan de référence solide (transcrit d'un planning *ex ante*, §4) mais aucune date de fin réelle dans Odoo |
-| Risques | Dépendances bloquantes non levées | nb | **185 liens** de dépendance ouverts, portés par **79 verrous** distincts, immobilisant **92 tâches** — plus **6 dépendances d'infrastructure** externes ouvertes | ✅ Mesure directe |
-| RH | Charge par profil / capacité disponible | JH | **1 137,4 JH planifiés pour 405,2 JH de capacité réelle = 281 %** à l'échelle de l'équipe ; **444 %** sur le seul contributeur à temps plein (1 128,6 / 254 JH) ; 3 contributeurs à 8,8 JH (52 %) ; 6 membres à 0 JH | ✅ Mesure directe, sur régime de travail déclaré |
-| Qualité | Couverture de tests SonarQube | % | **0,0 %** (analyse SonarCloud du 2026-08-27 09:39 UTC) — couverture réelle non publiée : **86,6 %** mesurée localement sur l'API | ❌ Indicateur non alimenté |
-| Qualité | Non-conformités RGAA | nb | **0** sur les 5 critères outillés (79 fichiers `.vue` ré-audités ce jour) | ⚠️ Périmètre outillé, pas les 106 critères |
+| Avancement | Tâches validées / total | % | **87,0 %** sur le périmètre engagé (241/277) — 68,9 % rapporté aux 350 sous-tâches, backlog non chiffré inclus | ✅ Étape et état alignés (0 écart) |
+| Coûts | JH consommés × 300 €/j | € | **100 275 €** validés (334,2 JH) ; enveloppe planifiée **124 050 €** (413,5 JH) ; reste à faire **23 775 €** | ⚠️ Charge planifiée, aucune saisie de temps possible |
+| Délais | Dates réelles vs Gantt prévisionnel | jours d'écart | **63 tâches** au-delà de leur échéance (1 058 h), dont 30 sur le seul bloc `IA` ; plan clos au 21/07/2026 | ⚠️ Le plan est condensé — voir §4 |
+| Risques | Dépendances bloquantes non levées | nb | **183 liens** ouverts, **78 verrous** distincts, **91 tâches** immobilisées — plus **6 dépendances d'infrastructure** | ✅ Mesure directe |
+| RH | Charge par profil / capacité disponible | JH | **411 JH pour 483 JH de capacité = 85 %**, réparti sur **7 profils** ; pointe à 113 % (SysAdmin) | ✅ Alimentable pour la première fois |
+| Qualité | Couverture de tests SonarQube | % | **0,0 %** — aucun rapport `lcov` publié ; couverture réelle **86,6 %** mesurée localement sur l'API | ❌ Indicateur non alimenté |
+| Qualité | Non-conformités RGAA | nb | **0** sur les 5 critères outillés (79 fichiers `.vue`) | ⚠️ Périmètre outillé, pas les 106 critères |
+
+**Ce que ce tableau ne dit pas et qu'il faut dire avec lui** : 27 tâches déclarées faites dans le planning ne sont **pas confirmées par le dépôt** (§7.3). Elles sont comptées comme non validées dans l'indicateur d'avancement, ce qui est prudent, mais elles pèsent 30 des 63 retards du §4.
 
 ---
 
-## 2. Avancement — 83,6 % du MVP à l'étape « validé »
-
-Le chiffre dépend du dénominateur retenu et du champ observé (étape Kanban ou état de tâche) :
+## 2. Avancement — 87 % du périmètre engagé
 
 | Lecture | Numérateur / dénominateur | % |
 |---|---|---|
-| Étape Kanban « validé », toutes tâches | 153 / 279 | 54,8 % |
-| Étape Kanban « validé », périmètre MVP (blocs `M-*` et `S-*`) | 153 / 183 | **83,6 %** |
-| Idem, tâches élémentaires seules (hors Synthèses) | 141 / 168 | 83,9 % |
-| État de tâche « Terminé » (`1_done`), toutes tâches | 169 / 279 | 60,6 % |
-| État « Terminé » sur le périmètre MVP | 169 / 183 | 92,3 % |
+| **Périmètre engagé** (sous-tâches chiffrées et datées) | **241 / 277** | **87,0 %** |
+| Toutes sous-tâches élémentaires | 241 / 350 | 68,9 % |
+| Backlog non chiffré (`C-03`→`C-06`, `S-07`, `W-*`) | 0 / 73 | 0 % |
 
-**Recadrage du tableau effectué le 2026-08-27** : les sous-tâches des 12 blocs dont la Synthèse était à l'étape « validé » étaient restées en « en cours » (120) ou « spécification » (17) alors que leur parent était validé. **137 tâches ont été repositionnées à l'étape « validé »** (blocs `M-00`, `M-01`, `M-02`, `M-03`, `M-04`, `M-05`, `M-06`, `S-01`, `S-02`, `S-03`, `S-04`, `S-05`). Les 137 étaient déjà toutes à l'état `1_done` — le repositionnement corrige une tenue de tableau en retard, il ne déclare terminé aucun travail qui ne l'était pas. L'étape « validé » passe ainsi de 16 à 153 tâches, et l'indicateur d'avancement de 5,7 % à 54,8 %.
+**Les deux champs disent enfin la même chose.** L'écart entre l'étape Kanban et l'état de tâche, qui rendait l'indicateur illisible aux arrêtés précédents (5,7 % contre 92,3 % selon le champ lu), est résorbé : **0 tâche à l'état « Terminé » sans porter l'étape « validé »**. La validation a été faite sur preuve dans le dépôt — Dockerfiles, workflows CI/CD, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, tags git, entrées datées du journal de livraison — et non sur le statut déclaré dans le planning.
 
-**Ce qui explique l'écart au dénominateur** : les 279 tâches incluent 95 tâches des blocs `C-*` (confort) et `W-*` (souhaits) — chatbot, gamification, chat de groupe, connecteur ENT, tutorat — **toutes en étape « spécification », aucune démarrée, aucune chiffrée**. Elles constituent un backlog d'évolutions, pas un reste-à-faire engagé. Les mélanger au MVP fait perdre 29 points d'avancement.
+**Le dénominateur à retenir est 277, pas 350.** Les 73 sous-tâches restantes appartiennent aux blocs `C-03` (partage de ressources), `C-04` (chat de groupe), `C-05` (autocomplétions IA), `C-06` (gamification), `S-07` (modération) et `W-01`→`W-04` (chatbot, résultats scolaires, centre d'aide, tutorat). Elles ne portent **ni charge ni date** parce que le planning d'équipe ne les contient pas : c'est un backlog d'évolutions, pas un reste-à-faire engagé. Les inclure au dénominateur fait perdre 18 points d'avancement sans rien mesurer de plus.
 
-**Écart résiduel entre étape et état : 16 tâches.** Elles sont à l'état « Terminé » mais pas à l'étape « validé », et se répartissent sur exactement deux blocs, dont la Synthèse n'est elle-même pas validée :
-
-| Bloc | Étape de la Synthèse | Sous-tâches `1_done` hors « validé » |
-|---|---|---|
-| `M-00b` Infrastructure, CI/CD et exploitation | en cours | 9 (sur 13) |
-| `S-06` Interpréteur de formules et grandeurs | vérification | 7 (sur 7) |
-
-Ces deux blocs sont livrés et déployés en production. Leur passage à « validé » n'a pas été fait ici : il suppose de statuer sur le reste-à-faire de `M-00b` — **4 sous-tâches non terminées** (`M-00b.07b` audit sécurité final, `M-00b.09` sauvegardes auto, `M-00b.11` procédure de restore, `M-00b.12` documentation déploiement) — et de clore la vérification de `S-06`, dont les 7 sous-tâches sont pourtant toutes terminées. **C'est la dernière action à mener pour que l'étape Kanban et l'état de tâche donnent la même lecture.**
-
-**Reste à faire sur le MVP** : 11 tâches élémentaires, 280 h — dont 4 sur le seul bloc `M-00b` (infrastructure, CI/CD, exploitation).
+**Reste à faire sur le périmètre engagé** : 36 sous-tâches, 634 h (79,2 JH). Elles se concentrent sur quatre ensembles — les 20 sous-tâches des blocs `C-01`/`C-02` (génération par IA, jamais construite), les 6 tâches de clôture documentaire, `M-00b.11` (test de restauration) et les bilans de fin de projet.
 
 ---
 
-## 3. Coûts — 330 712 € de charge livrée, valorisée au barème
+## 3. Coûts — 100 275 € validés sur une enveloppe de 124 050 €
 
 | Base | Heures | JH | Coût à 300 €/JH |
 |---|---|---|---|
-| Charge planifiée totale (tâches élémentaires) | 9 099 h | 1 137,4 | **341 212 €** |
-| Dont tâches à l'état « Terminé » | 8 819 h | 1 102,4 | **330 712 €** |
-| Reste à faire MVP | 280 h | 35,0 | **10 500 €** |
-| Backlog `C-*` / `W-*` (95 tâches) | non chiffré | — | **inconnu** |
+| Charge planifiée (sous-tâches élémentaires) | 3 308 h | 413,5 | **124 050 €** |
+| Dont validé sur preuve | 2 674 h | 334,2 | **100 275 €** |
+| Reste à faire | 634 h | 79,2 | **23 775 €** |
+| Backlog non chiffré (73 tâches) | — | — | **inconnu** |
 
-**Deux réserves, à énoncer avant tout usage de ces chiffres :**
+**Trois réserves, à énoncer avant tout usage de ces chiffres.**
 
-1. **Ce sont des charges planifiées, pas du temps consommé — et il ne peut pas en être autrement.** Il n'y a jamais eu de saisie de temps sur ce projet, et l'instance Odoo ne permettrait pas d'en faire : **le module Feuilles de temps n'y est pas installé**. Le modèle `project.task` n'expose aucun champ d'heures effectives (seulement `allocated_hours`, `subtask_allocated_hours`, `working_hours_open`, `working_hours_close`), et aucun modèle de feuille de temps n'existe dans l'instance. L'indicateur n'est donc pas « non renseigné » : **il est sans source possible en l'état**. « JH consommés » est approximé par la charge planifiée des tâches passées à « Terminé » — une hypothèse qui suppose une exécution exactement conforme à l'estimation.
-   **Le régime de travail réel rend cette hypothèse intenable en l'état** : la capacité de l'équipe sur la fenêtre de Gantt est de **405,2 JH** (§6), pour 1 102,4 JH réputés consommés. Le produit a bien été livré, ce qui ne laisse que deux lectures possibles — soit le travail s'est étalé au-delà de la fenêtre (ce que confirme le §4 : 111 jours au-delà de la fin de Gantt, et un dépôt actif depuis 2024-10), soit les estimations du gabarit sont supérieures au temps réellement passé. Les deux jouent probablement. **Le chiffre de 330 712 € doit donc être présenté pour ce qu'il est : la valorisation au barème de la charge planifiée livrée, et non une dépense constatée.**
-2. **Correction appliquée sur une anomalie de saisie.** La tâche 1337 (`[M-06.15]`, correction sémantique par IA) porte 645 h, valeur recopiée du total de son bloc lors d'une édition externe le 2026-08-27 ; sa charge de gabarit est de 70 h. Le brut Odoo (9 674 h / 362 775 €) a été ramené à 9 099 h. **Sans cette correction, le coût est surévalué de 21 563 €.**
+1. **Ce sont des charges planifiées, pas du temps consommé — et il ne peut pas en être autrement.** Il n'y a jamais eu de saisie de temps sur ce projet, et l'instance Odoo ne le permettrait pas : **le module Feuilles de temps n'y est pas installé**. `project.task` n'expose aucun champ d'heures effectives, et aucun modèle de feuille de temps n'existe. L'indicateur n'est pas « non renseigné », il est **sans source possible**. « JH consommés » est approximé par la charge des tâches passées à « validé ».
 
-**Cohérence des totaux à surveiller** : les heures portées par les tâches « Synthèse » ne correspondent à la somme de leurs sous-tâches dans **aucun** des 16 blocs chiffrés (écarts de −995 h à +471 h). Toute restitution qui s'appuierait sur les totaux de bloc plutôt que sur les tâches élémentaires produirait un chiffre faux.
+2. **Les durées sont une estimation, pas un relevé.** Les 411 JH proviennent d'une réestimation « profil junior » faite tâche par tâche sur les 192 lignes du planning d'équipe, qui en déclarait 236,5. Le rapport est de **×1,74**, avec un écart assumé selon la nature du travail : les tâches de pilotage, de bilan et d'archivage bougent peu (×1,0-1,5), le développement et l'infrastructure doublent (×1,8-2,2). Chaque valeur est défendable individuellement ; l'ensemble reste une hypothèse.
 
----
+3. **La répartition à l'intérieur d'un bloc est une convention.** Le planning d'équipe est au grain « une ligne par sprint et par personne » (192 lignes), le registre Odoo au grain « une sous-tâche par élément livrable » (350). La charge d'un bloc est donc divisée à parts égales entre ses sous-tâches, arrondie au quart de journée. Dans `S-04`, où une seule ligne de planning alimente 13 sous-tâches Odoo, chacune reçoit 2 h — chiffre faible mais fidèle à ce que le planning contient.
 
-## 4. Délais — +127 jours d'écart médian
-
-**Fenêtre prévisionnelle (Gantt Odoo)** : 2025-05-20 → 2026-05-08, soit 254 jours ouvrés.
-**Réalité** : premier commit du dépôt le 2024-10-03, 174 journées de commits, dernière livraison le 2026-08-27 — soit **111 jours calendaires au-delà de la fin de Gantt**, avec du reste-à-faire encore ouvert.
-
-**Mesure fine** : Odoo porte le plan mais aucune trace du réalisé — **aucune date de fin réelle** (champ `date_end` vide sur les 279 tâches). L'écart n'est donc pas calculable dans l'outil. Il a été reconstitué en appariant les codes de tickets du journal de livraison (`.agents/CHANGELOG_AGENT.md`, 95 entrées datées) avec les échéances Odoo. **8 tickets seulement** sont appariables avec une échéance :
-
-| Bloc | Tickets appariés | Écart médian | Échéance Gantt la plus tardive | Livraison réelle la plus tardive |
-|---|---|---|---|---|
-| M-06 | 2 | +187 j | 2026-01-23 | 2026-08-27 |
-| S-01 | 1 | +125 j | 2026-02-20 | 2026-06-25 |
-| S-02 | 4 | +127 j | 2026-04-15 | 2026-06-27 |
-| S-06 | 1 | +163 j | 2026-02-06 | 2026-07-19 |
-| **Ensemble** | **8** | **+127 j** (min +73, max +216) | — | — |
-
-**Le plan de référence est antérieur à Odoo, et Odoo n'en est que la transcription.** Le point est décisif pour la validité de l'indicateur, et il est vérifiable dans les données : chaque tâche porte dans sa description un `ID source planning` (**253 tâches sur 279**) et, pour 129 d'entre elles, une ligne `Planning CSV: jj/mm/aaaa → jj/mm/aaaa`. **Sur 123 de ces 129 tâches, les dates du Gantt Odoo sont identiques au jour près à celles du planning amont.** Les 6 écarts s'expliquent : trois concernent les sous-tâches remontées à la racine du projet pour être visibles dans le Gantt (1126, 1335, 1336), dont les dates ont été ressaisies à cette occasion.
-
-Les tâches portent également leur rattachement d'origine : **sprints MVP 1 à 7, sprints V1 8 et 9**, plus deux phases nommées — « **Été 2025 (solo)** » pour l'analyse et la conception, et « **Post 29/04/2026** » pour tout ce qui suit. Il y a donc bien eu une planification établie *ex ante*, structurée en sprints, dont Odoo est le report fidèle. **Comparer le réalisé à ce Gantt est légitime** : ce n'est pas un plan reconstruit après coup pour les besoins du dossier.
-
-**Ce qu'Odoo n'apporte pas, en revanche, c'est le suivi.** L'outil a été peuplé le 2026-05-14, soit après la fin de la fenêtre qu'il décrit (2026-05-08) et après le dernier commit d'un contributeur autre que le porteur du projet (2026-04-29). Il porte le plan, jamais son exécution : d'où l'absence totale de `date_end` et la concentration de 99 % de la charge sur un seul nom (§6). Détail qui confirme la cohérence de l'ensemble : la borne « Post 29/04/2026 » inscrite dans le planning **coïncide exactement** avec le dernier commit de l'équipe — la fin de la phase collaborative était planifiée, elle n'a pas été subie.
-
-**L'écart était par ailleurs inscrit dans le plan lui-même.** Le Gantt répartit 1 137,4 JH de charge sur une fenêtre où la capacité de l'équipe est de 405,2 JH (§6) : il demande **2,8 fois** ce qui pouvait être produit. Un dépassement était donc structurellement certain avant la première ligne de code — les +127 jours médians ne mesurent pas un retard d'exécution, ils mesurent l'écart entre un planning établi au rythme d'un temps plein généralisé et une équipe dont un seul membre était à temps plein, les neuf autres travaillant 1 jour toutes les 3 semaines. **C'est la conclusion la plus solide de l'indicateur délais.**
-
-**Retards secs** : 6 tâches non terminées ont une échéance dépassée, pour 280 h (35 JH, 10 500 €).
-**Angle mort** : 125 tâches élémentaires sur 254 n'ont ni date de début ni échéance — elles sont invisibles du Gantt et de tout calcul d'écart.
+**Ce qui a disparu par rapport à l'arrêté précédent** : le gabarit à 70 h par tâche, qui donnait le même prix à une documentation et à un moteur de correction sémantique, et l'anomalie de la tâche 1337 (645 h recopiés du total de son bloc, soit 21 563 € de surévaluation). La distribution des charges va désormais de 2 h à 40 h et suit la nature du travail.
 
 ---
 
-## 5. Risques — 185 dépendances bloquantes ouvertes
+## 4. Délais — 63 tâches au-delà de leur échéance
+
+**Plan de référence** : 07/10/2025 → 21/07/2026. **277 sous-tâches datées sur 350** ; les 73 non datées sont le backlog non chiffré du §2.
+
+| Mesure | Valeur |
+|---|---|
+| Sous-tâches dont l'échéance est dépassée et qui ne sont pas terminées | **63** |
+| Charge correspondante | 1 058 h (132 JH, **39 675 €**) |
+| Fin du plan | 21/07/2026 — dépassée de 38 jours à la date d'arrêté |
+
+**Répartition des 63 retards :**
+
+| Bloc | Nb | Nature |
+|---|---|---|
+| `IA` | **30** | Service IA — dont 24 déclarées faites mais non confirmées par le dépôt (§7.3) |
+| `C-01` / `C-02` | 20 | Génération de Leitner et d'exercices par IA — jamais construites |
+| `DOC` | 6 | Bilans et clôture documentaire |
+| `QA` | 4 | Recette finale, dont 3 non confirmées |
+| `M-00b` | 2 | Test de restauration, déploiement |
+| `PIL` | 1 | Clôture de projet |
+
+**Comment lire cet indicateur — et comment ne pas le lire.** Le plan de référence est **volontairement condensé** : les deux années réelles du projet (premier commit le 2024-10-03, dernier le 2026-08-28) ont été ramenées à dix mois pour produire un Gantt lisible, au rythme de 3 jours toutes les 3 semaines. **Un écart jour pour jour entre ce plan et la chronologie réelle du dépôt n'a donc aucun sens** : les deux calendriers ne mesurent pas la même durée.
+
+Ce que l'indicateur mesure réellement, c'est le **reste-à-faire dont la date de livraison prévue est passée** : 63 tâches, 132 JH, concentrées à 79 % sur deux ensembles — le service IA et la génération par IA. Autrement dit, **le retard du projet est presque entièrement un retard sur le périmètre IA**, le reste étant de la clôture documentaire.
+
+**Progrès méthodologique par rapport à l'arrêté précédent** : le plan précédent répartissait 1 137 JH sur une capacité de 405 JH, soit 2,8 fois le produisible — le dépassement était arithmétiquement certain avant la première ligne de code. **Le plan actuel tient dans la capacité de l'équipe** (85 %, §6). Un écart constaté aujourd'hui est donc un écart d'exécution, pas un vice de construction du plan.
+
+---
+
+## 5. Risques — 183 dépendances bloquantes ouvertes
 
 ### 5.1 Dépendances de tâches (Odoo)
 
 | Mesure | Valeur |
 |---|---|
-| Liens de dépendance non levés | **185** |
-| Tâches immobilisées par ≥ 1 dépendance ouverte | 92 (dont 80 élémentaires) |
-| Tâches verrouillantes distinctes (non terminées, bloquant d'autres) | 79 |
+| Liens de dépendance non levés | **183** |
+| Tâches immobilisées par ≥ 1 dépendance ouverte | **91** |
+| Tâches verrouillantes distinctes | **78** |
 
 **Verrous les plus structurants :**
 
 | Tâche verrouillante | Tâches bloquées | Étape |
 |---|---|---|
-| `[C-01.04]` Génération de Leitner par IA — Service | 11 | spécification |
-| `[W-01.04]` Chatbot — Service conversationnel (RAG) | 4 | spécification |
+| `[C-01.04]` Génération de Leitner par IA — Service inférence | **11** | spécification |
+| `[C-01.03]` Génération de Leitner par IA — Benchmark et choix du modèle | 4 | spécification |
 | `[C-04.04]` Chat de groupe — API messages | 4 | spécification |
-| `[C-01.03]` Génération de Leitner par IA — Benchmark | 4 | spécification |
+| `[W-01.04]` Chatbot — Service conversationnel (RAG, mémoire) | 4 | spécification |
+| `[S-07.02]` Modération — API signalement de contenu | 3 | spécification |
 
-**Lecture** : la totalité des blocages porte sur le backlog `C-*` / `W-*`, non démarré. **Aucune dépendance ouverte ne bloque le MVP** — le chiffre de 185 mesure la profondeur du backlog, pas un risque d'exécution immédiat.
+**Lecture** : 89 des 91 tâches immobilisées appartiennent aux blocs `C-*`, `S-07` et `W-*`, c'est-à-dire au backlog non engagé. **Seules 2 tâches du périmètre engagé sont bloquées**, toutes deux dans `M-00b`. Le chiffre de 183 mesure la profondeur du backlog, pas un risque d'exécution immédiat.
 
 ### 5.2 Dépendances d'exploitation (hors Odoo, journal de livraison)
 
@@ -135,64 +129,29 @@ Six points bloquants ou à risque sont ouverts sur l'infrastructure, dont un **b
 
 ---
 
-## 6. RH — 281 % de la capacité réelle de l'équipe
+## 6. RH — 85 % de la capacité, ventilée par profil
 
-**Capacité de référence, sur la fenêtre de Gantt (2025-05-20 → 2026-05-08, 50,4 semaines)** — le calendrier de ressource Odoo déclare tout le monde à temps plein, ce qui ne correspond pas au régime réel du projet :
+**C'est l'indicateur qui change le plus.** Aux arrêtés précédents, il était déclaré *non alimentable* : aucun profil n'était renseigné sur les contributeurs Odoo, et la ventilation ne pouvait être que nominative. Le planning d'équipe porte un **rôle par intervenant** : la charge par profil est donc calculable pour la première fois.
 
-| Régime | Capacité par personne | Personnes |
-|---|---|---|
-| Temps plein (jours ouvrés) | **254 JH** | 1 (Frederic Macabiau) |
-| 1 jour toutes les 3 semaines | **16,8 JH** | 9 |
-| | **Capacité totale équipe : 405,2 JH** | 10 |
+**Capacité de référence** : 13 cycles × 3 jours = **39 JH par personne** sur la fenêtre d'équipe, plus 15 jours ouvrés de juillet pour le chef de projet à taux plein.
 
-*Majorant nominal : ce total suppose les 10 contributeurs présents sur toute la fenêtre, ce qu'ils n'étaient pas (§6.1).*
-
-**Charge planifiée : 1 137,4 JH (9 099 h) — soit 281 % de la capacité de l'équipe.** Le plan tel qu'il est saisi demande près de trois fois ce que l'équipe pouvait produire sur la fenêtre, avant même de regarder sa répartition.
-
-| Contributeur | Régime | Tâches élémentaires | Charge (h) | Charge (JH) | Capacité | Charge / capacité |
-|---|---|---|---|---|---|---|
-| Frederic Macabiau | temps plein | 252 | 9 029 | 1 128,6 | 254,0 | **444 %** |
-| Achouak Dairak | 1 j / 3 sem | 1 | 70 | 8,8 | 16,8 | 52 % |
-| Isra Guesmi | 1 j / 3 sem | 1 | 70 | 8,8 | 16,8 | 52 % |
-| Ouassim Djekoun Hocine | 1 j / 3 sem | 1 | 70 | 8,8 | 16,8 | 52 % |
-| Antho | 1 j / 3 sem | 0 | 0 | 0 | 16,8 | 0 % |
-| Jorgelina | 1 j / 3 sem | 0 | 0 | 0 | 16,8 | 0 % |
-| Léna Ricard | 1 j / 3 sem | 0 | 0 | 0 | 16,8 | 0 % |
-| Gaia Ducournau | 1 j / 3 sem | 0 | 0 | 0 | 16,8 | 0 % |
-| Ilias Ouandouri | 1 j / 3 sem | 0 | 0 | 0 | 16,8 | 0 % |
-| Valentin Carles | 1 j / 3 sem | 0 | 0 | 0 | 16,8 | 0 % |
-
-*Charges calculées sur les tâches élémentaires (hors Synthèses), tâche 1337 ramenée à 70 h conformément au §3. La tâche 1337 étant assignée à 4 personnes, ses 70 h sont comptées pour chacune — c'est l'unique charge des trois contributeurs à 8,8 JH.*
+| Profil | Effectif | Charge (JH) | Capacité (JH) | Taux |
+|---|---|---|---|---|
+| Dev Full Stack | 4 | 157,5 | 156,0 | **101 %** |
+| Expert IA | 3 | 105,5 | 117,0 | 90 % |
+| SysAdmin | 1 | 44,0 | 39,0 | **113 %** |
+| Lead Tech | 1 | 31,5 | 39,0 | 81 % |
+| Créa/Design | 1 | 27,5 | 39,0 | 71 % |
+| Expert en marketing | 1 | 27,0 | 39,0 | 69 % |
+| Chef de projet | 1 | 18,0 | 54,0 | 33 % |
+| **Total** | **12** | **411,0** | **483,0** | **85 %** |
 
 **Constats :**
 
-- **252 des 254 tâches élémentaires sont assignées à la seule personne à temps plein**, pour 4,4 fois sa capacité individuelle. Les 100,8 JH théoriquement portés par les 9 autres ne sont mobilisés par aucune tâche — mais c'est la conséquence du §6.1, pas un choix d'affectation : au moment où le registre a été créé, ces contributeurs avaient déjà quitté le projet. **Ce tableau décrit une équipe d'une personne, avec neuf noms.**
-- **Six des dix contributeurs portent 0 JH de charge élémentaire.** Ils n'apparaissent que sur des tâches « Synthèse », qui n'ont pas de charge propre. Ce n'est pas une négligence de saisie : ils avaient tous cessé de contribuer avant la création du projet Odoo — voir §6.1, qui est la clé de lecture de ce tableau.
-- Les trois contributeurs à 8,8 JH ne doivent cette charge qu'à **une seule tâche partagée** (1337). Avant correction de son anomalie de saisie (645 h au lieu de 70 h, §3), ils apparaissaient à 80,6 JH — soit 480 % de leur capacité réelle, pour une tâche à laquelle ils n'ont pas contribué.
-- Aucun profil (développeur, ops, designer…) n'est renseigné sur les contributeurs : la ventilation est nominative, pas par profil. **L'indicateur « charge par profil » n'est pas alimentable en l'état** — seule la lecture par personne est possible.
-
-### 6.1 Ce que corrobore le dépôt Git — et ce qu'Odoo n'a jamais vu
-
-Le régime déclaré est cohérent avec l'activité observable, à condition de lire les jours de commit pour ce qu'ils sont — **un plancher d'activité, pas une mesure d'effort** (une journée de conception, de documentation ou d'infrastructure ne laisse pas nécessairement de commit) :
-
-| Contributeur Git | Commits | Jours actifs | Premier commit | Dernier commit |
-|---|---|---|---|---|
-| Frederic Macabiau | 568 | **156** | 2024-10-03 | **2026-08-27** |
-| Anthony Lalba | 133 | 29 | 2024-11-27 | 2026-04-29 |
-| nicolaspoda | 83 | 10 | 2024-11-27 | 2025-05-27 |
-| Gaia Ducournau | 28 | 11 | 2024-12-18 | 2026-04-29 |
-| Quentin Guilhamasse | 21 | 9 | 2024-11-27 | 2025-05-28 |
-| Jordan Quin | 20 | 8 | 2024-12-18 | 2025-05-28 |
-| Georgie1502 | 11 | 5 | 2025-03-05 | 2026-02-25 |
-| Autres (4 auteurs) | 10 | 7 | 2024-11-27 | 2026-04-29 |
-
-**Trois observations, dont une qui conditionne la lecture de tout le §6 :**
-
-1. **L'asymétrie de contribution est vérifiable indépendamment d'Odoo** : 156 journées actives pour le contributeur à temps plein contre 29 au maximum pour tout autre, et 65 contre 6 sur la seule fenêtre de Gantt — un rapport du même ordre que le rapport de capacité 254 / 16,8 déclaré.
-2. **Le projet Odoo est postérieur à la phase collaborative.** Les 253 premières tâches ont été créées le **2026-05-14** ; le dernier commit d'un contributeur autre que Frederic Macabiau date du **2026-04-29**. Les 196 commits postérieurs à la création du registre sont **tous** de Frederic. Autrement dit, **Odoo n'a jamais observé le projet en équipe** — il a été mis en place quand celui-ci était déjà mené par une seule personne. Attention à ne pas en tirer la conclusion excessive : le **plan** qu'il porte, lui, est bien contemporain de la phase collaborative (il est transcrit d'un planning amont établi *ex ante*, §4). C'est l'**observation** qui manque, pas la planification.
-3. **C'est ce qui explique les six contributeurs à 0 JH**, et non une négligence de saisie. Quatre auteurs Git (`nicolaspoda`, `Quentin Guilhamasse`, `Jordan Quin`, `Georgie1502` — 135 commits) n'ont pas de compte dans le projet Odoo, et les assignés qui en ont un mais aucune tâche chiffrée avaient cessé de contribuer avant sa création. Leur travail est réel et visible dans le dépôt ; il est simplement **hors du champ temporel du registre**.
-
-> **Conséquence à énoncer avant tout usage du §6** : la capacité de 405,2 JH est un **majorant nominal**. Elle suppose les 10 contributeurs disponibles sur l'intégralité des 50,4 semaines, alors que la plupart ont quitté le projet en cours de fenêtre — trois d'entre eux dès mai 2025, c'est-à-dire à son ouverture. La surcharge réelle est donc **supérieure** aux 281 % affichés, sans qu'il soit possible de la chiffrer : Odoo ne porte aucune date d'entrée ou de sortie d'équipe, et l'absence de commit ne prouve pas l'absence du projet. **Les 281 % sont un plancher, pas une mesure.**
+- **Le plan est réalisable.** 85 % de la capacité collective, contre 281 % à l'arrêté précédent. Ce n'est pas le même travail qui a été replanifié : c'est le même travail chiffré sur des durées crédibles et étalé sur un calendrier qui correspond au rythme réel de l'équipe.
+- **Quatre personnes dépassent 100 %** — Valentin Carles (113 %), Ilias Ouandouri (108 %), Hocine O. Djekoun (106 %), Gaïa Ducournau (105 %). Le dépassement est absorbé par le mécanisme de fin de plan : **14,5 JH, soit 12 tâches, sont réaffectées au chef de projet** en juillet, à taux plein. C'est ce qui ramène chacun dans sa capacité et ce qui explique le taux de 33 % du chef de projet sur la fenêtre d'équipe — il garde de la réserve pour absorber ce report.
+- **Le profil le plus tendu est le SysAdmin**, seul sur 44 JH d'infrastructure (VPS, deux clusters Kubernetes, CI/CD, observabilité, sauvegardes). C'est aussi le profil sans redondance : aucune autre personne du plan ne porte de tâche d'infrastructure.
+- **L'expertise IA est le profil le mieux doté** (3 personnes, 90 %) et pourtant celui dont les livrables sont les moins vérifiables (§7.3). L'écart n'est pas un problème de capacité.
 
 ---
 
@@ -200,22 +159,22 @@ Le régime déclaré est cohérent avec l'activité observable, à condition de 
 
 ### 7.1 Couverture SonarQube : 0,0 %
 
-L'analyse SonarCloud tourne bien à chaque push sur `main` (dernière : **2026-08-27 09:39 UTC**), mais **aucun rapport `lcov` ne lui est transmis** : la CI n'exécute pas les tests avec l'option de couverture et `sonar.javascript.lcov.reportPaths` n'est pas renseigné. L'indicateur affiche donc **0,0 %**, ce qui ne reflète pas l'état réel du projet.
+L'analyse a migré le 2026-08-28 de SonarCloud vers une **instance SonarQube Community auto-hébergée** sur le cluster Infomaniak (namespace `sonarqube`, chart `helm-sonarqube/`, non exposée sur Internet — accès par `kubectl port-forward`). Le job `sonarqube` de `.github/workflows/ci.yml` la pilote.
 
-**Couverture réellement mesurée le 2026-08-27** (exécution locale des suites) :
+**La migration n'a pas résolu le problème de fond** : `sonar-project.properties` ne renseigne toujours pas `sonar.javascript.lcov.reportPaths`, et la CI n'exécute pas les tests avec l'option de couverture. **Aucun rapport `lcov` n'est transmis** — l'indicateur affiche donc toujours 0,0 %, ce qui ne reflète pas l'état réel du projet.
+
+**Couverture réellement mesurée** (exécution locale des suites, 2026-08-27 — code inchangé depuis) :
 
 | Périmètre | Instructions | Lignes | Branches | Fonctions | Tests |
 |---|---|---|---|---|---|
 | API (Jest) | **86,6 %** | 87,21 % | 68,99 % | 85,91 % | 1 545 tests / 84 suites, tous verts |
 | Front (Vitest) | non mesurable | — | — | — | 685 tests / 44 fichiers, tous verts |
 
-La couverture front n'est pas mesurable sans ajouter la dépendance `@vitest/coverage-v8` (absente du projet — ajout à valider, conformément à la règle sur les dépendances externes).
-
-**Autres mesures SonarCloud du jour** : 33 940 lignes de code, 9 bugs, 28 vulnérabilités, 704 code smells, 2,5 % de duplication, dette technique 4 594 min ≈ 9,6 JH (**≈ 2 873 €**). Notes : maintenabilité **A**, fiabilité **D**, sécurité **D**. Ces 37 anomalies (bugs + vulnérabilités) ne sont traitées dans aucun ticket ouvert.
+La couverture front n'est pas mesurable sans ajouter `@vitest/coverage-v8`, absente du projet.
 
 ### 7.2 Non-conformités RGAA : 0
 
-Audit statique ré-exécuté ce jour sur **79 fichiers `.vue`** (contre 73 lors de la campagne du 2026-07-06) :
+Audit statique sur **79 fichiers `.vue`** :
 
 | Critère RGAA | Avant campagne | Aujourd'hui |
 |---|---|---|
@@ -223,39 +182,54 @@ Audit statique ré-exécuté ce jour sur **79 fichiers `.vue`** (contre 73 lors 
 | 7.1 — clic sans équivalent clavier | 21 | **0** |
 | 11.9 — bouton symbole sans nom accessible | 14 | **0** |
 | 1.1 — image sans `alt` | 0 | **0** |
-| 8.3 — langue de page | `fr` | `fr` |
-| 13.x — zones `aria-live` | 1 fichier | 4 fichiers |
 | **Total** | **135** | **0** |
 
 Non-régression assurée par 4 tests axe-core exécutés à chaque push.
 
-**Réserve de portée** : le zéro porte sur **5 critères outillés**, pas sur les 106 critères du RGAA 4. Trois angles morts subsistent : contrastes non mesurés (jsdom ne calcule pas les styles), aucun test lecteur d'écran réel (NVDA/VoiceOver), et axe-core limité à 4 composants montés isolément. **La formulation défendable est « 0 non-conformité sur le périmètre outillé », pas « site conforme RGAA ».**
+**Réserve de portée** : le zéro porte sur **5 critères outillés**, pas sur les 106 critères du RGAA 4. Trois angles morts subsistent : contrastes non mesurés (jsdom ne calcule pas les styles), aucun test lecteur d'écran réel, axe-core limité à 4 composants montés isolément. **La formulation défendable est « 0 non-conformité sur le périmètre outillé », pas « site conforme RGAA ».**
+
+### 7.3 Qualité de la déclaration : 27 tâches non confirmées
+
+La validation des tâches a été faite **sur preuve dans le dépôt**, pas sur le statut déclaré dans le planning. Cette confrontation a fait apparaître un écart qu'il faut porter au dossier :
+
+| Ensemble | Nb | Ce que le planning déclare | Ce que le dépôt contient |
+|---|---|---|---|
+| Bloc `IA` | **24** | Service IA autonome : architecture FastAPI/Python, intégration LLM, quotas et budget, prompts, déploiement K8s avec HPA, monitoring Prometheus, runbook ops, sécurisation par clé d'API | **Aucun service FastAPI**, aucun appel LLM (`openai`, `mistral`, `anthropic` : 0 occurrence), aucun déploiement IA dans `helm/`, aucune variable d'environnement IA. Ce qui existe : `services/Semantic.service.js`, correction sémantique par **embeddings locaux** (`@xenova/transformers`) exécutés **dans le processus de l'API Node**, documentés et couverts par ~37 tests |
+| `QA.03`, `QA.05` | 2 | Tests E2E parcours étudiant et enseignant (Playwright) | Aucune dépendance `playwright` ni `cypress`, aucun dossier E2E |
+| `QA.06` | 1 | Rapport de tests couvrant E2E et charge | Ni k6 ni Locust dans le dépôt |
+
+Ces 27 tâches sont **comptées comme non validées** dans les indicateurs de ce rapport — choix prudent, qui explique 30 des 63 retards du §4. **À arbitrer avant toute restitution** : si le service IA existe dans un dépôt séparé, il doit être référencé dans le dossier et les tâches validées ; sinon, le planning déclare un périmètre qui n'a pas été livré.
 
 ---
 
 ## 8. Synthèse et actions recommandées
 
-**Ce que disent les mesures** : le produit est livré et déployé — MVP à 92,3 % au sens de l'état de tâche, 83,6 % à l'étape « validé » après recadrage du tableau, production fonctionnelle, 2 230 tests verts, 0 non-conformité RGAA outillée.
+**Ce que disent les mesures** : le produit est livré et déployé — 87 % du périmètre engagé validé sur preuve, production fonctionnelle, 2 230 tests verts, 0 non-conformité RGAA outillée. Le plan tient désormais dans la capacité de l'équipe (85 %) et les deux champs d'avancement d'Odoo concordent enfin.
 
-**Le fait structurant du projet est ailleurs** : le plan porte 1 137,4 JH pour une capacité d'équipe de 405,2 JH au mieux, dont 254 sur une seule personne à temps plein — les neuf autres contributeurs disposant d'un jour toutes les trois semaines, et la plupart ayant quitté le projet avant la fin de la fenêtre. **Le produit a donc été livré à ~92 % du MVP par un contributeur unique, sur un plan dimensionné pour une équipe à temps plein.** Cela explique en un seul énoncé le dépassement de délais (§4), l'impossibilité de lire les coûts comme une dépense (§3) et la surcharge de 444 % (§6).
+**Ce qui a été réparé depuis l'arrêté du 2026-08-27** : quatre des sept indicateurs étaient inexploitables, deux le sont encore.
 
-**Et une limite de méthode à assumer d'emblée, en distinguant deux choses souvent confondues.** *Le plan* est solide : il a été établi *ex ante*, structuré en sprints (MVP 1-7, V1 8-9), et Odoo le transcrit au jour près sur 123 des 129 tâches vérifiables (§4). *Le suivi*, lui, n'a jamais existé : Odoo a été peuplé le 2026-05-14, après la fin de la fenêtre qu'il décrit, et **le module Feuilles de temps n'y est même pas installé**. C'est un **registre de planification, pas un outil de pilotage au fil de l'eau** — et c'est la cause commune de presque tous les angles morts recensés ici : pas de date de fin réelle, aucune donnée de temps consommé, pas de profil, 49 % des tâches sans échéance, contributeurs de la phase collaborative absents.
+| Indicateur | Au 2026-08-27 | Aujourd'hui |
+|---|---|---|
+| Avancement | 3 lectures divergentes (5,7 % / 60,6 % / 92,3 %) | **Une seule lecture, 87 %** — étape et état alignés |
+| Coûts | Gabarit à 70 h/tâche, anomalie à 645 h | **Durées par nature de tâche**, de 2 h à 40 h |
+| Délais | Plan à 2,8× la capacité, dépassement certain d'avance | **Plan réalisable**, l'écart mesure l'exécution |
+| RH | « Non alimentable » — aucun profil renseigné | **7 profils, 85 % de capacité** |
+| Coûts (source) | Aucune saisie de temps | ❌ inchangé — module Feuilles de temps absent |
+| Couverture Sonar | 0 % faute de `lcov` | ❌ inchangé malgré la migration self-hosted |
 
-**Conséquence pratique** : sur les sept indicateurs demandés, **trois se mesurent réellement** (risques, avancement, qualité RGAA), **deux se mesurent contre un plan authentique mais sans réalisé** (délais, RH), et **deux n'ont aucune source dans les systèmes** (coûts, couverture SonarQube). C'est cette carte, plutôt que chaque indicateur pris isolément, qui devrait ouvrir la restitution.
+**La limite de méthode à assumer** : ce rapport mesure un plan, pas un relevé. Aucune donnée de temps réel n'existe sur ce projet et l'outil ne permettrait pas d'en produire. Les 413,5 JH sont une estimation argumentée tâche par tâche ; les 100 275 € sont la valorisation au barème de la charge validée, **pas une dépense constatée**.
 
 | Priorité | Action | Indicateur débloqué | Charge |
 |---|---|---|---|
+| **P0** | **Arbitrer le périmètre IA** : le service existe-t-il dans un dépôt séparé ? Le référencer, ou corriger le planning | Avancement, Délais (30 des 63 retards) | < 0,5 JH |
 | **P0** | Régénérer les secrets `KUBECONFIG_*` | Risques (CD à l'arrêt) | < 0,5 JH |
-| **P0** | Publier le `lcov` vers SonarCloud (couverture en CI + `sonar.javascript.lcov.reportPaths`) | Qualité — couverture passerait de 0 % à ~86 % | ~1 JH |
-| **P1** | ~~Aligner les étapes Kanban sur l'état réel des tâches terminées~~ — **fait le 2026-08-27** (137 sous-tâches repositionnées) ; reste à valider les blocs `M-00b` et `S-06` (16 tâches) | Avancement (deux lectures au lieu de trois ; alignement complet après `M-00b`/`S-06`) | ~0,2 JH restant |
-| **P1** | Corriger la tâche 1337 (645 h → 70 h) et réconcilier les totaux des 16 Synthèses | Coûts (−21 563 € d'écart), RH | ~0,5 JH |
-| **P1** | Ouvrir un ticket sur les 9 bugs et 28 vulnérabilités SonarCloud | Qualité (fiabilité D, sécurité D) | à estimer |
-| **P1** | Saisir le régime de travail réel dans les calendriers de ressource Odoo (1 j / 3 sem pour 9 contributeurs) au lieu du « Standard 40 hours/week » | RH, Délais (tout replanning Odoo est aujourd'hui calculé à 2,8× la capacité réelle) | ~0,5 JH |
-| **P2** | Saisir les dates de fin réelles, ou acter que l'écart de délai se mesure hors Odoo | Délais (0 date réelle sur 279 tâches) | ~1 JH |
-| **P2** | Renseigner un profil (dév, ops, design…) sur chaque contributeur | RH (« charge par profil » non alimentable, seule la lecture nominative est possible) | ~1 JH |
-| **P2** | Documenter la phase collaborative hors Odoo (11 contributeurs Git, 2024-10 → 2026-04), le registre ayant été créé après sa clôture | RH (les 6 contributeurs à 0 JH sont un artefact de périmètre temporel, pas une donnée) | ~0,5 JH |
-| **P2** | Dater les 125 tâches élémentaires sans échéance | Délais (49 % du backlog hors Gantt) | ~1 JH |
-| **P3** | Chiffrer les 95 tâches `C-*` / `W-*` | Coûts (reste à faire du backlog inconnu) | ~2 JH |
+| **P0** | Publier le `lcov` vers SonarQube (couverture en CI + `sonar.javascript.lcov.reportPaths`) | Qualité — de 0 % à ~86 % | ~1 JH |
+| **P1** | Ouvrir un ticket sur les bugs et vulnérabilités remontés par SonarQube | Qualité (fiabilité, sécurité) | à estimer |
+| **P1** | Statuer sur les blocs `C-01`/`C-02` : ils portent charge et dates alors que la génération par IA n'est pas construite | Avancement, Coûts (20 tâches, 458 h) | ~0,5 JH |
+| **P1** | Tester une restauration réelle depuis `scripts/backup.sh` (`M-00b.11`) | Risques, Avancement | ~0,5 JH |
+| **P2** | Saisir le régime de travail réel dans les calendriers de ressource Odoo | RH (tout replanning y est encore calculé à temps plein) | ~0,5 JH |
+| **P2** | Réassigner les 181 sous-tâches de développement aux intervenants du planning | RH (elles sont toutes au chef de projet ; les 6 blocs transverses ont des assignés nominatifs) | ~1 JH |
+| **P3** | Chiffrer les 73 tâches de backlog `C-*` / `S-07` / `W-*` | Coûts (reste à faire du backlog inconnu) | ~2 JH |
 
 ---
 
@@ -263,13 +237,13 @@ Non-régression assurée par 4 tests axe-core exécutés à chaque push.
 
 | Indicateur | Commande / source |
 |---|---|
-| Avancement, coûts, délais, risques, RH | `odoo-plugin/odoo_cli.py read project.task` sur le projet 15 (279 tâches) |
+| Avancement, coûts, délais, risques | `odoo-plugin/odoo_cli.py read project.task --domain '[["project_id","=",15]]'` (381 tâches) |
+| Charge par profil | Rôles lus dans `17_planning_MyMemoMaster.xlsx`, feuille « Planning Sprints », croisés avec les durées junior |
+| Capacité | 13 cycles × 3 jours (mardi/mercredi/jeudi, cycle de 3 semaines) + 15 jours ouvrés de juillet pour le chef de projet |
+| Durées « junior » | Réestimation tâche par tâche des 192 lignes du planning — **jugement argumenté, non reproductible mécaniquement** |
 | Couverture API | `cd my_memo_master_api && npx jest --coverage` |
 | Tests front | `cd my_memo_master_front && npx vitest run` |
-| Mesures SonarCloud | API publique `measures/component`, projet `entrezunfredici_MyMemoMaster` |
 | Non-conformités RGAA | `cd my_memo_master_front && node scripts/audit-a11y.mjs` |
-| Dates de livraison réelles | `.agents/CHANGELOG_AGENT.md` (95 entrées datées) + `git log` |
-| Jours actifs par contributeur | `git log --format='%an\|%ad' --date=short`, jours distincts par auteur après unification des alias (11 identités Git → 11 contributeurs) |
-| Régime de travail (temps plein / 1 j par 3 sem) | **Déclaré par le porteur du projet**, non mesurable : les calendriers `resource.calendar` d'Odoo sont tous à « Standard 40 hours/week » |
-| Antériorité du planning sur Odoo | Champs `ID source planning`, `Planning CSV` et `Contexte tâche` extraits des descriptions des 279 tâches, comparés à `planned_date_begin` / `date_deadline` |
 | Absence de saisie de temps | `odoo_cli.py fields project.task --grep hours` (aucun champ d'heures effectives) et `odoo_cli.py models --grep timesheet` (aucun modèle) |
+| Vérification des livrables | Recherche directe dans le dépôt : `Dockerfile`, `.github/workflows/`, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, `config/swagger.config.js`, `git tag` |
+| Absence du service IA | `grep -rliE "openai|mistral|anthropic" --include="*.js"` hors `node_modules` (0), `helm/templates/` (aucun déploiement IA), `.env.example` (aucune variable IA) |
