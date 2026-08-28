@@ -2,6 +2,7 @@ const { Op } = require('sequelize')
 const { Etablissement, User, ClassGroup, ClassGroupUsers, Invitation, AuditLog, ClassGroupResource, ClassGroupSection } = require('../models/index')
 const AuditLogService = require('./AuditLog.service')
 const sendEmail = require('../helpers/sendEmail')
+const getFrontUrl = require('../helpers/frontUrl')
 const logger = require('../helpers/logger')
 
 const adminInclude = {
@@ -325,7 +326,7 @@ class EtablissementService {
     }
 
     // Cas 2 : pas de compte → invitation email (une seule par email/établissement)
-    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
+    const frontUrl = getFrontUrl()
 
     const [invitation, created] = await Invitation.findOrCreate({
       where: { etablissementId: Number(etablissementId), targetEmail: normalizedEmail, status: 'pending', role: 'admin_etablissement' },

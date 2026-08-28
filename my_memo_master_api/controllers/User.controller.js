@@ -3,6 +3,7 @@ const roleService = require('../services/Role.service')
 const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const sendEmail = require('../helpers/sendEmail')
+const getFrontUrl = require('../helpers/frontUrl')
 const logger = require('../helpers/logger')
 const tokenBlacklist = require('../helpers/tokenBlacklist')
 
@@ -12,7 +13,7 @@ exports.register = async (req, res) => {
     const { name, password, email } = req.body
     newUser = await userService.create({ name, email, password })
     const code = await userService.setValidEmailCode(newUser.userId)
-    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
+    const frontUrl = getFrontUrl()
     const verifyLink = `${frontUrl}/verify-email?email=${encodeURIComponent(email)}&code=${code}`
     await sendEmail(
       'Vérifiez votre adresse email - MyMemoMaster',
@@ -160,7 +161,7 @@ exports.resendVerification = async (req, res) => {
     if (!user || user.hasValidatedEmail) return res.status(200).send(genericMessage)
 
     const code = await userService.setValidEmailCode(user.userId)
-    const frontUrl = (process.env.APP_FRONT_URL || 'http://localhost').replace(/\/$/, '')
+    const frontUrl = getFrontUrl()
     const verifyLink = `${frontUrl}/verify-email?email=${encodeURIComponent(email)}&code=${code}`
     await sendEmail(
       'Nouveau code de vérification - MyMemoMaster',

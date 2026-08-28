@@ -7266,3 +7266,44 @@ Chaque sous-tâche porte : nom `[CODE.NN] Libellé — Tâche`, parent = sa Synt
 - **Les 181 sous-tâches de développement restent assignées au seul chef de projet**, alors que le planning nomme leurs intervenants. Le contraste est désormais visible : les 6 nouveaux blocs ont des assignés nominatifs, les blocs fonctionnels non. Une réassignation est possible mais approximative — un bloc Odoo est alimenté par plusieurs lignes de planning portées par des personnes différentes, la répartition à l'intérieur du bloc serait une interpolation de plus.
 - Les 25 Synthèses d'origine portent toujours leur ancienne charge (voir l'entrée précédente) ; les 6 nouvelles portent, elles, la somme exacte de leurs enfants.
 - `Clélia Potorel` est un compte utilisateur interne : selon le plan Odoo souscrit, il peut consommer un siège.
+
+---
+
+### [2026-08-28] DOC — Odoo : validation par la preuve, et écart constaté sur le service IA
+
+**Demande** : vérifier ce qui a réellement été livré et passer les tâches correspondantes à « fait ».
+
+**Méthode** : ne pas se fier au statut déclaré dans le planning d'équipe, mais chercher la preuve dans le dépôt (code, scripts, configuration CI/CD, documents) et dans le journal de livraison.
+
+#### Validé sur preuve — 20 tâches
+| Tâches | Preuve retenue |
+|---|---|
+| `S-06.01` → `S-06.07` (7) + Synthèse `S-06` | Les 7 sont marquées « Clôturé » dans le tableau d'état global du journal, avec dates (2026-07-19 / 2026-07-26) et éléments : KaTeX retenu et `mathjax` supprimé, écran prototype, stockage `$…$`, intégration dans les 4 éditeurs, `Interpreter.vue`, ~128 tests dédiés, revue du diff |
+| `M-00b` × 12 | `my_memo_master_api/Dockerfile` + `my_memo_master_front/Dockerfile`, `docker-compose.yml`, `traefik/`, 4 workflows GitHub Actions (`ci`, `cd`, `notify_ci`, `uptime`), `.eslintrc.cjs`, `helpers/logger.js`, `.env.example`, `docs/SECURITY_AUDIT_OWASP.md`, `scripts/backup.sh` + service `backup` du compose, `docs/RUNBOOK.md` + `MANUEL_DEPLOIEMENT_KUBERNETES.md` + `MANUEL_DEPLOIEMENT_VPS.md` |
+
+`M-00b.11` (« Procédure de restore **et test** ») est **laissée non validée** : la procédure `pg_restore` est bien documentée (RUNBOOK §« Restaurer une sauvegarde ») mais aucune trace d'un test de restauration effectif. La Synthèse `M-00b` reste donc « en cours ».
+
+#### Cohérence étape / état — 48 tâches corrigées
+Les 96 tâches créées le même jour portaient l'étape déduite du planning mais pas l'état de tâche correspondant (`01_in_progress` par défaut d'Odoo). L'état `1_done` a été posé sur les 48 dont le livrable est vérifiable ou non contredit : `MKT` (14), `PIL` (14), `DES` (6), `DOC` (6), `QA` (8).
+
+Preuves pour `DOC` et `QA` : `README.md` + `docs/RUNBOOK.md` + les deux manuels de déploiement ; `config/swagger.config.js` + `swagger-options.js` ; `docs/AUDIT_RGAA.md` (135 → 0 non-conformités) ; 8 tags git `v2026.08.1` → `v2026.08.8` ; 2 230 tests verts (1 545 Jest + 685 Vitest) pour la non-régression automatisée. `MKT`, `DES` et `PIL` sont des livrables externes au dépôt (analyses, Figma, rituels d'équipe) : ni vérifiables ni contredits ici, la déclaration du planning est retenue telle quelle — **c'est à signaler si le chiffre est cité**.
+
+#### Écart constaté — 27 tâches NON validées, en attente d'arbitrage
+**Le bloc `IA` (24 tâches) décrit une architecture absente du dépôt.** Vérifications faites : aucun service FastAPI/Python (seul `odoo-plugin/requirements.txt` répond à la recherche), aucun appel LLM (`openai`, `mistral`, `anthropic` : 0 occurrence hors `node_modules`), aucun déploiement IA dans `helm/` (uniquement `api`, `front`, `redis`, `postgres`, `prometheus`, `alertmanager`), aucune variable d'environnement IA dans `.env.example`.
+
+**Ce qui existe réellement** : `services/Semantic.service.js`, correction sémantique par **embeddings locaux** (`@xenova/transformers`, modèle `Xenova/paraphrase-multilingual-MiniLM-L12-v2`) exécutés **dans le processus de l'API Node**, documentés dans `diagrams/exercices_types_correction.md` et couverts par ~37 tests. Le choix du modèle et sa contrainte mémoire (512 Mo) sont argumentés dans DECISIONS (2026-08-27).
+
+Sont donc en attente : les 24 tâches `IA`, plus `QA.03` et `QA.05` (tests E2E Playwright — aucune dépendance `playwright`/`cypress`, aucun dossier E2E) et `QA.06` (rapport de tests couvrant E2E et charge — ni k6 ni Locust dans le dépôt).
+
+#### État final du projet
+| | Valeur |
+|---|---|
+| Sous-tâches à l'étape « validé » | **235** / 350 |
+| État `1_done` | 208 |
+| **Tâches à l'état Terminé sans l'étape validé** | **0** — l'alignement étape/état est complet |
+| Validé sans état Terminé | 27 (exactement les tâches en attente d'arbitrage) |
+
+#### Dette / points d'attention
+- **Question ouverte pour l'utilisateur** : le service IA existe-t-il dans un dépôt séparé ? Si oui, les 24 tâches sont validables et il faut le référencer dans le dossier ; sinon, le planning déclare un périmètre qui n'a pas été livré, ce qui doit être corrigé avant toute restitution.
+- Conséquence sur le mappage du 2026-08-28 : les blocs Odoo `C-01` (Génération de Leitner par IA) et `C-02` (Génération d'exercices par IA) ont reçu les dates et charges des lignes `C-01`/`C-02` du planning, qui portent en réalité sur la **correction** sémantique (livrée) et non sur la **génération** (absente du dépôt). Ces 20 sous-tâches restent en « spécification », ce qui est exact, mais elles portent désormais une charge et des dates qui décrivent un autre travail. À revoir en même temps que l'arbitrage ci-dessus.
+- Une affirmation erronée de l'entrée DECISIONS du même jour (« le service IA est une brique déployée en production ») a été corrigée sur place.
