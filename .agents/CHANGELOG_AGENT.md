@@ -139,7 +139,7 @@
 | Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
 | Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28** sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
 | Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
-| Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Reste à faire : poser les secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR`** (valeurs prêtes dans `helm-sonarqube/credentials.local`, non commité) — sans eux le job échoue au premier push sur `main` | 2026-08-28 |
+| Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -7381,3 +7381,35 @@ Les 27 tâches déclarées faites mais non confirmées par le dépôt (24 du blo
 - Le bandeau « arrêté périmé » posé plus tôt dans la journée est retiré : le document décrit à nouveau l'état réel.
 - Les indicateurs de qualité (couverture, RGAA) sont repris de l'arrêté du 2026-08-27 : le code applicatif n'a pas changé depuis (seuls `.agents/`, `docs/` et le chart SonarQube ont bougé).
 - L'action P2 « réassigner les 181 sous-tâches de développement » reste ouverte : elles sont toutes au chef de projet alors que les 6 blocs transverses ont des assignés nominatifs.
+
+
+---
+
+## [2026-08-28] [IMP] Première analyse réelle sur l'instance auto-hébergée — chaîne CI validée
+
+**Contexte** — Merge de `feat/sonarqube-k8s` sur `main` (`4bdac20`, `--no-ff`) et push. C'était le premier passage réel du job CI `sonarqube`, dont le maillon central — un runner GitHub qui atteint une instance ClusterIP par un tunnel `kubectl port-forward` — n'avait jamais été éprouvé.
+
+**Résultat** — **La chaîne fonctionne.** Tâche `REPORT` `e24ec18d-ae15-4c3f-b924-9e513b5f4b3c`, statut `SUCCESS`, soumise à 14:12:58 UTC soit **135 s après le push**, 7,1 s de calcul côté Compute Engine. Vérifié par l'API de l'instance (`/api/ce/activity`), la base de référence ayant été relevée à zéro analyse juste avant le push.
+
+**Mesures comparées à la dernière analyse SonarCloud (2026-08-27)** :
+
+| Métrique | Auto-hébergé | SonarCloud 27/08 |
+|---|---|---|
+| Lignes de code | 33 576 | 33 940 |
+| Bugs | 9 | 9 |
+| **Vulnérabilités** | **11** | **28** |
+| Code smells | 730 | 704 |
+| Duplication | 2,5 % | 2,5 % |
+| Couverture | 0,0 % | 0,0 % |
+| Dette technique | 4 743 min | 4 594 min |
+| Notes (maintenabilité / fiabilité / sécurité) | A / D / D | A / D / D |
+
+**Écart non expliqué — 11 vulnérabilités contre 28.** Ce n'est **pas** une reclassification en *security hotspots* : l'instance en compte **0**. Toutes les autres métriques concordent à quelques unités près, ce qui rend l'écart d'autant plus suspect. Pistes non vérifiées : version d'analyseur ou profil qualité différents entre SonarQube Community 26.8 et SonarCloud en août 2026. **À instruire avant de se fier au chiffre de sécurité** — l'indicateur « 28 vulnérabilités » de `docs/COMPTE_RENDU_METRIQUES.md` et l'action P1 qui en découle reposent sur la valeur SonarCloud.
+
+**Confirmé au passage** — La couverture reste à **0,0 %** sur l'instance auto-hébergée, exactement comme annoncé : le changement d'hébergement ne corrige pas l'action P0 (publier le `lcov`), qui reste entière.
+
+**Dette / reste à faire**
+- **Écart de vulnérabilités à instruire** (voir ci-dessus).
+- L'analyse reste limitée à `main` — l'analyse multi-branches est absente de l'édition Community.
+- Le projet est en visibilité **publique** dans l'instance (défaut de SonarQube). Sans effet tant qu'aucun Ingress n'est posé.
+- GitHub signale **10 vulnérabilités Dependabot** sur la branche par défaut (7 hautes, 2 modérées, 1 basse). Ne contredit pas le « 0 vulnérabilité » du CHANGELOG, qui mesure `npm audit --omit=dev` : Dependabot compte aussi les dépendances de développement.
