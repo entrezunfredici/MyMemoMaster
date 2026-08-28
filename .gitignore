@@ -20,3 +20,4 @@ PCU-N6AJX6E-openrc.txt
 k8s/secrets*.env
 helm-sonarqube/secrets.env
 helm-sonarqube/credentials.local
+helm-sonarqube/KUBECONFIG_SONAR.b64
