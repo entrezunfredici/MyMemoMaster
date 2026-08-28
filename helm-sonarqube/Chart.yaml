@@ -1,0 +1,7 @@
+apiVersion: v2
+name: sonarqube
+description: SonarQube Community Build auto-hébergé (analyse statique de MyMemoMaster)
+type: application
+version: 0.1.0
+# Suit la version applicative déployée (image.tag dans values.yaml)
+appVersion: "26.8.0"

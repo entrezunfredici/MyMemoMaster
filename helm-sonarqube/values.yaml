@@ -1,0 +1,139 @@
+# =============================================================================
+#  values.yaml — SonarQube Community Build auto-hébergé
+#
+#  Chart SÉPARÉ du chart applicatif helm/ : SonarQube est un outil d'usine
+#  logicielle, pas un composant de MyMemoMaster. Le mélanger au chart de l'app
+#  le ferait tomber sous le ResourceQuota de la preprod (6 Gi de limites, déjà
+#  calé au plus juste) et lierait son cycle de vie aux déploiements applicatifs.
+#
+#  Usage : helm upgrade --install sonarqube ./helm-sonarqube \
+#            -n sonarqube --create-namespace --atomic --timeout 10m
+# =============================================================================
+
+# ── Image ─────────────────────────────────────────────────────────────────────
+# Community Build — seule édition gratuite. Épinglée explicitement, jamais
+# :latest ni :community (tags flottants : une montée de version majeure de
+# SonarQube migre le schéma de base de façon IRRÉVERSIBLE au démarrage).
+# Tags disponibles : https://hub.docker.com/_/sonarqube/tags
+image:
+  repository: sonarqube
+  tag: 26.8.0.126808-community
+  pullPolicy: IfNotPresent
+
+# Nom du Secret K8s créé à la main (voir secrets.env.example).
+# Défaut calculé dans _helpers.tpl : {{ .Release.Name }}-secrets
+secretName: ""
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+config:
+  # Base dédiée à SonarQube — SURTOUT PAS celle de l'application.
+  PG_DB: sonar
+
+# ── SonarQube ─────────────────────────────────────────────────────────────────
+sonarqube:
+  # Volume /opt/sonarqube/data : index Elasticsearch + données de l'instance.
+  # C'est le volume dont la perte impose une réanalyse complète.
+  storage: 10Gi
+  # Volume /opt/sonarqube/extensions : plugins installés via le Marketplace.
+  extensionsStorage: 2Gi
+
+  # Dimensionnement JVM. La somme des heaps doit rester SOUS resources.limits.memory
+  # avec ~1 Gi de marge (metaspace, buffers hors-heap, natif Elasticsearch).
+  # Ici : 768m (web) + 1g (compute engine) + 1g (search) = 2,75 Gi pour 4 Gi de limite.
+  # Contrainte Elasticsearch : -Xms et -Xmx DOIVENT être égaux sur le search.
+  webJavaOpts: "-Xms256m -Xmx768m"
+  ceJavaOpts: "-Xms256m -Xmx1g"
+  searchJavaOpts: "-Xms1g -Xmx1g"
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  # Elasticsearch embarqué exige vm.max_map_count >= 524288 sur le NŒUD.
+  # Ce sysctl n'est pas namespacé : il se règle par un initContainer privileged,
+  # et le réglage vaut pour tout le nœud, pas seulement pour ce pod.
+  #
+  # Vérifié le 2026-08-28 : aucun label pod-security.kubernetes.io/enforce sur
+  # le cluster pck-dkoyol2 → le mode PSA par défaut est `privileged`, l'init
+  # container est admis. Si une politique restrictive est posée plus tard,
+  # l'admission le rejettera : passer alors sysctl.enabled=false ET
+  # esBootstrapChecksDisable=true (voir ci-dessous).
+  sysctl:
+    enabled: true
+    maxMapCount: "524288"
+    fileMax: "131072"
+
+  # Échappatoire quand on ne peut PAS régler le sysctl (PSA restrictive).
+  # Elasticsearch démarre malgré le contrôle d'amorçage échoué — mais il peut
+  # mourir plus tard sous pression mémoire, sur une instance chargée.
+  # À n'activer QUE si sysctl.enabled est à false.
+  esBootstrapChecksDisable: false
+
+# ── PostgreSQL dédié ──────────────────────────────────────────────────────────
+# Instance à part, PAS le PostgreSQL de l'application : SonarQube écrit
+# massivement (index d'issues, historique d'analyses) et une montée de version
+# majeure de SonarQube fait des migrations lourdes. Les deux charges n'ont
+# aucune raison de partager un cycle de sauvegarde ni un budget de connexions.
+postgres:
+  image: postgres:17-alpine
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Stockage (PVC) ────────────────────────────────────────────────────────────
+# csi-cinder-sc-retain (défaut du cluster) : le volume Cinder SURVIT à la
+# suppression du PVC. Choisi ici volontairement — un `helm uninstall` accidentel
+# ne doit pas effacer l'historique d'analyses. Contrepartie : le volume reste
+# facturé jusqu'à suppression manuelle dans OpenStack.
+storageClass: csi-cinder-sc-retain
+
+# ── Ordonnancement ────────────────────────────────────────────────────────────
+# Outil interne : doit céder la place à la prod ET à la preprod sous pression.
+# Créer la PriorityClass avant d'activer (cf. k8s/priorityclasses.yml).
+priorityClassName: ""
+
+# ── Placement : nœud d'outillage dédié ───────────────────────────────────────
+# SonarQube demande 2 Gi et peut en consommer 4 sur un nœud qui en alloue 5,5.
+# C'est le seul voisin réellement bruyant du cluster — la preprod, elle, est
+# déjà tenue par son ResourceQuota et par la PriorityClass `mmm-preprod`.
+# On l'isole donc sur un nœud dédié, avec les DEUX moitiés du mécanisme :
+#
+#   tolerations  — laisse SonarQube ENTRER sur le nœud tainté
+#   nodeSelector — l'y OBLIGE (sans ça, rien ne l'empêche d'aller ailleurs)
+#
+# Le nœud se prépare avec : bash k8s/node-topology.sh <nom-du-nœud>
+# (label workload=tooling + taint workload=tooling:NoSchedule).
+#
+# Un seul nœud est tainté, jamais les trois : ingress-nginx, cert-manager,
+# coredns et metrics-server sont des Deployments SANS toleration — tainter les
+# trois nœuds les enfermerait tous ici, et comme le Service ingress est en
+# `externalTrafficPolicy: Local`, tout le trafic de production entrerait par
+# le nœud d'outillage. Voir DECISIONS.md du 2026-08-28.
+#
+# Mettre les deux à vide ({} et []) pour revenir à un placement libre.
+nodeSelector:
+  workload: tooling
+
+tolerations:
+  - key: workload
+    operator: Equal
+    value: tooling
+    effect: NoSchedule
+
+# ── Exposition ────────────────────────────────────────────────────────────────
+# ClusterIP seul, aucun Ingress : l'accès se fait par
+#   kubectl -n sonarqube port-forward svc/sonarqube 9000:9000
+# Même parti pris que Prometheus dans le chart applicatif. Une instance neuve
+# démarre avec le compte admin/admin — l'exposer publiquement avant d'avoir
+# changé ce mot de passe donne l'administration à qui trouve l'URL.
+service:
+  port: 9000

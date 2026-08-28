@@ -18,3 +18,4 @@ PCU-N6AJX6E-openrc.txt
 
 # Valeurs réelles du Secret K8s — ne jamais commiter
 k8s/secrets*.env
+helm-sonarqube/secrets.env

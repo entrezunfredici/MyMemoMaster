@@ -72,15 +72,34 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run build
 
-  # Analyse statique continue sur SonarCloud (SonarQube Cloud) — remplace
-  # l'instance SonarQube auto-hébergée. Un seul projet (monorepo).
-  # Limité à main : l'analyse multi-branches est une fonctionnalité payante
-  # de SonarCloud — le plan gratuit n'accepte que la branche principale.
-  # Config du scanner : sonar-project.properties à la racine.
-  # Prérequis : secret SONAR_TOKEN (token généré sur sonarcloud.io) et
-  # Automatic Analysis désactivée sur le projet SonarCloud.
-  sonarcloud:
-    name: SonarCloud Analysis
+  # Analyse statique continue sur l'instance SonarQube AUTO-HÉBERGÉE
+  # (chart helm-sonarqube/, namespace `sonarqube` du cluster Infomaniak).
+  # Remplace l'analyse SonarCloud — voir .agents/DECISIONS.md.
+  #
+  # L'instance est en ClusterIP SANS Ingress : elle n'est joignable ni depuis
+  # Internet, ni depuis un runner GitHub. Le runner ouvre donc un tunnel
+  # `kubectl port-forward` vers l'API Kubernetes — elle, publique et
+  # authentifiée par kubeconfig — et fait pointer le scanner sur 127.0.0.1.
+  # C'est ce qui permet de garder SonarQube non exposé sur Internet.
+  #
+  # L'action v6 est une action node20 : elle s'exécute NATIVEMENT sur le
+  # runner et non dans un conteneur Docker, donc 127.0.0.1 y désigne bien le
+  # runner et atteint le tunnel. Ne pas revenir à la v5 : en plus d'être
+  # dépréciée, elle émet elle-même un avertissement de vulnérabilité.
+  #
+  # Limité à main, comme précédemment : l'analyse multi-branches n'existe pas
+  # en édition Community (elle était payante sur SonarCloud, elle est
+  # simplement absente ici).
+  #
+  # Prérequis (Settings → Secrets and variables → Actions) :
+  #   SONAR_TOKEN      — token « Global Analysis » généré DANS l'instance
+  #                      (Administration → Security → Users → Tokens).
+  #                      L'ancien token sonarcloud.io ne vaut plus rien ici.
+  #   KUBECONFIG_SONAR — kubeconfig base64 du cluster hébergeant l'instance
+  #                      (même contenu que KUBECONFIG_PREPROD tant que les
+  #                      deux vivent sur le même cluster).
+  sonarqube:
+    name: SonarQube Analysis (auto-hébergé)
     runs-on: ubuntu-latest
     needs: test_and_lint
     if: success() && github.ref == 'refs/heads/main'
@@ -91,8 +110,53 @@ jobs:
           # Historique complet requis par Sonar pour attribuer le "new code"
           fetch-depth: 0
 
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+      # Épinglé sur la version du cluster (v1.36.x), même raison que dans cd.yml.
+      - name: Pin kubectl version
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.3
+
+      - name: Set up kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_SONAR }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Open tunnel to SonarQube
+        run: |
+          kubectl -n sonarqube port-forward svc/sonarqube 9000:9000 \
+            > /tmp/port-forward.log 2>&1 &
+          echo $! > /tmp/port-forward.pid
+
+          # La sonde de disponibilité du pod répond 200 dès l'amorçage
+          # ("status":"STARTING"). On attend donc ici un "UP" explicite : sans
+          # cela le scanner attaque une instance qui migre encore son schéma et
+          # échoue sur une erreur peu lisible.
+          for i in $(seq 1 60); do
+            STATUS=$(curl -s --max-time 5 http://127.0.0.1:9000/api/system/status || true)
+            case "$STATUS" in
+              *'"status":"UP"'*)
+                echo "SonarQube UP après $i tentative(s)"
+                exit 0
+                ;;
+            esac
+            echo "En attente de SonarQube ($i/60) — ${STATUS:-pas de réponse}"
+            sleep 5
+          done
+
+          echo "::error::SonarQube n'a pas répondu UP en 5 minutes"
+          cat /tmp/port-forward.log
+          exit 1
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_HOST_URL: http://127.0.0.1:9000
+
+      - name: Close tunnel
+        if: always()
+        run: |
+          if [ -f /tmp/port-forward.pid ]; then
+            kill "$(cat /tmp/port-forward.pid)" 2>/dev/null || true
+          fi

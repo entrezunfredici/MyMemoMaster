@@ -20,7 +20,7 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
-| Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués ; [ADD] 2026-08-15 : révocation JWT (A07-M1, `helpers/tokenBlacklist.js`), `verifyRefreshToken` rejette un compte désactivé ; [FIX] 2026-08-27 : `APP_FRONT_URL` (lien de vérification email) n'était transmise à aucun conteneur API — ajoutée à docker-compose.yml (`api`, `api_server`) et au `.env` ; hors Docker les liens partaient vers `http://localhost` | 2026-08-27 |
+| Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués ; [ADD] 2026-08-15 : révocation JWT (A07-M1, `helpers/tokenBlacklist.js`), `verifyRefreshToken` rejette un compte désactivé ; [FIX] 2026-08-27 : `APP_FRONT_URL` (lien de vérification email) n'était transmise à aucun conteneur API — ajoutée à docker-compose.yml (`api`, `api_server`) et au `.env` ; hors Docker les liens partaient vers `http://localhost` ; [FIX] 2026-08-28 : un mail envoyé **depuis la prod** contenait encore `http://localhost` — `helpers/frontUrl.js` (chaîne de repli `APP_FRONT_URL` → `VITE_FRONT_URL` → `CORS_ORIGIN`, log d'erreur en production, plus jamais de localhost silencieux) remplace les 4 `process.env.APP_FRONT_URL \|\| 'http://localhost'` dupliqués | 2026-08-28 |
 | User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
@@ -104,7 +104,7 @@
 | Infrastructure Docker (load order + sync) | Stable — dotenv chargé avant models/index.js dans server.js ; sync alter drop:false | 2026-06-14 |
 | Infrastructure Docker Compose (dev/test unifié) | Stable — compose racine unique à 2 profils (dev local / test VPS), `server_docker_compose/` supprimé, CD sur `--profile test`, template VPS `.env.test.example` | 2026-07-12 |
 | CI/CD — branches de déploiement | Stable — branches Git renommées `test`→`dev`, `preprod`→`staging` (main inchangée) ; noms internes d'infra (images DockerHub, namespace K8s, chemin VPS) non touchés | 2026-07-01 |
-| Cluster Kubernetes (Infomaniak PCK) | Provisionné — cluster `pck-dkoyol2`, 2 workers 4 vCPU / 8 Go (allocatable réel : 3,92 vCPU / 5,5 Gi par nœud), K8s v1.36.3, CNI Cilium, CSI Cinder + OpenStack CCM. Addons installés le 2026-08-26 : ingress-nginx (2 replicas, LB Octavia `83.228.249.190`, real-IP Cloudflare, `externalTrafficPolicy: Local`), cert-manager, PriorityClasses `mmm-prod`/`mmm-preprod`. **metrics-server non fonctionnel** (certificats kubelet sans IP SAN) et **aucune release applicative déployée** à ce jour | 2026-08-26 |
+| Cluster Kubernetes (Infomaniak PCK) | Provisionné — cluster `pck-dkoyol2`, **3 workers** `a4-ram8-disk20-perf1` (4 vCPU / 8 Go ; allocatable réel : 3,92 vCPU / 5,5 Gi par nœud, soit 11,76 vCPU / 16,5 Gi au total), K8s v1.36.3, CNI Cilium, CSI Cinder + OpenStack CCM. Le 3ᵉ nœud (`…-5sx65`) a été ajouté le **2026-08-27 08:33 UTC**, après l'arbitrage à 2 nœuds du 2026-08-26 — constaté le 2026-08-28 via `kubectl get nodes`. Addons installés le 2026-08-26 : ingress-nginx (2 replicas, LB Octavia `83.228.249.190`, real-IP Cloudflare, `externalTrafficPolicy: Local`), cert-manager, PriorityClasses `mmm-prod`/`mmm-preprod`. **metrics-server non fonctionnel** (certificats kubelet sans IP SAN). **Prod ET preprod tournent** — constaté le 2026-08-28 : `mmm-prod` (api ×2, front ×2, postgres, redis, prometheus) et `mmm-preprod` (api, front, postgres, redis, pgadmin, prometheus) ; la mention « aucune release applicative déployée » datait du provisionnement et était devenue fausse. Réservations mesurées : prod 1 050 m / 1 728 Mi (limites 5 000 m / 6 400 Mi), preprod 450 m / 960 Mi, addons 400 m / 508 Mi. **Topologie de nœuds : livrée, non appliquée** — `k8s/node-topology.sh` dédie un nœud à l'outillage (label + taint `workload=tooling`) ; prod et preprod restent réparties sur les deux autres | 2026-08-28 |
 | Refresh token (rotation, révocation) | Stable — M-00b.07 H1 : hash SHA-256 stocké en base (même pattern reset password), brut envoyé au client | 2026-06-23 |
 | Reset mot de passe (token hashé) | Stable — M-05.06 : token 64-char hex brut envoyé par email, hash SHA-256 stocké en base | 2026-06-15 |
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
@@ -135,8 +135,10 @@
 | Front — Parcours guidé (onboarding d'usage) | Stable — store guidedTour.js (persisté localStorage) + bandeau GuidedTourBannerComponent dans App.vue + bouton HomePage ; 4 étapes sur les vraies pages (mindmap → Leitner → exercices → planification) avec pré-liaison subjectId/idSystem ; 12 tests Vitest | 2026-07-11 |
 | Front — Visite guidée de l'interface (driver.js) | Stable — auto-lancée au premier login (tour_seen API OnboardingState), relançable depuis HomePage ; store onboarding.js + composable useOnboardingTour + OnboardingTourComponent + ancres data-tour dans App.vue ; driver.js (MIT, remplace intro.js AGPL) ; 20 tests Vitest + 2 tests Jest ; **validée manuellement par l'utilisateur le 2026-07-17** | 2026-07-17 |
 | Dossier B2 (B2_RENDU.md) | À jour — onboarding documenté (§3.3, §9.6), chiffres de tests réels (1 450 API + 617 front), liens annexes corrigés, annexes/dev resynchronisées ; restent 3 placeholders d'assets (Figma, screenshots) + 2 réfs biblio à compléter | 2026-07-17 |
-| Connecteur Odoo (`odoo-plugin/`, hors périmètre applicatif) | Opérationnel — plugin Hermes `odoo-plugin` rendu utilisable en autonome : CLI JSON `odoo_cli.py` + façade `connector.OdooConnector`, accès lus dans le `.env` (`URL`/`BDD`/`MAIL`/`PASSWORD`), droits fournis par `local_rights/rights_plugin_api.py` (le plugin frère `rights-plugin` est absent du dépôt) ; CRUD vérifié en réel sur `bleu-canard.odoo.com` ; dossier gitignoré | 2026-08-27 |
-| Tableau de bord de pilotage (7 indicateurs) | Livré — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % (169/183), coût consommé 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, charge 444 % sur un contributeur, couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
+| Connecteur Odoo (`odoo-plugin/`, hors périmètre applicatif) | Opérationnel — plugin Hermes `odoo-plugin` rendu utilisable en autonome : CLI JSON `odoo_cli.py` + façade `connector.OdooConnector`, accès lus dans le `.env` (`URL`/`BDD`/`MAIL`/`PASSWORD`), droits fournis par `local_rights/rights_plugin_api.py` (le plugin frère `rights-plugin` est absent du dépôt) ; CRUD vérifié en réel sur `bleu-canard.odoo.com` ; dossier gitignoré ; première écriture de masse le 2026-08-27 (137 tâches repositionnées à l'étape « validé ») | 2026-08-27 |
+| Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
+| Tableau de bord de pilotage (7 indicateurs) | Livré — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
+| Analyse statique — SonarQube auto-hébergé | **Livré non déployé** — chart Helm `helm-sonarqube/` (StatefulSet SonarQube Community `26.8.0.126808-community` + PostgreSQL dédié + 3 PVC, namespace `sonarqube`, ClusterIP sans Ingress), `helm lint` et `kubectl apply --dry-run` verts contre `pck-dkoyol2` ; job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`) ; **rien n'est appliqué sur le cluster, aucun secret GitHub posé** — l'analyse `main` est donc à l'arrêt jusqu'au déploiement (voir `docs/MANUEL_SONARQUBE_K8S.md`) | 2026-08-28 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -6925,3 +6927,342 @@ Le code applicatif lui-même est **hors de cause** : le contrôleur, `User.servi
 - **Le domaine du front diverge entre les deux descripteurs de production** : `helm/values-prod.yaml` déclare `app.my-memo-master.com`, `k8s/prod/configmap.yml` déclare `my-memo-master.com` (l'apex, qui sert la landing page hors cluster d'après le commentaire de `values-prod.yaml`). `APP_FRONT_URL` a été aligné sur le `VITE_FRONT_URL`/`CORS_ORIGIN` **de chaque fichier**, sans trancher lequel fait foi — divergence antérieure, à arbitrer.
 - **Aucun test ne couvre la construction du lien de vérification** : ni la présence de `APP_FRONT_URL` dans l'environnement, ni le format de l'URL produite. La même régression pourrait repasser silencieusement.
 - **Le port 80 est une ressource partagée du poste** : Traefik ne démarrera pas si un autre serveur le prend, et le symptôme sera exactement celui rencontré ici (`ERR_CONNECTION_REFUSED` sur un lien pourtant correct).
+
+---
+
+### [2026-08-27] DOC — Odoo : cascade de l'étape « validé » sur les sous-tâches des 12 blocs validés
+
+**Demande** : l'étape Kanban du projet Odoo `MyMemoMasterRNCP` (id 15) n'était pas à jour — quand une Synthèse de bloc était passée à « validé », ses sous-tâches étaient restées à leur étape de travail, faute d'avoir été déplacées. Consigne : une tâche validée implique que toutes ses sous-tâches le sont.
+
+#### Ce qui a été fait
+- **137 tâches repositionnées à l'étape « validé »** (`stage_id` 164) en une seule écriture `project.task.write`, via `python odoo_cli.py update project.task --ids … --values '{"stage_id": 164}' --yes`.
+- Périmètre : les sous-tâches directes des **12 Synthèses déjà à l'étape « validé »** — `M-00` (14), `M-01` (12), `M-02` (13), `M-03` (11), `M-04` (8), `M-05` (13), `M-06` (14), `S-01` (9), `S-02` (9), `S-03` (12), `S-04` (13), `S-05` (9).
+- Étapes d'origine : 120 en « en cours », 17 en « spécification ».
+- Les 4 autres tâches déjà en « validé » (1126, 1335, 1336, 1337) sont des feuilles sans enfant — rien à cascader. La hiérarchie du projet est à un seul niveau (Synthèse → tâches élémentaires) : aucun petit-enfant à traiter.
+
+#### Contrôle préalable (le point qui rendait l'opération sûre)
+Les **137 tâches étaient déjà toutes à l'état `state = 1_done`** avant écriture (vérifié tâche par tâche). Le repositionnement corrige donc une tenue de tableau en retard ; **il ne déclare terminé aucun travail qui ne l'était pas**. Aucune tâche non terminée n'a été touchée.
+
+#### Vérifications effectuées
+- Relecture live des 279 tâches après écriture : répartition des étapes `validé 153 / spécification 107 / en cours 17 / vérification 1 / aide 1` (avant : `en cours 137 / spécification 124 / validé 16 / vérification 1 / aide 1`).
+- **0 enfant de tâche validée restant hors « validé »** — la cascade est complète.
+- **0 tâche à l'étape « validé » dont l'état ne serait pas `1_done`** — pas d'incohérence introduite.
+- Aucun parent non validé n'a désormais l'intégralité de ses enfants en « validé » (pas de cascade de second ordre en attente).
+- Sauvegarde de retour arrière (id → étape précédente) produite avant écriture, dans le scratchpad de session.
+
+#### Effet sur les indicateurs — `docs/COMPTE_RENDU_METRIQUES.md` mis à jour
+| Lecture | Avant | Après |
+|---|---|---|
+| Étape « validé » / 279 | 5,7 % (16) | **54,8 % (153)** |
+| Étape « validé » / MVP 183 | 8,7 % (16) | **83,6 % (153)** |
+| État `1_done` / MVP 183 | 92,3 % (169) | 92,3 % (169) — inchangé |
+
+Le §1 (tableau de bord), le §2 (réécrit) et le §8 (plan d'action, ligne P1) du compte rendu ont été mis à jour.
+
+#### Reste à faire (non fait volontairement)
+**16 tâches restent à l'état « Terminé » sans être à l'étape « validé »** — 9 du bloc `M-00b` (Synthèse en « en cours ») et 7 du bloc `S-06` (Synthèse en « vérification »). Elles sont hors consigne : leur Synthèse n'étant pas validée, la règle « une tâche validée implique ses sous-tâches » ne s'y applique pas. Les valider suppose deux arbitrages : statuer sur les 4 sous-tâches de `M-00b` encore non terminées (`07b` audit sécurité final, `09` sauvegardes auto, `11` procédure de restore, `12` documentation déploiement — 280 h de reste-à-faire, cf. §4 du compte rendu), et clore la vérification de `S-06`, dont les 7 sous-tâches sont pourtant toutes terminées. C'est le dernier écart entre l'étape Kanban et l'état de tâche.
+
+#### Dette / points d'attention
+- **`odoo-plugin/tasks.json` (export local du 2026-08-27 17:39) est désormais périmé** : il porte les anciennes étapes. Toute mesure repartant de ce fichier plutôt que d'une lecture live réafficherait 5,7 % d'avancement.
+- L'écriture a porté sur le seul champ `stage_id`. `date_last_stage_update` a été rafraîchi par Odoo sur les 137 tâches (effet natif du changement d'étape) : cette date ne peut plus servir à dater la fin réelle des travaux — ce qu'elle ne permettait déjà pas de façon fiable, `date_end` étant vide partout.
+
+---
+
+### [2026-08-27] DOC — Compte rendu de pilotage : régime de travail réel intégré (1 temps plein + 9 contributeurs à 1 j / 3 semaines)
+
+**Demande** : les durées de tâches du projet Odoo ne sont pas à lire à taux plein — l'équipe travaillait 1 jour toutes les 3 semaines, à l'exception du porteur du projet, à temps plein sur toute la durée.
+
+#### Ce qui a été corrigé dans `docs/COMPTE_RENDU_METRIQUES.md`
+Le compte rendu prenait pour capacité de référence **254 JH par personne** (jours ouvrés de la fenêtre de Gantt), c'est-à-dire un temps plein pour les 7 contributeurs listés — hypothèse héritée du calendrier de ressource Odoo, qui déclare tout le monde en « Standard 40 hours/week ». L'indicateur RH était donc calculé sur une capacité **15 fois trop élevée** pour 9 des 10 contributeurs.
+
+- **En-tête** : le régime de travail est désormais posé explicitement comme hypothèse déclarée (non déductible des données Odoo), au même titre que le taux journalier et la conversion 1 JH = 8 h.
+- **§6 (RH), réécrit** : capacité asymétrique — 254 JH pour Frederic Macabiau, **16,8 JH** (50,4 semaines / 3) pour chacun des 9 autres, soit **405,2 JH de capacité d'équipe**. Charge planifiée 1 137,4 JH = **281 % de la capacité réelle**. Le tableau passe de 7 à **10 contributeurs** (les assignés réels ont été relus dans Odoo : `Jorgelina`, `Léna Ricard` et `Ilias Ouandouri` manquaient). Les 3 contributeurs affichés à 80,6 JH / 31,7 % sont ramenés à **8,8 JH / 52 %** (application de la correction de la tâche 1337 déjà actée au §3, leur unique charge).
+- **§6.1, nouveau** : corroboration par le dépôt Git — jours actifs et bornes de contribution par auteur, après unification des 11 alias. 156 jours actifs (65 dans la fenêtre de Gantt) pour Frederic contre 29 (6 dans la fenêtre) au maximum pour tout autre, cohérent avec le rapport de capacité déclaré 254 / 16,8. Les jours de commit sont explicitement présentés comme **un plancher d'activité, pas une mesure d'effort**. La section porte aussi le constat chronologique ci-dessous, qui conditionne la lecture de tout le §6.
+- **§4 (Délais)** : l'écart de +127 j reçoit son explication structurelle — le Gantt répartit 1 137,4 JH sur une capacité de 405,2 JH, soit **2,8× ce qui était produisible**. Le dépassement était certain avant la première ligne de code ; l'indicateur ne mesure pas un retard d'exécution.
+- **§3 (Coûts)** : réserve renforcée — 1 102,4 JH « consommés » sont incompatibles avec 405,2 JH de capacité sur la fenêtre. Le chiffre de 330 712 € est requalifié en **valorisation au barème de la charge planifiée livrée**, pas en dépense constatée.
+- **§1, §8, annexe** : ligne RH du tableau de bord, synthèse (le fait structurant devient « MVP livré à ~92 % par un contributeur unique sur un plan dimensionné pour une équipe à temps plein »), 2 actions ajoutées au plan (saisir le régime réel dans les calendriers Odoo — P1 ; rapprocher comptes Odoo et auteurs Git — P2), et 3 lignes de reproductibilité.
+
+#### Constat structurant relevé au passage : Odoo n'a jamais observé le projet en équipe
+Le rapprochement Git / Odoo faisait d'abord apparaître un écart d'équipe (4 auteurs Git significatifs sans compte Odoo, 6 assignés Odoo sans tâche chiffrée). **L'explication est chronologique, pas une négligence de saisie** : les 253 premières tâches Odoo ont été créées le **2026-05-14**, alors que le dernier commit d'un contributeur autre que Frederic Macabiau date du **2026-04-29** — et les 196 commits postérieurs à la création du registre sont tous de Frederic.
+
+Dates de sortie mesurées : `nicolaspoda` 2025-05-27, `Quentin Guilhamasse` 2025-05-28, `Jordan Quin` 2025-05-28, `Georgie1502` 2026-02-25, `Anthony Lalba` / `Gaia Ducournau` / `Lena` 2026-04-29.
+
+**Trois conséquences inscrites dans le compte rendu :**
+- Le projet Odoo est un **registre rétrospectif tenu par une seule personne**, pas un outil de pilotage utilisé au fil de l'eau — cause commune de la plupart des angles morts du rendu (pas de `date_end`, pas de saisie de temps, pas de profil, 49 % des tâches sans échéance).
+- Les 6 contributeurs à 0 JH sont un **artefact de périmètre temporel**, pas une donnée RH. Leur travail est réel et visible dans le dépôt.
+- La capacité d'équipe de 405,2 JH est un **majorant nominal** (elle suppose 10 personnes présentes sur les 50,4 semaines, alors que 3 sont sorties dès l'ouverture de la fenêtre) : **les 281 % de surcharge sont un plancher, pas une mesure**. Non chiffrable plus finement — Odoo ne porte aucune date d'entrée/sortie d'équipe et l'absence de commit ne prouve pas l'absence du projet.
+
+Le §4 relève par ailleurs que le Gantt (fin le 2026-05-08) a été saisi le 2026-05-14, soit **après** la date de fin qu'il déclare et après la clôture de la phase collaborative. Action P2 requalifiée : documenter la phase collaborative hors Odoo, plutôt que « rapprocher les comptes ».
+
+#### Précision apportée ensuite (même jour) — distinguer *le plan* du *suivi*
+Deux compléments de l'utilisateur ont conduit à corriger une conclusion trop large (« le Gantt Odoo est un rétro-planning ») : il n'y a **jamais eu de saisie de temps** sur le projet, mais **il y avait bien eu des Gantts**, antérieurs à Odoo.
+
+**Vérifié dans les données, les deux points sont exacts et opposés :**
+- **Le plan est authentique et antérieur.** Les descriptions des tâches portent un `ID source planning` sur **253 tâches / 279** et une ligne `Planning CSV: jj/mm/aaaa → jj/mm/aaaa` sur 129 d'entre elles. **Sur 123 des 129, les dates du Gantt Odoo sont identiques au jour près à celles du planning amont** ; 3 des 6 écarts sont les sous-tâches remontées à la racine pour la visibilité Gantt (1126, 1335, 1336), ressaisies à cette occasion. Les tâches portent aussi leur rattachement : **sprints MVP 1-7, V1 8-9**, phases « Été 2025 (solo) » et « Post 29/04/2026 ». Odoo est donc le **report fidèle d'une planification établie ex ante** — comparer le réalisé à ce Gantt est légitime.
+- **Le suivi, lui, n'a jamais existé et ne pouvait pas exister.** `project.task` n'expose **aucun champ d'heures effectives** (seulement `allocated_hours`, `subtask_allocated_hours`, `working_hours_open`, `working_hours_close`) et `models --grep timesheet` ne retourne **aucun modèle** : le module Feuilles de temps n'est pas installé dans l'instance. L'indicateur coûts n'est pas « non renseigné », il est **sans source possible**.
+
+Détail de cohérence relevé au passage : la borne « **Post 29/04/2026** » inscrite dans le planning coïncide **exactement** avec le dernier commit d'un contributeur autre que le porteur du projet. La fin de la phase collaborative était planifiée, elle n'a pas été subie.
+
+**Sections corrigées** : §4 (interprétation réécrite — le plan de référence est antérieur à Odoo et vérifiable), §3 (réserve 1 : absence structurelle de saisie de temps), §1 (fiabilité des lignes Coûts → ❌ sans source, et Délais → plan solide mais pas de réalisé), §6.1 (observation 2 : ne pas confondre absence d'observation et absence de planification), §8 (la synthèse distingue désormais *plan* et *suivi*, et classe les 7 indicateurs en 3 mesurables / 2 sans réalisé / 2 sans source), annexe (3 lignes de reproductibilité).
+
+#### Vérifications effectuées
+- Charges recalculées depuis une lecture live d'Odoo (`allocated_hours`, `user_ids`, tâches élémentaires uniquement, tâche 1337 ramenée à 70 h) : total 9 099 h = 1 137,4 JH, identique au §3 — les deux sections sont cohérentes.
+- Jours actifs par auteur recalculés depuis `git log` sur les 693 jours d'historique (2024-10-03 → 2026-08-27) et sur la fenêtre de Gantt.
+- Aucun chiffre du §5 (risques), du §7 (qualité) ni du §2 (avancement) n'est affecté.
+
+#### Dette / points d'attention
+- **Le régime de travail n'est pas dans les données** : il est déclaré, et le compte rendu le dit. Tant que les `resource.calendar` d'Odoo restent en « Standard 40 hours/week », tout replanning fait dans l'outil recalculera des durées à 2,8× la capacité réelle — c'est l'objet de l'action P1 ajoutée au §8.
+- Les jours de commit ne mesurent pas l'effort : un contributeur peut travailler sans commiter (conception, documentation, infrastructure, Odoo). Le §6.1 s'en tient donc à un rapport d'ordre de grandeur, jamais à un décompte de JH.
+
+---
+
+### [2026-08-28] DOC — Planning daté sur estimations « dev junior », calendrier condensé sur un an
+
+**Demande** : partir du planning source (`17_planning_MyMemoMaster.xlsx`, ajouté par l'utilisateur), réestimer chaque tâche pour un profil **développeur junior**, puis poser des dates de début et de fin sur un calendrier condensé — deux ans ramenés à un an, travail par créneaux fixes.
+
+#### Point de départ : le planning source n'a rien à voir avec Odoo
+`17_planning_MyMemoMaster.xlsx` porte **192 tâches** réparties sur **12 membres × 16 sprints** (06/10/2025 → 12/06/2026), pour **236,5 JH**, avec des charges réalistes (0,5 / 1 / 1,5 / 2 JH). C'est un plan d'équipe crédible — sans rapport avec le gabarit Odoo à 70 h/tâche analysé la veille. **Les deux registres décrivent le même projet à deux granularités et deux époques différentes ; le xlsx est le plan réel.**
+
+#### Estimation junior
+Réestimation **tâche par tâche** (`scratchpad/estim.py`, 192 valeurs), pas un multiplicateur global : les tâches de pilotage, bilans et archivage bougent peu (×1,0-1,5), le développement et l'infrastructure doublent (×1,8-2,2). Exemples : « Composant canvas interactif (drag, zoom, connexions) » 3,5 → 7 JH ; « Éditeur d'exercice + player + écran résultats » 2 → 5 JH ; « Init cluster K8s prod » 2 → 4 JH ; les bilans de sprint 16 restent à 0,5 JH.
+
+**Résultat : 236,5 → 411,0 JH, soit ×1,74.** Ratios par membre de 1,41 (Design) à 1,92 (Dev Full Stack) — l'écart est le plus fort là où le planning source était le plus optimiste.
+
+#### Arbitrage du calendrier (trois contraintes incompatibles)
+Durées junior + 2 jours/3 semaines + fin en mai-juin ne tiennent pas ensemble : au rythme initial le membre le plus chargé (Valentin, 44 JH) demandait **22 cycles → fin décembre 2026**. Arbitrage retenu par l'utilisateur : **densifier à 3 jours toutes les 3 semaines**, étaler jusqu'en juillet, **et réaffecter tout l'après-juin au chef de projet seul, à taux plein**. Consigne explicite : rester sur un an, ne pas étaler sur deux.
+
+| | Valeur |
+|---|---|
+| Cycle | 3 semaines, **3 jours travaillés : mardi, mercredi, jeudi** |
+| Fenêtre équipe | C1 = 07-09/10/2025 → **C13 = 16-18/06/2026** (13 cycles = 39 JH/personne) |
+| Débord | **14,5 JH / 12 tâches** réaffectées au chef de projet, taux plein, **01/07 → 21/07/2026** |
+| Fin de projet | **21/07/2026** |
+
+Quatre membres seulement débordent : Valentin (6,5 JH), Ilias (3,0), Hocine (3,0), Gaïa (2,0) — les tâches concernées sont leurs dernières (observabilité prod, tests de non-régression, démos enregistrées, bilans), cohérentes avec une clôture menée par le chef de projet.
+
+#### Livrable
+`17_planning_MyMemoMaster_date.xlsx`, 4 feuilles : **Planning date** (192 lignes — sprint, cycle, membre, rôle, fonctionnalité, tâche, JH planifié, JH junior, écart, début, fin, réaffectation ; filtre automatique, lignes de débord surlignées), **Gantt par membre** (charge JH par membre × cycle), **Charge par membre** (planifié vs junior, ratio, débord, bornes), **Calendrier** (les 13 cycles + la fenêtre de juillet). Le fichier source n'est pas modifié.
+
+#### Choix de méthode
+La file de chaque membre est **étalée sur toute la fenêtre** plutôt que tassée au début. Un premier jet en remplissage séquentiel faisait finir les membres les plus légers dès mars (Abel au 26/03), ce qui datait leurs bilans de sprint 16 avant la fin du projet. L'étalement conserve l'ordre des sprints et rend les creux visibles.
+
+#### Vérifications effectuées
+- 192 tâches datées, aucune date de fin antérieure à son début, aucune tâche sans dates (relecture du fichier produit).
+- Aucun membre ne dépasse 39 JH sur la fenêtre équipe ; le débord réaffecté (14,5 JH) tient dans 15 jours ouvrés de juillet.
+- Le chef de projet absorbe le débord sans conflit : ses 18 JH propres occupent 18 des 39 jours de la fenêtre équipe.
+
+#### Dette / points d'attention
+- **L'estimation junior est un jugement, pas une mesure** — aucune donnée de temps réel n'existe sur ce projet (le module Feuilles de temps n'est pas installé dans Odoo). Les 411 JH sont défendables tâche par tâche, mais restent une hypothèse.
+- **Le planning daté n'est pas reporté dans Odoo.** Les 192 lignes du xlsx et les 254 sous-tâches Odoo ne sont pas au même grain ; un report supposerait d'abord une table de correspondance.
+- Le cycle C5 tombe sur les **30-31 décembre et 1er janvier** — à décaler si la trêve de fin d'année doit être respectée.
+
+
+---
+
+## [2026-08-28] [FIX] Lien des emails : toujours l'URL de l'environnement émetteur
+
+**Symptôme** — Un test d'inscription **effectué sur la production** a renvoyé un mail « Nouveau code de vérification » contenant `http://localhost/verify-email?email=…&code=…` au lieu de l'URL publique de la prod. Lien inutilisable pour l'utilisateur.
+
+**Cause** — Quatre endroits du code construisaient l'URL du front avec le même repli codé en dur :
+`(process.env.APP_FRONT_URL || 'http://localhost')`. `APP_FRONT_URL` n'a été ajoutée aux valeurs Helm que le 2026-08-27 (commit `d9d1b71`) ; toute API démarrée avant ce déploiement — ou tout environnement où la variable est oubliée — retombait **silencieusement** sur `localhost`, en prod comme ailleurs. Le repli n'était ni journalisé ni distingué par environnement.
+
+**Fichiers créés**
+- `my_memo_master_api/helpers/frontUrl.js` — résolution centralisée de l'URL publique du front, chaîne de repli :
+  1. `APP_FRONT_URL` (variable dédiée, définie par environnement)
+  2. `VITE_FRONT_URL` (même URL, présente dans **tous** les environnements : compose dev/test, ConfigMap Helm preprod/prod, manifestes k8s)
+  3. `CORS_ORIGIN` — 1re origine autorisée, garde-fou ultime, **journalisé en `warn`**
+  4. `http://localhost[:VITE_PORT]` — dev seulement ; en `NODE_ENV=production` un `logger.error` est émis avant.
+  Les logs de repli ne sont émis qu'une fois par processus (la fonction est appelée à chaque envoi de mail). Le slash final est retiré.
+- `my_memo_master_api/test/helpers/frontUrl.test.js` — 9 tests (priorité de la chaîne, slash final, valeur blanche, repli CORS + log unique, erreur en prod, port dev, `VITE_PORT=80`).
+
+**Fichiers modifiés**
+- `my_memo_master_api/controllers/User.controller.js` (`register` L15, `resendVerification` L163)
+- `my_memo_master_api/services/Invitation.service.js` (L75 — invitation à un groupe classe)
+- `my_memo_master_api/services/Etablissement.service.js` (L328 — invitation gestionnaire d'établissement)
+  → les 4 remplacés par `getFrontUrl()`.
+
+**Utilisable** — Tout mail (vérification d'adresse, invitation groupe, invitation établissement) porte désormais l'URL du front de l'environnement qui l'a émis : `http://localhost` en dev, `https://preprod.my-memo-master.com` en preprod, `https://app.my-memo-master.com` en prod. Même si `APP_FRONT_URL` disparaît de la configuration d'un environnement, `VITE_FRONT_URL` puis `CORS_ORIGIN` rattrapent — un lien localhost en prod est désormais impossible sans que les trois variables soient absentes, cas alors journalisé en erreur.
+
+**Vérifications** — `frontUrl.test.js` 9/9 ✅ · `User.controller` + `Invitation.service` + `Etablissement.service` 131/131 ✅ · ESLint vert sur les 5 fichiers.
+
+**Hypothèses posées**
+- `CORS_ORIGIN` est fiable comme dernier recours : elle vaut l'URL du front dans chaque environnement (`${VITE_FRONT_URL}` en compose dev, `https://${FRONT_DOMAIN}` en compose test, valeur explicite dans `values-preprod/prod.yaml` et les ConfigMaps k8s). Vérifié dans les 5 sources de configuration.
+- La production est bien déployée par Helm (`deploy_prod` → `helm upgrade mmm-prod -f helm/values-prod.yaml`), donc via `envFrom: configMapRef` — toutes les clés de `.Values.config` arrivent dans le conteneur API sans liste explicite à maintenir.
+
+**Dette / points d'attention**
+- **Divergence de domaine entre Helm et les manifestes k8s bruts.** `helm/values-prod.yaml` pointe le front sur `https://app.my-memo-master.com` (l'apex sert une landing page hors cluster), alors que `k8s/prod/configmap.yml` porte encore `https://my-memo-master.com` pour `APP_FRONT_URL`, `VITE_FRONT_URL` et `CORS_ORIGIN`. `k8s/` est le jeu antérieur à la migration Helm (`k8s/helm-migrate.sh`) et n'est plus appliqué par la CD — laissé tel quel volontairement, mais à supprimer ou réaligner pour éviter qu'un `kubectl apply` manuel ne réintroduise le mauvais domaine.
+- **Le correctif ne prend effet qu'au prochain déploiement prod.** Le code seul ne recharge pas les pods en cours ; il faut un `helm upgrade` (déclenché par un push sur `main` avec `K8S_PROD_ENABLED=true`) pour que les pods API repartent avec la nouvelle image *et* la ConfigMap contenant `APP_FRONT_URL`. Non vérifié en conditions réelles depuis cette session (pas d'accès `gh` ni `kubectl` sur le poste).
+
+
+---
+
+## [2026-08-28] [ADD] SonarQube auto-hébergé sur Kubernetes (chart `helm-sonarqube/`)
+
+**Demande** — Déployer un conteneur SonarQube dans un pod du cluster Kubernetes. Arbitrages retenus avec le porteur du projet : livrer les manifests **sans les appliquer**, namespace dédié, accès **interne uniquement**, et **bascule de la CI** sur cette instance.
+
+**Réserve signalée avant de coder** — Cela annule la décision du 2026-07-11 qui écartait explicitement le ré-hébergement de SonarQube au profit de SonarCloud. Confirmé par le porteur du projet ; entrée d'annulation ajoutée à `DECISIONS.md`.
+
+**Fichiers créés**
+- `helm-sonarqube/Chart.yaml`, `values.yaml`, `secrets.env.example`
+- `helm-sonarqube/templates/` — `_helpers.tpl`, `configmap.yaml`, `services.yaml`, `statefulset-postgres.yaml`, `statefulset-sonarqube.yaml`
+- `docs/MANUEL_SONARQUBE_K8S.md` — déploiement, accès, bascule CI, montée de version, dépannage, dette
+
+**Fichiers modifiés**
+- `.github/workflows/ci.yml` — job `sonarcloud` remplacé par `sonarqube` : ouverture d'un tunnel `kubectl port-forward` vers l'instance ClusterIP, attente explicite de `"status":"UP"`, scan, fermeture du tunnel en `if: always()`.
+- `sonar-project.properties` — en-tête réécrit ; `sonar.organization` **commentée** (notion propre à SonarCloud, sans objet sur une instance auto-hébergée), `sonar.projectKey` conservée à l'identique pour permettre un retour en arrière.
+- `.gitignore` — `helm-sonarqube/secrets.env`.
+
+**Utilisable** — Le chart est déployable en une commande (`helm upgrade --install sonarqube ./helm-sonarqube -n sonarqube --create-namespace --atomic --timeout 10m`) une fois le Secret `sonarqube-secrets` créé à la main. L'instance s'atteint ensuite par `kubectl -n sonarqube port-forward svc/sonarqube 9000:9000`.
+
+**Vérifications** — `helm lint` : 0 échec. `helm template` : 324 lignes rendues, 5 ressources. `kubectl apply --dry-run=client --validate=strict` contre `pck-dkoyol2` : les 5 ressources validées. `ci.yml` : YAML parsé, jobs `setup` / `test_and_lint` / `sonarqube`. **Aucun déploiement réel** — le comportement au démarrage de SonarQube n'est pas vérifié.
+
+**Deux points relevés au passage**
+- **`SonarSource/sonarqube-scan-action@v5`, utilisée jusqu'ici, est dépréciée et l'action émet elle-même un avertissement de vulnérabilité** renvoyant vers la v6. Corrigé dans le même geste : le job passe en `@v6`. À noter : ce défaut existait indépendamment de SonarQube et concernait aussi l'analyse SonarCloud.
+- **Capacité du cluster mesurée le 2026-08-28** : **3 nœuds** — la ligne « Cluster Kubernetes » de l'état global en annonçait encore 2, elle a été corrigée dans la foulée. 3 920 m CPU / 5 768 Mi allouables chacun, réservations mémoire à 13-24 %. Les 2 Gi de requests de SonarQube passent sans pression.
+
+**Hypothèses posées**
+- Le sysctl `vm.max_map_count` est réglé par un initContainer `privileged`. Vérifié le jour même : aucun label `pod-security.kubernetes.io/enforce` sur le cluster, donc PSA en mode `privileged` par défaut et l'initContainer est admis. Si une politique restrictive est posée plus tard, l'échappatoire est documentée (`sysctl.enabled=false` + `esBootstrapChecksDisable=true`).
+- Sondes en `httpGet` et non `exec` : la présence de `curl`/`wget` dans l'image SonarQube n'a pas été vérifiée (aucune image tirée). Conséquence assumée : `/api/system/status` répond 200 dès l'amorçage, la sonde de disponibilité ne distingue donc pas « démarré » de « prêt » — sans effet à une réplique, et la CI attend un `UP` explicite.
+
+**Dette / points d'attention**
+- **L'analyse statique de `main` est à l'arrêt tant que le déploiement n'est pas fait.** Le job CI pointe désormais sur une instance qui n'existe pas : il échouera au premier push sur `main`. Deux secrets GitHub restent à poser (`SONAR_TOKEN` régénéré **dans l'instance**, `KUBECONFIG_SONAR`), et le projet à créer dans l'UI avec la clé exacte `entrezunfredici_MyMemoMaster`.
+- **La couverture reste à 0 %** : l'action P0 de `docs/COMPTE_RENDU_METRIQUES.md` (publier le `lcov`) n'est pas traitée ici et l'indicateur se comportera exactement comme sur SonarCloud.
+- **Aucune NetworkPolicy** : tout pod du cluster peut joindre `sonarqube:9000` et `sonarqube-postgres:5432`.
+- **Aucune sauvegarde automatisée** de la base SonarQube (`pg_dump` manuel documenté), et l'instance n'est pas scrapée par le Prometheus du chart applicatif (namespace différent).
+- `storageClass: csi-cinder-sc-retain` volontaire : les volumes **survivent** à un `helm uninstall` et restent facturés jusqu'à suppression manuelle dans OpenStack.
+
+---
+
+### [2026-08-28] DOC — Report du planning daté dans Odoo : dates et durées des sous-tâches
+
+**Demande** : appliquer dans Odoo les dates et durées du planning daté « dev junior » produit le même jour.
+
+#### Piège identifié avant écriture : les blocs M-01 et M-02 sont inversés entre les deux systèmes
+Dans le xlsx, `M-01` = **moteur de Leitner** et `M-02` = **cartes mentales**. Dans Odoo, `[M-01]` = **Éditeur de cartes mentales** et `[M-02]` = **Révision active par systèmes de Leitner**. Un mappage par code de bloc — le réflexe évident — aurait posé les dates des cartes mentales sur le Leitner et réciproquement. **La correspondance a donc été établie sur le libellé, pas sur le code.**
+
+#### Correspondance retenue
+| Bloc Odoo | Alimenté par (features xlsx) |
+|---|---|
+| `M-00b` | `M-00b`, `DEV-LOCAL`, `DEV-VPS`, `PREPROD-K8S`, `PROD-K8S`, `Perf` — le bloc Odoo « Infrastructure, CI/CD et exploitation » les couvre explicitement |
+| `M-01` (cartes mentales) | xlsx **`M-02`** — inversion corrigée |
+| `M-02` (Leitner) | xlsx **`M-01`** — inversion corrigée |
+| `M-00`, `M-03` → `M-06`, `S-01` → `S-06`, `C-01`, `C-02` | même code de part et d'autre (libellés vérifiés) |
+
+Répartition à l'intérieur d'un bloc : la charge junior du bloc est divisée à parts égales entre ses sous-tâches Odoo (arrondi au quart de journée), et les sous-tâches sont étalées séquentiellement sur la fenêtre du bloc, en suivant les jours ouvrés du calendrier condensé.
+
+#### Écriture
+**181 sous-tâches** mises à jour (`allocated_hours`, `planned_date_begin`, `date_deadline`) en 131 écritures groupées par valeurs identiques — **0 échec**. Fichier de retour arrière produit avant écriture (`scratchpad/rollback_dates.json`, ancienne charge et anciennes dates des 181 tâches).
+
+| | Avant | Après |
+|---|---|---|
+| Sous-tâches chiffrées | 129 | **181** |
+| Charge élémentaire totale | 9 674 h / 1 209 JH | **2 096 h / 262 JH** |
+| Médiane des tâches chiffrées | 70 h | **8 h** |
+| Sous-tâches datées | 129 | **181** |
+| Fenêtre | 2025-05-20 → 2026-05-08 | **2025-10-07 → 2026-07-21** |
+
+**Le gabarit à 70 h a disparu** : la distribution va désormais de 2 h à 40 h et suit la nature du bloc. **L'anomalie de la tâche 1337** (645 h, recopie du total du bloc M-06) est résorbée au passage — elle porte 4 h, dans la fenêtre du 11/02/2026.
+
+#### Périmètre non couvert (volontaire)
+- **73 sous-tâches Odoo laissées intactes** : blocs `S-07`, `C-03` → `C-06`, `W-01` → `W-04`. Le planning d'équipe ne les contient pas ; elles restent à 0 h et sans dates, ce qui est exact — c'est du backlog non engagé.
+- **151,5 JH du planning n'ont aucune destination dans Odoo** : features `Pilotage` (16 tâches), `IA` (30), `Doc` (14), `QA` (12), `Marketing` (12), `Design` (7), `Landing` (5). Odoo ne modélise que le développement fonctionnel — ni le pilotage, ni le service IA comme brique propre, ni la recette, ni le marketing/design. **Le registre Odoo porte donc 262 JH sur les 411 JH du plan (64 %)** ; le xlsx reste la seule vue complète.
+
+#### Vérifications effectuées
+- Relecture live des 279 tâches après écriture : **0 écart** entre les valeurs écrites et les valeurs relues sur les 181 sous-tâches (heures, date de début, date de fin).
+- Contrôle sémantique du bloc `M-02` (Leitner) : ses sous-tâches portent bien la fenêtre du Leitner xlsx (30/10/2025 → 20/01/2026) et non celle des cartes mentales.
+- Totaux par bloc recalculés depuis Odoo : cohérents avec la répartition prévue (M-00b 65 JH, C-01 30,2, C-02 27,0, M-01 21,0, M-05 16,2, M-00 15,0…).
+
+#### Dette / points d'attention
+- **Les 25 tâches « Synthèse » n'ont pas été touchées et portent toujours leur ancienne charge** (M-00b : 1 901 h déclarées pour 520 h de sous-tâches, M-06 : 645 h pour 60 h…). L'écart Synthèse/enfants, déjà signalé au §3 du compte rendu, est donc **aggravé**. Les aligner (charge = somme des enfants, dates = min/max) est une écriture supplémentaire à décider — elle change la sémantique du champ sur les Synthèses.
+- **`docs/COMPTE_RENDU_METRIQUES.md` est annoté comme périmé sur ses §3, §4 et §6** : ses chiffres de coût (330 712 €), de charge (1 137,4 JH) et de capacité reposent sur l'ancien gabarit. Les §2, §5 et §7 restent valables.
+- Les lignes `Planning CSV: jj/mm/aaaa → jj/mm/aaaa` des descriptions **n'ont pas été modifiées** : la preuve d'antériorité du planning amont (§4 du compte rendu) est intacte, elle vit dans le champ description et non dans les champs de date.
+- La répartition à parts égales dans un bloc est une convention, pas une estimation : dans `S-04` (1 tâche source pour 13 sous-tâches Odoo), chaque sous-tâche reçoit 2 h — chiffre faible mais fidèle à ce que le planning contient.
+
+
+---
+
+## [2026-08-28] [ADD] Nœud dédié à l'outillage — `k8s/node-topology.sh` + placement de SonarQube
+
+**Demande** — « 1 nœud dédié à la prod, un à la preprod, un au monitoring/CI-CD ». Découpage revu après mesure : **seul le nœud d'outillage est dédié**, prod et preprod continuent de partager les deux autres. Arbitrage validé par le porteur du projet, périmètre « manifests + doc, sans appliquer ».
+
+**Pourquoi pas le 1/1/1 demandé** — Trois obstacles constatés dans le code et sur le cluster :
+1. `values-prod.yaml` déclare `api: 2, front: 2` et [deployment-api.yaml](../helm/templates/deployment-api.yaml) porte déjà un `topologySpreadConstraints` (`maxSkew: 1` sur `kubernetes.io/hostname`). Épingler la prod sur un nœud unique annule cette redondance tout en continuant à la payer.
+2. Le PDB `minAvailable: 1` de [pdb.yaml](../helm/templates/pdb.yaml) **bloquerait tout `kubectl drain`** du nœud prod : aucun pod évinçable, aucun nœud de repli. Le commentaire du fichier anticipe ce piège pour `replicas: 1`.
+3. `ingress-nginx`, `cert-manager`, `coredns` et `metrics-server` sont des Deployments **sans toleration**. Trois nœuds taintés les enfermeraient sur le nœud d'outillage — et le Service ingress étant en `externalTrafficPolicy: Local`, **tout le trafic de production entrerait par ce nœud**.
+
+Contrainte de fond : à 3 nœuds, « prod isolée » et « prod redondante » s'excluent. Les limites de la prod (6 400 Mi) dépassent déjà l'allouable d'un nœud (5 633 Mi).
+
+**Fichiers créés**
+- `k8s/node-topology.sh` — pose/retire le label `workload=tooling` et le taint `workload=tooling:NoSchedule`. Idempotent, `--dry-run` et `--revert`. Garde-fous : refuse un cluster de moins de 3 nœuds, signale les pods d'addons hors DaemonSet présents sur le nœud visé, liste les pods applicatifs qui migreront.
+
+**Fichiers modifiés**
+- `helm-sonarqube/values.yaml` — section « Placement » : `nodeSelector: {workload: tooling}` + toleration correspondante.
+- `helm-sonarqube/templates/statefulset-sonarqube.yaml` et `statefulset-postgres.yaml` — blocs `nodeSelector` / `tolerations` pilotés par les values (`{{- with }}`, donc omis si vidés).
+- `docs/MANUEL_SONARQUBE_K8S.md` — §1 bis « Placement : un nœud dédié à l'outillage » (mécanisme, trois pièges, vérification, sortie de secours si `Pending`).
+- `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` — renvoi vers le manuel SonarQube.
+
+**Utilisable** — `bash k8s/node-topology.sh <nœud>` puis le `helm upgrade` de SonarQube. Le chart porte déjà le `nodeSelector` et la toleration.
+
+**Vérifications** — `bash -n` : syntaxe verte. `--dry-run` exécuté **contre le cluster réel** sur `pck-dkoyol2-pgh-69qzm-5sx65` : 3 nœuds détectés, aucun pod d'addon hors DaemonSet sur ce nœud, 4 pods applicatifs listés comme devant migrer. `helm lint` vert, `helm template` : `nodeSelector` et `tolerations` présents sur les deux StatefulSets, `kubectl apply --dry-run=client --validate=strict` : 5 ressources validées. **Aucun label ni taint posé sur le cluster.**
+
+**Point relevé** — Le nœud `…-5sx65` est le bon candidat : il n'héberge aucun Deployment d'addon (ingress-nginx est sur `sccjf` et `4g9mk`, cert-manager et metrics-server sur `sccjf`, coredns et cilium-operator sur `4g9mk`), uniquement des DaemonSets qui tolèrent tout. Il porte en revanche 4 pods applicatifs qui migreront à leur prochain rollout — sans coupure, `NoSchedule` n'expulsant rien.
+
+**Hypothèse posée** — La clé `workload` est utilisée sans préfixe de domaine pour le label comme pour le taint. Admis pour un label posé par un administrateur (seul le kubelet est restreint sur les préfixes `kubernetes.io/`), et lisible ; à préfixer si le cluster venait à héberger d'autres projets.
+
+**Dette / points d'attention**
+- **Rien n'est appliqué** : tant que le script n'est pas lancé, SonarQube déployé en l'état resterait **`Pending`** (`node(s) didn't match Pod's node affinity/selector`), aucun nœud ne portant le label. Sortie de secours documentée : vider `nodeSelector` et `tolerations`.
+- **La preprod n'est pas isolée** de la prod ; elle reste tenue par son `ResourceQuota` (4 vCPU / 6 Gi) et la PriorityClass `mmm-preprod`. L'isoler vraiment demande un 4ᵉ worker (12,15 €/mois).
+- **Le nœud d'outillage devient un point unique** pour SonarQube : sa perte arrête l'analyse statique, donc la CI sur `main`. Acceptable pour de l'outillage, à retenir avant d'y placer autre chose de critique.
+- Prometheus reste dans les namespaces applicatifs (chart `helm/`), il n'a **pas** été déplacé vers le nœud d'outillage — le faire supposerait de le sortir du chart applicatif.
+
+---
+
+### [2026-08-28] ADD — Odoo : création des 6 blocs transverses absents du registre (MKT, DES, IA, QA, PIL, DOC)
+
+**Contexte** : après le report du planning daté, 109,5 JH sur 411 restaient sans destination dans Odoo, plus 42 JH de marketing/design. Le registre ne modélisait que le développement fonctionnel.
+
+#### Constat préalable — l'IA et la QA « existaient », mais pas celles-là
+L'utilisateur indiquait que les tâches IA et QA existaient déjà dans Odoo. Vérification faite, **ce ne sont pas les mêmes** :
+- Les blocs `C-01` (Génération de Leitner par IA) et `C-02` (Génération d'exercices par IA) sont des **fonctionnalités**, déjà datées par les 18 lignes `C-01`/`C-02` du planning. Les 30 lignes de la feature `IA` portent sur le **service IA lui-même** (architecture FastAPI, benchmark LLM, quotas et budget, prompts, cache embeddings, monitoring, runbook, déploiement K8s) — sans contrepartie. Les autres blocs « IA » d'Odoo (`C-05` autocomplétions, `W-01` chatbot) sont du backlog jamais démarré.
+- Chaque bloc Odoo porte bien ses sous-tâches « Tests unitaires / fonctionnels » et « Revue de code & merge », datées avec leur bloc. Mais les 12 lignes `QA` du planning sont **transverses** (plan de recette, E2E Playwright étudiant et enseignant, audit WCAG, non-régression, gel fonctionnel, hotfix) et ne correspondent à aucune d'elles.
+
+Arbitrage utilisateur : créer les blocs manquants, y compris `Pilotage` et `Doc`.
+
+#### Créations
+| Bloc | Libellé | Sous-tâches | Charge | Intervenants |
+|---|---|---|---|---|
+| `[MKT]` | Marketing et acquisition | 16 | 27,0 JH | Abel Giroud |
+| `[DES]` | Design et identité visuelle | 8 | 15,0 JH | Clélia Potorel |
+| `[IA]` | Service IA | 30 | 49,0 JH | Hocine, Achouak, Isra |
+| `[QA]` | Recette et qualité | 12 | 26,5 JH | Anthony, Gaïa, Ilias, Lena, Frédéric |
+| `[PIL]` | Pilotage de projet | 16 | 18,0 JH | Frédéric |
+| `[DOC]` | Documentation et livrables | 14 | 16,0 JH | tous |
+| | **Total** | **96 + 6 Synthèses** | **151,5 JH** | |
+
+Les tâches `Landing` du planning (5) ont été ventilées par intervenant : les 4 d'Abel dans `MKT`, celle de Clélia dans `DES`.
+
+Chaque sous-tâche porte : nom `[CODE.NN] Libellé — Tâche`, parent = sa Synthèse, `allocated_hours` (durée junior × 8), `planned_date_begin` / `date_deadline` du planning daté, `stage_id` déduit du statut du planning (✅ Terminé → *validé*, 🔄 En cours → *en cours*, ⏳ À faire → *spécification*), assigné nominatif, et une description reprenant feature d'origine, sprint, intervenant, rôle, charge et fenêtre. Les tâches réaffectées au chef de projet en juillet portent la mention de leur intervenant d'origine.
+
+#### Utilisatrice créée
+**`Clélia Potorel` (res.users id 24, login `clelia.potorel@mymemomaster.local`)** — la seule intervenante du planning sans compte Odoo. Login volontairement non routable : la personne n'utilisait pas Odoo, le compte ne sert qu'à porter l'assignation.
+
+#### État du projet après opération
+| | Avant (2026-08-27) | Après |
+|---|---|---|
+| Tâches | 279 | **381** |
+| Sous-tâches élémentaires | 254 | **350** |
+| Chiffrées | 129 | **277** |
+| Charge élémentaire | 9 674 h / 1 209 JH | **3 308 h / 413,5 JH** |
+| Fenêtre | 2025-05-20 → 2026-05-08 | **2025-10-07 → 2026-07-21** |
+
+**Odoo porte désormais la totalité des 411 JH du plan** (413,5 avec les arrondis de répartition par bloc), contre 64 % après le premier report.
+
+#### Vérifications effectuées
+- Relecture live des 381 tâches : 96 sous-tâches créées, **toutes assignées** (0 sans intervenant), toutes datées, toutes chiffrées.
+- Charges par bloc conformes au planning : MKT 27,0 / DES 15,0 / IA 49,0 / QA 26,5 / PIL 18,0 / DOC 16,0 JH.
+- Assignations nominatives contrôlées : Abel 16, Clélia 8, Achouak 13, Isra 11, Hocine 6, Antho 6, Léna 5, Gaïa 4, Ilias 3, Jorgelina 3.
+
+#### Dette / points d'attention
+- **Les 181 sous-tâches de développement restent assignées au seul chef de projet**, alors que le planning nomme leurs intervenants. Le contraste est désormais visible : les 6 nouveaux blocs ont des assignés nominatifs, les blocs fonctionnels non. Une réassignation est possible mais approximative — un bloc Odoo est alimenté par plusieurs lignes de planning portées par des personnes différentes, la répartition à l'intérieur du bloc serait une interpolation de plus.
+- Les 25 Synthèses d'origine portent toujours leur ancienne charge (voir l'entrée précédente) ; les 6 nouvelles portent, elles, la somme exacte de leurs enfants.
+- `Clélia Potorel` est un compte utilisateur interne : selon le plan Odoo souscrit, il peut consommer un siège.
