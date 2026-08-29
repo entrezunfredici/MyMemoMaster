@@ -7686,3 +7686,33 @@ Le chiffre API (81,41 %) est **inférieur** aux 86,6 % relevés précédemment, 
 - **58,91 % sur le front** : chiffre publiable mais bas. À regarder avant de communiquer dessus.
 - Le quality gate reste **non bloquant** pour le merge — dette ouverte depuis juillet, désormais faisable puisque l'instance est auto-hébergée.
 - L'écart **11 vs 28 vulnérabilités** entre l'instance et SonarCloud reste inexpliqué (entrée du 2026-08-28).
+
+
+---
+
+## [2026-08-29] [IMP] Couverture confirmée dans SonarQube (63,9 %) — et le quality gate passe au rouge
+
+**Chaîne validée de bout en bout.** 3ᵉ analyse reçue, CI verte en 200 s. Les `lcov` ont bien transité par artefact entre `test_and_lint` et `sonarqube`, et le préfixage des chemins a fonctionné : **le mode de panne silencieux (0 % sans erreur) ne s'est pas produit**.
+
+| Métrique | Valeur |
+|---|---|
+| `coverage` | **63,9 %** |
+| `line_coverage` | 62,5 % |
+| `branch_coverage` | 71,1 % |
+| `ncloc` | 33 638 |
+
+Chiffre global cohérent avec les mesures par projet (API 81,41 %, front 58,91 %), le front pesant plus lourd en lignes.
+
+**Conséquence non anticipée : le quality gate passe de `OK` à `ERROR`.**
+
+| Condition | Valeur | Verdict |
+|---|---|---|
+| `new_coverage` | 21,9 % | **ERROR** |
+| `new_violations` | 2 | **ERROR** |
+| `new_duplicated_lines_density` | 0,0 % | OK |
+
+**Ce n'est pas une régression de qualité** : la condition `new_coverage` n'était tout simplement **jamais évaluée** faute de données. Publier la couverture lui a donné de quoi juger, et elle juge sévèrement — 21,9 % sur le code neuf, contre un seuil par défaut de 80 %. Le code ajouté ces derniers jours (chart Helm, scripts, configurations) est très peu couvert par des tests, ce qui est attendu pour de l'infrastructure mais compte quand même dans la mesure.
+
+**Sans effet sur la CI aujourd'hui** : le job n'impose pas le quality gate (dette ouverte depuis juillet). **À savoir avant de le rendre bloquant** — dans l'état actuel, il ferait échouer chaque push sur `main`. Le rendre bloquant suppose donc d'abord soit de couvrir le code neuf, soit d'ajuster la condition.
+
+**Contexte du run** — L'étape d'audit de contraste est temporairement non bloquante (`continue-on-error`), sans quoi le job `sonarqube` restait *skipped* et rien de tout ceci n'aurait été mesurable. Diagnostic de cet échec toujours en attente des logs du runner.
