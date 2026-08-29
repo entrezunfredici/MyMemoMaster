@@ -1,7 +1,7 @@
 # Compte rendu de pilotage — MyMemoMaster
 
 **Date d'arrêté des mesures** : 2026-08-28
-**Périmètre** : projet Odoo `MyMemoMasterRNCP` (id 15, 381 tâches) + planning d'équipe `17_planning_MyMemoMaster.xlsx` + dépôt Git + SonarQube + suites de tests locales.
+**Périmètre** : projet Odoo `MyMemoMasterRNCP` (id 15, 381 tâches) + planning d'équipe `17_planning_MyMemoMaster.xlsx` + dépôt Git + **instance SonarQube auto-hébergée** (cluster `pck-dkoyol2`, analyse du 2026-08-28) + suites de tests locales.
 **Taux journalier retenu** : 300 €/JH. **Conversion** : 1 JH = 8 h.
 **Calendrier de référence** : plan condensé — 3 jours travaillés (mardi, mercredi, jeudi) toutes les 3 semaines, du **07/10/2025** au **18/06/2026** (13 cycles, 39 JH par personne), puis reprise par le seul chef de projet à taux plein jusqu'au **21/07/2026**.
 **Durées** : estimation « développeur junior », établie tâche par tâche sur les 192 lignes du planning d'équipe. **C'est un jugement argumenté, pas une mesure** — voir la réserve du §3.
@@ -14,15 +14,15 @@
 
 | Dimension | Indicateur | Unité | Valeur mesurée | Fiabilité |
 |---|---|---|---|---|
-| Avancement | Tâches validées / total | % | **87,0 %** sur le périmètre engagé (241/277) — 68,9 % rapporté aux 350 sous-tâches, backlog non chiffré inclus | ✅ Étape et état alignés (0 écart) |
+| Avancement | Tâches validées / total | % | **87,0 %** à l'étape « validé » sur le périmètre engagé (241/277) — dont **77,3 %** confirmés sur preuve (214/277) ; 68,9 % rapporté aux 350 sous-tâches | ⚠️ 27 validations reposent sur la déclaration, pas sur une preuve |
 | Coûts | JH consommés × 300 €/j | € | **100 275 €** validés (334,2 JH) ; enveloppe planifiée **124 050 €** (413,5 JH) ; reste à faire **23 775 €** | ⚠️ Charge planifiée, aucune saisie de temps possible |
 | Délais | Dates réelles vs Gantt prévisionnel | jours d'écart | **63 tâches** au-delà de leur échéance (1 058 h), dont 30 sur le seul bloc `IA` ; plan clos au 21/07/2026 | ⚠️ Le plan est condensé — voir §4 |
 | Risques | Dépendances bloquantes non levées | nb | **183 liens** ouverts, **78 verrous** distincts, **91 tâches** immobilisées — plus **6 dépendances d'infrastructure** | ✅ Mesure directe |
 | RH | Charge par profil / capacité disponible | JH | **411 JH pour 483 JH de capacité = 85 %**, réparti sur **7 profils** ; pointe à 113 % (SysAdmin) | ✅ Alimentable pour la première fois |
-| Qualité | Couverture de tests SonarQube | % | **0,0 %** — aucun rapport `lcov` publié ; couverture réelle **86,6 %** mesurée localement sur l'API | ❌ Indicateur non alimenté |
+| Qualité | Couverture de tests SonarQube | % | **0,0 %** — analyse opérationnelle et mesurée en direct sur l'instance auto-hébergée, mais aucun rapport `lcov` publié ; couverture réelle **86,6 %** mesurée localement sur l'API | ❌ Indicateur non alimenté (la chaîne, elle, fonctionne) |
 | Qualité | Non-conformités RGAA | nb | **0** sur les 5 critères outillés (79 fichiers `.vue`) | ⚠️ Périmètre outillé, pas les 106 critères |
 
-**Ce que ce tableau ne dit pas et qu'il faut dire avec lui** : 27 tâches déclarées faites dans le planning ne sont **pas confirmées par le dépôt** (§7.3). Elles sont comptées comme non validées dans l'indicateur d'avancement, ce qui est prudent, mais elles pèsent 30 des 63 retards du §4.
+**Ce que ce tableau ne dit pas et qu'il faut dire avec lui** : 27 tâches portent l'étape « validé » sur la seule foi du planning d'équipe et ne sont **pas confirmées par le dépôt** (§7.3). **Elles sont incluses dans les 87 %** — les en retirer ramène l'avancement à **77,3 %**. C'est l'écart entre « ce que l'équipe a déclaré » et « ce qui est démontrable », et il doit être énoncé avec le chiffre.
 
 ---
 
@@ -30,11 +30,16 @@
 
 | Lecture | Numérateur / dénominateur | % |
 |---|---|---|
-| **Périmètre engagé** (sous-tâches chiffrées et datées) | **241 / 277** | **87,0 %** |
+| **Périmètre engagé**, étape « validé » | **241 / 277** | **87,0 %** |
+| **Idem, en ne retenant que le confirmé sur preuve** | **214 / 277** | **77,3 %** |
 | Toutes sous-tâches élémentaires | 241 / 350 | 68,9 % |
 | Backlog non chiffré (`C-03`→`C-06`, `S-07`, `W-*`) | 0 / 73 | 0 % |
 
-**Les deux champs disent enfin la même chose.** L'écart entre l'étape Kanban et l'état de tâche, qui rendait l'indicateur illisible aux arrêtés précédents (5,7 % contre 92,3 % selon le champ lu), est résorbé : **0 tâche à l'état « Terminé » sans porter l'étape « validé »**. La validation a été faite sur preuve dans le dépôt — Dockerfiles, workflows CI/CD, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, tags git, entrées datées du journal de livraison — et non sur le statut déclaré dans le planning.
+**Deux chiffres, et il faut donner les deux.** 241 sous-tâches portent l'étape « validé », mais **27 d'entre elles n'y sont que sur la déclaration du planning d'équipe** : le dépôt ne confirme ni le service IA ni les tests E2E qu'elles décrivent (§7.3). L'avancement démontrable est donc de **77,3 %**, et l'écart de 9,7 points est exactement la mesure de ce qui est affirmé sans preuve.
+
+**L'alignement des champs est réel mais asymétrique.** **Aucune tâche n'est à l'état « Terminé » sans porter l'étape « validé »** — c'est ce qui rendait l'indicateur illisible aux arrêtés précédents (5,7 % contre 92,3 % selon le champ lu) et c'est résorbé. En revanche, **27 tâches portent l'étape « validé » sans être à l'état « Terminé »** : ce sont précisément les 27 non confirmées, laissées dans cet état intermédiaire pour qu'elles restent repérables dans l'outil jusqu'à l'arbitrage.
+
+**Les 214 confirmées l'ont été sur preuve dans le dépôt** — Dockerfiles, workflows CI/CD, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, tags git, entrées datées du journal de livraison — et non sur le statut déclaré dans le planning.
 
 **Le dénominateur à retenir est 277, pas 350.** Les 73 sous-tâches restantes appartiennent aux blocs `C-03` (partage de ressources), `C-04` (chat de groupe), `C-05` (autocomplétions IA), `C-06` (gamification), `S-07` (modération) et `W-01`→`W-04` (chatbot, résultats scolaires, centre d'aide, tutorat). Elles ne portent **ni charge ni date** parce que le planning d'équipe ne les contient pas : c'est un backlog d'évolutions, pas un reste-à-faire engagé. Les inclure au dénominateur fait perdre 18 points d'avancement sans rien mesurer de plus.
 
@@ -157,13 +162,32 @@ Six points bloquants ou à risque sont ouverts sur l'infrastructure, dont un **b
 
 ## 7. Qualité — couverture de tests et accessibilité
 
-### 7.1 Couverture SonarQube : 0,0 %
+### 7.1 Couverture SonarQube : 0,0 % — mais la chaîne d'analyse est désormais opérationnelle
 
-L'analyse a migré le 2026-08-28 de SonarCloud vers une **instance SonarQube Community auto-hébergée** sur le cluster Infomaniak (namespace `sonarqube`, chart `helm-sonarqube/`, non exposée sur Internet — accès par `kubectl port-forward`). Le job `sonarqube` de `.github/workflows/ci.yml` la pilote.
+**Ce qui a changé le 2026-08-28.** L'analyse a quitté SonarCloud pour une **instance SonarQube Community 26.8 auto-hébergée** sur le cluster Infomaniak `pck-dkoyol2` (namespace `sonarqube`, chart `helm-sonarqube/`, PostgreSQL 17 dédié, 3 PVC en `csi-cinder-sc-retain`). L'instance n'est **pas exposée sur Internet** : le runner GitHub l'atteint par un tunnel `kubectl port-forward` vers l'API Kubernetes, elle-même publique et authentifiée par kubeconfig.
 
-**La migration n'a pas résolu le problème de fond** : `sonar-project.properties` ne renseigne toujours pas `sonar.javascript.lcov.reportPaths`, et la CI n'exécute pas les tests avec l'option de couverture. **Aucun rapport `lcov` n'est transmis** — l'indicateur affiche donc toujours 0,0 %, ce qui ne reflète pas l'état réel du projet.
+**La chaîne est éprouvée**, ce qui n'était pas acquis : premier passage réel du job CI `sonarqube` au merge de `feat/sonarqube-k8s`, tâche `REPORT` en statut `SUCCESS` soumise **135 s après le push**, 7,1 s de calcul. Vérifié par l'API de l'instance, base de référence relevée à zéro analyse avant le push.
 
-**Couverture réellement mesurée** (exécution locale des suites, 2026-08-27 — code inchangé depuis) :
+**Mesures de l'analyse du 2026-08-28**, **requêtées directement sur l'instance** (`/api/measures/component` via tunnel), comparées à la dernière analyse SonarCloud de la veille :
+
+| Métrique | Auto-hébergé (28/08) | SonarCloud (27/08) |
+|---|---|---|
+| Lignes de code | 33 576 | 33 940 |
+| Bugs | **9** | 9 |
+| **Vulnérabilités** | **11** | **28** |
+| Security hotspots | 0 | — |
+| Code smells | 730 | 704 |
+| Duplication | 2,5 % | 2,5 % |
+| **Couverture** | **0,0 %** | 0,0 % |
+| Dette technique | 4 743 min ≈ 79 h ≈ **2 964 €** | 4 594 min |
+| Maintenabilité / Fiabilité / Sécurité | **A / D / D** | A / D / D |
+| Quality gate | **OK** | — |
+
+**Le quality gate passe, mais il ne dit presque rien.** Sa seule condition est `new_violations = 0` sur le code nouveau, et elle est satisfaite parce qu'aucun code nouveau n'a été analysé depuis la base de référence. **Il ne porte aucun jugement sur les 750 anomalies existantes** — un « OK » de quality gate n'est pas un état des lieux.
+
+**L'indicateur demandé reste à 0 %, et le changement d'hébergement n'y est pour rien.** La cause est inchangée : le job `test_and_lint` exécute `npm run test` sans option de couverture, aucun artefact `lcov` n'est produit ni transmis, et `sonar.javascript.lcov.reportPaths` n'est pas renseigné dans `sonar-project.properties`. **L'action P0 reste entière** — c'est ~1 JH pour passer l'indicateur de 0 % à ~86 %.
+
+**Couverture réellement mesurée** (exécution locale, 2026-08-27 — code applicatif inchangé depuis) :
 
 | Périmètre | Instructions | Lignes | Branches | Fonctions | Tests |
 |---|---|---|---|---|---|
@@ -171,6 +195,35 @@ L'analyse a migré le 2026-08-28 de SonarCloud vers une **instance SonarQube Com
 | Front (Vitest) | non mesurable | — | — | — | 685 tests / 44 fichiers, tous verts |
 
 La couverture front n'est pas mesurable sans ajouter `@vitest/coverage-v8`, absente du projet.
+
+#### 7.1.1 — Les 11 vulnérabilités, une par une
+
+L'accès direct à l'instance a permis de les caractériser (`/api/issues/search`) plutôt que de s'en tenir au compte :
+
+| Règle | Nb | Sévérité | Nature |
+|---|---|---|---|
+| `javascript:S2245` | **8** | MAJOR | « Make sure that using this pseudorandom number generator is safe here » — `Math.random()` dans `upload.middleware.js` (3), `mindmapImageUpload.js` (2), `functions.js` (2), `mindmap.js` (1) |
+| `javascript:S5693` | 1 | MAJOR | Limite de taille de contenu à vérifier |
+| `docker:S6471` | 1 | MINOR | L'image `node` tourne en `root` par défaut — `my_memo_master_api/Dockerfile:18` |
+| `docker:S6470` | 1 | **CRITICAL** | `COPY . .` récursif — `my_memo_master_api/Dockerfile:25` |
+
+**L'écart 11 / 28 s'explique, et il rend les deux chiffres non comparables.** Les 11 findings sont **tous** des règles de type « Make sure … is safe here » : ce sont, dans la terminologie Sonar, des **security hotspots** — des points à faire relire par un humain, pas des failles confirmées. Or l'instance auto-hébergée les classe en *vulnérabilités* et affiche **0 hotspot**, là où SonarCloud sépare les deux catégories. **Les deux plateformes ne rangent pas les mêmes règles au même endroit** : additionner ou comparer leurs compteurs n'a pas de sens. Ce qui est opposable, c'est la note de sécurité — **D dans les deux cas** — et le détail ci-dessus, qui lui ne dépend d'aucune convention de comptage. Les profils qualité de l'instance sont tous les « Sonar way » par défaut, sans personnalisation.
+
+#### 7.1.2 — ⚠️ La vulnérabilité CRITICAL est réelle : secrets embarqués dans l'image API
+
+`docker:S6470` n'est pas un faux positif. Vérification faite dans le dépôt :
+
+- `my_memo_master_api/Dockerfile:25` fait `COPY . .` dans le stage de production ;
+- `my_memo_master_api/.dockerignore` ne contient que `node_modules/`, `.git`, `.idea`, `Dockerfile*` — **`.env` n'y est pas** ;
+- `my_memo_master_api/.env` existe et porte **`AUTH_JWT_SECRET`** et **`SMTP_PASS`**.
+
+**Toute image construite depuis un poste de développement embarque donc ces secrets dans une couche.** Le fichier est bien ignoré par git (`.gitignore:1`), ce qui limite la portée : **les images construites par la CI, à partir d'un checkout propre, ne sont pas concernées** — le `.env` n'y existe pas. Le risque porte sur les builds locaux (`docker compose build`) et sur toute image qui en serait issue puis poussée.
+
+**Correctif** : ajouter `.env` et `.env.*` à `my_memo_master_api/.dockerignore`. Quelques minutes, à faire avant toute publication d'image construite localement.
+
+**À ne pas confondre avec le chiffre Dependabot** : GitHub signale 10 vulnérabilités sur la branche par défaut (7 hautes, 2 modérées, 1 basse). Cela ne contredit pas le « 0 vulnérabilité » de `npm audit --omit=dev` obtenu en CI — Dependabot compte aussi les dépendances de développement, qui n'entrent pas dans les images déployées.
+
+**Limites de l'instance** : analyse restreinte à `main` (le multi-branches est absent de l'édition Community), et projet en visibilité publique dans l'instance — sans effet tant qu'aucun Ingress n'est posé.
 
 ### 7.2 Non-conformités RGAA : 0
 
@@ -198,24 +251,24 @@ La validation des tâches a été faite **sur preuve dans le dépôt**, pas sur 
 | `QA.03`, `QA.05` | 2 | Tests E2E parcours étudiant et enseignant (Playwright) | Aucune dépendance `playwright` ni `cypress`, aucun dossier E2E |
 | `QA.06` | 1 | Rapport de tests couvrant E2E et charge | Ni k6 ni Locust dans le dépôt |
 
-Ces 27 tâches sont **comptées comme non validées** dans les indicateurs de ce rapport — choix prudent, qui explique 30 des 63 retards du §4. **À arbitrer avant toute restitution** : si le service IA existe dans un dépôt séparé, il doit être référencé dans le dossier et les tâches validées ; sinon, le planning déclare un périmètre qui n'a pas été livré.
+Ces 27 tâches **portent l'étape « validé » dans Odoo** — elles avaient reçu ce statut à leur création, depuis le planning — mais leur **état de tâche est resté « en cours »**, faute de preuve. Elles sont donc **incluses dans les 87 % du §2**, et les en retirer ramène l'avancement démontrable à **77,3 %**. Elles expliquent par ailleurs 30 des 63 retards du §4. **À arbitrer avant toute restitution** : si le service IA existe dans un dépôt séparé, il doit être référencé dans le dossier et les tâches validées ; sinon, le planning déclare un périmètre qui n'a pas été livré.
 
 ---
 
 ## 8. Synthèse et actions recommandées
 
-**Ce que disent les mesures** : le produit est livré et déployé — 87 % du périmètre engagé validé sur preuve, production fonctionnelle, 2 230 tests verts, 0 non-conformité RGAA outillée. Le plan tient désormais dans la capacité de l'équipe (85 %) et les deux champs d'avancement d'Odoo concordent enfin.
+**Ce que disent les mesures** : le produit est livré et déployé — 87 % du périmètre engagé à l'étape « validé », dont 77,3 % confirmés sur preuve, production fonctionnelle, 2 230 tests verts, 0 non-conformité RGAA outillée. Le plan tient désormais dans la capacité de l'équipe (85 %) et les deux champs d'avancement d'Odoo concordent enfin.
 
 **Ce qui a été réparé depuis l'arrêté du 2026-08-27** : quatre des sept indicateurs étaient inexploitables, deux le sont encore.
 
 | Indicateur | Au 2026-08-27 | Aujourd'hui |
 |---|---|---|
-| Avancement | 3 lectures divergentes (5,7 % / 60,6 % / 92,3 %) | **Une seule lecture, 87 %** — étape et état alignés |
+| Avancement | 3 lectures divergentes (5,7 % / 60,6 % / 92,3 %) | **87 % déclaré, 77,3 % démontrable** — l'écart est nommé, plus subi |
 | Coûts | Gabarit à 70 h/tâche, anomalie à 645 h | **Durées par nature de tâche**, de 2 h à 40 h |
 | Délais | Plan à 2,8× la capacité, dépassement certain d'avance | **Plan réalisable**, l'écart mesure l'exécution |
 | RH | « Non alimentable » — aucun profil renseigné | **7 profils, 85 % de capacité** |
 | Coûts (source) | Aucune saisie de temps | ❌ inchangé — module Feuilles de temps absent |
-| Couverture Sonar | 0 % faute de `lcov` | ❌ inchangé malgré la migration self-hosted |
+| Couverture Sonar | 0 % faute de `lcov` | ❌ inchangé — mais la chaîne est auto-hébergée, éprouvée, et **les anomalies sont désormais caractérisées une par une** (§7.1) |
 
 **La limite de méthode à assumer** : ce rapport mesure un plan, pas un relevé. Aucune donnée de temps réel n'existe sur ce projet et l'outil ne permettrait pas d'en produire. Les 413,5 JH sont une estimation argumentée tâche par tâche ; les 100 275 € sont la valorisation au barème de la charge validée, **pas une dépense constatée**.
 
@@ -224,7 +277,10 @@ Ces 27 tâches sont **comptées comme non validées** dans les indicateurs de ce
 | **P0** | **Arbitrer le périmètre IA** : le service existe-t-il dans un dépôt séparé ? Le référencer, ou corriger le planning | Avancement, Délais (30 des 63 retards) | < 0,5 JH |
 | **P0** | Régénérer les secrets `KUBECONFIG_*` | Risques (CD à l'arrêt) | < 0,5 JH |
 | **P0** | Publier le `lcov` vers SonarQube (couverture en CI + `sonar.javascript.lcov.reportPaths`) | Qualité — de 0 % à ~86 % | ~1 JH |
-| **P1** | Ouvrir un ticket sur les bugs et vulnérabilités remontés par SonarQube | Qualité (fiabilité, sécurité) | à estimer |
+| **P0** | Ajouter `.env` et `.env.*` à `my_memo_master_api/.dockerignore` — `COPY . .` embarque `AUTH_JWT_SECRET` et `SMTP_PASS` dans toute image construite localement (§7.1) | Qualité, Risques — vulnérabilité CRITICAL confirmée | < 0,1 JH |
+| **P1** | Traiter les **8 `Math.random()`** signalés (`upload.middleware.js`, `mindmapImageUpload.js`, `functions.js`, `mindmap.js`) : `crypto.randomUUID()` là où la valeur sert d'identifiant ou de nom de fichier | Qualité — 8 des 11 vulnérabilités | ~0,5 JH |
+| **P1** | Ouvrir un ticket sur les **9 bugs** (3 `css:S4649` police générique, 2 `javascript:S3403` comparaison toujours fausse, 1 `reduce()` sans valeur initiale, 1 tri sans comparateur…) — note de fiabilité **D** | Qualité (fiabilité) | à estimer |
+| **P2** | Faire tourner l'image API sous un utilisateur non-`root` (`docker:S6471`) | Qualité (durcissement) | ~0,5 JH |
 | **P1** | Statuer sur les blocs `C-01`/`C-02` : ils portent charge et dates alors que la génération par IA n'est pas construite | Avancement, Coûts (20 tâches, 458 h) | ~0,5 JH |
 | **P1** | Tester une restauration réelle depuis `scripts/backup.sh` (`M-00b.11`) | Risques, Avancement | ~0,5 JH |
 | **P2** | Saisir le régime de travail réel dans les calendriers de ressource Odoo | RH (tout replanning y est encore calculé à temps plein) | ~0,5 JH |
@@ -241,6 +297,7 @@ Ces 27 tâches sont **comptées comme non validées** dans les indicateurs de ce
 | Charge par profil | Rôles lus dans `17_planning_MyMemoMaster.xlsx`, feuille « Planning Sprints », croisés avec les durées junior |
 | Capacité | 13 cycles × 3 jours (mardi/mercredi/jeudi, cycle de 3 semaines) + 15 jours ouvrés de juillet pour le chef de projet |
 | Durées « junior » | Réestimation tâche par tâche des 192 lignes du planning — **jugement argumenté, non reproductible mécaniquement** |
+| Mesures SonarQube | Instance auto-hébergée `pck-dkoyol2`, namespace `sonarqube` — `kubectl -n sonarqube port-forward svc/sonarqube 9000:9000`, puis `/api/measures/component`, `/api/issues/search`, `/api/qualitygates/project_status` et `/api/qualityprofiles/search`, authentifiés par le token `SONAR_TOKEN` |
 | Couverture API | `cd my_memo_master_api && npx jest --coverage` |
 | Tests front | `cd my_memo_master_front && npx vitest run` |
 | Non-conformités RGAA | `cd my_memo_master_front && node scripts/audit-a11y.mjs` |

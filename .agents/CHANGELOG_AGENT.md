@@ -137,7 +137,7 @@
 | Dossier B2 (B2_RENDU.md) | À jour — onboarding documenté (§3.3, §9.6), chiffres de tests réels (1 450 API + 617 front), liens annexes corrigés, annexes/dev resynchronisées ; restent 3 placeholders d'assets (Figma, screenshots) + 2 réfs biblio à compléter | 2026-07-17 |
 | Connecteur Odoo (`odoo-plugin/`, hors périmètre applicatif) | Opérationnel — plugin Hermes `odoo-plugin` rendu utilisable en autonome : CLI JSON `odoo_cli.py` + façade `connector.OdooConnector`, accès lus dans le `.env` (`URL`/`BDD`/`MAIL`/`PASSWORD`), droits fournis par `local_rights/rights_plugin_api.py` (le plugin frère `rights-plugin` est absent du dépôt) ; CRUD vérifié en réel sur `bleu-canard.odoo.com` ; dossier gitignoré ; première écriture de masse le 2026-08-27 (137 tâches repositionnées à l'étape « validé ») | 2026-08-27 |
 | Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
-| Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28**, puis §7.1 actualisé le même jour sur les mesures réelles de l'instance SonarQube auto-hébergée (9 bugs, 11 vulnérabilités — écart à instruire contre 28 sur SonarCloud, 730 code smells, dette 4 743 min ≈ 2 964 €, notes A/D/D, couverture toujours 0 %), sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
+| Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28**, puis §7.1 actualisé sur les mesures **requêtées en direct** sur l'instance SonarQube auto-hébergée (9 bugs, 11 vulnérabilités caractérisées une par une, 730 code smells, dette 4 743 min ≈ 2 964 €, notes A/D/D, quality gate OK mais vide de sens, couverture toujours 0 %) — **vulnérabilité CRITICAL confirmée réelle : secrets embarqués dans l'image API**, sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
 | Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 
@@ -7453,3 +7453,95 @@ Les 27 tâches déclarées faites mais non confirmées par le dépôt (24 du blo
 **Non vérifiable — les secrets GitHub `KUBECONFIG_PREPROD` / `KUBECONFIG_PROD`.** C'est l'autre moitié du même risque et elle reste ouverte. Le push sur `main` de ce jour n'a déclenché aucun redéploiement (`mmm-prod` toujours en révision 4 du 2026-08-27), ce qui est cohérent avec `deploy_prod` conditionné à `K8S_PROD_ENABLED == 'true'` — donc **cela ne prouve rien**, ni que le secret est bon, ni qu'il est périmé. Seul élément positif : `KUBECONFIG_SONAR`, posé ce jour depuis le bon fichier, a fonctionné en CI. **À contrôler manuellement** dans Settings → Secrets, en comparant le port (`31159` = bon, `30922` = mort).
 
 **Relevé au passage** — La release Helm `metrics-server` est en statut `failed` (namespace `kube-system`), ce qui corrobore le « metrics-server non fonctionnel » déjà consigné. Non traité ici.
+
+
+---
+
+## [2026-08-28] [FIX] Prod : le lien de vérification email pointait encore `http://localhost` — le correctif était dans le dépôt, pas dans le cluster
+
+**Symptôme** — Un mail « Nouveau code de vérification » reçu d'un compte réel porte le lien `http://localhost/verify-email?email=…&code=…`. Le même défaut que celui traité les 27 et 28/08, alors que les deux correctifs sont commités.
+
+**Cause — l'écart entre le dépôt et le déployé, sur deux couches à la fois.**
+- La release Helm `mmm-prod` était en **révision 4 du 2026-08-27 11:35**, soit **antérieure** au commit `d9d1b71` qui ajoute `APP_FRONT_URL` à `helm/values-prod.yaml`. La ConfigMap vivante `mmm-prod-config` (32 clés) portait bien `CORS_ORIGIN` et `VITE_FRONT_URL` en `https://app.my-memo-master.com`, mais **pas `APP_FRONT_URL`**.
+- Les pods `mmm-prod-api` avaient **35 h** et tournaient donc sur une image antérieure au commit `68b906e` (2026-08-28 11:57) qui introduit `helpers/frontUrl.js`. Ils exécutaient encore l'ancien littéral `process.env.APP_FRONT_URL || 'http://localhost'` — sans chaîne de repli vers `VITE_FRONT_URL`.
+
+Les deux couches manquaient **en même temps**, et c'est ce qui rend le symptôme persistant : la ConfigMap seule aurait suffi à corriger l'ancienne image, et l'image seule aurait suffi à rattraper la ConfigMap incomplète par le repli `VITE_FRONT_URL`. Aucune des deux n'était en place. Cause racine unique : `deploy_prod` de `cd.yml` est conditionné à `vars.K8S_PROD_ENABLED == 'true'` — **aucun `helm upgrade` n'a eu lieu depuis le 27/08 11:35**, donc aucun des deux correctifs n'a jamais atteint la production.
+
+**Corrigé en ligne (autorisé explicitement par le porteur du projet)**
+- `kubectl patch configmap mmm-prod-config` → ajout de `APP_FRONT_URL: https://app.my-memo-master.com`, valeur **identique** à celle de `helm/values-prod.yaml:24` (donc aucune divergence introduite avec la source Helm).
+- `kubectl rollout restart deployment mmm-prod-api` → rollout terminé, 2/2 pods `Running`.
+
+**Effet de bord assumé et signalé avant l'action** — Le déploiement est en `image: fredissimo/mymemomaster_api:latest` avec `imagePullPolicy: Always` : le restart **change aussi de version d'image**. Vérifié avant de lancer : le tag `latest` du registry a été poussé le 2026-08-28 à 15:01, donc **après** `68b906e` (11:57) — l'image tirée contient `frontUrl.js`. Confirmé après rollout, les nouveaux pods tournent sur `sha256:31361540a58cb…`, digest correspondant au `latest` courant, là où les anciens portaient `sha256:a58ddda4745f…`.
+
+**Utilisable** — Les mails de vérification et de renvoi de code partis de la production portent désormais `https://app.my-memo-master.com/verify-email?…`. Les deux couches sont correctes simultanément : la ConfigMap fournit `APP_FRONT_URL`, et l'image porte la chaîne de repli qui rattraperait sa disparition via `VITE_FRONT_URL`.
+
+**Vérifications** — ConfigMap relue après patch (`APP_FRONT_URL=https://app.my-memo-master.com`) · `rollout status` conclusif · digest des nouveaux pods relevé et comparé au registry · `envFrom: mmm-prod-config` confirmé sur le pod, donc la clé est bien injectée. **Non vérifié de bout en bout** : aucun mail de test n'a été déclenché depuis la production, l'envoi vers une boîte réelle n'ayant pas été demandé.
+
+**Dette / reste à faire**
+- **Preprod porte exactement le même défaut, non corrigé.** `mmm-preprod-config` n'a pas `APP_FRONT_URL` et `mmm-preprod-api` a 35 h. Tout mail parti de preprod contient encore `http://localhost`. Laissé en l'état : seule la prod a été autorisée.
+- **La ConfigMap prod est désormais en dérive vis-à-vis de la révision Helm 4.** Sans conséquence en avant — le prochain `helm upgrade` re-rend la clé depuis `values-prod.yaml` avec la même valeur. **Mais un `helm rollback` vers une révision ≤ 4 supprimerait `APP_FRONT_URL`** et ferait réapparaître le bug sur l'ancienne image.
+- **Le fond n'est pas traité : `K8S_PROD_ENABLED` reste à `false`.** Tant que la CD prod est désactivée, tout correctif fusionné sur `main` reste sans effet en production et devra être rejoué à la main. C'est ce qui a produit ce bug ; cela en produira d'autres.
+- **Le tag `latest` empêche de savoir ce qui tourne.** Un `rollout restart` déclenche un changement de version non maîtrisé — ici favorable par chance, vérifié avant coup. Tagger les images par SHA de commit supprimerait ce couplage.
+- `k8s/prod/configmap.yml` pointe toujours le front sur l'apex `my-memo-master.com` au lieu de `app.` — dette déjà consignée le 28/08, inchangée.
+
+---
+
+### [2026-08-28] FIX/DOC — Accès direct à l'instance SonarQube : anomalies caractérisées, secrets embarqués dans l'image API découverts
+
+**Contexte** : le kubeconfig du poste ayant été corrigé (contexte `pck-dkoyol2` fonctionnel), l'instance SonarQube est devenue interrogeable depuis le poste — ce qui n'était pas le cas lors de la mise à jour précédente du §7.1, faite à partir d'un relevé consigné.
+
+#### Mesures requêtées, plus reprises
+Tunnel `kubectl -n sonarqube port-forward svc/sonarqube 9000:9000`, authentification par le token `SONAR_TOKEN` de `helm-sonarqube/credentials.local`. `/api/system/status` → `UP` (version 26.8.0.126808). **Toutes les valeurs du relevé sont confirmées à l'identique** : 33 576 lignes, 9 bugs, 11 vulnérabilités, 0 hotspot, 730 code smells, 2,5 % de duplication, 0,0 % de couverture, dette 4 743 min, notes A / D / D.
+
+#### L'écart 11 / 28 est expliqué : les deux plateformes ne classent pas pareil
+`/api/issues/search?types=VULNERABILITY` donne le détail : **les 11 findings sont tous des règles de type « Make sure … is safe here »**, c'est-à-dire des **security hotspots** au sens Sonar — des points à faire relire, pas des failles confirmées. L'instance les classe en *vulnérabilités* et affiche 0 hotspot, là où SonarCloud sépare les deux catégories. **Les compteurs ne sont donc pas comparables** ; ce qui est opposable, c'est la note de sécurité (D des deux côtés) et le détail par règle. Profils qualité vérifiés : tous les « Sonar way » par défaut, aucune personnalisation.
+
+| Règle | Nb | Sévérité |
+|---|---|---|
+| `javascript:S2245` — générateur pseudo-aléatoire | **8** | MAJOR |
+| `javascript:S5693` — limite de taille de contenu | 1 | MAJOR |
+| `docker:S6471` — image `node` en `root` | 1 | MINOR |
+| `docker:S6470` — `COPY . .` récursif | 1 | **CRITICAL** |
+
+#### ⚠️ La CRITICAL est réelle — secrets embarqués dans l'image API
+`docker:S6470` pointe `my_memo_master_api/Dockerfile:25`. Vérification dans le dépôt :
+- le stage de production fait `COPY . .` ;
+- `my_memo_master_api/.dockerignore` ne contient que `node_modules/`, `.git`, `.idea`, `Dockerfile*` — **`.env` n'y figure pas** ;
+- `my_memo_master_api/.env` existe et porte **`AUTH_JWT_SECRET`** et **`SMTP_PASS`**.
+
+**Toute image construite depuis un poste de développement embarque ces secrets dans une couche.** Portée limitée par le fait que le fichier est ignoré par git (`.gitignore:1`) : **les images construites par la CI, sur un checkout propre, ne sont pas concernées**. Le risque porte sur les builds locaux (`docker compose build`) et sur toute image qui en serait issue puis poussée. **Correctif : ajouter `.env` et `.env.*` à `my_memo_master_api/.dockerignore`** — inscrit en **P0** du plan d'action, < 0,1 JH. Non appliqué ici (hors périmètre de la demande, qui portait sur le rapport).
+
+#### Autre constat : le quality gate passe mais ne dit rien
+`/api/qualitygates/project_status` → `OK`, avec une **unique condition** : `new_violations ≤ 0`, satisfaite parce qu'aucun code nouveau n'a été analysé depuis la base de référence. **Le gate ne porte aucun jugement sur les 750 anomalies existantes.** Un « OK » de quality gate ne doit donc pas être présenté comme un état des lieux — c'est écrit dans le §7.1.
+
+#### Rapport mis à jour
+`§7.1` : mesures requêtées en direct, ligne « Quality gate » et sa mise en garde, tableau détaillé des 11 vulnérabilités, explication de l'écart 11/28, section dédiée à la CRITICAL et à son correctif. `§1`, `§8` (plan d'action) et l'annexe alignés. **Le plan d'action passe de 9 à 11 lignes** : un P0 (`.dockerignore`), un P1 sur les 8 `Math.random()`, un P1 sur les 9 bugs désormais nommés, un P2 sur l'utilisateur `root` — l'ancienne action « instruire l'écart » disparaît, l'écart étant expliqué.
+
+#### Dette / points d'attention
+- **Le correctif `.dockerignore` n'est pas appliqué** — c'est un P0 à traiter, le plus rentable du plan (< 0,1 JH).
+- Le tunnel `port-forward` a été refermé après les mesures.
+- `metrics.k8s.io` répond toujours en erreur sur le cluster (`metrics-server` non fonctionnel) — risque n° 2 du §5.2, inchangé et sans effet sur ces mesures.
+
+---
+
+### [2026-08-28] FIX — Compte rendu : l'indicateur d'avancement comptait les 27 tâches non confirmées
+
+**Déclencheur** : relecture live des étapes Odoo demandée par l'utilisateur pour l'indicateur d'avancement.
+
+**Erreur corrigée.** Le §1 du compte rendu affirmait que les 27 tâches déclarées faites mais non confirmées par le dépôt étaient « comptées comme non validées dans l'indicateur d'avancement, ce qui est prudent ». **C'était faux.** Ces 27 tâches ont reçu l'étape « validé » à leur création, déduite du statut du planning d'équipe ; seul leur **état de tâche** avait été laissé à `01_in_progress` faute de preuve. L'indicateur d'avancement se calcule sur l'étape : **elles étaient donc bien incluses dans les 241 validées, donc dans les 87 %**.
+
+| Lecture | Valeur |
+|---|---|
+| Étape « validé », périmètre engagé | 241 / 277 = **87,0 %** |
+| **Idem, confirmé sur preuve** | **214 / 277 = 77,3 %** |
+
+**L'écart de 9,7 points est exactement la mesure de ce qui est affirmé sans preuve** — 24 tâches du bloc `IA` et 3 de `QA`.
+
+**Alignement étape/état : réel mais asymétrique.** Le rapport annonçait « 0 écart ». C'est vrai dans un sens seulement : aucune tâche n'est à l'état « Terminé » sans l'étape « validé », mais **27 portent l'étape « validé » sans être à l'état « Terminé »** — état intermédiaire volontaire, qui les garde repérables dans Odoo jusqu'à l'arbitrage. Le rapport le dit maintenant explicitement.
+
+**Sections corrigées** : `§1` (ligne Avancement + note sous le tableau), `§2` (tableau à 4 lignes, deux paragraphes réécrits), `§7.3` (l'affirmation fausse), `§8` (tableau de progrès et phrase d'ouverture).
+
+**Contrôle live du jour** — 381 tâches, 350 élémentaires : étapes `validé 241 / spécification 101 / en cours 7 / aide 1`, charge validée **334,2 JH sur 413,5**, 0 tâche « Terminé » hors étape « validé ». Blocs à 100 % : `M-00`, `M-01`, `M-02`, `M-03`, `M-04`, `M-05`, `M-06`, `S-01`→`S-06`, `MKT`, `DES`. Blocs à 0 % : `C-01`→`C-06`, `S-07`, `W-01`→`W-04` (backlog non chiffré, plus la génération par IA jamais construite).
+
+#### Dette / points d'attention
+- Tant que l'arbitrage IA n'est pas rendu, **c'est 77,3 % qu'il faut citer**, pas 87 % — ou les deux, avec l'explication. Citer 87 % seul revient à présenter une déclaration comme un fait.
