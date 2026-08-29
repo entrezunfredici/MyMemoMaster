@@ -33,7 +33,7 @@
             <p class="settings__row-label">Mode sombre</p>
             <p class="settings__row-hint">Applique un thème sombre à l'interface.</p>
           </div>
-          <ToggleButton v-model="darkMode" />
+          <ToggleButton v-model="darkMode" ariaLabel="Mode sombre" />
         </div>
       </template>
 
@@ -68,6 +68,7 @@
             </div>
             <ToggleButton
               :modelValue="alertStore.settings.enabled"
+              ariaLabel="Activer les alertes de progression"
               @update:modelValue="save({ enabled: $event })"
             />
           </div>
@@ -83,6 +84,7 @@
               </div>
               <ToggleButton
                 :modelValue="alertStore.settings.inAppEnabled"
+                ariaLabel="Notification dans l'application"
                 @update:modelValue="save({ inAppEnabled: $event })"
               />
             </div>
@@ -94,6 +96,7 @@
               </div>
               <ToggleButton
                 :modelValue="alertStore.settings.emailEnabled"
+                ariaLabel="Notification par e-mail"
                 @update:modelValue="save({ emailEnabled: $event })"
               />
             </div>
@@ -103,7 +106,7 @@
                 <p class="settings__row-label">Notification mobile (push)</p>
                 <p class="settings__row-hint">Disponible quand l'application mobile sera publiée.</p>
               </div>
-              <ToggleButton :modelValue="false" :disabled="true" />
+              <ToggleButton :modelValue="false" :disabled="true" ariaLabel="Notification mobile (push) — indisponible" />
             </div>
 
             <!-- Types d'alertes -->
@@ -116,6 +119,7 @@
               </div>
               <ToggleButton
                 :modelValue="alertStore.settings.streakAlertEnabled"
+                ariaLabel="Alerte streak en danger"
                 @update:modelValue="save({ streakAlertEnabled: $event })"
               />
             </div>
@@ -130,6 +134,7 @@
               </div>
               <ToggleButton
                 :modelValue="alertStore.settings.disciplineAlertEnabled"
+                ariaLabel="Alerte discipline basse"
                 @update:modelValue="save({ disciplineAlertEnabled: $event })"
               />
             </div>
@@ -162,6 +167,7 @@
               </div>
               <ToggleButton
                 :modelValue="alertStore.settings.scoreDropAlertEnabled"
+                ariaLabel="Alerte baisse des scores"
                 @update:modelValue="save({ scoreDropAlertEnabled: $event })"
               />
             </div>

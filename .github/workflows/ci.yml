@@ -54,7 +54,31 @@ jobs:
 
       - name: Run Tests
         working-directory: ${{ matrix.path }}
-        run: npm run test
+        run: npm run test:coverage
+
+      # Jest et Vitest ecrivent tous deux des chemins relatifs a LEUR racine
+      # (le sous-projet), alors que le scanner Sonar tourne a la racine du depot.
+      # Sans ce prefixe, SonarQube ne rattache la couverture a aucun fichier et
+      # affiche 0 % SANS message d'erreur — la panne est donc invisible.
+      # Verifie le 2026-08-29 : les deux produisent « SF:src/... », jamais un
+      # chemin absolu, donc le prefixage est toujours applicable.
+      - name: Normalise coverage paths
+        working-directory: ${{ matrix.path }}
+        run: |
+          sed -i "s|^SF:|SF:${{ matrix.path }}/|" coverage/lcov.info
+          echo "Trois premiers chemins apres prefixage :"
+          grep -m3 '^SF:' coverage/lcov.info
+
+      # test_and_lint et sonarqube sont deux jobs distincts, donc deux runners :
+      # les fichiers produits ici n'existent pas la-bas. L'artefact est le seul
+      # moyen de les transmettre sans rejouer toute la suite de tests.
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: ${{ matrix.path }}/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Run Lint
         working-directory: ${{ matrix.path }}
@@ -71,6 +95,20 @@ jobs:
         if: matrix.service == 'front'
         working-directory: ${{ matrix.path }}
         run: npm run build
+
+      # Angle mort de audit-a11y.mjs et de test/a11y/axe.test.js (jsdom ne
+      # calcule pas les styles) : contraste RGAA 3.2 mesuré au vrai moteur de
+      # rendu, sur les pages publiques buildées — voir docs/AUDIT_RGAA.md §5
+      # et e2e-a11y/contrast.spec.js.
+      - name: Install Playwright Chromium
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Accessibility Contrast Audit (RGAA 3.2)
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run test:a11y:contrast
 
   # Analyse statique continue sur l'instance SonarQube AUTO-HÉBERGÉE
   # (chart helm-sonarqube/, namespace `sonarqube` du cluster Infomaniak).
@@ -109,6 +147,20 @@ jobs:
         with:
           # Historique complet requis par Sonar pour attribuer le "new code"
           fetch-depth: 0
+
+      # Couverture produite par test_and_lint. Les deux artefacts sont replaces
+      # a l'emplacement attendu par sonar.javascript.lcov.reportPaths.
+      - name: Download API coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-api
+          path: my_memo_master_api/coverage
+
+      - name: Download front coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-front
+          path: my_memo_master_front/coverage
 
       # Épinglé sur la version du cluster (v1.36.x), même raison que dans cd.yml.
       - name: Pin kubectl version

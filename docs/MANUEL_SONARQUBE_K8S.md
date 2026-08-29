@@ -211,7 +211,9 @@ kubectl -n sonarqube delete pvc --all # puis supprimer les volumes côté OpenSt
 
 ## 9. Dette connue
 
-- **Couverture de tests toujours à 0 %.** Le passage à l'auto-hébergement ne corrige pas l'action P0 de [COMPTE_RENDU_METRIQUES.md](COMPTE_RENDU_METRIQUES.md) : la CI ne produit pas de rapport `lcov` et `sonar.javascript.lcov.reportPaths` n'est pas renseigné. L'indicateur restera à 0 % sur l'instance auto-hébergée exactement comme il l'était sur SonarCloud.
+- ~~**Couverture de tests à 0 %**~~ — **corrigé le 2026-08-29** (action P0 de [COMPTE_RENDU_METRIQUES.md](COMPTE_RENDU_METRIQUES.md)). La CI produit désormais un `lcov` pour l'API (Jest, natif) et pour le front (`@vitest/coverage-v8`, ajouté), les transmet au job `sonarqube` par artefact, et `sonar.javascript.lcov.reportPaths` les déclare.
+
+  **Piège à connaître si vous touchez à cette chaîne** : Jest et Vitest écrivent des chemins relatifs à **leur** racine (`src/App.vue`), alors que le scanner tourne à la racine du dépôt. L'étape `Normalise coverage paths` de la CI les préfixe. Sans elle, SonarQube ne rattache la couverture à aucun fichier et affiche **0 % sans lever la moindre erreur** — la panne est donc silencieuse et se confond avec « pas de rapport ».
 - **Pas de NetworkPolicy.** Le cluster tourne sous Cilium ; en l'état, n'importe quel pod du cluster peut joindre `sonarqube:9000` et `sonarqube-postgres:5432`. Acceptable tant que le cluster n'héberge que ce projet.
 - **Pas de sauvegarde automatisée** de la base SonarQube — le `pg_dump` du §7 est manuel.
 - **Aucune supervision** : l'instance n'est pas scrapée par le Prometheus du chart applicatif (namespace différent).

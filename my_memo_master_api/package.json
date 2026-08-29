@@ -12,7 +12,8 @@
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:coverage": "jest --coverage"
   },
   "author": "",
   "license": "ISC",
@@ -77,6 +78,21 @@
     "forceExit": true,
     "setupFiles": [
       "<rootDir>/test/setup.js"
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "lcov"
+    ],
+    "collectCoverageFrom": [
+      "**/*.js",
+      "!**/node_modules/**",
+      "!**/coverage/**",
+      "!**/test/**",
+      "!**/__mocks__/**",
+      "!**/migrations/**",
+      "!**/seeders/**",
+      "!jest.config.js",
+      "!.eslintrc.js"
     ]
   }
 }

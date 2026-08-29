@@ -8,11 +8,16 @@
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createTestingPinia } from '@pinia/testing'
 import axe from 'axe-core'
 import ModalComponent from '@/components/ModalComponent.vue'
 import ButtonComponent from '@/components/ButtonComponent.vue'
 import TutorialItem from '@/components/TutorialItem.vue'
 import PasswordStrengthComponent from '@/components/PasswordStrengthComponent.vue'
+import DropdownComponent from '@/components/DropdownComponent.vue'
+import ToggleButton from '@/components/ToggleButton.vue'
+import PillComponent from '@/components/PillComponent.vue'
+import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 
 let wrapper
 
@@ -76,6 +81,49 @@ describe('Accessibilité (axe-core)', () => {
   it('PasswordStrengthComponent - jauge affichée - aucune violation axe', async () => {
     wrapper = mount(PasswordStrengthComponent, {
       props: { password: 'Abcdef123!' },
+      attachTo: document.body
+    })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('DropdownComponent - menu fermé - aucune violation axe', async () => {
+    wrapper = mount(DropdownComponent, {
+      props: { title: 'Filtrer' },
+      slots: { default: '<p>Contenu du menu</p>' },
+      attachTo: document.body
+    })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('ToggleButton - coché - aucune violation axe', async () => {
+    wrapper = mount(ToggleButton, {
+      props: { modelValue: true, ariaLabel: 'Mode sombre' },
+      attachTo: document.body
+    })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('PillComponent - pastille cliquable - aucune violation axe', async () => {
+    wrapper = mount(PillComponent, {
+      props: { text: 'Mathématiques', clickable: true },
+      attachTo: document.body
+    })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('TagSelectorComponent - tags sélectionnés - aucune violation axe', async () => {
+    wrapper = mount(TagSelectorComponent, {
+      props: { modelValue: [1] },
+      global: {
+        plugins: [
+          createTestingPinia({
+            stubActions: true,
+            initialState: {
+              tags: { tags: [{ tagId: 1, name: 'Algèbre', color: '#6366F1' }] }
+            }
+          })
+        ]
+      },
       attachTo: document.body
     })
     expect(await runAxe(wrapper.element)).toEqual([])

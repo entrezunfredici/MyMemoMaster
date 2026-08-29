@@ -1,6 +1,6 @@
 <template>
   <label class="switch">
-    <input type="checkbox" :checked="localValue" @change="toggle" />
+    <input type="checkbox" :checked="localValue" :aria-label="ariaLabel" @change="toggle" />
     <span class="slider round"></span>
   </label>
 </template>
@@ -8,8 +8,14 @@
 <script setup>
 import { computed } from 'vue'
 
+// RGAA 11.1 : le <label> n'entoure que le curseur visuel (span.slider), sans
+// texte — l'input n'a donc aucun nom accessible sans aria-label explicite.
 const props = defineProps({
-  modelValue: Boolean
+  modelValue: Boolean,
+  ariaLabel: {
+    type: String,
+    required: true,
+  }
 })
 const emit = defineEmits(['update:modelValue'])
 

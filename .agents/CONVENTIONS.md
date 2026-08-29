@@ -164,7 +164,7 @@ router.get("/", authMiddleware, entity.findAll);
 - La documentation Swagger est générée automatiquement depuis les JSDoc des routes et servie sur `/api-docs`
 - En dev, SQLite est utilisé (pas de PG_HOST) ; en prod/docker, PostgreSQL
 - `sqlite3` est une **devDependency** (dev/test uniquement — la prod est sur PostgreSQL) : ne pas la remonter en dependencies, sa chaîne de build porte des CVE
-- L'accessibilité est outillée : `node scripts/audit-a11y.mjs` (front, audit statique RGAA) et `test/a11y/` (axe-core, exécuté en CI) — toute nouvelle page/formulaire doit passer les deux
+- L'accessibilité est outillée sur trois niveaux : `node scripts/audit-a11y.mjs` (front, audit statique RGAA), `test/a11y/axe.test.js` (axe-core en jsdom, composants isolés, exécuté en CI) et `e2e-a11y/contrast.spec.js` (Playwright + axe-core, contraste RGAA 3.2 sur pages réelles rendues en Chromium, `npm run test:a11y:contrast`, exécuté en CI) — toute nouvelle page/formulaire doit passer les trois quand c'est applicable
 - Les métriques Prometheus (RED/USE) sont exposées sur `GET /metrics` via un serveur HTTP séparé (`METRICS_PORT`, défaut 9090) — jamais sur le port applicatif, jamais routé par l'Ingress/Traefik
 
 ---
@@ -199,7 +199,7 @@ router.get("/", authMiddleware, entity.findAll);
 | Math front | katex (rendu lecture seule — MathJax écarté) + mathlive (éditeur WYSIWYG, chargé lazy — voir DECISIONS 2026-07-19) |
 | Graphiques front | chart.js + vue-chartjs |
 | Visite guidée front (onboarding) | driver.js (MIT) |
-| Accessibilité (tests front) | axe-core (dev) |
+| Accessibilité (tests front) | axe-core (dev) + @playwright/test + @axe-core/playwright (dev, audit de contraste RGAA 3.2 en navigateur réel — voir DECISIONS 2026-08-29) |
 
 ---
 

@@ -54,7 +54,7 @@
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
 | Monitoring (Prometheus central) | Stable — Prometheus par environnement dans le chart Helm (`monitoring.enabled`), scrape par annotations pod, Deployment/emptyDir preprod vs StatefulSet/PVC prod, non exposé par l'Ingress ; port metrics restauré dans le chart (perdu à la migration Helm) | 2026-07-11 |
-| Accessibilité RGAA (front) | Stable — campagne 135→0 non-conformités, outil scripts/audit-a11y.mjs, 4 tests axe-core en CI, preuve docs/AUDIT_RGAA.md | 2026-07-06 |
+| Accessibilité RGAA (front) | Stable — 4 niveaux d'outillage (statique, jsdom, **navigateur** depuis le 2026-08-29), 8 tests axe-core jsdom + 8 tests Playwright de contraste en CI, 3 non-conformités réelles trouvées et corrigées le 2026-08-29 (contraste bouton, 2 noms accessibles manquants), preuve docs/AUDIT_RGAA.md | 2026-08-29 |
 | Sécurité dépendances (OWASP A06) | Stable — npm audit bloquant en CI (`--audit-level=high`), sqlite3 en devDeps ; [FIX] 2026-08-15 (x2) : `brace-expansion`/`fast-uri`/`ip-address`/`js-yaml` corrigés (non-breaking), puis `protobufjs`/`sharp`/`uuid` via `overrides` ciblés dans package.json (`@xenova/transformers` bloqué à 2.17.2, dernière version publiée, embarque des transitifs vulnérables) — `npm audit --omit=dev` : 0 vulnérabilité, vérifié aussi hors Jest avec le vrai modèle chargé | 2026-08-15 |
 | Redis (BullMQ + révocation JWT) | Stable — broker BullMQ (2026-06-12) ; [FIX] 2026-08-15 : persistance AOF activée en docker-compose (`--appendonly yes`, R2 du Bloc 4 — le chart Helm prod l'avait déjà) ; sert aussi de backend à `helpers/tokenBlacklist.js` (révocation JWT, réglages de résilience dédiés — voir DECISIONS) | 2026-08-15 |
 | CD — tagging de version (R1 du Bloc 4) | Livré — job `tag_release` dans cd.yml (staging/main) : tag git + images Docker Hub + Release GitHub en AAAA.MM.n, automatique à chaque merge, non bloquant pour le déploiement ; non vérifié en conditions réelles (pas de push déclenché depuis cette session) | 2026-08-15 |
@@ -137,7 +137,7 @@
 | Dossier B2 (B2_RENDU.md) | À jour — onboarding documenté (§3.3, §9.6), chiffres de tests réels (1 450 API + 617 front), liens annexes corrigés, annexes/dev resynchronisées ; restent 3 placeholders d'assets (Figma, screenshots) + 2 réfs biblio à compléter | 2026-07-17 |
 | Connecteur Odoo (`odoo-plugin/`, hors périmètre applicatif) | Opérationnel — plugin Hermes `odoo-plugin` rendu utilisable en autonome : CLI JSON `odoo_cli.py` + façade `connector.OdooConnector`, accès lus dans le `.env` (`URL`/`BDD`/`MAIL`/`PASSWORD`), droits fournis par `local_rights/rights_plugin_api.py` (le plugin frère `rights-plugin` est absent du dépôt) ; CRUD vérifié en réel sur `bleu-canard.odoo.com` ; dossier gitignoré ; première écriture de masse le 2026-08-27 (137 tâches repositionnées à l'étape « validé ») | 2026-08-27 |
 | Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
-| Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28**, puis §7.1 actualisé sur les mesures **requêtées en direct** sur l'instance SonarQube auto-hébergée (9 bugs, 11 vulnérabilités caractérisées une par une, 730 code smells, dette 4 743 min ≈ 2 964 €, notes A/D/D, quality gate OK mais vide de sens, couverture toujours 0 %) — **vulnérabilité CRITICAL confirmée réelle : secrets embarqués dans l'image API**, sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
+| Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28** après suppression du bloc `[IA]` doublon : avancement **87,8 % déclaré / 86,6 % démontrable** (216/246), enveloppe **109 200 €** dont **86 775 €** validés, **33 tâches** en retard (dont 20 sur `C-01`/`C-02`), RH **75 %** concordant avec le registre à 2 JH près ; §7.1 sur les mesures **requêtées en direct** sur l'instance SonarQube auto-hébergée (9 bugs, 11 vulnérabilités caractérisées une par une, 730 code smells, dette 4 743 min ≈ 2 964 €, notes A/D/D, quality gate OK mais vide de sens, couverture toujours 0 %) — **vulnérabilité CRITICAL confirmée réelle : secrets embarqués dans l'image API**, sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
 | Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 
@@ -7545,3 +7545,144 @@ Tunnel `kubectl -n sonarqube port-forward svc/sonarqube 9000:9000`, authentifica
 
 #### Dette / points d'attention
 - Tant que l'arbitrage IA n'est pas rendu, **c'est 77,3 % qu'il faut citer**, pas 87 % — ou les deux, avec l'explication. Citer 87 % seul revient à présenter une déclaration comme un fait.
+
+---
+
+### [2026-08-28] FIX — Suppression du bloc `[IA]` doublon et réédition complète du compte rendu
+
+**Déclencheur** : l'utilisateur signale que le bloc `[IA]` créé quelques heures plus tôt faisait double emploi — « les tâches IA, c'étaient celles-ci », en désignant `C-01` et `C-02`. Il précise au passage l'architecture réelle : **IA interne pour la correction sémantique, API IA externe pour la génération de contenu**.
+
+#### D'où venait l'erreur
+J'avais pris la formulation du planning d'équipe au pied de la lettre. Ses 30 lignes `IA` décrivent « Architecture service IA (**FastAPI/Python**) », « Déploiement service IA sur **K8s prod + HPA** », « Runbook ops service IA », « Sécurisation service IA prod » — c'est-à-dire **un service IA auto-hébergé, un troisième modèle** qui ne correspond à aucune des deux architectures réelles. J'ai donc cherché dans le dépôt un service FastAPI déployé, ne l'ai pas trouvé, et ai laissé 24 tâches non confirmées : bon constat, mauvaise explication.
+
+Le doublon était pourtant visible — plusieurs sous-tâches étaient **littéralement identiques** entre `[IA]` et `C-01` : « Gestion quotas et budget IA », « Pipeline traitement PDF/chunking/LLM », « Service inférence IA » / « POC intégration LLM », « Benchmark modèles LLM ».
+
+#### Vérification de l'architecture réelle
+Recherche élargie dans le dépôt : **aucune API IA externe non plus**. Aucune des 56 variables d'environnement de l'API ne concerne un fournisseur IA, aucun appel HTTP sortant vers un service d'inférence. Cohérent avec `C-01` à 0/11 et `C-02` à 0/9 dans Odoo.
+
+| Usage | Modèle | État |
+|---|---|---|
+| Correction sémantique | IA **interne** (`@xenova/transformers`, embeddings locaux dans le process Node) | **Livré** — `Semantic.service.js`, ~37 tests, `[M-06.15]` validée |
+| Génération de contenu | **API IA externe** | **Non commencé** — `C-01` 0/11, `C-02` 0/9 |
+
+#### Effet de la suppression (31 tâches retirées par l'utilisateur)
+| Indicateur | Avant | Après |
+|---|---|---|
+| Tâches du projet | 381 | **350** |
+| Sous-tâches élémentaires | 350 | **320** |
+| Avancement déclaré | 87,0 % (241/277) | **87,8 %** (216/246) |
+| **Avancement démontrable** | 77,3 % (214/277) | **86,6 %** (213/246) |
+| **Écart déclaré / démontrable** | **9,7 points** | **1,2 point** |
+| Enveloppe planifiée | 124 050 € (413,5 JH) | **109 200 €** (364,0 JH) |
+| Charge validée | 100 275 € (334,2 JH) | **86 775 €** (289,2 JH) |
+| Tâches en retard | 63 (132 JH) | **33** (83,2 JH) |
+| RH — charge / capacité | 411 JH / 483 = 85 % | **362 JH / 483 = 75 %** |
+| Tâches non confirmées | 27 | **3** (les E2E Playwright de `QA`) |
+
+**Le doublon pesait 49 JH, soit 12 % de l'enveloppe.** Il doublait aussi le retard affiché (les mêmes tâches comptées deux fois) et créait à lui seul l'écart de 9,7 points entre avancement déclaré et démontrable.
+
+**Contrôle de cohérence nouveau** : la charge nette du planning (362 JH, lignes `IA` retirées) et celle du registre Odoo (364,0 JH) **concordent désormais à 2 JH près**. Les deux sources divergeaient de 47 JH avant la correction.
+
+#### Sections du rapport réécrites
+En-tête (encadré de correction), `§1` (5 lignes du tableau de bord + note), `§2` (entier), `§3` (tableau et réserves), `§4` (entier), `§6` (entier, avec la distinction charge brute / charge nette), `§7.3` (entier — devient « 3 tâches non confirmées, et une architecture IA à requalifier »), `§8` (synthèse, tableau de progrès, plan d'action). L'action P0 « arbitrer le périmètre IA » est barrée comme faite ; l'action sur `C-01`/`C-02` passe en tête des P1 (20 des 33 retards).
+
+#### Dette / points d'attention
+- **Le travail de service IA du planning (49 JH) n'est plus représenté nulle part dans Odoo.** C'est cohérent avec la décision — il doublait `C-01`/`C-02` — mais si une part de ce travail était distincte (mise en place du socle d'embeddings, par exemple), elle est désormais invisible du registre.
+- Le profil **Expert IA tombe à 48 % de capacité** (3 personnes, 56,5 JH). Cohérent avec l'état du produit, mais à énoncer : la capacité n'a jamais été le facteur limitant sur ce périmètre.
+- Les 3 tâches `QA` non confirmées restent à trancher (E2E Playwright absent du dépôt).
+
+---
+
+### [2026-08-29] IMP — Traitement des angles morts RGAA (contraste navigateur + extension axe-core)
+
+**Déclencheur** : demande utilisateur « occupe-toi des non-conformités RGAA ». Audit préalable (`node scripts/audit-a11y.mjs`) : **0 non-conformité** sur les 79 fichiers `.vue`, confirmant l'entrée du 2026-08-27/28 du compte rendu de pilotage. Le travail restant n'était donc pas de corriger des non-conformités détectées, mais de réduire les angles morts documentés dans `docs/COMPTE_RENDU_METRIQUES.md` §7.2 (« trois angles morts subsistent : contrastes non mesurés, aucun test lecteur d'écran réel, axe-core limité à 4 composants »). Choix validé par l'utilisateur : traiter le contraste (nouvel outillage Playwright) et l'extension axe-core ; le test lecteur d'écran reste hors périmètre (manuel, irréductible).
+
+#### Nouvel outillage — audit de contraste navigateur (RGAA 3.2)
+
+`test/a11y/axe.test.js` tourne en jsdom, qui ne calcule pas les styles : la règle `color-contrast` d'axe-core y est désactivée depuis l'origine. Aucun outil du projet ne mesurait donc le contraste réel.
+
+- **Nouvelles devDependencies** (signalées) : `@playwright/test@^1.62.1`, `@axe-core/playwright@^4.13.0`. Chromium headless installé via `npx playwright install chromium` (~vérifié fonctionnel, y compris en environnement Windows local).
+- `my_memo_master_front/playwright.config.js` (nouveau) — `webServer` lance `vite preview --host 127.0.0.1 --port 4173 --strictPort` sur le `dist/` déjà buildé (`--host 127.0.0.1` explicite : `vite preview` sans cette option ne bind qu'en IPv6 sous Windows, rendant `127.0.0.1` inatteignable — piège rencontré et corrigé pendant le développement).
+- `my_memo_master_front/e2e-a11y/contrast.spec.js` (nouveau) — audite la règle `color-contrast` seule (les autres critères sont déjà couverts par les 2 niveaux existants) sur **8 pages publiques sans appel API au montage** : `/`, `/auth`, `/forgot-password`, `/reset-password`, `/tutorials`, `/credits`, `/error-server`, une route inexistante (404). Exclues et documentées en commentaire : `/register` (appel API dans `beforeEnter`), `/verify-email` (appel API dans `onMounted`), et toute page `private: true` (redirige vers `/auth` faute de session — le serveur de preview n'a pas d'API derrière lui).
+- `vitest.config.js` — `exclude: [...configDefaults.exclude, 'e2e-a11y/**']` : les specs Playwright partagent le pattern `*.spec.js` avec vitest mais un tout autre runner ; sans cette exclusion vitest tentait de les exécuter et échouait.
+- `package.json` — script `test:a11y:contrast": "playwright test"`.
+- `.github/workflows/ci.yml` — 2 étapes ajoutées au job `test_and_lint` (front uniquement), après le `Build` : `npx playwright install --with-deps chromium` puis `npm run test:a11y:contrast`.
+- `.gitignore` (front) — `/test-results/`, `/playwright-report/`, `/blob-report/`, `/playwright/.cache/`.
+
+**Résultat du premier passage : 1 non-conformité réelle trouvée** sur `/forgot-password` — bouton « Envoyer le code » avec un ratio de contraste de 2,2:1 (texte noir sur fond bleu `#1E3BA1`) au lieu des 4,5:1 requis.
+
+#### Cause racine identifiée (et non corrigée — voir dette)
+
+`text-white` ne génère **aucune classe CSS** dans ce build (`grep -c "text-white" dist/assets/*.css` → 0 partout). `tailwind.config.js` définit `theme.colors` — et non `theme.extend.colors` — ce qui **remplace entièrement** la palette Tailwind par défaut par la palette du projet (`primary`, `light`, `dark`…). `white`, `black`, `gray-*` etc. n'existent donc plus comme couleurs Tailwind ; le `safelist: ['text-white']` déjà présent dans la config ne suffit pas à les régénérer dans le build vérifié. Les pages `login`/`register` (`ConnexionPage.vue`, `InscriptionPage.vue`) contournaient déjà le problème via une classe CSS brute `.valider { color: white }` (`src/assets/auth-form.css`, chargée par `AuthFormLayout.vue`) — absente sur `ForgotPasswordPage.vue` et `ResetPasswordPage.vue`, qui utilisent le même bouton bleu sans elle.
+
+**Correctif appliqué (ciblé, pas la cause racine)** : classe `valider` ajoutée aux boutons de `ForgotPasswordPage.vue` et `ResetPasswordPage.vue` — réutilise le contournement existant plutôt que de reconfigurer `tailwind.config.js` (`theme.colors` → `theme.extend.colors`), un changement à fort rayon d'impact potentiel (peut changer le rendu de toute page utilisant une couleur Tailwind par défaut sans le savoir) jugé hors périmètre d'une campagne d'accessibilité. Documenté comme dette dans `docs/AUDIT_RGAA.md` §5.
+
+**Vérifié en conditions réelles** : `npm run build && npx playwright test` → 8/8 pages vertes après correctif (échec initial confirmé sur `/forgot-password` avant correction, pour valider que l'outil détecte bien une vraie non-conformité et pas un faux positif).
+
+#### Extension de la couverture axe-core (jsdom)
+
+`test/a11y/axe.test.js` passe de 4 à **8 composants testés** : ajout de `DropdownComponent`, `ToggleButton`, `PillComponent`, `TagSelectorComponent` (ce dernier monté avec `createTestingPinia`, store `tags` mocké — premier composant testé nécessitant Pinia dans ce fichier).
+
+**Résultat : 2 non-conformités réelles trouvées**, préexistantes et non couvertes par aucun des niveaux d'outillage précédents :
+
+- `ToggleButton.vue` (RGAA 11.1) — le `<label>` n'entoure que le curseur visuel (`span.slider`), sans texte : le `<input type="checkbox">` n'avait aucun nom accessible. **Correctif** : prop `ariaLabel` ajoutée, **rendue requise** (`required: true`) — interface publique modifiée, mais composant utilisé uniquement dans `SettingsPage.vue` (8 usages), tous mis à jour dans le même changement avec un libellé contextuel en français (« Mode sombre », « Alerte streak en danger »…). Signalé explicitement ici plutôt que laissé silencieux, conformément à `AGENT.md` §2.
+- `TagSelectorComponent.vue` (RGAA 11.9) — bouton flèche d'ouverture/fermeture du dropdown de tags, icône SVG seule, `tabindex="-1"`, sans `aria-label`. **Correctif** : `aria-label` dynamique (« Ouvrir »/« Fermer la liste des tags »).
+
+**Vérifié** : `npx vitest run test/a11y/` → 8/8 ; `npx vitest run` (suite complète) → **689/689 tests front verts**, aucune régression ; `npm run lint` → 0 erreur.
+
+#### Fichiers créés/modifiés
+- **Créés** : `my_memo_master_front/playwright.config.js`, `my_memo_master_front/e2e-a11y/contrast.spec.js`
+- **Modifiés** : `my_memo_master_front/package.json` (+2 devDependencies, +1 script), `package-lock.json`, `vitest.config.js` (exclude), `.gitignore`, `test/a11y/axe.test.js` (+4 tests), `src/components/ToggleButton.vue` (prop `ariaLabel` requise), `src/components/TagSelectorComponent.vue` (aria-label bouton flèche), `src/pages/SettingsPage.vue` (8× `ariaLabel` sur `ToggleButton`), `src/pages/ForgotPasswordPage.vue` + `src/pages/ResetPasswordPage.vue` (classe `valider`), `.github/workflows/ci.yml` (+2 étapes front), `docs/AUDIT_RGAA.md` (§1, §2 bis, §5), `.agents/CONVENTIONS.md` (dépendances approuvées + ligne outillage a11y)
+
+#### Ce qui est utilisable
+Les 3 non-conformités trouvées sont corrigées et re-vérifiées. Les 2 nouveaux niveaux/extensions d'outillage tournent en CI à chaque push sur le front (job `test_and_lint`).
+
+#### Hypothèses posées
+- Le périmètre du contraste navigateur est volontairement restreint aux pages publiques sans dépendance API — étendre aux pages privées demanderait un mock d'API ou un compte de test seedé, non demandé ici.
+- `ariaLabel` rendue requise sur `ToggleButton` plutôt qu'optionnelle avec valeur par défaut générique : force chaque futur usage à fournir un libellé contextuel, cohérent avec la règle RGAA 11.1 plutôt que de la contourner silencieusement.
+
+#### Dette / points d'attention
+- **`tailwind.config.js` : `theme.colors` remplace toute la palette par défaut** au lieu de l'étendre — `white`/`black`/`gray-*`/etc. ne génèrent aucune classe utilitaire dans le build. Un seul cas était déjà connu et contourné (`.valider`) ; combien d'autres classes Tailwind par défaut sont utilisées ailleurs dans `src/` sans effet n'a **pas** été audité à l'échelle du projet — seul le cas trouvé par l'audit de contraste a été corrigé. Documenté dans `docs/AUDIT_RGAA.md` §5.
+- Le périmètre du contraste navigateur ne couvre pas les pages privées (nécessitent une session) ni `/register`/`/verify-email` (appels API au montage).
+- Le test lecteur d'écran réel (NVDA/VoiceOver) reste manuel — aucun outil de ce projet ne peut s'y substituer.
+- Focus non piégé dans les modales « artisanales » (`AdminPage.vue`, `CalendarPage.vue`, `ClassroomPlateformeView.vue` repérées) — non traité, hors du périmètre validé par l'utilisateur pour cette campagne.
+- Couverture axe-core (jsdom) toujours partielle : 8 composants sur ~40 dans `src/components/`.
+
+
+---
+
+## [2026-08-29] [ADD] Publication de la couverture vers SonarQube — action P0 close
+
+**Contexte** — L'indicateur « couverture de tests » de `docs/COMPTE_RENDU_METRIQUES.md` affichait **0,0 %** depuis toujours, sur SonarCloud comme sur l'instance auto-hébergée. Cause identifiée de longue date : la CI ne produisait aucun rapport `lcov` et `sonar.javascript.lcov.reportPaths` n'était pas renseigné. C'était l'action **P0** du compte rendu de pilotage.
+
+**Mesures obtenues** (premières valeurs réelles publiables) :
+
+| | Couverture | Tests |
+|---|---|---|
+| API (Jest) | **81,41 %** statements · 67,12 % branches · 81,71 % lignes | 1 554 / 85 suites |
+| Front (Vitest) | **58,91 %** statements · 77,10 % branches · 58,91 % lignes | 689 / 44 fichiers |
+
+Le chiffre API (81,41 %) est **inférieur** aux 86,6 % relevés précédemment, et c'est délibéré : `collectCoverageFrom` couvre tout le code source, y compris les fichiers qu'aucun test n'atteint (`app.js`, `db_seeder.js`…). Un run par défaut ne compte que les fichiers touchés par les tests, ce qui flatte la mesure. **La couverture du front n'avait, elle, jamais été mesurée** — le fournisseur de couverture n'était pas installé.
+
+**Dépendance ajoutée** — `@vitest/coverage-v8@^3.2.7` en devDependency du front. Signalée conformément à `CONVENTIONS.md`. Ce n'est pas un choix parmi d'autres : c'est le fournisseur officiel de Vitest, sa version doit suivre celle de `vitest` (3.x), et sans lui `vitest --coverage` refuse de démarrer. `npm audit` : 0 vulnérabilité. Côté API, **rien à installer** — Jest 30 embarque la couverture.
+
+**Fichiers modifiés**
+- `my_memo_master_api/package.json` — script `test:coverage`, `coverageReporters: [text-summary, lcov]`, `collectCoverageFrom` cadré (exclut `test/`, `__mocks__/`, `migrations/`, `seeders/`).
+- `my_memo_master_front/package.json` + `package-lock.json` — dépendance et script `test:coverage`.
+- `my_memo_master_front/vitest.config.js` — bloc `coverage` (provider v8, `include: src/**` aligné sur `sonar.sources`).
+- `.github/workflows/ci.yml` — `npm run test:coverage`, normalisation des chemins, artefact ; le job `sonarqube` récupère les deux artefacts.
+- `sonar-project.properties` — `sonar.javascript.lcov.reportPaths`.
+- `docs/MANUEL_SONARQUBE_K8S.md` — dette « couverture 0 % » levée, piège documenté.
+
+**Le piège trouvé en vérifiant plutôt qu'en supposant** — Jest **et** Vitest écrivent des chemins relatifs à **leur propre racine** (`SF:src/App.vue`, `SF:helpers/frontUrl.js`), alors que le scanner tourne à la racine du dépôt. Sans préfixage, SonarQube ne rattache la couverture à aucun fichier et affiche **0 % sans lever la moindre erreur** — indiscernable de « aucun rapport transmis ». D'où l'étape `Normalise coverage paths`, dont le résultat a été vérifié localement sur les deux `lcov`.
+
+**Second point structurel** — `test_and_lint` et `sonarqube` sont deux jobs distincts, donc deux runners : les fichiers produits par l'un n'existent pas pour l'autre. Ils transitent par `upload-artifact`/`download-artifact` plutôt que de rejouer toute la suite de tests dans le job de scan.
+
+**Périmètre du commit** — Ce lot embarque aussi le **chantier accessibilité en cours** (audit de contraste Playwright, 5 composants Vue, `axe.test.js`, `CONVENTIONS.md`, `AUDIT_RGAA.md`), qui partageait `ci.yml`, `package.json` et `package-lock.json` avec la couverture. Les séparer aurait produit une CI cassée : les specs Playwright valident précisément les corrections de contraste des composants, et `ToggleButton.vue` introduit une prop `ariaLabel` **obligatoire** qu'exercent les nouveaux tests d'`axe.test.js`. Décision prise avec le porteur du projet après avoir constaté le risque.
+
+**Vérifications** — API 1 554/1 554 ✅ · front 689/689 ✅ · audit de contraste Playwright 8/8 ✅ · `lcov` produits et chemins de préfixage validés sur les deux projets · YAML de `ci.yml` parsé. **La chaîne complète en CI n'est pas encore éprouvée** : le passage des artefacts entre jobs et la lecture par le scanner ne seront confirmés qu'au prochain push sur `main`.
+
+**Dette / points d'attention**
+- **58,91 % sur le front** : chiffre publiable mais bas. À regarder avant de communiquer dessus.
+- Le quality gate reste **non bloquant** pour le merge — dette ouverte depuis juillet, désormais faisable puisque l'instance est auto-hébergée.
+- L'écart **11 vs 28 vulnérabilités** entre l'instance et SonarCloud reste inexpliqué (entrée du 2026-08-28).

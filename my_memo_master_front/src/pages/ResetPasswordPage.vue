@@ -39,7 +39,7 @@
         <button
           type="submit"
           :disabled="submitting"
-          class="w-full bg-[#1E3BA1] text-white hover:bg-[#162c7a] py-2 px-4 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+          class="w-full bg-[#1E3BA1] text-white valider hover:bg-[#162c7a] py-2 px-4 rounded disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {{ submitting ? 'Réinitialisation...' : 'Réinitialiser' }}
         </button>

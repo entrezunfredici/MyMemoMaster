@@ -55,6 +55,7 @@
         type="button"
         class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 transition-transform focus:outline-none"
         :class="anyOpen ? 'rotate-180' : ''"
+        :aria-label="anyOpen ? 'Fermer la liste des tags' : 'Ouvrir la liste des tags'"
         tabindex="-1"
         @click.stop="handleFieldClick"
       >
