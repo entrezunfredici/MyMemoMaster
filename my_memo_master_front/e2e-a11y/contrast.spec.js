@@ -5,11 +5,16 @@
  * la règle `color-contrast` d'axe-core est désactivée dans test/a11y/axe.test.js
  * et ne peut être vérifiée que par un vrai moteur de rendu (Chromium ici).
  *
- * Périmètre : pages publiques (`meta.private: false` dans router/routes.js)
- * qui ne font aucun appel API au montage — le serveur de preview n'a pas
- * d'API derrière lui. Sont donc exclues : /register (appel API dans
- * `beforeEnter`), /verify-email (appel API dans `onMounted`), et toute page
- * `private: true` (redirigerait vers /auth faute de session).
+ * Périmètre : pages publiques (`meta.private: false` dans router/routes.js).
+ * Sont exclues : /register (appel API dans `beforeEnter`), /verify-email
+ * (appel API dans `onMounted`), et toute page `private: true` (redirigerait
+ * vers /auth faute de session).
+ *
+ * ATTENTION : « la page n'appelle pas l'API » ne se lit pas sur la page seule.
+ * /tutorials n'appelle rien lui-même (ses données sont codées en dur) mais
+ * monte SubjectFilterComponent, qui fait `subjectStore.fetchSubjects()` dans
+ * son `onMounted`. Le critère porte sur l'ARBRE DE COMPOSANTS, pas sur le
+ * fichier de la page. D'où l'attente de disparition des toasts ci-dessous.
  *
  * Seule la règle color-contrast est activée : les autres (noms accessibles,
  * clavier, landmarks…) sont déjà couvertes par audit-a11y.mjs et axe.test.js.
@@ -31,6 +36,19 @@ const PUBLIC_PAGES = [
 for (const { path, label } of PUBLIC_PAGES) {
   test(`${label} (${path}) - contraste - aucune violation color-contrast`, async ({ page }) => {
     await page.goto(path)
+
+    // Le serveur de preview n'a pas d'API : les composants qui appellent
+    // l'API au montage font apparaitre un toast d'erreur. Il se ferme seul
+    // au bout de 4 s (notif.js), mais tant qu'il est a l'ecran axe le scanne
+    // — et pendant son animation d'apparition le contraste effectif du texte
+    // descend sous le seuil. C'est ce qui rendait ce test non deterministe :
+    // vert en local (8 workers, scan avant le toast), rouge sur le runner
+    // (2 workers, scan pendant). On attend donc qu'il ait disparu.
+    const toast = page.locator('.Vue-Toastification__toast')
+    if (await toast.count()) {
+      await toast.first().waitFor({ state: 'detached', timeout: 8000 })
+    }
+
     const results = await new AxeBuilder({ page })
       .withRules(['color-contrast'])
       .analyze()

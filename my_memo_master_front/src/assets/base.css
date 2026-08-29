@@ -48,12 +48,19 @@
     background-color: rgb(var(--primary)) !important;
 }
 
+/* RGAA 3.2 — le blanc sur --success (2,54:1) et sur --warning (2,15:1) est
+   tres en dessous du seuil AA de 4,5:1 pour du texte normal (0,95rem ici).
+   Corrige par un texte sombre plutot qu'en modifiant les couleurs de marque :
+   #111827 donne 6,99:1 sur success et 8,26:1 sur warning.
+   Detecte par l'audit de contraste Playwright le 2026-08-29. */
 .Vue-Toastification__toast--success {
     background-color: rgb(var(--success)) !important;
+    color: #111827 !important;
 }
 
 .Vue-Toastification__toast--warning {
     background-color: rgb(var(--warning)) !important;
+    color: #111827 !important;
 }
 
 .Vue-Toastification__toast--error {

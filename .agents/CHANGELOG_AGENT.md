@@ -7716,3 +7716,36 @@ Chiffre global cohérent avec les mesures par projet (API 81,41 %, front 58,91 %
 **Sans effet sur la CI aujourd'hui** : le job n'impose pas le quality gate (dette ouverte depuis juillet). **À savoir avant de le rendre bloquant** — dans l'état actuel, il ferait échouer chaque push sur `main`. Le rendre bloquant suppose donc d'abord soit de couvrir le code neuf, soit d'ajuster la condition.
 
 **Contexte du run** — L'étape d'audit de contraste est temporairement non bloquante (`continue-on-error`), sans quoi le job `sonarqube` restait *skipped* et rien de tout ceci n'aurait été mesurable. Diagnostic de cet échec toujours en attente des logs du runner.
+
+
+---
+
+## [2026-08-29] [FIX] Contraste des toasts success/warning + audit rendu déterministe
+
+**Symptôme** — L'audit de contraste échouait sur le runner GitHub (`color-contrast (serious) : .Vue-Toastification__toast-body` sur `/tutorials`) alors qu'il passait 8/8 en local, y compris avec `CI=true`.
+
+**Deux causes distinctes, et la plus grave n'était pas celle qu'on cherchait.**
+
+**1. Un test non déterministe.** Le serveur de preview n'a pas d'API. `/tutorials` ne fait pourtant aucun appel lui-même — ses données sont codées en dur — mais il monte `SubjectFilterComponent`, qui appelle `subjectStore.fetchSubjects()` dans son `onMounted`. Un toast d'erreur apparaît donc, se ferme seul au bout de 4 s, et axe le scanne ou non selon le moment. En local le scan tombait avant (8 workers), sur le runner pendant (2 workers). **Le critère « pages sans appel API au montage » avait été appliqué aux pages, pas à leur arbre de composants** — l'en-tête de la spec l'affirmait à tort et a été corrigé.
+
+Le toast d'erreur est à **4,83:1**, au-dessus du seuil AA de 4,5:1 — mais de 0,33 seulement. Pendant l'animation d'apparition, le contraste effectif passe dessous. La spec attend désormais explicitement la disparition des toasts avant de scanner : la course disparaît par construction, pas par chance de calendrier.
+
+**2. Un vrai défaut RGAA, indépendant de ce test.** En calculant les ratios de tous les toasts :
+
+| Toast | Texte blanc sur fond | AA 4,5:1 |
+|---|---|---|
+| info | 9,57:1 | ✅ |
+| error | 4,83:1 | ✅ (marge faible) |
+| **success** | **2,54:1** | ❌ |
+| **warning** | **2,15:1** | ❌ |
+
+**Tout toast de succès ou d'avertissement de l'application était illisible au sens du RGAA**, partout, depuis toujours. Corrigé par un texte sombre `#111827` plutôt qu'en touchant aux couleurs de marque : **6,99:1** sur success, **8,26:1** sur warning.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/assets/base.css` — texte sombre sur les toasts success et warning.
+- `my_memo_master_front/e2e-a11y/contrast.spec.js` — attente de disparition des toasts, en-tête corrigé sur le critère de sélection.
+- `.github/workflows/ci.yml` — `continue-on-error` retiré, l'audit redevient bloquant.
+
+**Vérifications** — 4 passages consécutifs `CI=true --workers=2` (configuration du runner) : 8/8 à chaque fois. Suite front : 689/689. **Le passage sur le runner lui-même reste à confirmer** — c'est justement là que le test échouait.
+
+**Ce que l'épisode montre** — L'audit a fait son travail : il a trouvé un défaut d'accessibilité réel que quatre exécutions locales avaient manqué par chance de synchronisation. Le réflexe de désactiver un test qui « ne casse qu'en CI » aurait enterré le défaut avec le symptôme.
