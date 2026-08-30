@@ -7793,3 +7793,16 @@ Le toast d'erreur est à **4,83:1**, au-dessus du seuil AA de 4,5:1 — mais de 
 - **Aucun test de rupture** : 10 VU est un régime nominal, le point de saturation reste inconnu.
 - **La charge est mesurée hors production** : stack locale, base vide, limiteur désactivé, Traefik contourné. Rien de cela ne vaut pour le cluster.
 - **Job limité à `main` et `staging`** : une régression sur une branche de fonctionnalité n'est vue qu'à la fusion.
+
+
+---
+
+## [2026-08-29] [FIX] Vitest ramassait les specs Playwright du nouveau répertoire e2e/
+
+**Symptôme** — Premier passage du job `e2e_and_load` : la CI échoue avant lui, sur `test_and_lint (front)` / *Run Tests*. Le job QA est donc *skipped* et n'a toujours pas été éprouvé.
+
+**Cause** — `vitest.config.js` excluait `e2e-a11y/**` mais pas `e2e/`, créé le jour même. Vitest ramassait `e2e/journeys.spec.js` — une spec **Playwright** — et échouait sur l'import de `@playwright/test`. Le commentaire de la config avertissait précisément de ce piège pour `e2e-a11y/` ; le second répertoire n'y a pas été ajouté.
+
+**Pourquoi ça n'a pas été vu avant le push** — La suite front a été exécutée **avant** la création de `e2e/`, puis plus après. Créer un répertoire de tests sans rejouer la suite unitaire, c'est précisément le geste qui laisse passer ce défaut.
+
+**Corrigé** — `exclude: [...configDefaults.exclude, 'e2e-a11y/**', 'e2e/**']`, avec un commentaire nommant les deux répertoires et le mode de défaillance. Vérifié : 689/689, couverture inchangée à 58,91 %.

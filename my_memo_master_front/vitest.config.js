@@ -16,9 +16,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    // e2e-a11y/ : specs Playwright (audit de contraste navigateur), pas des
-    // tests vitest — même pattern *.spec.js, mais un tout autre test runner.
-    exclude: [...configDefaults.exclude, 'e2e-a11y/**'],
+    // e2e-a11y/ ET e2e/ : specs Playwright (audit de contraste navigateur,
+    // parcours authentifiés), pas des tests vitest — même pattern *.spec.js,
+    // mais un tout autre test runner. Oublier l'un des deux fait ramasser des
+    // specs Playwright par vitest, qui échoue sur l'import de @playwright/test.
+    // C'est arrivé le 2026-08-29 à la création de e2e/ (run CI 8c4f8ee).
+    exclude: [...configDefaults.exclude, 'e2e-a11y/**', 'e2e/**'],
     // Couverture consommee par SonarQube (sonar.javascript.lcov.reportPaths).
     // Fournisseur v8 : celui de Vitest, aucune instrumentation Babel a maintenir.
     coverage: {
