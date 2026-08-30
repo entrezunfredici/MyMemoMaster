@@ -280,9 +280,19 @@ jobs:
       # QA.03 et QA.05. Le global setup crée le groupe classe via l'API : sans
       # groupe, /classroom affiche « Aucun groupe. » pour tous les rôles et les
       # vues étudiant/enseignant sont indiscernables.
+      # .env.ci alimente docker compose via --env-file, mais PAS le shell qui
+      # lance Playwright : sans ce chargement, global-setup.js retombe sur ses
+      # valeurs par defaut (l'admin d'un poste de dev) et la connexion echoue
+      # contre la base de la CI. Constate au premier passage du job.
+      # On source le meme fichier plutot que de recopier les valeurs ici :
+      # deux listes finiraient par diverger.
       - name: Run E2E journeys (QA.03 / QA.05)
         working-directory: my_memo_master_front
-        run: npm run test:e2e
+        run: |
+          set -a
+          . ../.env.ci
+          set +a
+          npm run test:e2e
 
       # QA.06. k6 tourne en conteneur sur le réseau de la stack et attaque
       # l'API directement (http://api:3000), sans passer par Traefik : on
@@ -290,11 +300,14 @@ jobs:
       - name: Run load test (QA.06)
         run: |
           mkdir -p load-tests/results
+          set -a
+          . ./.env.ci
+          set +a
           docker run --rm -i \
             --network my_memo_master_ci_network \
             -e BASE_URL=http://api:3000 \
-            -e E2E_STUDENT_EMAIL=e2e-student@mymemomaster.local \
-            -e E2E_STUDENT_PASSWORD='E2eStudent1234!' \
+            -e E2E_STUDENT_EMAIL="$E2E_STUDENT_EMAIL" \
+            -e E2E_STUDENT_PASSWORD="$E2E_STUDENT_PASSWORD" \
             grafana/k6 run - < load-tests/api-load.js \
             | tee load-tests/results/run.log
 
