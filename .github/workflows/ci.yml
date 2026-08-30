@@ -289,8 +289,12 @@ jobs:
       - name: Run E2E journeys (QA.03 / QA.05)
         working-directory: my_memo_master_front
         run: |
+          # On ne source QUE les identifiants necessaires, jamais le fichier
+          # entier : `.` traite un .env comme du shell, donc n'importe quelle
+          # valeur contenant un espace y devient une commande. C'est exactement
+          # ce qui a casse ce job (exit 127, run 33303382884).
           set -a
-          . ../.env.ci
+          . <(grep -E '^(ADMIN_SEED_|E2E_)[A-Z_]+=' ../.env.ci)
           set +a
           npm run test:e2e
 
@@ -300,8 +304,9 @@ jobs:
       - name: Run load test (QA.06)
         run: |
           mkdir -p load-tests/results
+          # Meme precaution que pour l'etape E2E : sourcer au plus juste.
           set -a
-          . ./.env.ci
+          . <(grep -E '^E2E_STUDENT_[A-Z_]+=' ./.env.ci)
           set +a
           docker run --rm -i \
             --network my_memo_master_ci_network \
