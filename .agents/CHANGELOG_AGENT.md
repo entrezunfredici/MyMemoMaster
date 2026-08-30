@@ -7826,3 +7826,38 @@ Le toast d'erreur est à **4,83:1**, au-dessus du seuil AA de 4,5:1 — mais de 
 **Leçon de méthode, valable au-delà de ce ticket** — Les trois premiers échecs viennent du même geste : vérifier une partie de ce que la CI exécute au lieu de l'ensemble. La discipline qui a fini par marcher est de rejouer localement **les quatre étapes front** (tests, lint, build, audit de contraste) avant tout push, et de reproduire en local tout ce qui peut l'être plutôt que de consommer un run pour le découvrir.
 
 **Point relevé au passage, non traité** — GitHub signale que `actions/checkout@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `actions/download-artifact@v4`, `azure/setup-kubectl@v4` et `SonarSource/sonarqube-scan-action@v6` ciblent **Node.js 20, déprécié** et forcé sur Node 24. Elles fonctionnent encore, mais casseront au retrait de Node 20. À traiter dans un ticket dédié — cela concerne les quatre jobs, pas seulement le job QA.
+
+
+---
+
+## [2026-08-30] [FIX] Vulnérabilités SonarQube — 10 sur 13 corrigées, 3 argumentées
+
+**Contexte** — L'instance signalait 13 vulnérabilités ouvertes (et non 11 : le chiffre a bougé avec le code ajouté ces deux jours). Revue une par une plutôt que traitées en masse.
+
+**La plus importante — `docker:S6470`, et ce n'était pas un faux positif.**
+`my_memo_master_api/.dockerignore` n'excluait pas `.env`, et **`my_memo_master_api/.env` existe** : il porte `AUTH_JWT_SECRET`, `SMTP_USER` et `SMTP_PASS`. Le `COPY . .` du Dockerfile embarquait donc ces secrets dans l'image. Le dépôt Docker Hub `fredissimo/mymemomaster_api` est **public** (`is_private: false`, vérifié par l'API Docker Hub).
+
+**Portée réelle, mesurée et non supposée** : le CD construit depuis un `git checkout` propre, où `.env` est ignoré par git — le fichier n'est donc pas sur le runner et **les images publiées ne le contiennent pas**. Le risque existait pour toute image construite **en local** puis poussée. Latent, pas réalisé. Aggravant : la racine portait une ligne `#.env` **commentée**, qui donnait l'illusion d'une exclusion.
+Corrigé sur les trois contextes de build (racine, api, front) ; la ligne trompeuse est retirée.
+
+**Corrigées — 10 / 13**
+
+| Règle | Où | Traitement |
+|---|---|---|
+| `docker:S6470` | 3 `.dockerignore` | Exclusion de `.env` et `.env.*` |
+| `javascript:S2068` ×2 | `seeders/…-seed-e2e-users.js` | **Mes propres** mots de passe par défaut supprimés : le seeder échoue franchement si les variables manquent |
+| `javascript:S2245` ×4 | `upload.middleware.js`, `mindmapImageUpload.js` | `crypto.randomBytes` au lieu de `Math.random()` pour les noms de fichiers uploadés |
+| `javascript:S2245` ×2 | `helpers/functions.js` | `randomInt` et `randomColor` **supprimés** — aucun usage dans le dépôt |
+| `javascript:S2245` ×1 | `helpers/mindmap.js` | Repli `crypto.getRandomValues` (disponible hors contexte sécurisé, contrairement à `randomUUID`) |
+
+Les noms de fichiers uploadés méritaient le correctif : une clé `<horodatage>-<random faible>` se devine, et celles des mind maps ne sont **pas cloisonnées par utilisateur** (`mindmaps/<suffixe>`).
+
+**Non corrigées — 3, et pourquoi**
+
+- `javascript:S2245` — `ExerciseDetailPage.vue:309`, mélange des réponses d'un exercice. **Pas sensible** : les réponses sont déjà toutes envoyées au client, la prévisibilité de l'ordre d'affichage ne divulgue rien. Passer au crypto satisferait l'outil sans rien améliorer.
+- `javascript:S5693` — limite d'upload à **10 Mo**, valeur explicite et raisonnable pour de l'image. La règle demande une revue, pas un changement.
+- `docker:S6471` — l'image `node` tourne en **root**. Durcissement réel et souhaitable, mais l'entrypoint joue `npm install` et écrit dans `/app` (monté en volume en dev) : un `USER` non-root peut casser le démarrage. **Non tenté faute de pouvoir le tester** — le démon Docker du poste était arrêté. À traiter dans un ticket dédié, avec vérification.
+
+**Vérifications** — API 1 554/1 554 ✅ · front 689/689 ✅ · les deux lints propres · `node --check` sur les fichiers modifiés. Le seul warning de lint porte sur un fichier **généré** (`coverage/lcov-report/`), pas sur le code.
+
+**Effet de bord assumé** — Le seeder E2E n'ayant plus de mot de passe par défaut, un `SEED_E2E_USERS=true` sans `E2E_*_PASSWORD` **fait échouer le démarrage**. C'est voulu : un compte au mot de passe connu créé silencieusement est pire qu'un démarrage qui refuse. Les variables sont documentées dans `.env.example`.

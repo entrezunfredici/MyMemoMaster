@@ -21,21 +21,42 @@ const bcrypt = require('bcryptjs')
 const ROLE_ETUDIANT = 2
 const ROLE_ENSEIGNANT = 3
 
-/** Comptes créés, avec leur rôle. Les valeurs par défaut ne servent qu'en local. */
-const accounts = () => [
-  {
-    email: process.env.E2E_STUDENT_EMAIL || 'e2e-student@mymemomaster.local',
-    rawPassword: process.env.E2E_STUDENT_PASSWORD || 'E2eStudent1234!',
-    name: 'E2E Étudiant',
-    roleId: ROLE_ETUDIANT
-  },
-  {
-    email: process.env.E2E_TEACHER_EMAIL || 'e2e-teacher@mymemomaster.local',
-    rawPassword: process.env.E2E_TEACHER_PASSWORD || 'E2eTeacher1234!',
-    name: 'E2E Enseignant',
-    roleId: ROLE_ENSEIGNANT
+/**
+ * Comptes créés, avec leur rôle.
+ *
+ * AUCUN mot de passe par défaut : un identifiant écrit dans le code finit
+ * dans l'historique git et dans toute image construite depuis ce dépôt, et
+ * la valeur « de test » devient la valeur réelle le jour où quelqu'un oublie
+ * de renseigner la variable. Le seeder échoue donc franchement plutôt que de
+ * créer un compte au mot de passe connu. Les valeurs vivent dans `.env`
+ * (local) et `.env.ci` (CI). Signalé par javascript:S2068.
+ */
+const accounts = () => {
+  const missing = ['E2E_STUDENT_PASSWORD', 'E2E_TEACHER_PASSWORD'].filter(
+    (key) => !process.env[key]
+  )
+  if (missing.length > 0) {
+    throw new Error(
+      `SEED_E2E_USERS=true mais ${missing.join(' et ')} non renseigné(s). ` +
+        'Définir ces variables ou désactiver le seeder E2E.'
+    )
   }
-]
+
+  return [
+    {
+      email: process.env.E2E_STUDENT_EMAIL || 'e2e-student@mymemomaster.local',
+      rawPassword: process.env.E2E_STUDENT_PASSWORD,
+      name: 'E2E Étudiant',
+      roleId: ROLE_ETUDIANT
+    },
+    {
+      email: process.env.E2E_TEACHER_EMAIL || 'e2e-teacher@mymemomaster.local',
+      rawPassword: process.env.E2E_TEACHER_PASSWORD,
+      name: 'E2E Enseignant',
+      roleId: ROLE_ENSEIGNANT
+    }
+  ]
+}
 
 const isEnabled = () =>
   process.env.SEED_E2E_USERS === 'true' && process.env.NODE_ENV !== 'production'

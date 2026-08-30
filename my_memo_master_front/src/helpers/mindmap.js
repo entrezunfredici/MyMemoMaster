@@ -42,10 +42,14 @@ const boxLevelToMastery = (level) => {
 };
 
 const createId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'mm-' + Math.random().toString(36).slice(2, 10);
+  if (typeof crypto === 'undefined') return `mm-${Date.now()}`;
+  // randomUUID exige un contexte securise (HTTPS ou localhost) — d'ou le repli.
+  if (crypto.randomUUID) return crypto.randomUUID();
+  // getRandomValues, lui, est disponible meme hors contexte securise : le repli
+  // reste cryptographique au lieu de retomber sur Math.random().
+  // Signale par javascript:S2245.
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return 'mm-' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 };
 
 const createBlankMindMap = (title = 'Nouvelle carte mentale') => {

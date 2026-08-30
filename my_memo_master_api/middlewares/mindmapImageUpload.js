@@ -1,10 +1,18 @@
 const path = require('path')
+const crypto = require('crypto')
 const fs = require('fs')
 const multer = require('multer')
 const multerS3 = require('multer-s3')
 const { s3Client, bucket } = require('../config/storage.config')
 const { extensionMatchesMime, s3SniffContentType } = require('../helpers/fileSignature')
 const logger = require('../helpers/logger')
+
+// Suffixe de nom de fichier tire d'un generateur CRYPTOGRAPHIQUE, pas de
+// Math.random() : les cles d'objets uploades ne doivent pas etre devinables.
+// Une cle previsible (`<horodatage>-<random faible>`) se brute-force, et celles
+// des mind maps ne sont meme pas cloisonnees par utilisateur.
+// Signale par javascript:S2245.
+const uniqueSuffix = () => `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
@@ -32,9 +40,9 @@ const buildStorage = () => {
       // OWASP A08-M2 — magic bytes vérifiés sur le flux (remplace AUTO_CONTENT_TYPE)
       contentType: s3SniffContentType,
       key: (_req, file, cb) => {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
+        const suffix = uniqueSuffix()
         const ext = path.extname(file.originalname).toLowerCase()
-        cb(null, `mindmaps/${uniqueSuffix}${ext}`)
+        cb(null, `mindmaps/${suffix}${ext}`)
       }
     })
   }
@@ -58,7 +66,7 @@ const buildStorage = () => {
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase()
       const base = sanitizeFilename(path.basename(file.originalname, ext))
-      cb(null, `${base}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`)
+      cb(null, `${base}-${uniqueSuffix()}${ext}`)
     }
   })
 }
