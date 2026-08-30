@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 /**
  * Préparation d'état pour les parcours E2E (QA.03 / QA.05).
  *

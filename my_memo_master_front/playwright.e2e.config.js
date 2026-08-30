@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 // Parcours E2E authentifiés — QA.03 (étudiant) et QA.05 (enseignant).
 //
 // Config SÉPARÉE de playwright.config.js, qui sert l'audit de contraste RGAA.
