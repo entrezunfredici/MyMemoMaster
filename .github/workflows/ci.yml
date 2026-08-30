@@ -212,3 +212,108 @@ jobs:
           if [ -f /tmp/port-forward.pid ]; then
             kill "$(cat /tmp/port-forward.pid)" 2>/dev/null || true
           fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  Parcours E2E authentifiés + test de charge — QA.03 / QA.05 / QA.06
+  #
+  #  Les trois tâches QA du §7.3 de docs/COMPTE_RENDU_METRIQUES.md étaient
+  #  déclarées « validé » sans rien dans le dépôt pour les soutenir. Ce job
+  #  est ce qui les rend confirmables : il rejoue les parcours à chaque passage
+  #  au lieu de s'appuyer sur une exécution manuelle datée.
+  #
+  #  Limité à main et staging : il monte la stack Docker complète et coûte
+  #  plusieurs minutes. Contrepartie assumée — une régression introduite sur
+  #  une branche de fonctionnalité n'est vue qu'à la fusion.
+  # ═══════════════════════════════════════════════════════════════════════════
+  e2e_and_load:
+    name: Parcours E2E + charge (QA.03/QA.05/QA.06)
+    runs-on: ubuntu-latest
+    needs: test_and_lint
+    if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # `front` (profil dev) s'attache au réseau `traefik_proxy`, déclaré
+      # EXTERNE dans docker-compose.yml. Il existe sur un poste de dev, jamais
+      # sur un runner neuf : sans cette création, `compose up` échoue avant
+      # d'avoir démarré quoi que ce soit.
+      - name: Create external Traefik network
+        run: docker network create traefik_proxy || true
+
+      # .env.ci ne contient aucune valeur réelle — stack jetable, détruite avec
+      # le runner. SEED_E2E_USERS=true y déclenche les comptes de test, et
+      # RATE_LIMIT_DISABLED=true évite que k6 ne mesure le rate limiter.
+      - name: Start application stack
+        run: docker compose --env-file .env.ci --profile dev up -d --build
+
+      # L'entrypoint joue npm install + migrations + seeders avant d'écouter :
+      # attendre le port ne suffirait pas, on attend la santé applicative.
+      - name: Wait for API to be healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost/api/v1/health | grep -q ok; then
+              echo "API prête après $((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::API toujours indisponible après 5 minutes"
+          docker compose --env-file .env.ci --profile dev logs --tail 80 api
+          exit 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: my_memo_master_front/package-lock.json
+
+      - name: Install front dependencies
+        working-directory: my_memo_master_front
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: my_memo_master_front
+        run: npx playwright install --with-deps chromium
+
+      # QA.03 et QA.05. Le global setup crée le groupe classe via l'API : sans
+      # groupe, /classroom affiche « Aucun groupe. » pour tous les rôles et les
+      # vues étudiant/enseignant sont indiscernables.
+      - name: Run E2E journeys (QA.03 / QA.05)
+        working-directory: my_memo_master_front
+        run: npm run test:e2e
+
+      # QA.06. k6 tourne en conteneur sur le réseau de la stack et attaque
+      # l'API directement (http://api:3000), sans passer par Traefik : on
+      # mesure l'API, pas le proxy.
+      - name: Run load test (QA.06)
+        run: |
+          mkdir -p load-tests/results
+          docker run --rm -i \
+            --network my_memo_master_ci_network \
+            -e BASE_URL=http://api:3000 \
+            -e E2E_STUDENT_EMAIL=e2e-student@mymemomaster.local \
+            -e E2E_STUDENT_PASSWORD='E2eStudent1234!' \
+            grafana/k6 run - < load-tests/api-load.js \
+            | tee load-tests/results/run.log
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-evidence
+          path: |
+            my_memo_master_front/playwright-report/
+            my_memo_master_front/test-results/
+            load-tests/results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: docker compose --env-file .env.ci --profile dev logs --tail 120
+
+      - name: Stop application stack
+        if: always()
+        run: docker compose --env-file .env.ci --profile dev down -v

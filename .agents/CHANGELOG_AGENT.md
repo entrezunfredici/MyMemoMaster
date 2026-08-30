@@ -140,6 +140,7 @@
 | Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28** après suppression du bloc `[IA]` doublon : avancement **87,8 % déclaré / 86,6 % démontrable** (216/246), enveloppe **109 200 €** dont **86 775 €** validés, **33 tâches** en retard (dont 20 sur `C-01`/`C-02`), RH **75 %** concordant avec le registre à 2 JH près ; §7.1 sur les mesures **requêtées en direct** sur l'instance SonarQube auto-hébergée (9 bugs, 11 vulnérabilités caractérisées une par une, 730 code smells, dette 4 743 min ≈ 2 964 €, notes A/D/D, quality gate OK mais vide de sens, couverture toujours 0 %) — **vulnérabilité CRITICAL confirmée réelle : secrets embarqués dans l'image API**, sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
 | Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
+| Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert et rejouable** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Exécutés le 2026-08-29 : **5/5 verts**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Rejoués par le job CI `e2e_and_load` sur `main` et `staging`. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-29 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -7749,3 +7750,46 @@ Le toast d'erreur est à **4,83:1**, au-dessus du seuil AA de 4,5:1 — mais de 
 **Vérifications** — 4 passages consécutifs `CI=true --workers=2` (configuration du runner) : 8/8 à chaque fois. Suite front : 689/689. **Le passage sur le runner lui-même reste à confirmer** — c'est justement là que le test échouait.
 
 **Ce que l'épisode montre** — L'audit a fait son travail : il a trouvé un défaut d'accessibilité réel que quatre exécutions locales avaient manqué par chance de synchronisation. Le réflexe de désactiver un test qui « ne casse qu'en CI » aurait enterré le défaut avec le symptôme.
+
+
+---
+
+## [2026-08-29] [ADD] Recette QA — parcours E2E authentifiés et test de charge (QA.03 / QA.05 / QA.06)
+
+**Contexte** — Les trois tâches QA du §7.3 de `docs/COMPTE_RENDU_METRIQUES.md` portaient l'étape « validé » sans rien dans le dépôt pour les soutenir : ni dépendance Playwright pour des parcours, ni outil de charge. Demande du porteur du projet : les rendre confirmables, au niveau « rejouable en CI ».
+
+**Résultats mesurés le 2026-08-29**
+
+| | Résultat |
+|---|---|
+| Parcours E2E | **5 tests, 5 réussis** (13,4 s) |
+| Charge k6 | **3 258 requêtes, 0 échec**, p95 **3,45 ms**, 0 réponse 429, 3 256/3 256 assertions |
+
+**Fichiers créés**
+- `my_memo_master_front/e2e/journeys.spec.js` — QA.03 (étudiant) et QA.05 (enseignant), plus un **contrôle négatif sans session**.
+- `my_memo_master_front/e2e/global-setup.js` — monte le groupe classe et ses membres via l'API.
+- `my_memo_master_front/playwright.e2e.config.js` — config séparée de celle de l'audit de contraste : les deux n'ont ni la même cible ni les mêmes prérequis.
+- `load-tests/api-load.js` + `load-tests/results/run.log` — scénario k6 et sortie brute conservée comme preuve.
+- `docs/RAPPORT_TESTS_QA.md` — rapport QA.06.
+- `.env.ci` — environnement de la stack jetable en CI. **Aucune valeur réelle**, et c'est écrit en tête de fichier.
+- `my_memo_master_api/seeders/20260829000001-seed-e2e-users.js` — comptes étudiant/enseignant pré-validés.
+
+**Fichiers modifiés**
+- `.github/workflows/ci.yml` — job `e2e_and_load` (main et staging uniquement).
+- `my_memo_master_api/entrypoint.sh` — invoque le seeder E2E si `SEED_E2E_USERS=true`.
+- `docker-compose.yml` — transmet les cinq variables E2E au conteneur API.
+
+**Quatre obstacles rencontrés, tous instructifs**
+
+1. **L'entrypoint ne joue pas tous les seeders** — il les appelle nommément. Le seeder E2E n'était jamais invoqué. Pire : `Dockerfile` copie `entrypoint.sh` vers `/entrypoint.sh` **à la construction**, donc le montage de volume ne suffit pas — il faut reconstruire l'image.
+2. **`docker-compose.yml` ne transmettait pas `SEED_E2E_USERS`** au conteneur. Le garde-fou du seeder aurait toujours refusé, sans message.
+3. **Un enseignant ne peut pas créer de groupe classe** — `ClassGroupService.create` n'autorise que les rôles 1 et 4. Le parcours enseignant part donc d'un groupe créé par un administrateur, ce qui reproduit le cheminement réel.
+4. **Sans groupe, les rôles sont indiscernables** — `/classroom` affiche « Aucun groupe. » pour tous, le reste étant derrière `v-if="currentGroup"`. Les deux premières versions des tests échouaient pour cette raison. D'où la préparation d'état par l'API.
+
+**Deux contraintes de l'API qui ont façonné le test de charge** — `apiLimiter` couvre tout `/api/v1` (500 req/15 min), d'où `RATE_LIMIT_DISABLED=true` et une mention explicite dans le rapport : **les chiffres décrivent la capacité derrière le limiteur**. Et `/users/login` porte `authLimiter`, d'où une connexion unique en `setup()`.
+
+**Dette / points d'attention**
+- **Le job CI n'a jamais tourné** : `e2e_and_load` sera éprouvé au prochain push sur `main`. Trois risques identifiés et traités en amont — réseau externe `traefik_proxy` créé par le job, nom de réseau dépendant d'`ENVIRONMENT` (`my_memo_master_ci_network`), attente de la santé applicative et non du seul port.
+- **Aucun test de rupture** : 10 VU est un régime nominal, le point de saturation reste inconnu.
+- **La charge est mesurée hors production** : stack locale, base vide, limiteur désactivé, Traefik contourné. Rien de cela ne vaut pour le cluster.
+- **Job limité à `main` et `staging`** : une régression sur une branche de fonctionnalité n'est vue qu'à la fusion.

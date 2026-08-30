@@ -11,7 +11,8 @@
     "test:a11y:contrast": "playwright test",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --config=playwright.e2e.config.js"
   },
   "dependencies": {
     "@fontsource/roboto": "^5.2.10",

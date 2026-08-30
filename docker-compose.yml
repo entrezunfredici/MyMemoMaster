@@ -168,6 +168,14 @@ services:
       REDIS_PASS: ${REDIS_PASS:-}
       ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL}
       ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD}
+      # Comptes de test des parcours E2E (QA.03/QA.05). Defaut false : le
+      # seeder ne cree rien sans opt-in explicite (il porte lui-meme un second
+      # garde-fou sur NODE_ENV, voir seeders/...-seed-e2e-users.js).
+      SEED_E2E_USERS: ${SEED_E2E_USERS:-false}
+      E2E_STUDENT_EMAIL: ${E2E_STUDENT_EMAIL:-}
+      E2E_STUDENT_PASSWORD: ${E2E_STUDENT_PASSWORD:-}
+      E2E_TEACHER_EMAIL: ${E2E_TEACHER_EMAIL:-}
+      E2E_TEACHER_PASSWORD: ${E2E_TEACHER_PASSWORD:-}
       MAX_USERS: ${MAX_USERS:-}
       RATE_LIMIT_DISABLED: ${RATE_LIMIT_DISABLED:-false}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
