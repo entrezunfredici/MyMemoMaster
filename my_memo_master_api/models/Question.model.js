@@ -14,8 +14,11 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      // CHOIX: TEXT plutôt que STRING (VARCHAR(255) implicite) — RAISON: un énoncé
+      // d'exercice n'a pas de raison d'être plafonné à 255 caractères ; c'était un
+      // défaut Sequelize non voulu (migration 20260831000001), aligné sur `content`.
       statement: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
         allowNull: false
       },
       type: {

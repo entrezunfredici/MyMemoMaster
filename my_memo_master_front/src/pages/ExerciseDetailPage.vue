@@ -23,7 +23,7 @@
           class="bg-gray-50 p-6 rounded-lg border border-gray-200"
         >
           <h3 class="text-lg font-semibold text-heading mb-4">Question {{ idx + 1 }}</h3>
-          <p class="text-base text-body mb-5"><FormulaText :text="question.statement || ''" /></p>
+          <p :id="`question-statement-${idx}`" class="text-base text-body mb-5"><FormulaText :text="question.statement || ''" /></p>
 
           <!-- open -->
           <template v-if="question.type === 'open'">
@@ -39,7 +39,11 @@
 
           <!-- mcq -->
           <template v-else-if="question.type === 'mcq'">
-            <div class="space-y-2">
+            <!-- CHOIX: role="radiogroup" + aria-labelledby plutôt que <fieldset>/<legend>
+                 RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans reprendre le style
+                 par défaut du navigateur pour <fieldset> (bordure/marge) — l'énoncé de la
+                 question (id="question-statement-N" ci-dessus) sert de légende programmatique. -->
+            <div class="space-y-2" role="radiogroup" :aria-labelledby="`question-statement-${idx}`">
               <label
                 v-for="(opt, oi) in question.content?.options"
                 :key="oi"
@@ -197,11 +201,12 @@
         <h2 class="text-xl font-bold text-heading mb-4">Historique de vos résultats</h2>
         <div class="overflow-x-auto">
           <table class="w-full text-sm border-collapse">
+            <caption class="sr-only">Historique de vos résultats</caption>
             <thead>
               <tr class="bg-gray-100 text-left">
-                <th class="px-4 py-2 rounded-tl-lg font-semibold text-gray-600">Date</th>
-                <th class="px-4 py-2 font-semibold text-gray-600">Score</th>
-                <th class="px-4 py-2 rounded-tr-lg font-semibold text-gray-600">Résultat</th>
+                <th scope="col" class="px-4 py-2 rounded-tl-lg font-semibold text-gray-600">Date</th>
+                <th scope="col" class="px-4 py-2 font-semibold text-gray-600">Score</th>
+                <th scope="col" class="px-4 py-2 rounded-tr-lg font-semibold text-gray-600">Résultat</th>
               </tr>
             </thead>
             <tbody>

@@ -24,6 +24,7 @@
           id="register-email"
           name="email"
           type="email"
+          autocomplete="email"
           v-model.trim="email"
           required
           :class="['w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.email ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
@@ -37,6 +38,7 @@
           id="register-password"
           name="password"
           type="password"
+          autocomplete="new-password"
           v-model="password"
           minlength="10"
           required
@@ -51,6 +53,7 @@
           id="register-confirm-password"
           name="confirmPassword"
           type="password"
+          autocomplete="new-password"
           v-model="confirmPassword"
           minlength="10"
           required

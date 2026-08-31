@@ -38,12 +38,13 @@
       <div v-else-if="etabStore.list.length === 0" class="text-sm text-dark/60">Aucun établissement.</div>
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
+          <caption class="sr-only">Liste des établissements</caption>
           <thead>
             <tr class="border-b border-gray text-left text-xs text-dark/60 uppercase tracking-wide">
-              <th class="pb-2 pr-4">Nom</th>
-              <th class="pb-2 pr-4">Code</th>
-              <th class="pb-2 pr-4">Gérant</th>
-              <th class="pb-2"></th>
+              <th scope="col" class="pb-2 pr-4">Nom</th>
+              <th scope="col" class="pb-2 pr-4">Code</th>
+              <th scope="col" class="pb-2 pr-4">Gérant</th>
+              <th scope="col" class="pb-2"></th>
             </tr>
           </thead>
           <tbody>

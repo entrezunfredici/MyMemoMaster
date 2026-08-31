@@ -126,6 +126,35 @@ describe('api.js — couche API front', () => {
     it('post - endpoint absent - lève une erreur', async () => {
       await expect(api.post()).rejects.toThrow()
     })
+
+    // Régression : validate.middleware.js renvoie { errors: [...] } (express-validator)
+    // sur un 400, jamais { message } — sans cette normalisation, tout appelant qui lit
+    // resp.data.message retombait sur son message générique, quelle que soit la vraie
+    // raison du rejet (trouvé sur la création de séance de révision).
+    it('post - statut 400 avec { errors } (validate.middleware) - data.message reprend errors[0].msg', async () => {
+      mockPost.mockResolvedValue({
+        data: { errors: [{ msg: "L'heure de fin doit être postérieure à l'heure de début." }] },
+        status: 400,
+      })
+      const result = await api.post('revision-sessions', {})
+      expect(result.data.message).toBe("L'heure de fin doit être postérieure à l'heure de début.")
+      expect(result.status).toBe(400)
+    })
+
+    it('post - statut 400 avec { message } déjà présent - ne le remplace pas par errors', async () => {
+      mockPost.mockResolvedValue({
+        data: { message: 'Message explicite du contrôleur.', errors: [{ msg: 'Autre message.' }] },
+        status: 400,
+      })
+      const result = await api.post('revision-sessions', {})
+      expect(result.data.message).toBe('Message explicite du contrôleur.')
+    })
+
+    it('post - statut 400 sans errors ni message - data.message reste absent', async () => {
+      mockPost.mockResolvedValue({ data: {}, status: 400 })
+      const result = await api.post('revision-sessions', {})
+      expect(result.data.message).toBeUndefined()
+    })
   })
 
   // ==================== api.put ====================

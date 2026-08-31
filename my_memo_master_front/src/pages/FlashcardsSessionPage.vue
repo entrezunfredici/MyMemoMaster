@@ -30,7 +30,7 @@
         </div>
 
         <div v-else-if="!isFinished" class="space-y-4">
-          <div class="w-full p-3 bg-white text-dark text-xl text-center font-semibold mt-1">
+          <div id="session-question-statement" class="w-full p-3 bg-white text-dark text-xl text-center font-semibold mt-1">
             <FormulaText :text="currentCard.question?.statement || ''" />
           </div>
 
@@ -50,8 +50,11 @@
 
           <!-- QCM -->
           <div v-else class="py-2 space-y-2">
-            <span class="text-sm font-medium text-gray-light uppercase">Choisis la bonne réponse</span>
+            <span id="session-mcq-legend" class="text-sm font-medium text-gray-light uppercase">Choisis la bonne réponse</span>
+            <!-- CHOIX: role="radiogroup" + aria-labelledby plutôt que <fieldset>/<legend>
+                 RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans le style par défaut du navigateur pour <fieldset> -->
             <template v-if="currentCard.question.content?.options?.length">
+              <div role="radiogroup" aria-labelledby="session-question-statement session-mcq-legend">
               <label
                 v-for="(opt, oi) in currentCard.question.content.options"
                 :key="oi"
@@ -71,6 +74,7 @@
                 />
                 <span class="text-dark"><FormulaText :text="opt.text || ''" /></span>
               </label>
+              </div>
             </template>
             <p v-else class="text-sm text-red-400 italic py-2">
               Options manquantes.

@@ -26,7 +26,7 @@
 | Risques | Dépendances bloquantes non levées | nb | **183 liens** ouverts, **78 verrous** distincts, **91 tâches** immobilisées — plus **6 dépendances d'infrastructure** | ✅ Mesure directe, revérifiée à cet arrêté — inchangée |
 | RH | Charge par profil / capacité disponible | JH | **362 JH pour 483 JH de capacité ≈ 75 %**, réparti sur **7 profils** ; pointe à 113 % (SysAdmin) | ⚠️ Total revérifié, répartition par profil non rejouée depuis le 2026-08-28 (planning d'équipe inchangé) |
 | Qualité | Couverture de tests SonarQube | % | **63,9 %** mesurée par l'instance auto-hébergée (dernière analyse effectivement lue, 2026-08-29) ; reproduite en local ce jour à **81,4 % API / 59,75 % front** | ⚠️ 3 analyses Sonar de plus depuis (vertes en CI) mais non relues en détail, faute de jeton local (§7.1) |
-| Qualité | Non-conformités RGAA | nb | **0** sur les 6 critères outillés (79 fichiers `.vue`, 20/36 composants sous axe-core, contraste réel confirmé vert en CI) ; **audit manuel des 106 critères — 60/106 posés (mise à jour du 2026-08-31, après l'arrêté ci-dessus), 5 non-conformités confirmées** dont une sévère (6.2, navigation principale sans nom accessible) | ⚠️ Voir §7.2 — chiffre mis à jour dans la même journée que l'arrêté, par une session de continuation dédiée non prévue à l'origine de ce rapport |
+| Qualité | Non-conformités RGAA | nb | **0** sur les 6 critères outillés (79 fichiers `.vue`, 20/36 composants sous axe-core, contraste réel confirmé vert en CI) ; **audit manuel des 106 critères — 60/106 posés (mise à jour du 2026-08-31, après l'arrêté ci-dessus)** — **9 non-conformités trouvées ont été corrigées le jour même** (dont la sévère : 6.2, navigation principale sans nom accessible) ; 3 candidats restent ouverts (9.2, 8.6, 12.7) | ⚠️ Voir §7.2 — chiffres mis à jour et corrigés dans la même journée que l'arrêté, par des sessions de continuation non prévues à l'origine de ce rapport |
 
 **Ce que ce tableau ne dit plus, et qu'il faut dire pour mémoire** : à l'arrêté du 2026-08-28, 3 tâches portaient l'étape « validé » sans preuve dans le dépôt, ce qui écartait avancement déclaré (87,8 %) et démontrable (86,6 %) de 1,2 point. **Ces trois tâches sont désormais couvertes par des tests rejouables en CI** (§7.3) : l'écart est refermé depuis le 2026-08-30, et le reste tel quel à cet arrêté.
 
@@ -267,17 +267,19 @@ Cette extension a aussi servi à **objectiver, sur deux cas réels, la limite de
 
 #### 7.2.1 — Audit manuel des 106 critères RGAA : 60/106, mis à jour le 2026-08-31 après l'arrêté ci-dessus
 
-**Mise à jour post-arrêté** — l'utilisateur a explicitement demandé la poursuite de l'audit dans la même journée que la réédition de ce rapport, après avoir lu la synthèse ci-dessus. `docs/AUDIT_RGAA_106.md` est passé de 23/106 (22 %) à **60/106 (57 %)** : thématiques 1 (Images), 5 (Tableaux) et 6 (Liens) closes, progrès partiels sur 4, 8, 9, 11, 12, 13. **5 non-conformités confirmées** (pas de simples candidats) s'ajoutent aux 2 déjà connues (8.6, 12.7) :
+**Mise à jour post-arrêté** — l'utilisateur a explicitement demandé la poursuite de l'audit dans la même journée que la réédition de ce rapport, après avoir lu la synthèse ci-dessus. `docs/AUDIT_RGAA_106.md` est passé de 23/106 (22 %) à **60/106 (57 %)**. **5 non-conformités confirmées puis, sur demande explicite de l'utilisateur, corrigées le jour même** :
 
-| Critère | Constat | Sévérité |
-|---|---|---|
-| **6.2** | La navigation principale de l'app (`App.vue`, desktop et mobile) n'a **aucun nom accessible** sur 8 de ses ~11 liens — icônes seules, sans `aria-label`/`title`/texte. Présent sur **toutes** les pages authentifiées. Invisible à l'outillage axe-core existant (`App.vue` n'est testé par aucun des 20 composants sous test). | 🔴 Élevée |
-| 11.6 / 11.7 | Aucun `<fieldset>`/`<legend>` dans tout le dépôt malgré de vrais regroupements (QCM à choix radio, sélection de jours) | 🟠 Moyenne |
-| 5.4-5.7 | Aucun des 4 tableaux de données de l'app n'a de `<caption>` ni de `scope` sur ses `<th>` | 🟠 Moyenne |
-| 11.13 | `autocomplete` absent des formulaires de connexion/inscription/vérification email | 🟡 Faible |
-| 1.2 | Illustration décorative avec `alt="Illustration"` au lieu de `alt=""`, sur 5 pages d'authentification | 🟡 Faible |
+| Critère | Constat | Sévérité | Correctif |
+|---|---|---|---|
+| **6.2** | Navigation principale (`App.vue`, desktop et mobile) sans **aucun nom accessible** sur 8 de ses ~11 liens — icônes seules. Présent sur **toutes** les pages authentifiées. Invisible à l'outillage axe-core existant. | 🔴 Élevée | `aria-label` ajouté sur ~11 liens × 2 blocs + test de régression dédié (`test/App.test.js`) |
+| 11.6 / 11.7 | Aucun `<fieldset>`/`<legend>` dans tout le dépôt malgré de vrais regroupements (QCM à choix radio, sélection de jours) | 🟠 Moyenne | `role="radiogroup"`/`"group"` + `aria-labelledby` sur les 5 regroupements identifiés |
+| 5.4-5.7 | Aucun des 4 tableaux de données de l'app n'avait de `<caption>` ni de `scope` sur ses `<th>` | 🟠 Moyenne | `<caption>` (masqué visuellement) + `scope="col"` ajoutés aux 4 tableaux |
+| 11.13 | `autocomplete` absent des formulaires de connexion/inscription/vérification email | 🟡 Faible | `autocomplete="email"`/`"current-password"`/`"new-password"` ajoutés |
+| 1.2 | Illustration décorative avec `alt="Illustration"` au lieu de `alt=""`, sur 5 pages d'authentification | 🟡 Faible | Valeur par défaut de la prop `imageAlt` passée à `''` |
 
-Détail des preuves (fichier/ligne, recherches exhaustives citées) : `docs/AUDIT_RGAA_106.md`. Toujours **EN COURS**, à ne pas confondre avec un audit terminé — 46 critères restants, dont ceux qui exigent un rendu de page réel (zoom, tabulation, focus visible), non testés dans cette session (lecture de code uniquement).
+**Vérifié après correctifs** : `npx vitest run` → 705/705 (2 nouveaux tests), 0 régression ; `node scripts/audit-a11y.mjs` → 0/79 ; `npx eslint` sur les 14 fichiers modifiés → 0 erreur. Thématiques 1, 5, 6 closes **sans aucune non-conformité restante**.
+
+**3 candidats restent ouverts**, non corrigés par choix (pas dans le lot proposé, ou nécessitant une confirmation avant correctif) : 9.2 (saut de niveau de titre, `CalendarPage.vue`), 8.6 (titres de route en anglais — pourrait être un choix éditorial, question à poser à l'utilisateur), 12.7 (lien d'évitement clavier — à confirmer par navigation réelle). Détail complet (preuves, correctifs, candidats) : `docs/AUDIT_RGAA_106.md`. Toujours **EN COURS**, à ne pas confondre avec un audit terminé — 46 critères restants à auditer, dont ceux qui exigent un rendu de page réel (zoom, tabulation, focus visible), non testés dans ces sessions (lecture de code uniquement).
 
 **Méthode** : référentiel RGAA 4.1.2 **téléchargé depuis la source officielle** et extrait en texte (`pdftotext`), pas reconstitué de mémoire — un premier essai par récupération web s'est révélé tronqué et partiellement inexact sur 4 thématiques, écarté après vérification. 106 critères recomptés (9+2+3+13+8+2+5+10+4+14+13+11+12) pour confirmer la grille complète. Un échantillon de 15 pages a été proposé (à valider).
 
@@ -332,7 +334,7 @@ Elles portent toujours l'étape « validé » dans Odoo, mais leur champ `state`
 | Couverture Sonar publiée | 63,9 % (analyse du 2026-08-29) | **Toujours 63,9 % citée** — 3 analyses de plus depuis, vertes en CI, non relues en détail (pas de `SONAR_TOKEN` local) |
 | Vulnérabilités dépendances (`npm audit`) | Non recompté à cet indicateur | **0**, rejoué à cet arrêté (API + front, périmètre production) |
 | RGAA outillé | 6 critères, 0 non-conformité | **Inchangé**, revérifié — 0 régression sur les 20 composants axe-core malgré le changement de mécanisme de fermeture des modales |
-| Audit manuel 106 critères | 23/106 posés | **60/106 (57 %)** — poursuite demandée par l'utilisateur après l'arrêté, 5 non-conformités confirmées dont 1 sévère (6.2) |
+| Audit manuel 106 critères | 23/106 posés | **60/106 (57 %)** — poursuite demandée par l'utilisateur après l'arrêté, **5 non-conformités confirmées corrigées le jour même** (dont 1 sévère, 6.2) |
 | Méthode | — | **Nouveau constat** : le registre Odoo ne capture pas les correctifs signalés et traités directement en session (3 commits, hors tâche Odoo) — voir encadré |
 
 **La limite de méthode à assumer, inchangée** : ce rapport mesure un plan, pas un relevé. Aucune donnée de temps réel n'existe sur ce projet et l'outil ne permettrait pas d'en produire. Les 362,3 JH sont une estimation argumentée tâche par tâche ; les 86 250 € sont la valorisation au barème de la charge validée, **pas une dépense constatée**.
@@ -359,8 +361,9 @@ Elles portent toujours l'étape « validé » dans Odoo, mais leur champ `state`
 | **P3** | Chiffrer les 72 tâches de backlog `C-*` / `S-07` / `W-*` | Coûts (reste à faire du backlog inconnu) | ~2 JH |
 | **P3** | Migrer les actions GitHub dépréciées (`checkout@v4`, `setup-node@v4`, etc. — ciblent Node 20, déprécié) avant leur retrait | Risques (CI) | à estimer |
 | **P1** | Confirmer visuellement les 2 non-conformités RGAA candidates (8.6 titres en anglais, 12.7 absence de lien d'évitement) et corriger si confirmées | Qualité (RGAA) | ~0,5 JH |
-| **P1** | Corriger la non-conformité 6.2 confirmée (nav principale sans nom accessible) — impact élevé, correctif probablement rapide (`aria-label` sur ~16 liens) | Qualité (RGAA) | ~1 JH |
-| **P2** | Corriger les non-conformités confirmées restantes (5.4-5.7 `caption`/`scope`, 11.6/11.7 `fieldset`/`legend`, 11.13 `autocomplete`, 1.2 `alt=""`) | Qualité (RGAA) | ~1 JH |
+| ~~P1~~ | ~~Corriger la non-conformité 6.2 (nav principale sans nom accessible)~~ — fait le 2026-08-31, `aria-label` + test de régression | Qualité (RGAA) | — |
+| ~~P2~~ | ~~Corriger les non-conformités confirmées restantes (5.4-5.7, 11.6/11.7, 11.13, 1.2)~~ — fait le 2026-08-31 | Qualité (RGAA) | — |
+| **P2** | Statuer sur les 3 candidats restants (9.2 saut de titre, 8.6 titres en anglais — question éditoriale à poser, 12.7 lien d'évitement) | Qualité (RGAA) | ~0,5 JH |
 | **P2** | Poursuivre l'audit manuel des 106 critères RGAA (46 restants) — `docs/AUDIT_RGAA_106.md` | Qualité (RGAA) | plusieurs sessions |
 
 ---

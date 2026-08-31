@@ -294,8 +294,20 @@ function handleSpecialStatus(status) {
   return false
 }
 
+// CHOIX: normaliser data.message depuis data.errors[0].msg (forme express-validator,
+// { errors: [...] }, posée par validate.middleware.js) plutôt que de faire porter ce
+// correctif par chacun des ~160 appelants qui lisent resp.data.message.
+// RAISON: validate.middleware.js ne renvoie jamais { message } sur un 400 de
+// validation — seulement { errors: [...] } — donc tout appelant qui fait
+// `resp.data.message || 'message générique'` retombait silencieusement sur son
+// message générique, quelle que soit la vraie raison du rejet (bug trouvé sur la
+// création de séance de révision, mais partagé par tous les formulaires du site).
 function toResponse(response) {
-  return { data: response.data, status: response.status }
+  const data = response.data
+  if (data && !data.message && Array.isArray(data.errors) && data.errors.length) {
+    return { data: { ...data, message: data.errors[0].msg }, status: response.status }
+  }
+  return { data, status: response.status }
 }
 
 /**

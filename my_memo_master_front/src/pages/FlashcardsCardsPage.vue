@@ -183,8 +183,10 @@
 
           <!-- Options MCQ -->
           <div v-if="form.type !== 'open'" class="form-group--lg">
-            <label class="form-label">Options (sélectionne la bonne réponse)</label>
-            <div class="space-y-2">
+            <label id="mcq-card-legend" class="form-label">Options (sélectionne la bonne réponse)</label>
+            <!-- CHOIX: role="radiogroup" + aria-labelledby plutôt que <fieldset>/<legend>
+                 RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans le style par défaut du navigateur pour <fieldset> -->
+            <div class="space-y-2" role="radiogroup" aria-labelledby="mcq-card-legend">
               <div v-for="(opt, oi) in form.mcqOptions" :key="oi" class="flex items-center gap-2">
                 <input :aria-label="`Marquer l'option ${oi + 1} comme correcte`"
                   type="radio"

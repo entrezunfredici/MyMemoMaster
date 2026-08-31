@@ -19,7 +19,11 @@ import '@/assets/auth-form.css'
 defineProps({
   title: { type: String, required: true },
   imageSrc: { type: String, default: '/connexion.jpg' },
-  imageAlt: { type: String, default: 'Illustration' },
+  // CHOIX: alt="" par défaut (pas "Illustration") — RGAA 1.2.
+  // RAISON: cette image est purement décorative (aucune des 5 pages qui l'utilisent
+  // ne passe imageAlt) ; un alt non vide la faisait annoncer par les lecteurs d'écran
+  // sans valeur informative au lieu d'être ignorée.
+  imageAlt: { type: String, default: '' },
   description: { type: String, default: null },
   titleClass: { type: String, default: 'md:text-[2.5rem]' },
 })

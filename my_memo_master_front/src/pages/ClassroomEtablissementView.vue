@@ -250,7 +250,11 @@
                   <option value="biweekly">Bi-hebdomadaire</option>
                   <option value="monthly">Mensuel</option>
                 </select>
-                <div class="flex flex-wrap gap-2" v-if="eventForm.frequency !== 'monthly'">
+                <!-- CHOIX: role="group" + aria-labelledby (légende visuellement masquée) plutôt que <fieldset>/<legend>
+                     RAISON: équivalent ARIA valide au RGAA 11.6/11.7 ; aucun texte visible n'existait déjà pour ce
+                     regroupement (contrairement aux QCM), donc une légende dédiée est ajoutée plutôt que réutilisée. -->
+                <div class="flex flex-wrap gap-2" v-if="eventForm.frequency !== 'monthly'" role="group" aria-labelledby="etab-days-legend">
+                  <span id="etab-days-legend" class="sr-only">Jours de la semaine</span>
                   <label v-for="day in weekDays" :key="day.value" class="flex items-center gap-1 text-sm cursor-pointer">
                     <input type="checkbox" :value="day.value" v-model="eventForm.days" class="rounded" />
                     {{ day.label }}

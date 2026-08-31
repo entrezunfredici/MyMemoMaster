@@ -124,7 +124,7 @@
               <div class="space-y-6">
                 <div v-for="(q, idx) in form.questions" :key="q._key" class="bg-gray-50 border border-gray-200 p-4 rounded-lg">
                   <div class="flex justify-between items-center mb-3">
-                    <span class="font-semibold text-sm text-heading">Question {{ idx + 1 }}</span>
+                    <span :id="`exercise-question-${idx}`" class="font-semibold text-sm text-heading">Question {{ idx + 1 }}</span>
                     <button v-if="form.questions.length > 1" type="button" @click="removeQuestion(idx)" class="text-red-500 hover:text-red-700 text-sm font-medium">
                       Supprimer
                     </button>
@@ -182,8 +182,10 @@
 
                   <!-- mcq -->
                   <template v-else-if="q.type === 'mcq'">
-                    <label class="block text-xs font-semibold text-gray-500 mb-2">Options (cocher la bonne réponse)</label>
-                    <div class="space-y-2">
+                    <label :id="`exercise-mcq-legend-${idx}`" class="block text-xs font-semibold text-gray-500 mb-2">Options (cocher la bonne réponse)</label>
+                    <!-- CHOIX: role="radiogroup" + aria-labelledby (2 ids : question + légende) plutôt que <fieldset>/<legend>
+                         RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans le style par défaut du navigateur pour <fieldset> -->
+                    <div class="space-y-2" role="radiogroup" :aria-labelledby="`exercise-question-${idx} exercise-mcq-legend-${idx}`">
                       <div v-for="(opt, oi) in q.mcqOptions" :key="oi" class="flex items-center gap-2">
                         <input :aria-label="`Marquer l'option ${oi + 1} comme correcte`" type="radio" :name="`mcq-correct-${idx}`" :value="oi" v-model="q.mcqCorrectIdx" class="accent-primary" />
                         <input :aria-label="`Texte de l'option ${oi + 1}`" :value="opt.text" @input="setExerciseOptionText(q, oi, $event.target.value)" type="text" placeholder="Option..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />

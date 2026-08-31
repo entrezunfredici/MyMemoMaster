@@ -14,52 +14,52 @@
       <nav class="flex flex-col items-center justify-between rounded-xl border-2 border-gray mb-4 p-2 w-20"
         style="height: calc(100% - 9rem);">
         <div class="flex flex-col items-center gap-3 justify-center">
-          <router-link to="/"
+          <router-link to="/" aria-label="Accueil"
             :class="[route?.name && route.name === 'home' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <HomeIcon class="size-8" />
           </router-link>
-          <router-link to="/tutorials"
+          <router-link to="/tutorials" aria-label="Tutoriels"
             :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <TutorialIcon class="size-8" />
           </router-link>
-          <router-link to="/mindmaps" data-tour="mindmaps"
+          <router-link to="/mindmaps" data-tour="mindmaps" aria-label="Cartes mentales"
             :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <MindmapIcon class="size-8" />
           </router-link>
-          <router-link to="/flashcards" data-tour="flashcards"
+          <router-link to="/flashcards" data-tour="flashcards" aria-label="Systèmes de Leitner"
             :class="[route?.name && route.name.includes('flashcards') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <FlashardIcon class="size-8" />
           </router-link>
-          <router-link to="/exercises" data-tour="exercises"
+          <router-link to="/exercises" data-tour="exercises" aria-label="Exercices"
             :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ExercisesIcon class="size-8" />
           </router-link>
-          <router-link to="/classroom" data-tour="classroom"
+          <router-link to="/classroom" data-tour="classroom" aria-label="Classe"
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
-          <router-link to="/calendar" data-tour="calendar"
+          <router-link to="/calendar" data-tour="calendar" aria-label="Calendrier & rappels"
             :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="Calendrier & rappels">
             <CalendarIcon class="size-8" />
           </router-link>
-          <router-link to="/todo" data-tour="todo"
+          <router-link to="/todo" data-tour="todo" aria-label="To-do"
             :class="[route?.name === 'todo' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="To-do">
             <CheckCircleIcon class="size-8" />
           </router-link>
-          <router-link to="/kpi" data-tour="kpi"
+          <router-link to="/kpi" data-tour="kpi" aria-label="Ma Progression"
             :class="[route?.name === 'kpi' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="Ma Progression">
             <KpiIcon class="size-8" />
           </router-link>
         </div>
         <div class="flex flex-col items-center gap-3 justify-center">
-          <router-link to="/profile"
+          <router-link to="/profile" aria-label="Profil"
             :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ProfileIcon class="size-8" />
           </router-link>
-          <router-link to="/settings"
+          <router-link to="/settings" aria-label="Réglages"
             :class="[route?.name && route.name.includes('settings') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <SettingsIcon class="size-8" />
           </router-link>
@@ -96,55 +96,57 @@
     </main>
     <nav
       class="flex flex-wrap items-center justify-evenly rounded-xl border-2 border-gray p-2 m-2 fixed inset-x-0 bottom-0 w-[98%] bg-light">
-      <router-link to="/"
+      <router-link to="/" aria-label="Accueil"
         :class="[route?.name && route.name === 'home' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <HomeIcon class="size-8" />
       </router-link>
-      <router-link to="/tutorials"
+      <router-link to="/tutorials" aria-label="Tutoriels"
         :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <TutorialIcon class="size-8" />
       </router-link>
-      <router-link to="/mindmaps" data-tour="mindmaps"
+      <router-link to="/mindmaps" data-tour="mindmaps" aria-label="Cartes mentales"
         :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <MindmapIcon class="size-8" />
       </router-link>
-      <router-link to="/flashcards" data-tour="flashcards"
+      <router-link to="/flashcards" data-tour="flashcards" aria-label="Systèmes de Leitner"
         :class="[route?.name && route.name.includes('flashcards') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <FlashardIcon class="size-8" />
       </router-link>
-      <router-link to="/exercises" data-tour="exercises"
+      <router-link to="/exercises" data-tour="exercises" aria-label="Exercices"
         :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ExercisesIcon class="size-8" />
       </router-link>
-      <router-link to="/classroom" data-tour="classroom"
+      <!-- CHOIX: <ClassroomIcon>, alignée sur la nav desktop -->
+      <!-- RAISON: la nav mobile réutilisait par erreur <ExercisesIcon> pour ce lien — bug distinct trouvé pendant l'audit RGAA, corrigé au passage -->
+      <router-link to="/classroom" data-tour="classroom" aria-label="Classe"
         :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <ExercisesIcon class="size-8" />
+        <ClassroomIcon class="size-8" />
       </router-link>
-      <router-link v-if="isAdminPlateforme" to="/classroom"
+      <router-link v-if="isAdminPlateforme" to="/classroom" aria-label="Administration"
         :class="[route?.name === 'classroom' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="Administration">
         <ShieldCheckIcon class="size-8" />
       </router-link>
-      <router-link to="/calendar" data-tour="calendar"
+      <router-link to="/calendar" data-tour="calendar" aria-label="Calendrier & rappels"
         :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="Calendrier & rappels">
         <CalendarIcon class="size-8" />
       </router-link>
-      <router-link to="/todo" data-tour="todo"
+      <router-link to="/todo" data-tour="todo" aria-label="To-do"
         :class="[route?.name === 'todo' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="To-do">
         <CheckCircleIcon class="size-8" />
       </router-link>
-      <router-link to="/kpi" data-tour="kpi"
+      <router-link to="/kpi" data-tour="kpi" aria-label="Ma Progression"
         :class="[route?.name === 'kpi' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
         title="Ma Progression">
         <KpiIcon class="size-8" />
       </router-link>
-      <router-link to="/profile"
+      <router-link to="/profile" aria-label="Profil"
         :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <ProfileIcon class="size-8" />
       </router-link>
-      <router-link to="/settings"
+      <router-link to="/settings" aria-label="Réglages"
         :class="[route?.name && route.name.includes('settings') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <SettingsIcon class="size-8" />
       </router-link>
