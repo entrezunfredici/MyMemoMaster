@@ -196,6 +196,20 @@ describe('MindmapsListView', () => {
     expect(wrapper.findAll('.item-title')[0].text()).toBe('Carte Physique')
   })
 
+  it('supprimer une carte quand api.del retourne undefined (204 réel) est traité comme un succès', async () => {
+    // api.del retourne `undefined` sur une réponse 204 (voir helpers/api.js) — c'est le cas réel
+    // renvoyé par Diagramme.controller.delete, contrairement au mock `{ status: 204 }` ci-dessus.
+    mockDel.mockResolvedValue(undefined)
+    const wrapper = mountListView()
+    await flushPromises()
+    await wrapper.findAll('.delete-btn')[0].trigger('click')
+    await flushPromises()
+    expect(mockToast.success).toHaveBeenCalledWith('Carte supprimée.')
+    expect(mockToast.warning).not.toHaveBeenCalled()
+    expect(wrapper.findAll('.item-title')).toHaveLength(1)
+    expect(wrapper.findAll('.item-title')[0].text()).toBe('Carte Physique')
+  })
+
   it('ne supprime pas si window.confirm retourne false', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false)
     const wrapper = mountListView()

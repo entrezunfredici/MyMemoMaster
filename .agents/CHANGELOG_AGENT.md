@@ -94,7 +94,7 @@
 | Front — FlashcardsPage | Stable — refactor : utilise ItemListLayout.vue, chrome dupliqué supprimé | 2026-06-21 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.08/M-06.09 : créateur + éditeur + player (4 types) + correction server-side + scores/historique livrés | 2026-06-21 |
 | Front — ItemListLayout.vue | Stable — composant layout partagé (recherche, filtre sujet, grille, états) | 2026-06-21 |
-| Front — MindmapsPage (+ MindmapsListView + MindmapsEditorView) | Stable — M-02.12 : MindmapsPage refactorisée en coordinateur 52 lignes + 2 vues filles testées | 2026-06-22 |
+| Front — MindmapsPage (+ MindmapsListView + MindmapsEditorView) | Stable — [FIX] 2026-08-31 : nom saisi à la création écrasé par `MindMapBuilder.vue` + première sauvegarde non automatique, corrigés | 2026-06-22 |
 | Front — ProfilePage | Stable — M-05.10 : tests + revue, 17 tests Vitest | 2026-06-17 |
 | Front — CalendarPage | Stable — M-03.07/M-03.08 : calendrier interactif + sidebar onglets Agenda/To-do | 2026-06-13 |
 | Front — M-03.09 Rappels in-app | Stable — Nav /calendar + /todo, NotificationBell polling 5 min | 2026-06-13 |
@@ -7959,3 +7959,50 @@ Les noms de fichiers uploadés méritaient le correctif : une clé `<horodatage>
 **Dette restante** : aucune autre paire validateur/colonne `STRING(50)` en désaccord détectée sur le reste du périmètre lu (`Tag.validators.js` était déjà cohérent à 50/50). Un audit systématique de tous les validateurs vs. tous les modèles n'a pas été fait — seuls les 3 cas déjà identifiés ont été traités.
 
 **Dette assumée, explicite plutôt que laissée implicite** : les pages complètes (vs composants isolés) restent hors périmètre jsdom, faute de mocks d'API systématiques — extension possible avec le pattern déjà utilisé pour `KpiAlertWidgetComponent`. Le test lecteur d'écran réel (NVDA/VoiceOver) et le contraste sur les pages privées restent des angles morts, documentés depuis le 2026-08-29, inchangés par ce ticket. Une bonne part des 106 critères RGAA (pertinence des intitulés hors contexte, cohérence de l'ordre de lecture) ne sera **jamais** couverte par de l'outillage seul — un audit manuel resterait nécessaire pour aller au-delà, non engagé ici par choix explicite de l'utilisateur.
+
+---
+
+## [2026-08-31] FIX — Nom de carte mentale perdu à la création + première sauvegarde non automatique
+
+**Contexte** — Signalement utilisateur (screenshots) : en créant une carte mentale, un nom saisi dans la modale (« test ») disparaît dès l'ouverture de l'éditeur (le champ « Nom de la carte » retombe sur « Nouvelle carte mentale ») ; il faut ensuite cliquer manuellement sur « Sauvegarder » pour que la carte soit réellement créée en base.
+
+**Cause** — Double responsabilité en conflit sur l'initialisation du store `mindmapBuilder` :
+1. `MindmapsPage.handleCreate` appelle `mindmapStore.new(resolvedName)` avec le nom saisi, **puis** bascule `view` vers `'editor'`, montant `MindmapsEditorView` → `MindMapBuilder`.
+2. `MindMapBuilder.vue` porte son propre `watch(() => props.mapPayload, ..., { immediate: true })` : comme la création d'une carte passe `mapPayload = null` (pas encore de carte à charger), la branche `else` de ce watcher appelait **inconditionnellement** `store.new('Nouvelle carte mentale')`, écrasant le nom déjà posé par `MindmapsPage` un instant plus tôt.
+3. Par ailleurs, `mindmapStore.new()` met `isDirty = false` sans appeler `touch()` : aucun des deux mécanismes de sauvegarde automatique déjà en place dans `MindmapsEditorView` (watcher sur `map.updatedAt`, ou le `performAutoSave` qu'il déclenche) ne se déclenchait tant que l'utilisateur n'avait pas lui-même modifié le canevas ou cliqué sur « Sauvegarder ».
+
+**Ce qui a été fait**
+- `MindMapBuilder.vue` : le watcher sur `mapPayload` ne réinitialise plus le store quand `mapPayload` est `null` — il ne fait que `store.load(payload)` quand un payload existe. Le composant appelant (`MindmapsEditorView`, seul consommateur du composant) est déjà responsable d'avoir initialisé le store (`mindmapStore.new(nom)` ou `mindmapStore.load(...)`) avant de le monter.
+- `MindmapsEditorView.vue` : `onMounted` appelle `mindmapStore.touch()` quand la carte n'a pas encore d'id (`!currentDiagramId.value`), c'est-à-dire uniquement au tout premier montage d'une carte fraîchement créée. Cela marque le store `isDirty`, ce qui déclenche le watcher existant sur `map.updatedAt` → `scheduleAutoSave()` (délai standard 1,5 s) → `performAutoSave()` (POST `diagrammes`), sans dupliquer la logique d'auto-save déjà en place.
+
+**Alternative écartée** : ajouter une réinitialisation défensive conditionnelle dans `MindMapBuilder.vue` (ex. ne réinitialiser que si `store.map.nodes` est vide) — écarté après vérification que l'état initial du store Pinia (`createBlankMindMap()` par défaut) contient toujours au moins le nœud sujet, rendant cette condition toujours fausse et donc inutile ; `MindMapBuilder.vue` n'a qu'un seul point d'usage (`MindmapsEditorView.vue`), qui initialise systématiquement le store avant montage — pas de scénario réel où le filet de sécurité aurait servi.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/components/mindmap/MindMapBuilder.vue`
+- `my_memo_master_front/src/components/mindmap/MindmapsEditorView.vue`
+
+**Vérifié** : `npx vitest run` → 701/701, 0 régression (dont les 13 tests `MindmapsEditorView.test.js`, 13 `MindmapsListView.test.js`, 27 `mindmapBuilder.store.test.js`, déjà stubbés/mockés et donc pas affectés par ce changement de comportement).
+
+**Dette signalée, non traitée ici** : aucun test Vitest dédié n'existe pour `MindMapBuilder.vue` lui-même (il est stubbé dans les tests de `MindmapsEditorView`) — un test qui monte le vrai composant avec `mapPayload=null` et vérifie que le titre du store n'est pas écrasé apporterait une garantie de non-régression directe sur ce bug précis, absente aujourd'hui.
+
+---
+
+## [2026-08-31] FIX — Suppression d'une carte mentale : toast "Suppression impossible." alors que la suppression a réussi
+
+**Contexte** — Signalement utilisateur (screenshot) : après confirmation de suppression d'une carte mentale, un toast d'avertissement « Suppression impossible. » s'affiche et la carte reste visible dans la liste (« 1 carte mentale trouvé ») — alors que la suppression a en réalité bien eu lieu côté serveur.
+
+**Cause** — `Diagramme.controller.delete` répond systématiquement `204 No Content` sur succès (pas de corps). Le helper front `api.del` (`helpers/api.js`) retourne explicitement `undefined` quand le serveur répond 204 (comportement documenté dans son JSDoc, déjà pris en compte dans `stores/diagrammes.js`). Or `MindmapsListView.confirmDelete` (introduit lors du refacto M-02.12, sans passer par ce store) testait `response && [200, 204].includes(response.status)` — condition **toujours fausse** pour un `response` valant `undefined`, donc systématiquement traitée comme un échec malgré une suppression réelle en base.
+
+**Ce qui a été fait**
+- `MindmapsListView.vue` — `confirmDelete` : condition de succès élargie à `response === undefined || [200, 204].includes(response.status)`, alignée sur le contrat réel de `api.del` (déjà appliqué dans `stores/diagrammes.js`).
+- `test/components/MindmapsListView.test.js` — 1 test ajouté : suppression avec `mockDel` résolvant `undefined` (reproduisant la vraie réponse 204) → toast succès, carte retirée de la liste, pas de toast d'avertissement. Le test existant (mock `{ status: 204 }`, non représentatif de la réalité mais couvrant une éventuelle évolution du contrôleur vers un corps de réponse) reste inchangé et passe toujours grâce au `||`.
+
+**Alternative écartée** : modifier `api.del` pour qu'il retourne toujours un objet `{ status }` même sur 204 — écarté : contrat partagé par `get`/`post`/`put`/`patch`/`del`, déjà consommé correctement ailleurs (`stores/diagrammes.js`) ; le corriger uniquement pour `del` aurait introduit une incohérence entre méthodes HTTP sans résoudre la cause réelle (un appelant qui suppose à tort qu'une réponse vide est un échec).
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/components/mindmap/MindmapsListView.vue`
+- `my_memo_master_front/test/components/MindmapsListView.test.js`
+
+**Vérifié** : `npx vitest run test/components/MindmapsListView.test.js` → 14/14 (13 existants + 1 nouveau) ; `npx vitest run` complet → 702/702, 0 régression.
+
+**Dette signalée, non traitée ici** : le même risque de désaccord entre le contrat `api.del` (retour `undefined` sur 204) et un appelant qui suppose un objet `response` défini pourrait exister ailleurs dans le front sur d'autres entités dont le controller retourne 204 (`Test`, `Role` — voir note ligne 1977) ; aucun audit systématique des autres appelants de `api.del` n'a été fait à cette occasion, seul le cas signalé (mind maps) a été corrigé.

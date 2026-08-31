@@ -105,7 +105,10 @@ const confirmDelete = async (diagram) => {
   if (!confirm(`Supprimer la carte "${diagram.mmName}" ? Cette action est irréversible.`)) return
   try {
     const response = await api.del(`diagrammes/${diagram.idMindMap}`)
-    if (response && [200, 204].includes(response.status)) {
+    // CHOIX: `api.del` retourne `undefined` quand le serveur répond 204 (no content) —
+    // Diagramme.controller.delete ne renvoie jamais de corps sur succès (voir stores/diagrammes.js).
+    // RAISON: sans ce cas, une suppression réussie était traitée comme un échec.
+    if (response === undefined || [200, 204].includes(response.status)) {
       toast.success('Carte supprimée.')
       diagrams.value = diagrams.value.filter((d) => d.idMindMap !== diagram.idMindMap)
     } else {

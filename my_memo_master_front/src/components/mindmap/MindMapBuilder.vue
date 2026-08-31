@@ -50,13 +50,15 @@ const emit = defineEmits(['save', 'export', 'new-map']);
 
 const store = useMindMapBuilderStore();
 
+// CHOIX: ne réinitialiser le store que si un payload est fourni
+// RAISON: à la création d'une carte, MindmapsPage a déjà initialisé le store
+// (mindmapStore.new(nom)) avant de monter ce composant avec mapPayload=null ;
+// réinitialiser ici écrasait systématiquement le nom saisi par l'utilisateur.
 watch(
   () => props.mapPayload,
   (payload) => {
     if (payload) {
       store.load(payload);
-    } else {
-      store.new('Nouvelle carte mentale');
     }
   },
   { immediate: true }

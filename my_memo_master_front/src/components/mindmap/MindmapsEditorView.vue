@@ -208,7 +208,17 @@ const handleBeforeUnload = (event) => {
   if (mindmapStore.isDirty) { event.preventDefault(); event.returnValue = '' }
 }
 
-onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
+onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  // CHOIX: déclencher la sauvegarde automatique dès l'ouverture d'une carte
+  // fraîchement créée (pas d'id existant), plutôt que d'attendre une
+  // première modification ou un clic manuel sur "Sauvegarder".
+  // RAISON: le nom saisi dans la modale de création doit être persisté
+  // immédiatement, sans action supplémentaire de l'utilisateur.
+  if (!currentDiagramId.value) {
+    mindmapStore.touch()
+  }
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
