@@ -167,7 +167,7 @@ onMounted(fetchDiagrams)
           <form @submit.prevent="confirmCreate">
             <div class="mb-4">
               <label class="form-label">Nom</label>
-              <input aria-label="Nom de la carte mentale" v-model="createName" type="text" class="form-input" required autofocus />
+              <input aria-label="Nom de la carte mentale" v-model="createName" type="text" class="form-input" maxlength="50" required autofocus />
             </div>
             <div class="mb-4">
               <label class="form-label">Matière</label>
@@ -191,7 +191,7 @@ onMounted(fetchDiagrams)
           <form @submit.prevent="confirmRename">
             <div class="mb-4">
               <label class="form-label">Nom</label>
-              <input aria-label="Nouveau nom de la carte mentale" v-model="editedName" type="text" class="form-input" required autofocus />
+              <input aria-label="Nouveau nom de la carte mentale" v-model="editedName" type="text" class="form-input" maxlength="50" required autofocus />
             </div>
             <div class="mb-4">
               <label class="form-label">Matière</label>

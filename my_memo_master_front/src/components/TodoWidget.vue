@@ -30,6 +30,7 @@
             type="checkbox"
             class="todo-check"
             :checked="item.isDone"
+            :aria-label="item.isDone ? 'Marquer non terminé' : 'Marquer terminé'"
             @change="toggle(item)"
           />
           <span class="todo-check-box" />

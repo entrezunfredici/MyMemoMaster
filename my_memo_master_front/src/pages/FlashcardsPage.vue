@@ -87,6 +87,7 @@
                 type="text"
                 placeholder="Ex : Maths S1, Vocabulaire anglais..."
                 class="form-input"
+                maxlength="50"
                 required
               />
             </div>

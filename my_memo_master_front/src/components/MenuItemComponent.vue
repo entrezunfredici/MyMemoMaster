@@ -8,6 +8,7 @@
           v-if="onEdit"
           @click="onEdit"
           class="hover:bg-gray-100 text-gray-600 font-bold py-1 px-2 rounded transition duration-200 border border-gray-300 hover:scale-110"
+          aria-label="Modifier"
           title="Modifier"
         >
           ✎
@@ -16,6 +17,7 @@
           v-if="onDelete"
           @click="onDelete"
           class="hover:bg-red-50 text-gray-600 font-bold py-1 px-2 rounded transition duration-200 border border-gray-300 hover:scale-110"
+          aria-label="Supprimer"
           title="Supprimer"
         >
           ✕

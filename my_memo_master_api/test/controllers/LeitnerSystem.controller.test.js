@@ -181,6 +181,30 @@ describe('LeitnerSystem Controller', () => {
       expect(leitnerSystemService.create).not.toHaveBeenCalled()
     })
 
+    // FIX: régression — name > 50 caractères passait la validation (max: 100) puis
+    // échouait en base (LeitnerSystem.name est VARCHAR(50)), remontant en 500 générique.
+    it('400 — name trop long (> 50 caractères), le service n’est pas appelé', async () => {
+      const res = await request(app)
+        .post('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'A'.repeat(51) })
+
+      expect(res.status).toBe(400)
+      expect(leitnerSystemService.create).not.toHaveBeenCalled()
+    })
+
+    it('201 — name à la limite haute (50 caractères)', async () => {
+      const name = 'A'.repeat(50)
+      leitnerSystemService.create.mockResolvedValue({ ...mockSystem, name })
+
+      const res = await request(app)
+        .post('/api/v1/leitnersystems')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name })
+
+      expect(res.status).toBe(201)
+    })
+
     it('500 — le service échoue', async () => {
       leitnerSystemService.create.mockRejectedValue(new Error('DB error'))
 

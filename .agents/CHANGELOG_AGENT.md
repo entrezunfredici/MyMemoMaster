@@ -23,12 +23,12 @@
 | Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués ; [ADD] 2026-08-15 : révocation JWT (A07-M1, `helpers/tokenBlacklist.js`), `verifyRefreshToken` rejette un compte désactivé ; [FIX] 2026-08-27 : `APP_FRONT_URL` (lien de vérification email) n'était transmise à aucun conteneur API — ajoutée à docker-compose.yml (`api`, `api_server`) et au `.env` ; hors Docker les liens partaient vers `http://localhost` ; [FIX] 2026-08-28 : un mail envoyé **depuis la prod** contenait encore `http://localhost` — `helpers/frontUrl.js` (chaîne de repli `APP_FRONT_URL` → `VITE_FRONT_URL` → `CORS_ORIGIN`, log d'erreur en production, plus jamais de localhost silencieux) remplace les 4 `process.env.APP_FRONT_URL \|\| 'http://localhost'` dupliqués | 2026-08-28 |
 | User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
-| Subject / Unit | Stable — S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-06-25 |
+| Subject / Unit | Stable — [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-08-31 |
 | Test / Question / Response | Stable — M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-06-30 |
 | TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
-| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-07-08 |
+| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-08-31 |
 | LeitnerSystemsUsers | Stable | init |
 | Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API ; sortie MathML explicite pour lecteurs d'écran (2026-07-19) | 2026-07-19 |
 | Librairie de rendu formules (S-06.01) | Clôturé — benchmark MathJax/KaTeX formalisé dans DECISIONS (2026-07-19) : KaTeX seul retenu ; dépendance `mathjax` et helper mort `mathjax-config.js` supprimés, CONVENTIONS corrigé | 2026-07-19 |
@@ -44,7 +44,7 @@
 | Interpréteur V2 — équivalences algébriques | Livré — helpers/algebraicEquivalence.js (AST canonicalisé) complète normalizeSymbolic dans le court-circuit `exact` : commutativité, a/b ≡ a·b⁻¹, termes semblables, racines en exposant, équations symétriques ; pas un CAS (pas de distributivité) | 2026-07-19 |
 | Interpréteur V2 — commandes matrice (+C/+L) | Corrigé — l'API de commande MathLive s'est révélée peu fiable (corruption `\begin{split}` possible, y compris matrice seule) ; remplacée par addMatrixColumn/addMatrixRow (manipulation LaTeX déterministe, interpreter.js) ; portée : formule = uniquement une matrice/cas | 2026-07-19 |
 | Interpréteur V2 — palette (glyphes résolus) | Livré — les 2 boutons « T » et la flèche blanche de la planche formules retirés (erreurs de planche) ; section « Lettres fraktur » (\mathfrak{}, 52 lettres, vrais glyphes Unicode générés par point de code) ajoutée à l'onglet Caractères (4ᵉ groupe, scroll interne requis) | 2026-07-19 |
-| Diagramme (mind maps) | Stable — M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-06-23 |
+| Diagramme (mind maps) | Stable — [FIX] 2026-08-31 : validateur `mmName` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-08-31 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
@@ -54,7 +54,8 @@
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
 | Monitoring (Prometheus central) | Stable — Prometheus par environnement dans le chart Helm (`monitoring.enabled`), scrape par annotations pod, Deployment/emptyDir preprod vs StatefulSet/PVC prod, non exposé par l'Ingress ; port metrics restauré dans le chart (perdu à la migration Helm) | 2026-07-11 |
-| Accessibilité RGAA (front) | Stable — 4 niveaux d'outillage (statique, jsdom, **navigateur** depuis le 2026-08-29), 8 tests axe-core jsdom + 8 tests Playwright de contraste en CI, 3 non-conformités réelles trouvées et corrigées le 2026-08-29 (contraste bouton, 2 noms accessibles manquants), preuve docs/AUDIT_RGAA.md | 2026-08-29 |
+| Accessibilité RGAA (front) | Stable — 4 niveaux d'outillage (statique, jsdom, **navigateur** depuis le 2026-08-29), **20 tests axe-core jsdom** (8 au 2026-08-29 + 12 au 2026-08-30, sur 36 composants au total) + 8 tests Playwright de contraste en CI, 5 non-conformités réelles trouvées et corrigées au total (3 le 2026-08-29 : contraste bouton, 2 noms accessibles manquants ; 2 le 2026-08-30 : nom accessible non fiable `TodoWidget`, nom non pertinent `MenuItemComponent` — les deux **passaient axe-core**, trouvés par lecture du rendu, pas par l'outil), preuve `docs/AUDIT_RGAA.md` §2 ter | 2026-08-30 |
+| Audit RGAA 4.1.2 — les 106 critères | **EN COURS** (ouvert 2026-08-30, ~22 % posé — 23/106 verdicts) — `docs/AUDIT_RGAA_106.md`, grille extraite du PDF officiel (pas de mémoire ni de résumé web, jugé peu fiable après test). Échantillon de 15 pages proposé (à valider). Acquis solides : thématique 2 (Cadres) close en NA, thématique 4 (Multimédia) très majoritairement NA, 8.1/8.3/8.4/8.5/10.1/12.3/12.4 confirmés C/NA par recherche exhaustive. **2 non-conformités candidates trouvées** : 8.6 (titres de page en anglais/casse incohérente sur 5 routes dans une app francophone) et 12.7 (aucun lien d'évitement clavier trouvé dans tout `src/`) — à confirmer visuellement avant correctif. Effet de bord : `src/pages/AdminPage.vue` identifié comme code mort (non routé, non référencé) — hors RGAA, signalé à part | 2026-08-30 |
 | Sécurité dépendances (OWASP A06) | Stable — npm audit bloquant en CI (`--audit-level=high`), sqlite3 en devDeps ; [FIX] 2026-08-15 (x2) : `brace-expansion`/`fast-uri`/`ip-address`/`js-yaml` corrigés (non-breaking), puis `protobufjs`/`sharp`/`uuid` via `overrides` ciblés dans package.json (`@xenova/transformers` bloqué à 2.17.2, dernière version publiée, embarque des transitifs vulnérables) — `npm audit --omit=dev` : 0 vulnérabilité, vérifié aussi hors Jest avec le vrai modèle chargé | 2026-08-15 |
 | Redis (BullMQ + révocation JWT) | Stable — broker BullMQ (2026-06-12) ; [FIX] 2026-08-15 : persistance AOF activée en docker-compose (`--appendonly yes`, R2 du Bloc 4 — le chart Helm prod l'avait déjà) ; sert aussi de backend à `helpers/tokenBlacklist.js` (révocation JWT, réglages de résilience dédiés — voir DECISIONS) | 2026-08-15 |
 | CD — tagging de version (R1 du Bloc 4) | Livré — job `tag_release` dans cd.yml (staging/main) : tag git + images Docker Hub + Release GitHub en AAAA.MM.n, automatique à chaque merge, non bloquant pour le déploiement ; non vérifié en conditions réelles (pas de push déclenché depuis cette session) | 2026-08-15 |
@@ -137,7 +138,7 @@
 | Dossier B2 (B2_RENDU.md) | À jour — onboarding documenté (§3.3, §9.6), chiffres de tests réels (1 450 API + 617 front), liens annexes corrigés, annexes/dev resynchronisées ; restent 3 placeholders d'assets (Figma, screenshots) + 2 réfs biblio à compléter | 2026-07-17 |
 | Connecteur Odoo (`odoo-plugin/`, hors périmètre applicatif) | Opérationnel — plugin Hermes `odoo-plugin` rendu utilisable en autonome : CLI JSON `odoo_cli.py` + façade `connector.OdooConnector`, accès lus dans le `.env` (`URL`/`BDD`/`MAIL`/`PASSWORD`), droits fournis par `local_rights/rights_plugin_api.py` (le plugin frère `rights-plugin` est absent du dépôt) ; CRUD vérifié en réel sur `bleu-canard.odoo.com` ; dossier gitignoré ; première écriture de masse le 2026-08-27 (137 tâches repositionnées à l'étape « validé ») | 2026-08-27 |
 | Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
-| Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-28** après suppression du bloc `[IA]` doublon : avancement **87,8 % déclaré / 86,6 % démontrable** (216/246), enveloppe **109 200 €** dont **86 775 €** validés, **33 tâches** en retard (dont 20 sur `C-01`/`C-02`), RH **75 %** concordant avec le registre à 2 JH près ; §7.1 sur les mesures **requêtées en direct** sur l'instance SonarQube auto-hébergée (9 bugs, 11 vulnérabilités caractérisées une par une, 730 code smells, dette 4 743 min ≈ 2 964 €, notes A/D/D, quality gate OK mais vide de sens, couverture toujours 0 %) — **vulnérabilité CRITICAL confirmée réelle : secrets embarqués dans l'image API**, sur le registre remis à plat — `docs/COMPTE_RENDU_METRIQUES.md` : avancement **87 %** du périmètre engagé (241/277, étape et état alignés, 0 écart), enveloppe **124 050 €** dont **100 275 €** validés, **63 tâches** au-delà de leur échéance (dont 30 sur le bloc IA), 183 dépendances ouvertes (89/91 blocages hors périmètre engagé), RH **85 % de capacité ventilée sur 7 profils** (indicateur alimentable pour la première fois), couverture SonarQube toujours 0 %, RGAA 0. **27 tâches déclarées faites non confirmées par le dépôt** (§7.3) | 2026-08-28 |
+| Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-30** — le dernier écart déclaré/démontrable (1,2 point, porté par `QA.03`/`QA.05`/`QA.06`) est refermé : ces trois tâches sont désormais confirmées par le dépôt (E2E + k6 + rapport). Avancement **87,5 % déclaré = 87,5 % démontrable** (217/248, revérifié en direct sur Odoo), enveloppe **108 675 €** dont **86 250 €** validés, **30 tâches** en retard (dont 20 sur `C-01`/`C-02`), risques **183/91/78 inchangés** (revérifiés), RH total **362,3 JH** (0,3 JH d'écart avec le planning, contre 2 JH au 2026-08-28, répartition par profil non rejouée). Qualité : couverture SonarQube **63,9 %** (dernière analyse lue, du 2026-08-29 — action P0 close), reproduite en local ce jour à 81,4 % API / 58,9 % front ; **vulnérabilités Sonar réduites de 13 à 3** le 2026-08-30, dont la CRITICAL (secrets `.env` embarquables dans l'image API) **corrigée** ; RGAA passé de 5 à **6 critères outillés** (ajout du contraste réel RGAA 3.2, 8/8 pages), toujours 0 non-conformité, **+ audit manuel des 106 critères ouvert dans la même journée** (23/106 posés, 2 candidats NC — 8.6, 12.7 — ajoutés au §7.2.1 et au plan d'actions). Précédent arrêté (2026-08-28, après suppression du bloc `[IA]` doublon) : avancement 87,8 %/86,6 %, enveloppe 109 200 €/86 775 €, 33 tâches en retard, 11 vulnérabilités dont 1 CRITICAL non traitée, couverture 0 % | 2026-08-30 |
 | Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
@@ -7861,3 +7862,100 @@ Les noms de fichiers uploadés méritaient le correctif : une clé `<horodatage>
 **Vérifications** — API 1 554/1 554 ✅ · front 689/689 ✅ · les deux lints propres · `node --check` sur les fichiers modifiés. Le seul warning de lint porte sur un fichier **généré** (`coverage/lcov-report/`), pas sur le code.
 
 **Effet de bord assumé** — Le seeder E2E n'ayant plus de mot de passe par défaut, un `SEED_E2E_USERS=true` sans `E2E_*_PASSWORD` **fait échouer le démarrage**. C'est voulu : un compte au mot de passe connu créé silencieusement est pire qu'un démarrage qui refuse. Les variables sont documentées dans `.env.example`.
+
+
+---
+
+## [2026-08-30] DOC — Compte rendu de pilotage réédité : le dernier écart déclaré/démontrable est refermé
+
+**Contexte** — Demande utilisateur : mettre à jour `docs/COMPTE_RENDU_METRIQUES.md` (arrêté du 2026-08-28) après les trois chantiers clos depuis (publication de la couverture, recette QA confirmée, correctif de vulnérabilités). Les sept indicateurs ont été revérifiés, pas simplement recopiés depuis le CHANGELOG.
+
+**Ce qui a été mesuré en direct pour cet arrêté** (et non repris tel quel des entrées précédentes) :
+- **Odoo** : `odoo_cli.py read project.task --domain '[["project_id","=",15]]'` sur les 350 tâches, avec `stage_id`, `state`, `date_deadline`, `allocated_hours`, `depend_on_ids`. Périmètre engagé : 248 sous-tâches (72 en backlog non chiffré, contre 246/74 au 2026-08-28 — léger rééquilibrage, effet net négligeable sur le taux). Avancement 217/248 = 87,5 %. **Seul écart restant identifié** (`state` ≠ `1_done` alors que `stage_id` = « validé ») : exactement `QA.03`, `QA.05`, `QA.06` — confirmé par recoupement programmatique, pas par relecture manuelle. Retard : 30 tâches / 598 h, recalculé par la même requête (deadline dépassée + stage ≠ validé). Dépendances : 183 liens / 91 tâches bloquées / 78 verrous, top verrous identiques à l'arrêté précédent — **revérifié, chiffres inchangés**.
+- **Suites de tests, rejouées ce jour** : API `npx jest --coverage` → 1 554/1 554, 81,4 % (contre 81,41 % publié le 2026-08-29 — stable). Front `npx vitest run --coverage` → 689/689, 58,9 % (contre 58,91 % — stable). Audit RGAA statique `node scripts/audit-a11y.mjs` → 0/79 fichiers. Audit de contraste `npx playwright test -c playwright.config.js` → 8/8.
+- **CI du commit de vulnérabilités** (`914d37e`, 2026-08-30) : vérifiée via l'API GitHub publique (`GET /repos/.../commits/914d37e.../check-runs`, sans jeton — dépôt public), pas supposée. Les 13 checks sont `success`, dont `SonarQube Analysis (auto-hébergé)` (09:52:56Z → 09:54:17Z) et `Parcours E2E + charge (QA.03/QA.05/QA.06)` (09:52:56Z → 09:57:24Z).
+
+**Ce qui n'a délibérément pas été revérifié, et pourquoi** : la répartition RH par profil (§6) n'a pas été rejouée depuis le 2026-08-28 — aucune réassignation n'a eu lieu dans le planning d'équipe entre les deux dates, seul le total (recalculé depuis Odoo) est à jour. Les mesures SonarQube détaillées (bugs, dette, notes, décompte exact des vulnérabilités restantes) n'ont **pas** été relues en direct sur l'instance : `kubectl -n sonarqube port-forward svc/sonarqube 9000:9000` fonctionne (`/api/system/status` → `UP`), mais `/api/measures/component` et `/api/issues/search` répondent `401` sans `SONAR_TOKEN`, qui n'est pas disponible en local (secret GitHub uniquement). Le rapport le dit explicitely plutôt que de présenter les valeurs du 2026-08-29 comme si elles dataient d'aujourd'hui.
+
+**Fichiers modifiés**
+- `docs/COMPTE_RENDU_METRIQUES.md` — réédité intégralement (date d'arrêté, les 7 indicateurs, tableau de synthèse, plan d'actions).
+- `.agents/CHANGELOG_AGENT.md` — ligne État global mise à jour + présente entrée.
+
+**Dette non traitée par cette entrée** (déjà actionnable depuis le rapport, §8) : synchroniser le champ `state` Odoo de `QA.03`/`QA.05`/`QA.06`, vérifier manuellement les secrets `KUBECONFIG_PREPROD`/`KUBECONFIG_PROD`, statuer sur `docker:S6471` (utilisateur non-root) et sur le quality gate `new_coverage`.
+
+
+---
+
+## [2026-08-30] ADD — RGAA : extension de l'outillage axe-core à 20 composants (12 de plus), 2 non-conformités invisibles à l'outil corrigées
+
+**Contexte** — Demande utilisateur, suite à la lecture du §7.2 de `docs/COMPTE_RENDU_METRIQUES.md` : « s'occuper des 106 critères ». Clarifié avant tout code (question posée à l'utilisateur) : un audit manuel complet des 106 critères RGAA est un chantier séparé, distinct d'une extension de l'outillage automatisable — l'utilisateur a choisi la seconde option.
+
+**Ce qui a été fait**
+- 36 composants de `src/components/` passés en revue un par un pour repérer ceux qui portent un élément interactif propre (formulaire, bouton icône, `role="button"`). 16 écartés (purement présentationnels, aucun élément à évaluer qui ne le soit déjà via leurs parents) ; les 20 restants (8 déjà couverts + 12 nouveaux) sont désormais sous `test/a11y/axe.test.js` : `TodoWidget`, `MenuItemComponent`, `ItemListLayout`, `GuidedTourBannerComponent`, `MindMapNodePickerComponent`, `NotificationBellComponent`, `SubjectFilterComponent`, `SubjectSelectorComponent`, `ReminderWidget`, `FormulaHelperComponent`, `StudentDetailComponent`, `KpiAlertWidgetComponent`.
+- Mock `vue-router` ajouté en tête de fichier (pattern repris de `test/components/ExerciseDetailPage.test.js`) pour les deux composants qui lisent `useRoute`/`useRouter`.
+- **2 non-conformités réelles trouvées en lisant le rendu, invisibles à axe-core** : `TodoWidget.vue` (case à cocher de séance — nom accessible porté uniquement par le `title` du `<label>` ambiant, pas par l'`input` ; axe/`dom-accessibility-api` retombe sur ce `title` et ne signale rien, mais la restitution par un lecteur d'écran réel n'est pas garantie dans cette configuration) et `MenuItemComponent.vue` (boutons éditer/supprimer nommés par les seuls glyphes Unicode `✎`/`✕` — un nom accessible techniquement non vide, mais pas pertinent). Corrigés par `aria-label` explicite, en cohérence avec le correctif déjà appliqué au même anti-patron sur `ToggleButton.vue` le 2026-08-29.
+
+**Fichiers modifiés**
+- `my_memo_master_front/test/a11y/axe.test.js` — 12 nouveaux tests + mock `vue-router`.
+- `my_memo_master_front/src/components/TodoWidget.vue` — `aria-label` dynamique sur la case à cocher.
+- `my_memo_master_front/src/components/MenuItemComponent.vue` — `aria-label` sur les boutons éditer/supprimer.
+- `docs/AUDIT_RGAA.md` — section 2 ter (méthode, périmètre écarté justifié, les 2 cas trouvés).
+- `docs/COMPTE_RENDU_METRIQUES.md` — §1 et §7.2 mis à jour.
+
+**Vérifié** : `npx vitest run` → 701/701 (12 nouveaux + 689 existants, 0 régression) ; `npm run lint` → 0 erreur ; `node scripts/audit-a11y.mjs` → 0/79 fichiers, inchangé.
+
+---
+
+## [2026-08-31] FIX — 500 à la création d'un système de Leitner (nom > 50 caractères)
+
+**Contexte** — Signalement utilisateur : erreur 500 sur `POST /leitnersystems` en prod, pendant l'étape 2/4 du parcours guidé (« Créez le système de Leitner lié »).
+
+**Cause** — Désaccord entre le validateur et la colonne DB sur `LeitnerSystem.name` : `LeitnerSystem.validators.js` acceptait jusqu'à 100 caractères (`isLength({ max: 100 })`) alors que la colonne est `VARCHAR(50)` (`LeitnerSystem.model.js` + migration `20260226151700-create-leitnersystem-table.js`). Un nom de 51 à 100 caractères passait la validation express-validator (pas de 400), puis l'`INSERT` échouait côté PostgreSQL (`value too long for type character varying(50)`), remontant en 500 générique via le `catch` du service/controller. Aucun `maxlength` côté front n'empêchait la saisie.
+
+**Décision** (question posée à l'utilisateur, deux options : resserrer le validateur/front sur 50, ou migrer la colonne à 100) : l'utilisateur a choisi de resserrer sur 50 — pas de migration à déployer en prod, correctif immédiat sans risque sur les données existantes. Voir `DECISIONS.md`.
+
+**Ce qui a été fait**
+- `LeitnerSystem.validators.js` : `nameRules` passé à `isLength({ min: 2, max: 50 })`, message d'erreur mis à jour, commentaire `CHOIX/RAISON` + `TODO`.
+- `LeitnerSystem.routes.js` : commentaire signalant l'alignement sur la doc du `POST /`.
+- `FlashcardsPage.vue` : `maxlength="50"` ajouté au champ « Nom du système » (empêche la saisie au-delà, cohérent avec la limite serveur).
+- `test/controllers/LeitnerSystem.controller.test.js` : 2 tests ajoutés (400 pour 51 caractères, 201 pour 50 caractères pile).
+
+**Dette signalée, non traitée ici (hors périmètre du ticket)** : même désaccord validateur/colonne trouvé sur `Subject.validators.js` (max: 100 vs `Subject.model.js` STRING(50)) et `Diagramme.validators.js` (max: 200 vs STRING(50)) — même classe de bug latent, à traiter dans un ticket séparé si confirmé en prod.
+
+**Fichiers modifiés**
+- `my_memo_master_api/validators/LeitnerSystem.validators.js`
+- `my_memo_master_api/routes/LeitnerSystem.routes.js`
+- `my_memo_master_api/test/controllers/LeitnerSystem.controller.test.js`
+- `my_memo_master_front/src/pages/FlashcardsPage.vue`
+
+**Vérifié** : `npx jest test/controllers/LeitnerSystem.controller.test.js` → 22/22 (dont les 2 nouveaux) ; `npx eslint` sur les 4 fichiers modifiés → 0 erreur.
+
+---
+
+## [2026-08-31] FIX — même désaccord validateur/colonne corrigé sur Subject et Diagramme (dette signalée dans l'entrée précédente)
+
+**Contexte** — Suite de l'entrée précédente : demande utilisateur de corriger la dette signalée (mêmes symptômes de 500 en création, latents jusque-là faute de nom assez long testé en prod).
+
+**Cause** — Même classe de bug que sur `LeitnerSystem.name` : `Subject.validators.js` acceptait `name` jusqu'à 100 caractères (colonne `Subject.name` = `VARCHAR(50)`, migration `20260226151200-create-subject-table.js`) ; `Diagramme.validators.js` acceptait `mmName` jusqu'à 200 caractères (colonne `MindMap.mmName` = `VARCHAR(50)`, migration `20260226151800-create-mindmap-table.js`). Aucun `maxlength` front sur les 4 champs de saisie concernés (création de sujet inline, création/renommage de carte mentale x2).
+
+**Ce qui a été fait**
+- `Subject.validators.js` : `nameRules` → `isLength({ min: 2, max: 50 })`, message mis à jour, commentaire `CHOIX/RAISON`.
+- `Diagramme.validators.js` : `mmNameRules` → `isLength({ min: 1, max: 50 })`, message mis à jour, commentaire `CHOIX/RAISON`.
+- Front — `maxlength="50"` ajouté sur : `SubjectSelectorComponent.vue` (création inline de sujet), `MindmapsListView.vue` (création + renommage de carte mentale), `MindmapsEditorView.vue` (renommage à l'export).
+- `test/controllers/Subject.controller.test.js` et `test/controllers/Diagramme.controller.test.js` : 2 tests ajoutés chacun (400 pour 51 caractères, 201 pour 50 pile), même pattern que `LeitnerSystem.controller.test.js`.
+- `AdminPage.vue` (champs `createForm.name`/`editForm.name`) **non touché** : composant confirmé mort (aucune route, aucun import — voir entrée RGAA 2026-08-30), donc hors du périmètre réel de la dette.
+
+**Fichiers modifiés**
+- `my_memo_master_api/validators/Subject.validators.js`
+- `my_memo_master_api/validators/Diagramme.validators.js`
+- `my_memo_master_api/test/controllers/Subject.controller.test.js`
+- `my_memo_master_api/test/controllers/Diagramme.controller.test.js`
+- `my_memo_master_front/src/components/SubjectSelectorComponent.vue`
+- `my_memo_master_front/src/components/mindmap/MindmapsListView.vue`
+- `my_memo_master_front/src/components/mindmap/MindmapsEditorView.vue`
+
+**Vérifié** : `npx jest test/controllers/Subject.controller.test.js test/controllers/Diagramme.controller.test.js` → 51/51 ; `npx vitest run` sur les composants touchés + `test/a11y/axe.test.js` → 71/71 ; `npx eslint` sur les 7 fichiers modifiés → 0 erreur.
+
+**Dette restante** : aucune autre paire validateur/colonne `STRING(50)` en désaccord détectée sur le reste du périmètre lu (`Tag.validators.js` était déjà cohérent à 50/50). Un audit systématique de tous les validateurs vs. tous les modèles n'a pas été fait — seuls les 3 cas déjà identifiés ont été traités.
+
+**Dette assumée, explicite plutôt que laissée implicite** : les pages complètes (vs composants isolés) restent hors périmètre jsdom, faute de mocks d'API systématiques — extension possible avec le pattern déjà utilisé pour `KpiAlertWidgetComponent`. Le test lecteur d'écran réel (NVDA/VoiceOver) et le contraste sur les pages privées restent des angles morts, documentés depuis le 2026-08-29, inchangés par ce ticket. Une bonne part des 106 critères RGAA (pertinence des intitulés hors contexte, cohérence de l'ordre de lecture) ne sera **jamais** couverte par de l'outillage seul — un audit manuel resterait nécessaire pour aller au-delà, non engagé ici par choix explicite de l'utilisateur.

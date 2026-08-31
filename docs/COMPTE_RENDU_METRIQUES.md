@@ -1,14 +1,16 @@
 # Compte rendu de pilotage — MyMemoMaster
 
-**Date d'arrêté des mesures** : 2026-08-28
-**Périmètre** : projet Odoo `MyMemoMasterRNCP` (id 15, 350 tâches) + planning d'équipe `17_planning_MyMemoMaster.xlsx` + dépôt Git + **instance SonarQube auto-hébergée** (cluster `pck-dkoyol2`, analyse du 2026-08-28) + suites de tests locales.
+**Date d'arrêté des mesures** : 2026-08-30
+**Périmètre** : projet Odoo `MyMemoMasterRNCP` (id 15, 350 tâches) + planning d'équipe `17_planning_MyMemoMaster.xlsx` + dépôt Git + **instance SonarQube auto-hébergée** (cluster `pck-dkoyol2`) + suites de tests locales, rejouées à cet arrêté.
 **Taux journalier retenu** : 300 €/JH. **Conversion** : 1 JH = 8 h.
 **Calendrier de référence** : plan condensé — 3 jours travaillés (mardi, mercredi, jeudi) toutes les 3 semaines, du **07/10/2025** au **18/06/2026** (13 cycles, 39 JH par personne), puis reprise par le seul chef de projet à taux plein jusqu'au **21/07/2026**.
 **Durées** : estimation « développeur junior », établie tâche par tâche sur les 192 lignes du planning d'équipe. **C'est un jugement argumenté, pas une mesure** — voir la réserve du §3.
 
-> **Ce qui a changé depuis l'arrêté du 2026-08-27.** Le registre Odoo a été remis à plat : gabarit à 70 h/tâche remplacé par les durées du planning d'équipe, dates reposées sur le calendrier condensé, 5 blocs transverses créés (marketing, design, recette, pilotage, documentation), Synthèses alignées sur leurs enfants, étapes Kanban validées sur preuve. **Les sept indicateurs sont recalculés sur cette base.** Les valeurs de l'arrêté précédent (330 712 €, 1 137 JH, 281 % de surcharge) reposaient sur un chiffrage de gabarit et ne sont plus comparables.
+> **Ce qui a changé depuis l'arrêté du 2026-08-28.** Le registre Odoo a été remis à plat : gabarit à 70 h/tâche remplacé par les durées du planning d'équipe, dates reposées sur le calendrier condensé, 5 blocs transverses créés (marketing, design, recette, pilotage, documentation), Synthèses alignées sur leurs enfants, étapes Kanban validées sur preuve. **Les sept indicateurs sont recalculés sur cette base.** Les valeurs de l'arrêté précédent (330 712 €, 1 137 JH, 281 % de surcharge) reposaient sur un chiffrage de gabarit et ne sont plus comparables.
 >
 > **Correction du bloc `IA` (2026-08-28, tard).** Un bloc `[IA] Service IA` de 30 sous-tâches avait été créé depuis la feature `IA` du planning d'équipe. **C'était un doublon** : ces lignes décrivent le même travail que les blocs `C-01` et `C-02` déjà présents dans le registre — plusieurs sous-tâches y étaient littéralement identiques (« Gestion quotas et budget IA », « Pipeline traitement PDF/chunking/LLM »). Le bloc a été supprimé. **C'est la correction la plus structurante de cet arrêté** : elle retire 49 JH comptés deux fois et fait tomber l'écart entre avancement déclaré et avancement démontrable de 9,7 points à 1,2 point.
+>
+> **Trois chantiers clôturés depuis (2026-08-29 → 2026-08-30).** (1) **La couverture de tests est désormais publiée et mesurée par SonarQube** — 63,9 % le 2026-08-29, contre 0 % depuis l'origine du rapport ; l'action P0 correspondante est close. (2) **Les trois tâches `QA.03` / `QA.05` / `QA.06`, jusqu'ici déclarées sans aucune preuve dans le dépôt, sont désormais confirmées** : parcours E2E Playwright (5/5), test de charge k6 (3 258 requêtes, 0 échec) et rapport `docs/RAPPORT_TESTS_QA.md`, rejoués à chaque push CI sur `main`/`staging` — **le dernier écart entre avancement déclaré et démontrable (1,2 point) tombe à 0**. (3) **10 des 13 vulnérabilités SonarQube ont été corrigées le 2026-08-30**, dont la plus sérieuse : `my_memo_master_api/.env` (portant `AUTH_JWT_SECRET` et `SMTP_PASS`) n'était pas exclu de `.dockerignore` et pouvait s'embarquer dans une image construite en local puis poussée sur le dépôt Docker Hub public — corrigé. Les 3 vulnérabilités restantes sont documentées et argumentées une par une (§7.1.1). En prime, **un audit de contraste RGAA 3.2** a été ajouté le 2026-08-29 (8 pages publiques, Playwright + axe-core) : 1 non-conformité réelle trouvée et corrigée, 0 aujourd'hui.
 
 ---
 
@@ -16,93 +18,95 @@
 
 | Dimension | Indicateur | Unité | Valeur mesurée | Fiabilité |
 |---|---|---|---|---|
-| Avancement | Tâches validées / total | % | **87,8 %** à l'étape « validé » sur le périmètre engagé (216/246) — dont **86,6 %** confirmés sur preuve (213/246) ; 67,8 % rapporté aux 320 sous-tâches | ✅ 3 validations seulement reposent sur la déclaration |
-| Coûts | JH consommés × 300 €/j | € | **86 775 €** validés (289,2 JH) ; enveloppe planifiée **109 200 €** (364,0 JH) ; reste à faire **22 425 €** | ⚠️ Charge planifiée, aucune saisie de temps possible |
-| Délais | Dates réelles vs Gantt prévisionnel | jours d'écart | **33 tâches** au-delà de leur échéance (666 h, 83,2 JH), dont 20 sur `C-01`/`C-02` ; plan clos au 21/07/2026 | ⚠️ Le plan est condensé — voir §4 |
-| Risques | Dépendances bloquantes non levées | nb | **183 liens** ouverts, **78 verrous** distincts, **91 tâches** immobilisées — plus **6 dépendances d'infrastructure** | ✅ Mesure directe |
-| RH | Charge par profil / capacité disponible | JH | **362 JH pour 483 JH de capacité = 75 %**, réparti sur **7 profils** ; pointe à 113 % (SysAdmin) | ✅ Alimentable pour la première fois |
-| Qualité | Couverture de tests SonarQube | % | **0,0 %** — analyse opérationnelle et mesurée en direct sur l'instance auto-hébergée, mais aucun rapport `lcov` publié ; couverture réelle **86,6 %** mesurée localement sur l'API | ❌ Indicateur non alimenté (la chaîne, elle, fonctionne) |
-| Qualité | Non-conformités RGAA | nb | **0** sur les 5 critères outillés (79 fichiers `.vue`) | ⚠️ Périmètre outillé, pas les 106 critères |
+| Avancement | Tâches validées / total | % | **87,5 %** à l'étape « validé » sur le périmètre engagé (217/248) — **désormais intégralement confirmé sur preuve, aucun écart** ; 67,8 % rapporté aux 320 sous-tâches | ✅ Les trois dernières validations sans preuve sont désormais soutenues par le dépôt |
+| Coûts | JH consommés × 300 €/j | € | **86 250 €** validés (287,5 JH) ; enveloppe planifiée **108 675 €** (362,3 JH) ; reste à faire **22 425 €** | ⚠️ Charge planifiée, aucune saisie de temps possible |
+| Délais | Dates réelles vs Gantt prévisionnel | jours d'écart | **30 tâches** au-delà de leur échéance (598 h, 74,8 JH), dont 20 sur `C-01`/`C-02` ; plan clos au 21/07/2026 | ⚠️ Le plan est condensé — voir §4 |
+| Risques | Dépendances bloquantes non levées | nb | **183 liens** ouverts, **78 verrous** distincts, **91 tâches** immobilisées — plus **6 dépendances d'infrastructure** | ✅ Mesure directe, revérifiée à cet arrêté |
+| RH | Charge par profil / capacité disponible | JH | **362 JH pour 483 JH de capacité ≈ 75 %**, réparti sur **7 profils** ; pointe à 113 % (SysAdmin) | ⚠️ Total revérifié, répartition par profil non rejouée depuis le 2026-08-28 |
+| Qualité | Couverture de tests SonarQube | % | **63,9 %** mesurée par l'instance auto-hébergée (analyse du 2026-08-29) ; reproduite en local ce jour à **81,4 % API / 58,9 % front** | ✅ La chaîne publie désormais réellement — quality gate en `ERROR` sur `new_coverage` (§7.1) |
+| Qualité | Non-conformités RGAA | nb | **0** sur les 6 critères outillés (79 fichiers `.vue`, 20/36 composants sous axe-core, 8 pages en contraste réel) ; **audit manuel des 106 critères ouvert** — 23/106 verdicts posés, 2 non-conformités candidates trouvées (8.6, 12.7), à confirmer | ⚠️ Périmètre outillé élargi deux fois ce jour ; l'audit des 106 critères est **en cours** (22 %), pas conclu — voir §7.2 |
 
-**Ce que ce tableau ne dit pas et qu'il faut dire avec lui** : 3 tâches portent l'étape « validé » sur la seule foi du planning d'équipe et ne sont **pas confirmées par le dépôt** (§7.3) — les tests E2E Playwright et le rapport de tests qui les cite. **Elles sont incluses dans les 87,8 %** ; les en retirer donne **86,6 %**. L'écart entre déclaré et démontrable est désormais de 1,2 point, contre 9,7 avant la suppression du bloc `IA` doublon.
+**Ce que ce tableau ne dit plus, et qu'il faut dire pour mémoire** : à l'arrêté du 2026-08-28, 3 tâches portaient l'étape « validé » sans preuve dans le dépôt, ce qui écartait avancement déclaré (87,8 %) et démontrable (86,6 %) de 1,2 point. **Ces trois tâches sont désormais couvertes par des tests rejouables en CI** (§7.3) : l'écart est refermé, et le léger recul de 87,8 % à 87,5 % vient uniquement d'une variation du périmètre engagé (+2 tâches) entre les deux arrêtés, pas d'un recul de qualité.
 
 ---
 
-## 2. Avancement — 87,8 % déclaré, 86,6 % démontrable
+## 2. Avancement — 87,5 % déclaré, désormais 87,5 % démontrable
 
 | Lecture | Numérateur / dénominateur | % |
 |---|---|---|
-| **Périmètre engagé**, étape « validé » | **216 / 246** | **87,8 %** |
-| **Idem, en ne retenant que le confirmé sur preuve** | **213 / 246** | **86,6 %** |
+| **Périmètre engagé**, étape « validé » | **217 / 248** | **87,5 %** |
+| **Idem, en ne retenant que le confirmé sur preuve** | **217 / 248** | **87,5 %** — plus d'écart |
 | Toutes sous-tâches élémentaires | 217 / 320 | 67,8 % |
-| Backlog non chiffré (`C-03`→`C-06`, `S-07`, `W-*`) | 0 / 74 | 0 % |
+| Backlog non chiffré (`C-03`→`C-06`, `S-07`, `W-*`) | 0 / 72 | 0 % |
 
-**Les deux lectures ont convergé.** À l'étape précédente de cet arrêté, elles s'écartaient de 9,7 points (87,0 % contre 77,3 %) parce que 24 sous-tâches du bloc `[IA]` portaient l'étape « validé » sur la seule foi du planning. **Ce bloc était un doublon de `C-01`/`C-02` et a été supprimé** : l'écart tombe à **1,2 point**, porté par 3 tâches seulement (§7.3). C'est la différence entre un registre qui reflète le réel et un registre qui reprend une déclaration.
+**L'écart déclaré/démontrable est refermé.** À l'arrêté précédent, il restait à 1,2 point (87,8 % contre 86,6 %), porté par 3 tâches — `QA.03`, `QA.05`, `QA.06` — qui portaient l'étape « validé » sans rien dans le dépôt pour le soutenir. **Elles sont désormais rejouées à chaque push CI** : parcours E2E Playwright (`my_memo_master_front/e2e/journeys.spec.js`, 5/5), test de charge k6 (`load-tests/api-load.js`, 3 258 requêtes, 0 échec) et `docs/RAPPORT_TESTS_QA.md` — confirmé par le job `Parcours E2E + charge (QA.03/QA.05/QA.06)`, vert sur le commit de cet arrêté (`914d37e`, 2026-08-30T09:52:56Z → 09:57:24Z, vérifié via l'API GitHub). C'est la différence entre un registre qui reflète le réel et un registre qui reprend une déclaration — la même différence qui avait motivé la suppression du doublon `IA` à l'arrêté précédent.
 
-**Le dénominateur à retenir est 246, pas 320.** Les 74 sous-tâches restantes appartiennent aux blocs `C-03` (partage de ressources), `C-04` (chat de groupe), `C-05` (autocomplétions IA), `C-06` (gamification), `S-07` (modération) et `W-01`→`W-04` (chatbot, résultats scolaires, centre d'aide, tutorat). Elles ne portent **ni charge ni date** parce que le planning d'équipe ne les contient pas : c'est un backlog d'évolutions, pas un reste-à-faire engagé.
+**Le périmètre engagé a légèrement bougé** : 248 sous-tâches contre 246 précédemment (et 72 dans le backlog non chiffré contre 74). Deux sous-tâches ont changé de colonne entre les deux arrêtés ; l'effet net sur le taux d'avancement (87,8 % → 87,5 %) est de l'ordre du bruit, pas d'un recul.
 
-**L'alignement des champs est réel mais asymétrique.** **Aucune tâche n'est à l'état « Terminé » sans porter l'étape « validé »** — c'est ce qui rendait l'indicateur illisible aux arrêtés précédents (5,7 % contre 92,3 % selon le champ lu) et c'est résorbé. En revanche, **3 tâches portent l'étape « validé » sans être à l'état « Terminé »** : les 3 non confirmées, laissées dans cet état intermédiaire pour rester repérables dans l'outil jusqu'à l'arbitrage.
+**Le dénominateur à retenir reste 248, pas 320.** Les 72 sous-tâches du backlog appartiennent toujours aux blocs `C-03` (partage de ressources, 8), `C-04` (chat de groupe, 10), `C-05` (autocomplétions IA, 6), `C-06` (gamification, 8), `S-07` (modération, 7) et `W-01`→`W-04` (chatbot, résultats scolaires, centre d'aide, tutorat, 33). Elles ne portent **ni charge ni date** parce que le planning d'équipe ne les contient pas : c'est un backlog d'évolutions, pas un reste-à-faire engagé.
 
-**Les 213 confirmées l'ont été sur preuve dans le dépôt** — Dockerfiles, workflows CI/CD, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, tags git, entrées datées du journal de livraison — et non sur le statut déclaré dans le planning.
+**L'alignement des champs reste réel mais asymétrique dans Odoo — un point d'hygiène à traiter.** Le champ `state` des tâches `QA.03`, `QA.05` et `QA.06` est toujours à `01_in_progress` dans Odoo, alors que leur étape (`stage_id`) est à « validé » **et** que le dépôt les confirme désormais. Le registre n'a pas été mis à jour pour refléter la clôture réelle — voir l'action correspondante en §8.
 
-**Reste à faire sur le périmètre engagé** : 30 sous-tâches, 598 h (74,8 JH). Elles se concentrent sur trois ensembles — les **20 sous-tâches de `C-01`/`C-02`** (génération de contenu par IA, non construite), les 6 tâches de clôture documentaire, et `M-00b.11` (test de restauration).
+**Les 217 confirmées l'ont été sur preuve dans le dépôt** — Dockerfiles, workflows CI/CD, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, `docs/RAPPORT_TESTS_QA.md`, tags git, entrées datées du journal de livraison — et non sur le statut déclaré dans le planning.
+
+**Reste à faire sur le périmètre engagé** : 31 sous-tâches (248 − 217), dont **30 sont en retard sur le plan** (§4). Elles se concentrent sur trois ensembles — les **20 sous-tâches de `C-01`/`C-02`** (génération de contenu par IA, non construite), les 6 tâches de clôture documentaire, et `M-00b.11` (test de restauration).
 
 ---
 
-## 3. Coûts — 86 775 € validés sur une enveloppe de 109 200 €
+## 3. Coûts — 86 250 € validés sur une enveloppe de 108 675 €
 
 | Base | Heures | JH | Coût à 300 €/JH |
 |---|---|---|---|
-| Charge planifiée (sous-tâches élémentaires) | 2 912 h | 364,0 | **109 200 €** |
-| Dont à l'étape « validé » | 2 314 h | 289,2 | **86 775 €** |
+| Charge planifiée (sous-tâches élémentaires, périmètre engagé) | 2 898 h | 362,3 | **108 675 €** |
+| Dont à l'étape « validé » | 2 300 h | 287,5 | **86 250 €** |
 | Reste à faire | 598 h | 74,8 | **22 425 €** |
-| Backlog non chiffré (74 tâches) | — | — | **inconnu** |
+| Backlog non chiffré (72 tâches) | — | — | **inconnu** |
 
-**L'enveloppe a baissé de 14 850 € par rapport au calcul précédent de cet arrêté**, et ce n'est pas une correction d'estimation : c'est la suppression des **49 JH du bloc `IA`**, qui comptaient deux fois le travail déjà porté par `C-01`/`C-02`. Un double compte de 12 % de l'enveloppe.
+**L'enveloppe recule légèrement (−525 €) par rapport à l'arrêté précédent**, dans la continuité du même mouvement — un très léger rééquilibrage entre périmètre engagé et backlog (§2), sans changement de méthode.
 
-**Trois réserves, à énoncer avant tout usage de ces chiffres.**
+**Les trois réserves de l'arrêté précédent restent entières, sans changement.**
 
 1. **Ce sont des charges planifiées, pas du temps consommé — et il ne peut pas en être autrement.** Il n'y a jamais eu de saisie de temps sur ce projet, et l'instance Odoo ne le permettrait pas : **le module Feuilles de temps n'y est pas installé**. `project.task` n'expose aucun champ d'heures effectives, et aucun modèle de feuille de temps n'existe. L'indicateur n'est pas « non renseigné », il est **sans source possible**. « JH consommés » est approximé par la charge des tâches passées à « validé ».
 
-2. **Les durées sont une estimation, pas un relevé.** Elles proviennent d'une réestimation « profil junior » faite tâche par tâche sur les 192 lignes du planning d'équipe, qui déclarait 236,5 JH au total. Le rapport est de **×1,74**, avec un écart assumé selon la nature du travail : les tâches de pilotage, de bilan et d'archivage bougent peu (×1,0-1,5), le développement et l'infrastructure doublent (×1,8-2,2). Chaque valeur est défendable individuellement ; l'ensemble reste une hypothèse.
+2. **Les durées sont une estimation, pas un relevé.** Elles proviennent d'une réestimation « profil junior » faite tâche par tâche sur les 192 lignes du planning d'équipe, qui déclarait 236,5 JH au total. Le rapport reste de l'ordre de **×1,74**, avec un écart assumé selon la nature du travail : les tâches de pilotage, de bilan et d'archivage bougent peu (×1,0-1,5), le développement et l'infrastructure doublent (×1,8-2,2). Chaque valeur est défendable individuellement ; l'ensemble reste une hypothèse.
 
-3. **La répartition à l'intérieur d'un bloc est une convention.** Le planning d'équipe est au grain « une ligne par sprint et par personne » (192 lignes), le registre Odoo au grain « une sous-tâche par élément livrable » (320). La charge d'un bloc est donc divisée à parts égales entre ses sous-tâches, arrondie au quart de journée. Dans `S-04`, où une seule ligne de planning alimente 13 sous-tâches Odoo, chacune reçoit 2 h — chiffre faible mais fidèle à ce que le planning contient.
+3. **La répartition à l'intérieur d'un bloc est une convention.** Le planning d'équipe est au grain « une ligne par sprint et par personne » (192 lignes), le registre Odoo au grain « une sous-tâche par élément livrable » (320). La charge d'un bloc est donc divisée à parts égales entre ses sous-tâches, arrondie au quart de journée.
 
-**Ce qui a disparu par rapport à l'arrêté précédent** : le gabarit à 70 h par tâche, qui donnait le même prix à une documentation et à un moteur de correction sémantique, et l'anomalie de la tâche 1337 (645 h recopiés du total de son bloc, soit 21 563 € de surévaluation). La distribution des charges va désormais de 2 h à 40 h et suit la nature du travail.
+**Convergence avec le RH (§6)** : la charge totale engagée mesurée dans Odoo aujourd'hui (362,3 JH) et la charge nette déclarée par le planning d'équipe (362,0 JH, doublon `IA` retiré) ne s'écartent plus que de **0,3 JH** — contre 2 JH à l'arrêté précédent. Les deux sources continuent de converger à mesure que le registre se stabilise.
 
 ---
 
-## 4. Délais — 33 tâches au-delà de leur échéance
+## 4. Délais — 30 tâches au-delà de leur échéance
 
-**Plan de référence** : 07/10/2025 → 21/07/2026. **247 sous-tâches datées sur 320** ; les 74 non datées sont le backlog non chiffré du §2.
+**Plan de référence** : 07/10/2025 → 21/07/2026. **247 sous-tâches datées sur 320** ; les 72 non datées sont le backlog non chiffré du §2.
 
 | Mesure | Valeur |
 |---|---|
-| Sous-tâches dont l'échéance est dépassée et qui ne sont pas terminées | **33** |
-| Charge correspondante | 666 h (83,2 JH, **24 975 €**) |
-| Fin du plan | 21/07/2026 — dépassée de 39 jours à la date d'arrêté |
+| Sous-tâches dont l'échéance est dépassée et qui ne sont pas terminées | **30** |
+| Charge correspondante | 598 h (74,8 JH, **22 425 €**) |
+| Fin du plan | 21/07/2026 — dépassée de **40 jours** à la date d'arrêté |
 
-**Répartition des 33 retards :**
+**Répartition des 30 retards :**
 
 | Bloc | Nb | Nature |
 |---|---|---|
 | `C-01` / `C-02` | **20** | Génération de Leitner et d'exercices par IA — non construite |
 | `DOC` | 6 | Bilans et clôture documentaire |
-| `QA` | 4 | Recette finale, dont 3 non confirmées (§7.3) |
 | `M-00b` | 2 | Test de restauration, déploiement |
 | `PIL` | 1 | Clôture de projet |
+| `QA` | 1 | `QA.12` — corrections urgentes post-livraison (hotfix), non encore requise |
 
-**Le retard a été divisé par deux — sans qu'aucun travail ne soit livré.** Il passe de 63 à 33 tâches et de 132 à 83,2 JH parce que les 30 sous-tâches du bloc `[IA]`, doublon de `C-01`/`C-02`, ont été supprimées : le même retard était compté deux fois. **C'est une correction de mesure, pas un progrès d'exécution** — et c'est exactement pour cela qu'il faut la dire.
+**Le retard a encore reculé, cette fois pour la bonne raison.** Il passe de 33 à **30 tâches** (83,2 JH → 74,8 JH) parce que `QA.03`, `QA.05` et `QA.06` sont désormais confirmées (§2, §7.3) : ce ne sont plus des tâches en attente de preuve, ce sont des tâches terminées. **C'est, cette fois, un vrai progrès d'exécution** — à la différence de la correction du doublon `IA` à l'arrêté précédent, qui n'était qu'une correction de mesure.
 
-**Le retard restant est concentré et lisible** : **20 des 33 tâches sont la génération de contenu par IA** (`C-01`, `C-02`), qui n'est pas commencée. Le reste est de la clôture — bilans, documentation, recette finale, test de restauration.
+**Le retard restant est concentré et lisible** : **20 des 30 tâches sont la génération de contenu par IA** (`C-01`, `C-02`), qui n'est toujours pas commencée. Le reste est de la clôture — bilans, documentation, test de restauration — plus une tâche de hotfix qui n'a simplement pas encore eu lieu d'être déclenchée.
 
-**Comment lire cet indicateur — et comment ne pas le lire.** Le plan de référence est **volontairement condensé** : les deux années réelles du projet (premier commit le 2024-10-03) ont été ramenées à dix mois pour produire un Gantt lisible, au rythme de 3 jours toutes les 3 semaines. **Un écart jour pour jour entre ce plan et la chronologie réelle du dépôt n'a donc aucun sens** : les deux calendriers ne mesurent pas la même durée. Ce que l'indicateur mesure, c'est le **reste-à-faire dont la date de livraison prévue est passée**.
-
-**Progrès méthodologique par rapport à l'arrêté précédent** : le plan précédent répartissait 1 137 JH sur une capacité de 405 JH, soit 2,8 fois le produisible — le dépassement était arithmétiquement certain avant la première ligne de code. **Le plan actuel tient largement dans la capacité de l'équipe** (75 %, §6). Un écart constaté aujourd'hui est donc un écart d'exécution, pas un vice de construction du plan.
+**Comment lire cet indicateur — et comment ne pas le lire.** Le plan de référence reste **volontairement condensé** : les deux années réelles du projet (premier commit le 2024-10-03) ont été ramenées à dix mois pour produire un Gantt lisible. **Un écart jour pour jour entre ce plan et la chronologie réelle du dépôt n'a donc aucun sens** : les deux calendriers ne mesurent pas la même durée. Ce que l'indicateur mesure, c'est le **reste-à-faire dont la date de livraison prévue est passée** — et à cet arrêté, ce chiffre coïncide exactement avec le reste-à-faire du §2 et du §3 (598 h), puisque la totalité du plan condensé est désormais échue.
 
 ---
 
 ## 5. Risques — 183 dépendances bloquantes ouvertes
+
+*Revérifié à cet arrêté (lecture directe d'Odoo) : les chiffres sont strictement identiques à ceux du 2026-08-28.*
 
 ### 5.1 Dépendances de tâches (Odoo)
 
@@ -126,22 +130,24 @@
 
 ### 5.2 Dépendances d'exploitation (hors Odoo, journal de livraison)
 
-Six points bloquants ou à risque sont ouverts sur l'infrastructure, dont un **bloquant de niveau 1** :
+*Non rejoué intégralement à cet arrêté — seul le point n°1 a été recroisé avec le journal.* Six points bloquants ou à risque restaient ouverts sur l'infrastructure au 2026-08-28 :
 
 | # | Dépendance non levée | Impact | Levée |
 |---|---|---|---|
-| 1 | Secrets GitHub `KUBECONFIG_PREPROD` / `KUBECONFIG_PROD` pointent l'ancien cluster | **Le déploiement continu échoue** | Régénérer les secrets |
+| 1 | Secrets GitHub `KUBECONFIG_PREPROD` / `KUBECONFIG_PROD` pointent l'ancien cluster | **Le déploiement continu échoue** | **Toujours ouvert** — vérification manuelle dans Settings → Secrets requise, non faite (voir note ci-dessous) |
 | 2 | `metrics-server` non fonctionnel (certificats kubelet sans IP SAN) | Pas de `kubectl top`, pas de HPA, ressources API non mesurées | Décision utilisateur en attente |
 | 3 | Kubeconfig `cluster-admin` stocké en secret CI | Compromission = pleins pouvoirs sur le cluster prod | ServiceAccount CI dédié (reporté) |
 | 4 | Filtrage des plages Cloudflare non appliqué sur 80/443 | Origine joignable en direct | Nécessite un accès OpenStack non fourni |
 | 5 | Envoi d'e-mails lié à l'IP de sortie du cluster autorisée chez Brevo | Un changement d'IP coupe les inscriptions | Surveillance après toute opération réseau |
 | 6 | IP source réelle masquée par le SNAT du load balancer Octavia | Logs d'accès non exploitables | PROXY protocol ou élargissement `proxy-real-ip-cidr` |
 
+**Sur le point 1** : le job `Deploy to Kubernetes (prod)` et `Deploy to Kubernetes (preprod)` du commit de cet arrêté sont restés `skipped` (déploiement conditionné à `K8S_PROD_ENABLED`/`K8S_PREPROD_ENABLED`, tous deux à `false`) — cela ne prouve donc **rien** sur l'état des secrets, exactement comme au 2026-08-28. Seul `KUBECONFIG_SONAR`, posé depuis le bon fichier, s'est révélé fonctionnel en CI (`SonarQube Analysis`, vert). Le contrôle manuel des deux autres secrets reste à faire.
+
 ---
 
 ## 6. RH — 75 % de la capacité, ventilée par profil
 
-**C'est l'indicateur qui change le plus.** Aux arrêtés précédents, il était déclaré *non alimentable* : aucun profil n'était renseigné sur les contributeurs Odoo, et la ventilation ne pouvait être que nominative. Le planning d'équipe porte un **rôle par intervenant** : la charge par profil est donc calculable pour la première fois.
+*Total revérifié à cet arrêté ; la répartition par profil n'a pas été rejouée depuis le 2026-08-28, faute de changement du planning d'équipe entre les deux dates — aucune réassignation n'a eu lieu.*
 
 **Capacité de référence** : 13 cycles × 3 jours = **39 JH par personne** sur la fenêtre d'équipe, plus 15 jours ouvrés de juillet pour le chef de projet à taux plein.
 
@@ -156,85 +162,80 @@ Six points bloquants ou à risque sont ouverts sur l'infrastructure, dont un **b
 | Chef de projet | 1 | 18,0 | 54,0 | 33 % |
 | **Total** | **12** | **362,0** | **483,0** | **75 %** |
 
-**Charge nette, doublon retiré.** Le planning d'équipe déclare 411 JH, mais ses 49 JH de lignes « service IA » décrivent le même travail que les blocs `C-01`/`C-02` — c'est ce qui a motivé la suppression du bloc Odoo correspondant. La charge nette est donc de **362 JH**, et c'est elle qui fait référence ici. **Contrôle de cohérence** : le registre Odoo porte 364,0 JH — les deux sources concordent désormais à 2 JH près, ce qui n'était pas le cas avant la correction.
+**Contrôle de cohérence, resserré depuis l'arrêté précédent.** Le registre Odoo porte désormais **362,3 JH** de charge sur le périmètre engagé (§3) contre 362,0 JH déclarés par le planning d'équipe — un écart de **0,3 JH**, contre 2 JH au 2026-08-28. Les deux sources continuent de converger à mesure que les corrections s'accumulent (suppression du doublon `IA`, léger rééquilibrage backlog/engagé).
 
-**Constats :**
+**Constats, inchangés depuis l'arrêté précédent** :
 
-- **Le plan est réalisable, avec de la marge.** 75 % de la capacité collective, contre 281 % à l'arrêté précédent. Ce n'est pas le même travail qui a été replanifié : c'est le même travail chiffré sur des durées crédibles, étalé sur un calendrier qui correspond au rythme réel de l'équipe, et débarrassé d'un double compte.
-- **Deux profils dépassent 100 %** — le SysAdmin (113 %) et les Dev Full Stack (101 %). Le dépassement est absorbé par le mécanisme de fin de plan : **14,5 JH, soit 12 tâches, sont réaffectées au chef de projet** en juillet, à taux plein. C'est ce qui explique son taux de 33 % sur la fenêtre d'équipe — il garde de la réserve pour ce report.
-- **Le profil le plus tendu est le SysAdmin**, seul sur 44 JH d'infrastructure (VPS, deux clusters Kubernetes, CI/CD, observabilité, sauvegardes). C'est aussi le profil sans redondance : aucune autre personne du plan ne porte de tâche d'infrastructure.
-- **L'expertise IA est le profil le moins chargé** (3 personnes, 48 %) une fois le doublon retiré — et c'est cohérent avec l'état du produit : la correction sémantique par IA interne est livrée, la génération de contenu par API IA externe n'est pas commencée (§7.3). **La capacité n'a jamais été le facteur limitant sur ce périmètre.**
+- **Le plan est réalisable, avec de la marge.** 75 % de la capacité collective. Ce n'est pas le même travail qui a été replanifié : c'est le même travail chiffré sur des durées crédibles, étalé sur un calendrier qui correspond au rythme réel de l'équipe.
+- **Deux profils dépassent 100 %** — le SysAdmin (113 %) et les Dev Full Stack (101 %). Le dépassement est absorbé par le mécanisme de fin de plan : **14,5 JH, soit 12 tâches, sont réaffectées au chef de projet** en juillet, à taux plein.
+- **Le profil le plus tendu est le SysAdmin**, seul sur 44 JH d'infrastructure. C'est aussi le profil sans redondance.
+- **L'expertise IA est le profil le moins chargé** (3 personnes, 48 %) — cohérent avec l'état du produit : la correction sémantique par IA interne est livrée, la génération de contenu par API IA externe n'est pas commencée (§7.3).
 
 ---
 
 ## 7. Qualité — couverture de tests et accessibilité
 
-### 7.1 Couverture SonarQube : 0,0 % — mais la chaîne d'analyse est désormais opérationnelle
+### 7.1 Couverture SonarQube : 63,9 % — l'action P0 est close
 
-**Ce qui a changé le 2026-08-28.** L'analyse a quitté SonarCloud pour une **instance SonarQube Community 26.8 auto-hébergée** sur le cluster Infomaniak `pck-dkoyol2` (namespace `sonarqube`, chart `helm-sonarqube/`, PostgreSQL 17 dédié, 3 PVC en `csi-cinder-sc-retain`). L'instance n'est **pas exposée sur Internet** : le runner GitHub l'atteint par un tunnel `kubectl port-forward` vers l'API Kubernetes, elle-même publique et authentifiée par kubeconfig.
+**Ce qui a changé depuis l'arrêté du 2026-08-28.** L'indicateur était à 0,0 % faute de rapport `lcov` transmis au scanner. C'est corrigé depuis le 2026-08-29 : Jest (API) et `@vitest/coverage-v8` (front, dépendance ajoutée) produisent chacun un `lcov.info`, transmis par artefact entre le job de tests et le job d'analyse, avec un préfixage de chemin (`sed` sur les lignes `SF:`) pour que Sonar les rattache aux bons fichiers — sans quoi l'échec est **silencieux** (0 % sans erreur).
 
-**La chaîne est éprouvée**, ce qui n'était pas acquis : premier passage réel du job CI `sonarqube` au merge de `feat/sonarqube-k8s`, tâche `REPORT` en statut `SUCCESS` soumise **135 s après le push**, 7,1 s de calcul. Vérifié par l'API de l'instance, base de référence relevée à zéro analyse avant le push.
+**Dernière mesure confirmée par l'instance** (analyse du 2026-08-29, 21:07) :
 
-**Mesures de l'analyse du 2026-08-28**, **requêtées directement sur l'instance** (`/api/measures/component` via tunnel), comparées à la dernière analyse SonarCloud de la veille :
+| Métrique | Valeur |
+|---|---|
+| Couverture globale | **63,9 %** |
+| Lignes | 62,5 % |
+| Branches | 71,1 % |
+| Lignes de code analysées (ncloc) | 33 638 |
 
-| Métrique | Auto-hébergé (28/08) | SonarCloud (27/08) |
-|---|---|---|
-| Lignes de code | 33 576 | 33 940 |
-| Bugs | **9** | 9 |
-| **Vulnérabilités** | **11** | **28** |
-| Security hotspots | 0 | — |
-| Code smells | 730 | 704 |
-| Duplication | 2,5 % | 2,5 % |
-| **Couverture** | **0,0 %** | 0,0 % |
-| Dette technique | 4 743 min ≈ 79 h ≈ **2 964 €** | 4 594 min |
-| Maintenabilité / Fiabilité / Sécurité | **A / D / D** | A / D / D |
-| Quality gate | **OK** | — |
+**Conséquence non anticipée, toujours d'actualité** : le quality gate est passé de `OK` à `ERROR` sur la condition `new_coverage = 21,9 %` (seuil requis : 80) et `new_violations = 2`. Ce n'est pas une régression : cette condition n'était simplement jamais évaluée faute de données. **Sans effet sur la CI aujourd'hui** (le gate n'est pas imposé comme bloquant), mais le rendre bloquant ferait échouer le prochain push tant que la couverture du code nouveau ne dépasse pas 80 % — décision à trancher (§8).
 
-**Le quality gate passe, mais il ne dit presque rien.** Sa seule condition est `new_violations = 0` sur le code nouveau, et elle est satisfaite parce qu'aucun code nouveau n'a été analysé depuis la base de référence. **Il ne porte aucun jugement sur les 750 anomalies existantes** — un « OK » de quality gate n'est pas un état des lieux.
+**Reproduction locale du jour (2026-08-30)**, après le correctif de vulnérabilités du même jour — code applicatif quasiment inchangé sur le périmètre testé :
 
-**L'indicateur demandé reste à 0 %, et le changement d'hébergement n'y est pour rien.** La cause est inchangée : le job `test_and_lint` exécute `npm run test` sans option de couverture, aucun artefact `lcov` n'est produit ni transmis, et `sonar.javascript.lcov.reportPaths` n'est pas renseigné dans `sonar-project.properties`. **L'action P0 reste entière** — c'est ~1 JH pour passer l'indicateur de 0 % à ~86 %.
-
-**Couverture réellement mesurée** (exécution locale, 2026-08-27 — code applicatif inchangé depuis) :
-
-| Périmètre | Instructions | Lignes | Branches | Fonctions | Tests |
+| Périmètre | Statements | Branches | Fonctions | Lignes | Tests |
 |---|---|---|---|---|---|
-| API (Jest) | **86,6 %** | 87,21 % | 68,99 % | 85,91 % | 1 545 tests / 84 suites, tous verts |
-| Front (Vitest) | non mesurable | — | — | — | 685 tests / 44 fichiers, tous verts |
+| API (Jest) | **81,4 %** | 67,15 % | 81,34 % | 81,73 % | **1 554 / 1 554**, 85 suites, tous verts |
+| Front (Vitest) | **58,9 %** | 77,06 % | 47,76 % | 58,9 % | **689 / 689**, 44 fichiers, tous verts |
 
-La couverture front n'est pas mesurable sans ajouter `@vitest/coverage-v8`, absente du projet.
+Ces chiffres (rejoués en local ce jour) sont quasi identiques aux premières publications du 2026-08-29 (81,41 % API, 58,91 % front) : la couverture n'a pas bougé, ce qui est cohérent avec un correctif de sécurité qui modifie des branches déjà testées plutôt que d'ajouter du code neuf non couvert.
 
-#### 7.1.1 — Les 11 vulnérabilités, une par une
+**Non revérifié à cet arrêté** : l'analyse SonarQube du commit de ce jour (`914d37e`) s'est bien exécutée avec succès — confirmé via l'API GitHub, tâche `SonarQube Analysis (auto-hébergé)` terminée à 09:54:17Z — mais ses mesures précises (couverture, dette, notes) n'ont pas été relues en direct sur l'instance : l'accès à celle-ci nécessite un jeton (`SONAR_TOKEN`) conservé côté secret GitHub, non disponible dans cette session. Les valeurs ci-dessus (63,9 %) sont donc celles de la **dernière analyse effectivement lue**, du 2026-08-29 — antérieure de quelques heures au correctif de vulnérabilités.
 
-L'accès direct à l'instance a permis de les caractériser (`/api/issues/search`) plutôt que de s'en tenir au compte :
+#### 7.1.1 — Les vulnérabilités : de 13 à 3, une par une
 
-| Règle | Nb | Sévérité | Nature |
+Le nombre de vulnérabilités avait bougé entre les arrêtés (11 → 13) avec le code ajouté pour la recette QA et le contraste. **10 des 13 ont été corrigées le 2026-08-30** (commit `914d37e`), revues une par une plutôt qu'en masse :
+
+| Règle | Nb | Sévérité | Traitement |
 |---|---|---|---|
-| `javascript:S2245` | **8** | MAJOR | « Make sure that using this pseudorandom number generator is safe here » — `Math.random()` dans `upload.middleware.js` (3), `mindmapImageUpload.js` (2), `functions.js` (2), `mindmap.js` (1) |
-| `javascript:S5693` | 1 | MAJOR | Limite de taille de contenu à vérifier |
-| `docker:S6471` | 1 | MINOR | L'image `node` tourne en `root` par défaut — `my_memo_master_api/Dockerfile:18` |
-| `docker:S6470` | 1 | **CRITICAL** | `COPY . .` récursif — `my_memo_master_api/Dockerfile:25` |
+| `docker:S6470` | 1 | **CRITICAL** | Corrigé — voir §7.1.2 |
+| `javascript:S2068` | 2 | MAJOR | Corrigé — mots de passe par défaut du seeder E2E supprimés, démarrage refusé si les variables manquent |
+| `javascript:S2245` | 7 | MAJOR | Corrigé — `crypto.randomBytes`/`randomUUID`/`getRandomValues` remplacent `Math.random()` pour les noms de fichiers uploadés ; deux fonctions inutilisées supprimées |
 
-**L'écart 11 / 28 s'explique, et il rend les deux chiffres non comparables.** Les 11 findings sont **tous** des règles de type « Make sure … is safe here » : ce sont, dans la terminologie Sonar, des **security hotspots** — des points à faire relire par un humain, pas des failles confirmées. Or l'instance auto-hébergée les classe en *vulnérabilités* et affiche **0 hotspot**, là où SonarCloud sépare les deux catégories. **Les deux plateformes ne rangent pas les mêmes règles au même endroit** : additionner ou comparer leurs compteurs n'a pas de sens. Ce qui est opposable, c'est la note de sécurité — **D dans les deux cas** — et le détail ci-dessus, qui lui ne dépend d'aucune convention de comptage. Les profils qualité de l'instance sont tous les « Sonar way » par défaut, sans personnalisation.
+**3 non corrigées, et pourquoi — argumentées, pas ignorées :**
 
-#### 7.1.2 — ⚠️ La vulnérabilité CRITICAL est réelle : secrets embarqués dans l'image API
+- `javascript:S2245` — `ExerciseDetailPage.vue:309`, mélange de l'ordre d'affichage des réponses d'un exercice. **Pas sensible** : les réponses sont déjà toutes envoyées au client, la prévisibilité de l'ordre ne divulgue rien.
+- `javascript:S5693` — limite d'upload à **10 Mo**, valeur explicite et raisonnable pour de l'image. La règle demande une revue, pas nécessairement un changement.
+- `docker:S6471` — l'image `node` tourne en **root**. Durcissement réel et souhaitable, mais **non tenté** : l'entrypoint fait `npm install` et écrit dans `/app` (monté en volume en dev), un `USER` non-root pourrait casser le démarrage, et le démon Docker du poste était arrêté au moment du correctif — impossible à vérifier avant de le committer. À traiter dans un ticket dédié, avec test.
 
-`docker:S6470` n'est pas un faux positif. Vérification faite dans le dépôt :
+**Vérifications faites au moment du correctif** : API 1 554/1 554 ✅, front 689/689 ✅ (confirmé à nouveau ce jour, §7.1), les deux lints propres. La CI du commit est passée au vert sur les 13 checks (`test_and_lint` ×2, `SonarQube Analysis`, `Parcours E2E + charge`, `Build and Push Docker Images`, etc. — vérifié via l'API GitHub).
 
-- `my_memo_master_api/Dockerfile:25` fait `COPY . .` dans le stage de production ;
-- `my_memo_master_api/.dockerignore` ne contient que `node_modules/`, `.git`, `.idea`, `Dockerfile*` — **`.env` n'y est pas** ;
-- `my_memo_master_api/.env` existe et porte **`AUTH_JWT_SECRET`** et **`SMTP_PASS`**.
+**Limites de l'instance, inchangées** : analyse restreinte à `main` (le multi-branches est absent de l'édition Community), et projet en visibilité publique dans l'instance — sans effet tant qu'aucun Ingress n'est posé.
 
-**Toute image construite depuis un poste de développement embarque donc ces secrets dans une couche.** Le fichier est bien ignoré par git (`.gitignore:1`), ce qui limite la portée : **les images construites par la CI, à partir d'un checkout propre, ne sont pas concernées** — le `.env` n'y existe pas. Le risque porte sur les builds locaux (`docker compose build`) et sur toute image qui en serait issue puis poussée.
+#### 7.1.2 — La vulnérabilité CRITICAL est corrigée : secrets qui pouvaient s'embarquer dans l'image API
 
-**Correctif** : ajouter `.env` et `.env.*` à `my_memo_master_api/.dockerignore`. Quelques minutes, à faire avant toute publication d'image construite localement.
+`docker:S6470` n'était pas un faux positif, et c'est désormais corrigé.
 
-**À ne pas confondre avec le chiffre Dependabot** : GitHub signale 10 vulnérabilités sur la branche par défaut (7 hautes, 2 modérées, 1 basse). Cela ne contredit pas le « 0 vulnérabilité » de `npm audit --omit=dev` obtenu en CI — Dependabot compte aussi les dépendances de développement, qui n'entrent pas dans les images déployées.
+**Ce qui a été trouvé** : `my_memo_master_api/.dockerignore` ne contenait que `node_modules/`, `.git`, `.idea`, `Dockerfile*` — **`.env` n'y était pas**, alors que `my_memo_master_api/.env` porte `AUTH_JWT_SECRET`, `SMTP_USER` et `SMTP_PASS`. Le `COPY . .` du Dockerfile embarquait donc ces secrets dans toute image construite depuis un poste où ce fichier existe. Aggravant : la racine du dépôt portait une ligne `#.env` **commentée**, qui donnait l'illusion d'une exclusion.
 
-**Limites de l'instance** : analyse restreinte à `main` (le multi-branches est absent de l'édition Community), et projet en visibilité publique dans l'instance — sans effet tant qu'aucun Ingress n'est posé.
+**Portée réelle, mesurée et non supposée** : le CD construit depuis un `git checkout` propre, où `.env` est ignoré par git — **les images publiées par la CI ne contenaient donc pas le fichier**. Le risque valait pour toute image construite **en local** (`docker compose build`) puis poussée vers le dépôt Docker Hub `fredissimo/mymemomaster_api`, qui est **public**. Latent, pas réalisé.
 
-### 7.2 Non-conformités RGAA : 0
+**Corrigé** : `.env` et `.env.*` exclus sur les trois contextes de build (racine, API, front) ; la ligne commentée trompeuse retirée.
 
-Audit statique sur **79 fichiers `.vue`** :
+**À ne pas confondre avec le chiffre Dependabot** : GitHub signale des vulnérabilités de dépendances sur la branche par défaut, non recomptées à cet arrêté. Ce n'est pas contradictoire avec `npm audit --omit=dev` en CI — Dependabot compte aussi les dépendances de développement, qui n'entrent pas dans les images déployées.
+
+### 7.2 Non-conformités RGAA : 0, sur un périmètre outillé élargi
+
+**Audit statique, rejoué ce jour** sur **79 fichiers `.vue`** :
 
 | Critère RGAA | Avant campagne | Aujourd'hui |
 |---|---|---|
@@ -246,67 +247,98 @@ Audit statique sur **79 fichiers `.vue`** :
 
 Non-régression assurée par 4 tests axe-core exécutés à chaque push.
 
-**Réserve de portée** : le zéro porte sur **5 critères outillés**, pas sur les 106 critères du RGAA 4. Trois angles morts subsistent : contrastes non mesurés (jsdom ne calcule pas les styles), aucun test lecteur d'écran réel, axe-core limité à 4 composants montés isolément. **La formulation défendable est « 0 non-conformité sur le périmètre outillé », pas « site conforme RGAA ».**
+**Nouveau depuis le 2026-08-29 : le contraste (RGAA 3.2), outillé pour la première fois.** `e2e-a11y/contrast.spec.js` (Playwright + axe-core, rendu Chromium réel — le seul niveau qui calcule vraiment les styles) audite 8 pages publiques sans appel API au montage. **Premier passage : 1 non-conformité réelle trouvée** — `/forgot-password`, texte noir sur fond bleu (ratio 2,2:1 au lieu de 4,5:1 requis), causée par une classe Tailwind `text-white` qui ne générait aucun CSS dans ce build. Corrigée. **Rejoué ce jour : 8/8 pages conformes.**
 
-### 7.3 Qualité de la déclaration : 3 tâches non confirmées, et une architecture IA à requalifier
+**Extension de la couverture axe-core (jsdom), 2026-08-29** : 4 composants ajoutés (`DropdownComponent`, `ToggleButton`, `PillComponent`, `TagSelectorComponent`), portant le total à 8. **2 non-conformités réelles trouvées et corrigées**, préexistantes et révélées par l'extension plutôt que par une régression : `ToggleButton.vue` (case à cocher sans nom accessible, RGAA 11.1, corrigée par une prop `ariaLabel` désormais requise) et `TagSelectorComponent.vue` (bouton flèche sans nom accessible, RGAA 11.9, corrigé par un `aria-label` dynamique).
 
-La validation des tâches a été faite **sur preuve dans le dépôt**, pas sur le statut déclaré dans le planning. Cette confrontation a fait apparaître deux choses.
+**Nouvelle extension, 2026-08-30 — en réponse directe à « s'occuper des 106 critères ».** Plutôt qu'un audit manuel des 106 critères (chantier séparé, non engagé), l'outillage automatisable a été étendu : 12 composants de plus sous axe-core (`TodoWidget`, `MenuItemComponent`, `ItemListLayout`, `GuidedTourBannerComponent`, `MindMapNodePickerComponent`, `NotificationBellComponent`, `SubjectFilterComponent`, `SubjectSelectorComponent`, `ReminderWidget`, `FormulaHelperComponent`, `StudentDetailComponent`, `KpiAlertWidgetComponent`), portant le total à **20 composants sur 36** — les 16 restants, revus un par un, n'ont aucun élément interactif propre à évaluer. **Les 20 tests passent, 0 violation détectée par l'outil.**
 
-**Ce qui reste non confirmé — 3 tâches :**
+Cette extension a aussi servi à **objectiver, sur deux cas réels, la limite de ce qu'un outil peut juger** : `TodoWidget.vue` (case à cocher dont le nom accessible ne tenait qu'à un `title` porté par le `<label>` ambiant, pas par le contrôle) et `MenuItemComponent.vue` (boutons éditer/supprimer nommés par les seuls glyphes `✎`/`✕`) **passaient tous les deux axe-core** — un nom accessible existe algorithmiquement dans les deux cas, mais n'est ni fiable (premier cas) ni pertinent pour un lecteur d'écran (second cas). Corrigés par cohérence avec le même correctif déjà appliqué ailleurs (`ToggleButton.vue`), pas parce qu'un outil l'exigeait. Détail : `docs/AUDIT_RGAA.md` §2 ter.
 
-| Tâche | Ce que le planning déclare | Ce que le dépôt contient |
+**Réserve de portée, affinée** : le zéro porte sur **6 critères outillés** (11.1, 7.1, 11.9, 1.1, 8.3, 3.2), toujours pas sur les 106 critères du RGAA 4 — et il ne peut pas en aller autrement par le seul outillage : une bonne part des critères restants (pertinence des intitulés hors contexte, cohérence de l'ordre de lecture, compatibilité lecteur d'écran réel) demande un jugement humain qu'aucun outil ne peut mécaniser de façon fiable, comme les deux cas ci-dessus le montrent concrètement. Deux angles morts documentés dans `docs/AUDIT_RGAA.md` restent entiers : aucun test lecteur d'écran réel, et le contraste n'est vérifié que sur 8 pages publiques sans API. **La formulation défendable reste « 0 non-conformité sur le périmètre outillé », pas « site conforme RGAA ».**
+
+#### 7.2.1 — Audit manuel des 106 critères RGAA : ouvert le 2026-08-30, 23/106 posés
+
+**Ce qui a changé après cet arrêté, dans la même session.** Demande explicite de l'utilisateur : s'occuper des 106 critères eux-mêmes, au-delà de l'outillage. Ouvert dans un document dédié — [`docs/AUDIT_RGAA_106.md`](AUDIT_RGAA_106.md), marqué **EN COURS**, à ne pas confondre avec un audit terminé.
+
+**Méthode** : référentiel RGAA 4.1.2 **téléchargé depuis la source officielle** et extrait en texte (`pdftotext`), pas reconstitué de mémoire — un premier essai par récupération web s'est révélé tronqué et partiellement inexact sur 4 thématiques, écarté après vérification. 106 critères recomptés (9+2+3+13+8+2+5+10+4+14+13+11+12) pour confirmer la grille complète. Un échantillon de 15 pages a été proposé (à valider).
+
+**État à cet arrêté** : **23 / 106 verdicts posés (22 %)**, tous avec preuve citée (fichier/ligne ou recherche exhaustive dans `src/`, jamais une estimation). Thématique 2 (Cadres) close en NA (aucun `<iframe>` dans le dépôt). Thématique 4 (Multimédia) très majoritairement NA (aucun `<video>`/`<audio>`).
+
+**2 non-conformités candidates trouvées** — à confirmer visuellement avant correctif, donc **non comptées dans le « 0 » du tableau de bord** :
+
+| Critère | Constat | Preuve |
 |---|---|---|
-| `QA.03`, `QA.05` | Tests E2E parcours étudiant et enseignant (Playwright) | Aucune dépendance `playwright` ni `cypress`, aucun dossier E2E |
-| `QA.06` | Rapport de tests couvrant E2E et charge | Ni k6 ni Locust dans le dépôt |
+| 8.6 (pertinence du titre de page) | 5 routes sur 27 ont un titre en anglais ou en casse incohérente (« Exercises », « Class Group », « register »…) dans une app francophone | `my_memo_master_front/src/router/routes.js`, lignes 18, 27, 135, 144, 214 |
+| 12.7 (lien d'évitement clavier) | Aucun lien « aller au contenu » trouvé nulle part dans le code | Recherche exhaustive `src/`, 0 résultat |
 
-Elles portent l'étape « validé » mais leur état de tâche est resté « en cours ». Elles sont **incluses dans les 87,8 % du §2** ; les en retirer donne **86,6 %**.
+**Effet de bord, hors RGAA** : `src/pages/AdminPage.vue` existe mais n'est référencé par aucune route ni aucun composant — code mort, signalé séparément.
 
-**Ce qui a été requalifié — l'architecture IA.** Le planning d'équipe décrit un **service IA auto-hébergé** (« Architecture service IA FastAPI/Python », « Déploiement service IA sur K8s prod + HPA », « Runbook ops service IA », « Sécurisation service IA prod »). **Cette architecture n'existe pas** : aucun service FastAPI, aucun déploiement IA dans `helm/`, aucune variable d'environnement d'API IA parmi les 56 que consomme l'API, aucun appel HTTP sortant vers un fournisseur.
+**83 critères restants** : une partie se règle par recherche exhaustive supplémentaire (rapide), une autre exige un rendu réel de l'échantillon (tableaux, formulaires, navigation clavier, zoom, ordre de tabulation) — plus long. Poursuite prévue thématique par thématique dans les prochaines sessions (ordre détaillé : `docs/AUDIT_RGAA_106.md` §4).
 
-L'architecture réelle est double, et aucune des deux ne correspond au libellé du planning :
+### 7.3 Qualité de la déclaration : le dernier écart est refermé
+
+**Ce qui reste de l'arrêté précédent** : la validation des tâches a été faite **sur preuve dans le dépôt**, pas sur le statut déclaré dans le planning. Trois tâches ne l'étaient pas encore au 2026-08-28.
+
+**Ce qui a changé — les 3 dernières tâches sont désormais confirmées :**
+
+| Tâche | Ce que le planning déclarait | Ce que le dépôt contient désormais |
+|---|---|---|
+| `QA.03`, `QA.05` | Tests E2E parcours étudiant et enseignant (Playwright) | `my_memo_master_front/e2e/journeys.spec.js` — 5 tests, 5 réussis (13,4 s), rejoués à chaque push CI |
+| `QA.06` | Rapport de tests couvrant E2E et charge | `load-tests/api-load.js` (k6, 3 258 requêtes, 0 échec, p95 3,45 ms) + `docs/RAPPORT_TESTS_QA.md` |
+
+Elles portent toujours l'étape « validé » dans Odoo, mais leur champ `state` interne y est resté à « en cours » — **incohérence d'hygiène du registre, pas d'avancement** : à traiter en synchronisant Odoo (§8), le dépôt faisant foi.
+
+**Ce qui reste requalifié depuis l'arrêté précédent — l'architecture IA, inchangé.** Le planning d'équipe décrit un service IA auto-hébergé qui n'existe pas dans le dépôt. L'architecture réelle reste double :
 
 | Usage | Modèle retenu | État |
 |---|---|---|
 | **Correction sémantique** | IA **interne** — `@xenova/transformers`, embeddings locaux exécutés dans le process de l'API Node | **Livré** — `services/Semantic.service.js`, ~37 tests, tâche `[M-06.15]` validée |
 | **Génération de contenu** | **API IA externe** | **Non commencé** — blocs `C-01` (0/11) et `C-02` (0/9) |
 
-C'est ce constat qui a conduit à supprimer le bloc `[IA]` : ses 30 sous-tâches décrivaient un troisième modèle qui n'a jamais existé, tout en dupliquant le travail réellement porté par `C-01` et `C-02`. **Le périmètre IA du projet est donc : une brique de correction livrée, une brique de génération non commencée** — et non « 24 tâches de service IA terminées », comme le planning le laissait croire.
+**Le périmètre IA du projet reste donc** : une brique de correction livrée, une brique de génération non commencée.
 
 ---
 
 ## 8. Synthèse et actions recommandées
 
-**Ce que disent les mesures** : le produit est livré et déployé — **87,8 %** du périmètre engagé à l'étape « validé », dont **86,6 % confirmés sur preuve**, production fonctionnelle, 2 230 tests verts, 0 non-conformité RGAA outillée. Le plan tient largement dans la capacité de l'équipe (75 %) et les deux champs d'avancement d'Odoo concordent enfin.
+**Ce que disent les mesures** : le produit est livré et déployé — **87,5 %** du périmètre engagé à l'étape « validé », **intégralement confirmé sur preuve pour la première fois**, production fonctionnelle, 2 243 tests verts (1 554 API + 689 front), 0 non-conformité RGAA sur 6 critères outillés. Le plan tient largement dans la capacité de l'équipe (75 %).
 
-**Ce qui a été réparé depuis l'arrêté du 2026-08-27** : quatre des sept indicateurs étaient inexploitables, deux le sont encore.
+**Ce qui a été réparé depuis l'arrêté du 2026-08-28** :
 
-| Indicateur | Au 2026-08-27 | Aujourd'hui |
+| Indicateur | Au 2026-08-28 | Aujourd'hui |
 |---|---|---|
-| Avancement | 3 lectures divergentes (5,7 % / 60,6 % / 92,3 %) | **87,8 % déclaré, 86,6 % démontrable** — 1,2 point d'écart après retrait du doublon `IA` |
-| Coûts | Gabarit à 70 h/tâche, anomalie à 645 h | **Durées par nature de tâche**, de 2 h à 40 h, **double compte de 49 JH retiré** |
-| Délais | Plan à 2,8× la capacité, dépassement certain d'avance | **Plan réalisable**, l'écart mesure l'exécution |
-| RH | « Non alimentable » — aucun profil renseigné | **7 profils, 75 % de capacité**, concordant avec le registre à 2 JH près |
+| Avancement | 87,8 % déclaré, 86,6 % démontrable — 1,2 point d'écart | **87,5 % déclaré = 87,5 % démontrable** — écart refermé |
+| Couverture Sonar | 0 % faute de `lcov` | **63,9 %**, chaîne de publication éprouvée — action P0 close |
+| Délais | 33 tâches en retard | **30 tâches** — recul réel, pas une correction de mesure |
+| Vulnérabilités Sonar | 11, dont 1 CRITICAL non traitée | **3, argumentées une par une** — la CRITICAL (secrets dans l'image) est corrigée |
+| RGAA | 5 critères outillés | **6 critères outillés**, dont le contraste réel (3.2) pour la première fois ; **audit manuel des 106 critères ouvert** (23/106, 2 candidats NC) |
 | Coûts (source) | Aucune saisie de temps | ❌ inchangé — module Feuilles de temps absent |
-| Couverture Sonar | 0 % faute de `lcov` | ❌ inchangé — mais la chaîne est auto-hébergée, éprouvée, et **les anomalies sont désormais caractérisées une par une** (§7.1) |
+| Risques infra | Secrets `KUBECONFIG_*` non vérifiés | ❌ inchangé — toujours à vérifier manuellement |
 
-**La limite de méthode à assumer** : ce rapport mesure un plan, pas un relevé. Aucune donnée de temps réel n'existe sur ce projet et l'outil ne permettrait pas d'en produire. Les 364,0 JH sont une estimation argumentée tâche par tâche ; les 86 775 € sont la valorisation au barème de la charge validée, **pas une dépense constatée**.
+**La limite de méthode à assumer, inchangée** : ce rapport mesure un plan, pas un relevé. Aucune donnée de temps réel n'existe sur ce projet et l'outil ne permettrait pas d'en produire. Les 362,3 JH sont une estimation argumentée tâche par tâche ; les 86 250 € sont la valorisation au barème de la charge validée, **pas une dépense constatée**.
 
-**Et une leçon de cet arrêté** : le doublon `IA` a survécu à trois recalculs avant d'être repéré — il gonflait l'enveloppe de 12 %, doublait le retard affiché et créait un écart artificiel de 9,7 points entre avancement déclaré et démontrable. **Un registre alimenté depuis deux sources au grain différent produit des doublons silencieux** ; c'est la confrontation avec le contenu réel du dépôt qui les révèle, pas la cohérence interne des chiffres.
+**Une réserve propre à cet arrêté** : la mesure de couverture SonarQube (63,9 %) date du 2026-08-29, quelques heures avant le correctif de vulnérabilités du 2026-08-30 — l'analyse de ce dernier commit s'est bien exécutée avec succès (vérifié via l'API GitHub), mais ses valeurs précises n'ont pas pu être relues en direct sur l'instance dans cette session, faute de jeton d'accès local. Les chiffres de couverture et de qualité générale (bugs, dette, notes) affichés ici sont donc ceux de la dernière analyse **effectivement lue**, pas nécessairement les tout derniers.
 
 | Priorité | Action | Indicateur débloqué | Charge |
 |---|---|---|---|
-| ~~P0~~ | ~~Arbitrer le périmètre IA~~ — **fait le 2026-08-28** : le bloc `[IA]` était un doublon de `C-01`/`C-02`, supprimé. Architecture requalifiée (§7.3) : IA interne pour la correction (livrée), API IA externe pour la génération (non commencée) | Avancement, Délais, Coûts | — |
-| **P0** | Régénérer les secrets `KUBECONFIG_*` | Risques (CD à l'arrêt) | < 0,5 JH |
-| **P0** | Publier le `lcov` vers SonarQube (couverture en CI + `sonar.javascript.lcov.reportPaths`) | Qualité — de 0 % à ~86 % | ~1 JH |
-| **P0** | Ajouter `.env` et `.env.*` à `my_memo_master_api/.dockerignore` — `COPY . .` embarque `AUTH_JWT_SECRET` et `SMTP_PASS` dans toute image construite localement (§7.1) | Qualité, Risques — vulnérabilité CRITICAL confirmée | < 0,1 JH |
-| **P1** | Traiter les **8 `Math.random()`** signalés (`upload.middleware.js`, `mindmapImageUpload.js`, `functions.js`, `mindmap.js`) : `crypto.randomUUID()` là où la valeur sert d'identifiant ou de nom de fichier | Qualité — 8 des 11 vulnérabilités | ~0,5 JH |
-| **P1** | Ouvrir un ticket sur les **9 bugs** (3 `css:S4649` police générique, 2 `javascript:S3403` comparaison toujours fausse, 1 `reduce()` sans valeur initiale, 1 tri sans comparateur…) — note de fiabilité **D** | Qualité (fiabilité) | à estimer |
-| **P2** | Faire tourner l'image API sous un utilisateur non-`root` (`docker:S6471`) | Qualité (durcissement) | ~0,5 JH |
-| **P1** | Statuer sur `C-01`/`C-02` : 20 tâches, 458 h, **20 des 33 retards** — les replanifier ou les sortir du périmètre engagé | Avancement, Délais, Coûts | ~0,5 JH |
+| ~~P0~~ | ~~Arbitrer le périmètre IA~~ — fait le 2026-08-28 | Avancement, Délais, Coûts | — |
+| ~~P0~~ | ~~Publier le `lcov` vers SonarQube~~ — fait le 2026-08-29, couverture 63,9 % confirmée | Qualité | — |
+| ~~P0~~ | ~~Ajouter `.env`/`.env.*` à `my_memo_master_api/.dockerignore`~~ — fait le 2026-08-30, vulnérabilité CRITICAL corrigée | Qualité, Risques | — |
+| ~~P1~~ | ~~Traiter les 8 `Math.random()` signalés~~ — fait le 2026-08-30 (`crypto.randomBytes`/`randomUUID`/`getRandomValues`) | Qualité | — |
+| **P0** | Régénérer les secrets `KUBECONFIG_PREPROD` / `KUBECONFIG_PROD` — toujours non vérifiés | Risques (CD à l'arrêt) | < 0,5 JH |
+| **P1** | Ouvrir un ticket sur les **9 bugs** Sonar (non retraités par le correctif du 2026-08-30, à recompter à la prochaine analyse) | Qualité (fiabilité) | à estimer |
+| **P2** | Faire tourner l'image API sous un utilisateur non-`root` (`docker:S6471`) — non tenté faute de démon Docker actif pour tester | Qualité (durcissement) | ~0,5 JH |
+| **P2** | Synchroniser le champ `state` Odoo de `QA.03`/`QA.05`/`QA.06` (`01_in_progress` → `1_done`) — le dépôt les confirme, le registre non | Hygiène du registre | < 0,1 JH |
+| **P2** | Statuer sur `new_coverage` (quality gate) : le rendre bloquant ferait échouer tout push tant que le code nouveau n'atteint pas 80 % de couverture | Qualité (process) | décision |
+| **P1** | Statuer sur `C-01`/`C-02` : 20 tâches, 20 des 30 retards restants — les replanifier ou les sortir du périmètre engagé | Avancement, Délais, Coûts | ~0,5 JH |
 | **P1** | Tester une restauration réelle depuis `scripts/backup.sh` (`M-00b.11`) | Risques, Avancement | ~0,5 JH |
-| **P2** | Saisir le régime de travail réel dans les calendriers de ressource Odoo | RH (tout replanning y est encore calculé à temps plein) | ~0,5 JH |
-| **P2** | Réassigner les 181 sous-tâches de développement aux intervenants du planning | RH (elles sont toutes au chef de projet ; les 6 blocs transverses ont des assignés nominatifs) | ~1 JH |
-| **P3** | Chiffrer les 73 tâches de backlog `C-*` / `S-07` / `W-*` | Coûts (reste à faire du backlog inconnu) | ~2 JH |
+| **P2** | Saisir le régime de travail réel dans les calendriers de ressource Odoo | RH | ~0,5 JH |
+| **P2** | Réassigner les sous-tâches de développement aux intervenants du planning | RH | ~1 JH |
+| **P3** | Chiffrer les 72 tâches de backlog `C-*` / `S-07` / `W-*` | Coûts (reste à faire du backlog inconnu) | ~2 JH |
+| **P3** | Migrer les actions GitHub dépréciées (`checkout@v4`, `setup-node@v4`, etc. — ciblent Node 20, déprécié) avant leur retrait | Risques (CI) | à estimer |
+| **P1** | Confirmer visuellement les 2 non-conformités RGAA candidates (8.6 titres en anglais, 12.7 absence de lien d'évitement) et corriger si confirmées | Qualité (RGAA) | ~0,5 JH |
+| **P2** | Poursuivre l'audit manuel des 106 critères RGAA (83 restants) — `docs/AUDIT_RGAA_106.md` | Qualité (RGAA) | plusieurs sessions |
 
 ---
 
@@ -314,14 +346,17 @@ C'est ce constat qui a conduit à supprimer le bloc `[IA]` : ses 30 sous-tâches
 
 | Indicateur | Commande / source |
 |---|---|
-| Avancement, coûts, délais, risques | `odoo-plugin/odoo_cli.py read project.task --domain '[["project_id","=",15]]'` (381 tâches) |
-| Charge par profil | Rôles lus dans `17_planning_MyMemoMaster.xlsx`, feuille « Planning Sprints », croisés avec les durées junior |
+| Avancement, coûts, délais, risques | `odoo-plugin/odoo_cli.py read project.task --domain '[["project_id","=",15]]' --fields id,name,stage_id,state,date_deadline,allocated_hours,depend_on_ids` (350 tâches) — rejoué à cet arrêté |
+| Charge par profil | Rôles lus dans `17_planning_MyMemoMaster.xlsx`, feuille « Planning Sprints », croisés avec les durées junior — non rejoué à cet arrêté |
 | Capacité | 13 cycles × 3 jours (mardi/mercredi/jeudi, cycle de 3 semaines) + 15 jours ouvrés de juillet pour le chef de projet |
 | Durées « junior » | Réestimation tâche par tâche des 192 lignes du planning — **jugement argumenté, non reproductible mécaniquement** |
-| Mesures SonarQube | Instance auto-hébergée `pck-dkoyol2`, namespace `sonarqube` — `kubectl -n sonarqube port-forward svc/sonarqube 9000:9000`, puis `/api/measures/component`, `/api/issues/search`, `/api/qualitygates/project_status` et `/api/qualityprofiles/search`, authentifiés par le token `SONAR_TOKEN` |
-| Couverture API | `cd my_memo_master_api && npx jest --coverage` |
-| Tests front | `cd my_memo_master_front && npx vitest run` |
-| Non-conformités RGAA | `cd my_memo_master_front && node scripts/audit-a11y.mjs` |
+| Mesures SonarQube | Instance auto-hébergée `pck-dkoyol2`, namespace `sonarqube` — `kubectl -n sonarqube port-forward svc/sonarqube 9000:9000`, puis `/api/measures/component`, `/api/issues/search`, authentifiés par le token `SONAR_TOKEN` (secret GitHub, non disponible en local à cet arrêté — l'instance répond `401` sans lui, vérifié) |
+| État d'exécution CI d'un commit | `GET /repos/entrezunfredici/MyMemoMaster/commits/<sha>/check-runs` (API GitHub publique, sans jeton — le dépôt est public) |
+| Couverture API | `cd my_memo_master_api && npx jest --coverage` — rejoué à cet arrêté : 1 554/1 554, 81,4 % |
+| Tests front + couverture | `cd my_memo_master_front && npx vitest run --coverage` — rejoué à cet arrêté : 689/689, 58,9 % |
+| Non-conformités RGAA (statique) | `cd my_memo_master_front && node scripts/audit-a11y.mjs` — rejoué à cet arrêté : 0/79 fichiers |
+| Contraste RGAA 3.2 | `cd my_memo_master_front && npm run build && npx playwright test -c playwright.config.js` — rejoué à cet arrêté : 8/8 |
+| Audit manuel des 106 critères RGAA | Référentiel officiel : `curl https://accessibilite.numerique.gouv.fr/doc/RGAA-v4.1.2.pdf` puis `pdftotext -layout -enc UTF-8`. Verdicts et méthode détaillée : `docs/AUDIT_RGAA_106.md` (23/106 posés à cet arrêté) |
 | Absence de saisie de temps | `odoo_cli.py fields project.task --grep hours` (aucun champ d'heures effectives) et `odoo_cli.py models --grep timesheet` (aucun modèle) |
-| Vérification des livrables | Recherche directe dans le dépôt : `Dockerfile`, `.github/workflows/`, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, `config/swagger.config.js`, `git tag` |
+| Vérification des livrables | Recherche directe dans le dépôt : `Dockerfile`, `.github/workflows/`, `scripts/backup.sh`, `docs/RUNBOOK.md`, `docs/AUDIT_RGAA.md`, `docs/RAPPORT_TESTS_QA.md`, `config/swagger.config.js`, `git tag` |
 | Absence du service IA | `grep -rliE "openai|mistral|anthropic" --include="*.js"` hors `node_modules` (0), `helm/templates/` (aucun déploiement IA), `.env.example` (aucune variable IA) |

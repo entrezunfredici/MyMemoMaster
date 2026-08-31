@@ -249,7 +249,7 @@ onBeforeUnmount(() => {
       <form @submit.prevent="confirmExportModal">
         <div class="mb-4">
           <label class="form-label">Nom</label>
-          <input aria-label="Nom de la carte mentale" v-model="exportName" type="text" class="form-input" required autofocus />
+          <input aria-label="Nom de la carte mentale" v-model="exportName" type="text" class="form-input" maxlength="50" required autofocus />
         </div>
         <div class="mb-4">
           <label class="form-label">Matière</label>

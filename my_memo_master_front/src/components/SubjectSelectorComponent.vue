@@ -28,6 +28,7 @@
         type="text"
         placeholder="Nom du sujet (ex : Physique)"
         class="subject-inline-input"
+        maxlength="50"
         @keydown.enter.prevent="create"
       />
       <button

@@ -216,6 +216,30 @@ describe('Diagramme Controller', () => {
 
       expect(res.status).toBe(401)
     })
+
+    // FIX: régression — mmName > 50 caractères passait la validation (max: 200) puis
+    // échouait en base (MindMap.mmName est VARCHAR(50)), remontant en 500 générique.
+    it('400 — mmName trop long (> 50 caractères), le service n’est pas appelé', async () => {
+      const res = await request(app)
+        .post(`${BASE}/diagrammes`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ mmName: 'A'.repeat(51), mindMapJson: '{}', subjectId: 1 })
+
+      expect(res.status).toBe(400)
+      expect(diagrammeService.create).not.toHaveBeenCalled()
+    })
+
+    it('201 — mmName à la limite haute (50 caractères)', async () => {
+      const mmName = 'A'.repeat(50)
+      diagrammeService.create.mockResolvedValue({ ...mockDiagramme, mmName })
+
+      const res = await request(app)
+        .post(`${BASE}/diagrammes`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ mmName, mindMapJson: '{}', subjectId: 1 })
+
+      expect(res.status).toBe(201)
+    })
   })
 
   // ── PUT /diagrammes/:id ────────────────────────────────────────────────────

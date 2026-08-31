@@ -112,6 +112,8 @@ router.get('/:id', authMiddleware, leitnerSystem.findOne)
  *       500:
  *         description: Erreur interne du serveur
  */
+// FIX: name limité à 50 caractères (voir LeitnerSystem.validators.js) — aligné sur
+// la colonne LeitnerSystem.name en base (VARCHAR(50)).
 router.post('/', authMiddleware, leitnerSystemValidators.create, validate, leitnerSystem.create)
 
 /**

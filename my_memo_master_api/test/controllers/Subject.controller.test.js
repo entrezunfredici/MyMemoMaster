@@ -171,6 +171,30 @@ describe('Subject Controller', () => {
 
       expect(res.status).toBe(500)
     })
+
+    // FIX: régression — name > 50 caractères passait la validation (max: 100) puis
+    // échouait en base (Subject.name est VARCHAR(50)), remontant en 500 générique.
+    it('400 — name trop long (> 50 caractères), le service n’est pas appelé', async () => {
+      const res = await request(app)
+        .post('/api/v1/subjects')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'A'.repeat(51) })
+
+      expect(res.status).toBe(400)
+      expect(subjectService.create).not.toHaveBeenCalled()
+    })
+
+    it('201 — name à la limite haute (50 caractères)', async () => {
+      const name = 'A'.repeat(50)
+      subjectService.create.mockResolvedValue({ subjectId: 1, name })
+
+      const res = await request(app)
+        .post('/api/v1/subjects')
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name })
+
+      expect(res.status).toBe(201)
+    })
   })
 
   // ── PUT /api/v1/subjects/:id ───────────────────────────────────────────────

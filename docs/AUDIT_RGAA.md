@@ -1,6 +1,6 @@
 # Audit d'accessibilité RGAA — MyMemoMaster (front)
 
-**Date** : 2026-07-06, complété le 2026-08-29
+**Date** : 2026-07-06, complété le 2026-08-29, étendu le 2026-08-30
 **Référentiel** : RGAA 4 (fondé sur WCAG 2.1) — choix justifié dans le dossier B2, section 5.3 : standard officiel français, public cible incluant des établissements scolaires potentiellement soumis à obligation légale.
 **Périmètre** : l'intégralité du code front (`my_memo_master_front/src/`, 79 fichiers `.vue` au 2026-08-29) + `index.html`.
 
@@ -64,6 +64,23 @@ Ces deux non-conformités existaient **avant** cette campagne mais n'étaient co
 
 ---
 
+## 2 ter. Campagne du 2026-08-30 — extension de l'outillage jsdom, et sa limite objectivée
+
+Suite à la demande de « s'occuper des 106 critères RGAA » sur `docs/COMPTE_RENDU_METRIQUES.md` §7.2 : décision (validée avec l'utilisateur) d'étendre ce qui est automatisable plutôt que de lancer un audit manuel des 106 critères. Cette campagne montre concrètement où se situe la limite de l'automatisable — pas seulement l'affirmer.
+
+**Couverture axe-core (jsdom) élargie de 8 à 20 composants** (sur 36 au total ; les 16 restants — `GridComponent`, `AuthFormLayout`, `LoaderComponent`, `NoItemComponent`, `FormulaTextComponent`, `OnboardingTourComponent` et les composants de l'éditeur de cartes mentales — ont été revus et écartés : aucun élément interactif propre, rien qu'axe puisse évaluer qui ne le soit déjà via leurs parents). Ajoutés : `TodoWidget`, `MenuItemComponent`, `ItemListLayout`, `GuidedTourBannerComponent`, `MindMapNodePickerComponent`, `NotificationBellComponent`, `SubjectFilterComponent`, `SubjectSelectorComponent`, `ReminderWidget`, `FormulaHelperComponent`, `StudentDetailComponent`, `KpiAlertWidgetComponent`. **Les 20 tests passent — 0 violation détectée par l'outil.**
+
+**Ce que l'outil ne détecte pas, montré sur deux cas réels trouvés en lisant le rendu plutôt qu'en se fiant au seul verdict axe :**
+
+- `TodoWidget.vue` — la case à cocher d'une séance est enveloppée dans un `<label>` dont le seul contenu textuel est un `<span>` décoratif vide ; son nom accessible ne provenait que du `title` posé sur le `<label>` (pas sur l'`input` lui-même). **axe-core ne signale rien** : `dom-accessibility-api` retombe sur ce `title` ambiant et calcule un nom non vide. C'est un nom accessible qui existe *pour l'algorithme*, mais dont la restitution par un lecteur d'écran réel n'est pas garantie de façon fiable dans cette configuration précise (label vide + title porté par l'ancêtre, pas par le contrôle).
+- `MenuItemComponent.vue` — les boutons éditer/supprimer utilisent les glyphes Unicode `✎`/`✕` comme contenu textuel. **axe-core ne signale rien non plus** : un caractère Unicode est un contenu textuel valide, donc un nom accessible non vide. Mais ce nom n'est pas *pertinent* — un lecteur d'écran énoncerait le glyphe, pas une action.
+
+**Les deux ont été corrigés** (`aria-label` explicite, ajouté à l'input pour le premier, aux deux boutons pour le second) — non pas parce qu'un outil l'exigeait, mais par cohérence avec le correctif déjà appliqué au même anti-patron ailleurs dans le projet (`ToggleButton.vue`, 2026-08-29). **C'est la démonstration, pas seulement l'affirmation, de la limite de l'outillage automatisé** : un outil vérifie qu'un nom accessible *existe algorithmiquement* ; juger qu'il est *fiable* (title vs aria-label selon le contexte du DOM) et *pertinent* (un glyphe n'est pas une action) reste un jugement humain — exactement ce que RGAA 11.1/11.9 demandent en réalité, au-delà du test mécanique.
+
+**Vérifié** : `npx vitest run` → 701/701 tests front verts (12 nouveaux + 689 existants, aucune régression), `npm run lint` → 0 erreur, `node scripts/audit-a11y.mjs` → 0/79 fichiers (inchangé).
+
+---
+
 ## 3. Motifs justifiés (non-conformités apparentes, conformes après analyse)
 
 - **Overlays de modale** (`@click`/`@click.self` sur le fond pour fermer) : la fermeture au clic hors panneau est une redondance de confort ; l'action de fermeture reste accessible au clavier via le bouton « Fermer » (désormais nommé) présent dans chaque panneau. Rendre l'overlay focusable ajouterait une étape de tabulation parasite.
@@ -82,6 +99,7 @@ Ces motifs sont encodés comme exceptions **documentées** dans `scripts/audit-a
 |---|---|---|
 | Contrastes — **outillé depuis le 2026-08-29**, mais limité aux 8 pages publiques sans appel API au montage | `e2e-a11y/contrast.spec.js` a besoin d'un serveur de preview statique, sans API derrière — les pages privées (nécessitent une session) et `/register`/`/verify-email` (appel API au montage/`beforeEnter`) restent hors périmètre | Étendre avec un mock d'API (ou un compte de test seedé) pour couvrir les pages privées et les 2 pages exclues |
 | Pas de test lecteur d'écran réel | Nécessite NVDA/VoiceOver et un protocole manuel — aucun outil du projet ne s'y substitue | Session de test manuelle NVDA sur les 3 parcours critiques (inscription, session de révision, création d'exercice) |
-| Périmètre axe-core (jsdom) partiel | 8 composants montés isolément (4 en 2026-07-06 + 4 en 2026-08-29) sur un total de ~40 ; les pages complètes exigent des mocks lourds | Étendre progressivement (une page/un composant par itération), en priorité les champs de formulaire et boutons icône-seule |
+| Périmètre axe-core (jsdom) partiel | 20 composants montés isolément (4 en 2026-07-06 + 4 en 2026-08-29 + 12 en 2026-08-30) sur un total de 36 ; les 16 restants sont purement présentationnels (revus, aucun élément interactif propre) ; les **pages** complètes (vs composants isolés) restent hors périmètre — elles exigent des mocks d'API lourds | Étendre aux pages, en mockant l'API (pattern déjà utilisé pour `KpiAlertWidgetComponent`/`ExerciseDetailPage`) |
+| Nom accessible techniquement présent mais non fiable ou non pertinent | axe-core ne peut juger ni la fiabilité d'un `title` porté par un ancêtre (vs par le contrôle lui-même), ni la pertinence sémantique d'un nom (un glyphe Unicode passe le test mécanique) — voir §2 ter, 2 cas réels trouvés et corrigés le 2026-08-30 | Revue manuelle ciblée sur les nouveaux composants ajoutés à l'app ; aucun outil ne peut se substituer à ce jugement |
 | Focus non piégé dans les modales « artisanales » | Plusieurs pages utilisent un overlay maison au lieu de `ModalComponent` (qui a le focus trap) — candidats repérés : `AdminPage.vue`, `CalendarPage.vue`, `ClassroomPlateformeView.vue` | Migration progressive vers `ModalComponent` |
 | **Dette découverte le 2026-08-29** : `tailwind.config.js` définit `theme.colors` (remplace toute la palette par défaut) plutôt que `theme.extend.colors` — `white`/`black`/`gray-*`/etc. ne génèrent aucune classe utilitaire ; un seul cas (`safelist: ['text-white']`) est contourné, et ce contournement lui-même ne fonctionnait pas dans le build vérifié | Changement structurant, à fort rayon d'impact (peut modifier le rendu de nombreuses pages qui utilisent ces classes sans le savoir) — volontairement hors périmètre de cette campagne, corrigée au cas par cas (`/forgot-password`, `/reset-password`) | Auditer l'usage des couleurs par défaut Tailwind dans tout `src/`, puis basculer `theme.colors` → `theme.extend.colors` en un lot dédié, avec revue visuelle complète |
