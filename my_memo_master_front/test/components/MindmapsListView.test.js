@@ -124,11 +124,13 @@ describe('MindmapsListView', () => {
     expect(wrapper.find('.modal-title').text()).toBe('Nouvelle carte mentale')
   })
 
-  it('la modale de création pré-remplit le nom par défaut', async () => {
+  it('la modale de création laisse le nom vide avec un placeholder (pas de valeur pré-remplie)', async () => {
     const wrapper = mountListView()
     await flushPromises()
     await wrapper.find('.create-trigger').trigger('click')
-    expect(wrapper.find('input.form-input').element.value).toBe('Nouvelle carte mentale')
+    const input = wrapper.find('input.form-input')
+    expect(input.element.value).toBe('')
+    expect(input.attributes('placeholder')).toBeTruthy()
   })
 
   it('la modale de création liste les matières dans le select', async () => {

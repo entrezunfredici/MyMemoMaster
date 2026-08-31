@@ -45,11 +45,11 @@ const fetchDiagrams = async () => {
 
 // ── Modal créer ────────────────────────────────────────────────────────────────
 const showCreateModal = ref(false)
-const createName = ref('Nouvelle carte mentale')
+const createName = ref('')
 const createSubjectId = ref(null)
 
 const openCreateModal = () => {
-  createName.value = 'Nouvelle carte mentale'
+  createName.value = ''
   createSubjectId.value = props.subjects[0]?.subjectId || null
   showCreateModal.value = true
 }
@@ -163,14 +163,23 @@ onMounted(fetchDiagrams)
 
     <template #modals>
       <!-- Modal créer -->
-      <div v-if="showCreateModal" class="modal-overlay" @click="showCreateModal = false">
-        <div class="modal-panel" @click.stop>
+      <div v-if="showCreateModal" class="modal-overlay" @mousedown.self="showCreateModal = false">
+        <div class="modal-panel">
           <button aria-label="Fermer" @click="showCreateModal = false" class="modal-close">&times;</button>
           <h2 class="modal-title">Nouvelle carte mentale</h2>
           <form @submit.prevent="confirmCreate">
             <div class="mb-4">
               <label class="form-label">Nom</label>
-              <input aria-label="Nom de la carte mentale" v-model="createName" type="text" class="form-input" maxlength="50" required autofocus />
+              <input
+                aria-label="Nom de la carte mentale"
+                v-model="createName"
+                type="text"
+                placeholder="Ex : Chapitre 3 - Les fractions"
+                class="form-input"
+                maxlength="50"
+                required
+                autofocus
+              />
             </div>
             <div class="mb-4">
               <label class="form-label">Matière</label>
@@ -187,8 +196,8 @@ onMounted(fetchDiagrams)
       </div>
 
       <!-- Modal renommer -->
-      <div v-if="showRenameModal" class="modal-overlay" @click="showRenameModal = false">
-        <div class="modal-panel" @click.stop>
+      <div v-if="showRenameModal" class="modal-overlay" @mousedown.self="showRenameModal = false">
+        <div class="modal-panel">
           <button aria-label="Fermer" @click="showRenameModal = false" class="modal-close">&times;</button>
           <h2 class="modal-title">Modifier la carte</h2>
           <form @submit.prevent="confirmRename">

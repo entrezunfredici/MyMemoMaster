@@ -91,7 +91,7 @@
 | Jobs (fifo.cron.js) | Stable | init |
 | Front — Auth (login, register) | Stable — M-05.09c : AuthFormLayout.vue composant layout partagé (4 pages auth refactorisées) | 2026-06-16 |
 | Front — HomePage | Stable | init |
-| Front — FlashcardsPage | Stable — refactor : utilise ItemListLayout.vue, chrome dupliqué supprimé | 2026-06-21 |
+| Front — FlashcardsPage | Stable — [IMP] 2026-08-31 : redirection auto vers gestion des cartes après création d'un système | 2026-06-21 |
 | Front — ExercisesPage / ExerciseDetailPage | Stable — M-06.08/M-06.09 : créateur + éditeur + player (4 types) + correction server-side + scores/historique livrés | 2026-06-21 |
 | Front — ItemListLayout.vue | Stable — composant layout partagé (recherche, filtre sujet, grille, états) | 2026-06-21 |
 | Front — MindmapsPage (+ MindmapsListView + MindmapsEditorView) | Stable — [FIX] 2026-08-31 : nom saisi à la création écrasé par `MindMapBuilder.vue` + première sauvegarde non automatique, corrigés | 2026-06-22 |
@@ -8006,3 +8006,52 @@ Les noms de fichiers uploadés méritaient le correctif : une clé `<horodatage>
 **Vérifié** : `npx vitest run test/components/MindmapsListView.test.js` → 14/14 (13 existants + 1 nouveau) ; `npx vitest run` complet → 702/702, 0 régression.
 
 **Dette signalée, non traitée ici** : le même risque de désaccord entre le contrat `api.del` (retour `undefined` sur 204) et un appelant qui suppose un objet `response` défini pourrait exister ailleurs dans le front sur d'autres entités dont le controller retourne 204 (`Test`, `Role` — voir note ligne 1977) ; aucun audit systématique des autres appelants de `api.del` n'a été fait à cette occasion, seul le cas signalé (mind maps) a été corrigé.
+
+---
+
+## [2026-08-31] IMP — Redirection automatique vers la gestion des cartes après création d'un système de Leitner
+
+**Contexte** — Demande utilisateur (amélioration UX, pas un bug) : après création d'un système de Leitner depuis `FlashcardsPage`, l'utilisateur reste sur la liste des systèmes et doit cliquer manuellement sur « Gérer les cartes → » pour commencer à ajouter des cartes. Un système fraîchement créé n'a par construction aucune carte — l'action suivante logique est d'en ajouter.
+
+**Ce qui a été fait**
+- `FlashcardsPage.vue` : `submitForm` redirige désormais vers `{ name: 'flashcards.cards', params: { systemId } }` (même cible que le lien existant « Gérer les cartes → », `FlashcardsPage.vue:56`) immédiatement après une **création** réussie (pas une édition — l'édition reste sur la liste avec rafraîchissement, comportement inchangé).
+
+**Effet de bord assumé, non traité** : le bandeau du parcours guidé (`GuidedTourBannerComponent.vue`, rendu globalement dans `App.vue`) calcule `onStepPage` en comparant `route.name` au nom de route de l'étape (`'flashcards'` pour l'étape Leitner) — après la redirection vers `'flashcards.cards'`, ce test devient faux et le bouton « Reprendre l'étape → » s'affiche en plus du bouton « Étape suivante → » (déjà actionnable, `currentStepDone` étant basé sur `links.leitnerSystemId` et non sur la route courante). Comportement cosmétique mineur, pas un dysfonctionnement — non corrigé ici, hors périmètre de la demande.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/pages/FlashcardsPage.vue`
+
+**Vérifié** : `npx vitest run` → 702/702, 0 régression (aucun test dédié à `FlashcardsPage.vue` n'existe — dette déjà documentée le 2026-08-30, non comblée ici) ; `npx eslint src/pages/FlashcardsPage.vue` → 0 erreur.
+
+**Dette signalée, non traitée ici** : pas de test Vitest pour `FlashcardsPage.vue` (page complète, hors périmètre jsdom actuel faute de mocks d'API systématiques — cf. entrée RGAA 2026-08-30) — un test qui monte la page, simule une création réussie et vérifie l'appel à `router.push` apporterait une garantie de non-régression directe sur ce comportement, absente aujourd'hui.
+
+---
+
+## [2026-08-31] IMP — Nom de carte mentale en placeholder (pas pré-rempli) + fermeture des modales sur l'appui plutôt que le relâchement
+
+**Contexte** — Deux demandes UX de l'utilisateur : (1) le champ « Nom » de la modale de création de carte mentale est pré-rempli avec « Nouvelle carte mentale », alors que le champ équivalent pour un système de Leitner (`FlashcardsPage.vue`) n'affiche qu'un exemple en placeholder — incohérence à harmoniser. (2) Sur toutes les modales de l'app, cliquer sur l'overlay (en dehors du panneau) ferme la modale **au relâchement du clic**, pas à l'appui ; sélectionner du texte dans un champ puis relâcher le bouton en dehors du panneau (glisser-sélectionner qui déborde) ferme donc la modale par accident.
+
+**Cause du (2)** — Le pattern dupliqué dans toute l'app est `@click="close"` sur l'overlay + `@click.stop` sur le panneau. Un `click` DOM se déclenche sur le plus proche ancêtre commun entre la cible du `mousedown` et celle du `mouseup` : si l'appui démarre dans le panneau (ex. sur un champ texte) et le relâchement a lieu hors du panneau, cet ancêtre commun est l'overlay — qui reçoit alors le `click` et se ferme, même si l'utilisateur ne visait pas l'extérieur.
+
+**Décision de portée** — Question posée à l'utilisateur : corriger uniquement les modales travaillées cette session (carte mentale + système Leitner) ou toutes les modales de l'app (même pattern dupliqué dans 7 fichiers + `ModalComponent.vue`). L'utilisateur a choisi **toutes les modales**.
+
+**Ce qui a été fait**
+- **Placeholder mindmap** — `MindmapsListView.vue` : `createName` initialisé à `''` (au lieu de `'Nouvelle carte mentale'`) dans le state et dans `openCreateModal()` ; ajout de `placeholder="Ex : Chapitre 3 - Les fractions"` sur le champ, symétrique au champ « Nom du système » de `FlashcardsPage.vue`. Le fallback `createName.value.trim() || 'Nouvelle carte mentale'` dans `confirmCreate()` reste en place (cas limite : nom composé uniquement d'espaces, non bloqué par `required`).
+- **Fermeture des modales** — remplacement de `@click="close"` (overlay) + `@click.stop` (panneau) par `@mousedown.self="close"` sur l'overlay seul, dans les 10 modales de l'app : `ModalComponent.vue`, `FlashcardsPage.vue` (×2), `MindmapsListView.vue` (×2), `MindmapsEditorView.vue`, `ExercisesPage.vue` (×2), `FlashcardsCardsPage.vue` (×2). Le modificateur `.self` garantit que seul un appui **directement** sur l'overlay ferme la modale — peu importe où le relâchement a lieu ensuite — donc `@click.stop` sur le panneau devient inutile et a été retiré partout.
+- Tests : `ModalComponent.test.js` — le test overlay/panneau migré de `click` à `mousedown` + un nouveau test reproduisant explicitement le scénario du bug (appui dans le panneau, relâchement sur l'overlay → pas de fermeture). `MindmapsListView.test.js` — le test de pré-remplissage du nom réécrit pour vérifier un champ vide + un placeholder présent, au lieu d'une valeur par défaut.
+
+**Alternative écartée** : garder `@click.stop` sur le panneau en plus de `@mousedown.self` sur l'overlay — écarté après vérification que `.self` suffit à lui seul (il compare `event.target` à `event.currentTarget`, insensible à ce qui se passe dans les descendants) ; le garder aurait été du code mort trompeur laissant croire à une protection supplémentaire.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/components/ModalComponent.vue`
+- `my_memo_master_front/src/pages/FlashcardsPage.vue`
+- `my_memo_master_front/src/pages/ExercisesPage.vue`
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue`
+- `my_memo_master_front/src/components/mindmap/MindmapsListView.vue`
+- `my_memo_master_front/src/components/mindmap/MindmapsEditorView.vue`
+- `my_memo_master_front/test/components/ModalComponent.test.js`
+- `my_memo_master_front/test/components/MindmapsListView.test.js`
+
+**Vérifié** : `npx vitest run` → 703/703 (1 nouveau test), 0 régression ; `npx eslint` sur les fichiers modifiés → 0 erreur.
+
+**Dette signalée, non traitée ici** : `TagSelectorComponent.vue` a son propre pattern de fermeture au clic extérieur (dropdown de sélection de tags), non touché par ce ticket — pattern différent (pas de classe `modal-overlay`), à vérifier séparément s'il présente le même défaut de relâchement.

@@ -73,8 +73,10 @@
     <template #modals>
 
       <!-- Modal créer / modifier système -->
-      <div v-if="showModal" class="modal-overlay" @click="closeModal">
-        <div class="modal-panel" @click.stop>
+      <!-- @mousedown.self (pas @click) : ferme dès l'appui hors du panneau, sans casser
+           la sélection de texte qui se termine (relâchement) hors du panneau. -->
+      <div v-if="showModal" class="modal-overlay" @mousedown.self="closeModal">
+        <div class="modal-panel">
           <button @click="closeModal" class="modal-close" title="Fermer">&times;</button>
           <h2 class="modal-title">
             {{ editingId ? 'Modifier le système' : 'Nouveau système Leitner' }}
@@ -126,8 +128,8 @@
       </div>
 
       <!-- Modal planification de session -->
-      <div v-if="showPlanModal" class="modal-overlay" @click="closePlanModal">
-        <div class="modal-panel" @click.stop>
+      <div v-if="showPlanModal" class="modal-overlay" @mousedown.self="closePlanModal">
+        <div class="modal-panel">
           <button aria-label="Fermer" @click="closePlanModal" class="modal-close">&times;</button>
           <h2 class="modal-title" style="margin-bottom: 0.25rem">Planifier une session</h2>
           <p class="text-sm text-gray-500 mb-6">Système : <span class="font-semibold text-primary">{{ planningSystem?.name }}</span></p>
@@ -314,6 +316,7 @@ const closeModal = () => {
 
 const submitForm = async () => {
   submitting.value = true
+  const isCreate = !editingId.value
   systemStore.system = {
     name: form.name,
     subjectId: form.subjectId || null,
@@ -324,11 +327,19 @@ const submitForm = async () => {
     : await systemStore.createSystem()
   if (ok) {
     const systemId = editingId.value || systemStore.system.idSystem
-    if (!editingId.value) guidedTourStore.recordLinks({ leitnerSystemId: systemId })
+    if (isCreate) guidedTourStore.recordLinks({ leitnerSystemId: systemId })
     await tagStore.setEntityTags('leitnersystem', systemId, form.tagIds)
     closeModal()
-    await systemStore.fetchSystems()
-    await loadStats()
+    if (isCreate) {
+      // CHOIX: rediriger directement vers la gestion des cartes du système fraîchement créé
+      // plutôt que de rester sur la liste.
+      // RAISON: un système tout juste créé n'a aucune carte — l'action suivante logique est
+      // d'en ajouter, pas de revoir la liste (demande utilisateur, plus cohérent avec le parcours).
+      router.push({ name: 'flashcards.cards', params: { systemId } })
+    } else {
+      await systemStore.fetchSystems()
+      await loadStats()
+    }
   }
   submitting.value = false
 }

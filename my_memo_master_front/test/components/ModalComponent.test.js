@@ -41,12 +41,22 @@ describe('ModalComponent', () => {
     expect(wrapper.find('.modal-close').attributes('aria-label')).toBe('Fermer')
   })
 
-  it('clic sur l’overlay — émet close ; clic dans le panneau — n’émet pas', async () => {
+  it('appui (mousedown) sur l’overlay — émet close ; appui dans le panneau — n’émet pas', async () => {
     factory()
-    await wrapper.find('.modal-panel').trigger('click')
+    await wrapper.find('.modal-panel').trigger('mousedown')
     expect(wrapper.emitted('close')).toBeUndefined()
-    await wrapper.find('.modal-overlay').trigger('click')
+    await wrapper.find('.modal-overlay').trigger('mousedown')
     expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
+  it('sélection de texte démarrée dans le panneau puis relâchée hors du panneau — n’émet pas close', async () => {
+    // Reproduit le bug corrigé : appui (mousedown) dans le panneau, relâchement (mouseup)
+    // hors du panneau (ex. sélection de texte qui déborde). Avec @mousedown.self, seul le
+    // point d'appui compte — l'événement mousedown ne se déclenche jamais sur l'overlay ici.
+    factory()
+    await wrapper.find('.modal-panel').trigger('mousedown')
+    await wrapper.find('.modal-overlay').trigger('mouseup')
+    expect(wrapper.emitted('close')).toBeUndefined()
   })
 
   it('touche Échap — émet close', async () => {

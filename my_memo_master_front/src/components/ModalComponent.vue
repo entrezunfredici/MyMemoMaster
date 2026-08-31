@@ -1,17 +1,24 @@
 <template>
+  <!--
+    CHOIX: fermeture sur @mousedown.self plutôt que @click(.stop sur le panneau).
+    RAISON: avec @click, sélectionner du texte dans le panneau puis relâcher le bouton
+    en dehors (overlay) fermait la modale au relâchement — le clic "démarre" dans le
+    panneau mais son ancêtre commun avec le point de relâchement est l'overlay, qui
+    recevait alors le click. @mousedown.self ne se déclenche que si l'appui a lieu
+    directement sur l'overlay, dès l'appui plutôt qu'au relâchement.
+  -->
   <div
     v-if="visible"
     class="modal-overlay"
     role="dialog"
     aria-modal="true"
     :aria-label="title || 'Fenêtre de dialogue'"
-    @click="emit('close')"
+    @mousedown.self="emit('close')"
   >
     <div
       ref="panel"
       :class="['modal-panel', sizeClass]"
       tabindex="-1"
-      @click.stop
       @keydown.tab="trapFocus"
     >
       <button class="modal-close" aria-label="Fermer" @click="emit('close')">&times;</button>

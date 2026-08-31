@@ -77,9 +77,9 @@
     <div
       v-if="showModal"
       class="modal-overlay"
-      @click="closeModal"
+      @mousedown.self="closeModal"
     >
-      <div class="modal-panel" @click.stop>
+      <div class="modal-panel">
         <button
           @click="closeModal"
           class="modal-close"
@@ -243,9 +243,9 @@
     <div
       v-if="showBoxModal"
       class="modal-overlay"
-      @click="closeBoxModal"
+      @mousedown.self="closeBoxModal"
     >
-      <div class="modal-panel modal-panel--sm" @click.stop>
+      <div class="modal-panel modal-panel--sm">
         <button aria-label="Fermer" @click="closeBoxModal" class="modal-close">&times;</button>
         <h2 class="modal-title">
           {{ editingBox ? 'Modifier la boîte' : 'Nouvelle boîte' }}

@@ -252,8 +252,8 @@ onBeforeUnmount(() => {
   </div>
 
   <!-- Modal nom (première création / export) -->
-  <div v-if="showExportModal" class="modal-overlay" @click="showExportModal = false">
-    <div class="modal-panel" @click.stop>
+  <div v-if="showExportModal" class="modal-overlay" @mousedown.self="showExportModal = false">
+    <div class="modal-panel">
       <button aria-label="Fermer" @click="showExportModal = false" class="modal-close">&times;</button>
       <h2 class="modal-title">Enregistrer la carte mentale</h2>
       <form @submit.prevent="confirmExportModal">

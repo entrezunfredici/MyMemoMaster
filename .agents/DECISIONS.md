@@ -1541,3 +1541,27 @@ Le champ `type` est contraint côté application à ces 4 valeurs via express-va
 **Alternative écartée** : faire passer `MindmapsListView` par le store `stores/diagrammes.js` (qui gère déjà correctement ce cas) plutôt que de dupliquer la correction dans le composant — écarté après lecture : ce store expose une API à état interne (`this.diagramme`) pensée pour un flux différent (formulaire d'édition), incompatible sans réécriture avec le flux liste/suppression en une seule action de `MindmapsListView`. Le corriger localement, avec le commentaire `CHOIX/RAISON` pointant vers le pattern déjà établi dans `stores/diagrammes.js`, était le changement le plus petit qui respecte le contrat déjà documenté.
 
 **Conséquences** : Le message de succès et le retrait de la carte de la liste locale reflètent maintenant le résultat réel de la requête serveur. Dette signalée : d'autres appelants de `api.del`/`api.put` sur des entités dont le controller retourne 204 (`Test`, `Role` — cf. note existante ligne ~1977 de `CHANGELOG_AGENT.md`) n'ont pas été audités à cette occasion ; le même défaut pourrait exister ailleurs et n'a pas été cherché de façon systématique.
+
+---
+
+### [2026-08-31] Redirection après création d'un système de Leitner : uniquement sur création, jamais sur édition
+
+**Contexte** : Demande utilisateur — après création d'un système de Leitner, être redirigé directement vers la gestion des cartes de ce système plutôt que de rester sur la liste. Décision à prendre : la redirection doit-elle aussi s'appliquer à une édition de système existant ?
+
+**Décision** : Restreindre la redirection au cas `isCreate` (pas `editingId.value`). Un système fraîchement créé n'a par construction aucune carte, donc « gérer les cartes » est l'action suivante évidente ; un système édité a probablement déjà des cartes et l'utilisateur qui vient de le modifier (nom, matière, tags) est plus vraisemblablement en train de gérer plusieurs systèmes depuis la liste que de vouloir en éditer les cartes. Le comportement d'édition (rester sur la liste, `fetchSystems` + `loadStats`) reste inchangé.
+
+**Alternative écartée** : rediriger dans les deux cas (création et édition) — écarté, aucune indication dans la demande utilisateur que l'édition devait aussi rediriger, et le raisonnement ci-dessus (système édité ≠ système vide) allait à l'encontre de ce comportement par défaut.
+
+**Conséquences** : Effet de bord mineur et assumé sur le bandeau de parcours guidé (`GuidedTourBannerComponent.vue`) — après la redirection, `onStepPage` (qui compare `route.name` à `'flashcards'`) devient faux et affiche en plus un bouton « Reprendre l'étape → », sans rien casser (le bouton « Étape suivante → » reste disponible, basé sur `links.leitnerSystemId` et non sur la route courante). Non corrigé, jugé cosmétique et hors périmètre de la demande initiale.
+
+---
+
+### [2026-08-31] Fermeture des modales au clic extérieur : corriger les 10 occurrences du pattern dupliqué, pas seulement celles en cours de travail
+
+**Contexte** : Signalement utilisateur — sélectionner du texte dans un champ d'une modale puis relâcher le clic hors du panneau (glisser-sélectionner qui déborde) fermait la modale par accident. Cause identifiée : le pattern `@click="close"` sur l'overlay + `@click.stop` sur le panneau, dupliqué à l'identique dans 7 fichiers (10 modales) plus `ModalComponent.vue`, ferme au relâchement (`click` se déclenche sur le plus proche ancêtre commun entre le point d'appui et le point de relâchement, pas sur l'un ou l'autre isolément).
+
+**Décision** : Question de portée posée à l'utilisateur avant de coder (corriger seulement les modales de cette session vs. toutes) — l'utilisateur a choisi toutes les modales. Remplacement mécanique et identique partout : `@click="close"` (overlay) + `@click.stop` (panneau) → `@mousedown.self="close"` (overlay seul, `@click.stop` retiré car rendu inutile par `.self`). `.self` compare `event.target` à `event.currentTarget` : seul un appui démarré directement sur l'overlay ferme la modale, quel que soit l'endroit du relâchement — élimine la classe de bug plutôt qu'un correctif au cas par cas.
+
+**Alternative écartée** : garder `@click.stop` sur le panneau par prudence, en plus de `.self` — écarté : strictement redondant une fois `.self` en place, aurait laissé du code mort suggérant à tort une protection supplémentaire à un futur lecteur. / Centraliser dans `ModalComponent.vue` et migrer les 6 autres fichiers vers ce composant partagé — écarté comme hors périmètre : un vrai refactor de dé-duplication (6 modales hand-roulées à réécrire avec slots équivalents à `ModalComponent`) est un chantier distinct, plus risqué, non demandé ; corriger le bug signalé à l'identique dans chaque copie est le changement le plus petit qui le résout partout.
+
+**Conséquences** : Les 10 modales de l'app partagent maintenant un comportement de fermeture cohérent et non-bugué. Dette signalée, non traitée : la duplication du pattern modal-overlay/modal-panel dans 6 fichiers hand-roulés (au lieu de passer par `ModalComponent.vue`) subsiste — un futur correctif de ce type devra être répété manuellement dans chaque fichier tant que cette dé-duplication n'est pas faite. `TagSelectorComponent.vue` a un pattern de fermeture au clic extérieur différent (pas de classe `modal-overlay`), non audité à cette occasion.

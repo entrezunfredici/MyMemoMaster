@@ -57,8 +57,8 @@
     <!-- Modals -->
     <template #modals>
       <!-- Modal assignation groupes -->
-      <div v-if="showAssignModal" class="modal-overlay" @click="closeAssignModal">
-        <div class="modal-panel" @click.stop>
+      <div v-if="showAssignModal" class="modal-overlay" @mousedown.self="closeAssignModal">
+        <div class="modal-panel">
           <h2 class="modal-title">Assigner aux groupes classes</h2>
           <p class="text-sm text-gray-500 mb-4">
             Sélectionnez les groupes qui auront accès à cet exercice.<br>
@@ -89,8 +89,8 @@
       </div>
 
       <!-- Modal création / édition exercice -->
-      <div v-if="showModal" class="modal-overlay" @click="closeModal">
-        <div class="modal-panel modal-panel--lg" @click.stop>
+      <div v-if="showModal" class="modal-overlay" @mousedown.self="closeModal">
+        <div class="modal-panel modal-panel--lg">
           <h2 class="modal-title">{{ isEditMode ? 'Modifier l\'exercice' : 'Nouvel exercice' }}</h2>
 
           <form @submit.prevent="submitExercise">
