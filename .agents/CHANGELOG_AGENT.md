@@ -113,7 +113,7 @@
 | Front — Stores Pinia Rappels | Stable — reminders.js : CRUD complet, pendingReminders, remindersByEntity | 2026-06-12 |
 | Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
 | Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
-| Front — Couche API Axios (api.js, config.js) | Stable — M-00.10 : JSDoc, messages FR, tests Vitest | 2026-06-06 |
+| Front — Couche API Axios (api.js, config.js) | Stable — [FIX] 2026-08-31 : `toResponse()` normalise `data.message` depuis `data.errors[0].msg` (forme express-validator) — corrige l'affichage du message d'erreur réel sur les 160 appelants qui lisaient `resp.data.message` | 2026-06-06 |
 | Tags (système de tags M2M) | Stable — S-05.01 : Tag model + 4 migrations + service/controller/validators/routes + TagSelector Vue + intégration MindmapsListView/FlashcardsPage/ExercisesPage + 39 tests controller | 2026-06-24 |
 | Documentation UI navigation par sujet | Stable — S-05.02 : diagrams/ui_navigation_sujet.md — maquettes ASCII, patterns ItemListLayout / TagSelectorComponent / MenuItemComponent, API props, flux utilisateur | 2026-06-25 |
 | Search API (cross-contenu) | Stable — S-05.05 : GET /search?subjectId&q — service + controller + validators + routes + 11 tests | 2026-06-25 |
@@ -8127,3 +8127,35 @@ Les noms de fichiers uploadés méritaient le correctif : une clé `<horodatage>
 - **Rappel déjà consigné le 28/08, toujours vrai** : au premier `helm upgrade` qui se déclenchera après réactivation, la ConfigMap prod (en dérive depuis le patch manuel `APP_FRONT_URL` du 28/08) sera re-rendue en totalité — sans risque de contenu (valeur identique à `helm/values-prod.yaml`), mais le diff affichera les 32 clés et pas seulement le delta réel.
 - **`K8S_PREPROD_ENABLED` toujours à `false`**, décision laissée à l'utilisateur — sans effet tant que `staging` n'avance pas.
 - **`gh` CLI absent du poste** (`where gh` → introuvable) — a forcé cette session à passer par l'API Docker Hub publique et `kubectl` direct plutôt que `gh run list`/`gh variable` ; à installer si des vérifications CI régulières depuis ce poste sont souhaitées.
+
+---
+
+## [2026-08-31] FIX — 500 en prod à la création d'exercices (énoncé > 255 caractères) + messages d'erreur de validation avalés partout dans le front
+
+**Contexte** — Signalement utilisateur (screenshot page 500 pleine page) : création d'une série d'exercices en prod. Le bandeau du parcours guidé confirmait que le `Test` avait été créé (`testId` déjà lié) — l'échec se situait donc dans la boucle `POST /questions` qui suit, pas à la création du test lui-même.
+
+**Cause** — `Question.statement` (l'énoncé de la question) était en `Sequelize.STRING` sans longueur précisée dans la migration d'origine (`20260226151500-create-question-table.js`) → `VARCHAR(255)` par défaut côté PostgreSQL. Aucun validateur (`Question.validators.js`) ne bornait la longueur de `statement`, et aucun `maxlength` n'existait côté formulaire (`ExercisesPage.vue`) — un énoncé un peu long (plausible pour un exercice) dépassait silencieusement les 255 caractères et faisait échouer l'`INSERT` en 500 générique.
+
+**Décision** (question posée à l'utilisateur : migrer la colonne en TEXT vs. resserrer validateur/formulaire à 255) : l'utilisateur a choisi de **migrer en TEXT** — contrairement aux 3 correctifs précédents de cette classe de bug (`LeitnerSystem`/`Subject`/`Diagramme`, où resserrer était le bon choix pour des champs "nom" courts par nature), un énoncé d'exercice n'a pas de raison d'être plafonné à 255 caractères ; `Question.content` (les options/réponses) est déjà en `TEXT`, la colonne `statement` était en désaccord avec sa propre table pour cette seule raison. Voir `DECISIONS.md`.
+
+**Ce qui a été fait**
+- `migrations/20260831000001-change-question-statement-to-text.js` — `changeColumn('Question', 'statement', { type: TEXT })`.
+- `models/Question.model.js` — `statement` passé de `DataTypes.STRING` à `DataTypes.TEXT`.
+
+**Deuxième bug trouvé en creusant l'échec (« erreurs en local à la création d'événements dans le calendrier », signalé par l'utilisateur dans la foulée)** — Reproduit avec un screenshot : heures de début/fin identiques (19:00/19:00), rejetées à raison par `RevisionSession.validators.js` (`endTime <= startTime`), mais le toast affiché restait le message générique `"Erreur lors de la création."` au lieu de la vraie raison. **Cause racine, partagée par tout le front** : `validate.middleware.js` renvoie `{ errors: [...] }` (forme express-validator) sur un 400, **jamais** `{ message }` — or `grep -rn 'resp?.data?.message' src/` remonte **160 occurrences** dans le front, toutes écrites en supposant un champ `message` qui n'existe jamais sur un rejet de validation. Autrement dit : **tout formulaire de l'app qui échoue à la validation serveur affiche un message générique inutile, sans exception** — pas un bug isolé au calendrier.
+
+**Correctif centralisé (pas 160 correctifs séparés)** : `helpers/api.js` — `toResponse()` normalise désormais `data.message` depuis `data.errors[0].msg` quand `message` est absent et `errors` est un tableau non vide. Un seul point de passage (déjà utilisé par `get`/`post`/`put`/`patch`/`del`) corrige les 160 appelants sans les toucher individuellement.
+
+**Fichiers modifiés**
+- `my_memo_master_api/migrations/20260831000001-change-question-statement-to-text.js`
+- `my_memo_master_api/models/Question.model.js`
+- `my_memo_master_front/src/helpers/api.js`
+- `my_memo_master_front/test/helpers/api.test.js` (+3 tests)
+
+**Vérifié** : `npx jest` (API) → 1 560/1 560, 0 régression (le changement de type ne casse aucun test, tous mockent le modèle) ; `npx vitest run` (front) → **708/708** (+3 nouveaux tests sur la normalisation `errors`→`message`), 0 régression ; `npx eslint` sur les fichiers modifiés → 0 erreur.
+
+**Dette signalée, non traitée ici** :
+- La migration n'a pas été jouée dans cette session (pas d'accès à une base locale/prod depuis ce poste) — elle s'appliquera au prochain déploiement, comme les migrations précédentes de ce projet (jouées en CD).
+- Aucun `maxlength` n'a été ajouté côté formulaire (`ExercisesPage.vue`) pour `statement` — cohérent avec le choix TEXT (pas de limite arbitraire à fixer), mais un très long énoncé reste possible sans retour utilisateur avant l'envoi ; jugé hors périmètre de ce correctif.
+- Le calendrier ne propose toujours pas de valeur par défaut pour `endTime` différente de `startTime` — l'utilisateur verra désormais le vrai message d'erreur (correctif principal), mais rien n'empêche de retomber sur le même 400 une seconde fois avant de comprendre qu'il faut changer l'heure de fin. Amélioration UX possible, non demandée, non faite.
+- Le `grep` des 160 occurrences n'a pas été audité une par une pour vérifier qu'aucune ne dépend d'un format de réponse different (ex. un contrôleur qui renverrait déjà `{ message, errors }` avec un `message` non pertinent) — le garde `!data.message` limite ce risque (ne touche que les réponses qui n'ont **aucun** message), mais ce n'est pas une preuve exhaustive.
