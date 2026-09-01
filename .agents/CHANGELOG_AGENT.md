@@ -25,11 +25,12 @@
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-08-31 |
 | Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-09-01 |
-| TestResult (scores historique exercices) | Stable — M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-06-21 |
+| TestResult (scores historique exercices) | Stable — [ADD] 2026-09-01 : colonne `durationSeconds` (nullable), chronométrée côté front sur `POST /tests/:id/submit`, alimente le KPI temps de révision ; M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-09-01 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `cardSystems`/`LeitnerSystemTag` — modèles Sequelize enregistrés préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-09-01 |
 | LeitnerSystemsUsers | Stable | init |
+| LeitnerReviewSession (journal sessions réelles) | Stable — [ADD] 2026-09-01 : nouvelle table, journalise chaque session Leitner réellement terminée (userId, idSystem, cardsReviewed, durationSeconds), `POST /leitner-review-sessions`, chronométrée côté front (`FlashcardsSessionPage.vue`) et best-effort (échec silencieux) ; alimente le KPI temps de révision aux côtés de `TestResult.durationSeconds` | 2026-09-01 |
 | Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API ; sortie MathML explicite pour lecteurs d'écran (2026-07-19) | 2026-07-19 |
 | Librairie de rendu formules (S-06.01) | Clôturé — benchmark MathJax/KaTeX formalisé dans DECISIONS (2026-07-19) : KaTeX seul retenu ; dépendance `mathjax` et helper mort `mathjax-config.js` supprimés, CONVENTIONS corrigé | 2026-07-19 |
 | Maquettes UI éditeur formules (S-06.02) | Clôturé — écran « Interpréteur de formules » ajouté au prototype interactif (15 écrans) : éditeur + palette de symboles + aperçu + badge homogénéité ; 17 captures régénérées (dont 17-interpreteur.png) | 2026-07-19 |
@@ -50,7 +51,7 @@
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) ; [FIX] 2026-08-15 : `getOnboardingByUserId`/`updateOnboarding` retournent `null` au lieu de `throw` (le controller traduisait déjà en 404, mais recevait un 500) | 2026-08-15 |
-| Kpi | Stable — vérifié sain en prod le 2026-09-01 (requête Prometheus `http_requests_total` sur `/api/v1/kpi/*` : 24h glissantes, uniquement 200/304/401, 0 code 5xx) suite au signalement d'un bug 500 sur un module voisin (Test/Question) ; M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-09-01 |
+| Kpi | Stable — [ADD] 2026-09-01 : `revision.totalMinutes` alimenté par un temps réel chronométré (exercices via `TestResult.durationSeconds`, sessions Leitner via la nouvelle table `LeitnerReviewSession`) en plus des créneaux planifiés `RevisionSession` — jusqu'ici toujours à 0 min en pratique ; vérifié sain en prod le 2026-09-01 (requête Prometheus `http_requests_total` sur `/api/v1/kpi/*` : 24h glissantes, uniquement 200/304/401, 0 code 5xx) suite au signalement d'un bug 500 sur un module voisin (Test/Question) ; M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-09-01 |
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
 | Monitoring (Prometheus central) | Stable — Prometheus par environnement dans le chart Helm (`monitoring.enabled`), scrape par annotations pod, Deployment/emptyDir preprod vs StatefulSet/PVC prod, non exposé par l'Ingress ; port metrics restauré dans le chart (perdu à la migration Helm) | 2026-07-11 |
@@ -8255,4 +8256,103 @@ Les 5 migrations correspondantes ont été vérifiées une à une : aucune ne cr
 **Dette signalée, non traitée ici**
 - Aucune vérification fonctionnelle en conditions réelles du redémarrage prod (pas de trafic observé dans la fenêtre Prometheus post-restart) — à confirmer par l'utilisateur.
 - D'autres modales ailleurs dans l'app pourraient avoir le même défaut sur des écrans très bas (mobile paysage, zoom élevé) même avec `max-height: 90vh` — non audité systématiquement, seul le cas signalé a été corrigé (mais la correction est générique, pas ciblée à une seule page).
+
+---
+
+## [2026-09-01] ADD — KPI "Temps total de révision" : chronométrage réel des exercices et sessions Leitner (jusqu'ici toujours à 0)
+
+**Contexte** — Signalement utilisateur (capture d'écran KPI) : « Temps total de révision » affichait 0 min alors que l'utilisateur avait déjà pratiqué. Cause : ce chiffre ne sommait que les créneaux planifiés dans `RevisionSession` (calendrier, `startTime`/`endTime` prévisionnels) — jamais le temps réellement passé sur un exercice ou une session Leitner, qu'aucun code ne mesurait. Proposition de l'utilisateur, reprise telle quelle : chronométrer côté front le temps réel passé sur chaque session Leitner et chaque série d'exercices, et l'additionner au temps planifié existant.
+
+**Décision d'architecture** — Ne **pas** réutiliser `RevisionSession` pour journaliser l'activité réelle (option envisagée puis écartée) : cette table sert à mesurer si l'utilisateur suit un planning qu'il s'est fixé à l'avance (`Sessions planifiées`/`complétées`/`streak`/`Taux de complétion`) — y injecter automatiquement de l'activité non planifiée aurait gonflé artificiellement ces indicateurs et changé leur sens sans le dire. Deux nouveaux points de mesure, propres à chaque type d'activité :
+- **Exercices** : `TestResult.durationSeconds` (nouvelle colonne, nullable) — une ligne `TestResult` existe déjà par tentative complétée, c'était le point d'ancrage naturel.
+- **Leitner** : aucune entité n'existait pour « une session de révision terminée » (chaque carte est un appel API individuel, sans notion de session) — nouvelle table `LeitnerReviewSession` (journal pur : userId, idSystem, cardsReviewed, durationSeconds, completedAt).
+
+Les deux durées s'additionnent au temps planifié existant dans `Kpi.service.js` (`_computeRealMinutes`), sans toucher au calcul de `_computeRevision` lui-même.
+
+**Chronométrage front** : `Date.now()` posé au moment où l'utilisateur devient effectivement actif (questions interactives affichées / cartes chargées), pas pendant le chargement réseau. `ExerciseDetailPage.vue` (redémarré sur `resetQuiz()`) et `FlashcardsSessionPage.vue` (à la fin naturelle de la session, pas sur abandon via « Retour » — limitation assumée, voir dette). Journalisation Leitner en best-effort (`stores/leitnerReviewSessions.js` — échec silencieux, la session déjà faite ne doit pas être remise en cause par un problème réseau sur ce seul point de mesure).
+
+**Garde-fou commun aux deux flux** : `durationSeconds` plafonné à 4h (14 400 s) côté validateurs (`Test.validators.js` et `LeitnerReviewSession.validators.js`) — au-delà, la valeur ne reflète plus une session réelle (onglet oublié ouvert, ordinateur en veille) et polluerait le KPI plutôt que de le renseigner.
+
+**Ce qui a été fait**
+- Backend : migrations `20260901000001` (colonne `TestResult.durationSeconds`) et `20260901000002` (table `LeitnerReviewSession`) ; nouveau modèle + service + controller + validators + routes `LeitnerReviewSession` (`POST /leitner-review-sessions`) ; `Test.service.js`/`Test.controller.js`/`Test.validators.js` acceptent et propagent `durationSeconds` sur `POST /tests/:id/submit` ; `Kpi.service.js` agrège les deux sources dans `revision.totalMinutes` (`getMyKpis` et `getPersonalKpisForSubjects`, ce dernier restreint aux matières consenties y compris pour le temps réel).
+- Frontend : `stores/testResults.js` (`submitTest` transmet `durationSeconds`), `stores/leitnerReviewSessions.js` (nouveau), `ExerciseDetailPage.vue` et `FlashcardsSessionPage.vue` chronomètrent et transmettent.
+
+**Fichiers créés**
+- `my_memo_master_api/migrations/20260901000001-add-durationseconds-to-testresult.js`
+- `my_memo_master_api/migrations/20260901000002-create-leitnerreviewsession-table.js`
+- `my_memo_master_api/models/LeitnerReviewSession.model.js`
+- `my_memo_master_api/services/LeitnerReviewSession.service.js`
+- `my_memo_master_api/controllers/LeitnerReviewSession.controller.js`
+- `my_memo_master_api/validators/LeitnerReviewSession.validators.js`
+- `my_memo_master_api/routes/LeitnerReviewSession.routes.js`
+- `my_memo_master_front/src/stores/leitnerReviewSessions.js`
+- Tests : `test/services/LeitnerReviewSession.service.test.js`, `test/controllers/LeitnerReviewSession.controller.test.js`, `test/stores/leitnerReviewSessions.store.test.js`
+
+**Fichiers modifiés**
+- `my_memo_master_api/models/TestResult.model.js`, `models/index.js`, `app.js`, `services/Test.service.js`, `controllers/Test.controller.js`, `validators/Test.validators.js`, `services/Kpi.service.js`
+- `my_memo_master_front/src/stores/testResults.js`, `src/pages/ExerciseDetailPage.vue`, `src/pages/FlashcardsSessionPage.vue`
+- Tests mis à jour : `test/services/Test.service.test.js`, `test/controllers/Test.controller.test.js`, `test/services/Kpi.service.test.js`, `test/stores/testResults.store.test.js`, `test/components/ExerciseDetailPage.test.js`, `test/components/FlashcardsSessionPage.test.js`
+
+**Vérifié** : `npx jest` (API) → **1580/1580**, 0 régression (+20 tests) ; `npx vitest run` (front) → **713/713**, 0 régression (+5 tests) ; `npx eslint` sur tous les fichiers touchés → 0 erreur.
+
+**Dette signalée, non traitée ici**
+- **Migrations non jouées dans cette session** (pas d'accès direct à une base locale/prod) — s'appliqueront au prochain déploiement, comme les précédentes de ce projet.
+- **Abandon d'une session Leitner en cours d'écran (bouton « Retour ») n'est pas journalisé** — seule une session menée jusqu'au bout (dernière carte) est comptée. Cohérent avec `cardsReviewed` (compte exact de cartes vraiment traitées) mais sous-estime le temps réel si l'utilisateur quitte en cours de route. Assumé pour cette première version — journaliser les abandons demanderait un `beforeunload`/`onUnmounted` fiable, plus complexe à garantir correct (navigateur mobile, fermeture d'onglet).
+- **Aucun affichage distinct** entre temps planifié (RevisionSession) et temps réel (nouveau) dans `KpiPage.vue` — le total reste un seul chiffre agrégé, tel que demandé par l'utilisateur ; une ventilation serait un ajout UI séparé, non demandé ici.
+- **`cardsReviewed`/`durationSeconds` ne sont actuellement affichés nulle part par carte ou par session** — uniquement agrégés dans le KPI de temps ; `LeitnerReviewSession` pourrait alimenter un futur historique détaillé si besoin.
+
+---
+
+## [2026-09-01] FIX — Pré-chauffage du modèle sémantique ne chargeait jamais rien (court-circuit sur deux chaînes identiques) ; conteneur API local OOM-killé à la 1ʳᵉ vraie correction
+
+**Contexte** — Signalement utilisateur : test local, 4 échecs consécutifs (« Erreur lors de la correction. ») en répondant à une carte Leitner de type « ouverte ». `docker logs mymemomaster-api-1` a montré la cause exacte au moment de l'échec : `[SemanticService] Loading embedding model: ...` suivi de `Killed` — le conteneur API a été tué par l'OOM killer Linux pendant le chargement du modèle d'embedding (`@xenova/transformers`), puis redémarré automatiquement par l'entrypoint (d'où les 4 échecs : chaque clic sur « Valider » tombait pendant la fenêtre de redémarrage).
+
+**Cause racine, distincte du manque de mémoire lui-même** — `server.js` pré-chauffe le modèle au démarrage via `semanticService.gradeSemantic('préchauffage du modèle', 'préchauffage du modèle')`, **deux chaînes strictement identiques**. Or `gradeSemantic()` a un court-circuit de correspondance exacte (`normalizeSymbolic(a) === normalizeSymbolic(b)`) qui retourne immédiatement `{ strategy: 'exact' }` **avant** d'appeler `getModel()` — trivialement vrai sur deux entrées identiques. Le pré-chauffage se terminait donc toujours avec succès (log `[SemanticService] Pre-warm inference done.`) **sans avoir jamais chargé le modèle**. Le vrai chargement — et son pic mémoire — n'arrivait qu'à la toute première correction d'un vrai utilisateur, en pleine session plutôt qu'en tâche de fond au démarrage.
+
+**Le vrai chiffre mémoire, mesuré cette fois** — Une fois le pré-chauffage corrigé pour charger réellement le modèle (voir ci-dessous), `docker stats` a montré **794 MiB** de RSS après chargement — très au-dessus des 512 Mo du conteneur local (`API_LIMIT_MEMORY`, `docker-compose.yml`) et du commentaire de code existant (`Semantic.service.js`, « MiniLM (~120 Mo) tient dans le même gabarit ») qui sous-estimait largement l'empreinte réelle du runtime ONNX WASM une fois le modèle chargé (le chiffre de 120 Mo décrivait probablement la taille des poids du modèle sur disque, pas l'empreinte du process une fois chargé en mémoire par `@xenova/transformers`).
+
+**Corrigé (2 volets)**
+1. **`server.js`** — le pré-chauffage utilise désormais deux chaînes différentes, pour ne plus jamais prendre le court-circuit et forcer un vrai appel à `getModel()` + un vrai calcul d'embedding, comme le veut l'intention déjà documentée dans le commentaire existant (« une vraie inférence plutôt que getModel() seul »).
+2. **`.env` (local uniquement, non committé)** — `API_LIMIT_MEMORY` porté de 512M (défaut `docker-compose.yml`) à **1536M** ; Docker Desktop dispose de 8 Go alloués, largement de la marge. Conteneur recréé et vérifié : le modèle charge maintenant réellement au démarrage (`[SemanticService] Loading embedding model...` → `Model loaded successfully.` → `Pre-warm inference done.`), conteneur stable à 794 MiB / 1,5 GiB.
+
+**Vérifié** : `npx jest test/services/Semantic.service.test.js` → 36/36, 0 régression ; `npx eslint server.js` → 0 erreur ; conteneur local recréé, sain (`docker ps` → healthy), logs de démarrage confirmant le chargement réel du modèle, aucun `Killed` depuis.
+
+**Fichiers modifiés**
+- `my_memo_master_api/server.js`
+- `.env` (local, non versionné — `API_LIMIT_MEMORY=1536M` ajouté)
+
+**Dette signalée, non traitée ici — risque potentiel en prod, à faire confirmer par l'utilisateur avant tout changement**
+- **`helm/values-prod.yaml`** plafonne l'API à **1 Gi** (`api.resources.limits.memory`), avec une requête à 512 Mi. Le chiffre mesuré ici (794 Mi au repos, pré-chauffage seul, sans trafic concurrent) laisse ~230 Mo de marge avant la limite — sous charge réelle (plusieurs corrections sémantiques concurrentes, autres opérations mémoire du même pod), **un risque réel d'OOMKill en prod n'est pas exclu**, avec les 2 réplicas API qui absorbent l'impact (k8s redémarre le pod tué) plutôt que de tout bloquer comme en local (un seul conteneur). **Non modifié ici** : changer une limite mémoire prod a un coût et n'a pas été demandé — à soumettre à l'utilisateur avec les chiffres ci-dessus s'il souhaite une marge de sécurité plus large (`kubectl top pods -n mymemomaster --containers` permettrait de confirmer l'usage réel en conditions de charge avant de trancher).
+- ~~Le commentaire dans `Semantic.service.js` reste inexact~~ — **corrigé dans la foulée** (voir entrée suivante).
+
+---
+
+## [2026-09-01] OPS — Mémoire API prod/preprod redimensionnée (512Mi/1Gi → 896Mi/1536Mi) sur mesure réelle ; preprod déployée, prod bloquée par les permissions
+
+**Contexte** — Suite au correctif de pré-chauffage (entrée précédente), demande explicite de l'utilisateur : « tu peux regarder et adapter [la mémoire prod] si besoin (si ça rentre dans les pods) ». Les deux fichiers `helm/values-{prod,preprod}.yaml` portaient déjà, avant cette session, des commentaires documentant que 512Mi/1Gi était une **valeur provisoire** « en attendant une mesure réelle » (`kubectl top pods`, jamais disponible — `metrics-server` cassé sur ce cluster, panne déjà connue). La mesure de 794-825 Mi obtenue en local (entrée précédente) est cette mesure réelle.
+
+**Analyse de faisabilité avant tout changement** (« si ça rentre ») :
+- `kubectl top` indisponible (`metrics-server` en panne) → capacité calculée depuis `status.allocatable.memory` des 3 nœuds (5 633 Mi chacun) et somme des `resources.requests/limits` de tous les pods (`kubectl get pods --all-namespaces -o json`, agrégé par nœud avec un script Python ad hoc).
+- Nouvelles valeurs testées (896Mi requests / 1536Mi limits, remplaçant 512Mi/1Gi) : **requests** restent confortables sur les 3 nœuds (17 à 55 % de l'allouable) — c'est la seule métrique qui bloque réellement l'ordonnancement. **limits** dépassent 100 % sur 2 nœuds (97,7 % et 113,6 %) mais un plafond n'est pas une réservation ; risque réel seulement si tous les conteneurs du nœud plafonnent simultanément (peu probable, les pods système `cilium`/`coredns`/`cert-manager` tournent très en dessous de leurs propres limites en pratique).
+- **Preprod a un `resourceQuota` namespace (contrainte dure, contrairement aux nœuds)** : recalculé précisément — somme des limites en régime établi 3,625 Gi + 1,5 Gi de surge (rolling update) = 5,125 Gi, sous le plafond existant de 6 Gi (marge encore confortable, ~0,9 Gi contre ~1,8 Gi avant). **Le plafond du quota lui-même n'a pas eu besoin d'être touché**, seul son commentaire explicatif a été mis à jour avec les nouveaux chiffres.
+- **Prod n'a pas de quota** (`resourceQuota.enabled: false`, choix documenté : « c'est l'environnement que l'on protège, le plafonner reviendrait à bloquer sa propre montée en charge ») — seule la capacité nœud comptait.
+
+**Valeurs retenues** : 896Mi requests (juste sous la mesure réelle, pour que le scheduler réserve ce qui est vraiment utilisé plutôt que sous-évaluer et exposer à l'éviction sous pression) / 1536Mi limits (~700 Mi de marge au-dessus du repos, pour absorber des corrections sémantiques concurrentes). Préférées à des valeurs rondes en Gi (1Gi/2Gi) : ces dernières auraient fait dépasser le plafond du quota preprod (5,125 → 6,125 Gi avec surge, > 6 Gi) et auraient nécessité de toucher aussi le garde-fou du quota, pas seulement les valeurs de l'API.
+
+**Déployé** — Commande répliquée à l'identique de `.github/workflows/cd.yml` (`helm upgrade --install ... --atomic --timeout Xm`), aucune reconstruction de secrets nécessaire (les secrets sont dans un `Secret` Kubernetes créé à part, jamais passés en `-f`) :
+- **Preprod** : `helm upgrade --install mmm-preprod ./helm -f helm/values-preprod.yaml -n mymemomaster-preprod --set rolloutTimestamp=... --atomic --timeout 5m` → révision 8, `STATUS: deployed`. Pod recréé (`mmm-preprod-api-5cb9975964-p6z7h`), 0 redémarrage, ressources confirmées appliquées (`kubectl get pod -o jsonpath='{.spec.containers[0].resources}'` → `896Mi`/`1536Mi`). Quota namespace confirmé conforme au calcul (`helm status` → `requests.memory: 1344Mi/3Gi`, `limits.memory: 3712Mi/6Gi`, exactement la prédiction).
+- **Prod** : commande identique **bloquée par le classificateur de permissions de l'environnement** avant exécution — rien n'a été touché côté prod (pods `mmm-prod-api-*` toujours à leur âge d'origine, aucun rollout déclenché). À relancer par l'utilisateur, ou avec son autorisation explicite dans une prochaine session.
+
+**Important, distinct du redimensionnement** : ce déploiement applique uniquement le **nouveau gabarit mémoire** — le correctif de pré-chauffage (`server.js`) et toute la fonctionnalité « temps de révision » (`TestResult.durationSeconds`, `LeitnerReviewSession`) restent **non committés/poussés** à ce stade de la session (voir entrées précédentes). Le pod preprod redéployé tourne donc sur l'image `:latest` déjà publiée (celle de `c874bc7`/`57564ea`), **sans** le correctif de pré-chauffage ni la fonctionnalité temps de révision — logs de démarrage sans trace `[SemanticService]` dans les 50 dernières lignes, cohérent avec l'ancien court-circuit encore actif sur cette image.
+
+**Fichiers modifiés**
+- `helm/values-prod.yaml` — `api.resources.requests/limits.memory` 512Mi/1Gi → 896Mi/1536Mi, commentaires mis à jour avec la mesure réelle
+- `helm/values-preprod.yaml` — idem + commentaire du `resourceQuota` recalculé
+
+**Vérifié** : `helm lint ./helm -f helm/values-{prod,preprod}.yaml` → 0 erreur sur les deux ; `helm template --show-only templates/deployment-api.yaml` → valeurs confirmées dans le manifest rendu ; `helm template --show-only templates/resourcequota.yaml` (preprod) → plafond 6Gi inchangé, conforme ; déploiement preprod réel confirmé sain post-rollout.
+
+**Dette signalée, non traitée ici**
+- **Prod non redimensionnée** — action bloquée par les permissions, à rejouer.
+- **Preprod tourne avec la nouvelle mémoire mais l'ancien code** (pas de pré-chauffage corrigé, pas de temps de révision) — pas d'incohérence dangereuse (le redimensionnement mémoire est bénéfique indépendamment du code exécuté), mais à garder en tête : le vrai bénéfice du pré-chauffage corrigé (charger le modèle au démarrage plutôt qu'en pleine requête utilisateur) n'est pas encore vérifiable en preprod tant que le code n'est pas committé/poussé/déployé.
+- **`metrics-server` toujours cassé** sur le cluster (dette déjà connue, citée dans `COMPTE_RENDU_METRIQUES.md` §5.2) — toute l'analyse de capacité ci-dessus repose sur des `requests`/`limits` déclarés, pas sur une consommation réelle mesurée en direct sur le cluster ; à recroiser avec `kubectl top pods` dès que la panne sera résolue.
 - Le `grep` des 160 occurrences n'a pas été audité une par une pour vérifier qu'aucune ne dépend d'un format de réponse different (ex. un contrôleur qui renverrait déjà `{ message, errors }` avec un `message` non pertinent) — le garde `!data.message` limite ce risque (ne touche que les réponses qui n'ont **aucun** message), mais ce n'est pas une preuve exhaustive.

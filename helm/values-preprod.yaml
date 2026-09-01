@@ -40,10 +40,13 @@ storageClass: csi-cinder-sc-delete
 # Priorité basse : la preprod cède la place à la prod sous pression.
 priorityClassName: mmm-preprod
 
-# Somme des limites en régime établi : 1,95 vCPU / 3,2 Gi. Le plafond doit
-# laisser en plus la place d'un pod de surge pendant un rolling update — le plus
-# gros est l'API (1 Gi). 4 Gi ne suffisait pas (3,2 + 1 = 4,125 Gi) et bloquait
-# tout redéploiement ; 6 Gi laisse la marge sans rendre le garde-fou inopérant.
+# Somme des limites en régime établi : 1,95 vCPU / 3,625 Gi (API repassée de 1 à
+# 1,5 Gi le 2026-09-01, mesure réelle du modèle sémantique — voir api.resources
+# ci-dessous). Le plafond doit laisser en plus la place d'un pod de surge pendant
+# un rolling update — le plus gros est toujours l'API (1,5 Gi) : 3,625 + 1,5 =
+# 5,125 Gi. 4 Gi ne suffisait déjà pas avant cette hausse et bloquait tout
+# redéploiement ; 6 Gi laisse encore ~0,9 Gi de marge (contre ~1,8 Gi avant la
+# hausse de l'API — à surveiller si un autre composant grossit à son tour).
 resourceQuota:
   enabled: true
   requests:
@@ -78,15 +81,25 @@ api:
   resources:
     requests:
       cpu: 100m
-      # Le modèle sémantique est chargé en mémoire par le pod (Semantic.service.js).
-      # NOTE : le chiffre de ~800Mi qui justifiait cette valeur datait du modèle
-      # all-mpnet-base-v2, remplacé depuis par paraphrase-multilingual-MiniLM-L12-v2
-      # (~120 Mo). Valeur conservative en attendant une mesure réelle via
-      # `kubectl top pods` (metrics-server installé le 2026-08-26).
-      memory: 512Mi
+      # Mesure réelle faite le 2026-09-01 (`docker stats`, conteneur local) :
+      # ~795-825 Mi de RSS avec paraphrase-multilingual-MiniLM-L12-v2 chargé en
+      # mémoire (Semantic.service.js) — le chiffre de ~800Mi qui justifiait
+      # l'ancienne valeur (mesuré sur all-mpnet-base-v2) était donc le bon
+      # ordre de grandeur malgré le changement de modèle : l'estimation de
+      # ~120 Mo pour MiniLM sous-évaluait largement l'empreinte réelle du
+      # runtime ONNX WASM une fois chargé (poids sur disque ≠ RSS process).
+      # Voir DECISIONS.md 2026-09-01 pour le détail et le correctif de
+      # pré-chauffage qui a permis d'obtenir cette mesure (il ne chargeait en
+      # fait jamais le modèle avant ce jour).
+      memory: 896Mi
     limits:
       cpu: 500m
-      memory: 1Gi
+      # ~700 Mi de marge au-dessus de la mesure au repos. Vérifié compatible
+      # avec le resourceQuota namespace ci-dessus (§ commentaire) : nouvelle
+      # somme en régime établi 3,625 Gi + 1,5 Gi de surge (rolling update) =
+      # 5,125 Gi, sous les 6 Gi de plafond (marge réduite à ~0,9 Gi contre
+      # ~1,8 Gi avant, mais toujours confortable).
+      memory: 1536Mi
 
 front:
   resources:

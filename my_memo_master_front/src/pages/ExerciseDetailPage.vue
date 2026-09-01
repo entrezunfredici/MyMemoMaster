@@ -263,6 +263,11 @@ const shuffledFragments = reactive([])
 const questionResults = reactive([])
 const correctCount = ref(0)
 
+// Chronométrage du temps réellement passé sur le quiz (alimente le KPI "Temps
+// total de révision") — démarré quand les questions deviennent interactives,
+// pas pendant le chargement de la page ni l'affichage des résultats précédents.
+const startedAt = ref(null)
+
 // ── lifecycle ─────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
@@ -278,6 +283,7 @@ onMounted(async () => {
     return
   }
   initAnswers()
+  startedAt.value = Date.now()
   loading.value = false
 })
 
@@ -367,7 +373,8 @@ async function submitAnswers() {
     answer: normalizeAnswer(userAnswers[idx] ?? null)
   }))
 
-  const result = await testResultStore.submitTest(test.value.testId, answers)
+  const durationSeconds = startedAt.value ? Math.round((Date.now() - startedAt.value) / 1000) : null
+  const result = await testResultStore.submitTest(test.value.testId, answers, durationSeconds)
   if (!result) {
     notif.notify('Erreur lors de la correction.', 'error')
     return
@@ -386,6 +393,7 @@ async function submitAnswers() {
 function resetQuiz() {
   resultsShown.value = false
   initAnswers()
+  startedAt.value = Date.now()
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 

@@ -140,7 +140,18 @@ describe('TestService', () => {
       expect(result.results).toHaveLength(2)
       expect(result.results[0]).toEqual(expect.objectContaining({ questionId: 1, correct: true, correctAnswer: 'Paris', explanation: 'Correct (similarity=1.00).', semanticScore: 1.0, points: 1.0 }))
       expect(result.results[1]).toEqual(expect.objectContaining({ questionId: 2, correct: false, correctAnswer: 'Berlin', explanation: 'Incorrect (similarity=0.20).', semanticScore: 0.2, points: 0.2 }))
-      expect(TestResult.create).toHaveBeenCalledWith({ testId: 1, userId: 5, score: 1.2, total: 2 })
+      expect(TestResult.create).toHaveBeenCalledWith({ testId: 1, userId: 5, score: 1.2, total: 2, durationSeconds: null })
+    })
+
+    it('transmet durationSeconds au TestResult quand il est fourni', async () => {
+      const questions = [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
+      Test.findByPk.mockResolvedValue({ testId: 1, userId: null, question: questions })
+      TestResult.create.mockResolvedValue({ resultId: 1, score: 1, total: 1 })
+      semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: '', decision_zone: 'correct' })
+
+      await TestService.submitAnswers(1, 5, [{ questionId: 1, answer: 'Paris' }], 87)
+
+      expect(TestResult.create).toHaveBeenCalledWith({ testId: 1, userId: 5, score: 1, total: 1, durationSeconds: 87 })
     })
 
     it('open — insensible à la casse et aux espaces (correction IA)', async () => {

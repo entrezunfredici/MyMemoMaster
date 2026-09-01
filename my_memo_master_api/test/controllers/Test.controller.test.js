@@ -353,7 +353,29 @@ describe('Test Controller', () => {
       expect(res.body.total).toBe(2)
       expect(res.body.resultId).toBe(10)
       expect(res.body.results).toHaveLength(2)
-      expect(testService.submitAnswers).toHaveBeenCalledWith(1, 1, VALID_ANSWERS)
+      expect(testService.submitAnswers).toHaveBeenCalledWith(1, 1, VALID_ANSWERS, null)
+    })
+
+    it('200 — transmet durationSeconds au service quand il est fourni', async () => {
+      testService.submitAnswers.mockResolvedValue(SUBMIT_RESULT)
+
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ answers: VALID_ANSWERS, durationSeconds: 120 })
+
+      expect(res.status).toBe(200)
+      expect(testService.submitAnswers).toHaveBeenCalledWith(1, 1, VALID_ANSWERS, 120)
+    })
+
+    it('400 — durationSeconds au-delà du plafond (4h)', async () => {
+      const res = await request(app)
+        .post(`${BASE}/tests/1/submit`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ answers: VALID_ANSWERS, durationSeconds: 14401 })
+
+      expect(res.status).toBe(400)
+      expect(testService.submitAnswers).not.toHaveBeenCalled()
     })
 
     it('404 — test introuvable', async () => {

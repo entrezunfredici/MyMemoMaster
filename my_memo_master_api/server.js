@@ -84,8 +84,18 @@ metricsServer.listen(METRICS_PORT, HOST, () => {
 // RAISON: charger le pipeline ne suffit pas — la première inférence paie encore
 // l'initialisation de la session ONNX (~30 s observés en conteneur), qui gelait
 // la première soumission d'exercice après chaque redémarrage.
+// CHOIX (2026-09-01): deux chaînes différentes, pas la même deux fois
+// RAISON: gradeSemantic('x', 'x') prend le court-circuit "correspondance exacte"
+// (normalizeSymbolic(a) === normalizeSymbolic(b) est trivialement vrai sur deux
+// chaînes identiques) — il retournait avant même d'appeler getModel(). Le
+// pré-chauffage ne chargeait donc jamais réellement le modèle : le vrai
+// chargement (et son pic mémoire, ONNX WASM) n'arrivait qu'à la première
+// correction d'un vrai utilisateur, en pleine session plutôt qu'au démarrage
+// en tâche de fond — observé en local : le conteneur API (512 Mo) s'est fait
+// tuer par l'OOM killer pile à ce moment, avec le pré-chauffage qui se
+// terminait "avec succès" sans jamais avoir chargé quoi que ce soit.
 semanticService
-  .gradeSemantic('préchauffage du modèle', 'préchauffage du modèle')
+  .gradeSemantic('préchauffage du modèle', 'texte différent pour forcer un vrai calcul d\'embedding')
   .then(() => logger.info('[SemanticService] Pre-warm inference done.'))
   .catch((err) => {
     logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)

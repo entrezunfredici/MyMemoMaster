@@ -161,12 +161,14 @@ import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
 import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
+import { useLeitnerReviewSessionStore } from '@/stores/leitnerReviewSessions'
 
 const router = useRouter()
 const route = useRoute()
 const cardStore = useLeitnerCardStore()
 const systemStore = useLeitnerSystemStore()
 const boxStore = useLeitnerBoxStore()
+const reviewSessionStore = useLeitnerReviewSessionStore()
 
 const systemId = Number(route.params.systemId)
 
@@ -178,12 +180,18 @@ const submitting = ref(false)
 const isFinished = ref(false)
 const errors = ref([])
 
+// Chronométrage du temps réellement passé sur la session (alimente le KPI
+// "Temps total de révision") — démarré une fois les cartes chargées, pas
+// pendant le chargement lui-même.
+const startedAt = ref(null)
+
 onMounted(async () => {
   await Promise.all([
     cardStore.fetchDueCards(systemId),
     systemStore.fetchSystemById(systemId),
     boxStore.fetchBoxes(),
   ])
+  startedAt.value = Date.now()
   loading.value = false
 })
 
@@ -228,6 +236,10 @@ const nextStep = () => {
     submitting.value = false
   } else {
     isFinished.value = true
+    if (startedAt.value) {
+      const durationSeconds = Math.round((Date.now() - startedAt.value) / 1000)
+      reviewSessionStore.logSession(systemId, cardStore.dueCards.length, durationSeconds)
+    }
   }
 }
 

@@ -68,15 +68,24 @@ redis:
 api:
   resources:
     requests:
-      # Aligné sur la preprod : 256Mi était en dessous du besoin réel du pod
-      # (modèle sémantique chargé en mémoire), ce qui pousse le scheduler à
-      # surbooker le nœud et expose à l'OOMKill sous charge. À réajuster après
-      # mesure réelle (`kubectl top pods -n mymemomaster --containers`).
+      # Mesure réelle faite le 2026-09-01 (`docker stats`, conteneur local, modèle
+      # sémantique chargé) : ~795-825 Mi de RSS avec paraphrase-multilingual-MiniLM-L12-v2
+      # chargé en mémoire (Semantic.service.js) — bien au-dessus des ~120 Mo estimés
+      # lors du choix du modèle (poids sur disque, pas l'empreinte réelle du runtime
+      # ONNX WASM une fois chargé) et du défaut historique de 512Mi, qui poussait
+      # le scheduler à surbooker le nœud et exposait à l'OOMKill (racine d'un
+      # correctif de pré-chauffage cassé — voir DECISIONS.md 2026-09-01, le
+      # pré-chauffage ne chargeait en fait jamais le modèle avant ce correctif).
       cpu: 200m
-      memory: 512Mi
+      memory: 896Mi
     limits:
       cpu: 1000m
-      memory: 1Gi
+      # ~700 Mi de marge au-dessus de la mesure au repos pour absorber des
+      # corrections sémantiques concurrentes (plusieurs utilisateurs en même
+      # temps). Vérifié : sans quota en prod (resourceQuota.enabled: false),
+      # tient largement sur les 3 nœuds du cluster (< 60 % de la mémoire
+      # allouable par nœud rien qu'en requests, même nœud que les 2 réplicas).
+      memory: 1536Mi
 
 front:
   resources:

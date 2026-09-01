@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import FlashcardsSessionPage from '@/pages/FlashcardsSessionPage.vue'
 import { useLeitnerCardStore } from '@/stores/leitnerCards'
+import { useLeitnerReviewSessionStore } from '@/stores/leitnerReviewSessions'
 
 // ── Mocks globaux ────────────────────────────────────────────────────────────
 
@@ -216,6 +217,30 @@ describe('FlashcardsSessionPage', () => {
 
     expect(wrapper.text()).toContain('Session terminée')
     expect(wrapper.text()).toContain('1 cartes')
+  })
+
+  it('fin de session — journalise la session (système, nb de cartes, durée >= 0)', async () => {
+    const wrapper = mountSession([mockCard])
+    await flushPromises()
+
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = { success: true, score: 0.9, correction: 'Paris', explanation: '', decision_zone: 'high' }
+      return true
+    })
+    const reviewSessionStore = useLeitnerReviewSessionStore()
+
+    await wrapper.find('textarea').setValue('Paris')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+
+    expect(reviewSessionStore.logSession).not.toHaveBeenCalled() // pas avant la fin réelle
+
+    await wrapper.findAll('button').find(b => b.text() === 'Continuer')?.trigger('click')
+    await flushPromises()
+
+    expect(reviewSessionStore.logSession).toHaveBeenCalledWith(1, 1, expect.any(Number))
+    expect(reviewSessionStore.logSession.mock.calls[0][2]).toBeGreaterThanOrEqual(0)
   })
 
   // ── Quitter la session ────────────────────────────────────────────────────

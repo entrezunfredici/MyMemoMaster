@@ -61,8 +61,8 @@ exports.delete = async (req, res) => {
 
 exports.submit = async (req, res) => {
   try {
-    const { answers } = req.body
-    const result = await testService.submitAnswers(Number(req.params.id), req.user.id, answers)
+    const { answers, durationSeconds } = req.body
+    const result = await testService.submitAnswers(Number(req.params.id), req.user.id, answers, durationSeconds ?? null)
     if (!result) return res.status(404).json({ message: 'Exercice introuvable.' })
     res.status(200).json(result)
   } catch (error) {

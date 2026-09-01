@@ -168,8 +168,24 @@ describe('ExerciseDetailPage', () => {
 
     expect(testResultStore.submitTest).toHaveBeenCalledWith(
       1,
-      expect.arrayContaining([expect.objectContaining({ questionId: 1 })])
+      expect.arrayContaining([expect.objectContaining({ questionId: 1 })]),
+      expect.any(Number)
     )
+  })
+
+  it('clic "Vérifier les résultats" — transmet une durée chronométrée non négative', async () => {
+    const { wrapper, testResultStore } = mountPage()
+    await flushPromises()
+
+    testResultStore.submitTest.mockResolvedValue(SUBMIT_RESULT)
+
+    await wrapper.find('textarea').setValue('Paris')
+    const btn = wrapper.findAll('button').find(b => b.text().includes('Vérifier'))
+    await btn.trigger('click')
+    await flushPromises()
+
+    const durationSeconds = testResultStore.submitTest.mock.calls[0][2]
+    expect(durationSeconds).toBeGreaterThanOrEqual(0)
   })
 
   it('après soumission — affiche l\'écran résultats avec le score', async () => {

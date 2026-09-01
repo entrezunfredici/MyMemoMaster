@@ -200,7 +200,7 @@ describe('useTestResultStore', () => {
     const store = useTestResultStore()
     const result = await store.submitTest(1, ANSWERS)
 
-    expect(mockPost).toHaveBeenCalledWith('tests/1/submit', { answers: ANSWERS }, { timeout: 90000 })
+    expect(mockPost).toHaveBeenCalledWith('tests/1/submit', { answers: ANSWERS, durationSeconds: null }, { timeout: 90000 })
     expect(result).toEqual(SUBMIT_RESPONSE)
     expect(store.results[0].resultId).toBe(1)
     expect(store.results[0].score).toBe(7)
@@ -228,6 +228,15 @@ describe('useTestResultStore', () => {
 
     expect(result).toBeNull()
     expect(mockNotify).toHaveBeenCalledWith(expect.any(String), 'error')
+  })
+
+  it('submitTest - avec durationSeconds - transmis dans le corps de la requête', async () => {
+    mockPost.mockResolvedValueOnce({ status: 200, data: SUBMIT_RESPONSE })
+
+    const store = useTestResultStore()
+    await store.submitTest(1, ANSWERS, 45)
+
+    expect(mockPost).toHaveBeenCalledWith('tests/1/submit', { answers: ANSWERS, durationSeconds: 45 }, { timeout: 90000 })
   })
 
   it('submitTest - résultats existants - ajoute en tête (unshift)', async () => {

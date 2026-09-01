@@ -32,6 +32,14 @@ module.exports = (instance) => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW
+      },
+      // Durée réelle du passage (secondes), chronométrée côté front — optionnelle
+      // (les résultats existants avant ce champ, ou saisis via une source qui ne
+      // la fournit pas, restent valides avec durationSeconds à null).
+      durationSeconds: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null
       }
     },
     {

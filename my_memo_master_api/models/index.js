@@ -46,6 +46,7 @@ models.CardSystem = require('./CardSystem.model')(instance)
 models.MindMapTag = require('./MindMapTag.model')(instance)
 models.LeitnerSystemTag = require('./LeitnerSystemTag.model')(instance)
 models.Etablissement = require('./Etablissement.model')(instance)
+models.LeitnerReviewSession = require('./LeitnerReviewSession.model')(instance)
 models.AuditLog = require('./AuditLog.model')(instance)
 
 Object.keys(models).forEach((modelName) => {

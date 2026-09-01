@@ -13,13 +13,21 @@ const subjectIdRules = body('subjectId')
 
 exports.create = [nameRules, subjectIdRules]
 
+// Plafond à 4h (14 400 s), même borne que LeitnerReviewSession.validators.js —
+// au-delà, la valeur ne reflète plus un temps de passage réel.
+const MAX_SESSION_DURATION_SECONDS = 14400
+
 exports.submit = [
   body('answers')
     .isArray({ min: 1 })
     .withMessage('answers doit être un tableau non vide.'),
   body('answers.*.questionId')
     .isInt({ min: 1 })
-    .withMessage('Chaque réponse doit avoir un questionId valide.')
+    .withMessage('Chaque réponse doit avoir un questionId valide.'),
+  body('durationSeconds')
+    .optional({ nullable: true })
+    .isInt({ min: 0, max: MAX_SESSION_DURATION_SECONDS })
+    .withMessage(`durationSeconds doit être un entier entre 0 et ${MAX_SESSION_DURATION_SECONDS}.`)
 ]
 
 exports.update = [

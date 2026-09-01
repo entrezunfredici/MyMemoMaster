@@ -122,7 +122,7 @@ class TestService {
    * Évalue les réponses d'un utilisateur, sauvegarde le TestResult et retourne la correction.
    * Accès identique à findOne : propriétaire, test legacy (userId null) ou membre d'un groupe assigné.
    */
-  async submitAnswers(testId, userId, answers) {
+  async submitAnswers(testId, userId, answers, durationSeconds = null) {
     const test = await Test.findByPk(testId, {
       include: [
         {
@@ -159,7 +159,7 @@ class TestService {
     }))
 
     const score = parseFloat(results.reduce((acc, r) => acc + r.points, 0).toFixed(2))
-    const testResult = await TestResult.create({ testId, userId, score, total: questions.length })
+    const testResult = await TestResult.create({ testId, userId, score, total: questions.length, durationSeconds })
     return { score, total: questions.length, results, resultId: testResult.resultId }
   }
 

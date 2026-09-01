@@ -8,10 +8,11 @@ jest.mock('../../models', () => ({
   Subject: {},
   LeitnerSystem: { findAll: jest.fn() },
   LeitnerBox: {},
-  LeitnerCard: {}
+  LeitnerCard: {},
+  LeitnerReviewSession: { findAll: jest.fn() }
 }))
 
-const { RevisionSession, TestResult, LeitnerSystem } = require('../../models')
+const { RevisionSession, TestResult, LeitnerSystem, LeitnerReviewSession } = require('../../models')
 
 // --- Fixtures ---
 const T = dayjs()
@@ -23,10 +24,12 @@ const daysAgo = (n) => fmt(T.subtract(n, 'day'))
 const session = (date, isDone, startTime = '09:00:00', endTime = '10:00:00') =>
   ({ date, isDone, startTime, endTime })
 
-const testResult = (score, total, completedAt = '2026-06-20T10:00:00Z', name = 'Test', subjectId = 1) => ({
-  score, total, completedAt,
+const testResult = (score, total, completedAt = '2026-06-20T10:00:00Z', name = 'Test', subjectId = 1, durationSeconds = null) => ({
+  score, total, completedAt, durationSeconds,
   test: { testId: 1, name, subjectId, subject: { subjectId, name: 'Maths' } }
 })
+
+const leitnerReviewSession = (durationSeconds) => ({ durationSeconds })
 
 const card = (correct, reviews, next_review_at = null) =>
   ({ correct_count: correct, review_count: reviews, next_review_at })
@@ -54,6 +57,7 @@ describe('KpiService', () => {
       RevisionSession.findAll.mockResolvedValue([])
       TestResult.findAll.mockResolvedValue([])
       LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
 
       const kpis = await kpiService.getMyKpis(1)
 
@@ -70,20 +74,73 @@ describe('KpiService', () => {
       RevisionSession.findAll.mockResolvedValue([])
       TestResult.findAll.mockResolvedValue([])
       LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
 
       await kpiService.getMyKpis(42)
 
       expect(RevisionSession.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 42 } }))
       expect(TestResult.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 42 } }))
       expect(LeitnerSystem.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { idUser: 42 } }))
+      expect(LeitnerReviewSession.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 42 } }))
     })
 
     it('propage l\'erreur si un modèle échoue', async () => {
       RevisionSession.findAll.mockRejectedValue(new Error('DB down'))
       TestResult.findAll.mockResolvedValue([])
       LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
 
       await expect(kpiService.getMyKpis(1)).rejects.toThrow('DB down')
+    })
+
+    // Régression : "Temps total de révision" affichait toujours 0 min — seuls les
+    // créneaux planifiés dans RevisionSession étaient comptés, quasiment jamais
+    // renseignés en pratique. Le temps réel chronométré (exercices + sessions
+    // Leitner) doit maintenant s'ajouter au temps planifié.
+    it('totalMinutes additionne le temps planifié et le temps réel chronométré (exercices + Leitner)', async () => {
+      RevisionSession.findAll.mockResolvedValue([session(today, true, '09:00:00', '09:30:00')]) // 30 min planifiées
+      TestResult.findAll.mockResolvedValue([
+        testResult(8, 10, '2026-06-20T10:00:00Z', 'Test', 1, 300), // 5 min
+        testResult(5, 10, '2026-06-21T10:00:00Z', 'Test', 1, 120)  // 2 min
+      ])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([leitnerReviewSession(180)]) // 3 min
+
+      const kpis = await kpiService.getMyKpis(1)
+
+      expect(kpis.revision.totalMinutes).toBe(40) // 30 planifiées + 5 + 2 + 3 réelles
+    })
+
+    it('totalMinutes ignore les durationSeconds absents (null) plutôt que de les compter comme 0 fautif', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([testResult(8, 10, '2026-06-20T10:00:00Z', 'Test', 1, null)])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([leitnerReviewSession(null)])
+
+      const kpis = await kpiService.getMyKpis(1)
+
+      expect(kpis.revision.totalMinutes).toBe(0)
+    })
+  })
+
+  // ─── getPersonalKpisForSubjects ──────────────────────────────────────────────
+
+  describe('getPersonalKpisForSubjects', () => {
+    it('totalMinutes additionne aussi le temps réel, restreint aux matières consenties', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([testResult(8, 10, '2026-06-20T10:00:00Z', 'Test', 1, 60)])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([leitnerReviewSession(60)])
+
+      const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
+
+      expect(kpis.revision.totalMinutes).toBe(2)
+      // Le filtre par matière consentie doit être répercuté sur la requête Leitner
+      // (via le système rattaché), pas seulement sur les exercices.
+      expect(LeitnerReviewSession.findAll).toHaveBeenCalledWith(expect.objectContaining({
+        where: { userId: 1 },
+        include: [expect.objectContaining({ where: { subjectId: [1] } })]
+      }))
     })
   })
 
@@ -191,6 +248,27 @@ describe('KpiService', () => {
 
       expect(r.sessionsLast30Days).toBe(1)
       expect(r.completedLast30Days).toBe(1)
+    })
+  })
+
+  // ─── _computeRealMinutes ──────────────────────────────────────────────────────
+
+  describe('_computeRealMinutes', () => {
+    it('aucune donnée — retourne 0', () => {
+      expect(kpiService._computeRealMinutes([], [])).toBe(0)
+    })
+
+    it('additionne les durées des exercices et des sessions Leitner, arrondies en minutes', () => {
+      const testResults = [testResult(1, 1, undefined, 'T', 1, 90), testResult(1, 1, undefined, 'T', 1, 45)] // 135 s
+      const sessions = [leitnerReviewSession(60)] // 60 s
+      // 195 s / 60 = 3.25 → arrondi à 3 min
+      expect(kpiService._computeRealMinutes(testResults, sessions)).toBe(3)
+    })
+
+    it('ignore les durationSeconds null (résultats antérieurs au champ) sans les compter comme 0 fautif', () => {
+      const testResults = [testResult(1, 1, undefined, 'T', 1, null), testResult(1, 1, undefined, 'T', 1, 120)]
+      const sessions = [leitnerReviewSession(null)]
+      expect(kpiService._computeRealMinutes(testResults, sessions)).toBe(2)
     })
   })
 

@@ -191,8 +191,12 @@ class SemanticService {
       // all-mpnet-base-v2 (anglais) ou paraphrase-multilingual-mpnet-base-v2 (multilingue mais ~280 Mo)
       // RAISON: l'application est francophone — le modèle anglais déprimait les similarités entre
       // paraphrases françaises correctes (~0,61 pour une réponse juste reformulée) ; la variante
-      // mpnet multilingue dépasse la limite mémoire des conteneurs API (512 Mo → OOM en boucle),
-      // MiniLM (~120 Mo) tient dans le même gabarit que l'ancien modèle
+      // mpnet multilingue dépasse la limite mémoire des conteneurs API.
+      // MESURE (2026-09-01, `docker stats` en local, conteneur au repos) : ~794 Mo de RSS une
+      // fois MiniLM chargé — largement au-dessus des ~120 Mo estimés initialement (poids du
+      // modèle sur disque, pas l'empreinte réelle du runtime ONNX WASM une fois en mémoire) et
+      // au-dessus du défaut local (512 Mo, relevé à 1536M dans .env) ; voir CHANGELOG_AGENT.md
+      // pour le détail et la limite prod (1 Gi, marge plus juste qu'espéré sous charge).
       console.log('[SemanticService] Loading embedding model: paraphrase-multilingual-MiniLM-L12-v2...')
       const extractor = await pipeline(
         'feature-extraction',
