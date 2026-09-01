@@ -1704,6 +1704,18 @@ Les deux durées s'additionnent au temps planifié existant (`revision.totalMinu
 
 ---
 
+### [2026-09-01] C-01.01 — Contrat de sortie du prompt de génération de cartes aligné sur les 3 endpoints existants, plutôt qu'un format libre à parser ensuite
+
+**Contexte** — Ticket `C-01.01` demande la spécification du prompt de génération de cartes par IA (feature list `C-01`, aucune ligne de code existante, `C-01` à 0/11 dans Odoo). Le contrat de sortie du LLM (schéma JSON des cartes proposées) pouvait être conçu librement, indépendamment du modèle de données actuel, puisque l'étape de Parsing (qui transforme cette sortie en appels API) est un ticket séparé et hors périmètre.
+
+**Décision** — Le schéma JSON de sortie (`cards[].statement/type/answer/acceptedAnswers/options`) reprend délibérément la forme déjà acceptée par la création manuelle d'une carte (`POST /questions` puis `POST /responses` si `type: "open"` puis `POST /leitnercards`, cf. `FlashcardsCardsPage.vue#handleCreate`) plutôt qu'un format LLM-natif générique (ex. un simple tableau de paires question/réponse sans distinction de type). Un champ `sourceExcerpt` est ajouté par carte, sans équivalent dans le modèle de données actuel — pur mécanisme de traçabilité pour l'écran de validation (hors périmètre), non destiné à être persisté dans cette première version.
+
+**Alternative écartée** : un schéma de sortie générique (`{ question, answer }[]` uniquement), plus simple à écrire dans le prompt mais qui aurait reporté tout le travail de distinction `open`/`mcq` et de structuration des options QCM sur l'étape de Parsing — écarté pour ne pas déplacer une contrainte du modèle de données vers une étape qui n'a pas vocation à la connaître mieux que le prompt lui-même, et pour que le mapping de persistance (§6 du document) reste une simple correspondance directe plutôt qu'une transformation.
+
+**Conséquences** : le contrat de sortie du prompt (`diagrams/generation_ia_prompt_cartes.md` §4) est couplé au contrat de persistance actuel de `Question`/`Response`/`LeitnerCard` — toute évolution future de ce contrat de persistance (ex. un futur endpoint de création en masse) devra être répercutée dans le prompt. Le mapping de persistance lui-même (§6 du document) reste explicitement une hypothèse non tranchée, pas une décision actée par ce document — voir la note en tête de section dans le document.
+
+---
+
 ### [2026-09-01] Mémoire API prod/preprod : 896Mi/1536Mi plutôt que des valeurs rondes en Gi (1Gi/2Gi)
 
 **Contexte** — Le correctif de pré-chauffage (entrée précédente) a produit la première mesure réelle de la mémoire consommée par l'API une fois le modèle sémantique chargé : 794-825 Mi de RSS. Les deux fichiers `helm/values-{prod,preprod}.yaml` portaient depuis leur création un commentaire attendant explicitement cette mesure pour remplacer la valeur provisoire (512Mi requests / 1Gi limits).

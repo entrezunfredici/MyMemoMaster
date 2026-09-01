@@ -142,6 +142,7 @@
 | Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
 | Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-31** — registre Odoo strictement inchangé (217/248, 183/91/78, RH 362,3 JH — revérifiés, identiques au 2026-08-30) ; seule la Qualité bouge : tests API 1 554→**1 560**, front 689→**703** (+20, issus de 3 commits de maintenance hors registre Odoo — 500 création LeitnerSystem/Subject/Diagramme, bugs carte mentale, fermeture des modales), couverture reproduite en local 81,4 % API / **59,75 %** front, RGAA revérifié 0 régression (20/20 axe-core, 0/79 statique), audit manuel 106 critères inchangé (23/106). SonarQube détaillé toujours daté du 2026-08-29 (pas de `SONAR_TOKEN` local, 3 analyses de plus non relues). **Arrêté précédent (2026-08-30)** — le dernier écart déclaré/démontrable (1,2 point, porté par `QA.03`/`QA.05`/`QA.06`) est refermé : ces trois tâches sont désormais confirmées par le dépôt (E2E + k6 + rapport). Avancement **87,5 % déclaré = 87,5 % démontrable** (217/248, revérifié en direct sur Odoo), enveloppe **108 675 €** dont **86 250 €** validés, **30 tâches** en retard (dont 20 sur `C-01`/`C-02`), risques **183/91/78 inchangés** (revérifiés), RH total **362,3 JH** (0,3 JH d'écart avec le planning, contre 2 JH au 2026-08-28, répartition par profil non rejouée). Qualité : couverture SonarQube **63,9 %** (dernière analyse lue, du 2026-08-29 — action P0 close), reproduite en local ce jour à 81,4 % API / 58,9 % front ; **vulnérabilités Sonar réduites de 13 à 3** le 2026-08-30, dont la CRITICAL (secrets `.env` embarquables dans l'image API) **corrigée** ; RGAA passé de 5 à **6 critères outillés** (ajout du contraste réel RGAA 3.2, 8/8 pages), toujours 0 non-conformité, **+ audit manuel des 106 critères ouvert dans la même journée** (23/106 posés, 2 candidats NC — 8.6, 12.7 — ajoutés au §7.2.1 et au plan d'actions). Précédent arrêté (2026-08-28, après suppression du bloc `[IA]` doublon) : avancement 87,8 %/86,6 %, enveloppe 109 200 €/86 775 €, 33 tâches en retard, 11 vulnérabilités dont 1 CRITICAL non traitée, couverture 0 % | 2026-08-30 |
 | Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
+| Génération de Leitner par IA (C-01) — Spécification prompt génération cartes | **Analyse livrée, aucun code** — `diagrams/generation_ia_prompt_cartes.md` (C-01.01) : prompt système + prompt utilisateur, contrat d'entrée/sortie JSON aligné sur le contrat réel de persistance (`POST /questions` → `POST /responses` → `POST /leitnercards`, cf. `FlashcardsCardsPage.vue#handleCreate`), garde-fous anti-hallucination (`sourceExcerpt` par carte), cas d'erreur. `C-01` reste à 0/11 dans Odoo — aucune intégration LLM externe dans le dépôt à ce jour | 2026-09-01 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -8372,3 +8373,54 @@ Les deux durées s'additionnent au temps planifié existant dans `Kpi.service.js
 
 **Dette signalée, non traitée ici** : la section « Discipline » plus bas garde son propre texte de légende sous le graphique (« sessions planifiées vs complétées ») — cohérent avec les nouveaux hints mais pas retouché, déjà suffisamment explicite dans son contexte.
 - Le `grep` des 160 occurrences n'a pas été audité une par une pour vérifier qu'aucune ne dépend d'un format de réponse different (ex. un contrôleur qui renverrait déjà `{ message, errors }` avec un `message` non pertinent) — le garde `!data.message` limite ce risque (ne touche que les réponses qui n'ont **aucun** message), mais ce n'est pas une preuve exhaustive.
+
+---
+
+## [2026-09-01] DOC — C-01.01 : Spécification prompt génération cartes (Génération de Leitner par IA)
+
+**Contexte** — Ticket `C-01.01` (feature list `C-01`, source planning, V2, tâche « Analyse »). Objectif : livrer la
+« Spécification prompt génération cartes » pour la fonctionnalité `C-01` (Génération de Leitner par IA), sans
+déborder sur les autres éléments IN du feature list (Prompt général, Benchmark LLM, Parsing, Chunking PDF,
+Quotas, Écran de validation) — ceux-ci sont traités uniquement comme interfaces amont/aval dans le document.
+Périmètre OUT rappelé par le ticket : pas de correction humaine automatique, pas de garantie de justesse
+absolue, pas de génération sans validation utilisateur.
+
+**Audit préalable** — Vérifié avant rédaction (règle d'audit d'`AGENT.md`) : `C-01` est à **0/11 dans Odoo**,
+aucune intégration LLM externe dans le dépôt (56 variables d'environnement de l'API auditées, aucune ne
+concerne un fournisseur IA — cf. entrée du 2026-08-27 sur le doublon `[IA]`/`C-01`). Le seul modèle IA embarqué
+(`@xenova/transformers`) sert à la correction sémantique des exercices (`Semantic.service.js`), pas à la
+génération de contenu. Le contrat de sortie du prompt a été aligné sur le flux réel de création manuelle d'une
+carte (`FlashcardsCardsPage.vue#handleCreate` : `POST /questions` → `POST /responses` si type `open` →
+`POST /leitnercards`), pour que l'étape de Parsing (hors périmètre) n'ait qu'un mapping direct à faire.
+
+**Ce qui a été fait** — `diagrams/generation_ia_prompt_cartes.md` (suit le format des autres documents
+d'analyse du dossier, ex. `exercices_types_correction.md`, `leitner_algo.md`) : prompt système + prompt
+utilisateur (texte concret), contrat d'entrée (`sourceText`, `subjectContext`, `cardCount`, `cardType`,
+`outputLanguage`), contrat de sortie JSON (`cards[]` avec `statement`/`type`/`answer`/`acceptedAnswers`/
+`options`/`sourceExcerpt`, plus `warning` racine), garde-fous (anti-hallucination via `sourceExcerpt`,
+atomicité, absence de doublon, contenu insuffisant → moins de cartes plutôt que combler, neutralité/langue),
+gestion des cas d'erreur (sortie non conforme au schéma → 1 retry puis échec sans fallback silencieux),
+mapping de persistance explicitement marqué comme hypothèse (pas une décision actée), tableau d'interfaces
+avec les 5 autres éléments IN du feature list, exemple concret complet (SVT/photosynthèse), tableau IN/OUT,
+section « Points ouverts / dette ».
+
+**Hypothèses posées, à confirmer** (documentées en §11 du document) :
+- Aucun modèle LLM concret retenu — prompt écrit indépendamment du fournisseur, en anticipant l'arbitrage du
+  Benchmark LLM.
+- Aucun appel réel effectué — les exemples du document sont illustratifs, pas mesurés empiriquement (pas
+  d'intégration LLM existante à tester).
+- Le mapping de persistance (réutilisation des 3 endpoints existants plutôt qu'un futur endpoint de création
+  en masse) est une hypothèse de travail, à trancher au moment où le Parsing et l'écran de validation seront
+  eux-mêmes scopés.
+- Aucune borne chiffrée sur `cardCount` (dépend de l'arbitrage Quotas, hors périmètre).
+
+**Ce qui n'est PAS couvert** — Benchmark LLM (choix de fournisseur/modèle), Chunking PDF, Quotas, Écran de
+validation (maquette/ergonomie), implémentation du Parsing, tout code (aucune ligne de code livrée — ticket
+d'analyse pur).
+
+**Fichiers créés**
+- `diagrams/generation_ia_prompt_cartes.md`
+
+**Dette signalée, non traitée ici** — Le document n'a été validé par aucun appel LLM réel (aucune intégration
+existante) ; sa robustesse (respect effectif du schéma JSON, qualité des cartes générées) reste à vérifier une
+fois le Benchmark LLM arbitré et une première intégration technique posée.
