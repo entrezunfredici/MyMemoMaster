@@ -12,6 +12,12 @@
 }
 
 /* Panel */
+/* CHOIX: max-height/overflow-y sur la classe de base plutôt que sur --lg seule
+   RAISON: seule modal-panel--lg scrollait — un formulaire un peu long dans une
+   modale de taille par défaut (ex: carte Leitner avec champ formule + aperçu +
+   nœud de carte mentale) débordait de l'écran sans aucun moyen d'atteindre les
+   boutons du bas (signalé par capture, viewport réduit). Toutes les tailles de
+   modale héritent désormais du même comportement scrollable. */
 .modal-panel {
   background-color: white;
   border-radius: 0.5rem;
@@ -19,11 +25,13 @@
   padding: 2rem;
   width: 100%;
   max-width: 28rem;
+  max-height: 90vh;
+  overflow-y: auto;
   position: relative;
 }
 
 .modal-panel--sm { max-width: 24rem; }
-.modal-panel--lg { max-width: 42rem; max-height: 90vh; overflow-y: auto; }
+.modal-panel--lg { max-width: 42rem; }
 
 /* Bouton de fermeture (×) */
 .modal-close {

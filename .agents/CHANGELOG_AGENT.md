@@ -8213,4 +8213,46 @@ Les 5 migrations correspondantes ont été vérifiées une à une : aucune ne cr
 **Dette signalée, non traitée ici**
 - **`/error-server` et `ErrorServerPage.vue` sont désormais du code mort** — plus aucun point d'entrée ne les déclenche automatiquement (seul un lien direct dans le navigateur y mènerait). À reconsidérer : soit les supprimer si aucun usage n'est prévu, soit les repurposer pour un cas plus ciblé (ex. handler d'erreur global Vue sur un crash de rendu, ou fallback uniquement pour le chargement initial de données critiques au montage de l'app) — décision non prise ici, hors périmètre de la demande.
 - **Un vrai 500 sur un appel non gardé par l'appelant redevient silencieux pour l'utilisateur** (juste un `console.error`, plus de page d'erreur qui « rattrapait » visuellement l'absence de gestion) — accepté comme compromis : l'architecture du projet (controller→service, try/catch systématique + `notif.notify` dans les stores) fait qu'un appelant sans aucune gestion d'erreur est déjà l'exception, pas la norme ; aucun audit exhaustif des ~200 sites d'appel n'a été fait pour le garantir à 100 %.
+
+---
+
+## [2026-09-01] DOC — `docs/COMPTE_RENDU_METRIQUES.md` : addendum ciblé (pas un arrêté complet), Odoo reconnecté, SonarQube toujours inaccessible
+
+**Contexte** — Demande explicite de l'utilisateur de mettre à jour le compte rendu de pilotage, avec consigne précise : récupérer les infos SonarQube, regarder les derniers commits, se connecter à Odoo pour vérifier l'état du registre.
+
+**Ce qui a été fait** — Reconnexion Odoo réussie (`odoo-plugin/odoo_cli.py check` → profil `bleu-canard`, utilisateur `superfred2468@gmail.com`) : registre reconfirmé strictement identique au 2026-08-31 (350 tâches, graphe de dépendances 183/91/78 octet pour octet identique, `QA.03`/`QA.05`/`QA.06` toujours désynchronisés). SonarQube : deux tentatives pour contourner l'absence de `SONAR_TOKEN` (accès anonyme à l'API de mesures via `kubectl port-forward` → 401 malgré la visibilité publique du projet ; logs du job CI via l'API GitHub sans jeton → 403), toutes deux infructueuses — même limitation que chaque arrêté depuis le 2026-08-29, documentée plutôt que contournée par une supposition. 4 commits depuis le dernier arrêté passés en revue via `check-runs` GitHub (tous verts, déploiements K8s toujours `skipped`). Tests/couverture rejoués (API 1 560/1 560 identique, front 708/708 +5).
+
+**Décision de méthode, assumée dans le document** : ne **pas** recalculer la ventilation fine « périmètre engagé » (217/248 tâches, 2 898 h, répartition par bloc) faute du script de filtrage utilisé par les arrêtés précédents (non versionné dans le dépôt) — ces indicateurs (Avancement, Coûts, Délais, RH) sont repris tels quels du 2026-08-31 et **explicitement marqués comme non recalculés** dans le tableau de bord, plutôt que de laisser une mention « revérifié » trompeuse recopiée de l'arrêté précédent. Nouvelle action P2 ajoutée pour verser ce script au dépôt.
+
+**Point signalé à l'utilisateur, non résolu** : le commit `c874bc7` (correctif `testQuestions`/`api.js` de cette session, voir entrées du dessus) a été committé et poussé sur `origin/main` sans qu'aucune commande git n'ait été exécutée par l'agent dans cette conversation. Origine non identifiée (`ListAgents` ne montre aucun autre agent actif sur la machine). Signalé à l'utilisateur en session et documenté dans le compte rendu comme point de méthode à surveiller.
+
+**Nouveau risque formalisé** : le gel récurrent de la CD (`K8S_PROD_ENABLED`/`K8S_PREPROD_ENABLED` à `false`, déjà rattrapé manuellement 3 fois et documenté ailleurs dans ce fichier) n'avait jamais été inventorié comme ligne du §5 Risques du compte rendu malgré 3 occurrences — ajouté comme point 7 de la section 5.2, avec conséquence directe pour cet arrêté : le correctif `c874bc7` est corrigé mais **pas déployé** en prod (nouvelle action P0).
+
+**Fichiers modifiés** : `docs/COMPTE_RENDU_METRIQUES.md` (date d'arrêté, encadré de tête, tableau de bord, §5 Risques +1 ligne, §7.1/§7.3, §8 synthèse + 4 nouvelles actions, annexe de reproductibilité).
+
+**Dette signalée, non traitée ici** : script de filtrage « périmètre engagé » toujours absent du dépôt (action P2 ajoutée) ; `SONAR_TOKEN` toujours indisponible (action P2 ajoutée) ; origine du push automatique `c874bc7` non investiguée (action P3 ajoutée).
+
+---
+
+## [2026-09-01] OPS — Correctif `c874bc7` déployé en prod (`kubectl rollout restart`), confirmé par l'utilisateur toujours en échec avant l'action
+
+**Contexte** — Après le correctif de la session précédente (`testQuestions`/`TestTag`/etc., commit `c874bc7`), l'utilisateur a signalé que le bug était **toujours actif en prod** (capture d'écran : 500 à la création d'une série d'exercices) et qu'un **second symptôme** était apparu : impossible de consulter/faire un exercice existant (« Erreur lors de la récupération du test » + « Exercice introuvable. »).
+
+**Diagnostic** — `ExerciseDetailPage.vue` appelle `GET tests/:id` → `TestService.findOne()` inclut `{ model: Question, as: 'question' }` sur l'association `testQuestions`, **exactement la même table de jointure** que celle corrigée dans `c874bc7` mais côté lecture plutôt qu'écriture. Confirmé en direct : `kubectl logs` sur les pods prod montrait encore `column question->testQuestions.createdAt does not exist` à 11:48-11:49 UTC, **après** le commit/push de `c874bc7` (10:55 UTC) — le correctif existait dans le code mais n'était pas déployé (`Deploy to Kubernetes (prod)` toujours `skipped`, `K8S_PROD_ENABLED=false`, cf. compte rendu de pilotage).
+
+**Action, confirmée explicitement par l'utilisateur avant exécution** — Vérifié que l'image `:latest` avec le correctif était bien publiée sur Docker Hub (`sha256:c7d9fdbe…`, poussée le 2026-09-01 11:02 UTC) et que `c874bc7` ne touche aucun fichier `helm/`/`k8s/` (donc aucun risque de dérive de ConfigMap, même pattern que les 3 rattrapages précédents documentés dans ce fichier). `kubectl rollout restart deployment mmm-prod-api mmm-prod-front -n mymemomaster` exécuté : les deux déploiements sont passés en `successfully rolled out`, nouveaux pods vérifiés sur les digests à jour, logs des nouveaux pods relus (aucune récurrence de l'erreur `createdAt` depuis le redémarrage).
+
+**Non confirmé par du trafic réel à la fin de cette session** — la fenêtre Prometheus immédiatement après le redémarrage ne contenait aucune requête sur les routes concernées (trafic trop faible pour conclure par la métrique) ; confirmation renvoyée à l'utilisateur via un nouvel essai direct dans l'app.
+
+**Effet de bord découvert dans la foulée (signalement utilisateur, capture d'écran)** — Une modale de taille par défaut (`.modal-panel`, sans le modificateur `--lg`) déborde du viewport sur un formulaire un peu long (carte Leitner avec champ formule + aperçu + sélecteur de nœud de carte mentale) : aucun `overflow-y`/`max-height` n'était posé sur la classe de base, seule `.modal-panel--lg` scrollait. Les boutons de bas de modale (Enregistrer/Annuler) devenaient inatteignables sans possibilité de scroller. **Corrigé** : `max-height: 90vh; overflow-y: auto;` déplacé de `.modal-panel--lg` vers `.modal-panel` (classe de base) — les 3 tailles de modale (`sm`/`md` par défaut/`lg`) héritent désormais du même comportement scrollable. Commentaire de `ModalComponent.vue` corrigé en conséquence (ne décrivait `lg` comme scrollable qu'à tort).
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/assets/modal-form.css`
+- `my_memo_master_front/src/components/ModalComponent.vue` (commentaire uniquement)
+
+**Vérifié** : `npx vitest run test/components/ModalComponent.test.js test/a11y/axe.test.js` → 31/31, 0 régression. Changement CSS pur, aucune logique JS touchée — pas de rejeu de la suite complète jugé nécessaire au-delà des tests directement concernés.
+
+**Dette signalée, non traitée ici**
+- Aucune vérification fonctionnelle en conditions réelles du redémarrage prod (pas de trafic observé dans la fenêtre Prometheus post-restart) — à confirmer par l'utilisateur.
+- D'autres modales ailleurs dans l'app pourraient avoir le même défaut sur des écrans très bas (mobile paysage, zoom élevé) même avec `max-height: 90vh` — non audité systématiquement, seul le cas signalé a été corrigé (mais la correction est générique, pas ciblée à une seule page).
 - Le `grep` des 160 occurrences n'a pas été audité une par une pour vérifier qu'aucune ne dépend d'un format de réponse different (ex. un contrôleur qui renverrait déjà `{ message, errors }` avec un `message` non pertinent) — le garde `!data.message` limite ce risque (ne touche que les réponses qui n'ont **aucun** message), mais ce n'est pas une preuve exhaustive.

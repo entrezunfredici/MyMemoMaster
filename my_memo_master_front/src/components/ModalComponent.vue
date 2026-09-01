@@ -37,7 +37,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 const props = defineProps({
   visible: { type: Boolean, required: true },
   title:   { type: String,  default: '' },
-  // 'sm' (24rem) | 'md' par défaut (28rem) | 'lg' (42rem, scrollable)
+  // 'sm' (24rem) | 'md' par défaut (28rem) | 'lg' (42rem) — les trois sont scrollables (max-height: 90vh)
   size:    { type: String,  default: 'md' },
 })
 
