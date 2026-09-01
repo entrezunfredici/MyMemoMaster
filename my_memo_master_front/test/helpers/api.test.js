@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // vi.hoisted garantit que ces mocks sont disponibles avant que vi.mock() ne soit évalué
-const { mockGet, mockPost, mockPut, mockDelete, mockRouterPush, mockLogout } = vi.hoisted(() => ({
+const { mockGet, mockPost, mockPut, mockDelete, mockLogout } = vi.hoisted(() => ({
   mockGet: vi.fn(),
   mockPost: vi.fn(),
   mockPut: vi.fn(),
   mockDelete: vi.fn(),
-  mockRouterPush: vi.fn(),
   mockLogout: vi.fn(),
 }))
 
@@ -29,10 +28,6 @@ vi.mock('@/stores/auth', () => ({
     user: {},
     logout: mockLogout,
   }),
-}))
-
-vi.mock('@/router', () => ({
-  default: { push: mockRouterPush },
 }))
 
 vi.mock('axios', () => ({
@@ -79,10 +74,15 @@ describe('api.js — couche API front', () => {
       expect(result).toBeUndefined()
     })
 
-    it('get - erreur réseau - redirige vers /error-server et retourne undefined', async () => {
+    // Régression : jusqu'au 2026-09-01, une erreur réseau/5xx redirigeait toute
+    // l'app vers /error-server, y compris pour un appel secondaire après un succès
+    // déjà affiché (ex: 2ᵉ question d'une série, le test étant déjà créé) — perte de
+    // tout le contexte en cours pour une erreur non fatale. L'appelant gère déjà ce
+    // cas (resp undefined) ; ne plus rediriger, seulement logger et retourner undefined.
+    it('get - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
       mockGet.mockRejectedValue(new Error('Network Error'))
       const result = await api.get('users/1')
-      expect(mockRouterPush).toHaveBeenCalledWith({ path: '/error-server' })
+      expect(console.error).toHaveBeenCalled()
       expect(result).toBeUndefined()
     })
 
@@ -116,10 +116,10 @@ describe('api.js — couche API front', () => {
       expect(result).toBeUndefined()
     })
 
-    it('post - erreur réseau - redirige vers /error-server et retourne undefined', async () => {
+    it('post - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
       mockPost.mockRejectedValue(new Error('Network Error'))
       const result = await api.post('users/1', {})
-      expect(mockRouterPush).toHaveBeenCalledWith({ path: '/error-server' })
+      expect(console.error).toHaveBeenCalled()
       expect(result).toBeUndefined()
     })
 
@@ -172,10 +172,10 @@ describe('api.js — couche API front', () => {
       expect(result).toBeUndefined()
     })
 
-    it('put - erreur réseau - redirige vers /error-server et retourne undefined', async () => {
+    it('put - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
       mockPut.mockRejectedValue(new Error('Network Error'))
       const result = await api.put('users/1', {})
-      expect(mockRouterPush).toHaveBeenCalledWith({ path: '/error-server' })
+      expect(console.error).toHaveBeenCalled()
       expect(result).toBeUndefined()
     })
 
@@ -205,10 +205,10 @@ describe('api.js — couche API front', () => {
       expect(result).toBeUndefined()
     })
 
-    it('del - erreur réseau - redirige vers /error-server et retourne undefined', async () => {
+    it('del - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
       mockDelete.mockRejectedValue(new Error('Network Error'))
       const result = await api.del('users/1')
-      expect(mockRouterPush).toHaveBeenCalledWith({ path: '/error-server' })
+      expect(console.error).toHaveBeenCalled()
       expect(result).toBeUndefined()
     })
 

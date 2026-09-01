@@ -11,7 +11,6 @@ import {
   VITE_API_GOOGLE_AUTH_HEADER,
 } from '@/config';
 import { useAuthStore } from '@/stores/auth'
-import router from '@/router'
 
 const SECURITY_MODES = {
   PUBLIC: 'public',
@@ -329,8 +328,14 @@ async function get(endpoint, params = {}) {
     if (handleSpecialStatus(response?.status)) return undefined
     return toResponse(response)
   } catch (error) {
+    // CHOIX: ne plus rediriger toute l'app vers /error-server ici — un vrai 500 sur
+    // un appel secondaire (ex: 2ᵉ question d'une série, après le test déjà créé avec
+    // succès) faisait perdre tout le contexte en cours pour une erreur non fatale.
+    // RAISON: chaque appelant gère déjà ce cas (resp undefined → notif.notify dans le
+    // try/catch englobant, ou garde explicite `if (!resp) …`) ; retourner undefined
+    // suffit, la redirection globale était un effet de bord disproportionné (bug
+    // trouvé le 2026-09-01 sur la création de série d'exercices).
     console.error('Error during API call using api.js:', error.stack)
-    router.push({ path: '/error-server' });
   }
 }
 
@@ -355,8 +360,8 @@ async function post(endpoint, data = {}, config = {}) {
     if (handleSpecialStatus(response?.status)) return undefined
     return toResponse(response)
   } catch (error) {
+    // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
     console.error('Error during API call using api.js:', error.stack)
-    router.push({ path: '/error-server' });
   }
 }
 
@@ -381,8 +386,8 @@ async function put(endpoint, data = {}, config = {}) {
     if (handleSpecialStatus(response?.status)) return undefined
     return toResponse(response)
   } catch (error) {
+    // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
     console.error('Error during API call using api.js:', error.stack)
-    router.push({ path: '/error-server' });
   }
 }
 
@@ -405,8 +410,8 @@ async function del(endpoint, data = {}) {
     if (handleSpecialStatus(response?.status)) return undefined
     return toResponse(response)
   } catch (error) {
+    // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
     console.error('Error during API call using api.js:', error.stack)
-    router.push({ path: '/error-server' });
   }
 }
 
@@ -426,8 +431,8 @@ async function patch(endpoint, data = {}) {
     if (handleSpecialStatus(response?.status)) return undefined
     return toResponse(response)
   } catch (error) {
+    // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
     console.error('Error during API call using api.js:', error.stack)
-    router.push({ path: '/error-server' })
   }
 }
 
