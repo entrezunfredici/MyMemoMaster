@@ -8355,4 +8355,20 @@ Les deux durées s'additionnent au temps planifié existant dans `Kpi.service.js
 - **Prod non redimensionnée** — action bloquée par les permissions, à rejouer.
 - **Preprod tourne avec la nouvelle mémoire mais l'ancien code** (pas de pré-chauffage corrigé, pas de temps de révision) — pas d'incohérence dangereuse (le redimensionnement mémoire est bénéfique indépendamment du code exécuté), mais à garder en tête : le vrai bénéfice du pré-chauffage corrigé (charger le modèle au démarrage plutôt qu'en pleine requête utilisateur) n'est pas encore vérifiable en preprod tant que le code n'est pas committé/poussé/déployé.
 - **`metrics-server` toujours cassé** sur le cluster (dette déjà connue, citée dans `COMPTE_RENDU_METRIQUES.md` §5.2) — toute l'analyse de capacité ci-dessus repose sur des `requests`/`limits` déclarés, pas sur une consommation réelle mesurée en direct sur le cluster ; à recroiser avec `kubectl top pods` dès que la panne sera résolue.
+
+---
+
+## [2026-09-01] IMP — KpiPage.vue : lève l'ambiguïté entre "sessions planifiées" (calendrier) et pratique réelle
+
+**Contexte** — Question de l'utilisateur devant la carte « Complétées / 30 j » à 0 malgré une pratique réelle récente : « ça correspond à quoi les sessions ? ». La section « Révision & Régularité » mélange sans le dire deux notions distinctes — les créneaux `RevisionSession` planifiés à l'avance dans le calendrier (`Sessions planifiées/complétées`, `Taux de complétion`, `Streak`, `30 derniers jours`, `Complétées / 30 j`, section `Discipline`) et la pratique réelle chronométrée ajoutée le jour même (`TestResult.durationSeconds` + `LeitnerReviewSession`, qui n'alimente que « Temps total de révision »). Confirmé demandé explicitement par l'utilisateur (« oui fait le »).
+
+**Décision** — Légende visible en permanence sous chaque carte concernée (nouveau prop `hint` sur le `StatCard` inline), pas une infobulle au survol (`title`) : cohérent avec une réserve déjà actée sur ce projet (`title` jugé mécanisme faible pour l'accessibilité, cf. correctif RGAA 6.2 du 2026-08-31) et accessible sans dépendre d'une interaction souris. Complété par une phrase d'intro sous le titre de section expliquant la distinction en clair.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/pages/KpiPage.vue`
+- `my_memo_master_front/test/components/KpiPage.test.js` (+3 tests)
+
+**Vérifié** : `npx vitest run test/components/KpiPage.test.js` → 24/24 (+3) ; `npx vitest run test/a11y/axe.test.js` → 20/20, 0 régression ; `npx eslint` → 0 erreur.
+
+**Dette signalée, non traitée ici** : la section « Discipline » plus bas garde son propre texte de légende sous le graphique (« sessions planifiées vs complétées ») — cohérent avec les nouveaux hints mais pas retouché, déjà suffisamment explicite dans son contexte.
 - Le `grep` des 160 occurrences n'a pas été audité une par une pour vérifier qu'aucune ne dépend d'un format de réponse different (ex. un contrôleur qui renverrait déjà `{ message, errors }` avec un `message` non pertinent) — le garde `!data.message` limite ce risque (ne touche que les réponses qui n'ont **aucun** message), mais ce n'est pas une preuve exhaustive.

@@ -131,6 +131,30 @@ describe('KpiPage', () => {
     expect(text).toContain('Diversité des matières')
   })
 
+  // ── Clarification "sessions planifiées" vs "pratique réelle" ────────────────
+  // Régression : les deux notions de "session" (créneaux calendrier vs
+  // exercices/Leitner faits directement) étaient confondues sous le même mot
+  // sans distinction visible — signalé par l'utilisateur.
+
+  it('précise que les "sessions" de la section Révision sont les créneaux planifiés au calendrier', () => {
+    const wrapper = mountKpi({ kpis: KPI_FIXTURE })
+    expect(wrapper.text()).toContain('créneaux que tu planifies à l\'avance dans le calendrier')
+  })
+
+  it('affiche une légende "créneaux calendrier" sous plusieurs cartes basées sur RevisionSession', () => {
+    const wrapper = mountKpi({ kpis: KPI_FIXTURE })
+    const occurrences = wrapper.text().match(/créneaux calendrier/g) || []
+    // Au moins Sessions planifiées, 30 derniers jours, Complétées / 30 j,
+    // Planifiées cette semaine, Complétées cette semaine partagent ce hint —
+    // borne large plutôt qu'un compte exact, fragile à la sérialisation du DOM
+    expect(occurrences.length).toBeGreaterThanOrEqual(5)
+  })
+
+  it('précise que "Temps total de révision" additionne planifié et réel', () => {
+    const wrapper = mountKpi({ kpis: KPI_FIXTURE })
+    expect(wrapper.text()).toContain('créneaux planifiés + pratique réelle chronométrée')
+  })
+
   // ── Badges ────────────────────────────────────────────────────────────────
 
   it('affiche tous les badges', () => {
