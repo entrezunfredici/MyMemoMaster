@@ -33,22 +33,27 @@
 
     <!-- RÉVISION & RÉGULARITÉ -->
     <section>
-      <h2 class="text-xl font-bold text-primary mb-3">Révision & Régularité</h2>
+      <h2 class="text-xl font-bold text-primary mb-1">Révision & Régularité</h2>
+      <p class="text-sm text-gray-400 mb-3">
+        Les « sessions » ci-dessous sont les créneaux que tu planifies à l'avance dans le calendrier —
+        pas tes exercices ou révisions Leitner faits directement, comptés séparément (voir « Temps total de révision »
+        et les sections Exercices / Leitner plus bas).
+      </p>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <StatCard label="Sessions planifiées" :value="store.kpis.revision.totalPlanned" />
-        <StatCard label="Sessions complétées" :value="store.kpis.revision.totalCompleted" />
-        <StatCard label="Taux de complétion" :value="store.kpis.revision.completionRate + ' %'" />
-        <StatCard label="Streak actuel" :value="store.kpis.revision.streakDays + ' j'" highlight />
+        <StatCard label="Sessions planifiées" :value="store.kpis.revision.totalPlanned" hint="créneaux calendrier" />
+        <StatCard label="Sessions complétées" :value="store.kpis.revision.totalCompleted" hint="créneaux calendrier cochés faits" />
+        <StatCard label="Taux de complétion" :value="store.kpis.revision.completionRate + ' %'" hint="créneaux planifiés tenus" />
+        <StatCard label="Streak actuel" :value="store.kpis.revision.streakDays + ' j'" highlight hint="jours de suite, créneaux planifiés" />
       </div>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-        <StatCard label="30 derniers jours" :value="store.kpis.revision.sessionsLast30Days + ' sessions'" />
-        <StatCard label="Temps total de révision" :value="formatMinutes(store.kpis.revision.totalMinutes)" />
-        <StatCard label="Complétées / 30 j" :value="store.kpis.revision.completedLast30Days + ' sessions'" />
+        <StatCard label="30 derniers jours" :value="store.kpis.revision.sessionsLast30Days + ' sessions'" hint="créneaux calendrier" />
+        <StatCard label="Temps total de révision" :value="formatMinutes(store.kpis.revision.totalMinutes)" hint="créneaux planifiés + pratique réelle chronométrée" />
+        <StatCard label="Complétées / 30 j" :value="store.kpis.revision.completedLast30Days + ' sessions'" hint="créneaux calendrier" />
       </div>
 
       <!-- Graphique activité hebdomadaire -->
       <div class="bg-white border-2 border-gray-100 rounded-xl p-4">
-        <p class="text-sm font-medium text-gray-500 mb-3">Activité hebdomadaire (sessions complétées)</p>
+        <p class="text-sm font-medium text-gray-500 mb-3">Activité hebdomadaire (créneaux calendrier complétés)</p>
         <div class="relative h-48">
           <Bar :data="weeklyChartData" :options="barOptions" />
         </div>
@@ -59,9 +64,9 @@
     <section>
       <h2 class="text-xl font-bold text-primary mb-3">Discipline</h2>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-        <StatCard label="Planifiées cette semaine" :value="store.kpis.discipline.plannedThisWeek" />
-        <StatCard label="Complétées cette semaine" :value="store.kpis.discipline.completedThisWeek" />
-        <StatCard label="Score discipline (30 j)" :value="store.kpis.discipline.disciplineScore + ' %'" :highlight="store.kpis.discipline.disciplineScore >= 70" />
+        <StatCard label="Planifiées cette semaine" :value="store.kpis.discipline.plannedThisWeek" hint="créneaux calendrier" />
+        <StatCard label="Complétées cette semaine" :value="store.kpis.discipline.completedThisWeek" hint="créneaux calendrier" />
+        <StatCard label="Score discipline (30 j)" :value="store.kpis.discipline.disciplineScore + ' %'" :highlight="store.kpis.discipline.disciplineScore >= 70" hint="créneaux planifiés tenus" />
       </div>
       <div class="bg-white border-2 border-gray-100 rounded-xl p-4">
         <div class="flex justify-between text-xs text-gray-500 mb-1">
@@ -219,12 +224,20 @@ const store = useKpiStore()
 onMounted(() => { store.fetchMyKpis() })
 
 // ---- Composant inline StatCard ----
+// CHOIX: `hint` affiché en légende visible sous la valeur, pas seulement au survol
+// (title/tooltip) — la section "Révision & Régularité" mélange deux notions de
+// "session" (créneaux planifiés au calendrier vs pratique réelle chronométrée,
+// voir DECISIONS.md 2026-09-01) : un texte visible en permanence règle
+// l'ambiguïté pour tout le monde, y compris au clavier/tactile, contrairement à
+// un `title` qui ne se découvre qu'au survol souris (déjà signalé comme
+// mécanisme faible pour l'accessibilité — voir DECISIONS.md sur la nav 6.2).
 const StatCard = defineComponent({
-  props: { label: String, value: [String, Number], highlight: Boolean },
+  props: { label: String, value: [String, Number], highlight: Boolean, hint: String },
   setup(props) {
     return () => h('div', { class: 'bg-white border-2 border-gray-100 rounded-xl p-4' }, [
       h('p', { class: 'text-xs text-gray-400 mb-1' }, props.label),
-      h('p', { class: `text-2xl font-bold ${props.highlight ? 'text-primary' : 'text-gray-800'}` }, String(props.value ?? '—'))
+      h('p', { class: `text-2xl font-bold ${props.highlight ? 'text-primary' : 'text-gray-800'}` }, String(props.value ?? '—')),
+      props.hint ? h('p', { class: 'text-[11px] text-gray-400 mt-1 italic' }, props.hint) : null
     ])
   }
 })
