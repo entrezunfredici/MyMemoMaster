@@ -222,7 +222,7 @@ validation, pas de celui-ci.
 | Élément IN du feature list | Interface avec ce document | Ce que ce document NE fixe PAS |
 |---|---|---|
 | Chunking PDF | Fournit `sourceText` (§2) | Taille/stratégie de découpage, gestion des PDF multi-pages |
-| Benchmark LLM | Choisit le modèle qui exécute ce prompt | Fournisseur, nom de modèle, format d'appel réseau, coût par appel |
+| Benchmark LLM | Choisit le modèle qui exécute ce prompt | Nom de modèle précis dans la gamme retenue, format d'appel réseau, coût par appel — le fournisseur (Mistral AI, orientation RGPD, voir §11) est acté mais pas le benchmark lui-même |
 | Quotas | Encadre le nombre d'appels à ce prompt | Limites chiffrées, mécanisme de comptage/blocage |
 | Parsing | Consomme la sortie JSON (§4) | Implémentation du parseur, mapping technique exact vers les 3 appels API (§6 n'est qu'une hypothèse) |
 | Écran de validation | Consomme `cards[]` et `warning` (§4), affiche `sourceExcerpt` (§5.1) | Maquette, ergonomie, comportement accept/edit/reject |
@@ -292,10 +292,13 @@ validation, pas de celui-ci.
 
 ## 11. Points ouverts / dette
 
-- **Aucun modèle LLM concret n'est arrêté** — ce prompt est écrit indépendamment du fournisseur, en anticipant
-  un arbitrage du Benchmark LLM (hors périmètre). Le prompt système suppose un modèle capable de respecter un
-  schéma JSON strict ; certains modèles nécessitent un mode "JSON strict"/"structured output" dédié plutôt
-  qu'une simple instruction en langage naturel — à vérifier une fois le modèle choisi.
+- **Orientation fournisseur actée par l'utilisateur : Mistral AI**, pour des raisons RGPD (hébergement UE) —
+  voir `DECISIONS.md`. Le Benchmark LLM lui-même (quel modèle précis dans la gamme Mistral, comparatif de
+  qualité/coût/latence) reste hors périmètre et non fait ici ; cette orientation ne dispense pas du benchmark,
+  elle en restreint le périmètre à l'offre Mistral. À date, les modèles Mistral exposent un mode sortie JSON
+  strict (`response_format: { type: "json_object" }`, API compatible du pattern OpenAI) — cohérent avec la
+  règle 6 du prompt système (§3.1) qui exige une sortie JSON exclusive ; à reconfirmer sur le modèle
+  précisément retenu une fois le Benchmark LLM fait, les capacités variant selon les versions.
 - **Aucun appel réel n'a été fait** — ce document n'a pas pu être validé empiriquement (pas d'intégration LLM
   existante dans le dépôt à ce jour ; le seul modèle IA embarqué, `@xenova/transformers`, sert à la correction
   sémantique des exercices, pas à la génération de contenu). Les exemples du §9 sont illustratifs, pas mesurés.

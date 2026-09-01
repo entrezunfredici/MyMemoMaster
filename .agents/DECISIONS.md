@@ -1716,6 +1716,42 @@ Les deux durées s'additionnent au temps planifié existant (`revision.totalMinu
 
 ---
 
+### [2026-09-01] C-01 — Orientation fournisseur LLM : Mistral AI, pour raison RGPD (hébergement UE)
+
+**Contexte** — Le document `diagrams/generation_ia_prompt_cartes.md` (C-01.01) laissait volontairement ouvert le choix du fournisseur LLM, le Benchmark LLM étant un élément distinct du feature list `C-01`, non traité par ce ticket. L'utilisateur a tranché cette orientation en session : le fournisseur retenu sera **Mistral AI**, motivé explicitement par la conformité RGPD — un modèle français/européen, hébergé dans l'UE, limite l'exposition aux transferts de données hors UE (contrairement aux offres américaines type OpenAI/Anthropic, qui impliquent un cadre de transfert international — clauses contractuelles types ou équivalent — que MyMemoMaster n'a pas à mettre en place avec un fournisseur européen).
+
+**Décision** — Orientation actée pour le fournisseur : Mistral AI. **Ceci n'est pas le Benchmark LLM lui-même** (ticket distinct, hors périmètre de C-01.01) — reste à faire séparément : le choix du modèle précis dans la gamme Mistral (ex. `mistral-large` vs `mistral-small`, arbitrage qualité de génération / coût / latence), la vérification concrète du support JSON strict sur ce modèle, et le format d'appel réseau. Cette orientation restreint simplement le périmètre du futur benchmark à l'offre Mistral plutôt qu'à un comparatif multi-fournisseurs ouvert.
+
+**Alternative écartée** : fournisseurs américains (OpenAI, Anthropic) — non retenus comme orientation par défaut en raison du critère RGPD mis en avant par l'utilisateur ; pas d'éléments de comparaison qualité/coût/latence discutés à ce stade, cette décision porte uniquement sur le critère de conformité, pas sur une évaluation technique comparée (qui reste à faire dans le Benchmark LLM si l'orientation Mistral s'avérait insuffisante en pratique).
+
+**Conséquences** : `diagrams/generation_ia_prompt_cartes.md` (§8, §11) mis à jour pour refléter cette orientation — le prompt système (§3.1, règle 6) suppose un mode de sortie JSON strict, cohérent avec l'offre Mistral actuelle (`response_format: json_object`) à reconfirmer sur le modèle précis une fois choisi. Aucun code, aucune clé d'API, aucune variable d'environnement ajoutée — décision d'orientation documentaire uniquement à ce stade.
+
+---
+
+### [2026-09-01] C-01.02 — Maquettes UI génération IA en ASCII dans `diagrams/`, pas en bundle-surgery du prototype interactif
+
+**Contexte** — Le ticket C-01.02 demande des « Maquettes UI génération Leitner IA ». Ce dépôt a déjà livré deux « Maquettes UI » par le passé, avec deux méthodes différentes : S-06.02 (2026-07-19) a directement édité le bundle minifié `docs/prototype/MyMemoMaster - Standalone.html` (dépaquetage manifest gzip+base64 → template → repackaging, via des scripts ad hoc non versionnés) pour ajouter un écran « Interpréteur de formules » ; S-05.02/S-04.02 ont produit des maquettes ASCII dans `diagrams/*_ui.md`. Les deux précédents n'ont pas le même contexte : S-06.02 documentait une fonctionnalité **déjà implémentée** en Vue (l'écran mirroir l'UI réelle, utile comme preuve pour le dossier de certification Bloc 2) ; S-05.02/S-04.02 documentaient une fonctionnalité **pas encore construite**, à l'étape « Analyse » — exactement la situation de `C-01` (0/11 dans Odoo, aucune ligne de code).
+
+**Décision** : maquettes ASCII dans `diagrams/generation_ia_ui.md`, sur le modèle d'`etablissement_admin_ui.md` (périmètre, vues ASCII, composants à créer/modifier, store Pinia squelette, comportements, points d'attention).
+
+**Alternative écartée** : reproduire la méthode S-06.02 (ajouter des écrans au prototype interactif versionné). Écartée pour deux raisons : (1) le prototype sert à démontrer une UI **déjà tranchée et cohérente avec l'implémentation réelle** — l'ajouter maintenant obligerait soit à figer des choix d'interaction qui n'ont pas encore été validés fonctionnellement, soit à re-générer l'écran une seconde fois une fois l'implémentation faite (double travail) ; (2) la méthode elle-même est fragile et coûteuse : dépaquetage/repackaging d'un bundle minifié de 255 Ko via des scripts ponctuels non versionnés, plus régénération des 17 captures via automatisation navigateur (Chromium headless/CDP) — disproportionné pour une fonctionnalité entièrement hypothétique à ce stade.
+
+**Conséquences** : `diagrams/generation_ia_ui.md` reste un document de travail non visuel (wireframes texte), moins parlant qu'une maquette Figma/Claude Design haute-fidélité pour une revue non technique — accepté comme niveau de maturité cohérent avec le reste des documents « Analyse » du projet. Si la fonctionnalité est un jour implémentée, un écran pourra être ajouté au prototype interactif à ce moment-là (comme S-06.02 l'a fait a posteriori pour l'interpréteur), sans que ce document ASCII n'ait besoin d'être conservé au-delà de sa valeur d'analyse.
+
+---
+
+### [2026-09-01] C-01.03 — Modèle LLM retenu : `mistral-small-latest`, `mistral-medium-latest` en option d'escalade
+
+**Contexte** — L'orientation fournisseur Mistral AI était déjà actée (entrée précédente, raison RGPD). Restait à choisir un modèle précis dans la gamme pour exécuter le prompt de génération de cartes (C-01.01). Aucune intégration technique n'existe dans le dépôt : le choix s'appuie sur une revue documentaire (tarifs et documentation publique Mistral, début septembre 2026 — sources dans `diagrams/generation_ia_llm_benchmark.md`), pas sur une mesure empirique.
+
+**Décision** — `mistral-small-latest` (Mistral Small 4) retenu comme modèle par défaut. Le profil de la tâche (extraction structurée ancrée sur un chunk de texte déjà découpé, sortie JSON strictement contrainte, pas de raisonnement complexe ni d'agentique) ne justifie pas a priori un modèle plus capable : Small expose le même mécanisme de sortie structurée que Large/Medium (JSON mode + schéma custom, cf. documentation Mistral), pour une fraction du coût (~×2,5 moins cher que Large en sortie, ~×12,5 moins cher que Medium). Le coût par appel est un critère de premier ordre ici car la fréquence d'appel (un par génération demandée par un utilisateur) interagit directement avec le budget que le futur arbitrage Quotas (hors périmètre) devra fixer.
+
+**Alternative écartée** : `mistral-large-latest` ou `mistral-medium-latest` par défaut — écartés comme choix par défaut faute de justification sur ce profil de tâche précis (pas un problème de raisonnement), mais **pas définitivement exclus** : documentés comme option d'escalade si une validation empirique future (protocole décrit en §8 du document, non exécuté ici) montrait un taux de non-conformité JSON ou une qualité de génération insuffisante avec Small. / Famille Ministral (8B/14B/3B, encore moins chère) — écartée par prudence, leur fiabilité sur un schéma JSON à plusieurs niveaux d'imbrication n'étant pas établie dans la documentation consultée, sans pour autant avoir été testée pour confirmer ou infirmer ce doute.
+
+**Conséquences** : `diagrams/generation_ia_llm_benchmark.md` documente le choix et son critère de bascule. Aucun code, aucune clé d'API, aucune variable d'environnement ajoutée — décision d'orientation documentaire, à valider empiriquement (protocole du §8 du document) avant toute mise en production. Le choix n'a d'impact ni sur le contrat du prompt (C-01.01, inchangé — le mécanisme de sortie structurée est le même pour tous les modèles candidats) ni sur les maquettes UI (C-01.02, le modèle est invisible pour l'utilisateur final).
+
+---
+
 ### [2026-09-01] Mémoire API prod/preprod : 896Mi/1536Mi plutôt que des valeurs rondes en Gi (1Gi/2Gi)
 
 **Contexte** — Le correctif de pré-chauffage (entrée précédente) a produit la première mesure réelle de la mémoire consommée par l'API une fois le modèle sémantique chargé : 794-825 Mi de RSS. Les deux fichiers `helm/values-{prod,preprod}.yaml` portaient depuis leur création un commentaire attendant explicitement cette mesure pour remplacer la valeur provisoire (512Mi requests / 1Gi limits).

@@ -142,7 +142,9 @@
 | Planning daté « dev junior » (condensé sur un an) | Livré et **intégralement reporté dans Odoo le 2026-08-28** : 181 sous-tâches redatées/rechiffrées + **6 blocs transverses créés** (`MKT`, `DES`, `IA`, `QA`, `PIL`, `DOC` — 96 sous-tâches, 151,5 JH) + utilisatrice `Clélia Potorel` créée. Projet passé de 279 à 381 tâches, charge élémentaire 1 209 → **413,5 JH**, fenêtre 2025-10-07 → 2026-07-21 — `17_planning_MyMemoMaster_date.xlsx` : les 192 tâches du planning source réestimées pour un profil junior (236,5 → **411 JH**, ×1,74) et datées sur un calendrier condensé (3 jours mar/mer/jeu toutes les 3 semaines, 07/10/2025 → 18/06/2026, puis débord de 14,5 JH réaffecté au chef de projet seul à taux plein jusqu'au 21/07/2026) | 2026-08-28 |
 | Tableau de bord de pilotage (7 indicateurs) | **Réédité au 2026-08-31** — registre Odoo strictement inchangé (217/248, 183/91/78, RH 362,3 JH — revérifiés, identiques au 2026-08-30) ; seule la Qualité bouge : tests API 1 554→**1 560**, front 689→**703** (+20, issus de 3 commits de maintenance hors registre Odoo — 500 création LeitnerSystem/Subject/Diagramme, bugs carte mentale, fermeture des modales), couverture reproduite en local 81,4 % API / **59,75 %** front, RGAA revérifié 0 régression (20/20 axe-core, 0/79 statique), audit manuel 106 critères inchangé (23/106). SonarQube détaillé toujours daté du 2026-08-29 (pas de `SONAR_TOKEN` local, 3 analyses de plus non relues). **Arrêté précédent (2026-08-30)** — le dernier écart déclaré/démontrable (1,2 point, porté par `QA.03`/`QA.05`/`QA.06`) est refermé : ces trois tâches sont désormais confirmées par le dépôt (E2E + k6 + rapport). Avancement **87,5 % déclaré = 87,5 % démontrable** (217/248, revérifié en direct sur Odoo), enveloppe **108 675 €** dont **86 250 €** validés, **30 tâches** en retard (dont 20 sur `C-01`/`C-02`), risques **183/91/78 inchangés** (revérifiés), RH total **362,3 JH** (0,3 JH d'écart avec le planning, contre 2 JH au 2026-08-28, répartition par profil non rejouée). Qualité : couverture SonarQube **63,9 %** (dernière analyse lue, du 2026-08-29 — action P0 close), reproduite en local ce jour à 81,4 % API / 58,9 % front ; **vulnérabilités Sonar réduites de 13 à 3** le 2026-08-30, dont la CRITICAL (secrets `.env` embarquables dans l'image API) **corrigée** ; RGAA passé de 5 à **6 critères outillés** (ajout du contraste réel RGAA 3.2, 8/8 pages), toujours 0 non-conformité, **+ audit manuel des 106 critères ouvert dans la même journée** (23/106 posés, 2 candidats NC — 8.6, 12.7 — ajoutés au §7.2.1 et au plan d'actions). Précédent arrêté (2026-08-28, après suppression du bloc `[IA]` doublon) : avancement 87,8 %/86,6 %, enveloppe 109 200 €/86 775 €, 33 tâches en retard, 11 vulnérabilités dont 1 CRITICAL non traitée, couverture 0 % | 2026-08-30 |
 | Tableau de bord de pilotage — arrêté précédent | Périmé — `docs/COMPTE_RENDU_METRIQUES.md`, photo au 2026-08-27 : MVP 92,3 % au sens de l'état de tâche (169/183) et **83,6 % à l'étape « validé » (153/183) après recadrage du tableau Odoo**, charge livrée valorisée 330 712 € (1 102,4 JH à 300 €), écart délais médian +127 j, 185 dépendances bloquantes ouvertes (toutes hors MVP) + 6 dépendances infra, **charge 1 137,4 JH pour 405,2 JH de capacité réelle = 281 % équipe / 444 % sur le seul contributeur à temps plein** (régime déclaré : 1 temps plein + 9 contributeurs à 1 j/3 sem), couverture SonarQube 0 % (aucun `lcov` publié) vs 86,6 % mesurée localement sur l'API, 0 non-conformité RGAA outillée ; conventions de calcul actées dans DECISIONS | 2026-08-27 |
-| Génération de Leitner par IA (C-01) — Spécification prompt génération cartes | **Analyse livrée, aucun code** — `diagrams/generation_ia_prompt_cartes.md` (C-01.01) : prompt système + prompt utilisateur, contrat d'entrée/sortie JSON aligné sur le contrat réel de persistance (`POST /questions` → `POST /responses` → `POST /leitnercards`, cf. `FlashcardsCardsPage.vue#handleCreate`), garde-fous anti-hallucination (`sourceExcerpt` par carte), cas d'erreur. `C-01` reste à 0/11 dans Odoo — aucune intégration LLM externe dans le dépôt à ce jour | 2026-09-01 |
+| Génération de Leitner par IA (C-01) — Spécification prompt génération cartes | **Analyse livrée, aucun code** — `diagrams/generation_ia_prompt_cartes.md` (C-01.01) : prompt système + prompt utilisateur, contrat d'entrée/sortie JSON aligné sur le contrat réel de persistance (`POST /questions` → `POST /responses` → `POST /leitnercards`, cf. `FlashcardsCardsPage.vue#handleCreate`), garde-fous anti-hallucination (`sourceExcerpt` par carte), cas d'erreur ; orientation fournisseur **Mistral AI actée par l'utilisateur (RGPD, hébergement UE)** — le Benchmark LLM (modèle précis, coût/latence) reste à faire séparément. `C-01` reste à 0/11 dans Odoo — aucune intégration LLM externe dans le dépôt à ce jour | 2026-09-01 |
+| Génération de Leitner par IA (C-01) — Maquettes UI génération Leitner IA | **Analyse livrée, aucun code** — `diagrams/generation_ia_ui.md` (C-01.02) : maquettes ASCII du parcours complet (point d'entrée sur `FlashcardsCardsPage.vue`, modal configuration source/matière/nombre/type, état de génération en cours, écran de validation accept/edit/reject par carte avec `sourceExcerpt`, édition réutilisant le formulaire carte existant), composants/store/comportements esquissés, persistance réutilisant les 3 endpoints existants (aucun ajout automatique sans validation — OUT du ticket). Endpoint(s) d'orchestration et progression réelle non tranchés (hors périmètre) | 2026-09-01 |
+| Génération de Leitner par IA (C-01) — Benchmark et choix modèle LLM | **Analyse livrée, aucun code** — `diagrams/generation_ia_llm_benchmark.md` (C-01.03) : revue documentaire (pas empirique, aucune intégration LLM existante) de la gamme Mistral AI (orientation RGPD déjà actée), tableau comparatif Large 3/Medium 3.5/Small 4/Ministral 3 (contexte, prix/M tokens, support sortie structurée), profil de tâche dérivé du prompt C-01.01 (extraction structurée sur chunk court, pas de raisonnement complexe) → **choix retenu `mistral-small-latest`**, `mistral-medium-latest` en option d'escalade ; protocole de validation empirique documenté mais non exécuté (hors périmètre) | 2026-09-01 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -8424,3 +8426,98 @@ d'analyse pur).
 **Dette signalée, non traitée ici** — Le document n'a été validé par aucun appel LLM réel (aucune intégration
 existante) ; sa robustesse (respect effectif du schéma JSON, qualité des cartes générées) reste à vérifier une
 fois le Benchmark LLM arbitré et une première intégration technique posée.
+
+---
+
+## [2026-09-01] DOC — C-01.02 : Maquettes UI génération Leitner IA
+
+**Contexte** — Ticket `C-01.02` (feature list `C-01`, source planning, V2, tâche « Analyse », suite directe de
+`C-01.01`). Objectif : livrer les « Maquettes UI génération Leitner IA », sans déborder sur les autres
+éléments IN du feature list (Prompt, Benchmark LLM, Parsing, Chunking PDF, Quotas — traités uniquement comme
+entrées/contraintes visuelles, ex. un indicateur de quota affiché sans mécanisme réel).
+
+**Audit préalable et choix de méthode** — Deux précédents existent dans ce dépôt pour un livrable « Maquettes
+UI » : (1) bundle-surgery du prototype interactif versionné `docs/prototype/MyMemoMaster - Standalone.html`
+(S-06.02, 2026-07-19) — utilisé pour un écran mirroir d'une fonctionnalité **déjà implémentée** (l'interpréteur
+de formules) ; (2) maquettes ASCII dans `diagrams/*_ui.md` (S-05.02, `dashboard_enseignant_ui.md`,
+`etablissement_admin_ui.md`) — utilisé en amont de l'implémentation, à l'étape « Analyse ». `C-01` étant à
+0/11 dans Odoo (rien d'implémenté, cf. entrée C-01.01), le précédent (2) s'applique : maquettes ASCII dans
+`diagrams/`, sur le modèle exact d'`etablissement_admin_ui.md` (périmètre, vues ASCII, composants à
+créer/modifier, store Pinia squelette, comportements, points d'attention). Pas de bundle-surgery du prototype
+interactif tenté — écarté comme disproportionné pour une fonctionnalité non implémentée, et risqué sans les
+scripts d'extraction/repackaging (ponctuels, non versionnés lors de S-06.02).
+
+**Ce qui a été fait** — `diagrams/generation_ia_ui.md` : périmètre (tableau IN/OUT du document), flux général
+en 3 écrans (configuration → génération en cours → validation), maquette du point d'entrée sur
+`FlashcardsCardsPage.vue` (bouton `✨ Générer par IA` à côté de `+ Ajouter une carte`), modal de configuration
+(source texte/PDF, matière pré-remplie via `SubjectSelectorComponent`, slider nombre de cartes, type
+open/mcq/mixed — repris du contrat `cardType` de `generation_ia_prompt_cartes.md`), état de génération avec
+variante d'erreur, écran de validation plein (liste de cartes cochées par défaut, accept/edit/reject,
+accordéon `sourceExcerpt`, bandeau `warning`, variante QCM), édition réutilisant le formulaire carte existant
+sans nouveau composant, tableaux composants à créer/réutilisés, squelette de store Pinia (`generate(config)`
+sans contrat réseau défini), diagramme de comportements/interactions, section « Points d'attention » (7
+questions ouvertes explicitement non tranchées).
+
+**Hypothèses posées, à confirmer** (documentées en §11 du document) :
+- Aucun endpoint d'orchestration nommé — dépend du découpage réel Chunking PDF/Benchmark LLM/Parsing.
+- Comportement en cas d'échec partiel de persistance (Vue 3) non tranché.
+- Progression de la Vue 2 illustrative (3 étapes) — un appel LLM synchrone ne permet pas de vraie progression
+  sans streaming/polling, hors périmètre.
+- Limite chiffrée du slider « nombre de cartes » (1-20) illustrative, dépend de Quotas.
+- Écran de validation en page dédiée vs. vue conditionnelle inline non tranché.
+
+**Ce qui n'est PAS couvert** — Contrat réseau des endpoints, Chunking PDF, Benchmark LLM, Parsing, Quotas
+(mécanisme réel), tout code (aucune ligne de code livrée — ticket d'analyse pur, comme C-01.01).
+
+**Fichiers créés**
+- `diagrams/generation_ia_ui.md`
+
+**Dette signalée, non traitée ici** — Aucune maquette visuelle haute-fidélité (Figma/Claude Design) produite,
+uniquement des wireframes ASCII — cohérent avec le niveau de maturité du reste des maquettes « Analyse » du
+projet (S-05.02, S-04.02) mais moins abouti visuellement que le prototype interactif de `docs/prototype/`.
+
+---
+
+## [2026-09-01] DOC — C-01.03 : Benchmark et choix modèle LLM (Génération de Leitner par IA)
+
+**Contexte** — Ticket `C-01.03` (feature list `C-01`, source planning, V2, tâche « Analyse », suite de
+C-01.01/C-01.02). Objectif : livrer le « Benchmark et choix modèle LLM », sans déborder sur les autres
+éléments IN du feature list (Prompt, Parsing, Chunking PDF, Quotas, Écran de validation — traités uniquement
+comme contexte). L'orientation fournisseur Mistral AI ayant déjà été actée par l'utilisateur (`DECISIONS.md`,
+2026-09-01, raison RGPD), ce ticket restreint le comparatif à la gamme Mistral plutôt qu'un comparatif
+multi-fournisseurs ouvert.
+
+**Méthode** — Aucune intégration LLM n'existe dans le dépôt (reconfirmé) : ce document est une **revue
+documentaire** (recherche web sur la documentation et les tarifs publics Mistral AI, début septembre 2026),
+explicitement marquée comme non empirique. Sources citées en fin de document (pricing officiel Mistral,
+docs.mistral.ai, Data Processing Addendum). Un tableau de 6 modèles généralistes de la gamme (Large 3, Medium
+3.5, Small 4, Ministral 3 14B/8B/3B) a été comparé sur contexte, prix entrée/sortie par million de tokens et
+support de sortie structurée — les modèles spécialisés (OCR, Codestral, Voxtral, Embed, Moderation) écartés
+d'emblée comme hors sujet.
+
+**Ce qui a été fait** — `diagrams/generation_ia_llm_benchmark.md` : profil de tâche dérivé du contrat de
+prompt C-01.01 (extraction structurée sur un chunk court, pas de raisonnement complexe, fréquence d'appel
+potentiellement élevée → coût déterminant), tableau comparatif des 6 modèles, rappel substantifié du critère
+RGPD (société française, résidence UE par défaut, rétention 30 j, DPA disponible — avec une piste
+auto-hébergement notée pour mémoire vu que plusieurs modèles Mistral sont open-weight Apache 2.0, non
+chiffrée, hors périmètre), **choix retenu : `mistral-small-latest`** (meilleur rapport coût/profil de tâche,
+sortie structurée supportée au même titre que les modèles plus capables), `mistral-medium-latest` documenté
+comme option d'escalade si la qualité s'avérait insuffisante. Protocole de validation empirique minimal décrit
+(§8) mais non exécuté — hors périmètre d'exécution de ce ticket d'analyse.
+
+**Hypothèses posées, à confirmer** (documentées en §9 du document) :
+- Aucune mesure empirique — choix basé sur des specs publiques, à valider dès qu'une intégration existera.
+- Contexte exact de Small/Medium non confirmé sur la documentation officielle au moment de la revue (chiffre
+  d'agrégateurs tiers) — sans impact sur la conclusion, le besoin en contexte de la tâche étant modeste.
+- Fiabilité de la sortie structurée sur la famille Ministral non confirmée, écartée par prudence.
+- Tarifs susceptibles d'évolution (gamme substantiellement renouvelée en 2026).
+
+**Ce qui n'est PAS couvert** — Chunking PDF, Parsing, Quotas (mécanisme réel), Écran de validation (déjà
+maquetté en C-01.02), tout code (aucune ligne de code livrée — ticket d'analyse pur).
+
+**Fichiers créés**
+- `diagrams/generation_ia_llm_benchmark.md`
+
+**Dette signalée, non traitée ici** — Le choix `mistral-small-latest` n'a été validé par aucun appel réel ;
+le protocole de validation empirique du §8 reste à exécuter avant toute mise en production, avec bascule
+possible vers `mistral-medium-latest` selon les résultats.
