@@ -9544,3 +9544,61 @@ se documentent dans ce journal et `DECISIONS.md`, pas en éditant rétroactiveme
 - `docs/RAPPORT_QUALITE_GENERATION_IA.md`
 - `docs/QUALITE_GENERATION_IA_RUN.json` (écrasé par le second run — le premier run reste décrit en
   détail dans le rapport pour la traçabilité de l'écart trouvé)
+
+---
+
+## [2026-09-02] FIX — Bug bloquant trouvé en usage réel (timeout front 10 s sur la génération IA) + `main` mise à jour + vulnérabilité `fast-uri` bloquant le CI
+
+**Contexte** — Trois événements enchaînés le même jour, tous découverts en marge de la revue C-01.11 :
+
+**1. Bug bloquant signalé par l'utilisateur** (« la génération a échoué ») — L'API globale du front
+(`helpers/api.js`) a un timeout par défaut de **10 000 ms**, calibré pour les ~160 endpoints CRUD de
+l'app. La génération IA peut légitimement dépasser ce délai (jusqu'à 20 passages × jusqu'à 2 appels
+Mistral chacun — mesuré jusqu'à ~7 s pour un seul appel simple lors du protocole C-01.10). Le navigateur
+coupait donc la connexion avant la fin d'une génération pourtant réussie côté serveur ; `api.post` avale
+l'erreur de timeout et renvoie `undefined`, d'où le message générique affiché alors que rien n'avait
+réellement échoué. **Corrigé** : `stores/aiCardGeneration.js#generate` passe désormais un timeout dédié
+de 5 min pour cet appel uniquement (`{ timeout: GENERATE_TIMEOUT_MS }`, `config` déjà supporté par
+`api.post`), sans toucher au timeout global des 160 autres endpoints. Testé (23/23 front), lint propre.
+Front rebuild et redéployé en local (`docker compose up -d --build front` — image statique, ne recharge
+pas à chaud contrairement à l'API montée en volume) pour que l'utilisateur puisse revalider immédiatement.
+
+**2. `main` n'était pas à jour** — Question directe de l'utilisateur. Vérifié : `dev` avait déjà reçu
+tout `C-01` par fast-forward depuis `dev_back_ia` (fait par l'utilisateur en parallèle, hors de cette
+session), mais `main` restait sur l'ancien commit `cd24173`. `main` étant un ancêtre direct de `dev`
+(même point de départ), fast-forward propre et sans conflit, confirmé avec l'utilisateur avant
+exécution : `main` → `4566965`.
+
+**3. CI en échec réel sur `main`, masquant le vrai problème** — En creusant l'inquiétude de l'utilisateur
+(« la prod n'est pas à jour selon le dernier commit sur main »), découverte que le CI **échouait
+réellement** sur `4566965` (`test_and_lint` API et front, étape `Audit Dependencies (OWASP A06)`) à
+cause d'une vulnérabilité **high** dans `fast-uri` (3.0.0-3.1.5, transitive via `ajv`, 4 avisories
+GHSA), publiée après le dernier passage vert. Comme le CI échoue, toute la chaîne CD (`push_images`,
+`deploy_prod`) reste `skipped` en cascade — donc **aucun redéploiement, quel que soit l'état de
+`K8S_PROD_ENABLED`**, contrairement aux 3 incidents précédents (27/08, 28/08, 31/08) qui, eux, avaient
+un CI vert mais un `deploy_prod` gated. **Corrigé** : `npm audit fix` (non-force) sur API et front —
+`fast-uri` résolu, 0 vulnérabilité `high`+ restante sur le périmètre `--omit=dev` vérifié par le CI.
+Non traité, pré-existant et hors du gate CI : chaîne `sqlite3`→`node-gyp`→`tar` (devDependency,
+nécessiterait `--force` et un bump majeur cassant de `sqlite3`) ; `qs`/`body-parser`/`express` restent
+en `moderate` (sous le seuil `--audit-level=high`). Suites complètes revérifiées après le fix : API
+1759/1759, front 739/739, build front OK.
+
+**Poussé sur `dev` puis fast-forward `main`** (`3d56f59`) — CI revérifié vert en direct (API et front),
+CD s'est déclenché, images poussées sur Docker Hub, tag de version + release GitHub créés.
+**`deploy_prod` reste `skipped`** — confirmé en observant le run CD réel : c'est bien la **4ᵉ occurrence**
+du défaut déjà documenté (`K8S_PROD_ENABLED` toujours `false`/absente), cause distincte et sans lien
+avec la vulnérabilité `fast-uri` corrigée ci-dessus. Signalé à l'utilisateur, décision de bascule de la
+variable GitHub laissée à lui (accès Settings hors de portée depuis ce poste).
+
+**Effet de bord observé, non traité** — Le CD déclenché par le push sur `dev` (même commit que `main`
+après le fast-forward) a fait tourner `Deploy to VPS (test)`, qui a **échoué** (raison SSH/VPS non
+investiguée, hors périmètre de cette session — sans lien avec `main`/prod).
+
+**Vérifié** : CI/CD suivis en direct via l'API GitHub publique (pas de token local, lecture seule) —
+`test_and_lint` API+front verts sur `3d56f59`, `push_images` vert, `Deploy to Kubernetes (prod)`
+confirmé `skipped` (pas une supposition).
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/stores/aiCardGeneration.js` (+`GENERATE_TIMEOUT_MS`)
+- `my_memo_master_front/test/stores/aiCardGeneration.store.test.js` (+1 test, 1 assertion mise à jour)
+- `my_memo_master_api/package-lock.json`, `my_memo_master_front/package-lock.json` (`npm audit fix`)
