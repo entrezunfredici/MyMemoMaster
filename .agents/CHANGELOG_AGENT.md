@@ -9313,3 +9313,101 @@ dans DECISIONS.md après C-01.08 : ajouter un point d'entrée pour reprendre un 
   `markBatchStatus`/`promoteCard`)
 - `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` (écran de révision + bandeau de reprise)
 - `my_memo_master_front/test/stores/aiCardGeneration.store.test.js` (+13 tests)
+
+---
+
+## [2026-09-02] DOC — Odoo : C-01.04→C-01.09 passées à l'étape « vérification »
+
+**Contexte** — Demande explicite de l'utilisateur : relire ce que le dépôt donne comme travail réellement
+livré sur `C-01` et recaler l'étape Kanban du registre officiel Odoo (`MyMemoMasterRNCP`, id 15) en
+conséquence. Relecture du présent journal : `C-01.04` (Service inférence IA), `C-01.05` (Pipeline
+traitement), `C-01.06` (Quotas/budget IA), `C-01.07` (Stockage cartes générées), `C-01.08` (Interface
+génération) et `C-01.09` (Écran révision cartes) portent chacune une entrée `ADD` de livraison complète
+(tests Jest/Vitest/BDD verts, ESLint 0 erreur, build front OK, audit RGAA statique 0 non-conformité pour
+`C-01.08`/`C-01.09`), certaines suivies d'un correctif de suivi (`C-01.04` : bug `cardType` trouvé en
+conditions réelles et corrigé ; `C-01.06` : perte d'usage facturé en cas d'échec, corrigée). Seul `C-01.08`
+a été confirmée fonctionnelle **par l'utilisateur en conditions réelles** (après le fix Docker
+`docker-compose.yml` documenté ci-dessus) ; `C-01.09` reste testée uniquement en automatisé, sa vérification
+manuelle en conditions réelles étant explicitement laissée à l'utilisateur dans sa propre entrée. Ces 6
+tâches étaient toutes encore à l'étape Odoo « en cours » (156), en décalage avec le dépôt.
+
+**Décision** — Plutôt que de trancher seul entre « vérification » (159) et « validé » (164) — étape dont
+`DECISIONS.md` établit qu'elle est traitée comme un sign-off explicite, pas un simple constat de tests
+verts — la question a été posée à l'utilisateur. Réponse : les 6 tâches passent uniformément à
+**« vérification » (159)**, y compris `C-01.08` malgré sa confirmation manuelle, pour ne pas introduire une
+distinction entre les 6 tickets de la même feature. `C-01.10` (Tests qualité génération) et `C-01.11` (Revue
+de code & merge) restent en « spécification » — rien à changer, aucun travail engagé dessus dans ce dépôt.
+
+**Vérifié** : écriture Odoo (`project.task.write` sur les ids 1062–1067, `stage_id: 159`) confirmée par une
+relecture immédiate des 6 enregistrements — les 6 portent bien `["159", "vérification"]`.
+
+**Ce qui n'est PAS couvert** — Pas de cascade vers la Synthèse `C-01` elle-même (hors périmètre de cette
+mise à jour, qui ne touche que les sous-tâches nommément vérifiées) ; `C-01.10`/`C-01.11` non engagées,
+non touchées.
+
+---
+
+## [2026-09-02] DOC — Odoo : synchronisation du champ `state` de QA.03/QA.05/QA.06 (dette signalée depuis le 2026-08-30, jamais appliquée)
+
+**Contexte** — Question de l'utilisateur sur une tâche précisément citée (« Tests E2E parcours étudiant
+complet (Playwright) », Sprint 11, Gaïa Ducournau). Identifiée dans Odoo comme `[QA.03]` (id 1399), déjà
+couverte par le dépôt : `my_memo_master_front/e2e/journeys.spec.js` (parcours étudiant authentifié +
+enseignant `QA.05` + contrôle négatif), rejoué vert en CI (`e2e_and_load`, commit `71ce5ee`, « 5 passed »),
+reconfirmé le 2026-09-01 via l'API GitHub publique sur le commit `914d37e` (check `Parcours E2E + charge
+(QA.03/QA.05/QA.06)` en `success`). Étape Kanban déjà « validé » (164) pour les trois — rien à changer là.
+En revanche, l'écart `state ≠ 1_done` malgré `stage_id = « validé »` sur ces trois mêmes tâches est signalé
+à répétition dans ce journal depuis le 2026-08-30 (comptes rendus de pilotage successifs, §8 « dette non
+traitée ») sans jamais avoir été corrigé.
+
+**Ce qui a été fait** — Sur confirmation de l'utilisateur, écriture `project.task.write` sur les ids
+1399 (`QA.03`), 1401 (`QA.05`), 1402 (`QA.06`) : `state` passé de `01_in_progress` à **`1_done`**.
+`stage_id` (déjà « validé ») non touché.
+
+**Vérifié** : relecture immédiate des 3 enregistrements — les 3 portent bien `state: "1_done"` avec
+`stage_id: [164, "validé"]`.
+
+**Ce qui n'est PAS couvert** — Les autres écarts `state`/`stage_id` éventuels ailleurs dans le registre
+(hors QA.03/05/06, seules tâches nommément concernées par cette dette documentée) n'ont pas été recherchés
+ni corrigés ici.
+
+---
+
+## [2026-09-02] ADD — DOC.07 : Rapport de tests final consolidé (tous types de tests)
+
+**Contexte** — Question de l'utilisateur sur une tâche du registre Odoo créée le 2026-08-28 depuis le
+planning d'équipe : `[DOC.07]` (id 1433, feature list `DOC`, Sprint 15, Lena Ricard), objectif « Rapport de
+tests final consolidé (tous types de tests) ». Vérification : aucun document du dépôt ne consolidait les
+différents rapports de tests déjà produits (`RAPPORT_TESTS_QA.md` pour E2E/charge, `AUDIT_RGAA.md` et
+`AUDIT_RGAA_106.md` pour l'accessibilité, `SECURITY_AUDIT_OWASP.md` pour la sécurité, chiffres de couverture
+dispersés dans `COMPTE_RENDU_METRIQUES.md`) — chacun existe séparément, aucun ne les réunit. Étape Odoo « en
+cours » / `state 01_in_progress` : exacte, pas de correction nécessaire contrairement à `QA.03/05/06`
+(entrée précédente).
+
+**Ce qui a été fait** — `docs/RAPPORT_TESTS_FINAL.md` : consolidation en un seul document de 12 catégories
+de tests (unitaires/fonctionnels API et front, lint, E2E, charge, RGAA sous ses 4 niveaux d'outillage,
+sécurité OWASP, vulnérabilités SonarQube, couverture SonarQube), avec pour chacune un statut explicite
+**rejoué le jour même** ou **repris d'une preuve déjà datée** (jamais les deux confondus). Rejoué dans cette
+session : suite Jest API (**1732/1732**, couverture 82,94 %), suite Vitest front (**738/738**, couverture
+59,5 %, y compris les 20 tests axe-core runtime), audit RGAA statique (**0/83** non-conformité, contre 79
+fichiers au dernier relevé daté — progression du périmètre non attribuée à ce ticket), ESLint API+front
+(0 erreur). Repris avec leur date d'origine, non rejoués (nécessiteraient une stack Docker complète ou un
+accès SonarQube absent en local) : E2E `QA.03`/`QA.05` (2026-08-30, reconfirmé CI 2026-09-01), charge `QA.06`
+(2026-08-30), contraste Playwright (2026-08-30), audit manuel des 106 critères RGAA (2026-08-31, **60/106**,
+en cours — pas un état final), audit OWASP (2026-06-23→07-06), vulnérabilités et couverture SonarQube
+(2026-08-30 et 2026-08-29). Au passage : vérification de l'état CI du commit courant (`ec4341f`) via l'API
+GitHub publique — `sonarqube`/`e2e_and_load` **`skipped`** expliqué par lecture de `ci.yml` (ces deux jobs ne
+tournent que sur `main`/`staging` ; la branche `dev_back_ia` ne fait tourner que le job `api`), pas une
+panne — documenté en §7 du rapport pour ne pas être mal interprété par une future session.
+
+**Vérifié** : chiffres du §1 et du §4.1-4.2 mesurés en direct dans cette session (commandes listées au §8 du
+rapport, reproductibles). Les chiffres repris sont cités avec leur date d'origine et leur document source,
+jamais présentés comme mesurés aujourd'hui.
+
+**Ce qui n'est PAS couvert** — Le document ne remplace aucun rapport source, il les indexe ; l'audit manuel
+106 critères RGAA n'est pas terminé (60/106) et aucun taux de conformité global n'est donc énoncé comme
+définitif ; `A07-M1` (absence de révocation JWT) reste une dette de sécurité ouverte, non traitée ici ; étape
+Odoo de `DOC.07` **non modifiée** dans cette entrée — décision laissée à l'utilisateur (le document est
+livré, mais son passage à « validé »/`terminé` sur le registre officiel n'a pas été tranché avec lui).
+
+**Fichiers créés**
+- `docs/RAPPORT_TESTS_FINAL.md`

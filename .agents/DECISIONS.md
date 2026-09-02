@@ -2020,3 +2020,28 @@ Les deux sont vérifiés ensemble par `checkQuota(userId)`, mais restent concept
 **Alternative écartée** : ajouter un second mode de soumission à la modal manuelle existante de `FlashcardsCardsPage.vue` (déjà volumineuse — `submitForm`/`handleCreate`/`handleUpdate`) pour suivre la maquette au pied de la lettre — écarté par prudence : cette modal est un chemin de création manuelle déjà en production et testé manuellement à plusieurs reprises (voir CHANGELOG_AGENT.md) ; y greffer une branche supplémentaire pour un flux de nature différente (mutation de brouillon vs création réelle) risquait de la complexifier sans bénéfice proportionné, pour un gain (éviter un nouveau fichier) purement cosmétique.
 
 **Conséquences** : légère duplication visuelle entre les deux modals (champs similaires, deux fichiers) — acceptée en échange de deux flux de données totalement indépendants, chacun plus simple à lire et à faire évoluer séparément.
+
+---
+
+### [2026-09-02] Odoo : « vérification » plutôt que « validé » pour du code livré et testé mais pas signé off
+
+**Contexte** — C-01.04→C-01.09 sont livrées côté dépôt (tests automatisés verts, ESLint, build) mais toutes
+encore à l'étape Odoo « en cours ». Le kanban de `MyMemoMasterRNCP` propose une étape intermédiaire
+« vérification » entre « en cours » et « validé ». Seule `C-01.08` a en plus été confirmée fonctionnelle par
+l'utilisateur en conditions réelles ; les 5 autres, dont `C-01.09`, n'ont eu qu'une vérification automatisée.
+
+**Décision** — Ne pas assimiler « tests automatisés verts » à « validé » : cette étape est déjà définie
+ailleurs dans ce document comme un sign-off explicite (voir l'entrée « Cascade de l'étape validé » du
+2026-08-27), pas un simple constat de livraison. Les 6 tickets sont montés à « vérification » (159)
+uniformément — y compris `C-01.08`, pour ne pas introduire d'écart d'étape entre les tickets d'une même
+feature sur la seule base d'une vérification manuelle qui n'a pas été demandée aux 5 autres. Le passage à
+« validé » est laissé à une décision ultérieure de l'utilisateur.
+
+**Alternative écartée** : passer les 6 directement à « validé » — écartée par l'utilisateur, qui a tranché
+la question posée avant écriture ; aurait fait porter à un sign-off de registre officiel une garantie
+(vérification manuelle en conditions réelles) que seule `C-01.08` a reçue à ce jour.
+
+**Conséquences** : `C-01.10`/`C-01.11` restent en « spécification » (aucun travail engagé). Une prochaine
+session qui veut clore `C-01` devra faire remonter ces 6 tâches à « validé » explicitement (et vérifier au
+passage la cascade vers la Synthèse `C-01`, jamais traitée ici), plutôt que supposer que « vérification »
+suffit.
