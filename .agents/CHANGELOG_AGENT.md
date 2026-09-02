@@ -146,6 +146,7 @@
 | Génération de Leitner par IA (C-01) — Maquettes UI génération Leitner IA | **Analyse livrée, aucun code** — `diagrams/generation_ia_ui.md` (C-01.02) : maquettes ASCII du parcours complet (point d'entrée sur `FlashcardsCardsPage.vue`, modal configuration source/matière/nombre/type, état de génération en cours, écran de validation accept/edit/reject par carte avec `sourceExcerpt`, édition réutilisant le formulaire carte existant), composants/store/comportements esquissés, persistance réutilisant les 3 endpoints existants (aucun ajout automatique sans validation — OUT du ticket). Endpoint(s) d'orchestration et progression réelle non tranchés (hors périmètre) | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Benchmark et choix modèle LLM | **Analyse livrée, aucun code** — `diagrams/generation_ia_llm_benchmark.md` (C-01.03) : revue documentaire (pas empirique, aucune intégration LLM existante) de la gamme Mistral AI (orientation RGPD déjà actée), tableau comparatif Large 3/Medium 3.5/Small 4/Ministral 3 (contexte, prix/M tokens, support sortie structurée), profil de tâche dérivé du prompt C-01.01 (extraction structurée sur chunk court, pas de raisonnement complexe) → **choix retenu `mistral-small-latest`**, `mistral-medium-latest` en option d'escalade ; protocole de validation empirique documenté mais non exécuté (hors périmètre) | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Service inférence IA (appel LLM, parsing) | **Livré et vérifié en conditions réelles** — `services/AiCardGeneration.service.js` (C-01.04) : exécute le prompt C-01.01 sur `mistral-small-latest` (config C-01.03, via `helpers/mistralConfig.js`), appel HTTP natif `fetch` (aucune dépendance ajoutée), `response_format: json_object`, parsing + validation stricte du schéma de sortie (`cards[]`/`warning`, y compris la cohérence entre le `cardType` demandé et le type réellement renvoyé par carte — trouvé en défaut lors du test réel, corrigé), retry unique sur sortie non conforme puis échec explicite (502) — jamais de fallback silencieux. Pas de controller/route (service pur, comme `Semantic.service.js` — hors périmètre de ce ticket). 47 tests (service + helper config), 0 régression sur les 1630 tests API. Testé avec une vraie clé API (fournie par l'utilisateur) : génération `open` et `mcq` toutes deux conformes | 2026-09-01 |
+| Génération de Leitner par IA (C-01) — Pipeline traitement (PDF, chunking, LLM) | **Livré et vérifié en conditions réelles (pdfjs-dist + OCR Mistral)** — `services/PdfExtraction.service.js` : `pdfjs-dist` en 1er (gratuit, local), **repli automatique sur l'OCR Mistral** (`$4/1000 pages`) si aucun texte trouvé (PDF scanné — décision utilisateur explicite) ; détection (sans description) des images/schémas embarqués sur les deux chemins, remontée en avertissement par le pipeline plutôt qu'ignorée silencieusement. `helpers/textChunker.js` (découpage par paragraphes/phrases, sans dépendance), `services/AiCardGenerationPipeline.service.js` (C-01.05, orchestre le tout + `AiCardGenerationService` de C-01.04 sur chaque chunk, agrège `{ cards, warnings }`, tolère un échec partiel). Pas de controller/route (hors périmètre, comme C-01.04). 41 tests (chunker + extraction PDF/OCR mockés + pipeline), 0 régression sur les 1670 tests API | 2026-09-01 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -8637,3 +8638,171 @@ déjà livré. `generateCards` transmet désormais le `cardType` réellement dem
 appels réels, non représentatif d'un vrai taux de conformité) ; le protocole de validation empirique plus
 complet documenté en C-01.03 §8 (jeu de référence, mesure de taux sur plusieurs matières/tailles de chunk)
 reste à exécuter avant toute mise en production.
+
+---
+
+## [2026-09-01] ADD — C-01.05 : Pipeline traitement (PDF, chunking, LLM) — Génération de Leitner par IA
+
+**Contexte** — Ticket `C-01.05` (feature list `C-01`, source planning, V2, tâche **Back-end**, suite de
+C-01.01→04). Objectif : livrer le « Pipeline traitement (PDF, chunking, LLM) », qui implémente concrètement
+l'élément IN « Chunking PDF » du feature list et orchestre son résultat vers le service d'inférence déjà
+livré (C-01.04) — sans déborder sur Quotas ni Écran de validation (hors périmètre).
+
+**Audit préalable** — Aucune dépendance PDF n'existe dans l'API. Recherche de 3 candidats (`npm view`) :
+`pdf-parse` (2.x dépend désormais de `@napi-rs/canvas`, un binaire natif — écarté, ce projet évite ce profil
+de risque en production, cf. `sqlite3`), `unpdf` (wrapper récent, moins éprouvé), `pdfjs-dist` (bibliothèque
+Mozilla elle-même, **zéro dépendance runtime** confirmé). **Choix : `pdfjs-dist@6.3.289`** — détail complet
+et alternative écartée dans `DECISIONS.md`.
+
+**Complication rencontrée et résolue en cours de ticket** — Le build Node de `pdfjs-dist` ≥ 6 (« legacy »)
+n'est publié qu'en ESM (`legacy/build/pdf.mjs`) ; l'export principal du package, lui requérable en CommonJS,
+plante à l'exécution en Node (`hashOriginal.toHex is not a function`) car il vise le navigateur. Résolu par
+un `import()` dynamique mis en cache dans `PdfExtraction.service.js` (module CommonJS comme le reste de
+l'API). Un second problème (chemins CMap/polices validés comme des URL, un chemin Windows classique étant
+rejeté) a nécessité de forcer un séparateur `/` littéral en fin de chemin — les deux trouvés et corrigés via
+des tests réels (`node` direct, hors Jest) sur `docs/sources/2009_Karpicke_Butler_Roediger.pdf` : extraction
+réussie, 24 013 caractères sur le PDF `Dunlosky_SciAmMind.pdf` (792 ms), texte cohérent vérifié visuellement
+(quelques artefacts d'espacement sur des titres à mise en forme stylisée — limitation connue de l'extraction
+PDF, pas un bug, non traitée).
+
+**Conséquence sur les tests** — L'`import()` dynamique réel échoue sous Jest dans la configuration par
+défaut de ce projet (`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING_FLAG`, `--experimental-vm-modules` absent).
+Activer ce flag est un changement d'infrastructure de test global, non fait dans ce ticket (voir
+DECISIONS.md). Stratégie de test documentée en tête de `PdfExtraction.service.test.js` : toute la logique
+est couverte en mockant la méthode publique `getPdfjs()` (jamais l'`import()` réel), et le chemin réel a été
+vérifié manuellement comme décrit ci-dessus.
+
+**Ce qui a été fait**
+- `services/PdfExtraction.service.js` — `extractText(pdfBuffer)` : ouvre le PDF, concatène le texte de
+  toutes les pages, lève une erreur dédiée si le buffer est invalide (400), le PDF illisible (400), ou si
+  aucun texte n'est extractible — cas d'un PDF scanné sans couche texte, pas d'OCR dans ce ticket (422).
+- `helpers/textChunker.js` — `chunkText(text, { maxChunkLength })` : découpe par paragraphes (empilés
+  jusqu'à la limite), redécoupe un paragraphe trop long par phrases puis par force si besoin (garantit la
+  terminaison et qu'aucun chunk ne dépasse la limite) ; longueur en caractères, approximation du nombre de
+  tokens (pas de tokenizer dédié — dette assumée, cf. DECISIONS.md).
+- `services/AiCardGenerationPipeline.service.js` — `generateCardsFromContent(...)` : résout le contenu
+  source (texte OU PDF, exclusif), découpe, répartit le `cardCount` total sur les chunks
+  (`distributeCardCount`), appelle `AiCardGenerationService.generateCards` séquentiellement par chunk,
+  agrège `{ cards, warnings: string[] }` — un chunk en échec devient un avertissement, pas un échec global
+  (seul un échec total lève une erreur 502). Garde-fou technique `MAX_CHUNKS=20` (distinct de Quotas, même
+  logique que `MAX_CARD_COUNT` en C-01.04).
+- Tests : `test/helpers/textChunker.test.js` (8), `test/services/PdfExtraction.service.test.js` (10, dont la
+  stratégie documentée en tête de fichier), `test/services/AiCardGenerationPipeline.service.test.js` (11).
+
+**Choix techniques principaux** (détail dans `DECISIONS.md`) :
+- `pdfjs-dist` plutôt que `pdf-parse`/`unpdf` (dépendance native évitée).
+- Appels LLM séquentiels (pas parallèles) par souci de coût/charge.
+- `warnings: string[]` en sortie du pipeline, délibérément différent du `warning: string|null` d'un appel
+  individuel (C-01.01 §4) — agrégation multi-chunks, pas le même contrat.
+- Échec partiel toléré (un chunk en échec n'invalide pas les autres) — cohérent avec « produire un premier
+  brouillon », pas une garantie de justesse absolue (OUT du ticket).
+
+**Ce qui est utilisable**
+- `AiCardGenerationPipelineService.generateCardsFromContent({ sourceText | pdfBuffer, subjectContext,
+  cardCount, cardType, outputLanguage })` callable depuis n'importe quel autre service/controller — retourne
+  un brouillon en mémoire, **jamais persisté** (même rappel périmètre OUT que C-01.04).
+- Vérifié : `npx jest test/helpers/textChunker.test.js test/services/PdfExtraction.service.test.js
+  test/services/AiCardGenerationPipeline.service.test.js` → 29/29 ; suite complète `npx jest` → **1659/1659**
+  (1630 + 29), 0 régression ; `npx eslint` → 0 erreur ; `npm audit --omit=dev` → **0 vulnérabilité**
+  (inchangé après l'ajout de `pdfjs-dist`).
+
+**Ce qui n'est PAS couvert** — Aucun controller/route (service pur, hors périmètre — comme C-01.04), OCR
+(PDF scanné sans texte), tokenizer réel pour le chunking (approximation par caractères), Quotas, Écran de
+validation, persistance des cartes générées.
+
+**Fichiers créés**
+- `my_memo_master_api/services/PdfExtraction.service.js`
+- `my_memo_master_api/helpers/textChunker.js`
+- `my_memo_master_api/services/AiCardGenerationPipeline.service.js`
+- `my_memo_master_api/test/helpers/textChunker.test.js`
+- `my_memo_master_api/test/services/PdfExtraction.service.test.js`
+- `my_memo_master_api/test/services/AiCardGenerationPipeline.service.test.js`
+
+**Fichiers modifiés**
+- `my_memo_master_api/package.json`/`package-lock.json` (+ `pdfjs-dist@6.3.289`, zéro dépendance
+  transitive ajoutée)
+
+**Dette signalée, non traitée ici**
+- **Chemin réel de `PdfExtractionService` non couvert par un test Jest automatisé** (voir « Conséquence sur
+  les tests » ci-dessus) — vérifié manuellement, à recouvrir automatiquement si `--experimental-vm-modules`
+  est activé un jour pour la suite Jest.
+- **Aucun test réel du pipeline complet** (PDF → chunking → vrais appels Mistral) — chaque maillon a été
+  vérifié séparément en réel (extraction PDF ici, appel LLM en C-01.04), mais pas la chaîne bout en bout ;
+  optionnel, à faire sur demande explicite (coût réel supplémentaire, cf. échange avec l'utilisateur en
+  C-01.04).
+- **Chunking par caractères, pas par tokens réels** — approximation grossière, peut sous- ou sur-remplir un
+  chunk selon la densité du texte (ponctuation, mots longs, langue).
+- **Aucun moyen d'appeler ce pipeline depuis l'application** — ni controller, ni route, ni upload multer
+  pour le PDF (le contrôleur qui recevrait l'upload et appellerait ce service reste à écrire, hors périmètre
+  de ce ticket comme de C-01.04).
+
+---
+
+## [2026-09-01] IMP — C-01.05 : repli OCR Mistral sur PDF scanné + détection des images/schémas (suite à une question utilisateur)
+
+**Contexte** — Après la livraison initiale de C-01.05, question de l'utilisateur : « on passe par [pdfjs-dist]
+ou par Mistral OCR ? c'est quoi le mieux ? et peut-il comprendre si le PDF a des schémas ? ». Réponse apportée
+avec le comparatif technique exact (pdfjs-dist = texte seul, aveugle aux images ; OCR Mistral = détecte et
+extrait les images comme blocs séparés mais ne les décrit pas — une vraie compréhension nécessiterait un
+modèle multimodal, non spécifié par aucun ticket `C-01`). Question posée à l'utilisateur via 4 options ;
+**réponse : repli automatique OCR sur échec** de `pdfjs-dist`. Question de suivi immédiate de l'utilisateur :
+un système peut-il « prévoir à l'avance » s'il faut passer par la lib ou l'OCR (détection de scan, de
+schémas) ? Réponse : le repli sur échec **est** déjà ce système (plus fiable qu'une prédiction — basé sur le
+résultat réel de l'extraction, pas une heuristique) ; pour les schémas, ajout d'une détection low-cost
+(locale, sans appel réseau supplémentaire côté pdfjs-dist) plutôt qu'une tentative de « compréhension ».
+
+**Ce qui a été fait**
+- `services/PdfExtraction.service.js` — refactor en 3 méthodes : `extractTextViaPdfjs` (logique existante,
+  inchangée sauf l'ajout de la détection d'images via `page.getOperatorList()` + `OPS.paintImageXObject` /
+  `paintJpegXObject` / `paintImageMaskXObject` / `paintInlineImageXObject`), `extractTextViaOcr` (nouveau —
+  `POST https://api.mistral.ai/v1/ocr`, `model: mistral-ocr-latest`, `document: { type: "document_url",
+  document_url: "data:application/pdf;base64,..." }`, réponse lue via `pages[].markdown` concaténé et
+  `pages[].images` pour la détection), `extractText` (orchestrateur : pdfjs-dist d'abord, repli OCR
+  uniquement sur son erreur 422 précise, jamais sur un 400 corrompu). Contrat de retour changé de `string` à
+  `{ text, hasEmbeddedImages }`.
+- `helpers/mistralConfig.js` — `ocrApiUrl`/`ocrModel` ajoutés (`MISTRAL_OCR_API_URL`/`MISTRAL_OCR_MODEL`,
+  mêmes défauts que testés en réel).
+- `services/AiCardGenerationPipeline.service.js` — `resolveSourceText` propage `{ text, hasEmbeddedImages }`
+  (texte collé : toujours `hasEmbeddedImages: false`) ; `generateCardsFromContent` ajoute un avertissement
+  dédié (« ce contenu contient des images/schémas qui ne sont pas analysés... ») quand `hasEmbeddedImages`
+  est vrai, en tête de `warnings`.
+- `.env.example` — `MISTRAL_OCR_API_URL`/`MISTRAL_OCR_MODEL` ajoutées.
+- Tests : `PdfExtraction.service.test.js` réécrit (32 tests au total pour le fichier — `extractTextViaPdfjs`,
+  `extractTextViaOcr`, `extractText` testés séparément, y compris les 2 branches de repli/non-repli) ;
+  `AiCardGenerationPipeline.service.test.js` +3 tests (avertissement présent/absent selon `hasEmbeddedImages`,
+  contrat objet au lieu de chaîne) ; `mistralConfig.test.js` mis à jour pour les 2 nouveaux champs.
+
+**Vérifié en conditions réelles (coût réel engagé, négligeable)** :
+- Détection d'images via `pdfjs-dist`, gratuite : `docs/sources/Dunlosky_SciAmMind.pdf` (revue illustrée) →
+  `hasEmbeddedImages: true` correctement détecté, 1840 ms, aucune régression sur le texte déjà extrait
+  (24 013 caractères, identique à la vérification précédente).
+- Appel OCR réel : `docs/sources/2009_Karpicke_Butler_Roediger.pdf` (10 pages, ≈ 0,04 $) → requête/réponse
+  conformes à la documentation Mistral (`document_url` en data URI, `pages[].markdown`/`pages[].images`),
+  40 389 caractères extraits (markdown structuré, ex. `![img-0.jpeg](img-0.jpeg)`), `hasEmbeddedImages: true`
+  correctement détecté, 1853 ms.
+- Suite complète : `npx jest test/services/PdfExtraction.service.test.js
+  test/services/AiCardGenerationPipeline.service.test.js` → 32/32 ; `npx jest` (API complète) → **1670/1670**
+  (1659 + 11, dont 3 tests pipeline ajoutés et 8 remplacés/étoffés dans PdfExtraction), 0 régression ;
+  `npx eslint` → 0 erreur.
+
+**Ce qui n'est PAS couvert** — Description/captioning sémantique du contenu d'un schéma (nécessiterait un
+modèle multimodal, un nouveau prompt, un nouveau coût par image — proposé à l'utilisateur comme extension
+future, pas construit) ; l'appel OCR réel n'a pas de test Jest automatisé pour la même raison que
+`extractTextViaPdfjs` (voir entrée précédente, `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING_FLAG` n'est pas en
+cause ici mais la stratégie de mock/vérification manuelle reste la même par cohérence).
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/PdfExtraction.service.js`
+- `my_memo_master_api/helpers/mistralConfig.js`
+- `my_memo_master_api/services/AiCardGenerationPipeline.service.js`
+- `my_memo_master_api/test/services/PdfExtraction.service.test.js`
+- `my_memo_master_api/test/services/AiCardGenerationPipeline.service.test.js`
+- `my_memo_master_api/test/helpers/mistralConfig.test.js`
+- `.env.example`
+
+**Dette signalée, non traitée ici**
+- Pas de borne sur la taille du PDF encodé en base64 envoyé à l'OCR (un très gros PDF scanné produirait un
+  payload JSON volumineux) — non traité, cohérent avec l'absence de limite de taille déjà assumée sur
+  `sourceText`/`pdfBuffer` ailleurs dans ce ticket.
+- Le captioning de schémas reste une fonctionnalité entière à scoper si l'utilisateur la souhaite un jour
+  (nouveau ticket probable, hors `C-01` tel que défini actuellement).

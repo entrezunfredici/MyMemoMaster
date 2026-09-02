@@ -1,7 +1,14 @@
 const getMistralConfig = require('../../helpers/mistralConfig')
 
 describe('getMistralConfig', () => {
-  const ENV_KEYS = ['MISTRAL_API_KEY', 'MISTRAL_API_URL', 'MISTRAL_MODEL', 'MISTRAL_TIMEOUT_MS']
+  const ENV_KEYS = [
+    'MISTRAL_API_KEY',
+    'MISTRAL_API_URL',
+    'MISTRAL_MODEL',
+    'MISTRAL_OCR_API_URL',
+    'MISTRAL_OCR_MODEL',
+    'MISTRAL_TIMEOUT_MS'
+  ]
   let savedEnv
 
   beforeEach(() => {
@@ -21,6 +28,8 @@ describe('getMistralConfig', () => {
       apiKey: '',
       apiUrl: 'https://api.mistral.ai/v1/chat/completions',
       model: 'mistral-small-latest',
+      ocrApiUrl: 'https://api.mistral.ai/v1/ocr',
+      ocrModel: 'mistral-ocr-latest',
       timeoutMs: 30000
     })
   })
@@ -29,12 +38,16 @@ describe('getMistralConfig', () => {
     process.env.MISTRAL_API_KEY = 'sk-test'
     process.env.MISTRAL_API_URL = 'https://example.test/v1/chat'
     process.env.MISTRAL_MODEL = 'mistral-medium-latest'
+    process.env.MISTRAL_OCR_API_URL = 'https://example.test/v1/ocr'
+    process.env.MISTRAL_OCR_MODEL = 'mistral-ocr-custom'
     process.env.MISTRAL_TIMEOUT_MS = '5000'
 
     expect(getMistralConfig()).toEqual({
       apiKey: 'sk-test',
       apiUrl: 'https://example.test/v1/chat',
       model: 'mistral-medium-latest',
+      ocrApiUrl: 'https://example.test/v1/ocr',
+      ocrModel: 'mistral-ocr-custom',
       timeoutMs: 5000
     })
   })

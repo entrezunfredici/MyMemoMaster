@@ -11,13 +11,17 @@
 // de raisonnement complexe).
 
 /**
- * @returns {{ apiKey: string, apiUrl: string, model: string, timeoutMs: number }}
+ * @returns {{ apiKey: string, apiUrl: string, model: string, ocrApiUrl: string, ocrModel: string, timeoutMs: number }}
  */
 module.exports = function getMistralConfig() {
   return {
     apiKey: process.env.MISTRAL_API_KEY || '',
     apiUrl: process.env.MISTRAL_API_URL || 'https://api.mistral.ai/v1/chat/completions',
     model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
+    // OCR (C-01.05, repli sur un PDF scanné sans couche texte) — endpoint et modèle distincts du
+    // chat completions ci-dessus.
+    ocrApiUrl: process.env.MISTRAL_OCR_API_URL || 'https://api.mistral.ai/v1/ocr',
+    ocrModel: process.env.MISTRAL_OCR_MODEL || 'mistral-ocr-latest',
     timeoutMs: parseInt(process.env.MISTRAL_TIMEOUT_MS || '30000', 10)
   }
 }

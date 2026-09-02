@@ -200,6 +200,7 @@ router.get("/", authMiddleware, entity.findAll);
 | Graphiques front | chart.js + vue-chartjs |
 | Visite guidée front (onboarding) | driver.js (MIT) |
 | Accessibilité (tests front) | axe-core (dev) + @playwright/test + @axe-core/playwright (dev, audit de contraste RGAA 3.2 en navigateur réel — voir DECISIONS 2026-08-29) |
+| Extraction de texte PDF (API, C-01 Génération IA) | pdfjs-dist (Apache-2.0, zéro dépendance runtime — pdf-parse et unpdf écartés, voir DECISIONS 2026-09-01) |
 
 ---
 
