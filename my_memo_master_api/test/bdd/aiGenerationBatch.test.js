@@ -275,6 +275,37 @@ describe('AiGenerationBatch — routes (tests fonctionnels)', () => {
     })
   })
 
+  describe('GET /ai-generation-batches/quota', () => {
+    it('GET /ai-generation-batches/quota — cas nominal — 200, reflète les générations déjà comptées aujourd\'hui', async () => {
+      aiCardGenerationPipelineService.generateCardsFromContent.mockResolvedValue(FAKE_PIPELINE_RESULT)
+      await request(app)
+        .post(`${BASE}/ai-generation-batches`)
+        .set('Authorization', `Bearer ${token}`)
+        .field('idSystem', String(system.idSystem))
+        .field('cardCount', '1')
+        .field('sourceText', 'Un texte.')
+
+      const res = await request(app).get(`${BASE}/ai-generation-batches/quota`).set('Authorization', `Bearer ${token}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          generationsToday: expect.any(Number),
+          maxGenerationsPerDay: expect.any(Number),
+          remainingGenerationsToday: expect.any(Number),
+          budgetSpentThisMonthUsd: expect.any(Number),
+          maxBudgetUsdPerMonth: expect.any(Number)
+        })
+      )
+      expect(res.body.generationsToday).toBeGreaterThan(0)
+    })
+
+    it('GET /ai-generation-batches/quota — sans token — 401', async () => {
+      const res = await request(app).get(`${BASE}/ai-generation-batches/quota`)
+      expect(res.status).toBe(401)
+    })
+  })
+
   describe('Cycle de vie d\'un batch (GET / PATCH / DELETE)', () => {
     let batchId
     let cardId

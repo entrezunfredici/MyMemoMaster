@@ -6,12 +6,20 @@
         ← Retour
       </button>
       <h2 class="text-2xl font-bold text-heading">{{ systemName }}</h2>
-      <button
-        @click="openAddModal"
-        class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
-      >
-        + Ajouter une carte
-      </button>
+      <div class="flex gap-2">
+        <button
+          @click="openAiFlow"
+          class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
+        >
+          ✨ Générer par IA
+        </button>
+        <button
+          @click="openAddModal"
+          class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
+        >
+          + Ajouter une carte
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="text-center text-gray-light py-10">Chargement des cartes...</div>
@@ -292,6 +300,27 @@
       </div>
     </div>
 
+    <!-- Génération de cartes par IA (C-01.08) — Vue 1 (configuration) puis Vue 2 (attente/erreur).
+         Montées via v-if pour toute la durée du flux : l'état saisi en Vue 1 survit à un aller-retour
+         par [Réessayer] (voir AiGenerateCardsModalComponent.vue). -->
+    <template v-if="showAiFlow">
+      <AiGenerateCardsModal
+        :visible="aiStep === 'config'"
+        :id-system="systemId"
+        :default-subject-context="systemSubjectName"
+        @close="closeAiFlow"
+        @submit="handleAiGenerate"
+      />
+      <AiGenerationProgressModal
+        :visible="aiStep === 'progress'"
+        :status="aiCardGenerationStore.status === 'error' ? 'error' : 'generating'"
+        :error-message="aiCardGenerationStore.errorMessage"
+        @cancel="closeAiFlow"
+        @close="closeAiFlow"
+        @retry="aiStep = 'config'"
+      />
+    </template>
+
   </div>
 </template>
 
@@ -303,6 +332,9 @@ import { notif } from '@/helpers/notif'
 import FormulaText from '@/components/FormulaTextComponent.vue'
 import FormulaHelper from '@/components/FormulaHelperComponent.vue'
 import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
+import AiGenerateCardsModal from '@/components/AiGenerateCardsModalComponent.vue'
+import AiGenerationProgressModal from '@/components/AiGenerationProgressModalComponent.vue'
+import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
 import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
 const router = useRouter()
@@ -313,6 +345,10 @@ const loading = ref(true)
 const systemName = ref('')
 const allCards = ref([])
 const systemBoxes = ref([])
+
+// Nom du sujet du système (LeitnerSystem.subjectId → Subject.name), utilisé pour pré-remplir le
+// champ "Matière" (subjectContext) de la génération par IA — voir loadCards().
+const systemSubjectName = ref('')
 
 // Carte mentale liée au système (LeitnerSystem.idMindMap) — alimente le sélecteur de nœud
 const mindMapJson = ref(null)
@@ -338,6 +374,11 @@ const boxFormError = ref('')
 const editingBox = ref(null)
 const boxForm = reactive({ level: '', intervall: '' })
 
+// --- génération par IA (C-01.08) ---
+const aiCardGenerationStore = useAiCardGenerationStore()
+const showAiFlow = ref(false)
+const aiStep = ref('config') // 'config' | 'progress'
+
 const cardsByLevel = computed(() => {
   const map = {}
   allCards.value.forEach(card => {
@@ -356,6 +397,7 @@ const loadCards = async () => {
 
   if (sysResp?.status === 200) {
     systemName.value = sysResp.data.name
+    systemSubjectName.value = sysResp.data.subject?.name || ''
     // Si le système est lié à une carte mentale, on la charge pour le sélecteur de nœud
     if (sysResp.data.idMindMap) {
       const mmResp = await api.get(`diagrammes/${sysResp.data.idMindMap}`)
@@ -660,5 +702,37 @@ const handleDeleteBox = async (box) => {
   }
   notif.notify('Boîte supprimée.', 'success')
   systemBoxes.value = systemBoxes.value.filter(b => b.idBox !== box.idBox)
+}
+
+// --- génération par IA (C-01.08) ---
+
+const openAiFlow = () => {
+  aiCardGenerationStore.reset()
+  aiStep.value = 'config'
+  showAiFlow.value = true
+}
+
+// Referme tout le flux IA (Vue 1/Vue 2) sans rien persister — rappel du périmètre OUT
+// (« Génération sans validation utilisateur ») : aucune écriture n'a jamais eu lieu ici, seul
+// POST /ai-generation-batches a été appelé (brouillon "pending", pas des cartes réelles).
+const closeAiFlow = () => {
+  showAiFlow.value = false
+  aiCardGenerationStore.reset()
+}
+
+// Lance la génération (Vue 1 → Vue 2). L'Écran de validation (Vue 3, diagrams/generation_ia_ui.md
+// §6) est hors périmètre de ce ticket (question posée à l'utilisateur, tranchée le 2026-09-02) :
+// une génération réussie referme simplement le flux avec un toast — le brouillon reste "pending",
+// récupérable via GET /ai-generation-batches par le futur ticket Écran de validation.
+const handleAiGenerate = async (config) => {
+  aiStep.value = 'progress'
+  const success = await aiCardGenerationStore.generate(config)
+  if (success) {
+    const count = aiCardGenerationStore.lastBatch?.cards?.length ?? 0
+    notif.notify(`${count} carte${count > 1 ? 's' : ''} générée${count > 1 ? 's' : ''}, en attente de validation.`, 'success')
+    closeAiFlow()
+  }
+  // Échec : aiCardGenerationStore.status passe à 'error', AiGenerationProgressModal affiche l'état
+  // d'erreur (message + [Réessayer]/[Fermer]) — rien de plus à faire ici.
 }
 </script>

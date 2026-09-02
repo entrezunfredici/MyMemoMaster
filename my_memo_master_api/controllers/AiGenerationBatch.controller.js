@@ -103,6 +103,20 @@ exports.generate = async (req, res) => {
 }
 
 /**
+ * Résumé de consommation IA (quota quotidien personnel + budget mensuel global) pour
+ * l'utilisateur connecté — alimente l'affichage "Quota restant" maquetté en C-01.02 §4.2, jusque là
+ * calculé par AiQuotaService#getUsageSummary mais jamais exposé (C-01.08, écran d'upload/paramètres).
+ */
+exports.getQuota = async (req, res) => {
+  try {
+    const summary = await aiQuotaService.getUsageSummary(req.user.id)
+    res.status(200).json(summary)
+  } catch (error) {
+    respondWithKnownOrGenericError(res, error, 'Erreur lors de la récupération du quota IA.')
+  }
+}
+
+/**
  * Liste les batches "pending" de l'utilisateur connecté (reprise d'un brouillon non validé).
  */
 exports.findPending = async (req, res) => {

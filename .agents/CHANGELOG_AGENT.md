@@ -150,6 +150,7 @@
 | Génération de Leitner par IA (C-01) — Stockage cartes générées (en attente) | **Livré** — tables `AiGenerationBatch`/`AiGeneratedCard` (2 migrations + modèles Sequelize), `services/AiGenerationBatch.service.js` : persiste le résultat du pipeline (C-01.05, `{ cards, warnings }`) en statut `pending` (transaction batch+cartes), relecture (`findById`/`findPendingByUser`), mutation d'une carte tant que son batch est `pending` (`updateCard`), bookkeeping `validated`/`discarded` (`markBatchStatus` — ne crée AUCUNE ligne dans Question/Response/LeitnerCard, juste un statut), suppression (`deleteBatch`, cascade DB). 17 tests sur vraie base SQLite en mémoire (transaction, cascade, ownership), migrations vérifiées manuellement (up/down réels, FK enforced). **Branchement HTTP ajouté dans la foulée** (décision utilisateur explicite, avant l'Écran de validation) — voir entrée dédiée ci-dessous. 0 régression | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Endpoint HTTP (POST /ai-generation-batches + cycle de vie) | **Livré, Quotas maintenant branché** — referme la chaîne pipeline (C-01.05) → stockage (C-01.07) → HTTP → Quotas/budget (C-01.06) : `POST /ai-generation-batches` (texte ou PDF via upload mémoire dédié, droits vérifiés via `LeitnerCard.service#resolveUserRights`, quota/budget vérifiés via `AiQuota.service#checkQuota` **avant** tout appel LLM/OCR, usage réel journalisé **après** succès), `GET /ai-generation-batches` (liste pending), `GET /ai-generation-batches/:id`, `PATCH /ai-generation-batches/:id/status` (validated/discarded), `PATCH /ai-generation-batches/cards/:cardId` (accept/edit/reject), `DELETE /ai-generation-batches/:id`. 20 tests fonctionnels (routes réelles + DB réelle, pipeline LLM mocké) | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Gestion quotas et budget IA | **Livré** — table `AiUsageLog` (migration + modèle, pattern audit `SET NULL` comme `AuditLog`) + `services/AiQuota.service.js` (C-01.06) : **quota** personnel (générations/jour, compté sur `AiGenerationBatch`) et **budget** global (coût $ estimé/mois, tous utilisateurs, compté sur `AiUsageLog`) — deux garde-fous distincts et indépendants, tous deux réglables par variable d'environnement. `estimateCostUsd` (tarifs C-01.03 codés en dur, à revérifier périodiquement), `checkQuota` (429 si l'un des deux dépassé), `recordUsage` (journalisation best-effort après coup), `getUsageSummary` (prêt pour un futur affichage « quota restant », déjà maquetté en C-01.02). `AiCardGenerationService`/`PdfExtraction.service.js`/`AiCardGenerationPipeline.service.js` enrichis pour faire remonter l'usage réel (tokens/pages) sans le journaliser eux-mêmes. 18 nouveaux tests (`AiQuota.service.test.js` 16 + `aiQuotaConfig.test.js` 2) sur vraie base SQLite en mémoire, + tests des 3 services enrichis mis à jour, + 3 tests BDD (429 quota, 429 budget, vérification `AiUsageLog`). Suite complète : **1725/1725**, 0 régression | 2026-09-02 |
+| Génération de Leitner par IA (C-01) — Interface génération (upload, paramètres) | **Livré (front-end)** — Vues 1/2 de la maquette C-01.02 : `stores/aiCardGeneration.js` (`generate`/`fetchQuota`/`reset`), `components/AiGenerateCardsModalComponent.vue` (source texte/PDF drag&drop, matière en texte libre, slider 1-20, type de carte, quota affiché), `components/AiGenerationProgressModalComponent.vue` (attente illustrative + erreur/retry), bouton d'entrée sur `FlashcardsCardsPage.vue`. Écart comblé au passage : `getUsageSummary` (C-01.06) n'était exposé par aucune route — `GET /ai-generation-batches/quota` ajouté (controller+route+2 tests BDD). Écran de validation (Vue 3) explicitement hors périmètre (décision utilisateur) : succès = toast + fermeture, batch reste `pending` | 2026-09-02 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -9107,3 +9108,121 @@ convention de code à respecter dans tout ajout futur à cette chaîne, pas une 
 - `my_memo_master_api/test/services/AiCardGeneration.service.test.js`,
   `test/services/PdfExtraction.service.test.js`, `test/services/AiCardGenerationPipeline.service.test.js`,
   `test/bdd/aiGenerationBatch.test.js`
+
+---
+
+## [2026-09-02] ADD — C-01.08 : Interface génération (upload, paramètres) — Génération de Leitner par IA
+
+**Contexte** — Ticket `C-01.08` (feature list `C-01`, source planning, V2, tâche **Front-end**, extension
+US-01). Premier ticket front-end de la feature : livrer l'écran d'upload/paramètres maquetté en C-01.02 §4
+(Vue 1 — modal de configuration) et §5 (Vue 2 — état de génération/erreur), branché sur la chaîne backend déjà
+livrée (C-01.04→07). Point d'attention explicite du ticket : rester dans le périmètre de « Interface génération
+(upload, paramètres) » sans déborder sur les autres éléments IN du feature list (dont l'Écran de validation,
+qui est un élément IN séparé — voir §11 de la maquette, « en page dédiée vs vue conditionnelle inline, non
+tranché »).
+
+**Audit préalable** (règle d'`AGENT.md`) — Toute la chaîne back C-01.01→07 existait déjà et a été relue avant
+implémentation. Trois écarts trouvés entre la maquette C-01.02 (document d'analyse pur, écrit avant toute
+implémentation back) et le contrat réel livré depuis :
+1. Aucune route n'exposait `AiQuotaService#getUsageSummary` (C-01.06) — le commentaire du service dit
+   lui-même « pensé pour un futur affichage Quota restant… pas encore consommé par aucune route/UI ».
+2. Le champ maquetté « Matière » suggérait de réutiliser `SubjectSelectorComponent` (sélecteur d'id `Subject`)
+   alors que le contrat réel (`AiGenerationBatch.validators.js`) attend `subjectContext` : une chaîne libre
+   (≤100 car.) envoyée telle quelle au prompt, pas une FK.
+3. Aucun endpoint d'orchestration n'était nommé (rappel explicite §11 de la maquette) — tranché par
+   l'implémentation existante : `POST /ai-generation-batches`.
+
+Ces écarts touchant une interface publique (nouvelle route) et une divergence de contrat avec la maquette,
+3 questions ont été posées à l'utilisateur avant de coder (règle d'audit d'`AGENT.md`) plutôt que de trancher
+silencieusement. Réponses (toutes les options recommandées) :
+- Ajouter `GET /ai-generation-batches/quota` (petit ajout d'API, pattern identique aux routes existantes)
+  plutôt que d'omettre l'affichage du quota réel.
+- Après une génération réussie : fermer le flux + toast, le brouillon reste `pending` (récupérable plus tard)
+  — pas de stub de l'Écran de validation dans ce ticket (hors périmètre, confirmé).
+- Champ Matière : input texte libre pré-rempli avec `LeitnerSystem.subject.name`, pas
+  `SubjectSelectorComponent`.
+
+**Ce qui a été fait**
+
+*Back-end (écart comblé, hors périmètre front strict mais nécessaire à l'affichage quota réel)*
+- `controllers/AiGenerationBatch.controller.js#getQuota` — expose `aiQuotaService.getUsageSummary(userId)`.
+- `routes/AiGenerationBatch.routes.js` — `GET /ai-generation-batches/quota`, déclarée **avant**
+  `/ai-generation-batches/:id` (sinon `:id` capture le segment fixe `quota` — même précaution documentée pour
+  `/cards/:cardId`).
+- `test/bdd/aiGenerationBatch.test.js` — 2 tests (cas nominal après une génération, 401 sans token).
+
+*Front-end*
+- `stores/aiCardGeneration.js` — nouveau store Pinia : `fetchQuota()` (best-effort, `quota` reste `null` en
+  cas d'échec — l'affichage se masque plutôt que de bloquer la génération), `generate(config)` (construit le
+  `FormData` multipart — texte XOR PDF, `subjectContext` optionnel —, statuts `'generating'|'error'|'done'`),
+  `reset()`.
+- `components/AiGenerateCardsModalComponent.vue` — Vue 1 : radio source texte/PDF (textarea + compteur de
+  caractères, ou drag&drop + `<input type="file">` avec validation client type/taille avant envoi), matière en
+  texte libre (≤100 car., pré-remplie), slider 1-20 cartes, radio type (`open`/`mcq`/`mixed`), bandeau quota
+  (masqué si `fetchQuota` échoue). **CHOIX** : pas de watcher de reset sur `visible` — les champs doivent
+  survivre à un aller-retour vers la Vue 2 puis `[Réessayer]` (§5/§10 de la maquette) ; le parent monte ce
+  composant en `v-if` pour toute la durée du flux, seul `visible` bascule entre les deux modales, donc l'état
+  local persiste naturellement sans code dédié.
+- `components/AiGenerationProgressModalComponent.vue` — Vue 2 : 3 étapes illustratives pendant `'generating'`
+  (aucune progression réelle possible sans streaming/polling, hors périmètre — §11 de la maquette), état
+  d'erreur (message serveur + `[Fermer]`/`[Réessayer]`).
+- `pages/FlashcardsCardsPage.vue` — bouton `✨ Générer par IA` à côté de `+ Ajouter une carte` ; capture
+  `LeitnerSystem.subject.name` dans `loadCards()` (déjà inclus par `LeitnerSystem.service.js#SUBJECT_INCLUDE`,
+  non exploité jusqu'ici) ; orchestration `showAiFlow`/`aiStep` (`'config'|'progress'`) ; `handleAiGenerate`
+  bascule vers la Vue 2, puis ferme tout + toast sur succès (Écran de validation hors périmètre, décision
+  ci-dessus) ou laisse la Vue 2 afficher l'état d'erreur sur échec.
+- `test/stores/aiCardGeneration.store.test.js` — 9 tests (`fetchQuota` nominal/erreur/réseau, `generate`
+  texte/PDF/matière/erreur connue/erreur réseau, `reset`).
+
+**Vérifié**
+- `npx jest test/bdd/aiGenerationBatch.test.js` → 23/23 (dont les 2 nouveaux tests quota).
+- `npx vitest run` (suite complète front) → **47 fichiers, 725 tests**, 0 régression.
+- `npx eslint` sur tous les fichiers modifiés/créés → 0 erreur.
+- `npx vite build` → compile sans erreur (`FlashcardsCardsPage` inclut les nouveaux composants).
+- `node scripts/audit-a11y.mjs` (audit statique RGAA, 81 fichiers .vue) → **0 non-conformité** ; les inputs des
+  nouvelles modales portent tous un `aria-label`, le groupe de radios `cardType` utilise
+  `role="radiogroup"`/`aria-labelledby` (même pattern que le formulaire carte existant).
+
+**Ce qui n'est PAS couvert**
+- Écran de validation (Vue 3, C-01.02 §6) — hors périmètre explicite de ce ticket, tranché avec l'utilisateur.
+  Le batch généré reste `pending`, entièrement récupérable via les endpoints déjà livrés
+  (`GET /ai-generation-batches`, `GET /ai-generation-batches/:id`, `PATCH .../cards/:cardId`,
+  `PATCH .../:id/status`) — rien à modifier côté back pour le futur ticket.
+- e2e-a11y/contrast.spec.js (Playwright, RGAA 3.2 en navigateur réel) non rejoué pour ces nouvelles modales
+  dans cette session (nécessite l'app démarrée) — seuls l'audit statique et `test/a11y/axe.test.js`
+  (générique, `ModalComponent` déjà couvert) ont été vérifiés.
+- Slider "nombre de cartes" plafonné à 20 côté front (dupliqué du plafond illustratif de la maquette), alors
+  que le back accepte jusqu'à `MAX_CARD_COUNT=30` (C-01.04) — écart mineur assumé, cohérent avec la maquette
+  qui qualifie sa propre borne d'« illustrative ».
+- Pas de bouton "annuler l'appel réseau en cours" réel pendant `'generating'` — `[Annuler]` referme
+  l'affichage côté front sans annuler la requête HTTP sous-jacente (comportement documenté comme acceptable
+  par la maquette §5, "détail d'implémentation hors périmètre").
+
+**Fichiers créés**
+- `my_memo_master_front/src/stores/aiCardGeneration.js`
+- `my_memo_master_front/src/components/AiGenerateCardsModalComponent.vue`
+- `my_memo_master_front/src/components/AiGenerationProgressModalComponent.vue`
+- `my_memo_master_front/test/stores/aiCardGeneration.store.test.js`
+
+**Fichiers modifiés**
+- `my_memo_master_api/controllers/AiGenerationBatch.controller.js` (+`getQuota`)
+- `my_memo_master_api/routes/AiGenerationBatch.routes.js` (+`GET /ai-generation-batches/quota`)
+- `my_memo_master_api/test/bdd/aiGenerationBatch.test.js` (+2 tests)
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` (bouton d'entrée + orchestration du flux IA)
+
+---
+
+## [2026-09-02] FIX — `docker-compose.yml` ne transmettait jamais les variables Mistral/IA au conteneur `api`
+
+**Contexte** — Vérification manuelle de C-01.08 (voir entrée précédente) demandée par l'utilisateur : premier essai réel de génération dans l'interface, avec `docker-compose up` (profil `dev`) et une vraie clé `MISTRAL_API_KEY` posée dans le `.env` racine. Résultat : `502`, message générique côté front (« La génération a échoué. Réessayez. »). Logs du conteneur `api` : `[AiCardGenerationPipeline] Passage 1/2 en échec : Service de génération IA non configuré (clé API manquante).` — alors que la clé est bien présente sur l'hôte.
+
+**Cause** — `docker-compose.yml` liste explicitement, service par service, chaque variable transmise depuis `.env` vers l'`environment:` du conteneur (pas de passthrough automatique). Les variables lues par `helpers/mistralConfig.js` et `helpers/aiQuotaConfig.js` (`MISTRAL_API_KEY`, `MISTRAL_API_URL`, `MISTRAL_MODEL`, `MISTRAL_OCR_API_URL`, `MISTRAL_OCR_MODEL`, `MISTRAL_TIMEOUT_MS`, `AI_QUOTA_MAX_GENERATIONS_PER_DAY`, `AI_BUDGET_MAX_USD_PER_MONTH`) n'y avaient jamais été ajoutées — trou resté invisible jusqu'ici car C-01.04/05/06 sont des services purs (testés unitairement, ou vérifiés manuellement en 2026-09-01 **hors Docker** d'après l'entrée C-01.04 du présent journal) : aucun de ces tickets ne passait par le conteneur `api` réel.
+
+**Correction** — Ajout des 8 variables à l'`environment:` du service `api`, dans les deux profils `docker-compose.yml` qui le définissent (`dev` et `test` — `preprod`/`prod` passent par des ConfigMaps Kubernetes séparées, non concernées). Même style que les variables S3 déjà présentes (`${VAR:-}`, vide par défaut plutôt qu'une valeur qui masquerait une absence).
+
+**Vérifié** : `docker compose config --quiet` (YAML valide) ; `docker compose up -d api` (recréation propre, healthcheck repasse `healthy`) ; `docker compose exec api sh -c '[ -n "$MISTRAL_API_KEY" ] ...'` confirme la clé présente dans le conteneur (32 caractères, valeur non affichée) sans la faire apparaître dans les logs.
+
+**Ce qui n'est PAS couvert** — Pas rejoué la génération réelle bout-en-bout dans le conteneur après le fix (dépend du retour de l'utilisateur, qui a l'interface ouverte) ; `preprod`/`prod` (Kubernetes) non vérifiées ici — à confirmer séparément que leurs ConfigMaps/Secrets portent bien ces mêmes variables si la fonctionnalité y est un jour déployée.
+
+**Fichiers modifiés**
+- `docker-compose.yml` (service `api`, profils `dev` et `test`)

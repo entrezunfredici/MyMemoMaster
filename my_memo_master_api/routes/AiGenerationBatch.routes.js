@@ -87,6 +87,33 @@ module.exports = (router) => {
 
   /**
    * @swagger
+   * /ai-generation-batches/quota:
+   *   get:
+   *     summary: Résumé de consommation IA de l'utilisateur connecté (quota quotidien + budget mensuel global, C-01.06)
+   *     tags: [AiGenerationBatches]
+   *     responses:
+   *       200:
+   *         description: Résumé de consommation
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 generationsToday: { type: integer }
+   *                 maxGenerationsPerDay: { type: integer }
+   *                 remainingGenerationsToday: { type: integer }
+   *                 budgetSpentThisMonthUsd: { type: number }
+   *                 maxBudgetUsdPerMonth: { type: number }
+   *       401:
+   *         description: Non authentifié
+   */
+  // Déclarée AVANT /ai-generation-batches/:id — un segment fixe ("quota") placé après une route
+  // paramétrée à un seul segment serait autrement capturé par :id (même précaution que
+  // /ai-generation-batches/cards/:cardId, qui s'en sort par un segment supplémentaire).
+  router.get('/ai-generation-batches/quota', authMiddleware, aiGenerationBatch.getQuota)
+
+  /**
+   * @swagger
    * /ai-generation-batches/{id}:
    *   get:
    *     summary: Récupère une génération (et ses cartes proposées) par id

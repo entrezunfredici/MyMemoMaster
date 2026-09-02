@@ -1936,3 +1936,51 @@ Les deux sont vérifiés ensemble par `checkQuota(userId)`, mais restent concept
 **Portée du déploiement, limitée par les permissions de la session** — Appliqué en direct sur **preprod** (`helm upgrade`, révision 8, vérifié sain) en répliquant exactement la commande de `.github/workflows/cd.yml`. La même commande sur **prod** a été **bloquée par le classificateur de permissions de l'environnement** — l'action a été abandonnée telle quelle plutôt que contournée, conformément à la consigne de ne jamais forcer un refus de permission ; à rejouer par l'utilisateur ou avec son autorisation explicite dans une session ultérieure.
 
 **Conséquences** : `helm lint`/`helm template` propres sur les deux environnements. Preprod tourne avec le nouveau gabarit mémoire mais l'ancienne image (le correctif de pré-chauffage et la fonctionnalité temps de révision restent non committés à ce stade — voir `CHANGELOG_AGENT.md`) : le redimensionnement est bénéfique indépendamment de cet écart, mais son bénéfice complet (pré-chauffage qui charge réellement le modèle) ne sera vérifiable qu'une fois le code déployé. **Dette non traitée** : toute l'analyse de capacité repose sur des `requests`/`limits` déclarés faute de `kubectl top` fonctionnel (`metrics-server` cassé, panne déjà connue) — à recroiser avec une mesure réelle dès que possible.
+
+---
+
+### [2026-09-02] C-01.08 — `GET /ai-generation-batches/quota` ajouté plutôt que d'omettre l'affichage du quota réel
+
+**Contexte** — La maquette C-01.02 (§4.2) affiche un bandeau « Quota restant » dans la modal de configuration, explicitement documenté à l'époque comme « affichage uniquement — mécanisme réel hors périmètre ». Le mécanisme réel a depuis été livré (C-01.06, `AiQuotaService#getUsageSummary`) mais son commentaire de code dit lui-même qu'il n'est « pas encore consommé par aucune route/UI ». Ce ticket (interface front) est le premier à avoir réellement besoin de cette donnée, et ajouter une route est un changement d'interface publique — question posée à l'utilisateur plutôt que tranchée seule (règle d'`AGENT.md`).
+
+**Décision** — `GET /ai-generation-batches/quota` (authMiddleware seul, pas de validator — aucun paramètre), déclarée avant `/ai-generation-batches/:id` dans le fichier de routes pour ne pas être capturée par le paramètre `:id`. Le contrôleur ne fait qu'appeler `aiQuotaService.getUsageSummary(req.user.id)` et renvoyer le résultat tel quel (200) — aucune logique métier ajoutée, le calcul existait déjà.
+
+**Alternative écartée** : ne pas afficher de quota réel dans ce ticket (texte générique ou bandeau omis), en reportant l'ajout de route à un ticket ultérieur — écarté par choix explicite de l'utilisateur : le calcul étant déjà écrit et testé (`AiQuota.service.test.js`), l'ajout de route est un branchement mince (même pattern que les 5 routes `AiGenerationBatch` existantes), pas une nouvelle fonctionnalité à concevoir.
+
+**Conséquences** : nouvelle route publique authentifiée, sans effet de bord (lecture seule, aucune écriture). Le quota affiché est quotidien (`remainingGenerationsToday`/`maxGenerationsPerDay`), pas mensuel comme le suggérait le libellé illustratif de la maquette (« Quota restant ce mois-ci ») — le front reprend le vrai libellé du mécanisme (C-01.06 : quota quotidien + budget mensuel séparé), sans chercher à faire correspondre le texte de la maquette au prix d'un contresens.
+
+---
+
+### [2026-09-02] C-01.08 — Champ « Matière » : texte libre pré-rempli, pas `SubjectSelectorComponent`
+
+**Contexte** — La maquette C-01.02 (§4.2) propose de réutiliser `SubjectSelectorComponent` (sélecteur d'id `Subject`, lié par FK) pour le champ Matière de la génération IA. Le contrat réel de l'endpoint (`AiGenerationBatch.validators.js#generate`, livré après la maquette) attend `subjectContext` : une chaîne libre de 100 caractères maximum, envoyée telle quelle dans le prompt utilisateur — sans lien avec la table `Subject`. Écart entre document d'analyse (antérieur à l'implémentation back) et contrat réel — signalé et tranché avec l'utilisateur avant de coder.
+
+**Décision** — Un simple `<input type="text" maxlength="100">`, pré-rempli avec `LeitnerSystem.subject.name` si le système a une matière associée (déjà chargée par `LeitnerSystem.service.js#SUBJECT_INCLUDE`, simplement non exploitée jusqu'ici côté `FlashcardsCardsPage.vue`), modifiable librement par l'utilisateur.
+
+**Alternative écartée** : suivre la maquette au pied de la lettre avec `SubjectSelectorComponent` puis résoudre l'id choisi vers `Subject.name` avant l'appel réseau — écarté : aurait ajouté un mapping id→nom sans bénéfice (le champ n'est qu'un contexte texte pour le prompt, pas une relation de données à préserver), et aurait laissé croire à tort que la matière choisie ici est liée aux systèmes/cartes Leitner comme le sont les autres usages de `SubjectSelectorComponent` dans le reste de l'application.
+
+**Conséquences** : `subjectContext` n'est associé à aucune entité `Subject` — un texte libre mal orthographié ou une matière inventée n'est jamais rejeté (c'est un contexte pour le LLM, pas une donnée validée). Cohérent avec le contrat déjà en place (`generation_ia_prompt_cartes.md`), aucun changement côté back nécessaire.
+
+---
+
+### [2026-09-02] C-01.08 — Écran de validation (Vue 3) hors périmètre : succès = toast + fermeture, pas de stub
+
+**Contexte** — Le ticket C-01.08 couvre explicitement « Interface génération (upload, paramètres) » (Vues 1 et 2 de la maquette C-01.02), tandis que l'Écran de validation (Vue 3, §6) est un élément IN séparé du feature list — non désigné dans ce ticket, et son point d'attention rappelle de ne pas déborder sur les éléments hors version. Reste une question ouverte : que doit afficher l'écran juste après une génération réussie, faute de Vue 3 à brancher ?
+
+**Décision** — Fermer tout le flux IA (les deux modales) et afficher un toast de confirmation (« N cartes générées, en attente de validation »). Le batch reste `status: 'pending'` côté back, entièrement récupérable ensuite via les endpoints déjà livrés en C-01.07 (`GET /ai-generation-batches`, `GET /ai-generation-batches/:id`, `PATCH .../cards/:cardId`, `PATCH .../:id/status`) — rien à modifier côté back pour le futur ticket Écran de validation.
+
+**Alternative écartée** : construire un stub minimal de l'Écran de validation (liste simple des cartes proposées, sans les interactions accept/edit/reject détaillées) pour éviter un cul-de-sac UX — écarté par choix explicite de l'utilisateur : un stub aurait dû être en grande partie réécrit par le futur ticket dédié (composants, store, interactions), pour un bénéfice UX temporaire limité (l'utilisateur reçoit déjà une confirmation claire par toast).
+
+**Conséquences** : entre ce ticket et le futur ticket Écran de validation, un batch généré n'est visible nulle part dans l'interface (pas de liste des brouillons en attente sur `FlashcardsCardsPage.vue`) — récupérable uniquement via l'API. Dette assumée, à lever par le ticket Écran de validation lui-même (qui devra très probablement afficher aussi les brouillons `pending` déjà existants, pas seulement celui qui vient d'être généré).
+
+---
+
+### [2026-09-02] Variables Mistral/IA ajoutées à `docker-compose.yml` (service `api`, profils `dev`/`test`)
+
+**Contexte** — `docker-compose.yml` n'a pas de passthrough automatique des variables d'environnement : chaque service liste explicitement celles qu'il reçoit depuis le `.env` racine. Les 8 variables lues par `helpers/mistralConfig.js`/`helpers/aiQuotaConfig.js` n'y figuraient pas — trouvé en testant manuellement C-01.08 dans un conteneur réel (502, « clé API manquante » alors que la clé existe sur l'hôte). Aucun ticket C-01 précédent (services purs C-01.04/05/06) n'était passé par le conteneur `api` pour être vérifié, d'où le trou resté invisible jusqu'à ce premier test bout-en-bout via Docker.
+
+**Décision** — Ajouter `MISTRAL_API_KEY`, `MISTRAL_API_URL`, `MISTRAL_MODEL`, `MISTRAL_OCR_API_URL`, `MISTRAL_OCR_MODEL`, `MISTRAL_TIMEOUT_MS`, `AI_QUOTA_MAX_GENERATIONS_PER_DAY`, `AI_BUDGET_MAX_USD_PER_MONTH` à l'`environment:` du service `api`, dans les profils `dev` et `test` (les deux seuls définis dans ce fichier — `preprod`/`prod` sont hors de son périmètre, gérées par des ConfigMaps Kubernetes séparées). Style `${VAR:-}` (vide par défaut), identique au bloc S3 déjà en place juste au-dessus, plutôt qu'une valeur par défaut qui masquerait silencieusement une absence.
+
+**Alternative écartée** : ne corriger que le profil `dev` (celui réellement testé dans l'immédiat) — écarté car le profil `test` (VPS, README §Environnement TEST) porte exactement le même bloc `environment:` dupliqué avec le même oubli ; le corriger au même endroit, pour la même raison, coûtait la même poignée de lignes.
+
+**Conséquences** : quiconque relance `docker-compose up` avec une clé Mistral dans son `.env` peut désormais tester la génération IA en conditions réelles sans modification manuelle du compose file. Dette non couverte ici : `preprod`/`prod` (Kubernetes) n'ont pas été vérifiées — à confirmer séparément que leurs manifests portent bien ces variables le jour où la fonctionnalité y est déployée.
