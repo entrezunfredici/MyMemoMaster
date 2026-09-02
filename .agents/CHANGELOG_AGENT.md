@@ -147,6 +147,9 @@
 | Génération de Leitner par IA (C-01) — Benchmark et choix modèle LLM | **Analyse livrée, aucun code** — `diagrams/generation_ia_llm_benchmark.md` (C-01.03) : revue documentaire (pas empirique, aucune intégration LLM existante) de la gamme Mistral AI (orientation RGPD déjà actée), tableau comparatif Large 3/Medium 3.5/Small 4/Ministral 3 (contexte, prix/M tokens, support sortie structurée), profil de tâche dérivé du prompt C-01.01 (extraction structurée sur chunk court, pas de raisonnement complexe) → **choix retenu `mistral-small-latest`**, `mistral-medium-latest` en option d'escalade ; protocole de validation empirique documenté mais non exécuté (hors périmètre) | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Service inférence IA (appel LLM, parsing) | **Livré et vérifié en conditions réelles** — `services/AiCardGeneration.service.js` (C-01.04) : exécute le prompt C-01.01 sur `mistral-small-latest` (config C-01.03, via `helpers/mistralConfig.js`), appel HTTP natif `fetch` (aucune dépendance ajoutée), `response_format: json_object`, parsing + validation stricte du schéma de sortie (`cards[]`/`warning`, y compris la cohérence entre le `cardType` demandé et le type réellement renvoyé par carte — trouvé en défaut lors du test réel, corrigé), retry unique sur sortie non conforme puis échec explicite (502) — jamais de fallback silencieux. Pas de controller/route (service pur, comme `Semantic.service.js` — hors périmètre de ce ticket). 47 tests (service + helper config), 0 régression sur les 1630 tests API. Testé avec une vraie clé API (fournie par l'utilisateur) : génération `open` et `mcq` toutes deux conformes | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Pipeline traitement (PDF, chunking, LLM) | **Livré et vérifié en conditions réelles (pdfjs-dist + OCR Mistral)** — `services/PdfExtraction.service.js` : `pdfjs-dist` en 1er (gratuit, local), **repli automatique sur l'OCR Mistral** (`$4/1000 pages`) si aucun texte trouvé (PDF scanné — décision utilisateur explicite) ; détection (sans description) des images/schémas embarqués sur les deux chemins, remontée en avertissement par le pipeline plutôt qu'ignorée silencieusement. `helpers/textChunker.js` (découpage par paragraphes/phrases, sans dépendance), `services/AiCardGenerationPipeline.service.js` (C-01.05, orchestre le tout + `AiCardGenerationService` de C-01.04 sur chaque chunk, agrège `{ cards, warnings }`, tolère un échec partiel). Pas de controller/route (hors périmètre, comme C-01.04). 41 tests (chunker + extraction PDF/OCR mockés + pipeline), 0 régression sur les 1670 tests API | 2026-09-01 |
+| Génération de Leitner par IA (C-01) — Stockage cartes générées (en attente) | **Livré** — tables `AiGenerationBatch`/`AiGeneratedCard` (2 migrations + modèles Sequelize), `services/AiGenerationBatch.service.js` : persiste le résultat du pipeline (C-01.05, `{ cards, warnings }`) en statut `pending` (transaction batch+cartes), relecture (`findById`/`findPendingByUser`), mutation d'une carte tant que son batch est `pending` (`updateCard`), bookkeeping `validated`/`discarded` (`markBatchStatus` — ne crée AUCUNE ligne dans Question/Response/LeitnerCard, juste un statut), suppression (`deleteBatch`, cascade DB). 17 tests sur vraie base SQLite en mémoire (transaction, cascade, ownership), migrations vérifiées manuellement (up/down réels, FK enforced). **Branchement HTTP ajouté dans la foulée** (décision utilisateur explicite, avant l'Écran de validation) — voir entrée dédiée ci-dessous. 0 régression | 2026-09-02 |
+| Génération de Leitner par IA (C-01) — Endpoint HTTP (POST /ai-generation-batches + cycle de vie) | **Livré, Quotas maintenant branché** — referme la chaîne pipeline (C-01.05) → stockage (C-01.07) → HTTP → Quotas/budget (C-01.06) : `POST /ai-generation-batches` (texte ou PDF via upload mémoire dédié, droits vérifiés via `LeitnerCard.service#resolveUserRights`, quota/budget vérifiés via `AiQuota.service#checkQuota` **avant** tout appel LLM/OCR, usage réel journalisé **après** succès), `GET /ai-generation-batches` (liste pending), `GET /ai-generation-batches/:id`, `PATCH /ai-generation-batches/:id/status` (validated/discarded), `PATCH /ai-generation-batches/cards/:cardId` (accept/edit/reject), `DELETE /ai-generation-batches/:id`. 20 tests fonctionnels (routes réelles + DB réelle, pipeline LLM mocké) | 2026-09-02 |
+| Génération de Leitner par IA (C-01) — Gestion quotas et budget IA | **Livré** — table `AiUsageLog` (migration + modèle, pattern audit `SET NULL` comme `AuditLog`) + `services/AiQuota.service.js` (C-01.06) : **quota** personnel (générations/jour, compté sur `AiGenerationBatch`) et **budget** global (coût $ estimé/mois, tous utilisateurs, compté sur `AiUsageLog`) — deux garde-fous distincts et indépendants, tous deux réglables par variable d'environnement. `estimateCostUsd` (tarifs C-01.03 codés en dur, à revérifier périodiquement), `checkQuota` (429 si l'un des deux dépassé), `recordUsage` (journalisation best-effort après coup), `getUsageSummary` (prêt pour un futur affichage « quota restant », déjà maquetté en C-01.02). `AiCardGenerationService`/`PdfExtraction.service.js`/`AiCardGenerationPipeline.service.js` enrichis pour faire remonter l'usage réel (tokens/pages) sans le journaliser eux-mêmes. 18 nouveaux tests (`AiQuota.service.test.js` 16 + `aiQuotaConfig.test.js` 2) sur vraie base SQLite en mémoire, + tests des 3 services enrichis mis à jour, + 3 tests BDD (429 quota, 429 budget, vérification `AiUsageLog`). Suite complète : **1725/1725**, 0 régression | 2026-09-02 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -8806,3 +8809,301 @@ cause ici mais la stratégie de mock/vérification manuelle reste la même par c
   `sourceText`/`pdfBuffer` ailleurs dans ce ticket.
 - Le captioning de schémas reste une fonctionnalité entière à scoper si l'utilisateur la souhaite un jour
   (nouveau ticket probable, hors `C-01` tel que défini actuellement).
+
+---
+
+## [2026-09-02] ADD — C-01.07 : Stockage cartes générées (en attente) — Génération de Leitner par IA
+
+**Contexte** — Ticket `C-01.07` (feature list `C-01`, source planning, V2, tâche **Back-end**, suite de
+C-01.01→05 — `C-01.06` non reçu dans cette session, probablement Quotas ou une autre tâche non assignée ici).
+Objectif : livrer le « Stockage cartes générées (en attente) », comblant la dette répétée dans les entrées
+précédentes (« aucun moyen d'appeler ce pipeline depuis l'application... aucune persistance »). Sans
+déborder sur Écran de validation (accept/edit/reject reste une logique UI séparée) ni sur la promotion finale
+vers Question/Response/LeitnerCard (hypothèse déjà notée en C-01.01 §6, toujours pas tranchée ici).
+
+**Décision de conception** — Deux tables plutôt qu'une (mirroir du pattern déjà établi
+`LeitnerSystem`/`LeitnerCard`) : `AiGenerationBatch` (une exécution du pipeline C-01.05 — utilisateur, système
+Leitner cible, paramètres de génération, statut `pending`/`validated`/`discarded`, `warnings` du pipeline) et
+`AiGeneratedCard` (une carte proposée, structure alignée sur `generation_ia_prompt_cartes.md` §4 —
+`statement`/`type`/`answer`/`acceptedAnswers`/`options`/`sourceExcerpt`, statut propre
+`pending`/`accepted`/`edited`/`rejected`). Détail complet et alternatives dans `DECISIONS.md`.
+
+**Ce qui a été fait**
+- `migrations/20260902000001-create-aigenerationbatch-table.js` et
+  `migrations/20260902000002-create-aigeneratedcard-table.js` — vérifiées manuellement (`up()`/`down()` réels
+  sur SQLite en mémoire via un script ponctuel hors Jest, `sequelize-cli` visant Postgres uniquement dans ce
+  projet et non accessible dans cette session) : tables créées avec les bonnes colonnes, contrainte FK
+  effectivement appliquée (un insert sans parent existant échoue comme attendu), insertion/lecture réelles
+  correctes, rollback (`down()`) propre.
+- `models/AiGenerationBatch.model.js` / `models/AiGeneratedCard.model.js` — enregistrés dans
+  `models/index.js`, associations `batch.hasMany(cards)` / `card.belongsTo(batch)` /
+  `batch.belongsTo(user/leitnerSystem)`.
+- `services/AiGenerationBatch.service.js` :
+  - `createFromPipelineResult({ userId, idSystem, subjectContext, cardType, outputLanguage, cards,
+    warnings })` — transaction (`create` batch + `bulkCreate` cartes), reprend telle quelle la sortie de
+    `AiCardGenerationPipelineService#generateCardsFromContent` (C-01.05).
+  - `findById(idBatch, userId)` / `findPendingByUser(userId)` — lecture, `null`/liste vide plutôt qu'une
+    erreur si absent (pas de distinction 403/404 sur une ressource strictement personnelle).
+  - `updateCard(idCard, userId, updates)` — mutation d'une carte (contenu et/ou statut) **uniquement si son
+    batch est encore `pending`** ; `null` sinon (batch déjà validé/abandonné, carte d'un autre utilisateur,
+    carte inexistante).
+  - `markBatchStatus(idBatch, userId, status)` — bookkeeping `validated`/`discarded` uniquement, **aucune
+    écriture dans Question/Response/LeitnerCard**.
+  - `deleteBatch(idBatch, userId)` — suppression, cascade DB sur les cartes.
+- Tests : `test/services/AiGenerationBatch.service.test.js` — 17 tests sur une vraie base SQLite en mémoire
+  (comme `test/bdd/`, pas de modèles mockés : transaction, cascade de suppression et associations réelles
+  auraient été mal représentées par des mocks), couvrant chaque méthode (cas nominal, ownership croisé,
+  statuts invalides, batch non-pending, ressources inexistantes).
+
+**Ce qui est utilisable**
+- Le service est directement appelable par un futur controller (ex. celui qui orchestrera Chunking PDF +
+  Service inférence + ce stockage en une requête HTTP, ou celui de l'Écran de validation).
+- Vérifié : `npx jest test/services/AiGenerationBatch.service.test.js` → 17/17 ; suite complète `npx jest` →
+  **1687/1687**, 0 régression ; `npx eslint` → 0 erreur ; migrations vérifiées manuellement (voir ci-dessus).
+
+**Ce qui n'est PAS couvert** — Aucun controller/route (service pur, comme C-01.04/05 — cohérent avec la
+répartition du travail : ce ticket fournit la couche durable, le branchement HTTP reste pour la tâche qui
+orchestrera la génération de bout en bout ou pour l'Écran de validation) ; promotion des cartes acceptées
+vers Question/Response/LeitnerCard (hypothèse ouverte depuis C-01.01 §6) ; Quotas (probablement C-01.06,
+non reçu).
+
+**Fichiers créés**
+- `my_memo_master_api/migrations/20260902000001-create-aigenerationbatch-table.js`
+- `my_memo_master_api/migrations/20260902000002-create-aigeneratedcard-table.js`
+- `my_memo_master_api/models/AiGenerationBatch.model.js`
+- `my_memo_master_api/models/AiGeneratedCard.model.js`
+- `my_memo_master_api/services/AiGenerationBatch.service.js`
+- `my_memo_master_api/test/services/AiGenerationBatch.service.test.js`
+
+**Fichiers modifiés**
+- `my_memo_master_api/models/index.js` (enregistrement des 2 nouveaux modèles)
+
+**Dette signalée, non traitée ici**
+- **Migrations non jouées contre une vraie base Postgres/dev** — vérifiées uniquement par script ponctuel
+  SQLite (voir ci-dessus) et par la suite Jest (SQLite en mémoire) ; s'appliqueront au prochain déploiement,
+  comme les migrations précédentes de ce projet.
+- **Aucun endpoint HTTP** — le stockage existe mais rien ne l'appelle depuis l'application (ni la génération
+  elle-même, ni une future consultation utilisateur) tant qu'un controller/route n'est pas écrit.
+- **Pas de purge automatique des batches anciens** — un batch `pending` jamais validé ni abandonné par
+  l'utilisateur reste en base indéfiniment ; pas de TTL/nettoyage prévu dans ce ticket.
+
+---
+
+## [2026-09-02] ADD — Branchement HTTP de la génération IA (POST /ai-generation-batches et cycle de vie)
+
+**Contexte** — Après C-01.07, question directe de l'utilisateur : construire les controllers/routes
+maintenant, ou attendre l'Écran de validation ? Recommandation faite (contrat déjà bien défini par
+C-01.01/C-01.02, chaque brique testable en isolation, referme une dette répétée 3 fois) — **validée par
+l'utilisateur**. Ticket non numéroté formellement (poursuite directe de C-01.07), même rigueur appliquée.
+
+**Ce qui a été fait**
+- `middlewares/aiPdfUpload.middleware.js` — multer dédié en `memoryStorage()` (pas
+  `middlewares/upload.middleware.js`, qui écrit durablement sur S3/disque pour des assets utilisateur — un
+  PDF source de génération est une entrée éphémère, jamais conservée). Vérification magic bytes (OWASP
+  A08-M2) faite dans le controller via `bufferMatchesMime` (déjà exporté par `helpers/fileSignature.js`,
+  jusqu'ici seulement utilisé en interne et par les tests).
+- `validators/AiGenerationBatch.validators.js` — `generate` (idSystem, cardCount 1-30 dupliqué du plafond
+  déjà présent dans `AiCardGenerationService`, cardType, exclusivité `sourceText`/PDF via un validateur
+  custom lisant `req.file`), `findOne`/`remove` (id), `markStatus` (status validated/discarded),
+  `updateCard` (cardId + champs optionnels).
+- `controllers/AiGenerationBatch.controller.js` — `generate` (vérifie les droits sur `idSystem` via
+  `leitnerCardService.resolveUserRights` avant tout appel LLM/OCR coûteux, résout PDF vs texte, appelle le
+  pipeline C-01.05 puis le stockage C-01.07), `findPending`, `findOne`, `updateCard`, `markStatus`, `remove`.
+  Erreurs : whitelist de statusCodes connus (400/403/422/500/502) relayés avec le message du service
+  d'origine (déjà en français, déjà pertinent), 500 générique sinon — généralisation du pattern à un seul
+  code déjà utilisé par `LeitnerCard.controller.js#addCard`.
+- `routes/AiGenerationBatch.routes.js` — 6 routes sous `/ai-generation-batches`, toutes derrière
+  `Auth.middleware`, avec annotations Swagger complètes (vérifié : `swagger-jsdoc` parse les 4 chemins sans
+  erreur). Enregistrées dans `app.js`.
+- Tests : `test/bdd/aiGenerationBatch.test.js` — 17 tests fonctionnels bout en bout (vraie app, vraie DB
+  SQLite en mémoire, seul `AiCardGenerationPipelineService` mocké — même frontière de mock que
+  `test/bdd/leitner.session.test.js` pour `Semantic.service`) : génération texte et PDF (upload réel via
+  supertest `.attach()`), rejet magic-bytes, exclusivité source, bornes cardCount, auth, droits croisés,
+  relais d'erreur du pipeline, cycle de vie complet (liste → lecture → édition de carte → validation →
+  rejet post-validation → suppression → 404).
+
+**Point d'attention (résolu depuis, C-01.06 reçu le même jour)** — Au moment de la rédaction de cette entrée,
+aucun Quotas n'était branché sur `POST /ai-generation-batches`. `C-01.06` (« Gestion quotas et budget IA »)
+est arrivé dans la foulée et a comblé ce point exact — voir l'entrée dédiée plus bas.
+
+**Ce qui est utilisable**
+- Chaîne complète appelable en HTTP authentifié : upload PDF ou texte → génération → stockage `pending` →
+  consultation/édition/validation/suppression, sans passer par aucun test ni script.
+- Vérifié : `npx jest test/bdd/aiGenerationBatch.test.js` → 17/17 ; suite complète `npx jest` →
+  **1704/1704**, 0 régression ; `npx eslint` → 0 erreur ; `swagger-jsdoc` génère les 4 chemins attendus sans
+  erreur.
+
+**Ce qui n'est PAS couvert** — ~~Quotas~~ (branché depuis, voir entrée C-01.06 plus bas), Écran de validation
+(front, consommera ces routes), promotion des cartes acceptées vers Question/Response/LeitnerCard (toujours
+l'hypothèse ouverte de C-01.01 §6).
+
+**Fichiers créés**
+- `my_memo_master_api/middlewares/aiPdfUpload.middleware.js`
+- `my_memo_master_api/validators/AiGenerationBatch.validators.js`
+- `my_memo_master_api/controllers/AiGenerationBatch.controller.js`
+- `my_memo_master_api/routes/AiGenerationBatch.routes.js`
+- `my_memo_master_api/test/bdd/aiGenerationBatch.test.js`
+
+**Fichiers modifiés**
+- `my_memo_master_api/app.js` (enregistrement de la route)
+
+**Dette signalée, non traitée ici**
+- ~~Quotas~~ — comblé le même jour, voir entrée C-01.06.
+- Le champ `warnings` d'un batch (avertissements du pipeline, ex. images/schémas non analysés — C-01.05)
+  n'est affiché nulle part côté front puisqu'aucune UI ne consomme encore ces routes.
+
+---
+
+## [2026-09-02] ADD — C-01.06 : Gestion quotas et budget IA — Génération de Leitner par IA
+
+**Contexte** — Ticket `C-01.06` (feature list `C-01`, source planning, V2, tâche **Back-end**), reçu juste
+après le branchement HTTP ci-dessus — referme exactement le point d'attention qui venait d'y être signalé
+(« aucun Quotas branché »). Objectif : gérer à la fois le **quota** (équité entre utilisateurs) et le
+**budget** (coût total maîtrisé), sans déborder sur les autres éléments IN (Prompt, Benchmark, Parsing,
+Chunking, Écran de validation — tous déjà livrés ou hors périmètre).
+
+**Décision de conception** — Deux garde-fous distincts, chacun sur la table la plus naturelle pour ce qu'il
+protège (détail complet et alternatives dans `DECISIONS.md`) :
+- **Quota** : nombre de générations par utilisateur et par jour, compté directement sur `AiGenerationBatch`
+  (une ligne = une requête `POST /ai-generation-batches` aboutie) — pas besoin de nouvelle table.
+- **Budget** : coût réel estimé, tous utilisateurs confondus, sur le mois en cours — nécessite une nouvelle
+  table (`AiUsageLog`) puisque `AiGenerationBatch` ne capture aucune donnée de coût/tokens.
+
+**Ce qui a été fait**
+- `migrations/20260902000003-create-aiusagelog-table.js` + `models/AiUsageLog.model.js` — pattern d'audit
+  déjà établi par `AuditLog.model.js` : FK `userId`/`idBatch` en `SET NULL` (le journal de coût garde sa
+  valeur propre même si l'utilisateur ou le batch d'origine disparaît). Vérifié manuellement (script ponctuel
+  hors Jest, comme pour les migrations précédentes) : up/down réels, et le `SET NULL` confirmé en pratique
+  (suppression d'un batch → `idBatch` de son usage log passe à `null`, la ligne elle-même survit).
+- `helpers/aiQuotaConfig.js` — même pattern que `mistralConfig.js` (fonction, pas figé au chargement).
+- `services/AiQuota.service.js` : `estimateCostUsd` (tarifs $/M tokens et $/1000 pages OCR repris du
+  benchmark C-01.03 et de la page tarifs Mistral, codés en dur — à revérifier périodiquement, limite déjà
+  connue), `checkQuota` (lève 429 sur quota OU budget dépassé), `recordUsage` (une ligne par génération
+  réussie, classe l'opération `chat_completion`/`ocr`/`chat_completion+ocr` selon ce qui a réellement été
+  utilisé), `getUsageSummary` (prêt pour un futur affichage « quota restant », déjà maquetté en
+  `generation_ia_ui.md` C-01.02 §4.2, mais non consommé par aucune route pour l'instant).
+- **Enrichissement des 3 services déjà livrés pour faire remonter l'usage réel**, sans qu'aucun ne journalise
+  lui-même (couplage évité, cf. DECISIONS.md) :
+  - `AiCardGeneration.service.js#callModel` renvoie désormais `{ content, usage: { promptTokens,
+    completionTokens } }` (lu depuis `data.usage` de la réponse Mistral) au lieu d'une simple chaîne ;
+    `generateCards` agrège l'usage des 2 appels au plus (1er essai + retry) et le renvoie dans son payload.
+  - `PdfExtraction.service.js` renvoie désormais `ocrPagesProcessed` sur les deux chemins (`0` pour
+    pdfjs-dist, gratuit ; le nombre réel de pages pour l'OCR, lu depuis `usage_info.pages_processed` avec
+    repli sur `pages.length` si absent de la réponse).
+  - `AiCardGenerationPipeline.service.js#generateCardsFromContent` agrège l'usage de tous les chunks traités
+    avec succès (un chunk en échec ne contribue rien, cohérent avec le traitement déjà existant des échecs
+    partiels) et l'`ocrPagesProcessed` de l'extraction, dans un objet `usage` unique renvoyé à l'appelant.
+- `controllers/AiGenerationBatch.controller.js#generate` : `checkQuota` appelé **avant** le pipeline (rejette
+  sans dépense si déjà atteint), `recordUsage` appelé **après** la création du batch, en best-effort (un
+  échec de journalisation n'invalide pas une génération par ailleurs réussie et déjà stockée — seul risque :
+  un budget légèrement sous-évalué pour cet appel précis, jugé acceptable face au risque inverse de perdre un
+  brouillon générique déjà payé). `429` ajouté à la whitelist de statusCodes connus.
+- Tests : `test/services/AiQuota.service.test.js` (16, vraie base SQLite en mémoire — `checkQuota`/
+  `getUsageSummary` agrègent des `COUNT`/`SUM` réels, mal représentés par des mocks), `test/helpers/
+  aiQuotaConfig.test.js` (2), tests des 3 services enrichis mis à jour (`AiCardGeneration.service.test.js`,
+  `PdfExtraction.service.test.js`, `AiCardGenerationPipeline.service.test.js` — nouvelles assertions sur
+  `usage`/`ocrPagesProcessed`, aucune régression sur les branches déjà couvertes), `test/bdd/
+  aiGenerationBatch.test.js` +3 (429 quota quotidien, 429 budget mensuel, vérification qu'`AiUsageLog` est
+  bien créé après une génération réussie).
+
+**Ce qui est utilisable**
+- `POST /ai-generation-batches` refuse désormais explicitement (429) toute génération au-delà du quota
+  personnel ou du budget global, avant tout appel LLM/OCR — le risque de coût non maîtrisé signalé dans
+  l'entrée précédente est fermé.
+- `AiUsageLog` peut déjà servir de base à un futur tableau de bord de suivi de coût (aucune UI ne le
+  consomme pour l'instant).
+- Vérifié : `npx jest test/services/AiQuota.service.test.js test/helpers/aiQuotaConfig.test.js` → 16+2 ;
+  suite complète `npx jest` → **1725/1725**, 0 régression ; `npx eslint .` → 0 erreur ; migration `AiUsageLog`
+  vérifiée manuellement (up/down réels, `SET NULL` confirmé en pratique).
+
+**Ce qui n'est PAS couvert** — Aucune UI de suivi de quota/budget (Écran de validation, hors périmètre) ;
+`getUsageSummary` n'est exposé par aucune route pour l'instant ; le protocole complet de validation empirique
+des tarifs Mistral (déjà noté en C-01.03) reste entier.
+
+**Fichiers créés**
+- `my_memo_master_api/migrations/20260902000003-create-aiusagelog-table.js`
+- `my_memo_master_api/models/AiUsageLog.model.js`
+- `my_memo_master_api/helpers/aiQuotaConfig.js`
+- `my_memo_master_api/services/AiQuota.service.js`
+- `my_memo_master_api/test/services/AiQuota.service.test.js`
+- `my_memo_master_api/test/helpers/aiQuotaConfig.test.js`
+
+**Fichiers modifiés**
+- `my_memo_master_api/models/index.js` (enregistrement du modèle)
+- `my_memo_master_api/services/AiCardGeneration.service.js` (`callModel`/`generateCards` renvoient `usage`)
+- `my_memo_master_api/services/PdfExtraction.service.js` (`extractTextViaPdfjs`/`extractTextViaOcr`/
+  `extractText` renvoient `ocrPagesProcessed`)
+- `my_memo_master_api/services/AiCardGenerationPipeline.service.js` (agrège et renvoie `usage`)
+- `my_memo_master_api/controllers/AiGenerationBatch.controller.js` (`checkQuota`/`recordUsage` branchés)
+- `my_memo_master_api/routes/AiGenerationBatch.routes.js` (429 documenté en Swagger)
+- `my_memo_master_api/test/services/AiCardGeneration.service.test.js`,
+  `test/services/PdfExtraction.service.test.js`, `test/services/AiCardGenerationPipeline.service.test.js`,
+  `test/bdd/aiGenerationBatch.test.js` (adaptés au nouveau contrat `usage`/`ocrPagesProcessed` + nouveaux cas)
+- `.env.example` (`AI_QUOTA_MAX_GENERATIONS_PER_DAY`, `AI_BUDGET_MAX_USD_PER_MONTH`)
+
+**Dette signalée, non traitée ici**
+- ~~Si le pipeline échoue après un appel réel mais non-conforme, cet usage n'est pas journalisé~~ — **corrigé
+  le même jour, voir entrée suivante** (demande explicite de l'utilisateur, « le point d'attention »).
+- Tarifs de `estimateCostUsd` codés en dur, à revérifier si Mistral change sa grille tarifaire (même limite
+  déjà notée pour le benchmark C-01.03).
+- Pas de distinction de quota par plan/rôle (étudiant vs enseignant, établissement...) — une seule limite
+  globale par variable d'environnement, applicable à tous les utilisateurs identiquement.
+
+---
+
+## [2026-09-02] FIX — L'usage réel n'est plus perdu quand la génération échoue après un appel facturé (C-01.06)
+
+**Contexte** — Demande explicite de l'utilisateur (« le point d'attention ») de corriger la dette signalée
+dans l'entrée précédente : un appel LLM/OCR réellement facturé (tokens consommés, pages traitées) dont le
+résultat final échouait quand même (2 essais non conformes, ou markdown OCR vide après traitement réel de
+pages) ne laissait aucune trace dans `AiUsageLog` — le budget (C-01.06) sous-évaluait la dépense réelle
+Mistral dans ce cas précis.
+
+**Principe de la correction** — Chaque endroit où une erreur peut survenir **après** qu'un appel a réellement
+abouti côté fournisseur attache désormais l'usage réel à l'erreur elle-même (`error.usage`), qui remonte
+ensuite la pile d'appels sans transformation jusqu'au controller, seul point qui journalise. Un échec qui n'a
+jamais atteint l'API (réseau, configuration manquante, buffer invalide) n'attache jamais `error.usage` —
+distinction faite explicitement à chaque point de la chaîne, jamais par défaut.
+
+**Ce qui a été fait**
+- `AiCardGeneration.service.js#callModel` — le cas « contenu vide » (réponse 200 avec `usage` réel mais sans
+  texte exploitable) attache désormais `err.usage = { promptTokens, completionTokens }` avant de lever
+  l'erreur (jusque-là, seul le cas succès portait l'usage).
+- `AiCardGeneration.service.js#generateCards` — refactor via un wrapper `callAndTrackUsage` : chaque appel
+  (1er essai + retry) alimente l'accumulateur `usage` au succès, et fusionne l'usage porté par une erreur
+  éventuelle avant de la relancer. L'erreur finale (« non conforme après retry ») porte toujours l'usage
+  cumulé des 2 appels réels. Un usage nul (ex. échec réseau au tout 1er appel, rien de facturé) n'est jamais
+  attaché — pas de ligne `AiUsageLog` à coût zéro pour un simple aléa réseau.
+- `PdfExtraction.service.js#extractTextViaOcr` — le cas « aucun texte » (markdown vide après un appel OCR
+  réel) attache `err.usage = { ocrPagesProcessed }` si des pages ont réellement été comptées (`> 0`).
+- `AiCardGenerationPipeline.service.js#generateCardsFromContent` — le `catch` par chunk fusionne
+  `error.usage` (s'il existe) dans l'accumulateur global avant de continuer aux chunks suivants ; l'erreur
+  finale « échec sur tous les passages » porte l'usage cumulé de tous les chunks/OCR réellement facturés,
+  s'il est non nul. Le cas d'une erreur d'extraction source (OCR) propagée sans modification portait déjà
+  son propre `error.usage` (§C-01.05/06) — aucun changement nécessaire à cet endroit.
+- `controllers/AiGenerationBatch.controller.js#generate` — nouvelle fonction `recordUsageBestEffort(userId,
+  idBatch, usage)` (no-op si `usage` est absent), appelée à la fois après un succès (`idBatch` réel, comme
+  avant) et dans le `catch` général de la route (`idBatch: null`, si `error.usage` est présent) — factorisant
+  la logique déjà en place et l'étendant au chemin d'échec.
+
+**Vérifié** :
+- Nouveaux tests : `AiCardGeneration.service.test.js` (+1 : contenu vide porte l'usage ; 1 test existant
+  étoffé pour vérifier l'usage sur l'erreur finale ; +1 : échec réseau au 2ᵉ appel conserve l'usage réel du
+  1er), `PdfExtraction.service.test.js` (+1 : OCR avec pages réellement traitées mais texte vide porte
+  `ocrPagesProcessed`), `AiCardGenerationPipeline.service.test.js` (+2 : échec total avec usage réel attaché,
+  agrégation d'un chunk en échec facturé + un chunk réussi), `test/bdd/aiGenerationBatch.test.js` (+1 :
+  vérifie qu'`AiUsageLog` est créé avec `idBatch: null` quand le pipeline échoue avec un usage réel).
+- Suite complète `npx jest` → **1730/1730** (1725 + 5), 0 régression ; `npx eslint .` → 0 erreur.
+
+**Ce qui n'est PAS couvert** — Un usage porté par une erreur qui remonte à travers un chemin non anticipé ici
+(ex. un futur appel ajouté sans suivre ce même principe `error.usage`) ne serait pas journalisé — c'est une
+convention de code à respecter dans tout ajout futur à cette chaîne, pas une garantie structurelle.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiCardGeneration.service.js`
+- `my_memo_master_api/services/PdfExtraction.service.js`
+- `my_memo_master_api/services/AiCardGenerationPipeline.service.js`
+- `my_memo_master_api/controllers/AiGenerationBatch.controller.js`
+- `my_memo_master_api/test/services/AiCardGeneration.service.test.js`,
+  `test/services/PdfExtraction.service.test.js`, `test/services/AiCardGenerationPipeline.service.test.js`,
+  `test/bdd/aiGenerationBatch.test.js`

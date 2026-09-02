@@ -239,10 +239,12 @@ ${SCHEMA_DESCRIPTION}`
   /**
    * Appelle l'API Mistral (chat completions, sortie JSON forcée) avec l'historique de messages
    * fourni. Ne fait aucun parsing/validation métier — seulement l'appel réseau et l'extraction du
-   * contenu texte de la réponse.
+   * contenu texte de la réponse. Renvoie aussi la consommation de tokens rapportée par l'API
+   * (`usage`), utilisée par le contrôleur pour journaliser le coût réel (C-01.06, Gestion quotas
+   * et budget IA) — ce service ne journalise rien lui-même, il se contente de la faire remonter.
    *
    * @param {{ role: string, content: string }[]} messages
-   * @returns {Promise<string>} Contenu texte brut renvoyé par le modèle
+   * @returns {Promise<{ content: string, usage: { promptTokens: number, completionTokens: number } }>}
    * @throws {Error} Configuration manquante (500) ou appel réseau/API en échec (502)
    */
   async callModel(messages) {
@@ -306,10 +308,20 @@ ${SCHEMA_DESCRIPTION}`
       logger.error('[AiCardGeneration] Réponse Mistral sans contenu exploitable.')
       const err = new Error("Le service de génération IA n'a renvoyé aucun contenu.")
       err.statusCode = 502
+      // L'appel a réellement abouti côté Mistral (réponse 200, tokens facturés) même sans contenu
+      // exploitable — l'usage réel est attaché à l'erreur pour ne pas être perdu par l'appelant
+      // (C-01.06, cf. dette signalée dans CHANGELOG_AGENT.md).
+      err.usage = { promptTokens: data?.usage?.prompt_tokens ?? 0, completionTokens: data?.usage?.completion_tokens ?? 0 }
       throw err
     }
 
-    return content
+    return {
+      content,
+      usage: {
+        promptTokens: data?.usage?.prompt_tokens ?? 0,
+        completionTokens: data?.usage?.completion_tokens ?? 0
+      }
+    }
   }
 
   /**
@@ -322,13 +334,19 @@ ${SCHEMA_DESCRIPTION}`
    * l'erreur sont renvoyés au modèle) avant d'échouer explicitement — jamais de brouillon partiel ou
    * reconstruit approximativement (cf. generation_ia_prompt_cartes.md §7).
    *
+   * Si un appel a réellement consommé des tokens facturés avant que la méthode ne lève une erreur
+   * (échec après un ou deux appels réels), l'erreur levée porte un champ `usage` (même forme que le
+   * `usage` renvoyé en cas de succès) — l'appelant peut ainsi journaliser le coût réel même sur un
+   * échec (C-01.06). Absent si rien n'a été facturé (erreur avant tout appel, ou appel réseau qui
+   * n'a jamais atteint l'API).
+   *
    * @param {object} params
    * @param {string} params.sourceText - Chunk de contenu source déjà découpé (Chunking PDF, hors périmètre)
    * @param {string|null} [params.subjectContext] - Nom de la matière, aide à lever les ambiguïtés
    * @param {number} params.cardCount - Nombre de cartes cible (1 à 30)
    * @param {string} [params.cardType] - "open" | "mcq" | "mixed" (défaut "open")
    * @param {string} [params.outputLanguage] - Code langue de sortie (défaut "fr")
-   * @returns {Promise<{ cards: object[], warning: string|null }>}
+   * @returns {Promise<{ cards: object[], warning: string|null, usage: { model: string, promptTokens: number, completionTokens: number } }>}
    * @throws {Error} Entrée invalide (400), configuration manquante (500) ou échec du modèle (502)
    */
   async generateCards({ sourceText, subjectContext = null, cardCount, cardType = 'open', outputLanguage = 'fr' }) {
@@ -339,13 +357,44 @@ ${SCHEMA_DESCRIPTION}`
       { role: 'user', content: this.buildUserPrompt({ sourceText, subjectContext, cardCount, cardType }) }
     ]
 
-    const firstContent = await this.callModel(messages)
-    const firstResult = this.parseAndValidate(firstContent, cardCount, cardType)
-    if (firstResult.valid) return firstResult.payload
+    // Usage cumulé sur les 2 appels au plus (1er essai + éventuel retry) — journalisé par
+    // l'appelant (contrôleur, C-01.06), pas par ce service.
+    const usage = { promptTokens: 0, completionTokens: 0 }
+    const addUsage = (callUsage) => {
+      if (!callUsage) return
+      usage.promptTokens += callUsage.promptTokens || 0
+      usage.completionTokens += callUsage.completionTokens || 0
+    }
+    const usageWithModel = () => ({ model: getMistralConfig().model, ...usage })
+
+    // Point d'attention (C-01.06) : si un appel échoue APRÈS avoir réellement consommé des tokens
+    // facturés (ex. callModel#"contenu vide" — réponse 200 avec usage réel mais sans texte
+    // exploitable), l'usage ne doit pas être perdu même si generateCards finit par lever une
+    // erreur. Chaque appel passe par ce wrapper : succès → usage ajouté normalement ; échec →
+    // l'usage éventuellement porté par l'erreur (callModel) est ajouté avant de relancer, et le
+    // total accumulé jusqu'ici est attaché à l'erreur (seulement s'il est réellement non nul — pas
+    // la peine de journaliser un coût de zéro sur un simple échec réseau où rien n'a été facturé).
+    const callAndTrackUsage = async (msgs) => {
+      try {
+        const result = await this.callModel(msgs)
+        addUsage(result.usage)
+        return result
+      } catch (error) {
+        addUsage(error.usage)
+        if (usage.promptTokens > 0 || usage.completionTokens > 0) {
+          error.usage = usageWithModel()
+        }
+        throw error
+      }
+    }
+
+    const first = await callAndTrackUsage(messages)
+    const firstResult = this.parseAndValidate(first.content, cardCount, cardType)
+    if (firstResult.valid) return { ...firstResult.payload, usage: usageWithModel() }
 
     logger.warn(`[AiCardGeneration] Sortie non conforme (1er essai) : ${firstResult.errors.join(' ; ')}`)
 
-    messages.push({ role: 'assistant', content: firstContent })
+    messages.push({ role: 'assistant', content: first.content })
     messages.push({
       role: 'user',
       content:
@@ -353,13 +402,16 @@ ${SCHEMA_DESCRIPTION}`
         'Renvoie uniquement un objet JSON strictement conforme au schéma fourni, sans aucun texte autour.'
     })
 
-    const secondContent = await this.callModel(messages)
-    const secondResult = this.parseAndValidate(secondContent, cardCount, cardType)
-    if (secondResult.valid) return secondResult.payload
+    const second = await callAndTrackUsage(messages)
+    const secondResult = this.parseAndValidate(second.content, cardCount, cardType)
+    if (secondResult.valid) return { ...secondResult.payload, usage: usageWithModel() }
 
     logger.error(`[AiCardGeneration] Sortie non conforme après retry : ${secondResult.errors.join(' ; ')}`)
     const err = new Error("La génération n'a pas produit un résultat exploitable. Réessayez.")
     err.statusCode = 502
+    // Les 2 appels ont réellement abouti (réponses exploitées, juste non conformes au schéma) —
+    // l'usage réel est garanti non nul ici, toujours attaché.
+    err.usage = usageWithModel()
     throw err
   }
 }

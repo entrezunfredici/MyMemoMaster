@@ -26,7 +26,7 @@ class AiCardGenerationPipelineService {
    * Mistral n'interprètent le contenu visuel — voir services/PdfExtraction.service.js).
    *
    * @param {{ sourceText: string|null, pdfBuffer: Buffer|null }} params
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
    * @throws {Error} Ni l'un ni l'autre, ou les deux à la fois fournis (400)
    */
   async resolveSourceText({ sourceText, pdfBuffer }) {
@@ -40,7 +40,7 @@ class AiCardGenerationPipelineService {
     }
 
     if (hasPdf) return pdfExtractionService.extractText(pdfBuffer)
-    return { text: sourceText.trim(), hasEmbeddedImages: false }
+    return { text: sourceText.trim(), hasEmbeddedImages: false, ocrPagesProcessed: 0 }
   }
 
   /**
@@ -83,7 +83,16 @@ class AiCardGenerationPipelineService {
    * @param {number} params.cardCount - Nombre total de cartes cible, réparti sur les chunks
    * @param {string} [params.cardType] - "open" | "mcq" | "mixed" (défaut "open")
    * @param {string} [params.outputLanguage] - Défaut "fr"
-   * @returns {Promise<{ cards: object[], warnings: string[] }>}
+   * `usage` agrège la consommation réelle de tous les appels effectués (chunks LLM + OCR éventuel)
+   * — alimente le suivi de budget (C-01.06, services/AiQuota.service.js). Non journalisé par ce
+   * service lui-même (pas de dépendance à la persistance), seulement renvoyé à l'appelant.
+   *
+   * Si la génération échoue entièrement (tous les chunks en échec, ou l'extraction source elle-même
+   * échoue) après qu'un usage réel a été facturé, l'erreur levée porte ce même `usage` (C-01.06) —
+   * l'appelant peut journaliser le coût réel même sur un échec total. Absent si rien n'a été
+   * facturé.
+   *
+   * @returns {Promise<{ cards: object[], warnings: string[], usage: { model: string|null, promptTokens: number, completionTokens: number, ocrPagesProcessed: number } }>}
    * @throws {Error} Contenu source invalide/vide (400/422) ou échec sur la totalité des chunks (502)
    */
   async generateCardsFromContent({
@@ -100,7 +109,11 @@ class AiCardGenerationPipelineService {
       throw err
     }
 
-    const { text: resolvedText, hasEmbeddedImages } = await this.resolveSourceText({ sourceText, pdfBuffer })
+    const {
+      text: resolvedText,
+      hasEmbeddedImages,
+      ocrPagesProcessed = 0
+    } = await this.resolveSourceText({ sourceText, pdfBuffer })
 
     const allChunks = chunkText(resolvedText, { maxChunkLength: MAX_CHUNK_LENGTH })
     if (allChunks.length === 0) {
@@ -115,6 +128,7 @@ class AiCardGenerationPipelineService {
 
     const cards = []
     const warnings = []
+    const usage = { model: null, promptTokens: 0, completionTokens: 0, ocrPagesProcessed }
     let successCount = 0
 
     if (hasEmbeddedImages) {
@@ -148,22 +162,41 @@ class AiCardGenerationPipelineService {
         })
         cards.push(...result.cards)
         if (result.warning) warnings.push(`Passage ${i + 1}/${chunks.length} : ${result.warning}`)
+        usage.model = result.usage.model
+        usage.promptTokens += result.usage.promptTokens
+        usage.completionTokens += result.usage.completionTokens
         successCount++
       } catch (error) {
         logger.warn(
           `[AiCardGenerationPipeline] Passage ${i + 1}/${chunks.length} en échec : ${error?.message || error}`
         )
         warnings.push(`Passage ${i + 1}/${chunks.length} n'a pas pu être traité (${error?.message || 'erreur inconnue'}).`)
+        // Un chunk en échec peut avoir réellement consommé des tokens facturés avant d'échouer
+        // (ex. AiCardGenerationService rejette après 2 appels réels non conformes, cf. son propre
+        // `error.usage`) — cet usage ne doit pas être perdu au prétexte que le chunk a échoué
+        // (C-01.06). Un chunk qui échoue avant tout appel réel (validation, réseau) n'a rien à
+        // fusionner (`error.usage` absent).
+        if (error.usage) {
+          usage.model = usage.model ?? error.usage.model ?? null
+          usage.promptTokens += error.usage.promptTokens || 0
+          usage.completionTokens += error.usage.completionTokens || 0
+        }
       }
     }
 
     if (successCount === 0) {
       const err = new Error('La génération a échoué sur tous les passages du contenu fourni.')
       err.statusCode = 502
+      // Le budget réel (C-01.06) ne doit pas être perdu même si la génération entière échoue —
+      // l'usage cumulé peut être non nul si un ou plusieurs chunks ont réellement été facturés
+      // avant d'échouer (voir le catch ci-dessus), ou si l'extraction OCR l'a déjà facturé.
+      if (usage.promptTokens > 0 || usage.completionTokens > 0 || usage.ocrPagesProcessed > 0) {
+        err.usage = usage
+      }
       throw err
     }
 
-    return { cards, warnings }
+    return { cards, warnings, usage }
   }
 }
 

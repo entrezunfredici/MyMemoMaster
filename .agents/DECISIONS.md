@@ -1837,6 +1837,94 @@ Les deux durées s'additionnent au temps planifié existant (`revision.totalMinu
 
 ---
 
+### [2026-09-02] C-01.07 — Stockage : `AiGenerationBatch` supprimé en CASCADE sur `User`/`LeitnerSystem` (pas `SET NULL`), ownership vérifié par `null` plutôt qu'un 403 explicite
+
+**Contexte** — Les FK de `LeitnerSystem.idUser` (contenu réel créé par l'utilisateur) utilisent `SET NULL` à la suppression du compte — un système Leitner devient orphelin mais reste consultable/récupérable. `AiGenerationBatch` référence aussi `User` et `LeitnerSystem` : fallait-il le même comportement ?
+
+**Décision** — `onDelete: 'CASCADE'` sur les deux FK de `AiGenerationBatch` (et sur `AiGeneratedCard.idBatch`, cascade du cascade). Un batch « en attente » n'a par construction aucune valeur propre une fois son utilisateur ou son système Leitner cible supprimé — contrairement à `LeitnerSystem` (dont le contenu a une valeur patrimoniale même orphelin), un brouillon de cartes non encore validées n'est qu'un état de travail intermédiaire, jetable par nature (rappel : `Correction humaine automatique`/`Génération sans validation utilisateur` sont OUT, la persistance réelle ne se fait jamais depuis ce stockage). De même, `AiGenerationBatchService` renvoie `null` (pas une erreur 403) sur un batch/une carte n'appartenant pas à l'utilisateur demandeur — pattern déjà utilisé ailleurs dans ce projet pour des ressources strictement personnelles, évite de confirmer l'existence d'une ressource d'autrui à qui la demande.
+
+**Alternative écartée** : `SET NULL`, par cohérence mécanique avec `LeitnerSystem.idUser` — écartée car un batch avec un `idSystem`/`userId` null n'aurait plus de sens exploitable (impossible de savoir à qui il appartenait ni où les cartes validées devaient atterrir) ; `CASCADE` est le comportement correct pour une donnée dont la suppression de son propriétaire/sa cible rend la conservation inutile.
+
+**Conséquences** : supprimer un `LeitnerSystem` supprime silencieusement ses batches de génération en attente (cohérent avec la suppression déjà cascadée de ses `LeitnerCard`/`LeitnerBox`) — pas de garde-fou de confirmation supplémentaire ajouté ici, la suppression d'un système est déjà une action confirmée côté front existant.
+
+---
+
+### [2026-09-02] C-01.07 — Deux tables (`AiGenerationBatch`/`AiGeneratedCard`) plutôt qu'une table unique avec les cartes en JSON
+
+**Contexte** — Le résultat du pipeline (C-01.05) est `{ cards: object[], warnings: string[] }`. Deux modélisations possibles : une seule ligne par génération avec les cartes stockées comme colonne JSON, ou une table de cartes séparée (une ligne par carte).
+
+**Décision** — Deux tables, sur le modèle déjà établi `LeitnerSystem`/`LeitnerCard` dans ce projet. Chaque carte a son propre `status` (`pending`/`accepted`/`edited`/`rejected`) et ses propres champs mutables (`updateCard`) — un JSON unique aurait obligé à relire/réécrire tout le tableau à chaque modification d'une seule carte (accept/edit/reject un item), un design plus fragile en cas d'écritures concurrentes et moins naturel à interroger (ex. compter les cartes encore `pending` d'un batch).
+
+**Alternative écartée** : une colonne JSON `cards` sur `AiGenerationBatch` — plus simple à écrire au départ (une seule insertion), mais reportait toute la logique de mutation par carte au niveau applicatif (parser/modifier/réécrire le JSON entier), pour un gain de simplicité qui disparaît dès que l'Écran de validation (hors périmètre, mais consommateur direct de ce stockage) doit modifier une carte individuellement.
+
+**Conséquences** : `warnings` (du pipeline, pas des cartes) reste en JSON sur `AiGenerationBatch` — ce n'est pas une donnée qui a besoin d'être mutée carte par carte, la même logique ne s'applique donc pas à ce champ.
+
+---
+
+### [2026-09-02] Endpoint génération IA construit avant l'Écran de validation, sans Quotas branché
+
+**Contexte** — Question directe de l'utilisateur : construire les controllers/routes maintenant, ou les faire en même temps que l'interface graphique (Écran de validation) ? `C-01.06` (probablement Quotas) n'a jamais été reçu dans cette session.
+
+**Décision** — Construire maintenant. Justification donnée et validée : le contrat est déjà entièrement spécifié par C-01.01 (schéma des cartes) et C-01.02 (ce que l'écran de config envoie, ce que l'écran de validation attend), donc le risque de concevoir la mauvaise forme d'API sans avoir le code front sous les yeux est faible ; chaque brique (C-01.04/05/07) est déjà testée séparément, il ne restait que le branchement HTTP à vérifier. L'endpoint est livré **sans aucune limite de fréquence dédiée** au-delà du rate limiting global `/api/v1` (`apiLimiter`) — décision assumée et signalée explicitement (pas une omission), en attendant que Quotas soit scopé.
+
+**Alternative écartée** : attendre l'Écran de validation pour construire les deux ensemble — écartée sur la base de l'argument ci-dessus (spec déjà suffisante), au prix d'un risque résiduel faible que l'UI révèle un besoin de forme d'API légèrement différente (auquel cas l'ajustement serait local à cette route, pas une reconception).
+
+**Conséquences** : `POST /ai-generation-batches` est un endpoint authentifié réellement exposé et fonctionnel, mais représente un vecteur de coût (appels Mistral facturés) non gardé par un mécanisme de quota — acceptable tant qu'aucun accès non maîtrisé à cette route n'est distribué (elle n'est appelée par aucune UI existante à ce stade), mais **à traiter avant toute exposition front réelle**. Point à rappeler explicitement au démarrage du ticket Quotas et de l'Écran de validation.
+
+---
+
+### [2026-09-02] Upload du PDF source en `multer.memoryStorage()` dédié, pas via `middlewares/upload.middleware.js`
+
+**Contexte** — `middlewares/upload.middleware.js` existe déjà et gère l'upload de fichiers (images mindmap, ressources de classe) vers S3 (ou disque en dev), avec vérification magic bytes intégrée à l'écriture du flux (`s3SniffContentType`). Le PDF source d'une génération IA doit lui aussi être uploadé.
+
+**Décision** — Middleware multer séparé (`middlewares/aiPdfUpload.middleware.js`), `storage: multer.memoryStorage()` : le fichier n'existe qu'en RAM le temps de la requête (`req.file.buffer`), jamais écrit sur S3/disque. Vérification magic bytes faite manuellement dans le controller (`bufferMatchesMime(req.file.buffer, 'application/pdf')`, déjà exporté par `helpers/fileSignature.js` mais jusqu'ici seulement consommé en interne par `s3SniffContentType` et par les tests) avant de transmettre le buffer au pipeline.
+
+**Alternative écartée** : réutiliser `middlewares/upload.middleware.js` tel quel — écarté car sémantiquement inadapté : ce middleware nomme et persiste durablement un objet (`uploads/{userId}/{suffix}{ext}`), avec la sémantique d'un asset utilisateur à conserver. Le PDF source d'une génération n'a aucune valeur une fois le texte extrait (`services/PdfExtraction.service.js`, C-01.05) — l'écrire sur S3/disque aurait été un stockage inutile (coût, exposition superflue d'un document potentiellement sensible sur un bucket partagé) pour une donnée à durée de vie d'une seule requête.
+
+**Conséquences** : un nouveau fichier middleware, mais aucune modification du middleware d'upload existant (pas de risque de régression sur les fonctionnalités qui en dépendent déjà). Le plafond de taille (10 Mo) est dupliqué depuis `upload.middleware.js` plutôt que partagé — cohérent avec la duplication déjà assumée ailleurs dans ce projet pour des constantes simples (ex. `MAX_SESSION_DURATION_SECONDS`).
+
+---
+
+### [2026-09-02] C-01.06 — Quota (par utilisateur, sur `AiGenerationBatch`) et Budget (global, sur une nouvelle table `AiUsageLog`) : deux mécanismes séparés, pas un seul
+
+**Contexte** — Le ticket demande de gérer à la fois un « quota » et un « budget » IA. Ces deux mots recouvrent des besoins différents : l'équité entre utilisateurs (personne ne doit pouvoir épuiser la ressource pour les autres) et la maîtrise du coût total (personne, même un seul utilisateur, ne doit pouvoir faire exploser la facture Mistral). `AiGenerationBatch` (C-01.07) existe déjà et compte nativement les requêtes de génération ; aucune table ne capture en revanche le coût réel (tokens, pages OCR) d'un appel.
+
+**Décision** — Deux garde-fous indépendants, chacun sur la donnée la plus proche de ce qu'il mesure :
+1. **Quota** = nombre de générations par utilisateur et par jour, compté par un simple `COUNT` sur `AiGenerationBatch.createdAt` — aucune nouvelle table nécessaire, la donnée existe déjà.
+2. **Budget** = somme du coût réel estimé (tous utilisateurs) sur le mois en cours, compté par un `SUM` sur une nouvelle table `AiUsageLog.estimatedCostUsd` — nécessaire car aucune table existante ne capture le coût/les tokens d'un appel.
+
+Les deux sont vérifiés ensemble par `checkQuota(userId)`, mais restent conceptuellement et techniquement séparés (deux erreurs 429 avec des messages distincts, deux configurations distinctes par variable d'environnement).
+
+**Alternative écartée** : un seul mécanisme de « quota » basé uniquement sur le nombre de requêtes (pas de notion de coût) — plus simple, mais aurait mal protégé contre un scénario réaliste : un seul utilisateur soumettant peu de requêtes mais avec des PDF énormes (beaucoup de chunks, beaucoup de pages OCR) pourrait générer un coût très supérieur à un autre utilisateur avec de nombreuses petites requêtes — un compteur de requêtes seul ne le détecterait pas. / Un budget par utilisateur (pas global) — écarté pour cette première version par simplicité : le risque principal identifié est la facture globale du projet, pas l'équité fine de coût entre utilisateurs (déjà couverte, de façon plus grossière, par le quota de requêtes).
+
+**Conséquences** : deux configurations à régler indépendamment (`AI_QUOTA_MAX_GENERATIONS_PER_DAY`, `AI_BUDGET_MAX_USD_PER_MONTH`). Un utilisateur peut être bloqué par le budget global même s'il n'a fait qu'une seule génération dans le mois (si d'autres utilisateurs ont déjà consommé tout le budget) — comportement voulu (le budget protège le projet, pas un utilisateur individuel), mais à expliquer clairement si un utilisateur se plaint de blocage sans avoir lui-même beaucoup généré.
+
+---
+
+### [2026-09-02] C-01.06 — L'usage réel remonte à travers les couches (retour enrichi), il n'est journalisé qu'au controller — pas dans les services d'inférence eux-mêmes
+
+**Contexte** — Le coût réel d'une génération n'est connu qu'au point d'appel du LLM/OCR (`AiCardGeneration.service.js#callModel`, `PdfExtraction.service.js#extractTextViaOcr`), mais journaliser cet usage (écriture dans `AiUsageLog`) est une préoccupation de persistance, pas de calcul.
+
+**Décision** — `callModel`/`extractTextViaOcr` renvoient l'usage réel (tokens, pages) au lieu de le journaliser eux-mêmes ; `generateCards` et `generateCardsFromContent` (pipeline) l'agrègent et le propagent encore plus haut ; seul le controller (`AiGenerationBatch.controller.js#generate`), après avoir créé le batch, appelle `AiQuotaService.recordUsage(...)`. Aucun des 3 services d'inférence (`AiCardGeneration.service.js`, `PdfExtraction.service.js`, `AiCardGenerationPipeline.service.js`) ne dépend de `AiQuota.service.js` ni des modèles Sequelize.
+
+**Alternative écartée** : faire journaliser l'usage directement dans `callModel`/`extractTextViaOcr` au moment de l'appel — plus simple à câbler (pas besoin de faire remonter `usage` à travers 3 niveaux d'appel) mais aurait couplé des services de calcul pur (déjà testés en isolation avec `fetch` mocké, sans base de données) à la couche de persistance, cassant leur testabilité actuelle (leurs tests n'ont aucune dépendance à une base de données) et leur responsabilité unique. Le coût de la remontée en cascade (modifier le contrat de retour de 3 fichiers déjà livrés et testés) a été jugé inférieur au coût de ce couplage.
+
+**Conséquences** : `AiCardGenerationService#generateCards` et `AiCardGenerationPipelineService#generateCardsFromContent` ont un contrat de retour élargi (`usage`), qui a nécessité de mettre à jour les mocks des tests déjà écrits pour C-01.04/05 (aucune régression fonctionnelle, uniquement des mocks à enrichir). La journalisation au controller est faite en **best-effort** (try/catch dédié autour de `recordUsage`) : un échec d'écriture dans `AiUsageLog` ne fait pas échouer une génération par ailleurs réussie et déjà stockée. Le cas d'un pipeline qui échoue après un appel réel facturé (usage jamais remonté car l'erreur était levée avant tout retour) a été corrigé le même jour — voir l'entrée suivante.
+
+---
+
+### [2026-09-02] C-01.06 (fix) — L'usage réel voyage SUR l'erreur (`error.usage`), pas via un canal séparé
+
+**Contexte** — Demande explicite de l'utilisateur de corriger la dette signalée juste après la livraison de C-01.06 : un appel LLM/OCR réellement facturé dont le résultat final échouait quand même (2 essais non conformes, OCR sans texte après pages réellement traitées) ne laissait aucune trace de coût. Le défi : l'usage réel n'est connu qu'au fond de la pile d'appels (`callModel`, `extractTextViaOcr`), mais doit atteindre le controller (seul point qui journalise, cf. décision précédente) **même quand la fonction qui l'a mesuré lève une exception** plutôt que de retourner normalement.
+
+**Décision** — Attacher l'usage réel directement sur l'objet `Error` levé (`err.usage = {...}`), jamais via un paramètre de callback, un événement, ou un second canal de retour. Chaque niveau qui peut lever une erreur après un appel réellement facturé (i) fusionne l'usage déjà porté par une erreur reçue plus bas avant de la relancer, et (ii) attache le total accumulé à sa propre erreur si elle en lève une. Un usage nul (rien de facturé) n'attache jamais `error.usage` — la présence du champ est elle-même le signal qu'il y a quelque chose à journaliser.
+
+**Alternative écartée** : faire journaliser l'usage à la source, dans `callModel`/`extractTextViaOcr` eux-mêmes, dès qu'il est mesuré (avant même de savoir si l'appel global réussira) — réglerait le problème plus simplement, mais recrée exactement le couplage service-de-calcul ↔ persistance déjà écarté par la décision précédente (ces services resteraient alors testables uniquement avec une base de données, perdant leur isolation actuelle). / Faire remonter l'usage via un second paramètre de sortie (ex. un callback `onUsage` passé en cascade à travers 3 niveaux d'appel) — écarté : plus verbeux que d'attacher un champ à l'erreur déjà en train de remonter naturellement par `throw`/`catch`, sans bénéfice supplémentaire ici (un seul type d'information à faire remonter, pas un flux répété).
+
+**Conséquences** : la convention « toute erreur qui peut survenir après un appel facturé doit porter `error.usage` si non nul » n'est pas imposée structurellement (pas de type/interface qui la force) — tout ajout futur à cette chaîne d'appels devra suivre la même discipline pour rester couvert par le suivi de budget. Documenté dans le JSDoc de chaque méthode concernée (`callModel`, `generateCards`, `extractTextViaOcr`, `generateCardsFromContent`) pour rester visible au moment d'étendre le code.
+
+---
+
 ### [2026-09-01] Mémoire API prod/preprod : 896Mi/1536Mi plutôt que des valeurs rondes en Gi (1Gi/2Gi)
 
 **Contexte** — Le correctif de pré-chauffage (entrée précédente) a produit la première mesure réelle de la mémoire consommée par l'API une fois le modèle sémantique chargé : 794-825 Mi de RSS. Les deux fichiers `helm/values-{prod,preprod}.yaml` portaient depuis leur création un commentaire attendant explicitement cette mesure pour remplacer la valeur provisoire (512Mi requests / 1Gi limits).

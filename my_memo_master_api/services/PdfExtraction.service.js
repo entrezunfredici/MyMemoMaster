@@ -75,7 +75,7 @@ class PdfExtractionService {
    * d'images/schémas embarqués (sans les décrire — voir en-tête de fichier).
    *
    * @param {Buffer} pdfBuffer
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
    * @throws {Error} PDF illisible/corrompu (400), ou sans texte extractible (422 — déclenche le repli OCR)
    */
   async extractTextViaPdfjs(pdfBuffer) {
@@ -123,16 +123,21 @@ class PdfExtractionService {
       throw err
     }
 
-    return { text: fullText, hasEmbeddedImages }
+    // Gratuit : aucune page n'est facturée via ce chemin (voir services/AiQuota.service.js, C-01.06).
+    return { text: fullText, hasEmbeddedImages, ocrPagesProcessed: 0 }
   }
 
   /**
    * Extraction via l'API OCR de Mistral (repli, coût réel — $4/1000 pages) : lit une image, contrairement
    * à pdfjs-dist. Détecte aussi la présence d'images/schémas (`pages[].images` de la réponse), sans les
-   * décrire (voir en-tête de fichier).
+   * décrire (voir en-tête de fichier). `ocrPagesProcessed` alimente le suivi de budget (C-01.06).
+   *
+   * Si l'appel a réellement traité des pages facturées avant de constater l'absence de texte (422),
+   * l'erreur porte un champ `usage: { ocrPagesProcessed }` — l'appelant peut journaliser ce coût
+   * réel même sur cet échec (C-01.06). Absent sur les échecs qui n'ont rien facturé (500, 502).
    *
    * @param {Buffer} pdfBuffer
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
    * @throws {Error} Configuration manquante (500), appel réseau/API en échec (502), ou aucun texte (422)
    */
   async extractTextViaOcr(pdfBuffer) {
@@ -188,14 +193,23 @@ class PdfExtractionService {
       .join('\n\n')
       .trim()
     const hasEmbeddedImages = pages.some((p) => Array.isArray(p.images) && p.images.length > 0)
+    // Repli sur pages.length si usage_info est absent de la réponse (forme non garantie par tous
+    // les modèles OCR) — reste une mesure réelle du nombre de pages traitées, pas une estimation.
+    const ocrPagesProcessed =
+      typeof data?.usage_info?.pages_processed === 'number' ? data.usage_info.pages_processed : pages.length
 
     if (!text) {
       const err = new Error("L'OCR n'a extrait aucun texte de ce PDF.")
       err.statusCode = 422
+      // L'appel a réellement traité des pages côté Mistral (facturées) même sans texte exploitable
+      // — l'usage réel est attaché pour ne pas être perdu par l'appelant (C-01.06). Attaché
+      // seulement si des pages ont réellement été comptées (0 page = rien de facturé, cas peu
+      // probable mais possible sur une réponse vide).
+      if (ocrPagesProcessed > 0) err.usage = { ocrPagesProcessed }
       throw err
     }
 
-    return { text, hasEmbeddedImages }
+    return { text, hasEmbeddedImages, ocrPagesProcessed }
   }
 
   /**
@@ -204,7 +218,7 @@ class PdfExtractionService {
    * fichier). Signale (`hasEmbeddedImages`) la présence d'images/schémas sans jamais les décrire.
    *
    * @param {Buffer} pdfBuffer
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
    * @throws {Error} Buffer invalide (400), PDF illisible/corrompu (400), configuration OCR manquante
    *   (500), échec réseau/API OCR (502), ou aucun texte extractible par aucun des deux moyens (422)
    */

@@ -48,6 +48,9 @@ models.LeitnerSystemTag = require('./LeitnerSystemTag.model')(instance)
 models.Etablissement = require('./Etablissement.model')(instance)
 models.LeitnerReviewSession = require('./LeitnerReviewSession.model')(instance)
 models.AuditLog = require('./AuditLog.model')(instance)
+models.AiGenerationBatch = require('./AiGenerationBatch.model')(instance)
+models.AiGeneratedCard = require('./AiGeneratedCard.model')(instance)
+models.AiUsageLog = require('./AiUsageLog.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

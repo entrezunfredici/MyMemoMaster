@@ -22,10 +22,10 @@ const VALID_MCQ_CARD = {
   sourceExcerpt: '...'
 }
 
-const mockFetchResponse = (content) => ({
+const mockFetchResponse = (content, usage = { prompt_tokens: 100, completion_tokens: 50 }) => ({
   ok: true,
   status: 200,
-  json: async () => ({ choices: [{ message: { content: JSON.stringify(content) } }] })
+  json: async () => ({ choices: [{ message: { content: JSON.stringify(content) } }], usage })
 })
 
 describe('AiCardGenerationService', () => {
@@ -287,9 +287,10 @@ describe('AiCardGenerationService', () => {
       process.env.MISTRAL_MODEL = 'mistral-small-latest'
       const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(mockFetchResponse({ cards: [], warning: null }))
 
-      const content = await AiCardGenerationService.callModel(messages)
+      const result = await AiCardGenerationService.callModel(messages)
 
-      expect(JSON.parse(content)).toEqual({ cards: [], warning: null })
+      expect(JSON.parse(result.content)).toEqual({ cards: [], warning: null })
+      expect(result.usage).toEqual({ promptTokens: 100, completionTokens: 50 })
       expect(fetchMock).toHaveBeenCalledTimes(1)
       const [url, options] = fetchMock.mock.calls[0]
       expect(url).toBe('https://api.mistral.ai/v1/chat/completions')
@@ -324,17 +325,18 @@ describe('AiCardGenerationService', () => {
       })
     })
 
-    it('callModel - contenu vide dans la réponse - lève une erreur 502', async () => {
+    it('callModel - contenu vide dans la réponse - lève une erreur 502 en attachant l\'usage réel (déjà facturé)', async () => {
       process.env.MISTRAL_API_KEY = 'test-key'
       jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ choices: [{ message: { content: '' } }] })
+        json: async () => ({ choices: [{ message: { content: '' } }], usage: { prompt_tokens: 30, completion_tokens: 0 } })
       })
 
       await expect(AiCardGenerationService.callModel(messages)).rejects.toMatchObject({
         message: "Le service de génération IA n'a renvoyé aucun contenu.",
-        statusCode: 502
+        statusCode: 502,
+        usage: { promptTokens: 30, completionTokens: 0 }
       })
     })
   })
@@ -364,6 +366,7 @@ describe('AiCardGenerationService', () => {
       expect(result.cards).toHaveLength(1)
       expect(result.warning).toBeNull()
       expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(result.usage).toEqual({ model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50 })
     })
 
     it('generateCards - 1er essai non conforme puis 2e conforme - retry avec correction, retourne le résultat du 2e essai', async () => {
@@ -376,6 +379,8 @@ describe('AiCardGenerationService', () => {
 
       expect(result.cards).toHaveLength(1)
       expect(fetchMock).toHaveBeenCalledTimes(2)
+      // Usage cumulé sur les 2 appels (1er essai invalide + retry conforme), pas seulement le dernier
+      expect(result.usage).toEqual({ model: 'mistral-small-latest', promptTokens: 200, completionTokens: 100 })
       const secondCallBody = JSON.parse(fetchMock.mock.calls[1][1].body)
       // Le 2e appel porte l'historique complet : system + user + assistant (invalide) + correction
       expect(secondCallBody.messages).toHaveLength(4)
@@ -384,25 +389,41 @@ describe('AiCardGenerationService', () => {
       expect(secondCallBody.messages[3].content).toContain("n'est pas conforme")
     })
 
-    it('generateCards - 1er et 2e essai non conformes - lève une erreur 502 après 2 appels', async () => {
+    it('generateCards - 1er et 2e essai non conformes - lève une erreur 502 après 2 appels, avec l\'usage réel cumulé attaché (C-01.06)', async () => {
       const fetchMock = jest
         .spyOn(global, 'fetch')
         .mockResolvedValue(mockFetchResponse({ cards: 'pas un tableau' }))
 
       await expect(AiCardGenerationService.generateCards(validParams)).rejects.toMatchObject({
         message: "La génération n'a pas produit un résultat exploitable. Réessayez.",
-        statusCode: 502
+        statusCode: 502,
+        // 2 appels réels ont eu lieu (juste non conformes au schéma) — l'usage n'est pas perdu
+        usage: { model: 'mistral-small-latest', promptTokens: 200, completionTokens: 100 }
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('generateCards - erreur réseau au 1er appel - propage sans tenter de 2e appel', async () => {
+    it('generateCards - erreur réseau au 1er appel - propage sans tenter de 2e appel, sans usage attaché (rien de facturé)', async () => {
       const fetchMock = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'))
 
-      await expect(AiCardGenerationService.generateCards(validParams)).rejects.toMatchObject({
-        statusCode: 502
-      })
+      const error = await AiCardGenerationService.generateCards(validParams).catch((e) => e)
+      expect(error.statusCode).toBe(502)
+      expect(error.usage).toBeUndefined()
       expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('generateCards - 1er appel conforme... puis un 2e contexte échoue en réseau (via un retry déclenché ailleurs) - l\'usage du 1er appel réel n\'est pas perdu', async () => {
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(mockFetchResponse({ cards: 'pas un tableau' })) // 1er essai non conforme, réel
+        .mockRejectedValueOnce(new Error('network down')) // retry : échec réseau, rien de facturé pour cet appel
+
+      const error = await AiCardGenerationService.generateCards(validParams).catch((e) => e)
+
+      expect(error.statusCode).toBe(502)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      // L'usage du 1er appel (réel, facturé) est conservé même si le 2e appel a échoué en réseau
+      expect(error.usage).toEqual({ model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50 })
     })
 
     // Constaté lors d'un appel réel (C-01.04, vérification post-livraison) : avec cardType "mcq",

@@ -34,10 +34,10 @@ const mockPdfjs = (pdfDocument) => {
   })
 }
 
-const mockOcrFetchResponse = (pages) => ({
+const mockOcrFetchResponse = (pages, usageInfo) => ({
   ok: true,
   status: 200,
-  json: async () => ({ pages })
+  json: async () => ({ pages, ...(usageInfo ? { usage_info: usageInfo } : {}) })
 })
 
 describe('PdfExtractionService', () => {
@@ -80,6 +80,8 @@ describe('PdfExtractionService', () => {
       const result = await PdfExtractionService.extractTextViaPdfjs(Buffer.from('%PDF-1.4'))
       expect(result.text).toBe('Ligne 1\nLigne 2\n\nPage 2')
       expect(result.hasEmbeddedImages).toBe(false)
+      // Gratuit : jamais de page facturée sur ce chemin (voir AiQuota.service.js, C-01.06)
+      expect(result.ocrPagesProcessed).toBe(0)
     })
 
     it('extractTextViaPdfjs - items sans champ "str" (marqueurs de positionnement) - ignorés', async () => {
@@ -121,26 +123,39 @@ describe('PdfExtractionService', () => {
       })
     })
 
-    it('extractTextViaOcr - appel réussi - concatène le markdown des pages et détecte les images', async () => {
+    it('extractTextViaOcr - appel réussi - concatène le markdown des pages, détecte les images, remonte usage_info.pages_processed', async () => {
       process.env.MISTRAL_API_KEY = 'test-key'
       const fetchMock = jest
         .spyOn(global, 'fetch')
         .mockResolvedValue(
-          mockOcrFetchResponse([
-            { markdown: 'Page 1', images: [] },
-            { markdown: 'Page 2', images: [{ id: 'img-0' }] }
-          ])
+          mockOcrFetchResponse(
+            [
+              { markdown: 'Page 1', images: [] },
+              { markdown: 'Page 2', images: [{ id: 'img-0' }] }
+            ],
+            { pages_processed: 2 }
+          )
         )
 
       const result = await PdfExtractionService.extractTextViaOcr(Buffer.from('%PDF-1.4'))
 
-      expect(result).toEqual({ text: 'Page 1\n\nPage 2', hasEmbeddedImages: true })
+      expect(result).toEqual({ text: 'Page 1\n\nPage 2', hasEmbeddedImages: true, ocrPagesProcessed: 2 })
       const [url, options] = fetchMock.mock.calls[0]
       expect(url).toBe('https://api.mistral.ai/v1/ocr')
       const body = JSON.parse(options.body)
       expect(body.model).toBe('mistral-ocr-latest')
       expect(body.document.type).toBe('document_url')
       expect(body.document.document_url).toMatch(/^data:application\/pdf;base64,/)
+    })
+
+    it('extractTextViaOcr - usage_info absent de la réponse - retombe sur le nombre de pages retournées', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(mockOcrFetchResponse([{ markdown: 'Page 1', images: [] }, { markdown: 'Page 2', images: [] }]))
+
+      const result = await PdfExtractionService.extractTextViaOcr(Buffer.from('%PDF-1.4'))
+      expect(result.ocrPagesProcessed).toBe(2)
     })
 
     it('extractTextViaOcr - réponse HTTP en erreur - lève une erreur 502', async () => {
@@ -162,14 +177,24 @@ describe('PdfExtractionService', () => {
       })
     })
 
-    it('extractTextViaOcr - aucune page ou markdown vide - lève une erreur 422', async () => {
+    it('extractTextViaOcr - aucune page ou markdown vide - lève une erreur 422, sans usage (0 page traitée)', async () => {
       process.env.MISTRAL_API_KEY = 'test-key'
       jest.spyOn(global, 'fetch').mockResolvedValue(mockOcrFetchResponse([]))
 
-      await expect(PdfExtractionService.extractTextViaOcr(Buffer.from('%PDF-1.4'))).rejects.toMatchObject({
-        message: "L'OCR n'a extrait aucun texte de ce PDF.",
-        statusCode: 422
-      })
+      const error = await PdfExtractionService.extractTextViaOcr(Buffer.from('%PDF-1.4')).catch((e) => e)
+      expect(error).toMatchObject({ message: "L'OCR n'a extrait aucun texte de ce PDF.", statusCode: 422 })
+      expect(error.usage).toBeUndefined()
+    })
+
+    it('extractTextViaOcr - pages réellement traitées mais markdown vide - lève une erreur 422 avec l\'usage réel attaché (C-01.06)', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(mockOcrFetchResponse([{ markdown: '', images: [] }], { pages_processed: 3 }))
+
+      const error = await PdfExtractionService.extractTextViaOcr(Buffer.from('%PDF-1.4')).catch((e) => e)
+      expect(error).toMatchObject({ message: "L'OCR n'a extrait aucun texte de ce PDF.", statusCode: 422 })
+      expect(error.usage).toEqual({ ocrPagesProcessed: 3 })
     })
   })
 
@@ -187,12 +212,14 @@ describe('PdfExtractionService', () => {
     })
 
     it('extractText - pdfjs-dist réussit - retourne son résultat sans appeler l\'OCR', async () => {
-      jest.spyOn(PdfExtractionService, 'extractTextViaPdfjs').mockResolvedValue({ text: 'ok', hasEmbeddedImages: false })
+      jest
+        .spyOn(PdfExtractionService, 'extractTextViaPdfjs')
+        .mockResolvedValue({ text: 'ok', hasEmbeddedImages: false, ocrPagesProcessed: 0 })
       const ocrSpy = jest.spyOn(PdfExtractionService, 'extractTextViaOcr')
 
       const result = await PdfExtractionService.extractText(Buffer.from('%PDF-1.4'))
 
-      expect(result).toEqual({ text: 'ok', hasEmbeddedImages: false })
+      expect(result).toEqual({ text: 'ok', hasEmbeddedImages: false, ocrPagesProcessed: 0 })
       expect(ocrSpy).not.toHaveBeenCalled()
     })
 
@@ -212,11 +239,11 @@ describe('PdfExtractionService', () => {
         .mockRejectedValue(Object.assign(new Error('aucun texte'), { statusCode: 422 }))
       jest
         .spyOn(PdfExtractionService, 'extractTextViaOcr')
-        .mockResolvedValue({ text: 'texte via OCR', hasEmbeddedImages: true })
+        .mockResolvedValue({ text: 'texte via OCR', hasEmbeddedImages: true, ocrPagesProcessed: 3 })
 
       const result = await PdfExtractionService.extractText(Buffer.from('%PDF-1.4'))
 
-      expect(result).toEqual({ text: 'texte via OCR', hasEmbeddedImages: true })
+      expect(result).toEqual({ text: 'texte via OCR', hasEmbeddedImages: true, ocrPagesProcessed: 3 })
     })
 
     it('extractText - pdfjs-dist échoue en 422 puis l\'OCR échoue aussi - propage l\'erreur de l\'OCR', async () => {

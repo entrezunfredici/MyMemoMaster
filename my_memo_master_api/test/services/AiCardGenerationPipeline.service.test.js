@@ -10,6 +10,7 @@ const AiCardGenerationService = require('../../services/AiCardGeneration.service
 const AiCardGenerationPipelineService = require('../../services/AiCardGenerationPipeline.service')
 
 const FAKE_CARD = (n) => ({ statement: `Q${n}`, type: 'open', answer: `A${n}`, sourceExcerpt: `E${n}` })
+const FAKE_USAGE = { model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50 }
 
 describe('AiCardGenerationPipelineService', () => {
   beforeEach(() => {
@@ -34,15 +35,15 @@ describe('AiCardGenerationPipelineService', () => {
 
     it('resolveSourceText - texte seul - retourne le texte trimé, hasEmbeddedImages à false, sans appeler PdfExtraction', async () => {
       const result = await AiCardGenerationPipelineService.resolveSourceText({ sourceText: '  bonjour  ', pdfBuffer: null })
-      expect(result).toEqual({ text: 'bonjour', hasEmbeddedImages: false })
+      expect(result).toEqual({ text: 'bonjour', hasEmbeddedImages: false, ocrPagesProcessed: 0 })
       expect(PdfExtractionService.extractText).not.toHaveBeenCalled()
     })
 
     it('resolveSourceText - PDF seul - délègue à PdfExtractionService.extractText et propage son résultat', async () => {
-      PdfExtractionService.extractText.mockResolvedValue({ text: 'texte extrait du pdf', hasEmbeddedImages: true })
+      PdfExtractionService.extractText.mockResolvedValue({ text: 'texte extrait du pdf', hasEmbeddedImages: true, ocrPagesProcessed: 3 })
       const buffer = Buffer.from('%PDF-1.4')
       const result = await AiCardGenerationPipelineService.resolveSourceText({ sourceText: null, pdfBuffer: buffer })
-      expect(result).toEqual({ text: 'texte extrait du pdf', hasEmbeddedImages: true })
+      expect(result).toEqual({ text: 'texte extrait du pdf', hasEmbeddedImages: true, ocrPagesProcessed: 3 })
       expect(PdfExtractionService.extractText).toHaveBeenCalledWith(buffer)
     })
   })
@@ -76,7 +77,7 @@ describe('AiCardGenerationPipelineService', () => {
     })
 
     it('generateCardsFromContent - texte tenant en un seul chunk - un seul appel LLM avec tout le cardCount', async () => {
-      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1), FAKE_CARD(2)], warning: null })
+      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1), FAKE_CARD(2)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
         sourceText: 'Un texte court.',
@@ -90,14 +91,19 @@ describe('AiCardGenerationPipelineService', () => {
       expect(AiCardGenerationService.generateCards).toHaveBeenCalledWith(
         expect.objectContaining({ sourceText: 'Un texte court.', cardCount: 2 })
       )
+      expect(result.usage).toEqual({ model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50, ocrPagesProcessed: 0 })
     })
 
-    it('generateCardsFromContent - texte long (plusieurs chunks) - agrège les cartes de chaque chunk', async () => {
+    it('generateCardsFromContent - texte long (plusieurs chunks) - agrège les cartes ET l\'usage de chaque chunk', async () => {
       const longText = Array.from({ length: 3 }, (_, i) => `Paragraphe ${i} : ${'mot '.repeat(500)}`).join('\n\n')
       AiCardGenerationService.generateCards
-        .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null })
-        .mockResolvedValueOnce({ cards: [FAKE_CARD(2)], warning: 'Contenu limité sur ce passage.' })
-        .mockResolvedValueOnce({ cards: [FAKE_CARD(3)], warning: null })
+        .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null, usage: { model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50 } })
+        .mockResolvedValueOnce({
+          cards: [FAKE_CARD(2)],
+          warning: 'Contenu limité sur ce passage.',
+          usage: { model: 'mistral-small-latest', promptTokens: 80, completionTokens: 40 }
+        })
+        .mockResolvedValueOnce({ cards: [FAKE_CARD(3)], warning: null, usage: { model: 'mistral-small-latest', promptTokens: 60, completionTokens: 30 } })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
         sourceText: longText,
@@ -107,13 +113,19 @@ describe('AiCardGenerationPipelineService', () => {
       expect(AiCardGenerationService.generateCards.mock.calls.length).toBeGreaterThan(1)
       expect(result.cards.length).toBe(AiCardGenerationService.generateCards.mock.calls.length)
       expect(result.warnings.some((w) => w.includes('Contenu limité sur ce passage.'))).toBe(true)
+      expect(result.usage).toEqual({
+        model: 'mistral-small-latest',
+        promptTokens: 240,
+        completionTokens: 120,
+        ocrPagesProcessed: 0
+      })
     })
 
-    it('generateCardsFromContent - un chunk échoue, les autres réussissent - agrège les succès, journalise l\'échec en warning', async () => {
+    it('generateCardsFromContent - un chunk échoue, les autres réussissent - agrège les succès (cartes ET usage), journalise l\'échec en warning', async () => {
       const longText = Array.from({ length: 2 }, (_, i) => `Paragraphe ${i} : ${'mot '.repeat(500)}`).join('\n\n')
       AiCardGenerationService.generateCards
         .mockRejectedValueOnce(Object.assign(new Error('Service indisponible.'), { statusCode: 502 }))
-        .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null })
+        .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
         sourceText: longText,
@@ -122,22 +134,79 @@ describe('AiCardGenerationPipelineService', () => {
 
       expect(result.cards).toHaveLength(1)
       expect(result.warnings.some((w) => w.includes("n'a pas pu être traité"))).toBe(true)
+      // Seul le chunk réussi contribue à l'usage — le chunk en échec n'a rien à agréger
+      expect(result.usage).toEqual({ model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50, ocrPagesProcessed: 0 })
     })
 
-    it('generateCardsFromContent - tous les chunks échouent - lève une erreur 502', async () => {
+    it('generateCardsFromContent - tous les chunks échouent, sans usage réel - lève une erreur 502 sans usage attaché', async () => {
       AiCardGenerationService.generateCards.mockRejectedValue(new Error('Service indisponible.'))
 
-      await expect(
-        AiCardGenerationPipelineService.generateCardsFromContent({ sourceText: 'Un texte court.', cardCount: 1 })
-      ).rejects.toMatchObject({
+      const error = await AiCardGenerationPipelineService.generateCardsFromContent({
+        sourceText: 'Un texte court.',
+        cardCount: 1
+      }).catch((e) => e)
+
+      expect(error).toMatchObject({
         message: 'La génération a échoué sur tous les passages du contenu fourni.',
         statusCode: 502
+      })
+      expect(error.usage).toBeUndefined()
+    })
+
+    it('generateCardsFromContent - tous les chunks échouent mais un usage réel a été facturé - l\'erreur porte l\'usage cumulé (C-01.06)', async () => {
+      const longText = Array.from({ length: 2 }, (_, i) => `Paragraphe ${i} : ${'mot '.repeat(500)}`).join('\n\n')
+      AiCardGenerationService.generateCards
+        .mockRejectedValueOnce(
+          Object.assign(new Error('non conforme'), {
+            statusCode: 502,
+            usage: { model: 'mistral-small-latest', promptTokens: 200, completionTokens: 100 }
+          })
+        )
+        .mockRejectedValueOnce(new Error('Service indisponible.')) // aucun usage : rien de facturé pour ce chunk
+
+      const error = await AiCardGenerationPipelineService.generateCardsFromContent({
+        sourceText: longText,
+        cardCount: 2
+      }).catch((e) => e)
+
+      expect(error.statusCode).toBe(502)
+      expect(error.usage).toEqual({
+        model: 'mistral-small-latest',
+        promptTokens: 200,
+        completionTokens: 100,
+        ocrPagesProcessed: 0
+      })
+    })
+
+    it('generateCardsFromContent - un chunk échoue avec un usage réel, un autre réussit - l\'usage des deux est agrégé', async () => {
+      const longText = Array.from({ length: 2 }, (_, i) => `Paragraphe ${i} : ${'mot '.repeat(500)}`).join('\n\n')
+      AiCardGenerationService.generateCards
+        .mockRejectedValueOnce(
+          Object.assign(new Error('non conforme'), {
+            statusCode: 502,
+            usage: { model: 'mistral-small-latest', promptTokens: 200, completionTokens: 100 }
+          })
+        )
+        .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+
+      const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+        sourceText: longText,
+        cardCount: 2
+      })
+
+      expect(result.cards).toHaveLength(1)
+      // Usage du chunk en échec (200/100) + usage du chunk réussi (100/50, FAKE_USAGE)
+      expect(result.usage).toEqual({
+        model: 'mistral-small-latest',
+        promptTokens: 300,
+        completionTokens: 150,
+        ocrPagesProcessed: 0
       })
     })
 
     it('generateCardsFromContent - PDF en entrée - extrait le texte puis suit le même pipeline', async () => {
-      PdfExtractionService.extractText.mockResolvedValue({ text: 'Texte extrait du PDF.', hasEmbeddedImages: false })
-      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null })
+      PdfExtractionService.extractText.mockResolvedValue({ text: 'Texte extrait du PDF.', hasEmbeddedImages: false, ocrPagesProcessed: 0 })
+      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
         pdfBuffer: Buffer.from('%PDF-1.4'),
@@ -150,9 +219,21 @@ describe('AiCardGenerationPipelineService', () => {
       )
     })
 
+    it('generateCardsFromContent - PDF traité via l\'OCR (repli) - ocrPagesProcessed remonté dans usage', async () => {
+      PdfExtractionService.extractText.mockResolvedValue({ text: 'Texte extrait via OCR.', hasEmbeddedImages: true, ocrPagesProcessed: 5 })
+      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+
+      const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+        pdfBuffer: Buffer.from('%PDF-1.4'),
+        cardCount: 1
+      })
+
+      expect(result.usage.ocrPagesProcessed).toBe(5)
+    })
+
     it('generateCardsFromContent - PDF avec images/schémas détectés - ajoute un avertissement dédié', async () => {
-      PdfExtractionService.extractText.mockResolvedValue({ text: 'Texte extrait du PDF.', hasEmbeddedImages: true })
-      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null })
+      PdfExtractionService.extractText.mockResolvedValue({ text: 'Texte extrait du PDF.', hasEmbeddedImages: true, ocrPagesProcessed: 0 })
+      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
         pdfBuffer: Buffer.from('%PDF-1.4'),
@@ -163,7 +244,7 @@ describe('AiCardGenerationPipelineService', () => {
     })
 
     it('generateCardsFromContent - texte collé (pas de PDF) - jamais d\'avertissement images/schémas', async () => {
-      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null })
+      AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
         sourceText: 'Un texte collé.',
