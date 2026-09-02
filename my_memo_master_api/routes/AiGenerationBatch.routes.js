@@ -1,5 +1,7 @@
 const authMiddleware = require('../middlewares/Auth.middleware')
 const validate = require('../middlewares/validate.middleware')
+const sanitize = require('../middlewares/sanitize.middleware')
+const { aiGenerationLimiter } = require('../middlewares/rateLimit.middleware')
 const aiPdfUpload = require('../middlewares/aiPdfUpload.middleware')
 const aiGenerationBatchValidators = require('../validators/AiGenerationBatch.validators')
 const aiGenerationBatch = require('../controllers/AiGenerationBatch.controller')
@@ -65,7 +67,15 @@ module.exports = (router) => {
   router.post(
     '/ai-generation-batches',
     authMiddleware,
+    // CORRECTIF (C-01.11) : limiteur dédié avant tout traitement — cette route déclenche un vrai
+    // appel LLM/OCR payant par requête, l'apiLimiter générique seul (500 req/15 min) ne suffit pas.
+    aiGenerationLimiter,
     aiPdfUpload.single('pdf'),
+    // CORRECTIF (C-01.11) : le `sanitize` global (app.js) tourne avant le routing, donc avant que
+    // multer (ci-dessus) ne peuple req.body pour cette route multipart — sourceText/subjectContext
+    // n'étaient donc jamais nettoyés du HTML. Reproduit ici, après multer, comme seule route de
+    // l'app dont le corps arrive en multipart plutôt qu'en JSON.
+    sanitize,
     aiGenerationBatchValidators.generate,
     validate,
     aiGenerationBatch.generate

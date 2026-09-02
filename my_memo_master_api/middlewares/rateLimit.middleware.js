@@ -95,4 +95,27 @@ const apiLimiter = rateLimit({
   legacyHeaders: false
 })
 
-module.exports = { authLimiter, registerLimiter, apiLimiter }
+/**
+ * Limiteur dédié à la génération de cartes par IA (POST /ai-generation-batches) — CORRECTIF C-01.11 :
+ * cette route déclenche un vrai appel LLM/OCR payant par requête, mais ne reposait jusqu'ici que sur
+ * apiLimiter (500 req/15 min, calibré pour des routes CRUD légères) — combiné au fait que le quota
+ * quotidien (AiQuotaService#checkQuota) peut être contourné par des générations qui échouent après
+ * l'appel payant (voir DECISIONS.md), rien n'empêchait des centaines d'appels réels en 15 minutes.
+ * Fenêtre plus large qu'authLimiter/registerLimiter (le quota quotidien par défaut est déjà de 10
+ * générations/jour — voir helpers/aiQuotaConfig.js — un plafond horaire généreux n'entrave donc pas
+ * un usage légitime tout en bornant fortement l'abus, y compris si le quota est un jour recontourné
+ * autrement). Configurable via AI_GENERATION_RATE_MAX et AI_GENERATION_RATE_WINDOW_MS.
+ *
+ * @type {import("express-rate-limit").RateLimitRequestHandler}
+ */
+const aiGenerationLimiter = rateLimit({
+  windowMs: parseInt(process.env.AI_GENERATION_RATE_WINDOW_MS, 10) || 60 * 60 * 1000,
+  max: parseInt(process.env.AI_GENERATION_RATE_MAX, 10) || 15,
+  keyGenerator: userKeyFromJwt,
+  skip: skipRateLimit,
+  message: { message: 'Trop de générations IA demandées, réessayez plus tard.' },
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+module.exports = { authLimiter, registerLimiter, apiLimiter, aiGenerationLimiter }

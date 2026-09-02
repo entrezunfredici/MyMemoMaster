@@ -1,16 +1,17 @@
 // Tests fonctionnels sur une vraie base SQLite en mémoire (comme AiGenerationBatch.service.test.js)
-// : checkQuota/getUsageSummary agrègent des COUNT/SUM réels sur AiGenerationBatch/AiUsageLog, mal
-// représentés par des modèles mockés.
+// : checkQuota/getUsageSummary agrègent des COUNT/SUM réels sur AiUsageLog (correctif C-01.11 — le
+// quota comptait auparavant sur AiGenerationBatch, contournable, voir DECISIONS.md), mal représentés
+// par des modèles mockés.
 process.env.DB_STORAGE = ':memory:'
 
 const dayjs = require('dayjs')
-const { syncModels, Role, User, LeitnerSystem, AiGenerationBatch, AiUsageLog } = require('../../models')
+const { syncModels, Role, User, AiGenerationBatch, AiUsageLog } = require('../../models')
 const AiQuotaService = require('../../services/AiQuota.service')
+const logger = require('../../helpers/logger')
 
 describe('AiQuotaService', () => {
   let userId
   let otherUserId
-  let idSystem
   const ENV_KEYS = ['AI_QUOTA_MAX_GENERATIONS_PER_DAY', 'AI_BUDGET_MAX_USD_PER_MONTH']
 
   beforeAll(async () => {
@@ -38,9 +39,6 @@ describe('AiQuotaService', () => {
       updatedAt: new Date()
     })
     otherUserId = otherUser.userId
-
-    const system = await LeitnerSystem.create({ name: 'Système test', idUser: userId })
-    idSystem = system.idSystem
   })
 
   afterEach(async () => {
@@ -78,6 +76,20 @@ describe('AiQuotaService', () => {
       expect(cost).toBeCloseTo(1, 6) // 250/1000 * 4 $, rien pour le chat
     })
 
+    it('estimateCostUsd - modèle inconnu avec tokens réellement consommés - logue une alerte (C-01.11, pas un échec silencieux)', () => {
+      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {})
+      AiQuotaService.estimateCostUsd({ model: 'modele-inconnu', promptTokens: 100, completionTokens: 50 })
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('modele-inconnu'))
+      errorSpy.mockRestore()
+    })
+
+    it('estimateCostUsd - modèle absent (null) - ne logue rien (cas normal, pas une config défaillante)', () => {
+      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {})
+      AiQuotaService.estimateCostUsd({ model: null, pagesProcessed: 3 })
+      expect(errorSpy).not.toHaveBeenCalled()
+      errorSpy.mockRestore()
+    })
+
     it('estimateCostUsd - aucun paramètre - retourne 0', () => {
       expect(AiQuotaService.estimateCostUsd({ model: null })).toBe(0)
     })
@@ -90,17 +102,26 @@ describe('AiQuotaService', () => {
 
     it('checkQuota - quota quotidien atteint pour cet utilisateur - lève une erreur 429', async () => {
       process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = '2'
-      await AiGenerationBatch.create({ userId, idSystem })
-      await AiGenerationBatch.create({ userId, idSystem })
+      await AiUsageLog.create({ userId, operation: 'chat_completion', estimatedCostUsd: 0.001 })
+      await AiUsageLog.create({ userId, operation: 'chat_completion', estimatedCostUsd: 0.001 })
 
       await expect(AiQuotaService.checkQuota(userId)).rejects.toMatchObject({ statusCode: 429 })
     })
 
     it('checkQuota - quota quotidien atteint pour un AUTRE utilisateur - ne bloque pas celui-ci (quota par utilisateur)', async () => {
       process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = '1'
-      await AiGenerationBatch.create({ userId: otherUserId, idSystem })
+      await AiUsageLog.create({ userId: otherUserId, operation: 'chat_completion', estimatedCostUsd: 0.001 })
 
       await expect(AiQuotaService.checkQuota(userId)).resolves.toBeUndefined()
+    })
+
+    it('checkQuota - tentative facturée sans batch créé (échec après coup) - compte quand même dans le quota (C-01.11, non-contournement)', async () => {
+      process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = '1'
+      // Aucun AiGenerationBatch créé (génération jamais aboutie) — seul AiUsageLog l'est, comme le
+      // fait controller#recordUsageBestEffort sur un échec après appel réellement facturé.
+      await AiUsageLog.create({ userId, idBatch: null, operation: 'chat_completion', estimatedCostUsd: 0.001 })
+
+      await expect(AiQuotaService.checkQuota(userId)).rejects.toMatchObject({ statusCode: 429 })
     })
 
     it('checkQuota - budget mensuel global atteint - lève une erreur 429, même pour un utilisateur sans génération', async () => {
@@ -114,7 +135,6 @@ describe('AiQuotaService', () => {
       process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = '1'
       process.env.AI_BUDGET_MAX_USD_PER_MONTH = '1'
       const lastMonth = dayjs().subtract(1, 'month').toDate()
-      await AiGenerationBatch.create({ userId, idSystem, createdAt: lastMonth })
       await AiUsageLog.create({ userId, operation: 'chat_completion', estimatedCostUsd: 5, createdAt: lastMonth })
 
       await expect(AiQuotaService.checkQuota(userId)).resolves.toBeUndefined()
@@ -160,7 +180,6 @@ describe('AiQuotaService', () => {
     it('getUsageSummary - retourne les compteurs du jour/mois en cours pour l\'utilisateur', async () => {
       process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = '10'
       process.env.AI_BUDGET_MAX_USD_PER_MONTH = '20'
-      await AiGenerationBatch.create({ userId, idSystem })
       await AiQuotaService.recordUsage({ userId, model: 'mistral-small-latest', promptTokens: 1_000_000, completionTokens: 0 })
 
       const summary = await AiQuotaService.getUsageSummary(userId)

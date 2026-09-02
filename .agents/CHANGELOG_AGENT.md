@@ -9602,3 +9602,65 @@ confirmé `skipped` (pas une supposition).
 - `my_memo_master_front/src/stores/aiCardGeneration.js` (+`GENERATE_TIMEOUT_MS`)
 - `my_memo_master_front/test/stores/aiCardGeneration.store.test.js` (+1 test, 1 assertion mise à jour)
 - `my_memo_master_api/package-lock.json`, `my_memo_master_front/package-lock.json` (`npm audit fix`)
+
+---
+
+## [2026-09-02] FIX — C-01.11 : 6 constats sécurité/coût de la revue de code corrigés
+
+**Contexte** — Revue de code C-01.11 (`main...dev_back_ia`, 47 fichiers, 8 volets d'analyse en
+arrière-plan) : 10 constats vérifiés directement contre le code, 6 retenus par l'utilisateur comme à
+corriger immédiatement (sécurité/coût, `main` étant déjà à jour et potentiellement en cours de
+déploiement). Les 4 restants (validation PDF hors validator, `MAX_CARD_COUNT` désynchronisé, 2 bugs
+UX de l'écran de révision) restent en dette, non corrigés dans cette entrée.
+
+**1. Quota quotidien contournable** — `checkQuota`/`getUsageSummary` comptaient `AiGenerationBatch`
+(créé seulement après succès complet du pipeline) au lieu des tentatives réellement facturées. Une
+génération qui échoue après l'appel LLM/OCR payant ne comptait jamais. **Corrigé** : comptage
+basculé sur `AiUsageLog` (une ligne = un appel réellement facturé, créée sur succès ET sur échec dès
+qu'un coût réel a été engagé — `controller#recordUsageBestEffort`, déjà en place depuis C-01.06).
+
+**2. Aucun rate-limiter dédié** sur `POST /ai-generation-batches` (route qui déclenche un vrai appel
+LLM/OCR payant), seul l'`apiLimiter` générique (500 req/15 min) s'appliquait. **Corrigé** : nouveau
+`aiGenerationLimiter` (`middlewares/rateLimit.middleware.js`, même pattern que `authLimiter` —
+15/heure par défaut, configurable via `AI_GENERATION_RATE_MAX`/`AI_GENERATION_RATE_WINDOW_MS`),
+appliqué avant tout traitement sur la route.
+
+**3. `sanitize` (nettoyage HTML global) ne s'appliquait jamais** à `sourceText`/`subjectContext` —
+il tourne avant le routing, donc avant que multer (route multipart) ne peuple `req.body`. **Corrigé** :
+`sanitize` réappliqué explicitement dans la chaîne de la route, après `aiPdfUpload.single('pdf')`.
+
+**4. Coût OCR jamais journalisé** — le pipeline renvoie `usage.ocrPagesProcessed`, le controller le
+spread tel quel dans `recordUsage({ ...usage })`, qui attend `pagesProcessed`. **Corrigé** : mapping
+explicite dans `recordUsageBestEffort` (`pagesProcessed: usage.ocrPagesProcessed ?? usage.pagesProcessed ?? 0`)
+plutôt qu'un spread — pour que ce type d'écart de nom soit visible à la lecture.
+
+**5. Coût LLM silencieusement à 0 $** si `MISTRAL_MODEL` ne correspond à aucune entrée de
+`CHAT_PRICING_USD_PER_MILLION_TOKENS`. **Corrigé** : `estimateCostUsd` logue une erreur explicite
+(sans bloquer la génération, déjà payée) quand un modèle configuré et réellement utilisé n'a pas de
+tarif connu.
+
+**6. Aucun plafond de longueur sur `sourceText`** — cette route multipart échappe au cap global
+`bodyParser.json({ limit: '10kb' })`. **Corrigé** : `MAX_SOURCE_TEXT_LENGTH = 80000` dans le
+validateur, aligné sur `MAX_CHUNKS × MAX_CHUNK_LENGTH` (20 × 4000, `AiCardGenerationPipeline.service.js`)
+— au-delà, le contenu était de toute façon tronqué avec un warning.
+
+**Vérifié** : `npx jest test/services/AiQuota.service.test.js test/bdd/aiGenerationBatch.test.js` →
+44/44 (+7 tests : mapping OCR, non-contournement du quota, sanitize sur multipart, plafond
+`sourceText`, logging du coût LLM à 0 $ ×2) ; suite complète API `npx jest` → **1766/1766**, 0
+régression ; `npx eslint .` → 0 erreur.
+
+**Ce qui n'est PAS couvert** — Les 4 autres constats de la revue (validation PDF dans le controller
+plutôt qu'un validator, `MAX_CARD_COUNT` front/back désynchronisé, compteur "acceptées" incluant les
+cartes `pending`, message "tout rejeté" trompeur sur un lot jamais généré) restent en dette,
+volontairement non traités dans cette entrée. Pas de test dédié au comptage précis du nouveau
+`aiGenerationLimiter` (429 après N requêtes) — la bibliothèque sous-jacente (`express-rate-limit`)
+est déjà éprouvée par les tests existants d'`authLimiter`/`apiLimiter` sur le même pattern.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiQuota.service.js`
+- `my_memo_master_api/controllers/AiGenerationBatch.controller.js`
+- `my_memo_master_api/middlewares/rateLimit.middleware.js`
+- `my_memo_master_api/routes/AiGenerationBatch.routes.js`
+- `my_memo_master_api/validators/AiGenerationBatch.validators.js`
+- `my_memo_master_api/test/services/AiQuota.service.test.js`
+- `my_memo_master_api/test/bdd/aiGenerationBatch.test.js`

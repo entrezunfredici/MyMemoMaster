@@ -2081,6 +2081,40 @@ variance. Une bascule de modèle ou un renforcement du prompt devra rejouer le m
 plutôt que de supposer que le comportement observé est stable. Le filet de sécurité applicatif (piste 2 du
 rapport) reste la dette la plus actionnable si l'écart se confirme en usage réel.
 
+---
+
+### [2026-09-02] C-01.11 : le quota quotidien IA compte sur AiUsageLog (tentatives facturées), pas sur AiGenerationBatch (batchs aboutis)
+
+**Contexte** — La revue de code C-01.11 a trouvé que `checkQuota` (et `getUsageSummary`) comptaient les
+lignes `AiGenerationBatch`, créées uniquement après succès complet du pipeline. Une génération qui échoue
+après le premier appel LLM/OCR (déjà facturé, déjà journalisé dans `AiUsageLog` via
+`recordUsageBestEffort`) ne créait aucun `AiGenerationBatch` et ne comptait donc jamais dans le quota
+quotidien — un utilisateur pouvait déclencher un nombre illimité d'appels réellement payants tant que
+chacun échouait après coup, le seul garde-fou restant étant le budget mensuel partagé entre tous les
+utilisateurs.
+
+**Décision** — Compter sur `AiUsageLog` plutôt que sur `AiGenerationBatch` : chaque ligne `AiUsageLog`
+correspond à un appel qui a réellement consommé des tokens/pages facturés (succès **ou** échec après
+coup), c'est exactement ce que le quota est censé borner (l'équité de consommation entre utilisateurs),
+pas le nombre de résultats aboutis. Un échec **avant** tout appel facturé (droits insuffisants, validation,
+quota déjà atteint) ne crée toujours aucune ligne `AiUsageLog` et ne compte donc toujours pas — cohérent
+avec le principe déjà en place : seul un coût réellement engagé doit peser sur le quota.
+
+**Alternative écartée** : ajouter un compteur de tentatives séparé (table ou colonne dédiée) — écartée
+par parcimonie : `AiUsageLog` existe déjà précisément pour capturer « un coût réel a été engagé », le
+réutiliser évite une nouvelle table et une nouvelle source de vérité à maintenir en synchronisation avec
+la première. / Créer le `AiGenerationBatch` plus tôt (avant l'appel pipeline) avec un statut
+intermédiaire — écartée : changerait la sémantique du modèle (un batch existerait avant même qu'un
+contenu ait été généré), impact plus large sur `AiGenerationBatch.service.js`/l'écran de validation, pour
+un problème que le comptage sur `AiUsageLog` résout déjà sans toucher au modèle.
+
+**Conséquences** : `getUsageSummary` (affichage "quota restant" côté front) reflète désormais le même
+compteur que celui réellement appliqué par `checkQuota` — avant ce correctif, les deux étaient déjà
+alignés en pratique (même source `AiGenerationBatch`) mais tous deux sous-comptaient les tentatives
+facturées-mais-échouées. Les tests qui simulaient un quota déjà atteint en créant des lignes
+`AiGenerationBatch` directement ont dû être réécrits pour créer des lignes `AiUsageLog` — signalé pour
+toute prochaine session qui ajouterait un test sur `checkQuota`/`getUsageSummary`.
+
 > **Mise à jour [2026-09-02, même jour]** — Sur demande explicite de l'utilisateur (« peut tu le
 > corriger »), les deux pistes ci-dessus ont finalement **toutes les deux** été appliquées plutôt qu'une
 > seule : le prompt (règle 7 explicite) **et** le filet de sécurité applicatif (`dedupeCards`, appelé

@@ -1,19 +1,26 @@
 const dayjs = require('dayjs')
 const { Op } = require('sequelize')
-const { AiGenerationBatch, AiUsageLog } = require('../models/index')
+const { AiUsageLog } = require('../models/index')
 const getAiQuotaConfig = require('../helpers/aiQuotaConfig')
+const logger = require('../helpers/logger')
 
 // Périmètre C-01.06 (« Gestion quotas et budget IA ») : deux garde-fous distincts, appliqués
 // séparément selon ce qu'ils protègent —
-// - QUOTA (équité entre utilisateurs) : nombre de générations par utilisateur et par jour, compté
-//   sur AiGenerationBatch (une ligne = une requête POST /ai-generation-batches aboutie).
+// - QUOTA (équité entre utilisateurs) : nombre de TENTATIVES DE GÉNÉRATION RÉELLEMENT FACTURÉES par
+//   utilisateur et par jour, compté sur AiUsageLog (une ligne = un appel LLM/OCR qui a réellement
+//   consommé des tokens/pages, que la génération ait ensuite abouti à un batch ou échoué après coup
+//   — voir controller#recordUsageBestEffort, appelé sur succès ET sur échec dès qu'un coût réel a
+//   été engagé). CHOIX (correctif, C-01.11) : compter sur AiGenerationBatch (une ligne = une
+//   requête ABOUTIE) laissait un utilisateur contourner le quota à volonté en faisant échouer la
+//   génération après l'appel payant — un batch n'est créé qu'après succès complet du pipeline, alors
+//   que le coût, lui, est déjà engagé dès le premier appel. Voir DECISIONS.md.
 // - BUDGET (coût total maîtrisé) : somme du coût réel estimé, tous utilisateurs confondus, sur le
-//   mois en cours, calculée sur AiUsageLog (un coût réel n'existe que si un appel a vraiment été
-//   fait — indépendant du nombre de requêtes, un batch peut déclencher plusieurs appels LLM/OCR).
+//   mois en cours, calculée sur AiUsageLog (même table, même raisonnement — indépendant du nombre de
+//   requêtes, un batch peut déclencher plusieurs appels LLM/OCR).
 // Ce service NE FAIT PAS : le calcul du coût par appel individuel (fait dans
 // AiCardGenerationService/PdfExtraction.service.js, qui renvoient l'usage réel sans le persister) —
 // il ne fait que l'estimer en $ (`estimateCostUsd`) et le journaliser (`recordUsage`), appelé par le
-// controller après une génération réussie.
+// controller après chaque appel LLM/OCR réellement facturé (succès ou échec ultérieur).
 
 // Tarifs en $/M tokens (entrée/sortie) et $/1000 pages OCR — repris du benchmark C-01.03
 // (diagrams/generation_ia_llm_benchmark.md §4) et de l'API OCR (mistral.ai/pricing/api, consultée
@@ -42,6 +49,16 @@ class AiQuotaService {
     if (pricing) {
       cost += (promptTokens / 1_000_000) * pricing.input
       cost += (completionTokens / 1_000_000) * pricing.output
+    } else if (model && (promptTokens > 0 || completionTokens > 0)) {
+      // CORRECTIF (C-01.11) : un modèle configuré (MISTRAL_MODEL) mais absent de cette table
+      // faisait auparavant tomber silencieusement le coût de chat à 0 $ — le budget mensuel
+      // (checkQuota) ne voyait alors plus rien de la dépense réelle. Logué pour être visible en
+      // monitoring plutôt que de continuer à échouer en silence ; ne bloque pas la génération
+      // (une estimation de coût manquante n'est pas une raison de refuser un service déjà payé).
+      logger.error(
+        `[AiQuota] Aucun tarif connu pour le modèle "${model}" — coût de chat non comptabilisé (0 $). ` +
+          'Table à jour dans services/AiQuota.service.js#CHAT_PRICING_USD_PER_MILLION_TOKENS.'
+      )
     }
 
     cost += (pagesProcessed / 1000) * OCR_PRICE_USD_PER_1000_PAGES
@@ -61,7 +78,7 @@ class AiQuotaService {
     const config = getAiQuotaConfig()
 
     const startOfDay = dayjs().startOf('day').toDate()
-    const generationsToday = await AiGenerationBatch.count({
+    const generationsToday = await AiUsageLog.count({
       where: { userId, createdAt: { [Op.gte]: startOfDay } }
     })
     if (generationsToday >= config.maxGenerationsPerDay) {
@@ -85,8 +102,10 @@ class AiQuotaService {
   }
 
   /**
-   * Journalise l'usage réel d'une génération réussie (une ligne par batch créé, agrégeant tous les
-   * appels LLM/OCR sous-jacents — voir AiCardGenerationPipelineService#generateCardsFromContent).
+   * Journalise l'usage réel d'un appel LLM/OCR réellement facturé — succès (une ligne par batch créé,
+   * agrégeant tous les appels sous-jacents) OU échec après coup (`idBatch: null`, voir
+   * controller#recordUsageBestEffort). Chaque ligne créée ici compte comme une tentative dans
+   * checkQuota (voir en-tête de fichier).
    *
    * @param {object} params
    * @param {number|null} [params.userId]
@@ -129,7 +148,7 @@ class AiQuotaService {
     const startOfDay = dayjs().startOf('day').toDate()
     const startOfMonth = dayjs().startOf('month').toDate()
 
-    const generationsToday = await AiGenerationBatch.count({
+    const generationsToday = await AiUsageLog.count({
       where: { userId, createdAt: { [Op.gte]: startOfDay } }
     })
     const spentThisMonth =

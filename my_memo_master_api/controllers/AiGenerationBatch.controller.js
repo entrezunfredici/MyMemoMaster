@@ -35,7 +35,20 @@ const respondWithKnownOrGenericError = (res, error, genericMessage) => {
 const recordUsageBestEffort = async (userId, idBatch, usage) => {
   if (!usage) return
   try {
-    await aiQuotaService.recordUsage({ userId, idBatch, ...usage })
+    // CORRECTIF (C-01.11) : le pipeline (AiCardGenerationPipelineService) renvoie le compteur de
+    // pages OCR sous la clé `ocrPagesProcessed`, alors qu'AiQuotaService#recordUsage attend
+    // `pagesProcessed` — un `...usage` naïf laissait ce champ de côté, donc le coût OCR réel
+    // n'était jamais journalisé (le budget mensuel ne voyait jamais la dépense OCR). Mapping
+    // explicite plutôt qu'un spread, précisément pour que ce genre d'écart de nom soit visible à la
+    // lecture au lieu de se perdre dans un spread silencieux.
+    await aiQuotaService.recordUsage({
+      userId,
+      idBatch,
+      model: usage.model,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      pagesProcessed: usage.ocrPagesProcessed ?? usage.pagesProcessed ?? 0
+    })
   } catch (usageError) {
     logger.error(`[AiGenerationBatch] Échec de journalisation de l'usage IA : ${usageError?.message || usageError}`)
   }

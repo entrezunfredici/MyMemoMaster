@@ -163,6 +163,35 @@ describe('AiGenerationBatch — routes (tests fonctionnels)', () => {
       expect(tooHigh.status).toBe(400)
     })
 
+    it('POST — sourceText/subjectContext avec balises HTML — nettoyés avant d\'atteindre le pipeline (C-01.11, sanitize sur route multipart)', async () => {
+      aiCardGenerationPipelineService.generateCardsFromContent.mockResolvedValue(FAKE_PIPELINE_RESULT)
+
+      const res = await request(app)
+        .post(`${BASE}/ai-generation-batches`)
+        .set('Authorization', `Bearer ${token}`)
+        .field('idSystem', String(system.idSystem))
+        .field('cardCount', '1')
+        .field('subjectContext', '<b>SVT</b>')
+        .field('sourceText', 'Un texte <script>alert(1)</script> source.')
+
+      expect(res.status).toBe(201)
+      const callArgs = aiCardGenerationPipelineService.generateCardsFromContent.mock.calls[0][0]
+      expect(callArgs.sourceText).toBe('Un texte alert(1) source.')
+      expect(callArgs.subjectContext).toBe('SVT')
+    })
+
+    it('POST — sourceText dépassant 80 000 caractères — 400 (C-01.11, plafond hors du cap JSON global 10kb)', async () => {
+      const res = await request(app)
+        .post(`${BASE}/ai-generation-batches`)
+        .set('Authorization', `Bearer ${token}`)
+        .field('idSystem', String(system.idSystem))
+        .field('cardCount', '1')
+        .field('sourceText', 'a'.repeat(80001))
+
+      expect(res.status).toBe(400)
+      expect(aiCardGenerationPipelineService.generateCardsFromContent).not.toHaveBeenCalled()
+    })
+
     it('POST — sans token — 401', async () => {
       const res = await request(app)
         .post(`${BASE}/ai-generation-batches`)
@@ -222,6 +251,26 @@ describe('AiGenerationBatch — routes (tests fonctionnels)', () => {
       expect(log.completionTokens).toBe(100)
     })
 
+    it('POST — usage OCR (ocrPagesProcessed non nul) — correctement mappé sur pagesProcessed (C-01.11)', async () => {
+      aiCardGenerationPipelineService.generateCardsFromContent.mockResolvedValue({
+        ...FAKE_PIPELINE_RESULT,
+        usage: { model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50, ocrPagesProcessed: 5 }
+      })
+
+      const res = await request(app)
+        .post(`${BASE}/ai-generation-batches`)
+        .set('Authorization', `Bearer ${token}`)
+        .field('idSystem', String(system.idSystem))
+        .field('cardCount', '1')
+        .field('sourceText', 'Un texte.')
+
+      expect(res.status).toBe(201)
+      const log = await AiUsageLog.findOne({ where: { idBatch: res.body.id } })
+      expect(log.pagesProcessed).toBe(5)
+      expect(log.operation).toBe('chat_completion+ocr')
+      expect(log.estimatedCostUsd).toBeGreaterThan(0.02) // au moins le coût OCR (5/1000 * 4$)
+    })
+
     it('POST — journalise l\'usage réel après une génération réussie (AiUsageLog)', async () => {
       aiCardGenerationPipelineService.generateCardsFromContent.mockResolvedValue(FAKE_PIPELINE_RESULT)
 
@@ -253,6 +302,47 @@ describe('AiGenerationBatch — routes (tests fonctionnels)', () => {
 
         expect(res.status).toBe(429)
         expect(aiCardGenerationPipelineService.generateCardsFromContent).not.toHaveBeenCalled()
+      } finally {
+        delete process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY
+      }
+    })
+
+    it('POST — une génération qui échoue APRÈS avoir facturé un appel compte dans le quota (C-01.11, non-contournement)', async () => {
+      // Quota fixé à (compteur déjà accumulé par les tests précédents dans ce fichier + 1) plutôt
+      // qu'à une valeur fixe : cette suite ne remet pas AiUsageLog à zéro entre les tests (partagé
+      // avec le même userId), seul le delta introduit par CE test doit décider du résultat.
+      const alreadyToday = await AiUsageLog.count({ where: { userId } })
+      process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = String(alreadyToday + 1)
+      try {
+        // 1er appel : le pipeline échoue mais a réellement facturé (comme le test ci-dessus) —
+        // aucun AiGenerationBatch n'est créé, mais un AiUsageLog l'est.
+        aiCardGenerationPipelineService.generateCardsFromContent.mockRejectedValueOnce(
+          Object.assign(new Error('Échec après coût réel.'), {
+            statusCode: 502,
+            usage: { model: 'mistral-small-latest', promptTokens: 50, completionTokens: 20, ocrPagesProcessed: 0 }
+          })
+        )
+        const first = await request(app)
+          .post(`${BASE}/ai-generation-batches`)
+          .set('Authorization', `Bearer ${token}`)
+          .field('idSystem', String(system.idSystem))
+          .field('cardCount', '1')
+          .field('sourceText', 'Un texte.')
+        expect(first.status).toBe(502)
+
+        // 2e appel : avant le correctif, checkQuota comptait AiGenerationBatch (aucune ligne créée
+        // par le 1er appel en échec) et laissait donc passer un nombre illimité de tentatives
+        // facturées. Après correctif (comptage sur AiUsageLog), le quota de 1/jour est déjà atteint.
+        aiCardGenerationPipelineService.generateCardsFromContent.mockResolvedValueOnce(FAKE_PIPELINE_RESULT)
+        const second = await request(app)
+          .post(`${BASE}/ai-generation-batches`)
+          .set('Authorization', `Bearer ${token}`)
+          .field('idSystem', String(system.idSystem))
+          .field('cardCount', '1')
+          .field('sourceText', 'Un texte.')
+
+        expect(second.status).toBe(429)
+        expect(second.body.message).toContain('Quota quotidien')
       } finally {
         delete process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY
       }

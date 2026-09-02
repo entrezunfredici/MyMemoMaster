@@ -4,6 +4,13 @@ const { body, param } = require('express-validator')
 // Test.validators.js/LeitnerReviewSession.validators.js (voir DECISIONS.md, 2026-09-01) : rejet
 // précoce et clair côté validateur plutôt que de laisser filer jusqu'à l'erreur du service.
 const MAX_CARD_COUNT = 30
+// CORRECTIF (C-01.11) : cette route est multipart (multer), donc hors du plafond global
+// bodyParser.json({ limit: '10kb' }) (app.js) qui borne toutes les autres routes JSON de l'app —
+// sourceText n'avait jusqu'ici aucune limite de longueur propre. Valeur alignée sur ce que le
+// pipeline peut effectivement exploiter : MAX_CHUNKS (20) × MAX_CHUNK_LENGTH (4000) = 80 000
+// caractères (AiCardGenerationPipeline.service.js) — au-delà, le contenu est de toute façon tronqué
+// avec un warning, donc valider plus haut ne ferait que payer du découpage pour rien.
+const MAX_SOURCE_TEXT_LENGTH = 80000
 const CARD_TYPES = ['open', 'mcq', 'mixed']
 const CARD_STATUSES = ['pending', 'accepted', 'edited', 'rejected']
 const BATCH_STATUSES = ['validated', 'discarded']
@@ -16,7 +23,11 @@ exports.generate = [
     .withMessage(`cardCount doit être un entier entre 1 et ${MAX_CARD_COUNT}.`),
   body('cardType').optional().isIn(CARD_TYPES).withMessage(`cardType doit être l'un de : ${CARD_TYPES.join(', ')}.`),
   body('outputLanguage').optional().isString().isLength({ min: 2, max: 10 }),
-  body('sourceText').optional({ nullable: true }).isString(),
+  body('sourceText')
+    .optional({ nullable: true })
+    .isString()
+    .isLength({ max: MAX_SOURCE_TEXT_LENGTH })
+    .withMessage(`sourceText ne peut pas dépasser ${MAX_SOURCE_TEXT_LENGTH} caractères.`),
   // Exactement un des deux : texte collé (sourceText) ou fichier PDF (req.file, posé par le
   // middleware d'upload qui précède ce validateur dans la chaîne de route).
   body().custom((_, { req }) => {
