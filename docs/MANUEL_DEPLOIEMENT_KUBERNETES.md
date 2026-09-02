@@ -70,8 +70,27 @@ kubectl create secret generic mmm-preprod-secrets \
   --from-literal=S3_ACCESS_KEY=<clé_s3> \
   --from-literal=S3_SECRET_KEY=<secret_s3> \
   --from-literal=REDIS_PASS= \
-  --from-literal=PGADMIN_DEFAULT_PASSWORD=<mot_de_passe>
+  --from-literal=PGADMIN_DEFAULT_PASSWORD=<mot_de_passe> \
+  --from-literal=MISTRAL_API_KEY=<clé_api_mistral>
 ```
+
+**Ajouter une clé à un Secret déjà créé** (ex. `MISTRAL_API_KEY` sur un cluster existant, sans retaper
+les autres valeurs — `kubectl create secret` régénérerait le Secret entier et écraserait ce qui n'est
+pas listé) :
+
+```sh
+kubectl patch secret mmm-prod-secrets -n mymemomaster --type=merge \
+  -p '{"stringData":{"MISTRAL_API_KEY":"<clé_api_mistral>"}}'
+# preprod : mmm-preprod-secrets -n mymemomaster-preprod
+```
+
+`stringData` ne remplace que les clés qu'il liste ; le contenu déjà présent dans `data` (les autres
+variables) n'est pas touché. Les 7 autres variables de la génération IA (`MISTRAL_API_URL`,
+`MISTRAL_MODEL`, `MISTRAL_OCR_API_URL`, `MISTRAL_OCR_MODEL`, `MISTRAL_TIMEOUT_MS`,
+`AI_QUOTA_MAX_GENERATIONS_PER_DAY`, `AI_BUDGET_MAX_USD_PER_MONTH`) ne sont pas des secrets — elles
+sont dans la ConfigMap (`helm/values.yaml#config`), vides par défaut (le code applique alors ses
+propres valeurs par défaut, voir `helpers/mistralConfig.js`/`helpers/aiQuotaConfig.js`) ; à surcharger
+dans `values-{env}.yaml` seulement si un réglage différent du défaut est voulu.
 
 ### 3.3 Déployer avec Helm
 

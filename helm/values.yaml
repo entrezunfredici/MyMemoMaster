@@ -84,6 +84,24 @@ config:
   # ── Inscriptions ───────────────────────────────────────────────────────────
   MAX_USERS: ""              # vide/0 = pas de limite ; sinon plafond de comptes
 
+  # ── Génération de Leitner par IA (C-01) ────────────────────────────────────
+  # Mêmes 8 variables que docker-compose.yml (service api, profils dev/test) — restées
+  # absentes du chart jusqu'ici (dette signalée dans CHANGELOG_AGENT.md, 2026-09-02 :
+  # "docker-compose.yml ne transmettait jamais les variables Mistral/IA au conteneur api",
+  # jamais reportée côté K8s). Vides ici : helpers/mistralConfig.js et helpers/aiQuotaConfig.js
+  # ont chacun un défaut applicatif sensé (mistral-small-latest, timeout 30s, 10
+  # générations/jour, 20 $/mois) — laisser vide revient à accepter ce défaut, comme en local.
+  # MISTRAL_API_KEY N'EST PAS ICI : c'est un secret, à ajouter dans le Secret K8s existant
+  # (mmm-{env}-secrets), jamais dans une ConfigMap versionnée — voir
+  # docs/MANUEL_DEPLOIEMENT_KUBERNETES.md §3.2.
+  MISTRAL_API_URL: ""
+  MISTRAL_MODEL: ""
+  MISTRAL_OCR_API_URL: ""
+  MISTRAL_OCR_MODEL: ""
+  MISTRAL_TIMEOUT_MS: ""
+  AI_QUOTA_MAX_GENERATIONS_PER_DAY: ""
+  AI_BUDGET_MAX_USD_PER_MONTH: ""
+
 # ── Domaines & Ingress ────────────────────────────────────────────────────────
 domain:
   api: ""         # défini dans values-{env}.yaml
