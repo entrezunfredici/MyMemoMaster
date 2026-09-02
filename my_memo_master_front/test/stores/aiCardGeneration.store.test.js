@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
-const { mockGet, mockPost } = vi.hoisted(() => ({
-  mockGet:  vi.fn(),
-  mockPost: vi.fn(),
+const { mockGet, mockPost, mockPatch } = vi.hoisted(() => ({
+  mockGet:   vi.fn(),
+  mockPost:  vi.fn(),
+  mockPatch: vi.fn(),
 }))
 
-vi.mock('@/helpers/api', () => ({ api: { get: mockGet, post: mockPost } }))
+vi.mock('@/helpers/api', () => ({ api: { get: mockGet, post: mockPost, patch: mockPatch } }))
 
 describe('useAiCardGenerationStore', () => {
   beforeEach(() => {
@@ -139,5 +141,180 @@ describe('useAiCardGenerationStore', () => {
     expect(store.status).toBe('idle')
     expect(store.errorMessage).toBe('')
     expect(store.lastBatch).toBeNull()
+  })
+
+  // ── fetchPendingBatches (C-01.09) ────────────────────────────────────────────
+
+  it('fetchPendingBatches - succès - peuple pendingBatches et retourne true', async () => {
+    const batches = [{ id: 1, idSystem: 5, status: 'pending', cards: [] }]
+    mockGet.mockResolvedValueOnce({ status: 200, data: batches })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.fetchPendingBatches()
+
+    expect(mockGet).toHaveBeenCalledWith('ai-generation-batches')
+    expect(store.pendingBatches).toEqual(batches)
+    expect(result).toBe(true)
+  })
+
+  it('fetchPendingBatches - échec - pendingBatches vidé, retourne false', async () => {
+    const store = useAiCardGenerationStore()
+    store.pendingBatches = [{ id: 1 }]
+    mockGet.mockResolvedValueOnce({ status: 500, data: { message: 'Erreur.' } })
+
+    const result = await store.fetchPendingBatches()
+
+    expect(store.pendingBatches).toEqual([])
+    expect(result).toBe(false)
+  })
+
+  // ── updateCard (C-01.09) ──────────────────────────────────────────────────────
+
+  it('updateCard - succès - retourne la carte mise à jour', async () => {
+    const updated = { id: 10, status: 'rejected' }
+    mockPatch.mockResolvedValueOnce({ status: 200, data: updated })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.updateCard(10, { status: 'rejected' })
+
+    expect(mockPatch).toHaveBeenCalledWith('ai-generation-batches/cards/10', { status: 'rejected' })
+    expect(result).toEqual(updated)
+  })
+
+  it('updateCard - échec (batch déjà validé, 404) - retourne null', async () => {
+    mockPatch.mockResolvedValueOnce({ status: 404, data: { message: 'Carte introuvable ou non modifiable.' } })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.updateCard(10, { status: 'accepted' })
+
+    expect(result).toBeNull()
+  })
+
+  it('updateCard - erreur réseau - retourne null sans lever', async () => {
+    mockPatch.mockResolvedValueOnce(undefined)
+
+    const store = useAiCardGenerationStore()
+    const result = await store.updateCard(10, { status: 'accepted' })
+
+    expect(result).toBeNull()
+  })
+
+  // ── markBatchStatus (C-01.09) ─────────────────────────────────────────────────
+
+  it('markBatchStatus - succès - retourne true', async () => {
+    mockPatch.mockResolvedValueOnce({ status: 200, data: { id: 1, status: 'validated' } })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.markBatchStatus(1, 'validated')
+
+    expect(mockPatch).toHaveBeenCalledWith('ai-generation-batches/1/status', { status: 'validated' })
+    expect(result).toBe(true)
+  })
+
+  it('markBatchStatus - échec - retourne false', async () => {
+    mockPatch.mockResolvedValueOnce({ status: 404, data: { message: 'Génération introuvable.' } })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.markBatchStatus(1, 'discarded')
+
+    expect(result).toBe(false)
+  })
+
+  // ── promoteCard (C-01.09) ─────────────────────────────────────────────────────
+
+  it('promoteCard - carte "open", cas nominal - crée question, réponses (answer + acceptedAnswers), carte', async () => {
+    mockPost
+      .mockResolvedValueOnce({ status: 201, data: { idQuestion: 42 } })     // POST /questions
+      .mockResolvedValueOnce({ status: 201, data: { idResponse: 1 } })     // POST /responses (answer)
+      .mockResolvedValueOnce({ status: 201, data: { idResponse: 2 } })     // POST /responses (variante)
+      .mockResolvedValueOnce({ status: 201, data: { idCard: 100 } })       // POST /leitnercards
+
+    const store = useAiCardGenerationStore()
+    const result = await store.promoteCard({
+      idSystem: 5,
+      statement: 'Qu\'est-ce que la photosynthèse ?',
+      type: 'open',
+      answer: 'Un processus.',
+      acceptedAnswers: ['Une conversion.'],
+    })
+
+    expect(result).toEqual({ success: true })
+    expect(mockPost).toHaveBeenNthCalledWith(1, 'questions', {
+      statement: normalizeFormulaSyntax('Qu\'est-ce que la photosynthèse ?'),
+      questionPosition: 0,
+      type: 'open',
+      content: null,
+    })
+    expect(mockPost).toHaveBeenNthCalledWith(2, 'responses', {
+      content: normalizeFormulaSyntax('Un processus.'),
+      correction: true,
+      idQuestion: 42,
+    })
+    expect(mockPost).toHaveBeenNthCalledWith(3, 'responses', {
+      content: normalizeFormulaSyntax('Une conversion.'),
+      correction: true,
+      idQuestion: 42,
+    })
+    expect(mockPost).toHaveBeenNthCalledWith(4, 'leitnercards', { idQuestion: 42, idSystem: 5, mindMapNodeId: null })
+  })
+
+  it('promoteCard - carte "mcq", cas nominal - pas de POST /responses', async () => {
+    mockPost
+      .mockResolvedValueOnce({ status: 201, data: { idQuestion: 42 } })
+      .mockResolvedValueOnce({ status: 201, data: { idCard: 100 } })
+
+    const store = useAiCardGenerationStore()
+    const options = [{ text: 'Paris', correct: true }, { text: 'Lyon', correct: false }]
+    const result = await store.promoteCard({ idSystem: 5, statement: 'Capitale ?', type: 'mcq', options })
+
+    expect(result).toEqual({ success: true })
+    expect(mockPost).toHaveBeenCalledTimes(2) // questions puis leitnercards, aucune réponse
+    expect(mockPost).toHaveBeenNthCalledWith(1, 'questions', expect.objectContaining({
+      type: 'mcq',
+      content: { options: options.map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) },
+    }))
+  })
+
+  it('promoteCard - échec sur POST /questions - retourne success:false, aucun autre appel', async () => {
+    mockPost.mockResolvedValueOnce({ status: 400, data: { message: 'Énoncé invalide.' } })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.promoteCard({ idSystem: 5, statement: 'X', type: 'open', answer: 'Y' })
+
+    expect(result).toEqual({ success: false, message: 'Énoncé invalide.' })
+    expect(mockPost).toHaveBeenCalledTimes(1)
+  })
+
+  it('promoteCard - échec sur POST /responses - retourne success:false, /leitnercards jamais appelé', async () => {
+    mockPost
+      .mockResolvedValueOnce({ status: 201, data: { idQuestion: 42 } })
+      .mockResolvedValueOnce({ status: 500, data: { message: 'Erreur serveur.' } })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.promoteCard({ idSystem: 5, statement: 'X', type: 'open', answer: 'Y' })
+
+    expect(result).toEqual({ success: false, message: 'Erreur serveur.' })
+    expect(mockPost).toHaveBeenCalledTimes(2)
+  })
+
+  it('promoteCard - échec sur POST /leitnercards - retourne success:false', async () => {
+    mockPost
+      .mockResolvedValueOnce({ status: 201, data: { idQuestion: 42 } })
+      .mockResolvedValueOnce({ status: 201, data: { idResponse: 1 } })
+      .mockResolvedValueOnce({ status: 403, data: { message: 'Droits insuffisants.' } })
+
+    const store = useAiCardGenerationStore()
+    const result = await store.promoteCard({ idSystem: 5, statement: 'X', type: 'open', answer: 'Y' })
+
+    expect(result).toEqual({ success: false, message: 'Droits insuffisants.' })
+  })
+
+  it('promoteCard - erreur réseau sur le tout premier appel - retourne un message générique', async () => {
+    mockPost.mockResolvedValueOnce(undefined)
+
+    const store = useAiCardGenerationStore()
+    const result = await store.promoteCard({ idSystem: 5, statement: 'X', type: 'open', answer: 'Y' })
+
+    expect(result).toEqual({ success: false, message: 'Erreur lors de la création de la question.' })
   })
 })

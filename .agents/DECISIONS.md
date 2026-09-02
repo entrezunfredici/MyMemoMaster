@@ -1984,3 +1984,39 @@ Les deux sont vérifiés ensemble par `checkQuota(userId)`, mais restent concept
 **Alternative écartée** : ne corriger que le profil `dev` (celui réellement testé dans l'immédiat) — écarté car le profil `test` (VPS, README §Environnement TEST) porte exactement le même bloc `environment:` dupliqué avec le même oubli ; le corriger au même endroit, pour la même raison, coûtait la même poignée de lignes.
 
 **Conséquences** : quiconque relance `docker-compose up` avec une clé Mistral dans son `.env` peut désormais tester la génération IA en conditions réelles sans modification manuelle du compose file. Dette non couverte ici : `preprod`/`prod` (Kubernetes) n'ont pas été vérifiées — à confirmer séparément que leurs manifests portent bien ces variables le jour où la fonctionnalité y est déployée.
+
+---
+
+### [2026-09-02] C-01.09 — Statut de `AiGeneratedCard` (pas un état local) comme source de vérité de la checkbox de l'écran de révision
+
+**Contexte** — L'écran de révision (Vue 3) doit refléter, par carte, un état accepté/rejeté/édité. Deux approches possibles : un état purement local (ex. un tableau réactif de booléens dans le composant, jamais envoyé au serveur avant le clic final) ou le statut déjà présent en base (`AiGeneratedCard.status`, écrit à chaque interaction via `PATCH /ai-generation-batches/cards/:cardId`). Le JSDoc de `AiGenerationBatch.service.js#findPendingByUser` (écrit en C-01.07/08, jamais exploité jusqu'ici) dit explicitement : « permet de reprendre une génération non encore validée (ex. après un rechargement de page côté Écran de validation) » — ce ticket est le premier à réellement construire cet écran, et donc le premier à devoir honorer cette promesse.
+
+**Décision** — Le statut backend est l'unique source de vérité : `card.status !== 'rejected'` détermine si la checkbox est cochée, aucun booléen local dupliqué. Chaque interaction (coche/décoche, `[🗑]`, `[✎]` + Enregistrer, `[Tout accepter]`) déclenche immédiatement un `PATCH` — pas de bouton "sauvegarder mes choix" séparé.
+
+**Alternative écartée** : état local, synchronisé en base seulement au clic final sur `[Ajouter les N cartes]` — plus simple à écrire (aucun aller-retour réseau par clic) et suffisant pour le flux nominal (génération → révision → validation dans la foulée, sans quitter la page), mais rendrait la reprise après rechargement impossible : un utilisateur qui ferme l'onglet par erreur en cours de relecture perdrait tout son travail de tri, malgré la garantie déjà documentée par le service backend. Le coût (un `PATCH` par interaction, sur un écran qui n'en génère jamais des centaines) a été jugé largement inférieur à celui de rompre cette garantie déjà actée.
+
+**Conséquences** : chaque coche/décoche/édition est un aller-retour réseau — acceptable pour un écran de relecture ponctuelle (quelques dizaines de cartes maximum, `MAX_CARD_COUNT`). Le batch reste `pending` tant que l'utilisateur n'a pas cliqué `[Ajouter les N cartes]` (succès total) ou `[Annuler]` (`discarded`) — un abandon silencieux (fermeture d'onglet) laisse le batch `pending` indéfiniment, récupéré par le bandeau de reprise (voir entrée suivante) plutôt que perdu.
+
+---
+
+### [2026-09-02] C-01.09 — Bandeau de reprise d'un brouillon `pending` ajouté (hors périmètre littéral du ticket, validé par l'utilisateur)
+
+**Contexte** — Le ticket C-01.09 ne demande explicitement que l'écran de révision atteint juste après une génération. Mais la dette notée dans DECISIONS.md après C-01.08 (« un batch généré n'est visible nulle part dans l'interface... dette assumée, à lever par le ticket Écran de validation lui-même ») pointait déjà vers ce ticket comme le bon endroit pour la combler. Question posée à l'utilisateur avant de coder plutôt que trancher seul, l'ajout changeant le comportement visible de `FlashcardsCardsPage.vue` au-delà du strict flux génération→révision.
+
+**Décision** — Ajouter un bandeau sur `FlashcardsCardsPage.vue` (visible si un batch `pending` existe pour le système courant) menant au même `AiValidationScreenComponent.vue` que le flux normal — aucun nouveau composant, juste un second point d'entrée vers le même écran. `aiCardGenerationStore.fetchPendingBatches()` appelé au montage de la page.
+
+**Alternative écartée** : rester strictement sur le flux génération → révision immédiate, sans point de reprise — était l'option par défaut avant la question posée à l'utilisateur ; écartée par choix explicite, pour ne pas reporter cette dette à un troisième ticket.
+
+**Conséquences** : si plusieurs batches `pending` existent pour un même système (généré deux fois sans jamais valider), seul le plus récent est proposé par le bandeau — les autres restent orphelins (récupérables via l'API uniquement). Dette mineure assumée, non traitée ici faute de nécessité immédiate (nécessiterait une petite liste plutôt qu'un bandeau à batch unique).
+
+---
+
+### [2026-09-02] C-01.09 — Vue 4 (édition d'une carte proposée) : composant dédié plutôt que la modal manuelle existante suggérée par la maquette
+
+**Contexte** — `diagrams/generation_ia_ui.md` §7 suggère de réutiliser telle quelle la modal `handleCreate`/`handleUpdate` déjà en place dans `FlashcardsCardsPage.vue` pour éditer une carte proposée, « le state initial change de source... rien d'autre ». En pratique, cette modal persiste toujours directement en base (`POST /questions` puis `/responses` puis `/leitnercards`) — éditer une carte *proposée* (brouillon, pas encore acceptée) doit au contraire appeler `PATCH /ai-generation-batches/cards/:cardId`, une opération de nature différente.
+
+**Décision** — Un composant dédié, `AiCardEditModalComponent.vue`, visuellement calqué sur la modal manuelle (mêmes champs, mêmes classes `form-group`/`form-input`, même logique open/mcq) mais avec sa propre logique de soumission (émet `save` avec les champs édités, le parent — `AiValidationScreenComponent.vue` — fait le `PATCH`).
+
+**Alternative écartée** : ajouter un second mode de soumission à la modal manuelle existante de `FlashcardsCardsPage.vue` (déjà volumineuse — `submitForm`/`handleCreate`/`handleUpdate`) pour suivre la maquette au pied de la lettre — écarté par prudence : cette modal est un chemin de création manuelle déjà en production et testé manuellement à plusieurs reprises (voir CHANGELOG_AGENT.md) ; y greffer une branche supplémentaire pour un flux de nature différente (mutation de brouillon vs création réelle) risquait de la complexifier sans bénéfice proportionné, pour un gain (éviter un nouveau fichier) purement cosmétique.
+
+**Conséquences** : légère duplication visuelle entre les deux modals (champs similaires, deux fichiers) — acceptée en échange de deux flux de données totalement indépendants, chacun plus simple à lire et à faire évoluer séparément.

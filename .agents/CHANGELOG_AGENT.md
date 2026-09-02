@@ -150,7 +150,8 @@
 | Génération de Leitner par IA (C-01) — Stockage cartes générées (en attente) | **Livré** — tables `AiGenerationBatch`/`AiGeneratedCard` (2 migrations + modèles Sequelize), `services/AiGenerationBatch.service.js` : persiste le résultat du pipeline (C-01.05, `{ cards, warnings }`) en statut `pending` (transaction batch+cartes), relecture (`findById`/`findPendingByUser`), mutation d'une carte tant que son batch est `pending` (`updateCard`), bookkeeping `validated`/`discarded` (`markBatchStatus` — ne crée AUCUNE ligne dans Question/Response/LeitnerCard, juste un statut), suppression (`deleteBatch`, cascade DB). 17 tests sur vraie base SQLite en mémoire (transaction, cascade, ownership), migrations vérifiées manuellement (up/down réels, FK enforced). **Branchement HTTP ajouté dans la foulée** (décision utilisateur explicite, avant l'Écran de validation) — voir entrée dédiée ci-dessous. 0 régression | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Endpoint HTTP (POST /ai-generation-batches + cycle de vie) | **Livré, Quotas maintenant branché** — referme la chaîne pipeline (C-01.05) → stockage (C-01.07) → HTTP → Quotas/budget (C-01.06) : `POST /ai-generation-batches` (texte ou PDF via upload mémoire dédié, droits vérifiés via `LeitnerCard.service#resolveUserRights`, quota/budget vérifiés via `AiQuota.service#checkQuota` **avant** tout appel LLM/OCR, usage réel journalisé **après** succès), `GET /ai-generation-batches` (liste pending), `GET /ai-generation-batches/:id`, `PATCH /ai-generation-batches/:id/status` (validated/discarded), `PATCH /ai-generation-batches/cards/:cardId` (accept/edit/reject), `DELETE /ai-generation-batches/:id`. 20 tests fonctionnels (routes réelles + DB réelle, pipeline LLM mocké) | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Gestion quotas et budget IA | **Livré** — table `AiUsageLog` (migration + modèle, pattern audit `SET NULL` comme `AuditLog`) + `services/AiQuota.service.js` (C-01.06) : **quota** personnel (générations/jour, compté sur `AiGenerationBatch`) et **budget** global (coût $ estimé/mois, tous utilisateurs, compté sur `AiUsageLog`) — deux garde-fous distincts et indépendants, tous deux réglables par variable d'environnement. `estimateCostUsd` (tarifs C-01.03 codés en dur, à revérifier périodiquement), `checkQuota` (429 si l'un des deux dépassé), `recordUsage` (journalisation best-effort après coup), `getUsageSummary` (prêt pour un futur affichage « quota restant », déjà maquetté en C-01.02). `AiCardGenerationService`/`PdfExtraction.service.js`/`AiCardGenerationPipeline.service.js` enrichis pour faire remonter l'usage réel (tokens/pages) sans le journaliser eux-mêmes. 18 nouveaux tests (`AiQuota.service.test.js` 16 + `aiQuotaConfig.test.js` 2) sur vraie base SQLite en mémoire, + tests des 3 services enrichis mis à jour, + 3 tests BDD (429 quota, 429 budget, vérification `AiUsageLog`). Suite complète : **1725/1725**, 0 régression | 2026-09-02 |
-| Génération de Leitner par IA (C-01) — Interface génération (upload, paramètres) | **Livré (front-end)** — Vues 1/2 de la maquette C-01.02 : `stores/aiCardGeneration.js` (`generate`/`fetchQuota`/`reset`), `components/AiGenerateCardsModalComponent.vue` (source texte/PDF drag&drop, matière en texte libre, slider 1-20, type de carte, quota affiché), `components/AiGenerationProgressModalComponent.vue` (attente illustrative + erreur/retry), bouton d'entrée sur `FlashcardsCardsPage.vue`. Écart comblé au passage : `getUsageSummary` (C-01.06) n'était exposé par aucune route — `GET /ai-generation-batches/quota` ajouté (controller+route+2 tests BDD). Écran de validation (Vue 3) explicitement hors périmètre (décision utilisateur) : succès = toast + fermeture, batch reste `pending` | 2026-09-02 |
+| Génération de Leitner par IA (C-01) — Interface génération (upload, paramètres) | **Livré (front-end)** — Vues 1/2 de la maquette C-01.02 : `stores/aiCardGeneration.js` (`generate`/`fetchQuota`/`reset`), `components/AiGenerateCardsModalComponent.vue` (source texte/PDF drag&drop, matière en texte libre, slider 1-20, type de carte, quota affiché), `components/AiGenerationProgressModalComponent.vue` (attente illustrative + erreur/retry), bouton d'entrée sur `FlashcardsCardsPage.vue`. Écart comblé au passage : `getUsageSummary` (C-01.06) n'était exposé par aucune route — `GET /ai-generation-batches/quota` ajouté (controller+route+2 tests BDD). Écran de validation (Vue 3) explicitement hors périmètre (décision utilisateur) : succès = toast + fermeture, batch reste `pending` ; **infra corrigée le même jour** — `docker-compose.yml` ne transmettait aucune variable Mistral/IA au conteneur `api` (502 systématique en test manuel réel), 8 variables ajoutées | 2026-09-02 |
+| Génération de Leitner par IA (C-01) — Écran révision cartes générées | **Livré (front-end)** — Vue 3/4 de la maquette C-01.02 : `components/AiValidationScreenComponent.vue` (écran plein remplaçant `FlashcardsCardsPage.vue`, checkbox=statut `AiGeneratedCard.status` persistée à chaque interaction — résiste à un rechargement, accordéon `sourceExcerpt`, bandeau `warnings`, `[Tout accepter]`), `components/AiCardEditModalComponent.vue` (Vue 4, composant dédié plutôt que la modal manuelle existante — voir DECISIONS.md), promotion des cartes cochées via `aiCardGenerationStore.promoteCard` (3 endpoints existants, échec partiel toléré : cartes en échec gardées avec badge, réessayables). Bandeau "reprendre un brouillon pending" ajouté sur `FlashcardsCardsPage.vue` (question posée à l'utilisateur, tranchée le 2026-09-02) — `fetchPendingBatches`. 13 nouveaux tests store (22 au total sur `aiCardGeneration.js`) | 2026-09-02 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -9226,3 +9227,89 @@ silencieusement. Réponses (toutes les options recommandées) :
 
 **Fichiers modifiés**
 - `docker-compose.yml` (service `api`, profils `dev` et `test`)
+
+---
+
+## [2026-09-02] ADD — C-01.09 : Écran révision cartes générées — Génération de Leitner par IA
+
+**Contexte** — Ticket `C-01.09` (feature list `C-01`, source planning, V2, tâche **Front-end**, extension
+US-01), suite directe de C-01.08 (confirmé fonctionnel par l'utilisateur après le fix Docker ci-dessus).
+Objectif : livrer l'Écran de révision (Vue 3 de `diagrams/generation_ia_ui.md` §6) et l'édition d'une carte
+proposée (Vue 4, §7) — dernier maillon manquant entre un batch `pending` (C-01.07) et de vraies cartes Leitner
+(`Question`/`Response`/`LeitnerCard`). Point d'attention explicite du ticket : rester dans le périmètre de
+« Écran révision cartes générées » sans déborder sur les autres éléments IN du feature list.
+
+**Audit préalable** (règle d'`AGENT.md`) — `AiGenerationBatch.service.js` était déjà entièrement prêt côté
+back (aucune modification nécessaire) : `updateCard`, `markBatchStatus`, `findPendingByUser`,
+`deleteBatch` existent depuis C-01.07/C-01.08. Point notable trouvé dans les commentaires de service, jamais
+exploité jusqu'ici : (1) `AiGenerationBatch.service.js` précise explicitement que « la promotion des cartes
+acceptées vers Question/Response/LeitnerCard... reste une hypothèse ouverte, non tranchée » — c'est ce ticket
+qui la tranche, en s'appuyant sur `generation_ia_prompt_cartes.md` §6 (3 endpoints existants, aucun nouvel
+endpoint) ; (2) le JSDoc de `findPendingByUser` anticipe explicitement une reprise après rechargement de page
+en cours de relecture — ce qui a orienté le choix de persister le statut de chaque carte à chaque interaction
+plutôt qu'en mémoire locale (voir DECISIONS.md). Une question a été posée à l'utilisateur avant de coder,
+portant sur un point hors du périmètre littéral du ticket mais découlant directement d'une dette déjà notée
+dans DECISIONS.md après C-01.08 : ajouter un point d'entrée pour reprendre un brouillon `pending` existant
+(pas seulement celui qui vient d'être généré) — **validé par l'utilisateur**.
+
+**Ce qui a été fait**
+
+*Store (`stores/aiCardGeneration.js`, étendu — même ressource que C-01.08, pas un second store)*
+- `fetchPendingBatches()` — alimente le bandeau de reprise.
+- `updateCard(cardId, updates)` — wrapper `PATCH /ai-generation-batches/cards/:cardId`.
+- `markBatchStatus(idBatch, status)` — wrapper `PATCH /ai-generation-batches/:id/status`.
+- `promoteCard({...})` — reproduit exactement la séquence de `FlashcardsCardsPage.vue#handleCreate`
+  (`POST /questions` → `POST /responses`×N si `open` → `POST /leitnercards`), `normalizeFormulaSyntax`
+  appliqué comme pour la création manuelle. N'écrit pas le statut de `AiGeneratedCard` — l'appelant reste
+  responsable de retirer la carte promue de sa liste locale.
+
+*Composants*
+- `components/AiValidationScreenComponent.vue` — Vue 3 : écran plein (pas une modal, conforme à la maquette),
+  liste des cartes avec checkbox (source de vérité = `AiGeneratedCard.status`, persistée à chaque clic —
+  résiste à un rechargement), accordéon `sourceExcerpt`, badge « ✎ modifiée », bandeau `warnings[]`,
+  `[Tout accepter]`, bouton `[Ajouter les N cartes]` (désactivé si N=0). `[Annuler]` marque le batch
+  `discarded` (bookkeeping) avant de fermer — évite qu'un abandon explicite réapparaisse dans le bandeau de
+  reprise. Promotion séquentielle avec **échec partiel toléré** (§10/§11 de la maquette, point explicitement
+  laissé ouvert par le document d'analyse) : cartes réussies retirées de la liste, cartes en échec gardées
+  avec un badge d'erreur et réessayables ; le batch n'est marqué `validated` que lorsque plus aucune carte
+  cochée n'est en échec.
+- `components/AiCardEditModalComponent.vue` — Vue 4 : composant dédié plutôt que la réutilisation littérale
+  de la modal manuelle existante suggérée par la maquette (voir DECISIONS.md — la modal manuelle persiste
+  directement en base, celle-ci ne fait qu'un `PATCH` de brouillon).
+
+*Page*
+- `pages/FlashcardsCardsPage.vue` — `aiValidationBatch` (bascule tout le contenu de la page vers l'écran de
+  révision quand non-null, conforme à « remplace temporairement le contenu » de la maquette) ; une génération
+  réussie (C-01.08) enchaîne directement dessus au lieu du toast+fermeture précédent ; bandeau « reprendre »
+  (batch `pending` le plus récent pour ce système, `fetchPendingBatches` au montage) ; `handleValidated`
+  recharge la liste des cartes (les nouvelles apparaissent immédiatement dans leurs boîtes).
+
+**Vérifié**
+- `npx vitest run` (suite complète front) → **47 fichiers, 738 tests** (+13 pour `promoteCard`/`updateCard`/
+  `markBatchStatus`/`fetchPendingBatches`), 0 régression.
+- `npx eslint` sur tous les fichiers modifiés/créés → 0 erreur.
+- `npx vite build` → compile sans erreur ; rebuild + redéploiement de l'image Docker `front` en local
+  (`docker compose up -d --build front`) pour vérification manuelle par l'utilisateur.
+- `node scripts/audit-a11y.mjs` (83 fichiers .vue) → **0 non-conformité**.
+
+**Ce qui n'est PAS couvert**
+- Tests de composants (`AiValidationScreenComponent.vue`/`AiCardEditModalComponent.vue`) — seule la logique
+  métier du store est testée unitairement (pattern déjà en place pour C-01.08 : les composants Vue de cette
+  feature ne sont pas testés au niveau composant, seuls leurs stores le sont).
+- e2e-a11y/contrast.spec.js (Playwright, RGAA 3.2 réel) non rejoué pour les nouveaux écrans — seuls l'audit
+  statique et `test/a11y/axe.test.js` (générique) ont été vérifiés, comme pour C-01.08.
+- Plusieurs brouillons `pending` simultanés pour le même système (ex. généré deux fois sans jamais valider) :
+  le bandeau de reprise n'affiche que le plus récent, les autres restent invisibles — dette mineure, non
+  bloquante (récupérables via l'API), non traitée ici.
+- Vérification manuelle en conditions réelles (génération → révision → ajout des cartes) laissée à
+  l'utilisateur, comme pour C-01.08.
+
+**Fichiers créés**
+- `my_memo_master_front/src/components/AiValidationScreenComponent.vue`
+- `my_memo_master_front/src/components/AiCardEditModalComponent.vue`
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/stores/aiCardGeneration.js` (+`fetchPendingBatches`/`updateCard`/
+  `markBatchStatus`/`promoteCard`)
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` (écran de révision + bandeau de reprise)
+- `my_memo_master_front/test/stores/aiCardGeneration.store.test.js` (+13 tests)

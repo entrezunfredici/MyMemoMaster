@@ -1,6 +1,18 @@
 <template>
   <div class="w-full max-w-4xl mx-auto p-6">
 
+    <!-- Écran de révision des cartes générées (C-01.09, Vue 3 de la maquette) — remplace
+         temporairement le contenu de la page, pas une modal, conforme à diagrams/generation_ia_ui.md
+         §6. -->
+    <AiValidationScreen
+      v-if="aiValidationBatch"
+      :batch="aiValidationBatch"
+      @close="handleValidationClose"
+      @validated="handleValidated"
+    />
+
+    <template v-else>
+
     <div class="flex items-center justify-between mb-6">
       <button @click="router.push('/flashcards')" class="text-primary font-semibold hover:underline">
         ← Retour
@@ -20,6 +32,20 @@
           + Ajouter une carte
         </button>
       </div>
+    </div>
+
+    <!-- Reprise d'un brouillon IA en attente de validation (C-01.09) — un batch "pending" existant
+         pour ce système, jamais fermé via l'écran de révision (ex. onglet fermé sans valider). -->
+    <div
+      v-if="pendingAiBatchForSystem"
+      class="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 mb-6"
+    >
+      <p class="text-sm text-primary">
+        ✨ Une génération par IA est en attente de validation ({{ pendingAiBatchForSystem.cards?.length ?? 0 }} cartes proposées)
+      </p>
+      <button @click="resumePendingBatch" class="text-sm font-semibold text-primary hover:underline">
+        Reprendre
+      </button>
     </div>
 
     <div v-if="loading" class="text-center text-gray-light py-10">Chargement des cartes...</div>
@@ -80,6 +106,8 @@
         </div>
       </div>
     </div>
+
+    </template>
 
     <!-- Modal ajouter / modifier -->
     <div
@@ -334,6 +362,7 @@ import FormulaHelper from '@/components/FormulaHelperComponent.vue'
 import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
 import AiGenerateCardsModal from '@/components/AiGenerateCardsModalComponent.vue'
 import AiGenerationProgressModal from '@/components/AiGenerationProgressModalComponent.vue'
+import AiValidationScreen from '@/components/AiValidationScreenComponent.vue'
 import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
 import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
@@ -374,10 +403,18 @@ const boxFormError = ref('')
 const editingBox = ref(null)
 const boxForm = reactive({ level: '', intervall: '' })
 
-// --- génération par IA (C-01.08) ---
+// --- génération par IA (C-01.08 / C-01.09) ---
 const aiCardGenerationStore = useAiCardGenerationStore()
 const showAiFlow = ref(false)
 const aiStep = ref('config') // 'config' | 'progress'
+const aiValidationBatch = ref(null) // batch affiché à l'écran de révision (Vue 3), null si fermé
+
+// Le plus récent batch "pending" pour CE système (la liste du store couvre tous les systèmes de
+// l'utilisateur) — bandeau de reprise (C-01.09), masqué tant que l'écran de révision est déjà ouvert.
+const pendingAiBatchForSystem = computed(() => {
+  if (aiValidationBatch.value) return null
+  return aiCardGenerationStore.pendingBatches.find(b => b.idSystem === systemId) || null
+})
 
 const cardsByLevel = computed(() => {
   const map = {}
@@ -435,6 +472,8 @@ const loadCards = async () => {
 onMounted(async () => {
   await loadCards()
   loading.value = false
+  // Bandeau de reprise (C-01.09) — best-effort, ne bloque pas l'affichage de la page si ça échoue
+  aiCardGenerationStore.fetchPendingBatches()
 })
 
 const selectType = (newType) => {
@@ -720,19 +759,42 @@ const closeAiFlow = () => {
   aiCardGenerationStore.reset()
 }
 
-// Lance la génération (Vue 1 → Vue 2). L'Écran de validation (Vue 3, diagrams/generation_ia_ui.md
-// §6) est hors périmètre de ce ticket (question posée à l'utilisateur, tranchée le 2026-09-02) :
-// une génération réussie referme simplement le flux avec un toast — le brouillon reste "pending",
-// récupérable via GET /ai-generation-batches par le futur ticket Écran de validation.
+// Lance la génération (Vue 1 → Vue 2). Une génération réussie enchaîne directement sur l'écran de
+// révision (Vue 3, C-01.09) — le brouillon "pending" renvoyé par le store est passé tel quel à
+// AiValidationScreenComponent.
 const handleAiGenerate = async (config) => {
   aiStep.value = 'progress'
   const success = await aiCardGenerationStore.generate(config)
   if (success) {
-    const count = aiCardGenerationStore.lastBatch?.cards?.length ?? 0
-    notif.notify(`${count} carte${count > 1 ? 's' : ''} générée${count > 1 ? 's' : ''}, en attente de validation.`, 'success')
-    closeAiFlow()
+    showAiFlow.value = false
+    aiValidationBatch.value = aiCardGenerationStore.lastBatch
   }
   // Échec : aiCardGenerationStore.status passe à 'error', AiGenerationProgressModal affiche l'état
   // d'erreur (message + [Réessayer]/[Fermer]) — rien de plus à faire ici.
+}
+
+// --- écran de révision (C-01.09) ---
+
+// Reprend le batch "pending" affiché par le bandeau — même écran que juste après une génération.
+const resumePendingBatch = () => {
+  if (pendingAiBatchForSystem.value) aiValidationBatch.value = pendingAiBatchForSystem.value
+}
+
+// Fermeture de l'écran de révision (Annuler, ou [X]) — le batch a été marqué "discarded" par le
+// composant lui-même avant d'émettre 'close' ; on rafraîchit juste le bandeau de reprise pour qu'il
+// disparaisse.
+const handleValidationClose = async () => {
+  aiValidationBatch.value = null
+  await aiCardGenerationStore.fetchPendingBatches()
+}
+
+// Toutes les cartes cochées ont été promues avec succès (POST /questions → /responses →
+// /leitnercards par carte) et le batch a été marqué "validated" par le composant — on recharge la
+// liste des cartes du système pour voir apparaître les nouvelles, et le bandeau de reprise.
+const handleValidated = async () => {
+  aiValidationBatch.value = null
+  loading.value = true
+  await Promise.all([loadCards(), aiCardGenerationStore.fetchPendingBatches()])
+  loading.value = false
 }
 </script>

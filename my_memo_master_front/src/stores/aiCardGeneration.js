@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { api } from '@/helpers/api'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
-// Store de l'écran "Interface génération (upload, paramètres)" — C-01.08. Couvre les Vues 1 et 2
-// de la maquette (diagrams/generation_ia_ui.md) : configuration + lancement de la génération et son
-// état d'attente/erreur. L'Écran de validation (Vue 3) est hors périmètre de ce ticket (question
-// posée à l'utilisateur, tranchée le 2026-09-02) — une génération réussie reste un batch "pending",
-// récupérable via GET /ai-generation-batches par un futur ticket, ce store ne fait qu'exposer
-// `lastBatch` pour lui laisser ce point d'accroche.
+// Store de la feature "Génération de Leitner par IA" (C-01), côté front. Couvre :
+// - C-01.08 (Vues 1/2 de diagrams/generation_ia_ui.md) : configuration + lancement de la
+//   génération et son état d'attente/erreur (`generate`, `fetchQuota`).
+// - C-01.09 (Vues 3/4) : révision d'un batch "pending" — mutation d'une carte proposée
+//   (accept/edit/reject), bookkeeping de statut du batch, et promotion des cartes acceptées vers la
+//   persistance réelle en réutilisant telle quelle la séquence de
+//   `FlashcardsCardsPage.vue#handleCreate` (3 endpoints existants — hypothèse actée par
+//   `generation_ia_prompt_cartes.md` §6, aucun nouvel endpoint de création en masse).
 
 export const useAiCardGenerationStore = defineStore('aiCardGeneration', {
   state: () => ({
@@ -14,6 +17,7 @@ export const useAiCardGenerationStore = defineStore('aiCardGeneration', {
     errorMessage: '',
     lastBatch: null,     // batch "pending" renvoyé par le dernier POST réussi (cards[] inclus)
     quota: null,         // résumé AiQuotaService#getUsageSummary — null tant que non chargé/indisponible
+    pendingBatches: [],  // batches "pending" de l'utilisateur (C-01.09 — reprise d'un brouillon)
   }),
 
   actions: {
@@ -82,6 +86,109 @@ export const useAiCardGenerationStore = defineStore('aiCardGeneration', {
       this.status = 'idle'
       this.errorMessage = ''
       this.lastBatch = null
+    },
+
+    /**
+     * Charge les batches "pending" de l'utilisateur (tous systèmes confondus, le plus récent en
+     * premier — cf. `AiGenerationBatch.service.js#findPendingByUser`). Alimente le bandeau "reprendre
+     * une génération en attente" de `FlashcardsCardsPage.vue` (C-01.09).
+     *
+     * @returns {Promise<boolean>}
+     */
+    async fetchPendingBatches() {
+      const resp = await api.get('ai-generation-batches')
+      if (!resp || resp.status !== 200) {
+        this.pendingBatches = []
+        return false
+      }
+      this.pendingBatches = resp.data
+      return true
+    },
+
+    /**
+     * Modifie une carte proposée (statut accept/edit/reject, et/ou son contenu si édition) — Vue 3/4
+     * de la maquette. Écrit systématiquement en base (pas seulement en mémoire locale) : le batch
+     * reste "pending" tant qu'il n'est pas validé/abandonné, donc résistant à un rechargement de page
+     * en cours de relecture (cf. JSDoc de `AiGenerationBatch.service.js#findPendingByUser`).
+     *
+     * @param {number} cardId
+     * @param {object} updates - Champs à modifier : statement/type/answer/acceptedAnswers/options/status
+     * @returns {Promise<object|null>} La carte mise à jour, ou `null` en cas d'échec
+     */
+    async updateCard(cardId, updates) {
+      const resp = await api.patch(`ai-generation-batches/cards/${cardId}`, updates)
+      if (!resp || resp.status !== 200) return null
+      return resp.data
+    },
+
+    /**
+     * Marque un batch "validated" (promotion terminée) ou "discarded" (abandon explicite depuis
+     * l'écran de révision, Vue 3 — `[Annuler]`) — bookkeeping uniquement, ne crée/supprime aucune
+     * carte réelle (cf. `AiGenerationBatch.service.js#markBatchStatus`).
+     *
+     * @param {number} idBatch
+     * @param {'validated'|'discarded'} status
+     * @returns {Promise<boolean>}
+     */
+    async markBatchStatus(idBatch, status) {
+      const resp = await api.patch(`ai-generation-batches/${idBatch}/status`, { status })
+      return Boolean(resp && resp.status === 200)
+    },
+
+    /**
+     * Promeut UNE carte proposée (déjà acceptée/éditée à l'écran de révision) vers la persistance
+     * réelle — reproduit exactement la séquence de `FlashcardsCardsPage.vue#handleCreate`
+     * (3 endpoints existants, aucun nouvel endpoint de création en masse — hypothèse actée par
+     * `generation_ia_prompt_cartes.md` §6) : `POST /questions` → (type "open" uniquement)
+     * `POST /responses` pour `answer` + chaque `acceptedAnswers` → `POST /leitnercards`.
+     *
+     * N'écrit PAS le statut de la carte proposée elle-même (`AiGeneratedCard`) — l'appelant reste
+     * responsable de retirer la carte promue de sa liste locale (§10 de la maquette : "cartes
+     * réussies retirées de la liste").
+     *
+     * @param {object} params
+     * @param {number} params.idSystem
+     * @param {string} params.statement
+     * @param {'open'|'mcq'} params.type
+     * @param {string|null} [params.answer]
+     * @param {string[]|null} [params.acceptedAnswers]
+     * @param {{text:string, correct:boolean}[]|null} [params.options]
+     * @returns {Promise<{success: boolean, message?: string}>}
+     */
+    async promoteCard({ idSystem, statement, type, answer = null, acceptedAnswers = null, options = null }) {
+      const questionPayload = {
+        statement: normalizeFormulaSyntax(statement),
+        questionPosition: 0,
+        type,
+        content: type === 'mcq'
+          ? { options: (options || []).map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) }
+          : null,
+      }
+
+      const qResp = await api.post('questions', questionPayload)
+      if (!qResp || qResp.status !== 201) {
+        return { success: false, message: qResp?.data?.message || 'Erreur lors de la création de la question.' }
+      }
+      const idQuestion = qResp.data.idQuestion
+
+      if (type === 'open') {
+        const answers = [answer, ...(acceptedAnswers || [])]
+          .map(a => (a || '').trim())
+          .filter(Boolean)
+        for (const content of answers) {
+          const rResp = await api.post('responses', { content: normalizeFormulaSyntax(content), correction: true, idQuestion })
+          if (!rResp || rResp.status !== 201) {
+            return { success: false, message: rResp?.data?.message || 'Erreur lors de la création de la réponse.' }
+          }
+        }
+      }
+
+      const cResp = await api.post('leitnercards', { idQuestion, idSystem, mindMapNodeId: null })
+      if (!cResp || cResp.status !== 201) {
+        return { success: false, message: cResp?.data?.message || 'Erreur lors de la création de la carte.' }
+      }
+
+      return { success: true }
     },
   },
 })
