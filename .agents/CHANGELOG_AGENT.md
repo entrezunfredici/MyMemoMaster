@@ -9664,3 +9664,34 @@ est déjà éprouvée par les tests existants d'`authLimiter`/`apiLimiter` sur l
 - `my_memo_master_api/validators/AiGenerationBatch.validators.js`
 - `my_memo_master_api/test/services/AiQuota.service.test.js`
 - `my_memo_master_api/test/bdd/aiGenerationBatch.test.js`
+
+---
+
+## [2026-09-02] FIX — Cause racine des 4 incidents `deploy_prod` (K8S_PROD_ENABLED posée comme Secret, pas comme Variable) + variables Mistral absentes du chart Helm
+
+**Contexte** — L'utilisateur a signalé que les nouvelles fonctionnalités (dont la génération IA)
+n'apparaissaient pas en prod malgré un CI/CD vert. En creusant avec une capture d'écran des GitHub
+Settings : **`K8S_PROD_ENABLED` était posée dans « Repository secrets » et non dans « Variables »**.
+`cd.yml` teste `vars.K8S_PROD_ENABLED == 'true'` — le contexte `vars` ne voit jamais un `secret`, quel
+que soit son nom. La condition valait donc toujours faux, silencieusement, sans erreur nulle part.
+**C'est la cause racine des 4 incidents `deploy_prod` skipped documentés depuis le 2026-08-27**
+(27/08, 28/08, 31/08, et celui du jour) — jusqu'ici tous attribués à « la variable n'a pas été
+activée », alors qu'elle l'avait été, mais au mauvais endroit.
+
+**Corrigé par l'utilisateur** : recréation de `K8S_PROD_ENABLED` comme Repository **variable** (pas
+secret) dans GitHub Settings — action hors dépôt, non versionnée, confirmée par l'utilisateur.
+
+**Second problème trouvé en creusant la même question** (« les nouvelles fonctionnalités » incluent la
+génération IA) : le chart Helm n'exposait aucune des 8 variables Mistral/IA consommées par
+`helpers/mistralConfig.js`/`helpers/aiQuotaConfig.js` — la dette déjà comblée pour `docker-compose.yml`
+(entrée du même jour, plus haut) n'avait jamais été reportée côté Kubernetes. Corrigé : voir entrée
+séparée « Chart Helm : variables Mistral/IA absentes du ConfigMap K8s » ci-dessus dans l'historique
+git (7 variables non sensibles dans `helm/values.yaml#config`, `MISTRAL_API_KEY` documentée pour le
+Secret K8s existant via `kubectl patch`).
+
+**Ce qui n'est PAS couvert** — L'ajout effectif de `MISTRAL_API_KEY` au Secret K8s réel
+(`mmm-prod-secrets`) reste une action à faire par l'utilisateur (accès cluster hors de portée depuis
+ce poste) ; la commande exacte est documentée dans `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` §3.2. Le
+prochain déploiement effectif (re-run du CD ou nouveau push) n'a pas été vérifié en conditions réelles
+dans cette session — à confirmer que les pods récupèrent bien le nouveau ConfigMap/Secret après le
+`helm upgrade`.
