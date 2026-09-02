@@ -9689,9 +9689,49 @@ séparée « Chart Helm : variables Mistral/IA absentes du ConfigMap K8s » ci-d
 git (7 variables non sensibles dans `helm/values.yaml#config`, `MISTRAL_API_KEY` documentée pour le
 Secret K8s existant via `kubectl patch`).
 
-**Ce qui n'est PAS couvert** — L'ajout effectif de `MISTRAL_API_KEY` au Secret K8s réel
-(`mmm-prod-secrets`) reste une action à faire par l'utilisateur (accès cluster hors de portée depuis
-ce poste) ; la commande exacte est documentée dans `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` §3.2. Le
-prochain déploiement effectif (re-run du CD ou nouveau push) n'a pas été vérifié en conditions réelles
-dans cette session — à confirmer que les pods récupèrent bien le nouveau ConfigMap/Secret après le
-`helm upgrade`.
+**Ce qui n'est PAS couvert** — Voir l'entrée suivante : l'ajout de `MISTRAL_API_KEY` et le déploiement
+effectif ont finalement été faits dans la foulée, dans cette même session.
+
+---
+
+## [2026-09-02] DÉPLOIEMENT — Prod K8s remise à jour (révision 4 du 27/08 → révision 5), `MISTRAL_API_KEY` ajoutée au Secret
+
+**Contexte** — L'utilisateur a indiqué disposer d'un accès cluster local (`k8s/kubeconfig/`,
+gitignored, non versionné) : « tu as l'accès avec les infos dans le dossier k8s ». Confirmé
+opérationnel (`kubectl cluster-info` → même port `31159` que les accès validés précédemment
+documentés dans ce journal). État trouvé à la connexion : `helm history mmm-prod -n mymemomaster`
+figé en **révision 4 du 2026-08-27 11:35**, pods de 33h (dernier redémarrage manuel, pas un vrai
+`helm upgrade`) — confirme en direct la série d'incidents `deploy_prod` déjà documentée (cause racine
+retrouvée le jour même : `K8S_PROD_ENABLED` posée comme Secret plutôt que Variable GitHub, corrigée
+par l'utilisateur juste avant). `mmm-prod-secrets` ne portait pas `MISTRAL_API_KEY`.
+
+**Ce qui a été fait** — Sur confirmation explicite de l'utilisateur (clé Mistral : réutilisation de
+celle du `.env` local plutôt qu'une clé prod séparée ; lancement direct du déploiement depuis ce
+poste plutôt que d'attendre un re-run GitHub Actions) :
+1. `kubectl patch secret mmm-prod-secrets -n mymemomaster --type=merge` — ajout de `MISTRAL_API_KEY`
+   sans toucher aux 11 autres clés déjà présentes (`stringData`, merge non destructif — voir
+   `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` §3.2 pour la commande générique).
+2. `helm upgrade --install mmm-prod ./helm -f helm/values-prod.yaml -n mymemomaster --set
+   "rolloutTimestamp=$(date +%s)" --atomic --timeout 8m` — même commande que `deploy_prod` dans
+   `cd.yml`. Release passée en **révision 5**, `STATUS: deployed`.
+
+**Vérifié** :
+- `kubectl get pods -n mymemomaster` — 4 nouveaux pods api/front (`Running 1/1`, âge 45-74 s au
+  moment du contrôle), `mmm-prod-api`/`mmm-prod-front` à `2/2 AVAILABLE`.
+- Digests réellement déployés : `mymemomaster_api@sha256:9182b5ed…`,
+  `mymemomaster_front@sha256:51795245…` (correspondent aux images poussées par le CD du commit
+  `6dfcd90`, qui embarque tout `C-01` + les 6 correctifs sécurité/coût de la revue C-01.11).
+- `MISTRAL_API_KEY` confirmée présente dans le Secret après patch (liste des clés relue, valeur non
+  affichée).
+- Endpoints publics : `GET https://api.my-memo-master.com/api/v1/health` → 200,
+  `https://app.my-memo-master.com/` → 200.
+
+**Ce qui n'est PAS couvert** — Pas de vérification fonctionnelle de la génération IA en conditions
+réelles sur la prod elle-même (bouton "✨ Générer par IA" cliqué, appel Mistral réel depuis le pod) —
+seule la santé générale des pods et la présence de la clé dans le Secret ont été vérifiées, pas
+l'exécution effective du pipeline complet en prod. `kubectl exec` dans le pod a été refusé par le
+classifieur de permissions de la session (action jugée trop invasive sur un système distant) — la
+vérification de la variable d'environnement injectée dans le pod n'a donc pas pu être faite
+directement, seule la présence de la clé côté Secret K8s l'a été. `K8S_PROD_ENABLED` (désormais en
+Variable GitHub, côté utilisateur) n'a pas été re-testée via un nouveau cycle CI/CD — ce déploiement a
+été fait directement en Helm, en contournant la CD pour aller plus vite.
