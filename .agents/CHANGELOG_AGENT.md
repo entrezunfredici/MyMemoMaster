@@ -145,6 +145,7 @@
 | Génération de Leitner par IA (C-01) — Spécification prompt génération cartes | **Analyse livrée, aucun code** — `diagrams/generation_ia_prompt_cartes.md` (C-01.01) : prompt système + prompt utilisateur, contrat d'entrée/sortie JSON aligné sur le contrat réel de persistance (`POST /questions` → `POST /responses` → `POST /leitnercards`, cf. `FlashcardsCardsPage.vue#handleCreate`), garde-fous anti-hallucination (`sourceExcerpt` par carte), cas d'erreur ; orientation fournisseur **Mistral AI actée par l'utilisateur (RGPD, hébergement UE)** — le Benchmark LLM (modèle précis, coût/latence) reste à faire séparément. `C-01` reste à 0/11 dans Odoo — aucune intégration LLM externe dans le dépôt à ce jour | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Maquettes UI génération Leitner IA | **Analyse livrée, aucun code** — `diagrams/generation_ia_ui.md` (C-01.02) : maquettes ASCII du parcours complet (point d'entrée sur `FlashcardsCardsPage.vue`, modal configuration source/matière/nombre/type, état de génération en cours, écran de validation accept/edit/reject par carte avec `sourceExcerpt`, édition réutilisant le formulaire carte existant), composants/store/comportements esquissés, persistance réutilisant les 3 endpoints existants (aucun ajout automatique sans validation — OUT du ticket). Endpoint(s) d'orchestration et progression réelle non tranchés (hors périmètre) | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Benchmark et choix modèle LLM | **Analyse livrée, aucun code** — `diagrams/generation_ia_llm_benchmark.md` (C-01.03) : revue documentaire (pas empirique, aucune intégration LLM existante) de la gamme Mistral AI (orientation RGPD déjà actée), tableau comparatif Large 3/Medium 3.5/Small 4/Ministral 3 (contexte, prix/M tokens, support sortie structurée), profil de tâche dérivé du prompt C-01.01 (extraction structurée sur chunk court, pas de raisonnement complexe) → **choix retenu `mistral-small-latest`**, `mistral-medium-latest` en option d'escalade ; protocole de validation empirique documenté mais non exécuté (hors périmètre) | 2026-09-01 |
+| Génération de Leitner par IA (C-01) — Service inférence IA (appel LLM, parsing) | **Livré et vérifié en conditions réelles** — `services/AiCardGeneration.service.js` (C-01.04) : exécute le prompt C-01.01 sur `mistral-small-latest` (config C-01.03, via `helpers/mistralConfig.js`), appel HTTP natif `fetch` (aucune dépendance ajoutée), `response_format: json_object`, parsing + validation stricte du schéma de sortie (`cards[]`/`warning`, y compris la cohérence entre le `cardType` demandé et le type réellement renvoyé par carte — trouvé en défaut lors du test réel, corrigé), retry unique sur sortie non conforme puis échec explicite (502) — jamais de fallback silencieux. Pas de controller/route (service pur, comme `Semantic.service.js` — hors périmètre de ce ticket). 47 tests (service + helper config), 0 régression sur les 1630 tests API. Testé avec une vraie clé API (fournie par l'utilisateur) : génération `open` et `mcq` toutes deux conformes | 2026-09-01 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -8521,3 +8522,118 @@ maquetté en C-01.02), tout code (aucune ligne de code livrée — ticket d'anal
 **Dette signalée, non traitée ici** — Le choix `mistral-small-latest` n'a été validé par aucun appel réel ;
 le protocole de validation empirique du §8 reste à exécuter avant toute mise en production, avec bascule
 possible vers `mistral-medium-latest` selon les résultats.
+
+---
+
+## [2026-09-01] ADD — C-01.04 : Service inférence IA (appel LLM, parsing) — Génération de Leitner par IA
+
+**Contexte** — Ticket `C-01.04` (feature list `C-01`, source planning, V2, tâche **Back-end** — première tâche
+d'implémentation de `C-01`, après 3 tickets d'analyse C-01.01/02/03). Objectif : livrer le « Service
+inférence IA (appel LLM, parsing) », sans déborder sur les autres éléments IN du feature list (Chunking PDF,
+Quotas, Écran de validation — hors périmètre) ni sur Prompt/Benchmark LLM (déjà livrés en C-01.01/C-01.03,
+consommés tels quels ici).
+
+**Audit préalable** — Vérifié avant codage (règle d'audit d'`AGENT.md`) : aucune intégration LLM n'existe dans
+le dépôt (reconfirmé une 3ᵉ fois), `axios` n'est pas une dépendance de l'API (front uniquement). Pattern de
+service pur sans controller/route déjà établi par `Semantic.service.js` (consommé en interne par
+`Test.service.js`, jamais exposé par sa propre route) — repris ici : ce ticket ne crée ni controller, ni
+route, ni validators, une route d'orchestration étant hors périmètre (dépend de Chunking PDF/Quotas, non
+livrés). Pattern de configuration par variables d'environnement résolues à l'appel (pas figées au chargement
+du module) déjà établi par `helpers/frontUrl.js` — repris pour `helpers/mistralConfig.js`, plus testable que
+le pattern `config/redis.config.js` (figé au require) pour ce cas d'usage.
+
+**Ce qui a été fait**
+- `helpers/mistralConfig.js` — résout `MISTRAL_API_KEY`/`MISTRAL_API_URL`/`MISTRAL_MODEL`/`MISTRAL_TIMEOUT_MS`
+  depuis `process.env` à chaque appel (fonction, pas un objet figé). Défaut `mistral-small-latest` (C-01.03).
+- `services/AiCardGeneration.service.js` — reproduit le prompt système/utilisateur et le schéma de sortie de
+  `generation_ia_prompt_cartes.md` §3-4 tels quels (fidélité au document déjà revu) : `buildSystemPrompt`,
+  `buildUserPrompt`, `validateInput` (400 sur paramètres invalides, y compris un plafond technique
+  `MAX_CARD_COUNT=30` — **garde-fou du service, pas une implémentation de Quotas**, voir DECISIONS.md),
+  `validateCard`/`validatePayload` (schéma complet : `open` avec `answer` requis, `mcq` avec 3-4 `options` et
+  exactement une `correct: true`, `sourceExcerpt` obligatoire sur toute carte, `cards.length` jamais > au
+  nombre demandé), `parseAndValidate` (JSON.parse + validation), `callModel` (appel HTTP natif `fetch` vers
+  l'API Mistral, `response_format: json_object`, température 0.3, timeout via `AbortController`, erreurs
+  distinctes : 500 si clé API absente, 502 sur échec réseau/HTTP/contenu vide), `generateCards` (orchestre le
+  tout, retry unique sur sortie non conforme avec l'historique de conversation + message de correction,
+  échec explicite 502 après le 2ᵉ essai — reprend exactement la politique documentée en C-01.01 §7).
+- `.env.example` — section IA ajoutée (`MISTRAL_API_KEY` vide par défaut, `MISTRAL_MODEL=mistral-small-latest`,
+  `MISTRAL_API_URL`, `MISTRAL_TIMEOUT_MS`).
+- Tests : `test/services/AiCardGeneration.service.test.js` (42 tests : prompts, validation d'entrée, de carte,
+  de payload, parsing, appel modèle mocké via `jest.spyOn(global.fetch)`, orchestration complète y compris le
+  retry et ses 2 issues), `test/helpers/mistralConfig.test.js` (3 tests : défauts, surcharge, réactivité au
+  changement d'environnement entre deux appels).
+
+**Choix techniques principaux** (détail Contexte/Décision/Alternative dans `DECISIONS.md`) :
+- `fetch` natif (Node 22) plutôt que `axios` ou le SDK officiel `@mistralai/mistralai` — aucune dépendance
+  ajoutée.
+- `response_format: json_object` (avec rappel du schéma dans le prompt, déjà la stratégie de C-01.01) plutôt
+  que les Custom Structured Outputs de Mistral (schéma JSON strict côté API) — le schéma a des champs
+  conditionnels selon `type` (open/mcq) qu'un schéma JSON Schema strict représenterait mal sans dupliquer les
+  cartes en deux variantes distinctes.
+- `MAX_CARD_COUNT=30` — plafond technique de protection du service, explicitement distingué de Quotas (hors
+  périmètre, arbitrage produit/coût à faire séparément).
+
+**Ce qui est utilisable**
+- `AiCardGenerationService.generateCards({ sourceText, subjectContext, cardCount, cardType, outputLanguage })`
+  callable depuis n'importe quel autre service/controller une fois `MISTRAL_API_KEY` configurée — retourne
+  `{ cards, warning }` en mémoire, **jamais persisté par ce service** (rappel périmètre OUT : aucune
+  génération sans validation utilisateur — le futur endpoint/Écran de validation restent à câbler séparément).
+- Vérifié : `npx jest test/services/AiCardGeneration.service.test.js test/helpers/mistralConfig.test.js` →
+  45/45 ; suite complète `npx jest` → **1625/1625**, 0 régression (+45 vs. 1580 avant ce ticket) ; `npx eslint .`
+  → 0 erreur.
+
+**Ce qui n'est PAS couvert** — Aucun controller/route/validators (service pur, hors périmètre — voir audit
+préalable), Chunking PDF, Quotas (au-delà du garde-fou technique ci-dessus), Écran de validation, persistance
+des cartes générées (reste, comme documenté en C-01.01 §6, une hypothèse de mapping vers les 3 endpoints
+existants — non câblée ici).
+
+**Fichiers créés**
+- `my_memo_master_api/helpers/mistralConfig.js`
+- `my_memo_master_api/services/AiCardGeneration.service.js`
+- `my_memo_master_api/test/services/AiCardGeneration.service.test.js`
+- `my_memo_master_api/test/helpers/mistralConfig.test.js`
+
+**Fichiers modifiés**
+- `.env.example` (section IA — génération de cartes Leitner)
+
+**Dette signalée, non traitée ici**
+- **`response_format: json_object` plutôt que Custom Structured Outputs** — piste d'amélioration si le taux
+  de conformité JSON mesuré en conditions réelles s'avère insuffisant (voir commentaire dans `callModel`).
+- **Aucun moyen d'appeler ce service depuis l'application** — ni controller, ni route, ni intégration front
+  (le store esquissé en C-01.02 § 9 reste un squelette) : ce ticket livre le moteur, pas le branchement.
+
+---
+
+## [2026-09-01] FIX — C-01.04 : vérification en conditions réelles, `cardType` demandé non recoupé avec le type renvoyé par carte
+
+**Contexte** — L'utilisateur a ajouté une vraie clé `MISTRAL_API_KEY` dans `.env` et demandé un test en
+conditions réelles pour confirmer que le service livré plus tôt dans la journée fonctionne. Deux appels réels
+faits via un script de vérification ponctuel (scratchpad de session, non versionné) : un en `cardType: "open"`
+(3 cartes, conforme du premier coup, 2 936 ms), un en `cardType: "mcq"` (2 cartes) — ce second appel a révélé
+que le modèle avait renvoyé **une carte "open" alors que "mcq" était strictement demandé**, sans qu'aucune
+erreur ne soit levée : `validatePayload`/`validateCard` ne vérifiaient que la cohérence interne de chaque
+carte (un "open" bien formé reste un "open" valide), jamais que son `type` correspondait au `cardType` demandé
+à l'appel — écart réel non couvert par les 45 tests initiaux, qui ne testaient jamais ce croisement.
+
+**Corrigé** — `validatePayload`/`parseAndValidate` acceptent un 3ᵉ paramètre `cardType` (défaut `'mixed'`,
+rétrocompatible avec les appels existants) : si `cardType` vaut `"open"` ou `"mcq"`, toute carte dont le
+`type` diffère devient une erreur de validation, qui déclenche donc le retry déjà en place (`generateCards`)
+au même titre que n'importe quelle autre non-conformité — pas de nouveau mécanisme, réutilisation de celui
+déjà livré. `generateCards` transmet désormais le `cardType` réellement demandé à chaque appel de
+`parseAndValidate`.
+
+**Revérifié en conditions réelles après correctif** : même appel `cardType: "mcq"` → 2/2 cartes bien `"mcq"`.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiCardGeneration.service.js`
+- `my_memo_master_api/test/services/AiCardGeneration.service.test.js` (+5 tests : 4 sur `validatePayload`
+  avec les 4 combinaisons de `cardType`, 1 sur `generateCards` vérifiant que l'écart déclenche bien le retry)
+
+**Vérifié** : `npx jest test/services/AiCardGeneration.service.test.js` → 47/47 (+2 vs. 45) ; suite complète
+`npx jest` → **1630/1630**, 0 régression ; `npx eslint` → 0 erreur ; 2 appels réels contre l'API Mistral
+(`open` et `mcq`) après correctif, tous deux conformes.
+
+**Dette signalée, non traitée ici** — Un seul type d'écart a été trouvé et corrigé par ce test ponctuel (2
+appels réels, non représentatif d'un vrai taux de conformité) ; le protocole de validation empirique plus
+complet documenté en C-01.03 §8 (jeu de référence, mesure de taux sur plusieurs matières/tailles de chunk)
+reste à exécuter avant toute mise en production.

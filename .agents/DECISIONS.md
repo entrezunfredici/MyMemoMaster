@@ -1752,6 +1752,42 @@ Les deux durées s'additionnent au temps planifié existant (`revision.totalMinu
 
 ---
 
+### [2026-09-01] C-01.04 — `fetch` natif plutôt qu'`axios`/SDK Mistral officiel, pour l'appel LLM
+
+**Contexte** — Le service d'inférence IA (`AiCardGeneration.service.js`) doit appeler l'API Mistral en HTTP. Trois options : le SDK officiel `@mistralai/mistralai`, `axios` (déjà dépendance approuvée côté front, absente côté API), ou `fetch` natif (disponible globalement depuis Node 18, Node 22 utilisé par ce projet).
+
+**Décision** — `fetch` natif, sans ajouter de dépendance. Un appel HTTP JSON simple (une requête, une réponse, un timeout via `AbortController`) ne justifie ni le SDK (surface d'API plus large que le seul besoin ici — chat completions) ni `axios` (déjà écarté côté API historiquement, cf. absence dans `package.json`).
+
+**Alternative écartée** : `@mistralai/mistralai` — écarté pour cette première version : aurait apporté du typage/des retries intégrés, mais aussi une dépendance de plus à maintenir/auditer (OWASP A06, cf. `CONVENTIONS.md`) pour un besoin qui se résume à un seul endpoint REST. À reconsidérer si le service doit gérer plusieurs endpoints Mistral (embeddings, OCR…) ou des besoins avancés (function calling multi-tours) que le SDK simplifierait significativement. / `axios` — écarté, aucun gain sur ce cas d'usage par rapport à `fetch` natif, et introduirait une dépendance supplémentaire là où `fetch` suffit.
+
+**Conséquences** : `package.json` de l'API inchangé, aucune nouvelle dépendance à auditer. Le timeout et l'annulation de requête sont gérés manuellement via `AbortController` (`services/AiCardGeneration.service.js#callModel`) plutôt que par une option native du client HTTP.
+
+---
+
+### [2026-09-01] C-01.04 — `response_format: json_object` (+ rappel du schéma dans le prompt) plutôt que les Custom Structured Outputs de Mistral
+
+**Contexte** — Mistral expose deux mécanismes de sortie structurée (cf. `diagrams/generation_ia_llm_benchmark.md` §4, `diagrams/generation_ia_prompt_cartes.md` §11) : le mode JSON simple (`response_format: { type: "json_object" }`, sortie JSON garantie mais forme libre) et les Custom Structured Outputs (schéma JSON Schema fourni à l'API, forme garantie). Le schéma de sortie du prompt (C-01.01 §4) a des champs conditionnels selon `card.type` (`answer`/`acceptedAnswers` pour `open`, `options` pour `mcq`, mutuellement exclusifs).
+
+**Décision** — `response_format: json_object`, avec le schéma rappelé en toutes lettres dans le prompt utilisateur (`SCHEMA_DESCRIPTION`, reproduit tel quel depuis `generation_ia_prompt_cartes.md` §4) — stratégie déjà actée en C-01.01, reprise ici sans modification.
+
+**Alternative écartée** : Custom Structured Outputs — un JSON Schema strict représenterait mal l'union conditionnelle `open`/`mcq` sans le modéliser en deux variantes de carte distinctes (`oneOf` sur `type`), ce qui aurait complexifié le schéma et désynchronisé l'implémentation du contrat déjà documenté et revu en C-01.01 sans bénéfice certain (le mode JSON simple, combiné à la validation applicative déjà écrite en `validatePayload`/`validateCard` + le retry unique, couvre déjà le besoin de fiabilité).
+
+**Conséquences** : la fiabilité du format repose sur la combinaison prompt + validation applicative + retry (déjà la stratégie documentée), pas sur une garantie API. Piste de dette explicitement notée : si le protocole de validation empirique (C-01.03 §8) mesure un taux de non-conformité trop élevé avec `json_object` seul, migrer vers les Custom Structured Outputs (avec un schéma `oneOf` par type de carte) est l'option de repli, sans remise en cause du reste du service.
+
+---
+
+### [2026-09-01] C-01.04 — Plafond technique `MAX_CARD_COUNT=30`, explicitement distinct de Quotas
+
+**Contexte** — `validateInput` du service rejette un `cardCount` non entier, ≤ 0, ou > 30. Le feature list `C-01` prévoit un élément IN séparé, « Quotas », non livré à ce stade (hors périmètre de C-01.04). Point d'attention du ticket : ne pas étendre le périmètre à Quotas.
+
+**Décision** — Un plafond fixe de 30 cartes par appel, codé en dur dans le service (`MAX_CARD_COUNT`), présenté et commenté explicitement comme un **garde-fou technique de robustesse du service** (éviter un appel manifestement aberrant — ex. `cardCount: 100000` — de gonfler démesurément un prompt ou un coût d'appel unique), **pas** une implémentation de Quotas (qui porterait sur un cumul dans le temps, par utilisateur/plan, avec sa propre persistance et ses propres règles produit — tout cela hors périmètre).
+
+**Alternative écartée** : aucune limite dans le service (tout `cardCount` positif accepté, la borne réelle laissée entièrement à un futur Quotas) — écartée car elle aurait laissé le service vulnérable à un appel technique aberrant même avant qu'un mécanisme de Quotas n'existe (ex. pendant le développement/les tests manuels de la prochaine intégration), pour un coût de complexité nul (une constante, une comparaison).
+
+**Conséquences** : le futur ticket Quotas devra composer avec cette borne haute existante (30) — soit la reprendre telle quelle comme plafond technique en complément de ses propres règles métier, soit la faire évoluer si une valeur différente s'avérait pertinente ; ce n'est pas un contrat figé, juste un filet de sécurité pris par prudence dans ce ticket.
+
+---
+
 ### [2026-09-01] Mémoire API prod/preprod : 896Mi/1536Mi plutôt que des valeurs rondes en Gi (1Gi/2Gi)
 
 **Contexte** — Le correctif de pré-chauffage (entrée précédente) a produit la première mesure réelle de la mémoire consommée par l'API une fois le modèle sémantique chargé : 794-825 Mi de RSS. Les deux fichiers `helm/values-{prod,preprod}.yaml` portaient depuis leur création un commentaire attendant explicitement cette mesure pour remplacer la valeur provisoire (512Mi requests / 1Gi limits).
