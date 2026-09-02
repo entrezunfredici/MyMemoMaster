@@ -71,7 +71,7 @@ describe('useAiCardGenerationStore', () => {
       cardType: 'open',
     })
 
-    expect(mockPost).toHaveBeenCalledWith('ai-generation-batches', expect.any(FormData))
+    expect(mockPost).toHaveBeenCalledWith('ai-generation-batches', expect.any(FormData), { timeout: 300000 })
     const formData = mockPost.mock.calls[0][1]
     expect(formData.get('idSystem')).toBe('5')
     expect(formData.get('sourceText')).toBe('Un texte source.')
@@ -116,6 +116,16 @@ describe('useAiCardGenerationStore', () => {
     expect(store.errorMessage).toBe('Quota quotidien de générations par IA atteint.')
     expect(store.lastBatch).toBeNull()
     expect(result).toBe(false)
+  })
+
+  it('generate - envoie un timeout étendu (300000 ms), distinct du timeout global 10000 ms (bug C-01.11)', async () => {
+    mockPost.mockResolvedValueOnce({ status: 201, data: { id: 5, cards: [] } })
+
+    const store = useAiCardGenerationStore()
+    await store.generate({ idSystem: 5, sourceText: 'Texte.', cardCount: 5, cardType: 'open' })
+
+    const config = mockPost.mock.calls[0][2]
+    expect(config.timeout).toBe(300000)
   })
 
   it('generate - erreur réseau (api.post renvoie undefined) - status "error", message générique', async () => {

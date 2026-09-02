@@ -11,6 +11,20 @@ import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 //   `FlashcardsCardsPage.vue#handleCreate` (3 endpoints existants — hypothèse actée par
 //   `generation_ia_prompt_cartes.md` §6, aucun nouvel endpoint de création en masse).
 
+// BUG TROUVÉ EN CONDITIONS RÉELLES (C-01.11, revue de code avant merge) : `api.post` hérite par
+// défaut du timeout global de `helpers/api.js` (10 000 ms — calibré pour les ~160 endpoints CRUD
+// de l'app). La génération IA appelle jusqu'à `MAX_CHUNKS` (20, `AiCardGenerationPipeline.service.js`)
+// passages, chacun jusqu'à 2 appels Mistral (1er essai + retry, `AiCardGeneration.service.js`) —
+// un seul passage avec retry dépasse déjà souvent 10 s en pratique (mesuré : jusqu'à ~7 s par appel
+// simple lors du protocole C-01.10, `docs/QUALITE_GENERATION_IA_RUN.json`). Le timeout global
+// coupait donc la connexion avant la fin d'une génération légitime — `api.post` avale l'erreur et
+// renvoie `undefined` (voir `helpers/api.js#post`), donc `generate()` ci-dessous affichait le
+// message générique "La génération a échoué. Réessayez." même quand rien n'avait réellement échoué
+// côté serveur. Valeur généreuse plutôt qu'un calcul exact du pire cas théorique (20 × 2 ×
+// MISTRAL_TIMEOUT_MS = 1200 s, non réaliste) : 5 min couvre confortablement une génération
+// multi-passages réelle sans laisser l'utilisateur indéfiniment bloqué sur un appel réellement mort.
+const GENERATE_TIMEOUT_MS = 300000
+
 export const useAiCardGenerationStore = defineStore('aiCardGeneration', {
   state: () => ({
     status: 'idle',      // 'idle' | 'generating' | 'error' | 'done'
@@ -65,7 +79,7 @@ export const useAiCardGenerationStore = defineStore('aiCardGeneration', {
         formData.append('sourceText', sourceText || '')
       }
 
-      const resp = await api.post('ai-generation-batches', formData)
+      const resp = await api.post('ai-generation-batches', formData, { timeout: GENERATE_TIMEOUT_MS })
 
       if (!resp || resp.status !== 201) {
         this.status = 'error'
