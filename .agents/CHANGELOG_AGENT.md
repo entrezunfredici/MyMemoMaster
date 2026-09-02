@@ -9411,3 +9411,136 @@ livré, mais son passage à « validé »/`terminé` sur le registre officiel n'
 
 **Fichiers créés**
 - `docs/RAPPORT_TESTS_FINAL.md`
+
+---
+
+## [2026-09-02] ADD — C-01.10 : Tests qualité génération — Génération de Leitner par IA
+
+**Contexte** — Ticket `C-01.10` (feature list `C-01`, source planning `C-01.10`, V2), demandé
+explicitement par l'utilisateur (« occupe-toi de cette tâche »), qui a par ailleurs confirmé en cours
+de session avoir testé fonctionnellement l'interface avec succès (« j'ai tester fonctionnellement c'est
+ok »). Objectif du ticket : livrer les tests qualité de la génération IA, en respectant strictement son
+périmètre (ne pas déborder sur les autres éléments IN de `C-01`, déjà livrés). Point de départ trouvé
+dans le dépôt : une dette explicitement signalée depuis C-01.04 (2026-09-01) — « le protocole de
+validation empirique plus complet documenté en C-01.03 §8 (jeu de référence, mesure de taux sur
+plusieurs matières/tailles de chunk) reste à exécuter avant toute mise en production » — c'est
+précisément ce protocole, déjà spécifié dans `diagrams/generation_ia_llm_benchmark.md` §8, qui a été
+exécuté ici.
+
+**Ce qui a été fait**
+
+*Vérifications de qualité, permanentes et testées (sans appel réseau)*
+- `helpers/aiGenerationQualityChecks.js` — fonctions pures vérifiant les garde-fous de
+  `generation_ia_prompt_cartes.md` §5 **non couverts** par la validation de schéma déjà faite par
+  `AiCardGenerationService#validatePayload`/`validateCard` (C-01.04) : `isExcerptGenuine` (le
+  `sourceExcerpt` cité existe-t-il vraiment dans le texte source, §5.1 anti-hallucination),
+  `findDuplicateStatements` (doublons de notion par égalité normalisée ou chevauchement lexical ≥ 0,8,
+  §5.2 atomicité), `respectsShortfallWarning` (§5.3 — contenu insuffisant signalé par `warning`).
+- `test/helpers/aiGenerationQualityChecks.test.js` — 21 tests.
+
+*Protocole empirique (appels réels, un seul run, non intégré à la suite Jest par défaut)*
+- `scripts/quality-check-ai-generation.js` — exécute `AiCardGenerationService#generateCards` en
+  conditions réelles (vraie `MISTRAL_API_KEY` du `.env`) sur 7 fixtures (plusieurs matières/tailles,
+  dont 2 cas limites délibérés : contenu insuffisant, `cardCount` disproportionné), applique les
+  vérifications de qualité ci-dessus, écrit un artefact JSON brut. Appelle le service directement
+  (comme le script ponctuel de C-01.04), pas l'endpoint HTTP : aucune consommation du quota quotidien
+  utilisateur, coût réel de l'ordre du millième de dollar (voir rapport §5).
+- `docs/RAPPORT_QUALITE_GENERATION_IA.md` — rapport du run du 2026-09-02 : **7/7 succès** (1 retry
+  déclenché sur `maths-pythagore-mcq`, exactement le défaut `cardType` déjà trouvé et corrigé en
+  C-01.04, confirmant que le correctif tient), **36/36 `sourceExcerpt` réellement présents** dans le
+  texte source (anti-hallucination 100 % sur cet échantillon), latence moyenne 3 665 ms.
+- `docs/QUALITE_GENERATION_IA_RUN.json` — artefact brut du run (toutes les cartes générées).
+
+**Écart trouvé** (détail et recommandation en §4 du rapport) — Sur les 2 cas limites de contenu
+insuffisant, le modèle **n'applique pas §5.3** : au lieu de réduire le nombre de cartes et de
+renseigner `warning`, il comble jusqu'au `cardCount` demandé en recyclant les mêmes 1-2 faits sous
+plusieurs angles (5 doublons détectés par `findDuplicateStatements` sur le cas à 15 cartes demandées
+pour 2 phrases source). Les 5 fixtures nominales (contenu proportionné) sont, elles, conformes à 100 %
+sur toutes les dimensions testées — l'écart est spécifique à la disproportion contenu/demande, pas un
+défaut général. **Aucun correctif appliqué** : hors périmètre du ticket (OUT : correction automatique),
+deux pistes documentées pour un futur ticket (renforcement du prompt §5.3, ou filet de sécurité
+applicatif réutilisant `findDuplicateStatements` côté pipeline).
+
+**Décision sur l'escalade de modèle (benchmark C-01.03 §6)** — Pas d'escalade vers
+`mistral-medium-latest` recommandée : l'écart trouvé est un problème de discipline sur un cas limite
+précis, pas une conformité de schéma ou une hallucination générale (100 % sur les deux), rien
+n'indiquant qu'un modèle plus grand se comporterait différemment sans que le prompt soit d'abord
+renforcé.
+
+**Vérifié** : `npx jest test/helpers/aiGenerationQualityChecks.test.js` → 21/21 ; suite complète API
+`npx jest` → **1753/1753**, 0 régression ; `npx eslint` sur les fichiers créés → 0 erreur ; protocole
+empirique rejoué en conditions réelles (voir artefact JSON).
+
+**Ce qui n'est PAS couvert** — Échantillon volontairement petit (7 fixtures, 1 seul run — pas une
+mesure de variance ni un taux statistiquement représentatif) ; pertinence pédagogique jugée par l'agent
+IA, pas par un enseignant ni par l'utilisateur ; Chunking PDF réel non testé (fixtures en texte déjà
+découpé, pas des chunks produits par C-01.05 sur un vrai document) ; correctif de l'écart trouvé
+volontairement non appliqué (hors périmètre, décision laissée à un futur ticket) ; étape Odoo de
+`C-01.10` non modifiée dans cette entrée.
+
+**Fichiers créés**
+- `my_memo_master_api/helpers/aiGenerationQualityChecks.js`
+- `my_memo_master_api/test/helpers/aiGenerationQualityChecks.test.js`
+- `my_memo_master_api/scripts/quality-check-ai-generation.js`
+- `docs/RAPPORT_QUALITE_GENERATION_IA.md`
+- `docs/QUALITE_GENERATION_IA_RUN.json`
+
+---
+
+## [2026-09-02] FIX — C-01.10 : correction de l'écart §5.3 trouvé par le protocole de qualité (contenu insuffisant comblé au lieu d'être réduit)
+
+**Contexte** — Demande explicite de l'utilisateur (« peut tu le corriger ») suite à l'entrée précédente,
+qui documentait sans corriger un écart trouvé par le protocole empirique C-01.10 : sur du contenu source
+insuffisant, `mistral-small-latest` comble jusqu'au `cardCount` demandé en recyclant les mêmes faits sous
+plusieurs angles plutôt que de réduire le nombre de cartes et de renseigner `warning` (§5.3 de
+`generation_ia_prompt_cartes.md`). Deux pistes avaient été documentées, non arbitrées, dans le rapport
+initial : renforcer le prompt, ou ajouter un filet de sécurité applicatif. **Les deux ont été appliquées**
+(défense en profondeur — voir `DECISIONS.md` pour l'arbitrage détaillé).
+
+**Ce qui a été fait**
+- `services/AiCardGeneration.service.js#buildSystemPrompt` — nouvelle règle 7 explicite (contenu source
+  insuffisant ⇒ moins de cartes plutôt que de la redondance, avec exemple concret repris directement du
+  cas trouvé par le protocole) ; règle 3 étendue pour préciser qu'une reformulation sous un angle
+  différent reste un doublon de notion. `buildUserPrompt` : rappel de la règle 7 juste après l'instruction
+  de génération, à côté du `cardCount` réel demandé (plus efficace pour un LLM qu'une règle générique
+  éloignée).
+- `helpers/aiGenerationQualityChecks.js#dedupeCards` — nouvelle fonction pure (retire les cartes en
+  doublon d'un batch, garde la première occurrence de chaque notion, réutilise `findDuplicateStatements`
+  déjà écrit pour le protocole de mesure), 4 tests.
+- `services/AiCardGeneration.service.js#applyDedupeSafetyNet` (nouvelle méthode) — appelée
+  systématiquement par `generateCards` après une validation de schéma réussie (1er essai ou retry) :
+  filtre les doublons résiduels et complète `warning` en conséquence (concatène si un `warning` du
+  modèle existe déjà, le crée sinon). 2 tests dédiés dans `AiCardGeneration.service.test.js`.
+
+**Revérifié en conditions réelles** (même script `quality-check-ai-generation.js`, mêmes 7 fixtures,
+second run réel le 2026-09-02 — détail complet dans `docs/RAPPORT_QUALITE_GENERATION_IA.md` §8) :
+- `contenu-insuffisant` : **5/5 → 2/5 cartes**, `warning` désormais renseigné et explicite.
+- `cardcount-disproportionne` : **15/15 (5 doublons) → 5/15 cartes** (le modèle s'est arrêté de
+  lui-même à 6 cartes valides ; le filet applicatif a filtré 1 doublon résiduel), `warning` combinant
+  l'explication du modèle et celle du filet.
+- Les 5 fixtures nominales restent conformes. Une seule casse observée sur ce second run, sans lien avec
+  le correctif : `type-mixed` a échoué (une carte `mcq` à 4 options toutes `correct: true`, rejetée après
+  retry comme prévu) — variance normale d'un modèle non déterministe (`temperature: 0.3`), pas une
+  régression.
+
+**Vérifié** : `npx jest test/services/AiCardGeneration.service.test.js test/helpers/aiGenerationQualityChecks.test.js`
+→ **75/75** ; suite complète API `npx jest` → **1759/1759**, 0 régression (1753 + 6 nouveaux tests) ;
+`npx eslint` sur les fichiers modifiés → 0 erreur.
+
+**Ce qui n'est PAS couvert** — Un seul re-run (même limite déjà posée dans le rapport initial : le modèle
+n'est pas déterministe, un ré-échantillonnage pourrait varier) ; l'ellipsis trouvée dans un
+`sourceExcerpt` de `maths-pythagore-mcq` (citation tronquée par `"..."`, non détectée comme authentique
+par le contrôle strict) n'est pas corrigée, sans rapport avec la demande de cette entrée ; les documents
+d'analyse `diagrams/generation_ia_prompt_cartes.md`/`generation_ia_llm_benchmark.md` n'ont volontairement
+**pas** été mis à jour pour refléter la règle 7 (convention déjà établie dans ce dépôt — voir C-01.08 :
+les documents d'analyse restent figés au moment de leur rédaction, les écarts avec l'implémentation réelle
+se documentent dans ce journal et `DECISIONS.md`, pas en éditant rétroactivement le document source).
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiCardGeneration.service.js`
+- `my_memo_master_api/helpers/aiGenerationQualityChecks.js`
+- `my_memo_master_api/test/services/AiCardGeneration.service.test.js`
+- `my_memo_master_api/test/helpers/aiGenerationQualityChecks.test.js`
+- `docs/RAPPORT_QUALITE_GENERATION_IA.md`
+- `docs/QUALITE_GENERATION_IA_RUN.json` (écrasé par le second run — le premier run reste décrit en
+  détail dans le rapport pour la traçabilité de l'écart trouvé)

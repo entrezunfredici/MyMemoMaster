@@ -1,5 +1,6 @@
 const logger = require('../helpers/logger')
 const getMistralConfig = require('../helpers/mistralConfig')
+const { dedupeCards } = require('../helpers/aiGenerationQualityChecks')
 
 // Périmètre C-01.04 (« Service inférence IA — appel LLM, parsing ») : ce service exécute le
 // prompt spécifié en C-01.01 (diagrams/generation_ia_prompt_cartes.md) sur le modèle retenu en
@@ -61,13 +62,20 @@ RÈGLES STRICTES :
    une date, une définition ou un chiffre absent du texte. Si une carte nécessiterait une information
    non présente dans le texte, ne la génère pas.
 2. Une carte = une notion atomique. N'empile jamais plusieurs questions dans un même énoncé.
-3. Ne produis jamais deux cartes portant sur exactement la même notion.
+3. Ne produis jamais deux cartes portant sur exactement la même notion — y compris en la reformulant
+   sous un angle différent (ex : "Quelle est la valeur de X ?", "Dans quel contexte X est-elle vraie ?"
+   et "Citez X" portent sur UNE SEULE notion, jamais trois cartes séparées).
 4. Formule les questions et réponses en langue ${outputLanguage}, dans un registre neutre,
    sans jugement de valeur, sans contenu sensible, discriminatoire ou hors sujet. Si le texte source
    contient un tel passage, ignore-le plutôt que de le retranscrire dans une carte.
 5. Chaque carte doit citer, dans le champ "sourceExcerpt", le passage exact du texte source qui
    justifie la carte (traçabilité pour la relecture utilisateur).
-6. Réponds UNIQUEMENT avec un objet JSON conforme au schéma fourni. Aucun texte avant ou après le JSON.`
+6. Réponds UNIQUEMENT avec un objet JSON conforme au schéma fourni. Aucun texte avant ou après le JSON.
+7. Si le texte source ne contient pas assez de faits distincts pour atteindre le nombre de cartes
+   demandé SANS enfreindre la règle 3, génère MOINS de cartes que demandé plutôt que de combler par
+   reformulation, paraphrase ou découpage artificiel d'un même fait. Un nombre de cartes inférieur à
+   la demande, accompagné d'un "warning" expliquant pourquoi, est une sortie valide et préférable à
+   des cartes redondantes.`
   }
 
   /**
@@ -86,7 +94,10 @@ ${sourceText}
 """
 
 Génère ${cardCount} carte(s) de révision de type "${cardType}" à partir de ce texte,
-en respectant strictement les règles du prompt système et le schéma JSON suivant :
+en respectant strictement les règles du prompt système et le schéma JSON suivant.
+Rappel (règle 7) : si ce texte ne permet pas de justifier ${cardCount} cartes réellement distinctes,
+génère-en moins et explique pourquoi dans "warning" — ne multiplie jamais les angles sur un même fait
+pour atteindre ${cardCount}.
 
 ${SCHEMA_DESCRIPTION}`
   }
@@ -233,6 +244,28 @@ ${SCHEMA_DESCRIPTION}`
     return {
       valid: true,
       payload: { cards: payload.cards, warning: payload.warning ?? null }
+    }
+  }
+
+  /**
+   * Filet de sécurité applicatif (C-01.10, suite à l'écart trouvé par le protocole de qualité —
+   * docs/RAPPORT_QUALITE_GENERATION_IA.md §4) : retire les cartes en doublon d'un payload validé,
+   * indépendamment de la discipline du modèle sur la règle 7 du prompt système. N'agit qu'après
+   * validation de schéma réussie — ne remplace pas le retry sur sortie non conforme (parseAndValidate),
+   * traite un problème différent (redondance de contenu, pas non-conformité de structure).
+   *
+   * @param {{ cards: object[], warning: string|null }} payload
+   * @returns {{ cards: object[], warning: string|null }}
+   */
+  applyDedupeSafetyNet(payload) {
+    const { cards, removedCount } = dedupeCards(payload.cards)
+    if (!removedCount) return payload
+
+    logger.warn(`[AiCardGeneration] ${removedCount} carte(s) redondante(s) filtrée(s) après génération.`)
+    const extraWarning = `${removedCount} carte(s) supprimée(s) automatiquement car redondante(s) avec une autre carte du même lot.`
+    return {
+      cards,
+      warning: payload.warning ? `${payload.warning} ${extraWarning}` : extraWarning
     }
   }
 
@@ -390,7 +423,9 @@ ${SCHEMA_DESCRIPTION}`
 
     const first = await callAndTrackUsage(messages)
     const firstResult = this.parseAndValidate(first.content, cardCount, cardType)
-    if (firstResult.valid) return { ...firstResult.payload, usage: usageWithModel() }
+    if (firstResult.valid) {
+      return { ...this.applyDedupeSafetyNet(firstResult.payload), usage: usageWithModel() }
+    }
 
     logger.warn(`[AiCardGeneration] Sortie non conforme (1er essai) : ${firstResult.errors.join(' ; ')}`)
 
@@ -404,7 +439,9 @@ ${SCHEMA_DESCRIPTION}`
 
     const second = await callAndTrackUsage(messages)
     const secondResult = this.parseAndValidate(second.content, cardCount, cardType)
-    if (secondResult.valid) return { ...secondResult.payload, usage: usageWithModel() }
+    if (secondResult.valid) {
+      return { ...this.applyDedupeSafetyNet(secondResult.payload), usage: usageWithModel() }
+    }
 
     logger.error(`[AiCardGeneration] Sortie non conforme après retry : ${secondResult.errors.join(' ; ')}`)
     const err = new Error("La génération n'a pas produit un résultat exploitable. Réessayez.")

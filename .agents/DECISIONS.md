@@ -2045,3 +2045,52 @@ la question posée avant écriture ; aurait fait porter à un sign-off de regist
 session qui veut clore `C-01` devra faire remonter ces 6 tâches à « validé » explicitement (et vérifier au
 passage la cascade vers la Synthèse `C-01`, jamais traitée ici), plutôt que supposer que « vérification »
 suffit.
+
+---
+
+### [2026-09-02] C-01.10 : appels réels ciblés plutôt que fixtures enregistrées, écart trouvé non corrigé dans le même ticket
+
+**Contexte** — `C-01.10` (« Tests qualité génération ») demande de vérifier ce que le prompt/modèle
+produisent réellement, pas seulement que le code réagit correctement à une réponse simulée (déjà couvert
+par les tests existants de C-01.04/05 avec `fetch` mocké). Deux approches possibles : (a) enregistrer une
+fois des réponses réelles en fixtures rejouables sans clé API ni coût, comme un cassette VCR ; (b) un
+script ponctuel non intégré à Jest, appelant réellement l'API à la demande.
+
+**Décision** — Option (b). Le coût réel est négligeable (de l'ordre du millième de dollar pour 7 appels sur
+`mistral-small-latest`, voir `docs/RAPPORT_QUALITE_GENERATION_IA.md` §5) et le modèle n'est pas
+déterministe (`temperature: 0.3`) : figer une réponse en fixture donnerait une fausse impression de
+garantie reproductible sur un système qui, par nature, ne l'est pas. Le script appelle le service
+directement (comme le précédent de C-01.04), pas l'endpoint HTTP, pour ne consommer aucun quota
+utilisateur. Les vérifications de qualité elles-mêmes (`helpers/aiGenerationQualityChecks.js` —
+anti-hallucination, doublons, non-bourrage) sont, elles, des fonctions pures testées unitairement sans
+appel réseau : seule l'exécution empirique contre le vrai modèle reste hors Jest.
+
+**Alternative écartée** : fixtures enregistrées (VCR-style) — écartée pour la raison de non-déterminisme
+ci-dessus, et parce que le protocole documenté en `generation_ia_llm_benchmark.md` §8 demandait
+explicitement une mesure réelle, pas une simulation d'une mesure passée.
+
+**Décision associée — l'écart trouvé (§5.3 non respecté sur contenu insuffisant) n'a pas été corrigé dans
+ce ticket.** Le OUT de `C-01.10` exclut la correction automatique ; deux pistes sont documentées (§4.2 du
+rapport) sans être arbitrées : renforcer le prompt, ou ajouter un filet de sécurité applicatif réutilisant
+`findDuplicateStatements` côté pipeline (C-01.05/07) avant l'écran de validation. Écarté de trancher ici
+par cohérence avec la règle déjà appliquée dans ce dépôt (voir C-01.04) : un ticket de tests documente un
+écart, il ne le corrige pas silencieusement en dehors de son périmètre déclaré.
+
+**Conséquences** : `docs/QUALITE_GENERATION_IA_RUN.json` est la preuve d'**un seul run** — pas une mesure de
+variance. Une bascule de modèle ou un renforcement du prompt devra rejouer le même script pour comparer,
+plutôt que de supposer que le comportement observé est stable. Le filet de sécurité applicatif (piste 2 du
+rapport) reste la dette la plus actionnable si l'écart se confirme en usage réel.
+
+> **Mise à jour [2026-09-02, même jour]** — Sur demande explicite de l'utilisateur (« peut tu le
+> corriger »), les deux pistes ci-dessus ont finalement **toutes les deux** été appliquées plutôt qu'une
+> seule : le prompt (règle 7 explicite) **et** le filet de sécurité applicatif (`dedupeCards`, appelé
+> systématiquement par `generateCards`). Décision de cumuler les deux plutôt que choisir : elles adressent
+> des symptômes différents du même écart — le prompt réduit le nombre de cartes produites (agit à la
+> source), le filet rattrape les doublons littéraux que le modèle laisserait quand même passer (agit après
+> coup, indépendamment de la discipline du modèle) ; le run de revérification l'a d'ailleurs confirmé : le
+> modèle s'est arrêté de lui-même à 6 cartes sur le cas à 15 demandées, ET le filet a quand même dû filtrer
+> 1 doublon résiduel parmi ces 6. L'une sans l'autre aurait laissé un angle mort. Revérifié en conditions
+> réelles (détail : `docs/RAPPORT_QUALITE_GENERATION_IA.md` §8) — `contenu-insuffisant` 5/5→2/5
+> cartes avec `warning`, `cardcount-disproportionne` 15/15→5/15. Le principe « un ticket de tests documente
+> un écart, il ne le corrige pas » reste la règle par défaut de ce dépôt ; il cède explicitement quand
+> l'utilisateur demande la correction, comme ici — pas une révision de la règle elle-même.

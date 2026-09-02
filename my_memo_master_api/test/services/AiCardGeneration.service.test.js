@@ -369,6 +369,32 @@ describe('AiCardGenerationService', () => {
       expect(result.usage).toEqual({ model: 'mistral-small-latest', promptTokens: 100, completionTokens: 50 })
     })
 
+    it('generateCards - sortie conforme mais avec des cartes en doublon (C-01.10) - filtre les doublons et complète le warning', async () => {
+      const duplicateCard = { ...VALID_OPEN_CARD, sourceExcerpt: 'La photosynthèse est un processus.' }
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(mockFetchResponse({ cards: [VALID_OPEN_CARD, duplicateCard], warning: null }))
+
+      const result = await AiCardGenerationService.generateCards({ ...validParams, cardCount: 2 })
+
+      expect(result.cards).toEqual([VALID_OPEN_CARD])
+      expect(result.warning).toBe('1 carte(s) supprimée(s) automatiquement car redondante(s) avec une autre carte du même lot.')
+    })
+
+    it('generateCards - doublon détecté avec un warning déjà présent - complète le warning existant plutôt que de l\'écraser', async () => {
+      const duplicateCard = { ...VALID_OPEN_CARD }
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        mockFetchResponse({ cards: [VALID_OPEN_CARD, duplicateCard], warning: 'Contenu source limité.' })
+      )
+
+      const result = await AiCardGenerationService.generateCards({ ...validParams, cardCount: 2 })
+
+      expect(result.cards).toEqual([VALID_OPEN_CARD])
+      expect(result.warning).toBe(
+        'Contenu source limité. 1 carte(s) supprimée(s) automatiquement car redondante(s) avec une autre carte du même lot.'
+      )
+    })
+
     it('generateCards - 1er essai non conforme puis 2e conforme - retry avec correction, retourne le résultat du 2e essai', async () => {
       const fetchMock = jest
         .spyOn(global, 'fetch')
