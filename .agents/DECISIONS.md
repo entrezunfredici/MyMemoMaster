@@ -2160,3 +2160,75 @@ l'œil (via `grep onDelete` + lecture des migrations concernées) et sont correc
 (`AiUsageLog`/`Test.userId` en `SET NULL`, `AiGenerationBatch`/`LeitnerReviewSession`/`TestResult`/
 `Deadline.createdBy`/`LeitnerSystemsUsers.idUser` en `CASCADE`), mais un audit systématique reste une
 dette si un nouveau 500 de ce type remonte.
+
+---
+
+### [2026-09-03] Registre Odoo — sous-tâche « terminée mais pas encore validée » : stage « vérification », pas « validé » directement
+
+**Contexte** : Vérification demandée par l'utilisateur des tâches à l'étape « en cours » du projet
+Odoo `MyMemoMasterRNCP` (id 15). Une sous-tâche (`[M-00b.12]` Documentation déploiement et runbook)
+s'est révélée finie côté dépôt (preuve : `docs/RUNBOOK.md`, Traefik, `scripts/backup.sh`, CI) mais
+encore à l'étape « en cours » côté registre. Deux lectures possibles de « la marquer comme finie » :
+la faire passer directement à l'étape finale « validé », ou à l'étape intermédiaire « vérification »
+(le travail est terminé côté exécutant, mais reste à faire relire/valider par un humain).
+
+**Décision** : stage → « vérification » (id 159), `state` → `1_done`, **pas** stage « validé » (id
+164) directement — tranché explicitement par l'utilisateur (question posée avant écriture, cf.
+AGENT.md §2 « pose une question avant de coder » appliqué à une écriture Odoo plutôt qu'à du code).
+C'est le stage qui matérialise « à valider » dans le référentiel de ce projet (`aide` → `cadrage` →
+`templates` → `to do` → `backlog` → `spécification` → `en cours` → `vérification` → `demande de
+modification` → `annulée` → `validé`) : une tâche ne passe à « validé » qu'après une relecture
+humaine distincte de la simple constatation qu'elle est finie.
+
+**Alternative écartée** : stage « validé » directement — écartée parce qu'elle confondrait « le
+travail est fait » avec « quelqu'un a validé que le travail est fait », deux affirmations différentes
+que le référentiel de stages distingue déjà explicitement. Court-circuiter l'étape aurait aussi
+recréé, en sens inverse, l'incohérence documentée de longue date sur `QA.03`/`QA.05`/`QA.06` (`state`
+et stage désynchronisés) — mieux vaut que le `state` (`1_done`, factuel : le travail est terminé) et
+le `stage_id` (`vérification`, processus : reste à faire relire) avancent chacun pour ce qu'ils
+représentent, sans forcer l'un à rattraper l'autre.
+
+**Conséquences** : ce mapping (« terminé côté dépôt » → stage « vérification » + `state` `1_done`)
+fait référence pour toute prochaine synchronisation similaire du registre Odoo, plutôt que de
+retrancher la question à chaque arrêté. Une sous-tâche en « vérification » n'est donc **pas** comptée
+dans le taux « validé » du tableau de bord (`docs/COMPTE_RENDU_METRIQUES.md` §2) tant qu'elle n'a pas
+été relue humainement et déplacée manuellement vers « validé » — c'est voulu, pas un oubli.
+
+---
+
+### [2026-09-03, même jour] Filtrage « périmètre engagé » du compte rendu métriques — versionné plutôt que redérivé de mémoire
+
+**Contexte** : Demande explicite de l'utilisateur de recalculer le tableau de bord des 7 indicateurs.
+Le filtrage « périmètre engagé » (exclusion des tâches « Synthèse » et des blocs de backlog non
+chiffrés `C-03`→`C-06`/`S-07`/`W-*`) était refait de mémoire à chaque arrêté depuis le 2026-08-28,
+jamais versionné dans le dépôt (le script `analyze_odoo.py` cité aux arrêtés précédents pour le
+graphe de dépendances n'a lui-même jamais été retrouvé) — une réserve méthodologique ouverte dans le
+compte rendu depuis lors.
+
+**Décision** : reconstituer la règle depuis les chiffres déjà publiés (248 tâches engagées / 72 de
+backlog sur les quatre arrêtés précédents, tous cohérents entre eux) et l'écrire dans
+`odoo-plugin/reports/perimetre_engage.py`, plutôt que de continuer à la redériver en session à chaque
+fois. Le script recalcule les 7 indicateurs (Avancement, Coûts, Délais, Risques) en une seule
+extraction Odoo, sortie JSON exploitable directement dans le rapport.
+
+**Correction apportée en cours de session** : cette entrée et le rapport qualifiaient d'abord ce
+script de « versionné dans le dépôt ». **C'est faux** — `odoo-plugin/` est intégralement exclu par
+`.gitignore` (racine, ligne 11). **Confirmé par l'utilisateur dans la foulée** : cette exclusion est
+volontaire et n'a pas à être remise en cause — `odoo-plugin/` est un outil de pilotage pour l'agent
+(accès Odoo, génération de rapports), pas un composant de l'application MyMemoMaster, il n'a donc pas
+vocation à faire partie du dépôt applicatif. Le script persiste sur ce poste, plus redérivé de mémoire
+à chaque arrêté — c'est l'objectif réel de cette décision, `git` n'en faisait pas partie. Pas de
+décision à prendre : rien à sortir de l'exclusion, rien à dupliquer.
+
+**Alternative écartée** : retrouver ou reconstituer `analyze_odoo.py` (le script historique cité pour
+le graphe de dépendances) — écartée : aucune trace de ce script dans l'historique Git, dans les
+sessions précédentes ni ailleurs dans le dépôt ; plutôt que de chercher indéfiniment un fichier
+disparu, un nouveau script clair et testé à la main contre les chiffres déjà publiés (recoupement
+exact sur 248/72) offre une garantie équivalente sans dépendre d'un artefact introuvable.
+
+**Conséquences** : lève la réserve « 183/91/78 non confirmés ni infirmés » ouverte plus tôt le même
+jour dans `docs/COMPTE_RENDU_METRIQUES.md` — l'écart avec les chiffres cités aux arrêtés précédents
+(175/88/75 contre 183/91/78) s'explique par de vraies validations de tâches entre-temps, pas par une
+différence de méthode. **Dette assumée** : le script n'a pas de test automatisé dans
+`odoo-plugin/tests/` à ce stade — à ajouter si sa logique de filtrage doit évoluer (nouveaux blocs de
+backlog, par exemple).

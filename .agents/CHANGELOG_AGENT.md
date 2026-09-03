@@ -9777,3 +9777,126 @@ prochain déploiement, voir dette ci-dessous).
   spécifiquement, trouvé en creusant le rapport utilisateur. Un audit exhaustif de toutes les FK vers
   `User` sans `onDelete` explicite (modèle **et** migration, les deux peuvent diverger) reste à faire
   si d'autres 500 de ce type remontent.
+
+---
+
+### [2026-09-03] DOC — Vérification ciblée des tâches Odoo « en cours » + mise à jour du compte rendu métriques
+
+**Déclencheur** : demande explicite de l'utilisateur — relire les tâches et sous-tâches Odoo à
+l'étape « en cours » (projet `MyMemoMasterRNCP`, id 15), et resynchroniser celles réellement
+terminées vers l'étape suivante.
+
+**Ce qui a été fait** :
+1. Extraction Odoo (`odoo-plugin/odoo_cli.py`) des 10 tâches à `stage_id = 156` (« en cours ») —
+   5 tâches « Synthèse » (agrégats sans preuve propre, écartées) et 5 sous-tâches réelles.
+2. Chaque sous-tâche confrontée aux preuves du dépôt (même méthode que `docs/COMPTE_RENDU_METRIQUES.md`
+   §2/§7.3) :
+   - `[M-00b.12]` Documentation déploiement et runbook — preuve complète (`docs/RUNBOOK.md`, Traefik,
+     `scripts/backup.sh`, CI). **Corrigée** sur confirmation explicite de l'utilisateur (le mapping
+     « à valider » → stage « vérification » + state `1_done`, plutôt que directement « validé », a été
+     tranché par l'utilisateur) : `odoo_cli.py update project.task --ids 1138 --values
+     '{"stage_id": 159, "state": "1_done"}'`.
+   - `[C-01.10]` Tests qualité génération — porte déjà `state = "1_done"` dans Odoo (DoD cochée) alors
+     que le bloc `C-01` est mesuré à 0/11 dans le dépôt. **Non corrigée, signalée** — incohérence en
+     sens inverse de celle historiquement connue sur `QA.03`/`QA.05`/`QA.06` (voir
+     `docs/COMPTE_RENDU_METRIQUES.md`, encadré du 2026-09-03) : ici c'est le registre qui affirme un
+     acquis que le dépôt dément. Nécessite un arbitrage humain avant toute écriture.
+   - `[PIL.15]`, `[DOC.07]`, `[DOC.13]` — aucune preuve suffisante dans le dépôt pour les déclarer
+     terminées (archivage non trouvé ; rapport de tests existant mais à périmètre plus étroit que
+     « tous types de tests » ; un screencast n'est de toute façon pas versionné en Git). Laissées en
+     l'état.
+3. Constat en passant, non provoqué par cette session : `QA.03`/`QA.05`/`QA.06` — l'incohérence de
+   `state` signalée à 4 arrêtés consécutifs (2026-08-28 → 2026-09-01) est déjà résolue (`state =
+   "1_done"` sur les trois). Origine du changement non investiguée.
+4. `docs/COMPTE_RENDU_METRIQUES.md` mis à jour : nouvel encadré d'addendum daté, deux actions du plan
+   §8 clôturées, une nouvelle action P1 ouverte (`C-01.10`), annexe de reproductibilité complétée.
+
+**Ce qui n'est PAS couvert** : Avancement/Coûts/Délais/RH/Qualité non recalculés — seule la
+vérification ciblée demandée a été faite. Une tentative de recompte indépendant du graphe de
+dépendances (183 liens/91 tâches/78 verrous cités) a donné un résultat différent (175/88/75) sans que
+la méthodologie d'origine (`analyze_odoo.py`, non versionné) ait pu être retrouvée pour arbitrer —
+les chiffres du tableau de bord n'ont donc **pas** été corrigés sur ce point, l'écart reste ouvert.
+
+**Points d'attention** : `[C-01.10]` reste une incohérence non résolue dans le registre Odoo — à
+traiter avant le prochain arrêté complet (voir §8 du compte rendu). Le script de filtrage « périmètre
+engagé » reste non versionné (dette déjà connue, inchangée).
+
+---
+
+### [2026-09-03, même jour] DOC — Tableau de bord des 7 indicateurs recalculé + correction d'une erreur de la session précédente
+
+**Déclencheur** : demande explicite de l'utilisateur — mettre à jour le tableau de bord des 7
+indicateurs de `docs/COMPTE_RENDU_METRIQUES.md` §1.
+
+**Correction d'abord** : l'entrée précédente de ce journal (ci-dessus) qualifiait `[C-01.10]`
+d'incohérence Odoo (« `state = "1_done"` alors que le bloc `C-01` est mesuré à 0/11 »), en se fiant
+au texte du rapport (non révisé depuis le 2026-09-01) plutôt qu'à une relecture fraîche du dépôt.
+**C'était une erreur** : le bloc `C-01` (Génération automatique de Leitner par IA) a en réalité été
+entièrement construit et déployé en prod entre le 2026-09-01 et cet arrêté (21 commits — Mistral,
+pipeline de génération, OCR, quotas, 3 tables, interface front, revue sécurité `C-01.11`, révision
+Helm 5 en prod). `[C-01.10]` avait raison de porter `state = "1_done"` : synchronisée comme ses 6
+tâches sœurs (`stage_id` → « vérification », même mapping déjà validé par l'utilisateur pour
+`[M-00b.12]`).
+
+**Ce qui a été fait** :
+1. Nouveau script `odoo-plugin/reports/perimetre_engage.py` — reconstitue le filtrage « périmètre
+   engagé » (248 tâches engagées / 72 de backlog non chiffré `C-03`→`C-06`/`S-07`/`W-*`), jusqu'ici
+   toujours redérivé de mémoire à chaque arrêté (action P2 ouverte depuis le 2026-08-28). Sortie
+   recoupée avec les chiffres déjà publiés (identique) — méthode validée. **Deux passes en cours de
+   session** : d'abord qualifié de « versionné dans le dépôt » — faux, `odoo-plugin/` est
+   intégralement exclu par `.gitignore` (racine, ligne 11), donc **aucun** fichier de ce dossier n'est
+   suivi par `git`. Puis **précisé par l'utilisateur** : cette exclusion est volontaire et à conserver
+   — `odoo-plugin/` est un outil de pilotage pour l'agent, pas un composant de l'application, il n'a
+   pas vocation à faire partie du dépôt. Le script persiste donc sur ce poste (réutilisable, plus
+   redérivé de mémoire), ce qui suffit à l'objectif de l'action P2 (désormais close) même sans passer
+   par `git` (`docs/COMPTE_RENDU_METRIQUES.md` §8).
+2. Les 7 indicateurs recalculés depuis une extraction Odoo fraîche (`odoo-plugin/odoo_cli.py`) :
+   Avancement 221/248 = 89,1 % (vs 217/248) ; Coûts 89 550 € validés / 19 125 € restant (vs
+   86 250 €/22 425 €) ; Délais 26 tâches en retard (vs 30) ; Risques 175 liens/88 tâches/75 verrous
+   (vs 183/91/78 — la réserve « méthodologie différente » ouverte plus tôt dans la journée est levée,
+   la baisse s'explique par des tâches réellement validées entre-temps) ; RH 362,2 JH (cohérent avec
+   le planning, écart 0,2 JH) ; Qualité — suites de tests rejouées (API 1 768/1 768 à 82,44 %, +208
+   tests ; front 739/739 à 59,4 %, +31 tests mais couverture en recul de 1,9 pt — nouvelle UI `C-01`
+   pas totalement testée) ; RGAA statique 0/83 fichiers (+4) ; audit manuel des 106 critères toujours
+   60/106, inchangé.
+3. **Nouveau constat, non lié à `C-01`** : `npm audit --omit=dev` côté API révèle **3 vulnérabilités
+   modérées** (`qs`/`body-parser`/`express`), absentes lors de la dernière analyse — CVE publiée
+   entre-temps sur une version déjà pinnée, corrigible via `npm audit fix`. Front toujours à 0.
+4. SonarQube toujours inaccessible (401 sans jeton) — écart désormais estimé à ~28 commits depuis la
+   dernière analyse effectivement lue (2026-08-29).
+5. `docs/COMPTE_RENDU_METRIQUES.md` mis à jour : tableau §1 recalculé, nouvel encadré d'addendum
+   « même jour », plusieurs actions du plan §8 closes (script versionné, `C-01.10`, `C-01` caduc en
+   tant qu'action puisque construit) et une ouverte (statuer sur `C-02`, resté seul non commencé), une
+   nouvelle action P2 (corriger les 3 vulnérabilités `npm audit`), annexe de reproductibilité mise à
+   jour.
+
+**Ce qui n'est PAS couvert** : `odoo-plugin/reports/perimetre_engage.py` n'a pas de test automatisé
+(dette assumée, signalée dans le rapport §8) — l'odoo-plugin dispose pourtant d'une suite
+`odoo-plugin/tests/`, non étendue à ce nouveau script faute de temps dans cette session. Ventilation
+RH par profil et 7 dépendances d'exploitation hors Odoo (§5.2) non rejouées en détail — seul le point
+1 (secrets K8s) a bougé (cause racine trouvée et corrigée par l'utilisateur, mais toujours `skipped`
+en CD sur le dernier commit, rattrapage fait en Helm manuel plutôt que par un nouveau cycle CI/CD).
+
+**Points d'attention** : la même erreur de méthode qui a produit le faux constat sur `[C-01.10]` (se
+fier au texte encore en place dans le rapport plutôt qu'à une relecture fraîche du dépôt/d'Odoo) est
+à éviter systématiquement — un rapport de pilotage vieillit vite sur un projet actif, et son propre
+texte ne doit jamais remplacer une vérification directe avant d'agir dessus.
+
+---
+
+### [2026-09-03] DÉPLOIEMENT MANUEL — Fix suppression de compte poussé en prod (4ᵉ occurrence du symptôme `deploy_prod` figé)
+
+**Contexte** : image `fredissimo/mymemomaster_api:latest` contenant le fix `MindMap.userId` (commit
+`cd59d4f`) poussée sur Docker Hub à 05:50 UTC, mais `helm history mmm-prod` restait figé en révision 5
+(déployée la veille 23:06 UTC) — 4ᵉ occurrence du même symptôme que les 27-31/08 (`push_images` vert,
+image disponible, mais `deploy_prod` ne la propage pas aux pods).
+
+**Action** : `kubectl rollout restart deployment mmm-prod-api mmm-prod-front -n mymemomaster` (aucun
+changement Helm/ConfigMap requis, le fix ne touche que du code applicatif). Rollout terminé avec succès,
+4 pods `Running 1/1` sur l'image `sha256:5e851051…`, migration `20260903000001` exécutée en base au
+démarrage sans erreur (vérifié via `kubectl logs`).
+
+**Cause racine toujours non traitée** : `K8S_PROD_ENABLED` (Variable GitHub) — même dette que signalée
+le 2026-08-31, 4ᵉ occurrence sans investigation du pipeline lui-même. Reste à faire : soit fiabiliser
+`deploy_prod` (root cause du blocage jamais identifiée malgré 4 occurrences), soit documenter ce rollout
+manuel comme procédure de secours officielle dans le runbook si le correctif du pipeline n'est pas priorisé.
