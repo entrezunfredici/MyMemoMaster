@@ -2128,3 +2128,35 @@ toute prochaine session qui ajouterait un test sur `checkQuota`/`getUsageSummary
 > cartes avec `warning`, `cardcount-disproportionne` 15/15→5/15. Le principe « un ticket de tests documente
 > un écart, il ne le corrige pas » reste la règle par défaut de ce dépôt ; il cède explicitement quand
 > l'utilisateur demande la correction, comme ici — pas une révision de la règle elle-même.
+
+---
+
+### [2026-09-03] Suppression de compte en prod (500) — `MindMap.userId` corrigé en `SET NULL`, pas `CASCADE`
+
+**Contexte** : Signalement utilisateur — suppression de compte impossible en prod. Root cause : FK
+`MindMap.userId → User.userId` sans `onDelete` explicite (ni modèle Sequelize, ni migration de
+création), donc `NO ACTION` par défaut sous PostgreSQL — `DELETE /users/:id` échoue en 500 dès qu'un
+utilisateur a au moins une carte mentale enregistrée. Non reproduit en dev/CI (base sans historique).
+Même défaut déjà rencontré et corrigé sur `LeitnerBox.idSystem` (migration `20260706000001`), jamais
+appliqué à `MindMap`.
+
+**Décision** : `onDelete: 'SET NULL'` (+ `userId` rendu nullable), aligné sur `LeitnerSystem.idUser`
+(voir DECISIONS 2026-09-02 C-01.07) — une carte mentale est un contenu réel créé par l'utilisateur,
+à valeur patrimoniale même orpheline : elle doit survivre à la suppression du compte, détachée plutôt
+que perdue. Migration écrite sur le pattern dialecte-conscient déjà établi par
+`20260706000001-add-cascade-delete-leitnerbox-idsystem.js` (recréation de table en SQLite, `ALTER
+CONSTRAINT` dynamique en PostgreSQL puisque la contrainte a été créée sans nom explicite).
+
+**Alternative écartée** : `CASCADE` (supprimer les cartes mentales avec le compte) — écartée pour la
+même raison que `LeitnerSystem` : contrairement à un batch de génération IA en attente
+(`AiGenerationBatch`, décision du 2026-09-02, jetable par nature), une carte mentale est un livrable
+fini de l'utilisateur, sans lien de dépendance qui la rendrait inexploitable une fois orpheline.
+
+**Conséquences** : la migration `20260903000001` doit être jouée sur la base de prod pour que le
+correctif s'applique réellement (le code seul ne suffit pas, la contrainte FK existante en base doit
+être remplacée). Aucun audit exhaustif des autres FK vers `User` n'a été fait à cette occasion — seule
+`MindMap` a été vérifiée et corrigée ; les FK des autres tables référençant `userId` ont été relues à
+l'œil (via `grep onDelete` + lecture des migrations concernées) et sont correctement configurées
+(`AiUsageLog`/`Test.userId` en `SET NULL`, `AiGenerationBatch`/`LeitnerReviewSession`/`TestResult`/
+`Deadline.createdBy`/`LeitnerSystemsUsers.idUser` en `CASCADE`), mais un audit systématique reste une
+dette si un nouveau 500 de ce type remonte.

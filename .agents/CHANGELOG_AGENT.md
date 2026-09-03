@@ -45,7 +45,7 @@
 | Interpréteur V2 — équivalences algébriques | Livré — helpers/algebraicEquivalence.js (AST canonicalisé) complète normalizeSymbolic dans le court-circuit `exact` : commutativité, a/b ≡ a·b⁻¹, termes semblables, racines en exposant, équations symétriques ; pas un CAS (pas de distributivité) | 2026-07-19 |
 | Interpréteur V2 — commandes matrice (+C/+L) | Corrigé — l'API de commande MathLive s'est révélée peu fiable (corruption `\begin{split}` possible, y compris matrice seule) ; remplacée par addMatrixColumn/addMatrixRow (manipulation LaTeX déterministe, interpreter.js) ; portée : formule = uniquement une matrice/cas | 2026-07-19 |
 | Interpréteur V2 — palette (glyphes résolus) | Livré — les 2 boutons « T » et la flèche blanche de la planche formules retirés (erreurs de planche) ; section « Lettres fraktur » (\mathfrak{}, 52 lettres, vrais glyphes Unicode générés par point de code) ajoutée à l'onglet Caractères (4ᵉ groupe, scroll interne requis) | 2026-07-19 |
-| Diagramme (mind maps) | Stable — [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `MindMapTag` — modèle Sequelize enregistré préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `mmName` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-09-01 |
+| Diagramme (mind maps) | Stable — [FIX] 2026-09-03 : `MindMap.userId` sans `onDelete` explicite (modèle + migration de création) → PostgreSQL en `NO ACTION`, bloquait `DELETE /users/:id` (500) dès qu'un utilisateur avait au moins une carte mentale, signalé par l'utilisateur en prod, non reproduit en dev avant (base vide) ; corrigé en `SET NULL` (pattern déjà retenu pour `LeitnerSystem.idUser`, DECISIONS 2026-09-02) ; [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `MindMapTag` — modèle Sequelize enregistré préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `mmName` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-09-03 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
@@ -9735,3 +9735,45 @@ vérification de la variable d'environnement injectée dans le pod n'a donc pas 
 directement, seule la présence de la clé côté Secret K8s l'a été. `K8S_PROD_ENABLED` (désormais en
 Variable GitHub, côté utilisateur) n'a pas été re-testée via un nouveau cycle CI/CD — ce déploiement a
 été fait directement en Helm, en contournant la CD pour aller plus vite.
+
+---
+
+### [2026-09-03] FIX — Suppression de compte impossible en prod (500) : FK `MindMap.userId` sans `onDelete`
+
+**Déclencheur** : l'utilisateur signale ne plus pouvoir supprimer son compte sur la prod.
+
+**Cause racine** : `MindMap.userId` référence `User.userId` sans clause `onDelete`, ni dans le modèle
+Sequelize (`models/Diagramme.model.js`) ni dans sa migration de création
+(`20260226151800-create-mindmap-table.js`). PostgreSQL applique alors `NO ACTION` par défaut : dès
+qu'un utilisateur a au moins une carte mentale enregistrée, `DELETE /users/:id` (`User.service.js
+#delete` → `User.destroy`) lève une violation de contrainte FK, catchée en 500 générique par
+`User.controller.js#delete`. C'est le même défaut que celui déjà corrigé sur `LeitnerBox.idSystem`
+(migration `20260706000001`), jamais appliqué à `MindMap`. N'était pas reproductible en dev/CI avec
+une base fraîche (aucune carte mentale existante) — d'où le passage inaperçu jusqu'à un compte prod
+avec un historique d'usage réel.
+
+**Fichiers modifiés :**
+- `models/Diagramme.model.js` — `userId` : `allowNull: true`, `onDelete: 'SET NULL'`, `onUpdate: 'CASCADE'`
+- `migrations/20260903000001-add-setnull-delete-mindmap-userid.js` — migration dialecte-consciente
+  (SQLite : recréation de table : Postgres : `ALTER COLUMN ... DROP NOT NULL` + recréation de la
+  contrainte FK), sur le pattern déjà établi par `20260706000001-add-cascade-delete-leitnerbox-idsystem.js`
+- `test/bdd/user.delete.test.js` (nouveau) — 2 tests DB réelle (SQLite in-memory, controller → service
+  → model) : suppression sans carte mentale (nominal déjà correct) et suppression avec une carte
+  mentale (régression) ; confirmé que le test échoue bien (500) sans le correctif du modèle avant
+  d'appliquer le fix
+
+**Choix technique** : `SET NULL` plutôt que `CASCADE`, par cohérence avec `LeitnerSystem.idUser` (voir
+DECISIONS 2026-09-02 C-01.07) — une carte mentale est un contenu réel de l'utilisateur, à valeur
+patrimoniale même orpheline, pas un état de travail jetable.
+
+**Ce qui est utilisable** : `DELETE /users/:id` fonctionne désormais quel que soit l'historique de
+cartes mentales de l'utilisateur, en dev comme en prod (migration appliquée automatiquement au
+prochain déploiement, voir dette ci-dessous).
+
+**Dette / points d'attention** :
+- La migration s'applique automatiquement au prochain déploiement (`entrypoint.sh` lance `npx
+  sequelize-cli db:migrate` au démarrage du conteneur) — pas d'étape manuelle sur la base de prod.
+- Pattern non audité systématiquement sur les autres tables : cette correction traite `MindMap`
+  spécifiquement, trouvé en creusant le rapport utilisateur. Un audit exhaustif de toutes les FK vers
+  `User` sans `onDelete` explicite (modèle **et** migration, les deux peuvent diverger) reste à faire
+  si d'autres 500 de ce type remontent.
