@@ -99,9 +99,28 @@ jobs:
       # `npx --package` télécharge npm@latest dans son propre cache et l'exécute
       # sans toucher au npm utilisé par `npm ci`/test/lint dans les étapes
       # précédentes de ce même job.
+      #
+      # CHOIX: 3 tentatives avec pause plutôt qu'un seul appel.
+      # RAISON: constaté en CI — l'endpoint bulk (recommandé, voir ci-dessus) renvoie
+      # par moments un 503 Service Unavailable, panne temporaire côté registre npm,
+      # sans rapport avec l'état réel de nos dépendances. Un seul essai ferait
+      # échouer le job sur un aléa d'infrastructure externe, indépendant de tout
+      # vulnérabilité réelle. Une vraie vulnérabilité high/critical échoue de façon
+      # stable sur les 3 tentatives (l'endpoint répond, juste avec un résultat
+      # positif) — la boucle n'affaiblit donc pas le contrôle, elle absorbe
+      # uniquement l'indisponibilité passagère du service.
       - name: Audit Dependencies (OWASP A06)
         working-directory: ${{ matrix.path }}
-        run: npx --yes --package npm@latest -- npm audit --omit=dev --audit-level=high
+        run: |
+          for attempt in 1 2 3; do
+            if npx --yes --package npm@latest -- npm audit --omit=dev --audit-level=high; then
+              exit 0
+            fi
+            echo "Tentative $attempt/3 échouée — nouvel essai dans 15s (le registre npm peut être temporairement indisponible)..."
+            sleep 15
+          done
+          echo "npm audit a échoué 3 fois de suite — vulnérabilité réelle probable, ou registre npm durablement indisponible."
+          exit 1
 
       - name: Build
         if: matrix.service == 'front'

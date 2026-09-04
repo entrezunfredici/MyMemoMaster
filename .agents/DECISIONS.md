@@ -2662,3 +2662,28 @@ comprendre le mécanisme exact de la casse.
 correctifs — aucun changement de comportement en dehors de l'étape d'audit elle-même. Correctif encore
 **non vérifié en conditions réelles** (mêmes limites d'accès que l'entrée précédente) — à confirmer au
 prochain push, sur les deux fronts : le job d'audit passe, et aucune suite `test/bdd/*` ne régresse.
+
+---
+
+### [2026-09-04, 8ᵉ session du jour, 3ᵉ round] `npm audit` intermittent (503 registre npm) : retry en bash plutôt qu'une action tierce
+
+**Contexte** — L'isolation `npx --package npm@latest` (entrée précédente) a fonctionné comme prévu :
+l'endpoint appelé est bien le bulk recommandé. Mais ce même endpoint a répondu `503 Service Unavailable`
+au run suivant — panne temporaire du registre npm, pas un problème de notre côté.
+
+**Décision** : boucle de 3 tentatives (15 s de pause) en bash directement dans le `run:` de l'étape,
+plutôt qu'une action GitHub dédiée au retry. Le besoin est trivial (rejouer une commande shell N fois) —
+ajouter une dépendance externe pour ça serait disproportionné, et le reste de `ci.yml`/`cd.yml` réserve
+déjà les actions tierces aux cas qu'un script ne couvre pas simplement (checkout, setup-node/kubectl/helm,
+upload-artifact). Une vraie vulnérabilité échoue de façon stable sur les 3 tentatives (l'endpoint répond
+correctement, juste avec un résultat positif) — la boucle absorbe l'indisponibilité passagère du service
+sans affaiblir le contrôle de sécurité lui-même.
+
+**Alternative écartée (retirer `--audit-level=high` ou rendre l'étape non bloquante)** — écartée :
+aurait supprimé le contrôle OWASP A06 lui-même pour contourner un aléa d'infrastructure externe,
+disproportionné et risqué (une vraie vulnérabilité high/critical passerait aussi inaperçue).
+
+**Conséquences** : le job échoue encore si le registre npm reste indisponible plus longtemps que les
+~45 s couverts par les 3 tentatives — accepté, une panne prolongée côté npmjs.org n'est pas un problème
+que ce workflow doit chercher à masquer indéfiniment. Non vérifié en conditions réelles (mêmes limites
+d'accès que les entrées précédentes de cette même journée).

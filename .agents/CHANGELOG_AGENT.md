@@ -10338,3 +10338,31 @@ global, pour que le rayon d'action du correctif corresponde exactement à celui 
 (le job `Audit Dependencies` passe, ET aucune suite `test/bdd/*` ne régresse).
 
 **Tests** : YAML validé (`python -c "import yaml; yaml.safe_load(...)"`).
+
+---
+
+## [2026-09-04, 8ᵉ session du jour, 3ᵉ round] FIX — CI : `npm audit` (bulk) intermittent — 503 côté registre npm, retry ajouté
+
+**Contexte** — Signalé par l'utilisateur : au run CI suivant le correctif précédent (isolation
+`npx --package npm@latest`, ci-dessus), le job `Audit Dependencies` échoue à nouveau, mais
+**différemment** — confirmation que l'isolation a fonctionné : `npm audit` appelle désormais bien
+l'endpoint bulk recommandé (`POST /-/npm/v1/security/advisories/bulk`, plus l'ancien `quick audit` en
+cours de retrait), qui renvoie cette fois `503 Service Unavailable` — panne temporaire du registre npm
+lui-même, sans lien avec l'état réel de nos dépendances ni avec un bug côté dépôt.
+
+**Corrigé** : `.github/workflows/ci.yml` — la commande d'audit est enveloppée dans une boucle de 3
+tentatives avec 15 s de pause entre chaque, avant d'échouer réellement. Une vraie vulnérabilité
+high/critical échoue de façon stable sur les 3 tentatives (l'endpoint répond, avec un résultat positif)
+— la boucle absorbe uniquement l'indisponibilité passagère du service, elle n'affaiblit pas le contrôle
+de sécurité lui-même.
+
+**Choix techniques** : retry en shell simple plutôt qu'une action GitHub dédiée (`nick-fields/retry` ou
+équivalent) — pas de nouvelle dépendance externe pour 6 lignes de bash, cohérent avec le reste du
+fichier qui n'utilise des actions tierces que pour des besoins qu'un script ne couvre pas simplement
+(checkout, setup-node, upload-artifact...).
+
+**Ce qui n'est PAS couvert** : toujours non vérifié en conditions réelles. Si le registre npm reste
+indisponible plus de ~45 s (3 × 15 s), le job échouera quand même — accepté, un vrai correctif à une
+panne prolongée côté npmjs.org n'a pas sa place dans ce workflow.
+
+**Tests** : YAML validé.
