@@ -10,16 +10,22 @@ import { api } from '@/helpers/api'
 export const useLeitnerReviewSessionStore = defineStore('leitnerReviewSessions', {
   actions: {
     /**
-     * Journalise une session de révision Leitner terminée (durée chronométrée
-     * côté front). Best-effort : ne bloque jamais l'affichage de l'écran de fin.
+     * Journalise une session de révision Leitner (durée chronométrée côté
+     * front) — complète ou partielle. Best-effort : ne bloque jamais
+     * l'affichage de l'écran de fin ni la navigation en cas de sortie
+     * anticipée.
      *
      * @param {number} idSystem
      * @param {number} cardsReviewed
      * @param {number} durationSeconds
+     * @param {boolean} [completed=true] - false pour une sortie anticipée
+     *   (bouton "← Retour") : n'invalide pas la journalisation du temps passé,
+     *   mais évite de valider automatiquement une séance planifiée sur une
+     *   session non menée à son terme (voir RevisionSession.service.js côté API).
      */
-    async logSession(idSystem, cardsReviewed, durationSeconds) {
+    async logSession(idSystem, cardsReviewed, durationSeconds, completed = true) {
       try {
-        await api.post('leitner-review-sessions', { idSystem, cardsReviewed, durationSeconds })
+        await api.post('leitner-review-sessions', { idSystem, cardsReviewed, durationSeconds, completed })
       } catch {
         // best-effort — voir CHOIX ci-dessus
       }

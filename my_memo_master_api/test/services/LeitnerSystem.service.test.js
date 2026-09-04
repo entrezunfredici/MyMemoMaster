@@ -125,6 +125,22 @@ describe('LeitnerSystemService', () => {
     expect(system).toEqual(mockWithSubject)
   })
 
+  // Régression : les 5 boîtes par défaut portaient des raccourcis de test (5/10/15/20/30 s)
+  // appliqués tels quels en prod (intervall est en secondes dans tous les environnements,
+  // aucun branchement dev/prod dans le code — voir DECISIONS.md 2026-06-06). Passage aux
+  // valeurs de répétition espacée réelles une fois le fonctionnement validé.
+  test('create - les 5 boîtes par défaut portent les intervalles réels (1j/3j/7j/14j/30j en secondes)', async () => {
+    instance.transaction.mockResolvedValue(mockTransaction)
+    LeitnerSystem.create.mockResolvedValue({ idSystem: 3, idUser: 3, subjectId: 1 })
+    LeitnerBox.bulkCreate.mockResolvedValue([])
+    LeitnerSystem.findByPk.mockResolvedValue({})
+
+    await LeitnerSystemService.create({ name: 'Test', idUser: 3, subjectId: 1 })
+
+    const [boxes] = LeitnerBox.bulkCreate.mock.calls[0]
+    expect(boxes.map((b) => b.intervall)).toEqual([86400, 259200, 604800, 1209600, 2592000])
+  })
+
   test('create - erreur DB - rollback et propage l\'erreur', async () => {
     instance.transaction.mockResolvedValue(mockTransaction)
     LeitnerSystem.create.mockRejectedValue(new Error('DB error'))

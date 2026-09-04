@@ -1,9 +1,14 @@
 const { Test, TestResult, ClassGroup, ClassGroupUsers, TestClassGroup } = require('../../models/index')
 const semanticService = require('../../services/Semantic.service')
+const revisionSessionService = require('../../services/RevisionSession.service')
 const TestService = require('../../services/Test.service')
 
 jest.mock('../../services/Semantic.service', () => ({
   gradeSemantic: jest.fn()
+}))
+
+jest.mock('../../services/RevisionSession.service', () => ({
+  validateMatchingSessions: jest.fn()
 }))
 
 jest.mock('../../models/index', () => ({
@@ -152,6 +157,27 @@ describe('TestService', () => {
       await TestService.submitAnswers(1, 5, [{ questionId: 1, answer: 'Paris' }], 87)
 
       expect(TestResult.create).toHaveBeenCalledWith({ testId: 1, userId: 5, score: 1, total: 1, durationSeconds: 87 })
+    })
+
+    // Un exercice soumis est toujours "complet" (pas de notion de soumission partielle) —
+    // valide donc systématiquement la séance planifiée du jour correspondante, si elle existe.
+    it('valide la séance planifiée du jour correspondante (idTest) après création du TestResult', async () => {
+      const questions = [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
+      Test.findByPk.mockResolvedValue({ testId: 1, userId: null, question: questions })
+      TestResult.create.mockResolvedValue({ resultId: 1, score: 1, total: 1 })
+      semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: '', decision_zone: 'correct' })
+
+      await TestService.submitAnswers(1, 5, [{ questionId: 1, answer: 'Paris' }])
+
+      expect(revisionSessionService.validateMatchingSessions).toHaveBeenCalledWith({ userId: 5, idTest: 1 })
+    })
+
+    it('test introuvable — ne valide aucune séance planifiée', async () => {
+      Test.findByPk.mockResolvedValue(null)
+
+      await TestService.submitAnswers(99, 1, [])
+
+      expect(revisionSessionService.validateMatchingSessions).not.toHaveBeenCalled()
     })
 
     it('open — insensible à la casse et aux espaces (correction IA)', async () => {

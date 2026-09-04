@@ -6,18 +6,42 @@ jest.mock('../../models/index', () => ({
   LeitnerSystem: {}
 }))
 
+jest.mock('../../services/RevisionSession.service', () => ({
+  validateMatchingSessions: jest.fn()
+}))
+const revisionSessionService = require('../../services/RevisionSession.service')
+
 describe('LeitnerReviewSessionService', () => {
   beforeEach(() => jest.clearAllMocks())
 
   describe('create', () => {
-    it('journalise une session avec les bons champs', async () => {
-      const mockSession = { id: 1, userId: 1, idSystem: 2, cardsReviewed: 5, durationSeconds: 120 }
+    it('journalise une session avec les bons champs (completed par défaut à true)', async () => {
+      const mockSession = { id: 1, userId: 1, idSystem: 2, cardsReviewed: 5, durationSeconds: 120, completed: true }
       LeitnerReviewSession.create.mockResolvedValue(mockSession)
 
       const session = await LeitnerReviewSessionService.create({ userId: 1, idSystem: 2, cardsReviewed: 5, durationSeconds: 120 })
 
-      expect(LeitnerReviewSession.create).toHaveBeenCalledWith({ userId: 1, idSystem: 2, cardsReviewed: 5, durationSeconds: 120 })
+      expect(LeitnerReviewSession.create).toHaveBeenCalledWith({ userId: 1, idSystem: 2, cardsReviewed: 5, durationSeconds: 120, completed: true })
       expect(session).toEqual(mockSession)
+    })
+
+    it('session complète (completed: true) — valide en plus la séance planifiée correspondante', async () => {
+      LeitnerReviewSession.create.mockResolvedValue({ id: 1 })
+
+      await LeitnerReviewSessionService.create({ userId: 1, idSystem: 2, cardsReviewed: 5, durationSeconds: 120, completed: true })
+
+      expect(revisionSessionService.validateMatchingSessions).toHaveBeenCalledWith({ userId: 1, idSystem: 2 })
+    })
+
+    it('session partielle (completed: false) — ne valide aucune séance planifiée', async () => {
+      LeitnerReviewSession.create.mockResolvedValue({ id: 1 })
+
+      await LeitnerReviewSessionService.create({ userId: 1, idSystem: 2, cardsReviewed: 2, durationSeconds: 40, completed: false })
+
+      expect(LeitnerReviewSession.create).toHaveBeenCalledWith(
+        expect.objectContaining({ completed: false })
+      )
+      expect(revisionSessionService.validateMatchingSessions).not.toHaveBeenCalled()
     })
   })
 

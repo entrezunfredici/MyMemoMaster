@@ -28,6 +28,15 @@ module.exports = (instance) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      // true = session menée jusqu'à la dernière carte due, false = sortie
+      // anticipée (bouton "← Retour", journalisée depuis le 2026-09-04). Seule
+      // une session à true valide automatiquement une séance planifiée
+      // correspondante — voir RevisionSession.service.js#validateMatchingSessions.
+      completed: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+      },
       completedAt: {
         type: DataTypes.DATE,
         allowNull: false,

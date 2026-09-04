@@ -35,20 +35,24 @@
     <section>
       <h2 class="text-xl font-bold text-primary mb-1">Révision & Régularité</h2>
       <p class="text-sm text-gray-400 mb-3">
-        Les « sessions » ci-dessous sont les créneaux que tu planifies à l'avance dans le calendrier —
-        pas tes exercices ou révisions Leitner faits directement, comptés séparément (voir « Temps total de révision »
-        et les sections Exercices / Leitner plus bas).
+        Deux temps : ce que tu <strong>prévois</strong> dans le calendrier, et ce que tu <strong>fais</strong>
+        réellement (exercices, révisions Leitner, cartes mentales). Une séance planifiée se valide
+        automatiquement dès qu'une pratique réelle correspondante a lieu le jour même — sinon, coche-la à la main.
       </p>
+
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prévu</p>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <StatCard label="Sessions planifiées" :value="store.kpis.revision.totalPlanned" hint="créneaux calendrier" />
-        <StatCard label="Sessions complétées" :value="store.kpis.revision.totalCompleted" hint="créneaux calendrier cochés faits" />
         <StatCard label="Taux de complétion" :value="store.kpis.revision.completionRate + ' %'" hint="créneaux planifiés tenus" />
         <StatCard label="Streak actuel" :value="store.kpis.revision.streakDays + ' j'" highlight hint="jours de suite, créneaux planifiés" />
-      </div>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         <StatCard label="30 derniers jours" :value="store.kpis.revision.sessionsLast30Days + ' sessions'" hint="créneaux calendrier" />
+      </div>
+
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fait</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+        <StatCard label="Sessions complétées" :value="store.kpis.revision.totalCompleted" hint="cochées ou validées par la pratique" />
+        <StatCard label="Complétées / 30 j" :value="store.kpis.revision.completedLast30Days + ' sessions'" hint="cochées ou validées par la pratique" />
         <StatCard label="Temps total de révision" :value="formatMinutes(store.kpis.revision.totalMinutes)" hint="Leitner, exercices et cartes mentales chronométrés" />
-        <StatCard label="Complétées / 30 j" :value="store.kpis.revision.completedLast30Days + ' sessions'" hint="créneaux calendrier" />
       </div>
 
       <!-- Graphique activité hebdomadaire -->

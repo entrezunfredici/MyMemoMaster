@@ -136,17 +136,27 @@ describe('KpiPage', () => {
   // exercices/Leitner faits directement) étaient confondues sous le même mot
   // sans distinction visible — signalé par l'utilisateur.
 
-  it('précise que les "sessions" de la section Révision sont les créneaux planifiés au calendrier', () => {
+  it('précise la distinction "prévu" (calendrier) vs "fait" (pratique réelle) dans la section Révision', () => {
     const wrapper = mountKpi({ kpis: KPI_FIXTURE })
-    expect(wrapper.text()).toContain('créneaux que tu planifies à l\'avance dans le calendrier')
+    expect(wrapper.text()).toContain('ce que tu prévois dans le calendrier')
+    expect(wrapper.text()).toContain('ce que tu fais')
+  })
+
+  it('regroupe les cartes "Prévu" et "Fait" sous des sous-titres distincts', () => {
+    const wrapper = mountKpi({ kpis: KPI_FIXTURE })
+    expect(wrapper.text()).toContain('Prévu')
+    expect(wrapper.text()).toContain('Fait')
   })
 
   it('affiche une légende "créneaux calendrier" sous plusieurs cartes basées sur RevisionSession', () => {
     const wrapper = mountKpi({ kpis: KPI_FIXTURE })
     const occurrences = wrapper.text().match(/créneaux calendrier/g) || []
-    // Au moins Sessions planifiées, 30 derniers jours, Complétées / 30 j,
-    // Planifiées cette semaine, Complétées cette semaine partagent ce hint —
-    // borne large plutôt qu'un compte exact, fragile à la sérialisation du DOM
+    // Au moins Sessions planifiées, 30 derniers jours, l'intitulé du graphique
+    // hebdomadaire, Planifiées cette semaine, Complétées cette semaine partagent
+    // ce hint (les cartes "Fait" — Sessions complétées, Complétées / 30 j — ont
+    // depuis le 2026-09-04 un hint différent, elles peuvent être validées par la
+    // pratique et pas seulement cochées au calendrier) — borne large plutôt qu'un
+    // compte exact, fragile à la sérialisation du DOM
     expect(occurrences.length).toBeGreaterThanOrEqual(5)
   })
 

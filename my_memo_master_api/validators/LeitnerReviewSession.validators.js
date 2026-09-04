@@ -14,5 +14,12 @@ exports.create = [
     .withMessage('cardsReviewed doit être un entier strictement positif.'),
   body('durationSeconds')
     .isInt({ min: 0, max: MAX_SESSION_DURATION_SECONDS })
-    .withMessage(`durationSeconds doit être un entier entre 0 et ${MAX_SESSION_DURATION_SECONDS}.`)
+    .withMessage(`durationSeconds doit être un entier entre 0 et ${MAX_SESSION_DURATION_SECONDS}.`),
+  // Optionnel, défaut true (comportement historique — voir modèle) : absent pour
+  // un appelant qui ignore la distinction, explicite (false) pour une sortie
+  // anticipée journalisée depuis le 2026-09-04.
+  body('completed')
+    .optional()
+    .isBoolean()
+    .withMessage('completed doit être un booléen.')
 ]

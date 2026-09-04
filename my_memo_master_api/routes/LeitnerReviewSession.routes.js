@@ -31,6 +31,12 @@ module.exports = (router) => {
    *                 type: integer
    *               durationSeconds:
    *                 type: integer
+   *               completed:
+   *                 type: boolean
+   *                 description: >
+   *                   true (défaut) si la session a été menée jusqu'à la dernière carte due,
+   *                   false pour une sortie anticipée. Une session complète valide en plus
+   *                   automatiquement la séance planifiée du jour correspondante, si elle existe.
    *     responses:
    *       201:
    *         description: Session journalisée

@@ -184,6 +184,11 @@ const errors = ref([])
 // "Temps total de révision") — démarré une fois les cartes chargées, pas
 // pendant le chargement lui-même.
 const startedAt = ref(null)
+// Nombre de cartes réellement corrigées (submitResponse réussi), indépendant de
+// currentIndex/nextStep qui ne servent qu'à la navigation d'écran — voir CHOIX
+// sur logSessionProgress ci-dessous.
+const reviewedCount = ref(0)
+let sessionLogged = false
 
 onMounted(async () => {
   await Promise.all([
@@ -222,10 +227,37 @@ const handleValidation = async () => {
 
   if (!ok) return  // le store a déjà affiché le notif d'erreur
 
+  // Comptée dès la correction réussie, pas à la navigation vers la carte suivante :
+  // submitResponse a déjà fait avancer la carte dans ses boîtes côté serveur à ce
+  // stade, la garder pour "Continuer" sous-compterait la dernière carte visible si
+  // l'utilisateur quitte avant d'avoir cliqué ce bouton.
+  reviewedCount.value++
+
   if (!cardStore.lastCorrection?.success) {
     errors.value.push(currentCard.value)
   }
   showFeedback.value = true
+}
+
+// CHOIX: journaliser le temps réellement passé même si l'utilisateur quitte en
+// cours de session (confirmExit), plutôt que seulement à la toute fin.
+// RAISON: décision initiale du 2026-09-01 (abandon non journalisé) revenue sur
+// demande explicite de l'utilisateur — le temps déjà passé sur les cartes
+// effectivement corrigées reste une mesure réelle, quelle que soit la façon dont
+// la session se termine. Un seul point d'appel pour les deux cas (fin normale et
+// sortie anticipée), gardé par `sessionLogged` pour ne jamais journaliser deux
+// fois la même session, et par `reviewedCount >= 1` pour ne rien envoyer si
+// l'utilisateur quitte avant d'avoir corrigé la moindre carte (le validateur API
+// exige cardsReviewed >= 1, et une session à 0 carte n'a rien à mesurer).
+// `completed` distingue les deux cas côté API : seule une session menée à son
+// terme valide en plus automatiquement une séance planifiée correspondante
+// (voir RevisionSession.service.js#validateMatchingSessions) — une sortie
+// anticipée reste journalisée pour le temps, mais ne valide rien.
+const logSessionProgress = (completed) => {
+  if (sessionLogged || !startedAt.value || reviewedCount.value < 1) return
+  sessionLogged = true
+  const durationSeconds = Math.round((Date.now() - startedAt.value) / 1000)
+  reviewSessionStore.logSession(systemId, reviewedCount.value, durationSeconds, completed)
 }
 
 const nextStep = () => {
@@ -236,15 +268,15 @@ const nextStep = () => {
     submitting.value = false
   } else {
     isFinished.value = true
-    if (startedAt.value) {
-      const durationSeconds = Math.round((Date.now() - startedAt.value) / 1000)
-      reviewSessionStore.logSession(systemId, cardStore.dueCards.length, durationSeconds)
-    }
+    logSessionProgress(true)
   }
 }
 
 const confirmExit = () => {
   const confirmed = window.confirm('⚠️ Attention : la session en cours sera perdue. Voulez-vous vraiment quitter ?')
-  if (confirmed) router.push('/flashcards')
+  if (confirmed) {
+    logSessionProgress(false)
+    router.push('/flashcards')
+  }
 }
 </script>

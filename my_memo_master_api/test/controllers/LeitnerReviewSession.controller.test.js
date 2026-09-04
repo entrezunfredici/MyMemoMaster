@@ -71,6 +71,34 @@ describe('LeitnerReviewSession Controller', () => {
       })
     })
 
+    it('201 — completed: false (sortie anticipée) transmis tel quel au service', async () => {
+      leitnerReviewSessionService.create.mockResolvedValue({ ...SESSION_FIXTURE, cardsReviewed: 2, completed: false })
+
+      const res = await request(app)
+        .post(`${BASE}/leitner-review-sessions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ idSystem: 2, cardsReviewed: 2, durationSeconds: 40, completed: false })
+
+      expect(res.status).toBe(201)
+      expect(leitnerReviewSessionService.create).toHaveBeenCalledWith({
+        userId: 1,
+        idSystem: 2,
+        cardsReviewed: 2,
+        durationSeconds: 40,
+        completed: false
+      })
+    })
+
+    it('400 — completed non booléen', async () => {
+      const res = await request(app)
+        .post(`${BASE}/leitner-review-sessions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ idSystem: 2, cardsReviewed: 5, durationSeconds: 120, completed: 'oui' })
+
+      expect(res.status).toBe(400)
+      expect(leitnerReviewSessionService.create).not.toHaveBeenCalled()
+    })
+
     it('201 — durationSeconds = 0 accepté (session quasi instantanée)', async () => {
       leitnerReviewSessionService.create.mockResolvedValue({ ...SESSION_FIXTURE, durationSeconds: 0 })
 

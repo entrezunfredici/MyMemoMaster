@@ -104,6 +104,40 @@ class RevisionSessionService {
     await session.destroy()
     return true
   }
+
+  /**
+   * Valide automatiquement (isDone = true) les séances planifiées du jour qui
+   * correspondent à une pratique réelle qui vient d'avoir lieu — ferme la boucle
+   * entre « prévu » (RevisionSession, coché manuellement jusqu'ici) et « fait »
+   * (session Leitner menée à son terme, ou exercice soumis), sur demande
+   * explicite de l'utilisateur (2026-09-04). Ne touche jamais une séance déjà
+   * marquée faite, ni une séance planifiée à une autre date (une pratique
+   * aujourd'hui ne rattrape pas un créneau en retard, pour rester prévisible).
+   *
+   * @param {object} params
+   * @param {number} params.userId
+   * @param {number} [params.idSystem] - système Leitner dont une session vient d'être menée à son terme
+   * @param {number} [params.idTest] - test dont un résultat vient d'être soumis
+   * @returns {Promise<number>} nombre de séances validées
+   */
+  async validateMatchingSessions({ userId, idSystem, idTest }) {
+    if (!idSystem && !idTest) return 0
+
+    const today = dayjs().format('YYYY-MM-DD')
+    const [count] = await RevisionSession.update(
+      { isDone: true },
+      {
+        where: {
+          userId,
+          date: today,
+          isDone: false,
+          ...(idSystem ? { idSystem } : {}),
+          ...(idTest ? { idTest } : {})
+        }
+      }
+    )
+    return count
+  }
 }
 
 module.exports = new RevisionSessionService()

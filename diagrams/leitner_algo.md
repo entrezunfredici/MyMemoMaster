@@ -102,16 +102,19 @@ const now = dayjs();
 const nextReviewAt = now.add(nextBox.intervall, "second").toDate();
 ```
 
-`LeitnerBox.intervall` est **toujours en secondes**. Voir [DECISIONS.md](../agents/DECISIONS.md) pour la justification du choix secondes vs jours.
+`LeitnerBox.intervall` est **toujours en secondes**, dans tous les environnements — pas de branchement dev/prod dans le code. Voir [DECISIONS.md](../agents/DECISIONS.md) pour la justification du choix secondes vs jours, et l'entrée 2026-09-04 pour le passage aux valeurs réelles ci-dessous.
 
-### Valeurs de référence
+### Valeurs par défaut (`DEFAULT_BOXES`, `services/LeitnerSystem.service.js`)
 
-| Environnement | Boîte 1 | Boîte 2 | Boîte 3 | Boîte 4 | Boîte 5 |
-|--------------|---------|---------|---------|---------|---------|
-| Dev (test) | 10 s | 30 s | 60 s | 120 s | 300 s |
-| Prod (recommandé) | 1 jour (86 400 s) | 3 jours (259 200 s) | 7 jours (604 800 s) | 14 jours (1 209 600 s) | 30 jours (2 592 000 s) |
+Appliquées aux 5 boîtes de tout nouveau système Leitner, quel que soit l'environnement :
 
-> Les valeurs prod sont des recommandations — elles sont configurables par système via l'interface d'administration des boîtes.
+| Boîte 1 | Boîte 2 | Boîte 3 | Boîte 4 | Boîte 5 |
+|---------|---------|---------|---------|---------|
+| 1 jour (86 400 s) | 3 jours (259 200 s) | 7 jours (604 800 s) | 14 jours (1 209 600 s) | 30 jours (2 592 000 s) |
+
+> Uniquement des **valeurs de départ** : chaque boîte reste configurable indépendamment par système, sans restriction de droits particulière (`PUT /leitnerboxes/:id`, bouton "✎ Modifier" sur la page de gestion des cartes) — un étudiant peut régler ses systèmes Leitner comme il le souhaite, y compris revenir à des intervalles courts.
+>
+> Avant le 2026-09-04, `DEFAULT_BOXES` portait des raccourcis de test (5/10/15/20/30 s) — appliqués tels quels en prod faute de branchement par environnement, le temps de valider le fonctionnement de l'algorithme. Les suites de tests (`test/bdd/leitner.session.test.js`, etc.) définissent leurs propres intervalles courts en fixture, indépendamment de cette constante, pour garder des scénarios rapides à exécuter.
 
 ---
 
@@ -165,9 +168,22 @@ Carte courante → textarea réponse → POST /leitnercards/response
 
 ### 7.3 Abandon de session
 
-L'utilisateur peut quitter la session à tout moment via le bouton "← Retour". Une confirmation est demandée. Les révisions déjà soumises sont **persistées** (la progression n'est pas annulée).
+L'utilisateur peut quitter la session à tout moment via le bouton "← Retour". Une confirmation est demandée. Les révisions déjà soumises sont **persistées** (la progression n'est pas annulée) — chaque carte corrigée a déjà fait avancer ses boîtes côté serveur au moment de la correction, indépendamment de la suite.
+
+Depuis le 2026-09-04, le **temps réellement passé jusqu'à la sortie** est lui aussi journalisé (`POST /leitner-review-sessions`, `cardsReviewed` = nombre de cartes réellement corrigées, pas le total dû) — une session menée jusqu'au bout n'est plus la seule à compter pour le KPI "Temps total de révision". Seule une session menée **jusqu'au bout** (`completed: true`) valide en plus automatiquement une séance planifiée du jour correspondante (voir §12) ; une sortie anticipée (`completed: false`) journalise le temps mais ne valide rien.
 
 ---
+
+## 12. Lien avec le calendrier (`RevisionSession`)
+
+Une séance planifiée (`RevisionSession`) peut être liée à un système Leitner (`idSystem`) ou à un test (`idTest`) — bouton "Planifier" depuis `FlashcardsPage.vue`/`ExercisesPage.vue`. Depuis le 2026-09-04, la pratique réelle **valide automatiquement** (`isDone = true`) la ou les séances planifiées du jour même qui correspondent :
+
+```
+Session Leitner menée à son terme (idSystem)  → RevisionSessionService.validateMatchingSessions({ userId, idSystem })
+Exercice soumis (idTest, toujours "complet")  → RevisionSessionService.validateMatchingSessions({ userId, idTest })
+```
+
+Ne touche que les séances `date = aujourd'hui`, `isDone = false`, du même utilisateur — une pratique réalisée aujourd'hui ne rattrape jamais un créneau en retard (comportement volontairement prévisible plutôt qu'un rattrapage automatique). Une séance sans `idSystem`/`idTest` (créneau générique) reste cochable uniquement à la main (`PUT /revision-sessions/:id/done`). Une session Leitner **partielle** (`completed: false`) ne valide rien — seule une session menée à son terme le fait.
 
 ## 8. Historique de révision
 

@@ -4,6 +4,7 @@ const { Test, Subject, Question, TestResult, Tag, ClassGroup, ClassGroupUsers, T
 const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
 const CLASS_GROUPS_INCLUDE = { model: ClassGroup, as: 'classGroups', attributes: ['id', 'name'], through: { attributes: [] }, required: false }
 const semanticService = require('./Semantic.service')
+const revisionSessionService = require('./RevisionSession.service')
 
 class TestService {
   /**
@@ -160,6 +161,13 @@ class TestService {
 
     const score = parseFloat(results.reduce((acc, r) => acc + r.points, 0).toFixed(2))
     const testResult = await TestResult.create({ testId, userId, score, total: questions.length, durationSeconds })
+
+    // Un exercice soumis est toujours "complet" (pas de notion de soumission partielle,
+    // contrairement à une session Leitner) — valide donc systématiquement la séance
+    // planifiée du jour correspondante, si elle existe (demande explicite de l'utilisateur,
+    // 2026-09-04 — voir RevisionSession.service.js#validateMatchingSessions).
+    await revisionSessionService.validateMatchingSessions({ userId, idTest: testId })
+
     return { score, total: questions.length, results, resultId: testResult.resultId }
   }
 

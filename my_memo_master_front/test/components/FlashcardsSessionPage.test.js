@@ -239,7 +239,7 @@ describe('FlashcardsSessionPage', () => {
     await wrapper.findAll('button').find(b => b.text() === 'Continuer')?.trigger('click')
     await flushPromises()
 
-    expect(reviewSessionStore.logSession).toHaveBeenCalledWith(1, 1, expect.any(Number))
+    expect(reviewSessionStore.logSession).toHaveBeenCalledWith(1, 1, expect.any(Number), true)
     expect(reviewSessionStore.logSession.mock.calls[0][2]).toBeGreaterThanOrEqual(0)
   })
 
@@ -265,5 +265,70 @@ describe('FlashcardsSessionPage', () => {
 
     expect(mockRouterPush).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Quelle est la capitale de la France ?')
+  })
+
+  // Régression : jusqu'ici, quitter une session en cours (bouton "← Retour") ne
+  // journalisait jamais rien, même si des cartes avaient déjà été corrigées —
+  // seule une session menée à son terme comptait. Revenu sur demande explicite
+  // de l'utilisateur : le temps déjà passé doit être journalisé.
+  it('quitte après avoir corrigé au moins une carte — journalise une session partielle (nb de cartes réellement corrigées, pas le total dû)', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const wrapper = mountSession([mockCard, mockCard2])
+    await flushPromises()
+
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = { success: true, score: 0.9, correction: 'Paris', explanation: '', decision_zone: 'high' }
+      return true
+    })
+    const reviewSessionStore = useLeitnerReviewSessionStore()
+
+    // Corrige uniquement la 1ʳᵉ carte (sur 2 dues), puis quitte sans aller plus loin
+    await wrapper.find('textarea').setValue('Paris')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+
+    await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await flushPromises()
+
+    expect(reviewSessionStore.logSession).toHaveBeenCalledWith(1, 1, expect.any(Number), false)
+    expect(mockRouterPush).toHaveBeenCalledWith('/flashcards')
+  })
+
+  it('quitte sans avoir corrigé aucune carte — ne journalise rien (rien à mesurer)', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const wrapper = mountSession([mockCard, mockCard2])
+    await flushPromises()
+
+    const reviewSessionStore = useLeitnerReviewSessionStore()
+
+    await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await flushPromises()
+
+    expect(reviewSessionStore.logSession).not.toHaveBeenCalled()
+    expect(mockRouterPush).toHaveBeenCalledWith('/flashcards')
+  })
+
+  it('quitte + annule la confirmation — ne journalise rien (session pas réellement quittée)', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const wrapper = mountSession([mockCard, mockCard2])
+    await flushPromises()
+
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = { success: true, score: 0.9, correction: 'Paris', explanation: '', decision_zone: 'high' }
+      return true
+    })
+    const reviewSessionStore = useLeitnerReviewSessionStore()
+
+    await wrapper.find('textarea').setValue('Paris')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+
+    await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await flushPromises()
+
+    expect(reviewSessionStore.logSession).not.toHaveBeenCalled()
+    expect(mockRouterPush).not.toHaveBeenCalled()
   })
 })

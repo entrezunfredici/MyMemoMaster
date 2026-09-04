@@ -2456,3 +2456,141 @@ la robustesse du rollout et la visibilité de l'échec, pas sur sa cause. Aucune
 upgrade`/`kubectl apply` exécutée sur le cluster réel dans cette session (uniquement `helm
 lint`/`template`, `kubectl diff`, tous en lecture seule) — les changements prennent effet au prochain
 déploiement réussi.
+
+---
+
+### [2026-09-04, 5ᵉ session du jour] `DEFAULT_BOXES` Leitner : intervalles réels par défaut, sans restreindre qui peut les modifier
+
+**Contexte** — En creusant la question « c'est le compte admin qui paramètre ça ? », constat qu'aucune
+route `LeitnerBox` (`POST`/`PUT`/`DELETE /leitnerboxes`) ne vérifie ni rôle ni propriété — seul
+`authMiddleware` protège ces routes, contrairement à `LeitnerCard.service.js` qui a déjà
+`resolveUserRights(userId, idSystem)` pour le même genre d'opération. Un utilisateur connecté peut donc
+modifier ou supprimer la boîte d'un système qui n'est pas le sien, juste en connaissant son `idBox`.
+
+**Décision 1 — ne pas restreindre les droits sur `LeitnerBox`, sur demande explicite de l'utilisateur.**
+Le constat (IDOR potentiel) a été présenté avec une proposition de correctif (répliquer
+`resolveUserRights`, déjà en place pour `LeitnerCard`). L'utilisateur a explicitement choisi de ne pas
+y toucher : « pour la possibilité de modifier les valeurs on laisse comme ça, l'étudiant pourra
+paramétrer ces systèmes de leitner comme il le souhaite ». Interprété comme un choix produit assumé
+(la configurabilité des boîtes reste volontairement ouverte), pas comme un oubli — aucune modification
+apportée à `routes/LeitnerBox.routes.js`, `controllers/LeitnerBox.controller.js` ni
+`services/LeitnerBox.service.js` dans cette session.
+
+**Décision 2 — `DEFAULT_BOXES` passe aux valeurs réelles, sans branchement par environnement.**
+Les 5 boîtes créées à chaque nouveau système portaient des raccourcis de test (5/10/15/20/30 s,
+`services/LeitnerSystem.service.js`) — appliqués identiquement en prod, faute de toute distinction
+dev/prod dans le code (`intervall` est en secondes partout, décision actée 2026-06-06 précisément pour
+permettre des délais sub-journaliers si besoin, pas pour être ensuite recloisonnée par environnement).
+Sur confirmation explicite de l'utilisateur (« maintenant que le fonctionnement est validé on peut
+passer aux vraies valeurs »), `DEFAULT_BOXES` prend les valeurs déjà documentées comme "Prod
+(recommandé)" dans `diagrams/leitner_algo.md` §5 (1j/3j/7j/14j/30j) — jusqu'ici une recommandation
+jamais réellement appliquée par défaut. Alternative écartée : ajouter une variable d'environnement ou
+un `NODE_ENV`/`ENVIRONMENT` pour ne changer le défaut qu'en prod — non demandé, et contraire à l'esprit
+de la décision 2026-06-06 (garder `intervall` simple et non recloisonné) ; les suites de tests qui ont
+besoin d'intervalles courts définissent déjà leurs propres fixtures indépendamment de cette constante.
+
+**Conséquences** : tout nouveau système Leitner créé à partir de maintenant — en prod comme ailleurs —
+démarre avec des intervalles de répétition espacée réels plutôt que des délais de quelques secondes.
+Les systèmes déjà existants ne sont pas affectés rétroactivement (`DEFAULT_BOXES` n'est lu qu'à la
+création) — aucune migration de données demandée ni faite pour les systèmes déjà créés avec les
+anciennes valeurs. `npx jest` (API) → 1779/1779 (+1, nouveau test qui épingle les 5 valeurs réelles).
+**Dette assumée, documentée mais pas corrigée** : l'IDOR potentiel sur `LeitnerBox` reste tel quel, sur
+choix explicite de l'utilisateur — à reconsidérer seulement s'il change d'avis, jamais à corriger
+unilatéralement par l'agent.
+
+---
+
+### [2026-09-04, 6ᵉ session du jour] Session Leitner interrompue : journaliser le temps partiel plutôt que rien — revient sur la décision du 2026-09-01
+
+**Contexte** — En expliquant pourquoi le compteur "Temps total de révision" de l'utilisateur restait à
+0 min après un test en prod (session Leitner quittée avant la fin), rappel de la règle actée le
+2026-09-01 : « seule une session menée à son terme est comptée ». L'utilisateur a explicitement demandé
+de revenir dessus : journaliser le temps passé jusqu'au moment où l'on quitte, pas seulement les
+sessions complètes.
+
+**Décision — un point de journalisation unique (`logSessionProgress`), partagé entre fin normale et
+sortie anticipée, plutôt que deux chemins de code séparés.**
+La fin normale (dernière carte, `nextStep`) et la sortie anticipée (`confirmExit`) ont exactement le
+même besoin : calculer la durée depuis `startedAt`, journaliser `reviewedCount` cartes pour `systemId`.
+Dupliquer cette logique dans les deux branches aurait risqué une divergence future (ex: un correctif
+appliqué à un seul des deux chemins) — un seul point d'appel avec une garde (`sessionLogged`) empêche
+aussi tout risque de double envoi si les deux chemins finissaient par se chevaucher.
+
+**Décision — `reviewedCount` (compteur dédié, incrémenté à la correction) plutôt que réutiliser
+`currentIndex`/`cardStore.dueCards.length`.**
+`currentIndex` ne sert qu'à la navigation d'écran (quelle carte afficher), pas à combien ont été
+réellement corrigées : il n'avance qu'au clic sur "Continuer", pas à la correction elle-même —
+`submitResponse` a pourtant déjà fait avancer la carte dans ses boîtes côté serveur dès que la réponse
+est soumise et validée. Si l'utilisateur corrige la dernière carte visible puis quitte immédiatement
+(sans cliquer "Continuer"), `currentIndex` sous-compterait d'une unité. `cardStore.dueCards.length`
+(utilisé avant ce ticket) est le total de cartes **dues**, correct seulement quand la session est menée
+à son terme — plus la bonne mesure en cas de sortie anticipée. `reviewedCount`, incrémenté dans
+`handleValidation` dès que `submitResponse` réussit, reste correct dans les deux cas.
+
+**Alternative écartée (ne rien changer, documenter comme dette permanente)** : la décision du
+2026-09-01 avait volontairement écarté la journalisation des abandons — mais c'était un choix par
+défaut prudent en l'absence de retour utilisateur, pas un principe intangible. Revenue dessus dès que
+l'utilisateur a explicitement demandé le contraire, cohérent avec le traitement déjà appliqué le même
+jour à `MindMapViewSession` (segments partiels journalisés plutôt que tout-ou-rien).
+
+**Conséquences** : le temps de révision reflète désormais le temps réellement passé, y compris pour les
+sessions interrompues — cohérent avec l'esprit général du 2026-09-04 (totalMinutes = uniquement du
+temps réel chronométré, plus fiable qu'une case cochée ou qu'un tout-ou-rien sur la complétion).
+`npx vitest run` (front) → 758/758 (+3). **Dette assumée** : même limite que documentée pour les cartes
+mentales avant leur propre correctif — une fermeture d'onglet/navigateur pendant une session Leitner en
+cours n'est toujours pas journalisée (`FlashcardsSessionPage.vue` n'a pas de handler `pagehide`/beacon).
+Non répliqué dans ce ticket, non demandé ; le pattern (`api.postBeacon`, `stores/mindmapViewSessions.js`)
+existe déjà et pourrait être réutilisé pour `leitnerReviewSessions.js` si cette limite devient gênante en
+pratique.
+
+---
+
+### [2026-09-04, 7ᵉ session du jour] Validation automatique des séances planifiées par la pratique réelle : bornée au jour même, `completed` persisté plutôt que transitoire
+
+**Contexte** — Demande explicite de l'utilisateur (après clarification via question, deux lectures
+possibles de son message initial étaient en jeu — voir échange) : qu'une session Leitner menée à son
+terme, ou un exercice soumis, valide automatiquement (`isDone = true`) la séance planifiée
+correspondante dans le calendrier, si elle existe — et que le compteur "Sessions complétées" reflète
+désormais cette pratique réelle plutôt qu'une case cochée à la main uniquement.
+
+**Décision 1 — validation bornée à `date = aujourd'hui`, jamais de rattrapage rétroactif.**
+Alternative écartée : valider aussi les séances planifiées passées, encore non faites (rattraper un
+retard). Écartée pour rester prévisible — un utilisateur qui a un mois de créneaux planifiés non cochés
+ne doit pas voir dix séances anciennes se cocher d'un coup parce qu'il a fait une session aujourd'hui,
+sans lien réel avec elles. La sémantique reste simple : "as-tu fait aujourd'hui ce que tu avais prévu
+aujourd'hui ?", pas un solde à rattraper.
+
+**Décision 2 — `completed` (LeitnerReviewSession) : colonne persistée plutôt qu'un simple paramètre de
+requête transitoire.**
+La distinction "session complète / partielle" n'était utile, dans l'immédiat, que pour décider côté
+service si `validateMatchingSessions` doit être appelée — un paramètre de requête non stocké aurait
+suffi. Persisté quand même : coût quasi nul (une colonne booléenne, défaut `true`), et donne une
+information a posteriori utile (distinguer, dans le journal, une session menée à son terme d'un abandon
+en cours) sans devoir la reconstituer indirectement (`cardsReviewed` vs. le nombre de cartes dues au
+moment de la session, non conservé par ailleurs). Alternative écartée : ne rien persister — écartée
+pour ce faible coût contre cette perte d'information définitive.
+
+**Décision 3 — exercices toujours "complets" (`Test.service.js#submitAnswers` appelle systématiquement
+`validateMatchingSessions`), sessions Leitner conditionnées à `completed: true`.**
+Un exercice n'a pas de notion de soumission partielle : `POST /tests/:id/submit` envoie toutes les
+réponses en un seul appel, à la fin du test — contrairement à une session Leitner où chaque carte est
+un appel indépendant et où l'utilisateur peut quitter au milieu (fonctionnalité de la 6ᵉ session du jour
+sur ce même fichier). Pas de garde côté exercices équivalente à `completed` : il n'y a rien à distinguer.
+
+**Alternative écartée (valider dans `Kpi.service.js`, au moment du calcul plutôt qu'à l'écriture)** —
+aurait fallu recalculer, à chaque lecture du KPI, quelles séances planifiées "auraient dû" être validées
+par la pratique déjà enregistrée (jointure supplémentaire entre `RevisionSession` et
+`TestResult`/`LeitnerReviewSession` par date+système/test, à chaque appel `getMyKpis`). Écartée : plus
+coûteux à chaque lecture, et `isDone` resterait sémantiquement faux en base (pas mis à jour) — la
+validation à l'écriture (au moment de la pratique) garde `RevisionSession.isDone` comme source de
+vérité unique, cohérente pour n'importe quel autre lecteur futur de cette table (pas seulement
+`Kpi.service.js`).
+
+**Conséquences** : `totalCompleted`/`completionRate` (déjà calculés depuis `isDone`, `Kpi.service.js`
+inchangé) reflètent désormais aussi bien les séances cochées à la main que celles validées par la
+pratique — sans changement de code côté KPI, seul le mécanisme qui fait passer `isDone` à `true` change.
+Page `KpiPage.vue` réorganisée en deux lignes "Prévu"/"Fait" pour rendre cette distinction visible (voir
+CHANGELOG_AGENT.md pour le détail des cartes déplacées). `npx jest` (API) → 1789/1789 (+10) ; `npx
+vitest run` (front) → 760/760 (+2). **Dette assumée** : aucun rattrapage rétroactif (décision 1,
+assumée) ; pas de notification UI quand une validation automatique a lieu — l'utilisateur le découvre
+en consultant son calendrier, non demandé dans ce ticket.

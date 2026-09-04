@@ -1,12 +1,22 @@
 const { LeitnerSystem, LeitnerBox, LeitnerSystemsUsers, Subject, Tag, instance } = require('../models/index')
 const rightsCache = require('../helpers/leitnerRightsCache')
 
+// CHOIX: valeurs de répétition espacée réelles (1j/3j/7j/14j/30j) plutôt que les
+// raccourcis de test (5/10/15/20/30 s) utilisés jusqu'ici.
+// RAISON: intervall est en secondes dans tous les environnements, sans branchement
+// dev/prod dans le code (voir DECISIONS.md 2026-06-06) — les raccourcis de test
+// étaient donc aussi ce que recevait un système créé en prod, tant que l'utilisateur
+// ne les modifiait pas lui-même via l'UI de gestion des boîtes. Le fonctionnement
+// étant validé, on bascule le défaut sur les valeurs "Prod (recommandé)" déjà
+// documentées dans diagrams/leitner_algo.md §5. Reste configurable par système,
+// sans restriction de droits (voir DECISIONS.md — décision explicite de l'utilisateur
+// de ne pas ajouter de vérification de propriété sur LeitnerBox).
 const DEFAULT_BOXES = [
-  { level: 1, intervall: 5, color: 123456 },
-  { level: 2, intervall: 10, color: 654321 },
-  { level: 3, intervall: 15, color: 111111 },
-  { level: 4, intervall: 20, color: 222222 },
-  { level: 5, intervall: 30, color: 333333 }
+  { level: 1, intervall: 86400, color: 123456 }, // 1 jour
+  { level: 2, intervall: 259200, color: 654321 }, // 3 jours
+  { level: 3, intervall: 604800, color: 111111 }, // 7 jours
+  { level: 4, intervall: 1209600, color: 222222 }, // 14 jours
+  { level: 5, intervall: 2592000, color: 333333 } // 30 jours
 ]
 
 const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }

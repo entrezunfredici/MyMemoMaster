@@ -25,12 +25,12 @@
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-08-31 |
 | Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-09-01 |
-| TestResult (scores historique exercices) | Stable — [ADD] 2026-09-01 : colonne `durationSeconds` (nullable), chronométrée côté front sur `POST /tests/:id/submit`, alimente le KPI temps de révision ; M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé | 2026-09-01 |
+| TestResult (scores historique exercices) | Stable — [ADD] 2026-09-01 : colonne `durationSeconds` (nullable), chronométrée côté front sur `POST /tests/:id/submit`, alimente le KPI temps de révision ; M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé ; [ADD] 2026-09-04 : `submitAnswers` valide en plus automatiquement une séance `RevisionSession` planifiée du jour (idTest) après création du TestResult — un exercice soumis est toujours "complet" | 2026-09-04 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
-| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `cardSystems`/`LeitnerSystemTag` — modèles Sequelize enregistrés préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-09-01 |
+| LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `cardSystems`/`LeitnerSystemTag` — modèles Sequelize enregistrés préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) ; [IMP] 2026-09-04 : `DEFAULT_BOXES` (5 boîtes créées à chaque nouveau système) passe des raccourcis de test (5/10/15/20/30 s) aux intervalles réels (1j/3j/7j/14j/30j) — appliqués tels quels en prod jusqu'ici faute de branchement dev/prod dans le code ; routes `LeitnerBox` volontairement laissées sans vérification de propriété/droits (décision explicite de l'utilisateur — l'étudiant règle ses systèmes comme il le souhaite) | 2026-09-04 |
 | LeitnerSystemsUsers | Stable | init |
-| LeitnerReviewSession (journal sessions réelles) | Stable — [ADD] 2026-09-01 : nouvelle table, journalise chaque session Leitner réellement terminée (userId, idSystem, cardsReviewed, durationSeconds), `POST /leitner-review-sessions`, chronométrée côté front (`FlashcardsSessionPage.vue`) et best-effort (échec silencieux) ; alimente le KPI temps de révision aux côtés de `TestResult.durationSeconds` | 2026-09-01 |
+| LeitnerReviewSession (journal sessions réelles) | Stable — [ADD] 2026-09-01 : nouvelle table, journalise chaque session Leitner réellement terminée (userId, idSystem, cardsReviewed, durationSeconds), `POST /leitner-review-sessions`, chronométrée côté front (`FlashcardsSessionPage.vue`) et best-effort (échec silencieux) ; alimente le KPI temps de révision aux côtés de `TestResult.durationSeconds` ; [IMP] 2026-09-04 : une sortie anticipée (bouton "← Retour") journalise désormais aussi une session **partielle** (cardsReviewed = cartes réellement corrigées, pas le total dû) — jusqu'ici seule une session menée à son terme comptait (décision du 2026-09-01, revenue sur demande explicite de l'utilisateur) ; nouvelle colonne `completed` (défaut true) ; `completed: true` valide en plus automatiquement une séance `RevisionSession` planifiée du jour correspondante via `RevisionSession.service#validateMatchingSessions` | 2026-09-04 |
 | MindMapViewSession (journal consultations cartes mentales) | Stable — [ADD] 2026-09-04 : nouvelle table, journalise la consultation d'une carte mentale **existante** (userId, idMindMap, durationSeconds), `POST /mindmap-view-sessions`, chronométrée côté front (`MindmapsEditorView.vue`, uniquement quand `diagramId` est non nul à l'ouverture — création d'une carte neuve non comptée) et best-effort (échec silencieux) ; alimente le KPI temps de révision aux côtés de `TestResult.durationSeconds` et `LeitnerReviewSession` ; [IMP] 2026-09-04 (même jour) : fermeture d'onglet/navigateur journalisée via `pagehide` + `api.postBeacon` (fetch keepalive, en-tête `Authorization` — `sendBeacon` écarté, pas d'en-têtes personnalisés) ; bascule vers "Nouvelle carte" (`handleNewMap`) clôt la mesure en cours avant réinitialisation ; [IMP] 2026-09-04 (3ᵉ session du jour) : chronométrage réécrit en mesure par segments (`document.visibilitychange` — 'hidden' clôt via beacon sans arrêter le suivi, 'visible' redémarre un segment) pour couvrir la mise en arrière-plan prolongée (mobile notamment, où l'OS peut tuer l'onglet sans `pagehide`) ; segments de durée nulle ignorés | 2026-09-04 |
 | Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API ; sortie MathML explicite pour lecteurs d'écran (2026-07-19) | 2026-07-19 |
 | Librairie de rendu formules (S-06.01) | Clôturé — benchmark MathJax/KaTeX formalisé dans DECISIONS (2026-07-19) : KaTeX seul retenu ; dépendance `mathjax` et helper mort `mathjax-config.js` supprimés, CONVENTIONS corrigé | 2026-07-19 |
@@ -70,7 +70,7 @@
 | ClassGroup / ClassGroupUsers | Stable — M-05.01 : droits élargis à Admin établissement (roleId=4) | 2026-06-14 |
 | CalendarEvent / EventOccurrence | Stable — CRUD complet + récurrence auto/manual, protection RESTRICT | 2026-06-10 |
 | Deadline | Stable — M-06.07 front : select exercice dans formulaire enseignant + lien exercice côté étudiant + section échéances dans ExerciseDetailPage | 2026-06-30 |
-| RevisionSession | Stable — CRUD + liens optionnels idSystem/idTest + bouton Planifier depuis FlashcardsPage | 2026-06-13 |
+| RevisionSession | Stable — CRUD + liens optionnels idSystem/idTest + bouton Planifier depuis FlashcardsPage ; [ADD] 2026-09-04 : `validateMatchingSessions({userId, idSystem?, idTest?})` — valide automatiquement (isDone=true) la séance planifiée du jour correspondante quand une pratique réelle a lieu (session Leitner menée à son terme, exercice soumis) ; `isDone` reste aussi cochable manuellement | 2026-09-04 |
 | Reminder (rappels BullMQ) | Stable — CRUD complet, queue Redis, worker email | 2026-06-12 |
 | ESLint / Prettier (front + back) | Stable — lint vert après revue M-03 (formatDate supprimée, globalThis→window, Reminder.controller normalisé) | 2026-06-14 |
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
@@ -10122,3 +10122,144 @@ session — les fichiers modifiés prendront effet au prochain déploiement (CD 
   pod fraîchement basculé Ready peut donc recevoir une requête de correction sémantique avant d'être
   chaud. N'est pas une coupure de service (juste une réponse plus lente sur cette route précise pour la
   toute première requête) — signalé, non traité, hors périmètre de la demande initiale.
+
+---
+
+## [2026-09-04, 5ᵉ session du jour] IMP — Boîtes de Leitner : intervalles par défaut réels (1j/3j/7j/14j/30j) plutôt que les raccourcis de test
+
+**Contexte** — Suite de l'échange précédent (question utilisateur : « c'est le compte admin qui
+paramètre ça ? »). Audit du code (`routes/LeitnerBox.routes.js`, `services/LeitnerBox.service.js`) :
+aucune vérification de rôle ni de propriété sur `PUT`/`POST`/`DELETE /leitnerboxes` — seul
+`authMiddleware` protège ces routes, n'importe quel utilisateur connecté peut modifier ou supprimer
+n'importe quelle boîte de n'importe quel système par son `idBox`. Signalé à l'utilisateur comme un
+IDOR potentiel. **Décision explicite de l'utilisateur : ne pas y toucher** — « pour la possibilité de
+modifier les valeurs on laisse comme ça, l'étudiant pourra paramétrer ces systèmes de leitner comme il
+le souhaite ». En revanche, demande de passer `DEFAULT_BOXES` (les 5 boîtes créées à chaque nouveau
+système) des raccourcis de test aux valeurs réelles : « les valeurs courtes étaient pour les tests,
+maintenant que le fonctionnement est validé on peut passer aux vraies valeurs ».
+
+**Ce qui a été fait** :
+- `services/LeitnerSystem.service.js` — `DEFAULT_BOXES` : `intervall` passe de `5/10/15/20/30` (secondes)
+  à `86400/259200/604800/1209600/2592000` (1j/3j/7j/14j/30j) — les valeurs "Prod (recommandé)" déjà
+  documentées dans `diagrams/leitner_algo.md` §5, jusqu'ici jamais réellement appliquées par défaut.
+  Aucun branchement dev/prod ajouté : `intervall` reste en secondes dans tous les environnements
+  (décision actée 2026-06-06, voir `DECISIONS.md`), donc ce nouveau défaut s'applique partout où le
+  code tourne — y compris en local/dev, cohérent avec la demande de « passer aux vraies valeurs »
+  maintenant que l'algorithme est validé.
+- `diagrams/leitner_algo.md` §5 — table "Valeurs de référence" réécrite : n'oppose plus un "Dev (test)"
+  et un "Prod (recommandé)" qui n'ont jamais correspondu au code réel (la ligne "Dev" citait des
+  valeurs qui n'étaient même pas celles de `DEFAULT_BOXES`, mais celles d'une fixture de test BDD) —
+  une seule table "Valeurs par défaut (`DEFAULT_BOXES`)" reflétant ce qui est réellement appliqué,
+  avec une note explicite sur la reconfigurabilité sans restriction de droits.
+- `test/services/LeitnerSystem.service.test.js` — nouveau test qui épingle les 5 valeurs réelles
+  (`boxes.map(b => b.intervall)` === `[86400, 259200, 604800, 1209600, 2592000]`) ; aucun test existant
+  ne référençait ces valeurs numériques (les suites `LeitnerBox`/`LeitnerCard`/BDD utilisent toutes
+  leurs propres fixtures d'intervalle courtes, indépendantes de `DEFAULT_BOXES`, pour des scénarios
+  rapides à exécuter — aucune n'a eu besoin d'être modifiée).
+
+**Choix techniques** : voir `DECISIONS.md` — pas de branchement environnement plutôt qu'une distinction
+dev/prod des valeurs par défaut, cohérent avec la décision déjà actée 2026-06-06 (`intervall` en
+secondes justement pour la flexibilité, pas pour être ensuite recloisonné par environnement).
+
+**Ce qui n'est PAS couvert** :
+- `seeds/LeitnerBox.seed.json` (fixture de démo utilisée par `seeder.js`, indépendante de
+  `DEFAULT_BOXES`) conserve ses valeurs de test (5/10/15/20/30 s) — hors périmètre, pas demandé, et
+  changer une fixture de démo n'a pas le même enjeu qu'un défaut appliqué à de vrais comptes.
+- Aucune vérification de rôle/propriété ajoutée sur `routes/LeitnerBox.routes.js` — refus explicite de
+  l'utilisateur, voir Contexte ci-dessus. Le constat (IDOR potentiel) reste documenté dans cette même
+  entrée pour mémoire, au cas où la décision serait reconsidérée plus tard.
+- Les systèmes Leitner **déjà créés** avant ce changement gardent leurs boîtes existantes (5/10/15/20/30 s
+  ou toute valeur déjà personnalisée) — `DEFAULT_BOXES` n'est lu qu'à la création d'un nouveau système,
+  aucune migration de données rétroactive n'a été demandée ni faite.
+
+**Tests** : `npx jest` (API) → 1779/1779 (+1). Pas de changement front, pas de changement API publique
+(seule la valeur des données créées change, pas la forme des endpoints).
+
+---
+
+## [2026-09-04, 6ᵉ session du jour] IMP — FlashcardsSessionPage : journalise le temps passé même en cas de sortie anticipée d'une session Leitner
+
+**Contexte** — Suite de l'échange sur le KPI "Temps total de révision" (le compteur à 0 min de
+l'utilisateur s'expliquait par une session Leitner quittée avant la fin, non journalisée par design
+depuis le 2026-09-01). Demande explicite de l'utilisateur : revenir sur cette règle — journaliser le
+temps passé jusqu'au moment où l'utilisateur quitte, pas seulement les sessions menées à leur terme.
+
+**Ce qui a été fait** — `pages/FlashcardsSessionPage.vue` :
+- Nouveau compteur `reviewedCount`, incrémenté à chaque `submitResponse` réussi (pas à la navigation
+  `nextStep`/"Continuer") : une carte déjà corrigée a déjà fait avancer ses boîtes côté serveur, quelle
+  que soit la suite de la navigation front — la garder pour "Continuer" sous-compterait la dernière
+  carte visible si l'utilisateur quitte juste après l'avoir corrigée, avant d'avoir cliqué ce bouton.
+- Nouvelle fonction `logSessionProgress()`, appelée à la fois par la fin normale de session
+  (`nextStep`, dernière carte) et par `confirmExit` (bouton "← Retour" confirmé) — un seul point
+  d'appel, gardé par `sessionLogged` (jamais deux fois la même session) et par `reviewedCount >= 1`
+  (rien à journaliser, et le validateur API exige `cardsReviewed >= 1`, si l'utilisateur quitte avant
+  d'avoir corrigé la moindre carte).
+- `cardsReviewed` envoyé à l'API est désormais `reviewedCount` (cartes réellement corrigées) plutôt que
+  `cardStore.dueCards.length` (total de cartes dues) — identiques en cas de session menée à son terme,
+  mais seule la première valeur a un sens en cas de sortie anticipée.
+
+**Tests** : `test/components/FlashcardsSessionPage.test.js` (+3) : sortie après au moins une carte
+corrigée journalise une session partielle (nb réel, pas le total dû) ; sortie sans avoir rien corrigé
+ne journalise rien ; annuler la confirmation de sortie ne journalise rien non plus (session pas
+réellement quittée). `npx vitest run` (front) → 758/758 (+3). `npm run lint` propre.
+
+**Choix techniques** : voir `DECISIONS.md` — décision du 2026-09-01 explicitement revenue, pas un bug ;
+un seul point de journalisation partagé plutôt que dupliquer la logique entre fin normale et sortie
+anticipée.
+
+**Ce qui n'est PAS couvert** : la fermeture d'onglet/navigateur pendant une session Leitner en cours
+n'est toujours pas journalisée (même limite que celle déjà comblée pour les cartes mentales via
+`pagehide`/`api.postBeacon` — non répliquée ici, non demandé dans ce ticket ; voir DECISIONS.md
+2026-09-04 sur ce point précis). Le texte de la boîte de confirmation ("la session en cours sera
+perdue") n'a pas été retouché — il reste vrai pour les cartes *non encore* corrigées, seule la mesure
+du temps déjà passé change de comportement.
+
+---
+
+## [2026-09-04, 7ᵉ session du jour] ADD — Validation automatique des séances planifiées par la pratique réelle + réorganisation "Prévu / Fait" de la page KPI
+
+**Contexte** — Suite de l'échange précédent : demande explicite de l'utilisateur de fermer la boucle
+entre "prévu" (calendrier, `RevisionSession`) et "fait" (pratique réelle) — qu'une session Leitner menée
+à son terme (ou un exercice soumis) valide automatiquement la séance planifiée correspondante si elle
+existe, et que le compteur "Sessions complétées" reflète désormais cette validation. Puis, dans le même
+échange, demande de réorganiser la page KPI pour séparer visuellement les deux notions.
+
+**Ce qui a été fait** :
+1. **`RevisionSession.service.js`** — nouvelle méthode `validateMatchingSessions({userId, idSystem?,
+   idTest?})` : marque `isDone = true` sur les séances de l'utilisateur, du jour même, pas encore
+   faites, dont `idSystem` ou `idTest` correspond. Ne touche jamais une séance déjà faite ni une séance
+   d'une autre date (pas de rattrapage d'un créneau en retard — comportement volontairement
+   prévisible). `totalCompleted`/`completionRate` (déjà calculés depuis `isDone` dans
+   `Kpi.service.js#_computeRevision`, inchangé) reflètent donc désormais aussi la pratique réelle, sans
+   changement de code côté KPI.
+2. **Session Leitner → validation conditionnelle à `completed`** — `LeitnerReviewSession` gagne une
+   colonne `completed` (migration `20260904000002`, défaut `true`) : `true` = session menée jusqu'à la
+   dernière carte due, `false` = sortie anticipée (journalisée depuis la 6ᵉ session du jour). Seule
+   `completed: true` déclenche `validateMatchingSessions({userId, idSystem})` — une session partielle
+   journalise le temps mais ne valide rien. Chaîne complète : `FlashcardsSessionPage.vue`
+   (`logSessionProgress(completed)`) → `stores/leitnerReviewSessions.js` (`logSession(...,
+   completed = true)`) → `POST /leitner-review-sessions` (`completed` optionnel, validé booléen) →
+   `LeitnerReviewSession.service#create`.
+3. **Exercice soumis → validation systématique** — `Test.service.js#submitAnswers` appelle
+   `validateMatchingSessions({userId, idTest: testId})` après chaque `TestResult.create` : un exercice
+   soumis est toujours "complet" (pas de notion de soumission partielle, contrairement à Leitner).
+4. **`pages/KpiPage.vue`** — section "Révision & Régularité" réorganisée en deux lignes explicitement
+   sous-titrées "Prévu" (Sessions planifiées, Taux de complétion, Streak actuel, 30 derniers jours) et
+   "Fait" (Sessions complétées, Complétées / 30 j, Temps total de révision) — jusqu'ici "Sessions
+   complétées" et "30 derniers jours" étaient dans la mauvaise ligne au regard de cette distinction.
+   Paragraphe d'intro et hints de "Sessions complétées"/"Complétées / 30 j" réécrits pour refléter
+   qu'elles peuvent désormais être validées par la pratique, pas seulement cochées à la main.
+
+**Choix techniques** : voir `DECISIONS.md` — validation bornée à `date = aujourd'hui` (pas de
+rattrapage) ; `completed` en colonne persistée plutôt qu'un simple paramètre transitoire de requête (visibilité/débogage) ; exercices toujours "complets" contrairement aux sessions Leitner.
+
+**Tests** : `npx jest` (API) → 1789/1789 (+10 : `RevisionSession.service.test.js` ×4 nouveaux,
+`LeitnerReviewSession.service.test.js` ×2, `LeitnerReviewSession.controller.test.js` ×2,
+`Test.service.test.js` ×2). `npx vitest run` (front) → 760/760 (+2 : `KpiPage.test.js` retitré/ajusté,
+`leitnerReviewSessions.store.test.js` ×1 nouveau). `npm run lint` propre des deux côtés.
+
+**Ce qui n'est PAS couvert** : aucun rattrapage pour une séance planifiée à une date passée non
+faite — volontaire (voir Décision dans `DECISIONS.md`). Une séance planifiée sans `idSystem`/`idTest`
+(créneau générique) reste cochable uniquement à la main, comme avant. Pas de notification/toast dans
+l'UI quand une séance est validée automatiquement (l'utilisateur le découvre en consultant son
+calendrier ou la page KPI) — non demandé, ajout possible plus tard si le besoin se confirme.

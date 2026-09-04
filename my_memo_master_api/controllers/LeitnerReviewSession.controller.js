@@ -3,12 +3,13 @@ const logger = require('../helpers/logger')
 
 exports.create = async (req, res) => {
   try {
-    const { idSystem, cardsReviewed, durationSeconds } = req.body
+    const { idSystem, cardsReviewed, durationSeconds, completed } = req.body
     const session = await leitnerReviewSessionService.create({
       userId: req.user.id,
       idSystem,
       cardsReviewed,
-      durationSeconds
+      durationSeconds,
+      completed
     })
     res.status(201).json(session)
   } catch (error) {

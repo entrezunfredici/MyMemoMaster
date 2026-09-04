@@ -6,7 +6,8 @@ jest.mock('../../models/index', () => ({
   RevisionSession: {
     findAll: jest.fn(),
     findOne: jest.fn(),
-    create: jest.fn()
+    create: jest.fn(),
+    update: jest.fn()
   }
 }))
 
@@ -159,6 +160,50 @@ describe('RevisionSession Service', () => {
       const result = await RevisionSessionService.delete(99, 1)
 
       expect(result).toBe(false)
+    })
+  })
+
+  // ── validateMatchingSessions ─────────────────────────────────────────────────
+  // Auto-validation d'une séance planifiée par une pratique réelle correspondante
+  // (2026-09-04, demande explicite de l'utilisateur).
+  describe('validateMatchingSessions', () => {
+    it('idSystem fourni — valide les séances du jour non faites liées à ce système', async () => {
+      models.RevisionSession.update.mockResolvedValue([2])
+
+      const count = await RevisionSessionService.validateMatchingSessions({ userId: 1, idSystem: 5 })
+
+      expect(models.RevisionSession.update).toHaveBeenCalledWith(
+        { isDone: true },
+        { where: { userId: 1, date: TODAY, isDone: false, idSystem: 5 } }
+      )
+      expect(count).toBe(2)
+    })
+
+    it('idTest fourni — valide les séances du jour non faites liées à ce test', async () => {
+      models.RevisionSession.update.mockResolvedValue([1])
+
+      const count = await RevisionSessionService.validateMatchingSessions({ userId: 1, idTest: 7 })
+
+      expect(models.RevisionSession.update).toHaveBeenCalledWith(
+        { isDone: true },
+        { where: { userId: 1, date: TODAY, isDone: false, idTest: 7 } }
+      )
+      expect(count).toBe(1)
+    })
+
+    it('ni idSystem ni idTest — ne fait aucune requête, retourne 0', async () => {
+      const count = await RevisionSessionService.validateMatchingSessions({ userId: 1 })
+
+      expect(models.RevisionSession.update).not.toHaveBeenCalled()
+      expect(count).toBe(0)
+    })
+
+    it('aucune séance correspondante — retourne 0', async () => {
+      models.RevisionSession.update.mockResolvedValue([0])
+
+      const count = await RevisionSessionService.validateMatchingSessions({ userId: 1, idSystem: 99 })
+
+      expect(count).toBe(0)
     })
   })
 })
