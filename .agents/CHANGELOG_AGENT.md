@@ -10423,3 +10423,46 @@ signalée mais non comblée ici (hors périmètre de la demande). Migration `202
 contre `db.sqlite` local en session (même limite que les migrations précédentes du jour) — s'appliquera
 automatiquement au prochain déploiement prod (`entrypoint.sh` exécute les migrations à chaque démarrage
 de pod, vérifié fonctionnel par le déploiement de révision 6 documenté ci-dessus).
+
+---
+
+## [2026-09-04, 10ᵉ session du jour] FIX — Génération IA : 429 Mistral en cascade sur un contenu source long, backoff exponentiel ajouté
+
+**Contexte** — Signalé par l'utilisateur avec une capture d'écran ("La génération a échoué. Réessayez.")
+juste après la mise en prod de la révision 6. Diagnostiqué en direct via `kubectl logs` sur les pods
+`mmm-prod-api` (accès déjà utilisé plus tôt dans la journée) plutôt que deviner depuis le message
+générique front : 10 chunks consécutifs en échec sur ~1,2 seconde, chacun avec
+`Réponse Mistral 429 : {"...":"Rate limit exceeded"...}`, jusqu'à `La génération a échoué sur tous les
+passages du contenu fourni.` — le contenu source demandait 17 passages
+(`AiCardGenerationPipeline.service.js`, découpage par chunks de 4000 caractères).
+
+**Cause** — `AiCardGeneration.service.js#callModel` traitait un `429` exactement comme n'importe quelle
+autre erreur HTTP (502 générique, aucun réessai). Le pipeline traite déjà les chunks séquentiellement
+(pas en parallèle, CHOIX déjà documenté dans son code), mais sans aucun délai entre eux — dès qu'un
+premier chunk atteint la limite de débit de Mistral, tous les chunks suivants, envoyés immédiatement
+après, la retrouvent aussitôt : la génération entière échoue en une fraction de seconde alors qu'un
+simple ralentissement l'aurait absorbée.
+
+**Corrigé** : `callModel` réessaie désormais jusqu'à `RATE_LIMIT_MAX_RETRIES` (3) fois sur un `429`,
+avec un backoff exponentiel (1 s, 2 s, 4 s) — respecte l'en-tête `Retry-After` de Mistral quand il est
+fourni, sinon utilise le backoff calculé. Au-delà de 3 tentatives, le comportement redevient
+exactement celui d'avant (502 générique) — aucun changement pour toute réponse non-429. Nouvelle
+méthode `sleep(ms)` extraite pour rester mockable en test (les tests ne subissent pas les délais réels).
+
+**Tests** : `test/services/AiCardGeneration.service.test.js` (+4) : 429 puis succès (réessaie après
+backoff), respect de `Retry-After`, backoff exponentiel sans `Retry-After` (1s/2s/4s vérifiés
+précisément), 429 persistant au-delà de 3 tentatives → 502 comme avant. `npx jest` (API) →
+1797/1797 (+4). `npm run lint` propre.
+
+**Choix techniques** : voir `DECISIONS.md` — retry borné au niveau de l'appel individuel
+(`callModel`), pas de délai artificiel ajouté entre chunks dans le pipeline (le backoff sur 429 suffit
+et ne pénalise jamais un enchaînement de chunks qui réussissent du premier coup).
+
+**Ce qui n'est PAS couvert** : pas de changement au niveau du pipeline (`AiCardGenerationPipeline.service.js`)
+lui-même — le retry reste local à `callModel`, un chunk qui épuise ses 3 tentatives est toujours compté
+comme un échec de ce chunk (comportement de tolérance à l'échec partiel déjà en place, inchangé). Pas
+de configuration par variable d'environnement pour le nombre de tentatives/le délai de base — constantes
+techniques (`RATE_LIMIT_MAX_RETRIES`, `RATE_LIMIT_BASE_DELAY_MS`) au même titre que `MAX_CHUNKS`/
+`MAX_CARD_COUNT`, déjà hors du système de config `helpers/mistralConfig.js`. Correctif non re-testé en
+conditions réelles en prod avec une génération volumineuse (le diagnostic vient des logs d'un échec
+réel, pas d'une reproduction contrôlée) — à confirmer par l'utilisateur au prochain essai.

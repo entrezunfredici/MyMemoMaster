@@ -16,6 +16,15 @@ const CARD_TYPES = ['open', 'mcq', 'mixed']
 // implémentation de Quotas (hors périmètre — arbitrage produit/coût encore à faire séparément).
 const MAX_CARD_COUNT = 30
 
+// Constaté en prod (2026-09-04) : une génération sur un contenu source long (plusieurs dizaines de
+// chunks, AiCardGenerationPipeline.service.js) déclenche des appels séquentiels rapprochés — sans
+// délai entre eux, une réponse 429 de Mistral atteinte sur un chunk se reproduit immédiatement sur
+// tous les suivants (observé : 10 chunks en échec sur ~1,2 s, tous "429 Rate limit exceeded"), la
+// génération entière échoue alors qu'un simple ralentissement l'aurait absorbée. Backoff exponentiel
+// borné à 3 tentatives, respecte l'en-tête `Retry-After` de Mistral quand il est fourni.
+const RATE_LIMIT_MAX_RETRIES = 3
+const RATE_LIMIT_BASE_DELAY_MS = 1000
+
 // Reproduit tel quel le schéma de sortie documenté dans generation_ia_prompt_cartes.md §4, injecté
 // dans le prompt utilisateur pour réduire le risque de sortie non conforme (plus fiable qu'un
 // simple renvoi au nom du schéma — cf. document, §3.2).
@@ -270,11 +279,27 @@ ${SCHEMA_DESCRIPTION}`
   }
 
   /**
+   * Attend `ms` millisecondes — extrait en méthode plutôt qu'un `setTimeout` inline pour être
+   * mockable telle quelle dans les tests (évite d'attendre réellement le backoff 429 ci-dessous).
+   *
+   * @param {number} ms
+   * @returns {Promise<void>}
+   */
+  sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  /**
    * Appelle l'API Mistral (chat completions, sortie JSON forcée) avec l'historique de messages
    * fourni. Ne fait aucun parsing/validation métier — seulement l'appel réseau et l'extraction du
    * contenu texte de la réponse. Renvoie aussi la consommation de tokens rapportée par l'API
    * (`usage`), utilisée par le contrôleur pour journaliser le coût réel (C-01.06, Gestion quotas
    * et budget IA) — ce service ne journalise rien lui-même, il se contente de la faire remonter.
+   *
+   * Une réponse `429` (rate limit Mistral) déclenche jusqu'à `RATE_LIMIT_MAX_RETRIES` nouvelles
+   * tentatives avec un backoff exponentiel (respecte l'en-tête `Retry-After` si Mistral le fournit)
+   * avant de se comporter comme n'importe quelle autre erreur HTTP — voir le commentaire sur
+   * `RATE_LIMIT_MAX_RETRIES` en tête de fichier.
    *
    * @param {{ role: string, content: string }[]} messages
    * @returns {Promise<{ content: string, usage: { promptTokens: number, completionTokens: number } }>}
@@ -289,70 +314,84 @@ ${SCHEMA_DESCRIPTION}`
       throw err
     }
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+    for (let attempt = 0; ; attempt++) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
 
-    let response
-    try {
-      response = await fetch(config.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`
-        },
-        body: JSON.stringify({
-          model: config.model,
-          messages,
-          // CHOIX: response_format json_object plutôt qu'un schéma custom Mistral (Custom
-          // Structured Outputs) pour cette première version.
-          // RAISON: le schéma de generation_ia_prompt_cartes.md §4 comporte des champs
-          // conditionnels selon "type" (open vs mcq) qu'un schéma JSON strict représenterait mal
-          // sans dupliquer les cartes en deux variants ; json_object + rappel explicite du schéma
-          // dans le prompt (voir SCHEMA_DESCRIPTION) est la même stratégie déjà documentée en
-          // C-01.01. Le passage au schéma custom reste une piste d'amélioration si le taux de
-          // conformité mesuré (protocole du benchmark, C-01.03 §8) s'avère insuffisant.
-          response_format: { type: 'json_object' },
-          // CHOIX: température basse (extraction structurée ancrée sur un texte source, pas de
-          // créativité recherchée) plutôt que la valeur par défaut du modèle.
-          temperature: 0.3
-        }),
-        signal: controller.signal
-      })
-    } catch (error) {
-      logger.error(`[AiCardGeneration] Appel Mistral échoué : ${error?.message || error}`)
-      const err = new Error('Le service de génération IA est indisponible pour le moment.')
-      err.statusCode = 502
-      throw err
-    } finally {
-      clearTimeout(timeout)
-    }
+      let response
+      try {
+        response = await fetch(config.apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.apiKey}`
+          },
+          body: JSON.stringify({
+            model: config.model,
+            messages,
+            // CHOIX: response_format json_object plutôt qu'un schéma custom Mistral (Custom
+            // Structured Outputs) pour cette première version.
+            // RAISON: le schéma de generation_ia_prompt_cartes.md §4 comporte des champs
+            // conditionnels selon "type" (open vs mcq) qu'un schéma JSON strict représenterait mal
+            // sans dupliquer les cartes en deux variants ; json_object + rappel explicite du schéma
+            // dans le prompt (voir SCHEMA_DESCRIPTION) est la même stratégie déjà documentée en
+            // C-01.01. Le passage au schéma custom reste une piste d'amélioration si le taux de
+            // conformité mesuré (protocole du benchmark, C-01.03 §8) s'avère insuffisant.
+            response_format: { type: 'json_object' },
+            // CHOIX: température basse (extraction structurée ancrée sur un texte source, pas de
+            // créativité recherchée) plutôt que la valeur par défaut du modèle.
+            temperature: 0.3
+          }),
+          signal: controller.signal
+        })
+      } catch (error) {
+        logger.error(`[AiCardGeneration] Appel Mistral échoué : ${error?.message || error}`)
+        const err = new Error('Le service de génération IA est indisponible pour le moment.')
+        err.statusCode = 502
+        throw err
+      } finally {
+        clearTimeout(timeout)
+      }
 
-    if (!response.ok) {
-      const bodyText = await response.text().catch(() => '')
-      logger.error(`[AiCardGeneration] Réponse Mistral ${response.status} : ${bodyText}`)
-      const err = new Error('Le service de génération IA est indisponible pour le moment.')
-      err.statusCode = 502
-      throw err
-    }
+      if (response.status === 429 && attempt < RATE_LIMIT_MAX_RETRIES) {
+        const retryAfterSeconds = Number(response.headers?.get?.('retry-after'))
+        const delayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? retryAfterSeconds * 1000
+          : RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt
+        logger.warn(
+          `[AiCardGeneration] 429 Mistral (rate limit) — nouvel essai dans ${delayMs}ms (${attempt + 1}/${RATE_LIMIT_MAX_RETRIES})`
+        )
+        await this.sleep(delayMs)
+        continue
+      }
 
-    const data = await response.json()
-    const content = data?.choices?.[0]?.message?.content
-    if (typeof content !== 'string' || !content.trim()) {
-      logger.error('[AiCardGeneration] Réponse Mistral sans contenu exploitable.')
-      const err = new Error("Le service de génération IA n'a renvoyé aucun contenu.")
-      err.statusCode = 502
-      // L'appel a réellement abouti côté Mistral (réponse 200, tokens facturés) même sans contenu
-      // exploitable — l'usage réel est attaché à l'erreur pour ne pas être perdu par l'appelant
-      // (C-01.06, cf. dette signalée dans CHANGELOG_AGENT.md).
-      err.usage = { promptTokens: data?.usage?.prompt_tokens ?? 0, completionTokens: data?.usage?.completion_tokens ?? 0 }
-      throw err
-    }
+      if (!response.ok) {
+        const bodyText = await response.text().catch(() => '')
+        logger.error(`[AiCardGeneration] Réponse Mistral ${response.status} : ${bodyText}`)
+        const err = new Error('Le service de génération IA est indisponible pour le moment.')
+        err.statusCode = 502
+        throw err
+      }
 
-    return {
-      content,
-      usage: {
-        promptTokens: data?.usage?.prompt_tokens ?? 0,
-        completionTokens: data?.usage?.completion_tokens ?? 0
+      const data = await response.json()
+      const content = data?.choices?.[0]?.message?.content
+      if (typeof content !== 'string' || !content.trim()) {
+        logger.error('[AiCardGeneration] Réponse Mistral sans contenu exploitable.')
+        const err = new Error("Le service de génération IA n'a renvoyé aucun contenu.")
+        err.statusCode = 502
+        // L'appel a réellement abouti côté Mistral (réponse 200, tokens facturés) même sans contenu
+        // exploitable — l'usage réel est attaché à l'erreur pour ne pas être perdu par l'appelant
+        // (C-01.06, cf. dette signalée dans CHANGELOG_AGENT.md).
+        err.usage = { promptTokens: data?.usage?.prompt_tokens ?? 0, completionTokens: data?.usage?.completion_tokens ?? 0 }
+        throw err
+      }
+
+      return {
+        content,
+        usage: {
+          promptTokens: data?.usage?.prompt_tokens ?? 0,
+          completionTokens: data?.usage?.completion_tokens ?? 0
+        }
       }
     }
   }

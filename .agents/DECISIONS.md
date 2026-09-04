@@ -2743,3 +2743,45 @@ ces deux composants n'avaient aucun test avant ce ticket — les nouveaux fichie
 comportement ajouté et quelques cas de base, pas une couverture exhaustive du reste de leurs
 fonctionnalités préexistantes (accept/reject, gestion MCQ, promotion multi-cartes) ; signalé, non
 comblé, hors périmètre de la demande.
+
+---
+
+### [2026-09-04, 10ᵉ session du jour] 429 Mistral : backoff dans `callModel` (l'appel individuel), pas de délai artificiel entre chunks dans le pipeline
+
+**Contexte** — Génération IA en échec en prod juste après la mise en ligne de la révision 6, diagnostiquée
+via les logs réels du pod (`kubectl logs`, accès déjà utilisé plus tôt dans la journée) plutôt que par
+hypothèse depuis le message générique affiché côté front : 10 chunks en échec en ~1,2 s, tous
+`429 Rate limit exceeded` côté Mistral, sur une génération qui demandait 17 passages.
+
+**Décision — retry avec backoff exponentiel localisé dans `callModel` (l'appel HTTP individuel), plutôt
+qu'un délai fixe inséré entre chaque chunk dans `AiCardGenerationPipeline.service.js`.**
+Deux endroits possibles pour absorber un 429 : (a) ralentir la boucle du pipeline (un `sleep` fixe
+entre chaque itération, indépendamment du résultat), ou (b) réessayer l'appel qui a effectivement
+échoué, avec un délai calculé sur la réponse reçue. (b) retenu : un délai fixe entre chunks pénaliserait
+aussi les générations qui n'atteignent jamais la limite de débit (majorité des cas, contenu source
+court) en ajoutant une latence systématique sans bénéfice ; le retry localisé au niveau de l'appel ne
+coûte rien quand tout va bien (aucun changement de comportement pour un 200 immédiat) et absorbe
+précisément le cas observé (respecte en plus `Retry-After` quand Mistral le fournit, plus précis qu'un
+délai fixe deviné).
+
+**Alternative écartée (déplacer le retry dans `AiCardGenerationPipeline.service.js`, au niveau du
+chunk plutôt que de l'appel HTTP)** — écartée : `generateCards` (le service appelant `callModel`) fait
+déjà lui-même jusqu'à 2 appels par chunk (1er essai + retry sur sortie non conforme au schéma) —
+dupliquer une logique de retry au niveau du pipeline aurait multiplié les points de décision pour un
+seul et même problème (throttling réseau), alors que `callModel` est le seul endroit qui voit
+effectivement le code HTTP `429` et l'en-tête `Retry-After`.
+
+**Alternative écartée (rendre `RATE_LIMIT_MAX_RETRIES`/`RATE_LIMIT_BASE_DELAY_MS` configurables via
+variable d'environnement, comme `MISTRAL_TIMEOUT_MS`)** — écartée : ce sont des garde-fous techniques
+de résilience réseau, pas des paramètres métier/environnement — même catégorie que `MAX_CHUNKS`
+(pipeline) ou `MAX_CARD_COUNT` (ce même service), déjà hors de `helpers/mistralConfig.js` pour cette
+raison.
+
+**Conséquences** : une génération qui heurte ponctuellement la limite de débit Mistral (contenu source
+long, plusieurs dizaines de chunks séquentiels) a désormais une vraie chance d'aboutir au lieu d'échouer
+en cascade sur tous les chunks restants en une fraction de seconde. Latence dans le pire cas alourdie
+d'au plus ~7 s par appel réellement rate-limité (1+2+4 s) — reste largement dans le budget de
+`GENERATE_TIMEOUT_MS` (5 min, front) déjà calibré pour une génération multi-passages réelle. `npx jest`
+(API) → 1797/1797 (+4). **Dette assumée** : correctif diagnostiqué et testé unitairement (backoff mocké,
+comportement vérifié précisément), mais pas encore reproduit en conditions réelles avec une nouvelle
+génération volumineuse en prod — à confirmer par l'utilisateur.

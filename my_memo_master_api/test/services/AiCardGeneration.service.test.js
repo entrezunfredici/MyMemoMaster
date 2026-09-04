@@ -339,6 +339,70 @@ describe('AiCardGenerationService', () => {
         usage: { promptTokens: 30, completionTokens: 0 }
       })
     })
+
+    // Régression constatée en prod (2026-09-04) : plusieurs chunks séquentiels en 429 d'affilée
+    // faisaient échouer toute la génération sans jamais ralentir — voir RATE_LIMIT_MAX_RETRIES.
+    describe('429 (rate limit Mistral)', () => {
+      const rateLimitedResponse = (retryAfter = null) => ({
+        ok: false,
+        status: 429,
+        headers: { get: (name) => (name === 'retry-after' ? retryAfter : null) },
+        text: async () => '{"message":"Rate limit exceeded"}'
+      })
+
+      it('429 puis succès — réessaie après le backoff et retourne le contenu', async () => {
+        process.env.MISTRAL_API_KEY = 'test-key'
+        jest.spyOn(AiCardGenerationService, 'sleep').mockResolvedValue()
+        const fetchMock = jest.spyOn(global, 'fetch')
+          .mockResolvedValueOnce(rateLimitedResponse())
+          .mockResolvedValueOnce(mockFetchResponse({ cards: [], warning: null }))
+
+        const result = await AiCardGenerationService.callModel(messages)
+
+        expect(JSON.parse(result.content)).toEqual({ cards: [], warning: null })
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(AiCardGenerationService.sleep).toHaveBeenCalledTimes(1)
+      })
+
+      it('429 - respecte l\'en-tête Retry-After quand Mistral le fournit', async () => {
+        process.env.MISTRAL_API_KEY = 'test-key'
+        jest.spyOn(AiCardGenerationService, 'sleep').mockResolvedValue()
+        jest.spyOn(global, 'fetch')
+          .mockResolvedValueOnce(rateLimitedResponse('2'))
+          .mockResolvedValueOnce(mockFetchResponse({ cards: [], warning: null }))
+
+        await AiCardGenerationService.callModel(messages)
+
+        expect(AiCardGenerationService.sleep).toHaveBeenCalledWith(2000)
+      })
+
+      it('429 - sans Retry-After, backoff exponentiel (1s, 2s, 4s)', async () => {
+        process.env.MISTRAL_API_KEY = 'test-key'
+        jest.spyOn(AiCardGenerationService, 'sleep').mockResolvedValue()
+        jest.spyOn(global, 'fetch')
+          .mockResolvedValueOnce(rateLimitedResponse())
+          .mockResolvedValueOnce(rateLimitedResponse())
+          .mockResolvedValueOnce(rateLimitedResponse())
+          .mockResolvedValueOnce(mockFetchResponse({ cards: [], warning: null }))
+
+        await AiCardGenerationService.callModel(messages)
+
+        expect(AiCardGenerationService.sleep.mock.calls).toEqual([[1000], [2000], [4000]])
+      })
+
+      it('429 persistant au-delà de RATE_LIMIT_MAX_RETRIES - lève une erreur 502, comme toute autre réponse en erreur', async () => {
+        process.env.MISTRAL_API_KEY = 'test-key'
+        jest.spyOn(AiCardGenerationService, 'sleep').mockResolvedValue()
+        const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(rateLimitedResponse())
+
+        await expect(AiCardGenerationService.callModel(messages)).rejects.toMatchObject({
+          message: 'Le service de génération IA est indisponible pour le moment.',
+          statusCode: 502
+        })
+        // 1 essai initial + 3 réessais (RATE_LIMIT_MAX_RETRIES) = 4 appels au total
+        expect(fetchMock).toHaveBeenCalledTimes(4)
+      })
+    })
   })
 
   describe('generateCards', () => {
