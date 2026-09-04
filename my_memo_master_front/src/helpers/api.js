@@ -437,6 +437,42 @@ async function patch(endpoint, data = {}) {
 }
 
 /**
+ * Requête POST "best-effort" conçue pour survivre à la fermeture de l'onglet/du
+ * navigateur — utilise `fetch` avec `keepalive: true` plutôt qu'Axios : les
+ * requêtes XHR d'Axios sont annulées par le navigateur pendant le déchargement
+ * de la page, ce qui perdait silencieusement tout journal envoyé depuis un
+ * handler `pagehide` (ex: durée de consultation d'une carte mentale, voir
+ * stores/mindmapViewSessions.js). `fetch(..., { keepalive: true })` supporte
+ * les en-têtes personnalisés (contrairement à `navigator.sendBeacon`, qui ne
+ * permet pas d'envoyer l'en-tête `Authorization` exigé par `Auth.middleware.js`).
+ * Ne suit pas le cycle normal de `post()` (pas de retry sur 401, pas de log
+ * d'erreur réseau, pas de valeur de retour) : la page se ferme, l'appelant ne
+ * peut de toute façon plus réagir à la réponse.
+ *
+ * @param {string} endpoint - Chemin de l'endpoint (ex: "mindmap-view-sessions")
+ * @param {object} [data={}] - Corps de la requête
+ */
+function postBeacon(endpoint, data = {}) {
+  if (!endpoint || typeof fetch !== 'function') return
+
+  const authStore = useAuthStore()
+  const token = authStore.authenticated ? authStore.token || authStore.user?.connectionToken : null
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  try {
+    fetch(`${VITE_API_URL}/${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+      keepalive: true,
+    })
+  } catch {
+    // best-effort — la page est en train de se fermer, aucune récupération possible
+  }
+}
+
+/**
  * Télécharge un fichier depuis l'API avec authentification — retourne un Blob.
  *
  * @param {string} endpoint - Chemin de l'endpoint (ex: "storage/stream?key=...")
@@ -460,4 +496,5 @@ export const api = {
   patch,
   del,
   getBlob,
+  postBeacon,
 }

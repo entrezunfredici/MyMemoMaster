@@ -150,9 +150,9 @@ describe('KpiPage', () => {
     expect(occurrences.length).toBeGreaterThanOrEqual(5)
   })
 
-  it('précise que "Temps total de révision" additionne planifié et réel', () => {
+  it('précise que "Temps total de révision" ne compte que le temps chronométré', () => {
     const wrapper = mountKpi({ kpis: KPI_FIXTURE })
-    expect(wrapper.text()).toContain('créneaux planifiés + pratique réelle chronométrée')
+    expect(wrapper.text()).toContain('Leitner, exercices et cartes mentales chronométrés')
   })
 
   // ── Badges ────────────────────────────────────────────────────────────────

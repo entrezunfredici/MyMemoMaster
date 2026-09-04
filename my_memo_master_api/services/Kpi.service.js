@@ -1,6 +1,7 @@
 const dayjs = require('dayjs')
 const { RevisionSession, TestResult, Test, Subject, LeitnerSystem, LeitnerBox, LeitnerCard, ClassGroup } = require('../models')
 const leitnerReviewSessionService = require('./LeitnerReviewSession.service')
+const mindMapViewSessionService = require('./MindMapViewSession.service')
 
 /**
  * Retourne le lundi de la semaine (ISO) contenant la date donnée.
@@ -22,7 +23,7 @@ class KpiService {
    * @returns {object} KPI agrégés (révision, exercices, leitner, sujets, discipline, badges)
    */
   async getMyKpis(userId) {
-    const [sessions, testResults, leitnerSystems, leitnerReviewSessions] = await Promise.all([
+    const [sessions, testResults, leitnerSystems, leitnerReviewSessions, mindMapViewSessions] = await Promise.all([
       RevisionSession.findAll({ where: { userId }, order: [['date', 'DESC']] }),
       TestResult.findAll({
         where: { userId },
@@ -51,7 +52,8 @@ class KpiService {
           { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
         ]
       }),
-      leitnerReviewSessionService.findByUser(userId)
+      leitnerReviewSessionService.findByUser(userId),
+      mindMapViewSessionService.findByUser(userId)
     ])
 
     // Seuls les résultats des tests privés (sans groupe assigné) alimentent les KPI persos
@@ -59,9 +61,11 @@ class KpiService {
     const groupTestResults = testResults.filter((r) => r.test?.classGroups?.length)
 
     const revisionKpi = this._computeRevision(sessions)
-    // Temps réel chronométré (exercices privés + sessions Leitner), en plus du temps
-    // des créneaux planifiés dans RevisionSession — voir _computeRealMinutes.
-    revisionKpi.totalMinutes += this._computeRealMinutes(privateTestResults, leitnerReviewSessions)
+    // Temps de révision = uniquement le temps réellement chronométré (exercices privés +
+    // sessions Leitner + consultations de cartes mentales) — voir _computeRealMinutes. Ne
+    // reflète plus les créneaux planifiés dans RevisionSession (isDone) : une case cochée par
+    // l'utilisateur ne garantit ni qu'il a réellement révisé, ni combien de temps il y a passé.
+    revisionKpi.totalMinutes = this._computeRealMinutes(privateTestResults, leitnerReviewSessions, mindMapViewSessions)
     const exercisesKpi = this._computeExercises(privateTestResults)
     const leitnerKpi = this._computeLeitner(leitnerSystems)
     const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
@@ -76,15 +80,16 @@ class KpiService {
    * Calcule les KPI personnels filtrés par matières consenties.
    * Leitner et exercices sont filtrés par subjectIds. Sessions planifiées (RevisionSession)
    * et discipline sont partagées telles quelles (données générales non liées à une matière) —
-   * seul le temps réel chronométré qui s'ajoute à revision.totalMinutes est filtré, puisqu'il
-   * provient des exercices/sessions Leitner déjà restreints aux matières consenties.
+   * seul revision.totalMinutes (temps réel chronométré) est filtré, puisqu'il provient des
+   * exercices/sessions Leitner/consultations de cartes mentales déjà restreints aux matières
+   * consenties.
    *
    * @param {number} userId
    * @param {number[]} subjectIds - Liste des subjectId consentis
    * @returns {object} KPI filtrés
    */
   async getPersonalKpisForSubjects(userId, subjectIds) {
-    const [sessions, testResults, leitnerSystems, leitnerReviewSessions] = await Promise.all([
+    const [sessions, testResults, leitnerSystems, leitnerReviewSessions, mindMapViewSessions] = await Promise.all([
       RevisionSession.findAll({ where: { userId }, order: [['date', 'DESC']] }),
       TestResult.findAll({
         where: { userId },
@@ -114,7 +119,8 @@ class KpiService {
           { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
         ]
       }),
-      leitnerReviewSessionService.findByUser(userId, subjectIds)
+      leitnerReviewSessionService.findByUser(userId, subjectIds),
+      mindMapViewSessionService.findByUser(userId, subjectIds)
     ])
 
     const privateTestResults = testResults.filter((r) => !r.test?.classGroups?.length)
@@ -122,7 +128,7 @@ class KpiService {
     const revisionKpi = this._computeRevision(sessions)
     // Temps réel, restreint aux matières consenties comme le reste de cette méthode
     // (contrairement à getMyKpis, ici le filtre par matière s'applique aussi au temps).
-    revisionKpi.totalMinutes += this._computeRealMinutes(privateTestResults, leitnerReviewSessions)
+    revisionKpi.totalMinutes = this._computeRealMinutes(privateTestResults, leitnerReviewSessions, mindMapViewSessions)
     const exercisesKpi = this._computeExercises(privateTestResults)
     const leitnerKpi = this._computeLeitner(leitnerSystems)
     const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
@@ -174,39 +180,39 @@ class KpiService {
     }
     const weeklyActivity = Object.entries(weeklyMap).map(([week, count]) => ({ week, count }))
 
-    // Temps total en minutes sur les sessions complétées ayant startTime/endTime
-    let totalMinutes = 0
-    for (const s of completed) {
-      if (s.startTime && s.endTime) {
-        const [sh, sm] = s.startTime.split(':').map(Number)
-        const [eh, em] = s.endTime.split(':').map(Number)
-        const diff = eh * 60 + em - (sh * 60 + sm)
-        if (diff > 0) totalMinutes += diff
-      }
-    }
-
+    // NOTE: totalMinutes n'est plus calculé ici depuis les créneaux planifiés
+    // (startTime/endTime des RevisionSession cochées "terminé") — une case cochée
+    // par l'utilisateur ne garantit ni qu'il a réellement révisé, ni combien de
+    // temps il y a passé. Le champ est renseigné par l'appelant (getMyKpis /
+    // getPersonalKpisForSubjects) depuis _computeRealMinutes, seule mesure fiable
+    // car chronométrée par le front. Les autres indicateurs ci-dessus (streak,
+    // taux de complétion, sessions planifiées/complétées) continuent de mesurer
+    // le respect du planning et restent inchangés.
     const revivedToday = completed.some((s) => s.date === today)
 
-    return { totalPlanned: total, totalCompleted, completionRate, streakDays, sessionsLast30Days: sessionsLast30.length, completedLast30Days: completedLast30.length, weeklyActivity, totalMinutes, revivedToday }
+    return { totalPlanned: total, totalCompleted, completionRate, streakDays, sessionsLast30Days: sessionsLast30.length, completedLast30Days: completedLast30.length, weeklyActivity, revivedToday }
   }
 
   /**
-   * Additionne le temps réellement chronométré (front) sur les exercices et
-   * les sessions Leitner — distinct des créneaux planifiés dans RevisionSession,
-   * qui restent comptés séparément par _computeRevision. Les valeurs absentes
-   * (durationSeconds null — résultats antérieurs à ce champ, ou soumis par un
-   * appelant qui ne le fournit pas) sont ignorées plutôt que traitées comme 0,
-   * pour ne pas fausser la moyenne si ce chiffre est un jour affiché ailleurs.
+   * Additionne le temps réellement chronométré (front) sur les exercices, les
+   * sessions Leitner et les consultations de cartes mentales — seule source du
+   * KPI "Temps total de révision" (voir NOTE dans _computeRevision). Les valeurs
+   * absentes (durationSeconds null — résultats antérieurs à ce champ, ou soumis
+   * par un appelant qui ne le fournit pas) sont ignorées plutôt que traitées
+   * comme 0, pour ne pas fausser la moyenne si ce chiffre est un jour affiché
+   * ailleurs.
    *
    * @private
    * @param {TestResult[]} testResults
    * @param {LeitnerReviewSession[]} leitnerReviewSessions
+   * @param {MindMapViewSession[]} mindMapViewSessions
    * @returns {number} minutes, arrondies
    */
-  _computeRealMinutes(testResults, leitnerReviewSessions) {
+  _computeRealMinutes(testResults, leitnerReviewSessions, mindMapViewSessions) {
     const testSeconds = testResults.reduce((acc, r) => acc + (r.durationSeconds || 0), 0)
     const leitnerSeconds = leitnerReviewSessions.reduce((acc, s) => acc + (s.durationSeconds || 0), 0)
-    return Math.round((testSeconds + leitnerSeconds) / 60)
+    const mindMapSeconds = mindMapViewSessions.reduce((acc, s) => acc + (s.durationSeconds || 0), 0)
+    return Math.round((testSeconds + leitnerSeconds + mindMapSeconds) / 60)
   }
 
   /**

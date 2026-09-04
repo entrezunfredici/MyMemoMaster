@@ -4,6 +4,7 @@ import { api } from '@/helpers/api'
 import { useToast } from 'vue-toastification'
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
 import { useGuidedTourStore } from '@/stores/guidedTour'
+import { useMindMapViewSessionStore } from '@/stores/mindmapViewSessions'
 import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue'
 
 const props = defineProps({
@@ -16,6 +17,80 @@ const emit = defineEmits(['back'])
 const toast = useToast()
 const mindmapStore = useMindMapBuilderStore()
 const guidedTourStore = useGuidedTourStore()
+const mindMapViewSessionStore = useMindMapViewSessionStore()
+
+// ── Chronométrage de la consultation ───────────────────────────────────────────
+// CHOIX: chronométrer uniquement l'ouverture d'une carte EXISTANTE (props.diagramId
+// non nul au montage), pas la création d'une carte neuve dans ce même éditeur.
+// RAISON: alimente le KPI "Temps total de révision" au même titre que les sessions
+// Leitner et les exercices — "regarder une carte mentale" suppose une carte qui
+// existe déjà ; créer une carte est une activité de création, pas de révision.
+const viewedMindMapId = props.diagramId
+
+// CHOIX: mesure par segments (ouverts/clos à chaque bascule visible ⇄ caché de
+// l'onglet), plutôt qu'une seule mesure de bout en bout du montage au démontage.
+// RAISON: un onglet laissé ouvert en arrière-plan (changement d'onglet, écran en
+// veille, application mobile mise en arrière-plan) ne doit pas compter comme du
+// temps de consultation ; et sur mobile, l'OS peut tuer l'onglet en arrière-plan
+// sans jamais déclencher `pagehide` — sans clôture au passage en arrière-plan,
+// tout le temps déjà passé serait perdu plutôt que journalisé. `visibilitychange`
+// → 'hidden' clôt le segment en cours (via beacon, page potentiellement en train
+// de se décharger) ; 'visible' en ouvre un nouveau si le suivi n'est pas arrêté.
+// Chaque segment est journalisé séparément (plusieurs lignes MindMapViewSession
+// pour une même consultation) — le KPI les additionne déjà toutes, voir
+// Kpi.service.js#_computeRealMinutes.
+let segmentStartedAt = viewedMindMapId ? Date.now() : null
+let trackingActive = Boolean(viewedMindMapId)
+
+/**
+ * Clôt et journalise le segment de consultation en cours, s'il y en a un.
+ * Ne referme PAS le suivi dans son ensemble — un nouveau segment peut
+ * redémarrer ensuite (voir resumeSegment) tant que stopTracking() n'a pas été
+ * appelé.
+ *
+ * @param {boolean} [useBeacon=false] - true si le segment se clôt parce que la
+ *   page se cache ou se décharge (pagehide, visibilitychange 'hidden') : la
+ *   requête normale (Axios) serait annulée par le navigateur, voir CHOIX dans
+ *   stores/mindmapViewSessions.js.
+ */
+const flushSegment = (useBeacon = false) => {
+  if (!trackingActive || segmentStartedAt === null) return
+  const durationSeconds = Math.round((Date.now() - segmentStartedAt) / 1000)
+  segmentStartedAt = null
+  if (durationSeconds <= 0) return // rien à journaliser — évite le bruit des bascules trop brèves
+  if (useBeacon) {
+    mindMapViewSessionStore.logSessionBeacon(viewedMindMapId, durationSeconds)
+  } else {
+    mindMapViewSessionStore.logSession(viewedMindMapId, durationSeconds)
+  }
+}
+
+/**
+ * Clôt définitivement le suivi de `viewedMindMapId` (bouton Retour, bascule
+ * "Nouvelle carte", fermeture d'onglet) : journalise le segment en cours s'il
+ * y en a un, puis empêche tout redémarrage ultérieur (ex: un `visibilitychange`
+ * tardif après démontage).
+ *
+ * @param {boolean} [useBeacon=false]
+ */
+const stopTracking = (useBeacon = false) => {
+  flushSegment(useBeacon)
+  trackingActive = false
+}
+
+/** Redémarre un segment quand l'onglet redevient visible, si le suivi est toujours actif. */
+const resumeSegment = () => {
+  if (!trackingActive || segmentStartedAt !== null) return
+  segmentStartedAt = Date.now()
+}
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'hidden') {
+    flushSegment(true)
+  } else if (document.visibilityState === 'visible') {
+    resumeSegment()
+  }
+}
 
 // ── État interne ──────────────────────────────────────────────────────────────
 const currentDiagramId = ref(props.diagramId)
@@ -148,6 +223,9 @@ const handleExport = (payload) => {
 }
 
 const handleNewMap = (payload) => {
+  // La consultation de la carte ouverte à l'origine (le cas échéant) s'arrête ici :
+  // le temps passé ensuite sert à créer une carte neuve, pas à consulter viewedMindMapId.
+  stopTracking()
   currentDiagramId.value = null
   currentDiagramMeta.value = { mmName: payload.title, subjectId: currentDiagramMeta.value?.subjectId || 1 }
   exportName.value = payload.title
@@ -208,8 +286,24 @@ const handleBeforeUnload = (event) => {
   if (mindmapStore.isDirty) { event.preventDefault(); event.returnValue = '' }
 }
 
+// CHOIX: clôturer définitivement le suivi sur `pagehide` plutôt que de se
+// reposer uniquement sur onBeforeUnmount (hook Vue). RAISON: `onBeforeUnmount`
+// ne se déclenche que sur un démontage du composant (ex: clic sur "← Mes cartes
+// mentales") — une fermeture réelle de l'onglet/du navigateur détruit le
+// contexte JS sans exécuter les hooks Vue, donc sans jamais appeler
+// stopTracking(). `pagehide` se déclenche dans les deux cas (navigation,
+// fermeture d'onglet, mise en cache bfcache) et — contrairement à
+// `beforeunload` — seulement quand la page se décharge réellement, pas quand
+// l'utilisateur annule une boîte de dialogue de confirmation. Les gardes
+// `trackingActive`/`segmentStartedAt` évitent un double envoi si `pagehide` se
+// déclenche après un `visibilitychange` 'hidden' déjà traité, ou avant le
+// démontage normal du composant.
+const handlePageHide = () => stopTracking(true)
+
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('pagehide', handlePageHide)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   // CHOIX: déclencher la sauvegarde automatique dès l'ouverture d'une carte
   // fraîchement créée (pas d'id existant), plutôt que d'attendre une
   // première modification ou un clic manuel sur "Sauvegarder".
@@ -222,7 +316,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('pagehide', handlePageHide)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   clearAutoSaveTimer()
+  stopTracking()
 })
 </script>
 

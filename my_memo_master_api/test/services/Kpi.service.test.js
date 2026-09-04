@@ -9,10 +9,12 @@ jest.mock('../../models', () => ({
   LeitnerSystem: { findAll: jest.fn() },
   LeitnerBox: {},
   LeitnerCard: {},
-  LeitnerReviewSession: { findAll: jest.fn() }
+  LeitnerReviewSession: { findAll: jest.fn() },
+  Diagramme: {},
+  MindMapViewSession: { findAll: jest.fn() }
 }))
 
-const { RevisionSession, TestResult, LeitnerSystem, LeitnerReviewSession } = require('../../models')
+const { RevisionSession, TestResult, LeitnerSystem, LeitnerReviewSession, MindMapViewSession } = require('../../models')
 
 // --- Fixtures ---
 const T = dayjs()
@@ -30,6 +32,8 @@ const testResult = (score, total, completedAt = '2026-06-20T10:00:00Z', name = '
 })
 
 const leitnerReviewSession = (durationSeconds) => ({ durationSeconds })
+
+const mindMapViewSession = (durationSeconds) => ({ durationSeconds })
 
 const card = (correct, reviews, next_review_at = null) =>
   ({ correct_count: correct, review_count: reviews, next_review_at })
@@ -58,6 +62,7 @@ describe('KpiService', () => {
       TestResult.findAll.mockResolvedValue([])
       LeitnerSystem.findAll.mockResolvedValue([])
       LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
 
       const kpis = await kpiService.getMyKpis(1)
 
@@ -75,6 +80,7 @@ describe('KpiService', () => {
       TestResult.findAll.mockResolvedValue([])
       LeitnerSystem.findAll.mockResolvedValue([])
       LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
 
       await kpiService.getMyKpis(42)
 
@@ -82,6 +88,7 @@ describe('KpiService', () => {
       expect(TestResult.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 42 } }))
       expect(LeitnerSystem.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { idUser: 42 } }))
       expect(LeitnerReviewSession.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 42 } }))
+      expect(MindMapViewSession.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 42 } }))
     })
 
     it('propage l\'erreur si un modèle échoue', async () => {
@@ -89,26 +96,30 @@ describe('KpiService', () => {
       TestResult.findAll.mockResolvedValue([])
       LeitnerSystem.findAll.mockResolvedValue([])
       LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
 
       await expect(kpiService.getMyKpis(1)).rejects.toThrow('DB down')
     })
 
-    // Régression : "Temps total de révision" affichait toujours 0 min — seuls les
-    // créneaux planifiés dans RevisionSession étaient comptés, quasiment jamais
-    // renseignés en pratique. Le temps réel chronométré (exercices + sessions
-    // Leitner) doit maintenant s'ajouter au temps planifié.
-    it('totalMinutes additionne le temps planifié et le temps réel chronométré (exercices + Leitner)', async () => {
-      RevisionSession.findAll.mockResolvedValue([session(today, true, '09:00:00', '09:30:00')]) // 30 min planifiées
+    // Régression : "Temps total de révision" affichait toujours 0 min quand seuls les
+    // créneaux planifiés dans RevisionSession étaient comptés (quasiment jamais renseignés en
+    // pratique) — le temps réel chronométré (exercices + sessions Leitner) a d'abord été ajouté
+    // au temps planifié, puis le temps planifié a été abandonné (une case cochée par
+    // l'utilisateur ne garantit ni qu'il a révisé, ni combien de temps) : totalMinutes ne
+    // reflète plus désormais que le temps réellement chronométré, cartes mentales incluses.
+    it('totalMinutes ne compte que le temps réel chronométré (exercices + Leitner + cartes mentales), pas les créneaux planifiés', async () => {
+      RevisionSession.findAll.mockResolvedValue([session(today, true, '09:00:00', '09:30:00')]) // 30 min planifiées — ignorées
       TestResult.findAll.mockResolvedValue([
         testResult(8, 10, '2026-06-20T10:00:00Z', 'Test', 1, 300), // 5 min
         testResult(5, 10, '2026-06-21T10:00:00Z', 'Test', 1, 120)  // 2 min
       ])
       LeitnerSystem.findAll.mockResolvedValue([])
       LeitnerReviewSession.findAll.mockResolvedValue([leitnerReviewSession(180)]) // 3 min
+      MindMapViewSession.findAll.mockResolvedValue([mindMapViewSession(60)]) // 1 min
 
       const kpis = await kpiService.getMyKpis(1)
 
-      expect(kpis.revision.totalMinutes).toBe(40) // 30 planifiées + 5 + 2 + 3 réelles
+      expect(kpis.revision.totalMinutes).toBe(11) // 5 + 2 + 3 + 1 réelles, sans les 30 planifiées
     })
 
     it('totalMinutes ignore les durationSeconds absents (null) plutôt que de les compter comme 0 fautif', async () => {
@@ -116,6 +127,7 @@ describe('KpiService', () => {
       TestResult.findAll.mockResolvedValue([testResult(8, 10, '2026-06-20T10:00:00Z', 'Test', 1, null)])
       LeitnerSystem.findAll.mockResolvedValue([])
       LeitnerReviewSession.findAll.mockResolvedValue([leitnerReviewSession(null)])
+      MindMapViewSession.findAll.mockResolvedValue([mindMapViewSession(null)])
 
       const kpis = await kpiService.getMyKpis(1)
 
@@ -126,18 +138,24 @@ describe('KpiService', () => {
   // ─── getPersonalKpisForSubjects ──────────────────────────────────────────────
 
   describe('getPersonalKpisForSubjects', () => {
-    it('totalMinutes additionne aussi le temps réel, restreint aux matières consenties', async () => {
+    it('totalMinutes reflète le temps réel, restreint aux matières consenties', async () => {
       RevisionSession.findAll.mockResolvedValue([])
       TestResult.findAll.mockResolvedValue([testResult(8, 10, '2026-06-20T10:00:00Z', 'Test', 1, 60)])
       LeitnerSystem.findAll.mockResolvedValue([])
       LeitnerReviewSession.findAll.mockResolvedValue([leitnerReviewSession(60)])
+      MindMapViewSession.findAll.mockResolvedValue([mindMapViewSession(60)])
 
       const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
 
-      expect(kpis.revision.totalMinutes).toBe(2)
+      expect(kpis.revision.totalMinutes).toBe(3)
       // Le filtre par matière consentie doit être répercuté sur la requête Leitner
-      // (via le système rattaché), pas seulement sur les exercices.
+      // (via le système rattaché) et sur la requête cartes mentales (via la carte
+      // rattachée), pas seulement sur les exercices.
       expect(LeitnerReviewSession.findAll).toHaveBeenCalledWith(expect.objectContaining({
+        where: { userId: 1 },
+        include: [expect.objectContaining({ where: { subjectId: [1] } })]
+      }))
+      expect(MindMapViewSession.findAll).toHaveBeenCalledWith(expect.objectContaining({
         where: { userId: 1 },
         include: [expect.objectContaining({ where: { subjectId: [1] } })]
       }))
@@ -154,7 +172,6 @@ describe('KpiService', () => {
       expect(r.totalCompleted).toBe(0)
       expect(r.completionRate).toBe(0)
       expect(r.streakDays).toBe(0)
-      expect(r.totalMinutes).toBe(0)
       expect(r.weeklyActivity).toHaveLength(8)
       expect(r.weeklyActivity.every((w) => w.count === 0)).toBe(true)
     })
@@ -214,15 +231,13 @@ describe('KpiService', () => {
       expect(r.streakDays).toBe(2) // aujourd'hui + hier
     })
 
-    it('totalMinutes additionne les durées des sessions complétées uniquement', () => {
-      const sessions = [
-        session(today, true, '09:00:00', '10:30:00'),    // 90 min ✓
-        session(yesterday, true, '14:00:00', '15:00:00'), // 60 min ✓
-        session(daysAgo(2), false, '08:00:00', '09:00:00') // 60 min ✗ (non complétée)
-      ]
+    // totalMinutes n'est plus renvoyé par _computeRevision (voir NOTE dans le code) — il est
+    // désormais calculé par l'appelant depuis _computeRealMinutes, testé plus bas.
+    it('ne renvoie plus totalMinutes — calculé séparément par _computeRealMinutes', () => {
+      const sessions = [session(today, true, '09:00:00', '10:30:00')]
       const r = kpiService._computeRevision(sessions)
 
-      expect(r.totalMinutes).toBe(150)
+      expect(r.totalMinutes).toBeUndefined()
     })
 
     it('weeklyActivity retourne exactement 8 entrées', () => {
@@ -255,20 +270,22 @@ describe('KpiService', () => {
 
   describe('_computeRealMinutes', () => {
     it('aucune donnée — retourne 0', () => {
-      expect(kpiService._computeRealMinutes([], [])).toBe(0)
+      expect(kpiService._computeRealMinutes([], [], [])).toBe(0)
     })
 
-    it('additionne les durées des exercices et des sessions Leitner, arrondies en minutes', () => {
+    it('additionne les durées des exercices, des sessions Leitner et des consultations de cartes mentales, arrondies en minutes', () => {
       const testResults = [testResult(1, 1, undefined, 'T', 1, 90), testResult(1, 1, undefined, 'T', 1, 45)] // 135 s
       const sessions = [leitnerReviewSession(60)] // 60 s
-      // 195 s / 60 = 3.25 → arrondi à 3 min
-      expect(kpiService._computeRealMinutes(testResults, sessions)).toBe(3)
+      const mindMapSessions = [mindMapViewSession(30)] // 30 s
+      // 225 s / 60 = 3.75 → arrondi à 4 min
+      expect(kpiService._computeRealMinutes(testResults, sessions, mindMapSessions)).toBe(4)
     })
 
     it('ignore les durationSeconds null (résultats antérieurs au champ) sans les compter comme 0 fautif', () => {
       const testResults = [testResult(1, 1, undefined, 'T', 1, null), testResult(1, 1, undefined, 'T', 1, 120)]
       const sessions = [leitnerReviewSession(null)]
-      expect(kpiService._computeRealMinutes(testResults, sessions)).toBe(2)
+      const mindMapSessions = [mindMapViewSession(null)]
+      expect(kpiService._computeRealMinutes(testResults, sessions, mindMapSessions)).toBe(2)
     })
   })
 

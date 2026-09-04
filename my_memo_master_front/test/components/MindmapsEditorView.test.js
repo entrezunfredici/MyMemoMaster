@@ -3,6 +3,7 @@ import { nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import MindmapsEditorView from '@/components/mindmap/MindmapsEditorView.vue'
+import { useMindMapViewSessionStore } from '@/stores/mindmapViewSessions'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -209,5 +210,124 @@ describe('MindmapsEditorView', () => {
 
     expect(mockToast.error).toHaveBeenCalledWith('Erreur lors de la sauvegarde.')
     expect(wrapper.find('.editor-save-status--error').exists()).toBe(false)
+  })
+
+  // ── Chronométrage de la consultation ─────────────────────────────────────────
+  // CHOIX: Date.now() mocké (vi.spyOn) plutôt que le temps réel écoulé pendant le test —
+  // rend les durées attendues déterministes (le composant mesure par segments dont la
+  // durée nulle est ignorée, voir CHOIX dans MindmapsEditorView.vue).
+
+  const setVisibility = (state) => {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+  }
+
+  it('journalise la durée du segment ouvert au montage, à la fermeture (bouton Retour / démontage)', () => {
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
+    const wrapper = mountEditorView({ diagramId: 5 })
+    const reviewSessionStore = useMindMapViewSessionStore()
+
+    dateNowSpy.mockReturnValue(1_000_000 + 42_000) // +42s
+    wrapper.unmount()
+
+    expect(reviewSessionStore.logSession).toHaveBeenCalledWith(5, 42)
+    dateNowSpy.mockRestore()
+  })
+
+  it("ne journalise rien à la fermeture d'une carte neuve (pas encore existante à l'ouverture)", async () => {
+    const wrapper = mountEditorView({ diagramId: null, diagramMeta: null })
+    const reviewSessionStore = useMindMapViewSessionStore()
+
+    wrapper.unmount()
+
+    expect(reviewSessionStore.logSession).not.toHaveBeenCalled()
+  })
+
+  it("journalise via logSessionBeacon (fetch keepalive) sur pagehide, pas via logSession (annulé par le navigateur pendant le déchargement)", () => {
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(2_000_000)
+    const wrapper = mountEditorView({ diagramId: 5 })
+    const reviewSessionStore = useMindMapViewSessionStore()
+
+    dateNowSpy.mockReturnValue(2_000_000 + 10_000) // +10s
+    window.dispatchEvent(new Event('pagehide'))
+
+    expect(reviewSessionStore.logSessionBeacon).toHaveBeenCalledWith(5, 10)
+    expect(reviewSessionStore.logSession).not.toHaveBeenCalled()
+
+    // pagehide arrête définitivement le suivi (stopTracking) : le démontage qui suit ne rejournalise rien
+    wrapper.unmount()
+    expect(reviewSessionStore.logSession).not.toHaveBeenCalled()
+    expect(reviewSessionStore.logSessionBeacon).toHaveBeenCalledTimes(1)
+    dateNowSpy.mockRestore()
+  })
+
+  it("bascule vers une carte neuve (Nouvelle carte) : journalise (normal) le segment en cours sans le re-journaliser au démontage", async () => {
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(3_000_000)
+    const wrapper = mountEditorView({ diagramId: 5 })
+    const reviewSessionStore = useMindMapViewSessionStore()
+    const builder = wrapper.findComponent({ name: 'MindMapBuilder' })
+
+    dateNowSpy.mockReturnValue(3_000_000 + 7_000) // +7s
+    await builder.vm.$emit('new-map', { title: 'Nouvelle carte' })
+
+    expect(reviewSessionStore.logSession).toHaveBeenCalledWith(5, 7)
+
+    wrapper.unmount()
+    expect(reviewSessionStore.logSession).toHaveBeenCalledTimes(1)
+    dateNowSpy.mockRestore()
+  })
+
+  it("visibilitychange 'hidden' clôt le segment en cours via logSessionBeacon, sans arrêter le suivi", () => {
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(4_000_000)
+    const wrapper = mountEditorView({ diagramId: 5 })
+    const reviewSessionStore = useMindMapViewSessionStore()
+
+    dateNowSpy.mockReturnValue(4_000_000 + 15_000) // +15s en arrière-plan
+    setVisibility('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(reviewSessionStore.logSessionBeacon).toHaveBeenCalledWith(5, 15)
+    expect(reviewSessionStore.logSession).not.toHaveBeenCalled()
+
+    setVisibility('visible')
+    wrapper.unmount()
+    dateNowSpy.mockRestore()
+  })
+
+  it("visibilitychange 'visible' redémarre un nouveau segment après une mise en arrière-plan, journalisé (normal) à la fermeture", () => {
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(5_000_000)
+    const wrapper = mountEditorView({ diagramId: 5 })
+    const reviewSessionStore = useMindMapViewSessionStore()
+
+    // Segment 1 : 20s puis mise en arrière-plan
+    dateNowSpy.mockReturnValue(5_000_000 + 20_000)
+    setVisibility('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(reviewSessionStore.logSessionBeacon).toHaveBeenCalledWith(5, 20)
+
+    // Retour au premier plan : nouveau segment de 8s avant fermeture
+    setVisibility('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    dateNowSpy.mockReturnValue(5_000_000 + 20_000 + 8_000)
+    wrapper.unmount()
+
+    expect(reviewSessionStore.logSession).toHaveBeenCalledWith(5, 8)
+    expect(reviewSessionStore.logSessionBeacon).toHaveBeenCalledTimes(1)
+    expect(reviewSessionStore.logSession).toHaveBeenCalledTimes(1)
+    dateNowSpy.mockRestore()
+  })
+
+  it('ignore un segment de durée nulle (bascule de visibilité instantanée) — pas de bruit sur des changements d\'onglet trop brefs', () => {
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(6_000_000)
+    const wrapper = mountEditorView({ diagramId: 5 })
+    const reviewSessionStore = useMindMapViewSessionStore()
+
+    setVisibility('hidden') // aucune avancée du temps depuis le montage
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(reviewSessionStore.logSessionBeacon).not.toHaveBeenCalled()
+
+    setVisibility('visible')
+    wrapper.unmount()
+    dateNowSpy.mockRestore()
   })
 })

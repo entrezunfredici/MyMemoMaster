@@ -31,6 +31,7 @@
 | LeitnerSystem / LeitnerCard / LeitnerBox | Stable — [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `cardSystems`/`LeitnerSystemTag` — modèles Sequelize enregistrés préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; [FIX] 2026-07-08 : cascade de suppression complétée au 2ᵉ niveau (FK LeitnerCard.idBox sans ON DELETE CASCADE — un système avec cartes était insupprimable, 500) | 2026-09-01 |
 | LeitnerSystemsUsers | Stable | init |
 | LeitnerReviewSession (journal sessions réelles) | Stable — [ADD] 2026-09-01 : nouvelle table, journalise chaque session Leitner réellement terminée (userId, idSystem, cardsReviewed, durationSeconds), `POST /leitner-review-sessions`, chronométrée côté front (`FlashcardsSessionPage.vue`) et best-effort (échec silencieux) ; alimente le KPI temps de révision aux côtés de `TestResult.durationSeconds` | 2026-09-01 |
+| MindMapViewSession (journal consultations cartes mentales) | Stable — [ADD] 2026-09-04 : nouvelle table, journalise la consultation d'une carte mentale **existante** (userId, idMindMap, durationSeconds), `POST /mindmap-view-sessions`, chronométrée côté front (`MindmapsEditorView.vue`, uniquement quand `diagramId` est non nul à l'ouverture — création d'une carte neuve non comptée) et best-effort (échec silencieux) ; alimente le KPI temps de révision aux côtés de `TestResult.durationSeconds` et `LeitnerReviewSession` ; [IMP] 2026-09-04 (même jour) : fermeture d'onglet/navigateur journalisée via `pagehide` + `api.postBeacon` (fetch keepalive, en-tête `Authorization` — `sendBeacon` écarté, pas d'en-têtes personnalisés) ; bascule vers "Nouvelle carte" (`handleNewMap`) clôt la mesure en cours avant réinitialisation ; [IMP] 2026-09-04 (3ᵉ session du jour) : chronométrage réécrit en mesure par segments (`document.visibilitychange` — 'hidden' clôt via beacon sans arrêter le suivi, 'visible' redémarre un segment) pour couvrir la mise en arrière-plan prolongée (mobile notamment, où l'OS peut tuer l'onglet sans `pagehide`) ; segments de durée nulle ignorés | 2026-09-04 |
 | Formules mathématiques (Leitner + exercices) | Stable — convention `$…$` rendue en KaTeX inline (FormulaTextComponent) + bouton ƒ latéral ouvrant l'interpréteur, insertion au curseur (FormulaHelperComponent) ; syntaxe canonique unique (frac → over normalisé à l'insertion et avant tout envoi API) ; aucun changement API ; sortie MathML explicite pour lecteurs d'écran (2026-07-19) | 2026-07-19 |
 | Librairie de rendu formules (S-06.01) | Clôturé — benchmark MathJax/KaTeX formalisé dans DECISIONS (2026-07-19) : KaTeX seul retenu ; dépendance `mathjax` et helper mort `mathjax-config.js` supprimés, CONVENTIONS corrigé | 2026-07-19 |
 | Maquettes UI éditeur formules (S-06.02) | Clôturé — écran « Interpréteur de formules » ajouté au prototype interactif (15 écrans) : éditeur + palette de symboles + aperçu + badge homogénéité ; 17 captures régénérées (dont 17-interpreteur.png) | 2026-07-19 |
@@ -51,7 +52,7 @@
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | Tutorials | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
 | OnboardingState | Stable — bug PUT corrigé (req.user.userId → req.user.id) ; [FIX] 2026-08-15 : `getOnboardingByUserId`/`updateOnboarding` retournent `null` au lieu de `throw` (le controller traduisait déjà en 404, mais recevait un 500) | 2026-08-15 |
-| Kpi | Stable — [ADD] 2026-09-01 : `revision.totalMinutes` alimenté par un temps réel chronométré (exercices via `TestResult.durationSeconds`, sessions Leitner via la nouvelle table `LeitnerReviewSession`) en plus des créneaux planifiés `RevisionSession` — jusqu'ici toujours à 0 min en pratique ; vérifié sain en prod le 2026-09-01 (requête Prometheus `http_requests_total` sur `/api/v1/kpi/*` : 24h glissantes, uniquement 200/304/401, 0 code 5xx) suite au signalement d'un bug 500 sur un module voisin (Test/Question) ; M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) | 2026-09-01 |
+| Kpi | Stable — [ADD] 2026-09-01 : `revision.totalMinutes` alimenté par un temps réel chronométré (exercices via `TestResult.durationSeconds`, sessions Leitner via la nouvelle table `LeitnerReviewSession`) en plus des créneaux planifiés `RevisionSession` — jusqu'ici toujours à 0 min en pratique ; vérifié sain en prod le 2026-09-01 (requête Prometheus `http_requests_total` sur `/api/v1/kpi/*` : 24h glissantes, uniquement 200/304/401, 0 code 5xx) suite au signalement d'un bug 500 sur un module voisin (Test/Question) ; M-04.08 : revue de code corrigée (double index, archi controller→service, weeklyActivity) ; [IMP] 2026-09-04 : `revision.totalMinutes` ne compte plus les créneaux planifiés `RevisionSession` — devient exclusivement la somme du temps réel chronométré (exercices + sessions Leitner + nouvelle table `MindMapViewSession`), une case `isDone` cochée par l'utilisateur ne garantissant ni qu'il a révisé ni combien de temps il y a passé ; `_computeRevision` ne renvoie plus `totalMinutes` (calcul déplacé vers `_computeRealMinutes`, seul appelant) | 2026-09-04 |
 | Logs applicatifs (Winston + Morgan) | Stable — M-00b.10 : Morgan installé, pipé dans Winston, désactivé en test | 2026-06-24 |
 | Métriques RED/USE (Prometheus) | Stable — prom-client, GET /metrics sur serveur HTTP séparé (port 9090, hors Ingress), instrumentation RED sur toutes les routes, USE = métriques process Node par défaut | 2026-07-06 |
 | Monitoring (Prometheus central) | Stable — Prometheus par environnement dans le chart Helm (`monitoring.enabled`), scrape par annotations pod, Deployment/emptyDir preprod vs StatefulSet/PVC prod, non exposé par l'Ingress ; port metrics restauré dans le chart (perdu à la migration Helm) | 2026-07-11 |
@@ -9900,3 +9901,153 @@ démarrage sans erreur (vérifié via `kubectl logs`).
 le 2026-08-31, 4ᵉ occurrence sans investigation du pipeline lui-même. Reste à faire : soit fiabiliser
 `deploy_prod` (root cause du blocage jamais identifiée malgré 4 occurrences), soit documenter ce rollout
 manuel comme procédure de secours officielle dans le runbook si le correctif du pipeline n'est pas priorisé.
+
+---
+
+## [2026-09-04] IMP — KPI "Temps total de révision" : abandon du temps planifié RevisionSession, ajout du temps chronométré sur les cartes mentales
+
+**Contexte** — Demande explicite de l'utilisateur : `revision.totalMinutes` ne doit plus se baser (même
+partiellement) sur les créneaux `RevisionSession` cochés "terminé" par l'utilisateur — une case cochée
+ne garantit ni qu'il a réellement révisé, ni combien de temps il y a passé ("à l'aveugle"). Le KPI doit
+désormais refléter **uniquement** le temps réellement chronométré : sessions Leitner, exercices, et
+désormais aussi les consultations de cartes mentales (activité non couverte jusqu'ici).
+
+**Ce qui a été fait** :
+- `services/Kpi.service.js` — `_computeRevision` ne calcule plus `totalMinutes` depuis
+  `startTime`/`endTime` des `RevisionSession` complétées (boucle supprimée, champ retiré de l'objet
+  retourné) ; `getMyKpis`/`getPersonalKpisForSubjects` affectent désormais `revision.totalMinutes`
+  directement depuis `_computeRealMinutes` (`=`, plus `+=`). Les 4 autres indicateurs de
+  `_computeRevision` (streak, taux de complétion, sessions planifiées/complétées) sont inchangés — ils
+  continuent de mesurer le respect du planning, indépendamment du temps réel.
+- `_computeRealMinutes(testResults, leitnerReviewSessions, mindMapViewSessions)` — nouveau 3ᵉ
+  paramètre, même traitement que les deux autres (durée ignorée si `null`, pas comptée comme 0).
+- **Nouveau flux de mesure "consultation de carte mentale"**, même pattern que `LeitnerReviewSession`
+  (2026-09-01) :
+  - `migrations/20260904000001-create-mindmapviewsession-table.js` — table `MindMapViewSession`
+    (id, userId → User CASCADE, idMindMap → MindMap CASCADE, durationSeconds, viewedAt).
+  - `models/MindMapViewSession.model.js`, `services/MindMapViewSession.service.js` (`create`,
+    `findByUser(userId, subjectIds?)` — filtre par matière via la carte mentale consultée, même
+    pattern que `LeitnerReviewSession.findByUser`), `controllers/MindMapViewSession.controller.js`,
+    `validators/MindMapViewSession.validators.js` (plafond 14 400 s, même borne que les deux autres
+    flux), `routes/MindMapViewSession.routes.js` (`POST /mindmap-view-sessions`, Swagger).
+  - Enregistré dans `models/index.js` et `app.js`.
+  - Frontend : `stores/mindmapViewSessions.js` (nouveau, même pattern best-effort/échec silencieux que
+    `leitnerReviewSessions.js`) ; `components/mindmap/MindmapsEditorView.vue` chronomètre du montage à
+    `onBeforeUnmount` et journalise **uniquement si une carte existante était ouverte** (`props.diagramId`
+    non nul au montage) — la création d'une carte neuve dans ce même éditeur n'est pas comptée (activité
+    de création, pas de consultation).
+  - `pages/KpiPage.vue` — hint de la StatCard "Temps total de révision" mis à jour ("Leitner, exercices
+    et cartes mentales chronométrés", ne mentionne plus les créneaux planifiés).
+
+**Choix techniques** :
+- Décision confirmée par l'utilisateur avant codage (voir `DECISIONS.md`) : remplacer entièrement
+  `totalMinutes` plutôt que garder deux chiffres séparés ; chronométrer uniquement l'ouverture de cartes
+  **existantes**, pas la création.
+- Table de journal pur `MindMapViewSession`, même raisonnement que `LeitnerReviewSession` : pas de FK
+  vers `RevisionSession`, une consultation réelle n'a aucune raison d'être liée à un créneau planifié.
+
+**Ce qui n'est PAS couvert** :
+- ~~Fermeture d'onglet/navigateur pendant la consultation~~ — comblé le 2026-09-04 (même jour, entrée
+  suivante) : handler `pagehide` + `api.postBeacon` (fetch keepalive).
+- ~~Bascule vers "Nouvelle carte" en cours de consultation~~ — comblé le 2026-09-04 (même jour, entrée
+  suivante) : `handleNewMap` clôt la mesure en cours avant de basculer.
+- Pas d'affichage distinct par flux (Leitner/exercices/cartes mentales) dans `KpiPage.vue` — le total
+  reste un seul chiffre agrégé, comme pour l'ajout du 2026-09-01.
+
+**Points d'attention** : migration `20260904000001` non exécutée contre `db.sqlite` local pendant cette
+session (action refusée par le classifieur — modification d'état hors périmètre test) ; à appliquer
+(`npm run migrate`) avant de tester le flux manuellement en dev.
+
+**Tests** : `npx jest` (API) → 1778/1778 (dont 3 nouvelles suites : `MindMapViewSession.service.test.js`,
+`MindMapViewSession.controller.test.js`, `Kpi.service.test.js` mis à jour). `npx vitest run` (front) →
+743/743 (dont `mindmapViewSessions.store.test.js` nouveau, `MindmapsEditorView.test.js` et
+`KpiPage.test.js` mis à jour). `npm run lint` propre côté API (1 warning préexistant hors périmètre,
+fichier de coverage généré) et côté front (0 erreur).
+
+---
+
+## [2026-09-04, même jour] IMP — MindMapViewSession : fermeture d'onglet/navigateur et bascule "Nouvelle carte" désormais journalisées
+
+**Contexte** — Suite immédiate du ticket précédent (même jour) : demande explicite de l'utilisateur de
+combler les deux limites listées dans "Ce qui n'est PAS couvert" — consultation interrompue par
+fermeture d'onglet/navigateur, et bascule vers "Nouvelle carte" en cours de consultation d'une carte
+existante.
+
+**Ce qui a été fait** :
+- **Fermeture d'onglet/navigateur** — `helpers/api.js` : nouvelle fonction `postBeacon(endpoint, data)`,
+  utilise `fetch(..., { keepalive: true })` plutôt qu'Axios (dont les requêtes XHR sont annulées par le
+  navigateur pendant le déchargement de la page) ; envoie l'en-tête `Authorization: Bearer <token>` (lu
+  depuis `useAuthStore`), ce que `navigator.sendBeacon()` ne permet pas (pas d'en-têtes personnalisés) —
+  écarté pour cette raison, voir `DECISIONS.md`. `stores/mindmapViewSessions.js` — nouvelle action
+  `logSessionBeacon(idMindMap, durationSeconds)` (synchrone, fire-and-forget) déléguant à
+  `api.postBeacon`. `components/mindmap/MindmapsEditorView.vue` — `logViewSession(useBeacon = false)`
+  accepte désormais un flag ; nouveau listener `pagehide` (`handlePageHide`) posé/retiré dans
+  `onMounted`/`onBeforeUnmount` aux côtés de l'existant `beforeunload`, appelle
+  `logViewSession(true)`. `pagehide` préféré à `beforeunload` pour cet usage : ne se déclenche que
+  lorsque la page se décharge réellement (pas si l'utilisateur annule une boîte de dialogue de
+  confirmation).
+- **Bascule "Nouvelle carte"** — `handleNewMap` appelle désormais `logViewSession()` (variante normale,
+  Axios) avant de réinitialiser `currentDiagramId` : la mesure de la carte ouverte à l'origine est close
+  au moment précis où l'utilisateur quitte sa consultation pour créer une carte neuve, plutôt qu'à la
+  fermeture finale de l'éditeur (qui aurait inclus le temps de création). La garde `viewLogged` (déjà en
+  place) empêche tout second envoi au démontage.
+- Tests : `test/helpers/api.test.js` (+7, describe `api.postBeacon` : avec/sans token, fallback
+  `user.connectionToken`, endpoint absent, fetch indisponible, fetch qui lève) ; `useAuthStore` mocké via
+  `vi.fn()` plutôt qu'une factory statique pour varier `authenticated`/`token` par test ;
+  `test/stores/mindmapViewSessions.store.test.js` (+1, `logSessionBeacon`) ;
+  `test/components/MindmapsEditorView.test.js` (+2 : `pagehide` déclenche `logSessionBeacon` et pas
+  `logSession`, bascule vers une carte neuve journalise puis n'enregistre plus rien au démontage).
+
+**Choix techniques** : voir `DECISIONS.md` — `fetch keepalive` plutôt que `navigator.sendBeacon()`
+(en-tête `Authorization` requis par `Auth.middleware.js`, incompatible avec `sendBeacon`) ; `pagehide`
+plutôt que `beforeunload` seul pour le déclenchement de la mesure (évite un faux positif si l'utilisateur
+annule la navigation).
+
+**Ce qui n'est PAS couvert** : ~~mise en arrière-plan prolongée d'un onglet resté ouvert (mobile,
+`visibilitychange`)~~ — comblé le 2026-09-04 (même jour, entrée suivante) ; la réplication à
+`LeitnerReviewSession`/`TestResult` évoquée ici s'est révélée non applicable, voir l'entrée suivante
+(ces deux flux ne journalisent que des sessions **menées à leur terme** — décision déjà actée le
+2026-09-01 — donc rien d'équivalent à "clore une mesure en cours" à répliquer).
+
+**Tests** : `npx vitest run` (front) → 752/752 (+9). `npm run lint` front propre (0 erreur). Aucun
+changement API/backend dans ce ticket.
+
+---
+
+## [2026-09-04, 3ᵉ session du jour] IMP — MindMapViewSession : mesure par segments (visibilitychange) pour couvrir la mise en arrière-plan prolongée
+
+**Contexte** — Demande explicite de l'utilisateur : combler les cas encore listés en "Ce qui n'est PAS
+couvert" de l'entrée précédente.
+
+**Ce qui a été fait** :
+- `components/mindmap/MindmapsEditorView.vue` — chronométrage entièrement réécrit en **mesure par
+  segments** plutôt qu'une seule mesure de bout en bout : `flushSegment(useBeacon)` clôt et journalise le
+  segment en cours sans arrêter le suivi ; `stopTracking(useBeacon)` (bouton Retour, bascule "Nouvelle
+  carte", `pagehide`) clôt le segment en cours **et** empêche tout redémarrage ; `resumeSegment()` en
+  ouvre un nouveau. Nouveau listener `document.visibilitychange` : `'hidden'` appelle `flushSegment(true)`
+  (beacon — la page peut être en train de se décharger, notamment si l'OS mobile tue l'onglet en
+  arrière-plan sans jamais déclencher `pagehide`), `'visible'` appelle `resumeSegment()`. Chaque segment
+  journalisé produit une ligne `MindMapViewSession` distincte ; `Kpi.service.js#_computeRealMinutes` les
+  additionne déjà toutes (aucun changement backend nécessaire).
+- Un segment de durée nulle (`durationSeconds <= 0` après arrondi) n'est pas envoyé — évite le bruit sur
+  des bascules d'onglet trop brèves pour représenter une vraie pause.
+- `test/components/MindmapsEditorView.test.js` — tests réécrits avec `Date.now()` mocké (`vi.spyOn`)
+  plutôt que le temps réel écoulé pendant le test, pour des durées attendues déterministes ; +3 tests
+  nouveaux (`visibilitychange` 'hidden' clôt via beacon sans arrêter le suivi ; 'visible' redémarre un
+  segment journalisé normalement à la fermeture ; segment de durée nulle ignoré).
+
+**Choix techniques** — voir `DECISIONS.md` :
+- Mesure par segments plutôt qu'une seule mesure de bout en bout : un onglet en arrière-plan ne doit pas
+  compter comme consultation, et sur mobile l'OS peut tuer l'onglet sans jamais déclencher `pagehide` —
+  sans clôture au passage en arrière-plan, tout le temps déjà passé aurait été perdu.
+- Réplication à `LeitnerReviewSession`/`TestResult` jugée **non applicable** : ces deux flux ne
+  journalisent que des activités menées à leur terme (décision du 2026-09-01, LeitnerReviewSession —
+  abandon volontairement non compté) ; il n'y a pas de "mesure en cours à clore" à répliquer, contrairement
+  aux cartes mentales où toute la durée d'ouverture compte, sans notion de "fin" explicite.
+
+**Ce qui n'est PAS couvert** : aucun changement côté API/backend. Le nombre de lignes `MindMapViewSession`
+par consultation peut désormais être supérieur à 1 si l'utilisateur change d'onglet plusieurs fois — pas
+de test de volumétrie sur ce point, jugé disproportionné (chaque ligne reste plafonnée à 4h côté
+validateur, et `findByUser` ne fait qu'un `SUM` implicite via réduction JS, pas de `GROUP BY` coûteux).
+
+**Tests** : `npx vitest run` (front) → 755/755 (+3). `npm run lint` front propre (0 erreur).

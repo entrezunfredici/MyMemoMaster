@@ -47,7 +47,7 @@
       </div>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         <StatCard label="30 derniers jours" :value="store.kpis.revision.sessionsLast30Days + ' sessions'" hint="créneaux calendrier" />
-        <StatCard label="Temps total de révision" :value="formatMinutes(store.kpis.revision.totalMinutes)" hint="créneaux planifiés + pratique réelle chronométrée" />
+        <StatCard label="Temps total de révision" :value="formatMinutes(store.kpis.revision.totalMinutes)" hint="Leitner, exercices et cartes mentales chronométrés" />
         <StatCard label="Complétées / 30 j" :value="store.kpis.revision.completedLast30Days + ' sessions'" hint="créneaux calendrier" />
       </div>
 

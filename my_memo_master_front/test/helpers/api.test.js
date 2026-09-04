@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // vi.hoisted garantit que ces mocks sont disponibles avant que vi.mock() ne soit évalué
-const { mockGet, mockPost, mockPut, mockDelete, mockLogout } = vi.hoisted(() => ({
+const { mockGet, mockPost, mockPut, mockDelete, mockLogout, mockUseAuthStore } = vi.hoisted(() => ({
   mockGet: vi.fn(),
   mockPost: vi.fn(),
   mockPut: vi.fn(),
   mockDelete: vi.fn(),
   mockLogout: vi.fn(),
+  mockUseAuthStore: vi.fn(),
 }))
 
 vi.mock('@/config', () => ({
@@ -21,13 +22,10 @@ vi.mock('@/config', () => ({
   VITE_API_GOOGLE_AUTH_HEADER: 'Authorization',
 }))
 
+// CHOIX: useAuthStore mocké via vi.fn() (plutôt qu'une factory statique) pour que les
+// tests api.postBeacon puissent faire varier authenticated/token par test (mockReturnValueOnce).
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({
-    authenticated: false,
-    token: null,
-    user: {},
-    logout: mockLogout,
-  }),
+  useAuthStore: mockUseAuthStore,
 }))
 
 vi.mock('axios', () => ({
@@ -51,6 +49,7 @@ describe('api.js — couche API front', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockUseAuthStore.mockReturnValue({ authenticated: false, token: null, user: {}, logout: mockLogout })
   })
 
   // ==================== api.get ====================
@@ -214,6 +213,72 @@ describe('api.js — couche API front', () => {
 
     it('del - endpoint absent - lève une erreur', async () => {
       await expect(api.del()).rejects.toThrow()
+    })
+  })
+
+  // ==================== api.postBeacon ====================
+  describe('api.postBeacon', () => {
+    it('postBeacon - non authentifié - fetch sans en-tête Authorization', () => {
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost/api/v1/mindmap-view-sessions',
+        expect.objectContaining({
+          method: 'POST',
+          keepalive: true,
+          body: JSON.stringify({ idMindMap: 2, durationSeconds: 120 }),
+        })
+      )
+      expect(mockFetch.mock.calls[0][1].headers.Authorization).toBeUndefined()
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - authentifié - fetch avec en-tête Authorization Bearer', () => {
+      mockUseAuthStore.mockReturnValue({ authenticated: true, token: 'jwt-token', user: {}, logout: mockLogout })
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })
+
+      expect(mockFetch.mock.calls[0][1].headers.Authorization).toBe('Bearer jwt-token')
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - authentifié via user.connectionToken (fallback) - envoie ce token', () => {
+      mockUseAuthStore.mockReturnValue({ authenticated: true, token: null, user: { connectionToken: 'conn-token' }, logout: mockLogout })
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })
+
+      expect(mockFetch.mock.calls[0][1].headers.Authorization).toBe('Bearer conn-token')
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - endpoint absent - ne fait rien (pas d\'exception, best-effort)', () => {
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      expect(() => api.postBeacon()).not.toThrow()
+      expect(mockFetch).not.toHaveBeenCalled()
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - fetch indisponible (SSR/environnement sans fetch global) - ne lève pas', () => {
+      vi.stubGlobal('fetch', undefined)
+
+      expect(() => api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })).not.toThrow()
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - fetch lève synchroniquement - ne propage pas (best-effort)', () => {
+      vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Network Error') }))
+
+      expect(() => api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })).not.toThrow()
+      vi.unstubAllGlobals()
     })
   })
 })

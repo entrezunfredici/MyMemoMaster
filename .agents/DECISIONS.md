@@ -2232,3 +2232,156 @@ jour dans `docs/COMPTE_RENDU_METRIQUES.md` — l'écart avec les chiffres cités
 différence de méthode. **Dette assumée** : le script n'a pas de test automatisé dans
 `odoo-plugin/tests/` à ce stade — à ajouter si sa logique de filtrage doit évoluer (nouveaux blocs de
 backlog, par exemple).
+
+---
+
+### [2026-09-04] `revision.totalMinutes` : remplacer le temps planifié RevisionSession par le seul temps chronométré, cartes mentales incluses
+
+**Contexte** — Depuis le 2026-09-01, `revision.totalMinutes` additionnait le temps planifié (créneaux
+`RevisionSession` cochés `isDone`, `startTime`/`endTime`) et le temps réellement chronométré (exercices
++ sessions Leitner). Demande explicite de l'utilisateur : ne plus se baser, même partiellement, sur la
+validation de session par l'utilisateur ("à l'aveugle") — une case cochée ne garantit ni qu'il a
+réellement révisé, ni combien de temps il y a passé. Le KPI doit refléter uniquement le temps
+chronométré sur des activités de révision réelles : sessions Leitner, exercices, et — nouveauté demandée
+dans la foulée — consultations de cartes mentales, jusqu'ici non mesurées du tout.
+
+**Décision** :
+1. **Remplacer** `totalMinutes` plutôt que garder deux chiffres séparés (option "temps planifié" +
+   "temps réel" envisagée puis écartée, confirmée par l'utilisateur avant codage) : `_computeRevision`
+   ne calcule et ne renvoie plus `totalMinutes` — seules restent les 4 métriques qui mesurent le
+   *respect du planning* (streak, taux de complétion, sessions planifiées/complétées), qui ne sont pas
+   concernées par la demande et gardent leur sens actuel. `totalMinutes` est désormais entièrement
+   calculé par l'appelant (`getMyKpis`/`getPersonalKpisForSubjects`) via `_computeRealMinutes`, en
+   affectation directe (`=`) plutôt qu'addition (`+=`).
+2. **Cartes mentales : nouvelle table `MindMapViewSession`**, même pattern que `LeitnerReviewSession`
+   (2026-09-01) — pas de FK vers `RevisionSession`, plafond 14 400 s (4h) côté validateur, même
+   raisonnement que les deux flux existants (au-delà, la mesure ne reflète plus une consultation réelle).
+3. **Périmètre du chronométrage "carte mentale" : ouverture d'une carte existante uniquement**, pas la
+   création d'une carte neuve — décision tranchée par question explicite à l'utilisateur avant codage.
+   `MindmapsEditorView.vue` sert à la fois à créer, éditer et consulter (pas de mode lecture seule
+   séparé) ; "regarder une carte mentale" (le terme employé par l'utilisateur) suppose une carte qui
+   existe déjà, tandis que la création est une activité distincte, de même nature que "créer un exercice"
+   n'est pas "faire un exercice". Le composant capture `props.diagramId` une seule fois au montage (avant
+   toute mutation locale via `handleNewMap`) pour décider si la session est chronométrée.
+
+**Alternative écartée (garder les deux chiffres)** : ajouter un champ `revision.realMinutes` distinct
+sans toucher à `totalMinutes` existant — écartée sur choix explicite de l'utilisateur : la demande porte
+sur le sens de "temps de révision écoulé" lui-même, pas sur l'ajout d'une donnée supplémentaire.
+
+**Alternative écartée (chronométrer aussi la création de carte)** — écartée sur choix explicite de
+l'utilisateur : aurait gonflé le KPI avec du temps de conception de contenu, pas de révision de contenu
+existant, changeant la nature de la mesure sans le dire (même risque que celui déjà écarté le 2026-09-01
+pour ne pas réutiliser `RevisionSession`).
+
+**Conséquences** : `revision.totalMinutes` ne reflète plus jamais de temps planifié, y compris pour les
+utilisateurs qui n'ont ni session Leitner, ni exercice, ni consultation de carte mentale chronométrés —
+le KPI peut redescendre à 0 min pour un profil qui n'utilisait jusqu'ici que des créneaux `RevisionSession`
+cochés sans activité réelle mesurée derrière, ce qui est l'effet recherché (la mesure était trompeuse).
+`npx jest` (API) → 1778/1778 (+30 dont les tests `MindMapViewSession`) ; `npx vitest run` (front) →
+743/743 (+30). **Dette assumée alors, comblée le jour même** (voir entrée suivante) : consultation
+interrompue par fermeture d'onglet/navigateur non journalisée, et bascule vers "Nouvelle carte"
+n'isolant pas la durée. Migration `20260904000001` non exécutée contre `db.sqlite` local en session
+(action refusée par le classifieur de permissions) — à appliquer manuellement (`npm run migrate`) avant
+tout test manuel en dev.
+
+---
+
+### [2026-09-04, même jour] MindMapViewSession : `fetch keepalive` (pas `sendBeacon`) sur `pagehide` (pas `beforeunload`) pour couvrir fermeture d'onglet et bascule "Nouvelle carte"
+
+**Contexte** — Demande explicite de l'utilisateur, en suite immédiate de l'entrée précédente : combler
+les deux limites listées dans "Ce qui n'est PAS couvert" (fermeture d'onglet/navigateur pendant une
+consultation de carte mentale ; bascule vers "Nouvelle carte" en cours de consultation).
+
+**Décision 1 — fermeture d'onglet/navigateur : `fetch(..., { keepalive: true })` plutôt que
+`navigator.sendBeacon()`.**
+`sendBeacon()` est l'API standard pour ce cas d'usage (analytics/durée de page envoyées à la fermeture),
+mais elle ne permet pas de définir l'en-tête `Authorization` — seul le corps de la requête et son
+`Content-Type` (via le type du `Blob` passé) sont configurables. Or `Auth.middleware.js` exige
+strictement le schéma `Bearer <token>` dans l'en-tête `Authorization` (AGENT.md : "Toute route privée
+est protégée par `Auth.middleware.js` — pas de vérification JWT inline") ; transmettre le token dans le
+corps aurait exigé une vérification JWT ad hoc dans le controller, hors architecture. `fetch` avec
+`keepalive: true` (support navigateurs modernes équivalent à `sendBeacon`, requête qui survit au
+déchargement de la page) accepte des en-têtes personnalisés — solution retenue via une nouvelle fonction
+`api.postBeacon()`, qui lit le token depuis `useAuthStore` exactement comme l'intercepteur Axios de
+`api.post()`.
+
+**Décision 2 — déclenchement sur `pagehide` plutôt que `beforeunload`.**
+`onBeforeUnmount` (hook Vue) ne s'exécute pas lors d'une fermeture réelle d'onglet/navigateur — le
+contexte JS est détruit sans exécuter les hooks du framework, c'est précisément la cause de la dette.
+Entre les deux événements DOM candidats : `beforeunload` se déclenche même si l'utilisateur annule
+ensuite la confirmation de navigation (boîte de dialogue "Quitter le site ?"), ce qui aurait clos la
+mesure de consultation prématurément alors que l'utilisateur reste sur la page ; `pagehide` ne se
+déclenche que lorsque la page se décharge réellement (navigation confirmée, fermeture d'onglet, mise en
+cache bfcache), donc sans ce faux positif. `beforeunload` reste en place, inchangé, pour son rôle actuel
+(avertissement de modifications non sauvegardées) — les deux listeners coexistent, chacun sur son
+événement le plus approprié.
+
+**Décision 3 — bascule "Nouvelle carte" : clôturer la mesure dans `handleNewMap`, pas au démontage.**
+Alternative écartée : laisser courir la mesure jusqu'à la fermeture de l'éditeur, comme avant — aurait
+continué à additionner le temps passé à créer la carte neuve dans la durée attribuée à la carte
+initialement consultée, contradiction directe avec la décision du 2026-09-04 (entrée précédente)
+d'exclure la création du chronométrage. `handleNewMap` appelle désormais `logViewSession()` avant de
+réinitialiser `currentDiagramId` ; la garde `viewLogged` (déjà en place pour éviter un double envoi
+pagehide/démontage) protège aussi ce nouveau point d'appel sans changement.
+
+**Conséquences** : les deux limites documentées dans l'entrée précédente sont désormais couvertes ; le
+KPI "Temps total de révision" reflète un temps de consultation de cartes mentales plus complet et plus
+précis (segments correctement bornés par bascule ou fermeture, plutôt qu'une seule mesure de bout en
+bout incluant du temps hors périmètre). `npx vitest run` (front) → 752/752 (+9, tous côté front — aucun
+changement API dans ce ticket). **Dette assumée alors, requalifiée le jour même** (voir entrée
+suivante) : la mise en arrière-plan prolongée (mobile, `visibilitychange`) a été comblée ; la
+réplication à `LeitnerReviewSession`/`TestResult` s'est révélée non applicable plutôt que simplement
+non faite — ces deux flux n'ont pas de "mesure en cours à clore", voir entrée suivante.
+
+---
+
+### [2026-09-04, 3ᵉ session du jour] MindMapViewSession : mesure par segments (`visibilitychange`) plutôt qu'une seule mesure de bout en bout
+
+**Contexte** — Demande explicite de l'utilisateur : combler les cas restants listés en "Ce qui n'est PAS
+couvert" de l'entrée précédente — mise en arrière-plan prolongée d'un onglet resté ouvert (mobile), et
+réplication de `postBeacon`/`pagehide` à `LeitnerReviewSession`/`TestResult`.
+
+**Décision 1 — mesure par segments plutôt qu'une seule mesure montage→démontage.**
+La mesure "un seul segment du montage à la fermeture" (2026-09-04, 2ᵉ session) suffisait pour une
+fermeture propre ou une fermeture d'onglet, mais pas pour un onglet laissé ouvert en arrière-plan
+longtemps : le temps passé sur un autre onglet, en veille d'écran, ou avec l'application mobile en
+arrière-plan aurait continué à s'accumuler dans `viewedMindMapId` comme si l'utilisateur consultait
+activement la carte. Plus grave sur mobile : les OS (iOS Safari, Chrome Android) peuvent tuer l'onglet en
+arrière-plan sans jamais déclencher `pagehide` — dans ce cas, la seule mesure de bout en bout n'aurait
+jamais été journalisée du tout, perdant même le temps de consultation réel qui avait précédé la mise en
+arrière-plan. Solution : `document.visibilitychange` → `'hidden'` clôt et journalise le segment en cours
+(`flushSegment(true)`, via beacon puisque l'onglet peut être sur le point d'être tué) sans arrêter le
+suivi dans son ensemble ; `'visible'` en ouvre un nouveau (`resumeSegment()`). Chaque segment produit sa
+propre ligne `MindMapViewSession` ; `Kpi.service.js#_computeRealMinutes` les additionne déjà toutes (`SUM`
+implicite par réduction JS sur tous les enregistrements de l'utilisateur), donc **aucun changement
+backend n'était nécessaire** pour ce ticket.
+
+**Décision 2 — ignorer les segments de durée nulle.**
+Un utilisateur qui bascule rapidement entre onglets peut déclencher plusieurs `visibilitychange` en
+quelques millisecondes. Sans garde, chaque bascule instantanée produirait une ligne `durationSeconds: 0`
+(acceptée par le validateur, qui autorise 0 comme "consultation quasi instantanée", même borne que
+`LeitnerReviewSession`) — du bruit pur pour le KPI. `flushSegment` retourne sans rien envoyer quand la
+durée arrondie est ≤ 0.
+
+**Décision 3 — réplication à `LeitnerReviewSession`/`TestResult` : non applicable, pas seulement non
+faite.**
+Ré-examen demandé par l'utilisateur : `postBeacon`/`pagehide` résolvent un problème précis — une mesure
+**en cours**, sans notion de fin explicite, qui doit être close proprement quand la page se cache ou se
+décharge. Les sessions Leitner et les exercices n'ont pas ce problème par construction : les deux ne
+journalisent que des activités **menées à leur terme** (dernière carte corrigée pour Leitner, test
+soumis pour un exercice) — décision actée le 2026-09-01 pour Leitner (abandon via bouton Retour
+volontairement non compté, voir `CHANGELOG_AGENT.md` du 2026-09-01). Il n'y a donc rien à "clore" à la
+fermeture de l'onglet : soit l'action de complétion a eu lieu (et la ligne existe déjà, indépendamment de
+ce qui se passe ensuite dans le navigateur), soit elle n'a pas eu lieu (et rien ne doit être journalisé,
+par design). Répliquer `postBeacon`/`pagehide` sur ces flux reviendrait à journaliser des sessions
+abandonnées — un changement de règle métier, non demandé, qui contredirait une décision déjà actée.
+
+**Conséquences** : le KPI "Temps total de révision" reste fiable même sur un onglet laissé ouvert en
+arrière-plan pendant une longue période, y compris sur mobile où l'onglet peut être tué sans avertissement
+— le temps déjà écoulé au moment de la mise en arrière-plan est journalisé, seul le temps *après* la mise
+en arrière-plan cesse d'être compté. Une même consultation peut désormais produire plusieurs lignes
+`MindMapViewSession` (un segment par cycle visible/caché) — accepté, aucune limite de volumétrie côté
+API (chaque segment reste indépendamment plafonné à 4h par le validateur). `npx vitest run` (front) →
+755/755 (+3, tous côté front — aucun changement API/backend dans ce ticket). **Dette assumée** :
+aucune nouvelle — les deux limites de l'entrée précédente sont couvertes, et la troisième s'est révélée
+non pertinente plutôt que reportée.
