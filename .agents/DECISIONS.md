@@ -2625,3 +2625,40 @@ différent du npm 10.x de la CI) ; aucun accès `gh`/token depuis ce poste pour 
 À confirmer au prochain push — si le symptôme persiste malgré la mise à jour de npm, la piste lockfile
 resterait à rouvrir, cette fois avec un vrai signal de la CI (le message d'erreur changerait probablement
 de forme si la cause réelle était le lockfile plutôt que l'endpoint).
+
+**⚠️ Cette décision a été reprise le jour même** : `npm install -g npm@latest` avant `npm ci` a cassé la
+compilation native de `sqlite3`, constaté par l'utilisateur au run CI suivant — voir entrée ci-dessous.
+
+---
+
+### [2026-09-04, 8ᵉ session du jour, suite] `npm install -g npm@latest` global cassait `npm ci` (sqlite3) : isolé à l'audit via `npx --package` à la place
+
+**Contexte** — Régression causée par la décision précédente (ci-dessus, même jour) : neuf suites
+`test/bdd/*.test.js` plus deux suites service échouent au run CI suivant avec `Could not locate the
+bindings file` pour `sqlite3` — absent avant l'ajout de l'étape `Update npm`.
+
+**Décision** : retirer le remplacement global du npm du job, isoler le contournement (npm récent) à la
+seule commande qui en a besoin — `npx --yes --package npm@latest -- npm audit --omit=dev
+--audit-level=high` — plutôt que de continuer à chercher pourquoi le remplacement global casse
+`sqlite3` (dont la cause exacte — quel comportement de npm@latest interfère avec la compilation/le
+téléchargement du binaire natif — n'a pas été creusée, l'isolation rendant la question sans objet pour
+ce ticket).
+
+**Pourquoi le remplacement global était le mauvais niveau d'action** : le besoin réel ne concernait
+qu'une seule commande (`npm audit`, dont l'échec pointait spécifiquement vers un endpoint HTTP qu'elle
+seule appelle) ; le corriger en changeant le npm de **tout le job** — y compris `npm ci`, qui installe
+et compile `sqlite3` — élargissait le rayon d'action du correctif bien au-delà du problème identifié.
+`npx --package npm@latest -- <commande>` télécharge la version demandée dans son propre cache isolé et
+l'utilise pour cette seule invocation, sans toucher au binaire `npm` que les autres étapes du job
+continuent d'utiliser — la portée du correctif correspond enfin exactement à celle du symptôme.
+
+**Alternative écartée (diagnostiquer précisément pourquoi npm@latest cassait sqlite3, puis garder le
+remplacement global)** — écartée : aurait consommé du temps à comprendre un effet de bord d'un
+changement déjà jugé trop large, alors qu'une version strictement plus étroite du même correctif
+(isoler au lieu de remplacer globalement) supprime le risque à la racine sans avoir besoin de
+comprendre le mécanisme exact de la casse.
+
+**Conséquences** : `npm ci` (et donc `sqlite3`) redevient identique à avant toute cette série de
+correctifs — aucun changement de comportement en dehors de l'étape d'audit elle-même. Correctif encore
+**non vérifié en conditions réelles** (mêmes limites d'accès que l'entrée précédente) — à confirmer au
+prochain push, sur les deux fronts : le job d'audit passe, et aucune suite `test/bdd/*` ne régresse.

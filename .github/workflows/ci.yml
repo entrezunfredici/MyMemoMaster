@@ -48,22 +48,6 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package-lock.json
 
-      # CHOIX: npm réaligné sur la dernière version plutôt que celui embarqué par
-      # actions/setup-node (npm 10.x sur Node 22 LTS) — même correctif déjà en place
-      # dans my_memo_master_api/Dockerfile (voir son commentaire), appliqué ici pour
-      # la même raison : "Audit Dependencies (OWASP A06)" échouait en CI
-      # ("Invalid package tree, run npm install...", précédé d'un 400 Bad Request
-      # sur l'endpoint `/-/npm/v1/security/audits/quick`, que npm signale lui-même
-      # comme en cours de retrait — "Use the bulk advisory endpoint instead").
-      # RAISON: cet endpoint "quick audit" est celui qu'utilisent les npm 10.x ;
-      # les versions récentes de npm basculent sur l'endpoint bulk recommandé —
-      # non reproductible en local de façon concluante (npm local plus récent que
-      # celui de la CI), donc corrigé par la même stratégie déjà validée pour le
-      # même symptôme côté image Docker plutôt que par une hypothèse non vérifiable
-      # sur le contenu de package-lock.json.
-      - name: Update npm
-        run: npm install -g npm@latest
-
       - name: Install Dependencies
         working-directory: ${{ matrix.path }}
         run: npm ci
@@ -103,9 +87,21 @@ jobs:
       # OWASP A06 — composants vulnérables : bloque si une dépendance de production
       # a une vulnérabilité high/critical connue (les devDependencies sont exclues,
       # elles n'entrent pas dans les images déployées)
+      #
+      # CHOIX: npm récent invoqué via `npx --package npm@latest`, isolé à cette seule
+      # commande, plutôt qu'un remplacement global du npm du job (essayé puis annulé
+      # le même jour — voir DECISIONS.md 2026-09-04). RAISON: `npm install -g
+      # npm@latest` avant `npm ci` a cassé la compilation native de sqlite3
+      # (devDependency, tests BDD en échec "Could not locate the bindings file",
+      # absent avant ce changement) — régression pire que le symptôme d'origine
+      # (le job échouait avec `Invalid package tree`, précédé d'un 400 sur
+      # l'endpoint `quick audit` que npm annonce lui-même en cours de retrait).
+      # `npx --package` télécharge npm@latest dans son propre cache et l'exécute
+      # sans toucher au npm utilisé par `npm ci`/test/lint dans les étapes
+      # précédentes de ce même job.
       - name: Audit Dependencies (OWASP A06)
         working-directory: ${{ matrix.path }}
-        run: npm audit --omit=dev --audit-level=high
+        run: npx --yes --package npm@latest -- npm audit --omit=dev --audit-level=high
 
       - name: Build
         if: matrix.service == 'front'

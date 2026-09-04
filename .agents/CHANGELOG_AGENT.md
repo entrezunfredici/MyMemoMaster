@@ -10296,3 +10296,45 @@ resterait à investiguer en second lieu.
 
 **Tests** : YAML validé (`python -c "import yaml; yaml.safe_load(...)"`), aucun test automatisé
 n'exerce les workflows GitHub Actions eux-mêmes.
+
+**⚠️ Correction (même jour, entrée suivante)** : ce correctif a causé une régression — `npm install -g
+npm@latest` placé avant `npm ci` a cassé la compilation native de `sqlite3` (tests BDD en échec
+"Could not locate the bindings file"), constaté par l'utilisateur au run CI suivant. Remplacé, voir
+entrée ci-dessous.
+
+---
+
+## [2026-09-04, 8ᵉ session du jour, suite] FIX — CI : `npm install -g npm@latest` cassait la compilation native de sqlite3 — remplacé par `npx --package npm@latest` isolé à l'étape d'audit
+
+**Contexte** — Signalé par l'utilisateur avec le log complet : au run CI suivant le correctif précédent
+(même entrée, ci-dessus), le job `test_and_lint` échoue différemment — 9 suites `test/bdd/*.test.js` et
+2 suites service (`AiGenerationBatch`, `AiQuota`) échouent toutes avec `Could not locate the bindings
+file` pour `sqlite3` (`node_modules/sqlite3/lib/binding/node-v127-linux-x64/node_sqlite3.node`
+introuvable), remontant jusqu'à `new Sequelize(...)` dans `models/index.js`. Toutes les suites qui
+échouent chargent le vrai `models/index.js` (donc le dialecte SQLite via `sqlite3`) ; toutes celles qui
+mockent `../../models/index` (la majorité des tests unitaires, y compris tous les tests ajoutés dans
+cette session) passent normalement — signature nette d'un binaire natif absent, pas d'une régression de
+code applicatif.
+
+**Diagnostic** — Cause quasi certaine : l'étape `Update npm` ajoutée juste avant (`npm install -g
+npm@latest`) s'exécute **avant** `npm ci`, donc avant l'installation de `sqlite3` (devDependency) et sa
+compilation/téléchargement de binaire natif. Remplacer le npm global du job avant `npm ci` change la
+version qui pilote toute la résolution de dépendances et l'exécution des scripts d'installation — plus
+risqué que prévu pour un correctif censé ne toucher qu'une seule commande (`npm audit`).
+
+**Corrigé** : `.github/workflows/ci.yml` — l'étape `Update npm` globale est retirée ; `npm ci` retrouve
+sa place d'origine, avec le npm par défaut d'`actions/setup-node` (sqlite3 se compile normalement, comme
+avant toute cette série de correctifs). Le contournement de l'endpoint retiré est désormais **isolé à
+la seule étape d'audit** : `npx --yes --package npm@latest -- npm audit --omit=dev --audit-level=high`
+— `npx --package` télécharge npm@latest dans son propre cache et l'exécute pour cette seule commande,
+sans jamais remplacer le npm utilisé par `npm ci`/`npm run test:coverage`/`npm run lint` dans les étapes
+précédentes du même job.
+
+**Choix techniques** : voir `DECISIONS.md` — isolation par `npx --package` plutôt qu'un remplacement
+global, pour que le rayon d'action du correctif corresponde exactement à celui du problème.
+
+**Ce qui n'est PAS couvert** : ce correctif non plus n'a pas pu être vérifié en conditions réelles
+(toujours aucun accès `gh`/token) — à confirmer au prochain push, sur les deux fronts cette fois
+(le job `Audit Dependencies` passe, ET aucune suite `test/bdd/*` ne régresse).
+
+**Tests** : YAML validé (`python -c "import yaml; yaml.safe_load(...)"`).
