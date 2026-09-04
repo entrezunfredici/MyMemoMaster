@@ -448,6 +448,24 @@ describe('AiGenerationBatch — routes (tests fonctionnels)', () => {
       expect(res.status).toBe(400)
     })
 
+    it('PATCH /ai-generation-batches/cards/:cardId — lie la carte à un nœud de carte mentale', async () => {
+      const res = await request(app)
+        .patch(`${BASE}/ai-generation-batches/cards/${cardId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ mindMapNodeId: 'node-42' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.mindMapNodeId).toBe('node-42')
+    })
+
+    it('PATCH /ai-generation-batches/cards/:cardId — mindMapNodeId trop long — 400', async () => {
+      const res = await request(app)
+        .patch(`${BASE}/ai-generation-batches/cards/${cardId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ mindMapNodeId: 'x'.repeat(65) })
+      expect(res.status).toBe(400)
+    })
+
     it('PATCH /ai-generation-batches/:id/status — marque "validated"', async () => {
       const res = await request(app)
         .patch(`${BASE}/ai-generation-batches/${batchId}/status`)

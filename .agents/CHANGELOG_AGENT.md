@@ -10361,8 +10361,65 @@ de sécurité lui-même.
 fichier qui n'utilise des actions tierces que pour des besoins qu'un script ne couvre pas simplement
 (checkout, setup-node, upload-artifact...).
 
-**Ce qui n'est PAS couvert** : toujours non vérifié en conditions réelles. Si le registre npm reste
-indisponible plus de ~45 s (3 × 15 s), le job échouera quand même — accepté, un vrai correctif à une
-panne prolongée côté npmjs.org n'a pas sa place dans ce workflow.
+**Ce qui n'est PAS couvert** : si le registre npm reste indisponible plus de ~45 s (3 × 15 s), le job
+échouera quand même — accepté, un vrai correctif à une panne prolongée côté npmjs.org n'a pas sa place
+dans ce workflow.
 
-**Tests** : YAML validé.
+**Tests** : YAML validé. **Vérifié en conditions réelles le jour même** (commit `c6ac057`, run CD
+33879414369) : `Deploy to Kubernetes (prod)` → `success` — cette fois pour de vrai. La cause profonde
+du symptôme "deploy_prod figé" documenté depuis le 27/08 était en fait double : (1) `K8S_PROD_ENABLED`
+posée comme Secret plutôt que Variable (trouvé et corrigé le 2026-09-02), (2) un **espace parasite** à
+la fin du nom de la variable lors de sa recréation (trouvé et corrigé par l'utilisateur ce jour, en
+suivant les étapes GitHub Settings données en session) — invisible à l'écran, mais `vars.K8S_PROD_ENABLED`
+(avec l'espace) ne correspondait jamais exactement à `vars.K8S_PROD_ENABLED` (sans espace) testé dans
+`cd.yml`. `helm history mmm-prod` confirme la révision 6 déployée (Fri Sep 4 13:41:29), la première
+depuis le 2026-09-02 — tout le travail du jour (KPI, cartes mentales, boîtes Leitner, validation
+automatique des séances planifiées) est désormais réellement en prod.
+
+---
+
+## [2026-09-04, 9ᵉ session du jour] ADD — Lier une carte générée par IA à un nœud de carte mentale, à l'édition
+
+**Contexte** — Demande explicite de l'utilisateur : l'écran d'édition d'une carte proposée par IA
+(Écran de validation, C-01.09) n'offrait aucun moyen de la lier à un nœud de la carte mentale du
+système, contrairement à une carte créée manuellement (`FlashcardsCardsPage.vue`, sélecteur déjà en
+place). Le backend (`LeitnerCard.mindMapNodeId`, `POST /leitnercards`) supportait déjà ce lien —
+`AiCardGeneration.js#promoteCard` l'envoyait simplement toujours à `null`.
+
+**Ce qui a été fait** :
+- **Backend** — nouvelle colonne `AiGeneratedCard.mindMapNodeId` (migration `20260904000003`, même
+  forme que `LeitnerCard.mindMapNodeId` : STRING(64) nullable) ; `AiGenerationBatch.service.js#updateCard`
+  et son validateur (`AiGenerationBatch.validators.js`) l'acceptent désormais au même titre que
+  statement/type/answer/options ; Swagger de `PATCH /ai-generation-batches/cards/{cardId}` mis à jour.
+- **Front** :
+  - `AiCardEditModalComponent.vue` — nouveau champ `mindMapJson` (prop) ; réutilise tel quel
+    `MindMapNodePickerComponent.vue` (même composant que la création manuelle) ; `form.mindMapNodeId`
+    pré-rempli depuis la carte éditée, inclus dans l'objet `save` émis.
+  - `AiValidationScreenComponent.vue` — reçoit `mindMapJson` en prop, le transmet à
+    `AiCardEditModal` ; badge "🗺 nœud lié" sur la carte dans la liste quand un nœud est choisi (même
+    style que le badge "✎ modifiée" déjà existant) ; `submit()` transmet désormais
+    `card.mindMapNodeId` à `promoteCard(...)` plutôt que de laisser la valeur par défaut `null`.
+  - `stores/aiCardGeneration.js#promoteCard` — nouveau paramètre `mindMapNodeId` (défaut `null`),
+    transmis tel quel au `POST /leitnercards` final (remplace le `null` en dur).
+  - `FlashcardsCardsPage.vue` — transmet `mindMapJson` (déjà chargé pour le sélecteur de création
+    manuelle) à `<AiValidationScreen>` — aucun nouvel appel réseau, réutilisation de l'état existant.
+
+**Choix techniques** : voir `DECISIONS.md` — réutilisation intégrale de `MindMapNodePickerComponent.vue`
+plutôt qu'un second composant, persistance du choix en base (`AiGeneratedCard.mindMapNodeId`) plutôt
+qu'un état front éphémère perdu au rechargement, cohérent avec le choix déjà fait pour tous les autres
+champs de ce brouillon (statement/type/answer/options).
+
+**Tests** : `npx jest` (API) → 1793/1793 (+4 : `AiGenerationBatch.service.test.js` ×2,
+`test/bdd/aiGenerationBatch.test.js` ×2). `npx vitest run` (front) → 771/771 (+13 : nouveaux fichiers
+`AiCardEditModalComponent.test.js` (6) et `AiValidationScreenComponent.test.js` (4, premiers tests de
+ces deux composants — aucun n'existait avant ce ticket), `aiCardGeneration.store.test.js` (+1)). `npm
+run lint` propre des deux côtés.
+
+**Ce qui n'est PAS couvert** : `AiCardEditModalComponent.vue` et `AiValidationScreenComponent.vue`
+n'avaient **aucun** test avant ce ticket — les nouveaux fichiers couvrent le comportement ajouté
+(mindMapNodeId) et quelques cas structurels de base, pas une couverture exhaustive des fonctionnalités
+préexistantes (gestion MCQ, accept/reject, promotion multi-cartes, etc.) — dette déjà présente,
+signalée mais non comblée ici (hors périmètre de la demande). Migration `20260904000003` non exécutée
+contre `db.sqlite` local en session (même limite que les migrations précédentes du jour) — s'appliquera
+automatiquement au prochain déploiement prod (`entrypoint.sh` exécute les migrations à chaque démarrage
+de pod, vérifié fonctionnel par le déploiement de révision 6 documenté ci-dessus).

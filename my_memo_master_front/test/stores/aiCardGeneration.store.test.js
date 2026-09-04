@@ -268,6 +268,24 @@ describe('useAiCardGenerationStore', () => {
     expect(mockPost).toHaveBeenNthCalledWith(4, 'leitnercards', { idQuestion: 42, idSystem: 5, mindMapNodeId: null })
   })
 
+  it('promoteCard - mindMapNodeId fourni - transmis à POST /leitnercards', async () => {
+    mockPost
+      .mockResolvedValueOnce({ status: 201, data: { idQuestion: 42 } })
+      .mockResolvedValueOnce({ status: 201, data: { idResponse: 1 } })
+      .mockResolvedValueOnce({ status: 201, data: { idCard: 100 } })
+
+    const store = useAiCardGenerationStore()
+    await store.promoteCard({
+      idSystem: 5,
+      statement: 'X',
+      type: 'open',
+      answer: 'Y',
+      mindMapNodeId: 'node-42',
+    })
+
+    expect(mockPost).toHaveBeenNthCalledWith(3, 'leitnercards', { idQuestion: 42, idSystem: 5, mindMapNodeId: 'node-42' })
+  })
+
   it('promoteCard - carte "mcq", cas nominal - pas de POST /responses', async () => {
     mockPost
       .mockResolvedValueOnce({ status: 201, data: { idQuestion: 42 } })

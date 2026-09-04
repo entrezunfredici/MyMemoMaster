@@ -82,6 +82,17 @@
         </button>
       </div>
 
+      <!-- Nœud de la carte mentale liée (optionnel, même sélecteur qu'à la création manuelle) -->
+      <div v-if="mindMapJson" class="form-group--lg">
+        <label class="form-label">
+          Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
+        </label>
+        <MindMapNodePicker
+          v-model="form.mindMapNodeId"
+          :mind-map-json="mindMapJson"
+        />
+      </div>
+
       <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>
     </form>
 
@@ -96,6 +107,7 @@
 import { reactive, ref, watch } from 'vue'
 import ModalComponent from '@/components/ModalComponent.vue'
 import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
 
 // Vue 4 de diagrams/generation_ia_ui.md (§7) — édition d'une carte proposée par l'IA avant
 // acceptation, à l'écran de révision (C-01.09). CHOIX : composant dédié plutôt que la réutilisation
@@ -109,7 +121,9 @@ import FormulaHelper from '@/components/FormulaHelperComponent.vue'
 
 const props = defineProps({
   visible: { type: Boolean, required: true },
-  card: { type: Object, default: null }, // { statement, type, answer, acceptedAnswers, options }
+  card: { type: Object, default: null }, // { statement, type, answer, acceptedAnswers, options, mindMapNodeId }
+  // Carte mentale liée au système, pour le sélecteur de nœud — absente (null) si le système n'en a pas.
+  mindMapJson: { type: [Object, String], default: null },
 })
 const emit = defineEmits(['close', 'save'])
 
@@ -120,6 +134,7 @@ const form = reactive({
   answer: '',
   acceptedAnswers: [],
   options: [{ text: '', correct: true }, { text: '', correct: false }],
+  mindMapNodeId: null,
 })
 
 // Repeuple le formulaire à chaque ouverture avec la carte à éditer — contrairement à
@@ -137,6 +152,7 @@ watch(
     form.options = Array.isArray(card.options) && card.options.length
       ? card.options.map(o => ({ text: o.text, correct: !!o.correct }))
       : [{ text: '', correct: true }, { text: '', correct: false }]
+    form.mindMapNodeId = card.mindMapNodeId || null
   },
   { immediate: true },
 )
@@ -181,6 +197,7 @@ function submit() {
     answer: form.type === 'open' ? form.answer.trim() : null,
     acceptedAnswers: form.type === 'open' ? form.acceptedAnswers.map(a => a.trim()).filter(Boolean) : null,
     options: form.type === 'mcq' ? form.options.map(o => ({ text: o.text.trim(), correct: o.correct })) : null,
+    mindMapNodeId: form.mindMapNodeId || null,
   })
 }
 </script>

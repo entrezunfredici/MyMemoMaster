@@ -40,6 +40,13 @@ module.exports = (instance) => {
         type: DataTypes.TEXT,
         allowNull: true
       },
+      // Nœud de la carte mentale liée au système (id interne au JSON MindMap.mindMapJson) — même
+      // rôle que LeitnerCard.mindMapNodeId, choisi à l'écran de révision avant promotion.
+      mindMapNodeId: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        defaultValue: null
+      },
       status: {
         // Valeurs : 'pending' | 'accepted' | 'edited' | 'rejected'
         type: DataTypes.STRING(20),

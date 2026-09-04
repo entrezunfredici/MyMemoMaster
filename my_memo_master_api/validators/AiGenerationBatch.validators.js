@@ -56,6 +56,14 @@ exports.updateCard = [
   body('answer').optional({ nullable: true }).isString(),
   body('acceptedAnswers').optional({ nullable: true }).isArray(),
   body('options').optional({ nullable: true }).isArray(),
+  // Même contrainte que LeitnerCard.validators.js — id interne au JSON MindMap.mindMapJson.
+  body('mindMapNodeId')
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('mindMapNodeId doit être une chaîne')
+    .trim()
+    .isLength({ min: 1, max: 64 })
+    .withMessage('mindMapNodeId doit contenir entre 1 et 64 caractères'),
   body('status')
     .optional()
     .isIn(CARD_STATUSES)

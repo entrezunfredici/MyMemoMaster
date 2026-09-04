@@ -238,6 +238,7 @@ module.exports = (router) => {
    *               answer: { type: string, nullable: true }
    *               acceptedAnswers: { type: array, items: { type: string } }
    *               options: { type: array }
+   *               mindMapNodeId: { type: string, nullable: true, description: "Nœud de la carte mentale liée au système (optionnel)" }
    *               status: { type: string, enum: [pending, accepted, edited, rejected] }
    *     responses:
    *       200:

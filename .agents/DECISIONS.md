@@ -2685,5 +2685,61 @@ disproportionné et risqué (une vraie vulnérabilité high/critical passerait a
 
 **Conséquences** : le job échoue encore si le registre npm reste indisponible plus longtemps que les
 ~45 s couverts par les 3 tentatives — accepté, une panne prolongée côté npmjs.org n'est pas un problème
-que ce workflow doit chercher à masquer indéfiniment. Non vérifié en conditions réelles (mêmes limites
-d'accès que les entrées précédentes de cette même journée).
+que ce workflow doit chercher à masquer indéfiniment.
+
+**⚠️ Vérifié en conditions réelles le jour même, cause racine finale identifiée** : le déploiement prod
+restait bloqué même après ce correctif, cause distincte des trois précédentes du jour — un **espace
+parasite** à la fin du nom de la variable GitHub `K8S_PROD_ENABLED` (visible uniquement en resélectionnant
+tout le champ, invisible à l'œil), introduit lors de sa recréation en Variable (au lieu de Secret, cause
+initialement diagnostiquée le 2026-09-02). `vars.K8S_PROD_ENABLED ` (avec l'espace, tel qu'enregistré)
+ne correspond jamais exactement à `vars.K8S_PROD_ENABLED` (sans espace, tel que testé dans `cd.yml`) —
+même symptôme (`deploy_prod` `skipped`) que les causes précédentes, mécanisme différent. Corrigé par
+l'utilisateur en resélectionnant/retapant le nom au clavier plutôt qu'en copier-collant. `helm history
+mmm-prod` confirme la révision 6 déployée le jour même, la première depuis le 2026-09-02 — le
+correctif `npx --package` + retry documenté dans cette entrée fonctionne bien en conditions réelles,
+il était simplement masqué par ce second problème indépendant tant qu'il n'était pas résolu.
+
+---
+
+### [2026-09-04, 9ᵉ session du jour] Lier une carte IA à un nœud de carte mentale : réutiliser MindMapNodePicker tel quel, persister en base plutôt qu'en état front éphémère
+
+**Contexte** — Demande explicite de l'utilisateur : ajouter, à l'écran d'édition d'une carte proposée
+par IA, la possibilité de la lier à un nœud de carte mentale — fonctionnalité déjà disponible à la
+création manuelle d'une carte (`FlashcardsCardsPage.vue`), absente du flux IA. Constat en amont :
+`LeitnerCard.mindMapNodeId` et `POST /leitnercards` supportaient déjà ce champ ; seul
+`AiCardGeneration.js#promoteCard` l'envoyait systématiquement à `null` — la persistance finale
+n'exigeait donc aucun changement, seul le choix en amont manquait.
+
+**Décision 1 — réutiliser `MindMapNodePickerComponent.vue` intégralement, sans variante.**
+Le composant est déjà découplé du store d'édition de carte mentale (`mindmapBuilder`) précisément pour
+pouvoir être monté ailleurs sans effet de bord (CHOIX déjà documenté dans son propre fichier) — exactement
+le besoin ici. Alternative écartée : dupliquer un sélecteur simplifié dans le contexte IA — aurait
+introduit une deuxième implémentation du même rendu SVG/sélection sans bénéfice, pour un composant déjà
+conçu comme réutilisable.
+
+**Décision 2 — persister `mindMapNodeId` en base (`AiGeneratedCard`) dès l'édition, pas seulement en
+mémoire côté front jusqu'à la promotion finale.**
+Tous les autres champs d'une carte proposée (statement/type/answer/options) suivent déjà ce principe :
+`saveEdit` écrit systématiquement via `PATCH /ai-generation-batches/cards/:cardId`, pour que le
+brouillon résiste à un rechargement de page en cours de relecture (JSDoc de
+`AiGenerationBatch.service.js#findPendingByUser`, qui anticipe explicitement ce cas). Traiter
+`mindMapNodeId` différemment (état front seul) aurait introduit une incohérence arbitraire entre champs
+d'une même carte, et aurait perdu le choix de nœud si l'utilisateur revient sur un brouillon "pending"
+plus tard.
+
+**Alternative écartée (ajouter le sélecteur directement dans `AiValidationScreenComponent.vue`, sans
+passer par la modal d'édition)** — écartée : la carte affichée dans la liste (Vue 3 de la maquette) est
+volontairement compacte (statement, réponse/options en résumé, source repliable) ; un sélecteur de
+nœud (SVG, ~260px de haut) y aurait été hors de propos visuellement. La modal d'édition (Vue 4) est
+l'endroit déjà prévu pour ce niveau de détail — c'est aussi celui utilisé pour toute autre modification
+de contenu de la carte, cohérent avec le geste "je modifie cette carte" plutôt que deux points d'entrée
+différents pour deux types de modification.
+
+**Conséquences** : parité complète entre carte créée manuellement et carte générée par IA sur ce point
+— aucune des deux n'a plus de fonctionnalité que l'autre sur le lien à la carte mentale.
+`npx jest` (API) → 1793/1793 (+4) ; `npx vitest run` (front) → 771/771 (+13, dont les tout premiers
+tests de `AiCardEditModalComponent.vue` et `AiValidationScreenComponent.vue`). **Dette assumée** :
+ces deux composants n'avaient aucun test avant ce ticket — les nouveaux fichiers couvrent le
+comportement ajouté et quelques cas de base, pas une couverture exhaustive du reste de leurs
+fonctionnalités préexistantes (accept/reject, gestion MCQ, promotion multi-cartes) ; signalé, non
+comblé, hors périmètre de la demande.

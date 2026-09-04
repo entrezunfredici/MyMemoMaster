@@ -169,6 +169,30 @@ describe('AiGenerationBatchService', () => {
       const result = await AiGenerationBatchService.updateCard(999999, userId, { status: 'accepted' })
       expect(result).toBeNull()
     })
+
+    // Lien vers un nœud de carte mentale (même rôle que LeitnerCard.mindMapNodeId), choisi à
+    // l'écran de révision avant promotion.
+    it('updateCard - mindMapNodeId fourni - persiste le lien vers le nœud', async () => {
+      const batch = await AiGenerationBatchService.createFromPipelineResult({ userId, idSystem, cards: VALID_CARDS })
+      const cardId = batch.cards[0].id
+
+      const updated = await AiGenerationBatchService.updateCard(cardId, userId, {
+        mindMapNodeId: 'node-42',
+        status: 'edited'
+      })
+
+      expect(updated.mindMapNodeId).toBe('node-42')
+    })
+
+    it('updateCard - mindMapNodeId retiré (remis à null) - le lien est supprimé', async () => {
+      const batch = await AiGenerationBatchService.createFromPipelineResult({ userId, idSystem, cards: VALID_CARDS })
+      const cardId = batch.cards[0].id
+      await AiGenerationBatchService.updateCard(cardId, userId, { mindMapNodeId: 'node-42' })
+
+      const updated = await AiGenerationBatchService.updateCard(cardId, userId, { mindMapNodeId: null })
+
+      expect(updated.mindMapNodeId).toBeNull()
+    })
   })
 
   describe('markBatchStatus', () => {

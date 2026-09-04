@@ -7,6 +7,7 @@
     <AiValidationScreen
       v-if="aiValidationBatch"
       :batch="aiValidationBatch"
+      :mind-map-json="mindMapJson"
       @close="handleValidationClose"
       @validated="handleValidated"
     />

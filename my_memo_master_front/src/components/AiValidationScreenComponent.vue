@@ -38,6 +38,7 @@
             <p class="font-semibold text-heading">
               <FormulaText :text="card.statement" />
               <span v-if="card.status === 'edited'" class="ml-2 text-xs font-normal text-primary">✎ modifiée</span>
+              <span v-if="card.mindMapNodeId" class="ml-2 text-xs font-normal text-primary">🗺 nœud lié</span>
             </p>
 
             <template v-if="card.type === 'open'">
@@ -105,6 +106,7 @@
     <AiCardEditModal
       :visible="editingCard !== null"
       :card="editingCard"
+      :mind-map-json="mindMapJson"
       @close="editingCard = null"
       @save="saveEdit"
     />
@@ -129,6 +131,9 @@ import { notif } from '@/helpers/notif'
 
 const props = defineProps({
   batch: { type: Object, required: true }, // { id, idSystem, warnings, cards: [...] }
+  // Carte mentale liée au système (LeitnerSystem.idMindMap), pour le sélecteur de nœud dans l'édition
+  // d'une carte proposée — absente (null) si le système n'en a pas.
+  mindMapJson: { type: [Object, String], default: null },
 })
 const emit = defineEmits(['close', 'validated'])
 
@@ -213,6 +218,7 @@ async function submit() {
       answer: card.answer,
       acceptedAnswers: card.acceptedAnswers,
       options: card.options,
+      mindMapNodeId: card.mindMapNodeId,
     })
 
     if (result.success) {

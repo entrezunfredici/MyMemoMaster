@@ -104,7 +104,7 @@ class AiGenerationBatchService {
    *
    * @param {number} idCard
    * @param {number} userId
-   * @param {object} updates - Champs à modifier : statement/type/answer/acceptedAnswers/options/status
+   * @param {object} updates - Champs à modifier : statement/type/answer/acceptedAnswers/options/mindMapNodeId/status
    * @returns {Promise<AiGeneratedCard|null>} `null` si la carte n'existe pas, n'appartient pas à
    *   l'utilisateur, ou que son batch n'est plus "pending"
    * @throws {Error} `status` fourni hors de l'ensemble autorisé (400)
@@ -121,13 +121,14 @@ class AiGenerationBatchService {
     })
     if (!card || card.batch.userId !== userId || card.batch.status !== 'pending') return null
 
-    const { statement, type, answer, acceptedAnswers, options, status } = updates
+    const { statement, type, answer, acceptedAnswers, options, mindMapNodeId, status } = updates
     await card.update({
       ...(statement !== undefined ? { statement } : {}),
       ...(type !== undefined ? { type } : {}),
       ...(answer !== undefined ? { answer } : {}),
       ...(acceptedAnswers !== undefined ? { acceptedAnswers } : {}),
       ...(options !== undefined ? { options } : {}),
+      ...(mindMapNodeId !== undefined ? { mindMapNodeId } : {}),
       ...(status !== undefined ? { status } : {})
     })
     return card

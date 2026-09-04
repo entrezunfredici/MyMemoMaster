@@ -167,9 +167,10 @@ export const useAiCardGenerationStore = defineStore('aiCardGeneration', {
      * @param {string|null} [params.answer]
      * @param {string[]|null} [params.acceptedAnswers]
      * @param {{text:string, correct:boolean}[]|null} [params.options]
+     * @param {string|null} [params.mindMapNodeId] - Nœud de la carte mentale liée, choisi à l'écran de révision
      * @returns {Promise<{success: boolean, message?: string}>}
      */
-    async promoteCard({ idSystem, statement, type, answer = null, acceptedAnswers = null, options = null }) {
+    async promoteCard({ idSystem, statement, type, answer = null, acceptedAnswers = null, options = null, mindMapNodeId = null }) {
       const questionPayload = {
         statement: normalizeFormulaSyntax(statement),
         questionPosition: 0,
@@ -197,7 +198,7 @@ export const useAiCardGenerationStore = defineStore('aiCardGeneration', {
         }
       }
 
-      const cResp = await api.post('leitnercards', { idQuestion, idSystem, mindMapNodeId: null })
+      const cResp = await api.post('leitnercards', { idQuestion, idSystem, mindMapNodeId })
       if (!cResp || cResp.status !== 201) {
         return { success: false, message: cResp?.data?.message || 'Erreur lors de la création de la carte.' }
       }
