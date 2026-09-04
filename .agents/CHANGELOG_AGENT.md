@@ -10263,3 +10263,36 @@ faite — volontaire (voir Décision dans `DECISIONS.md`). Une séance planifié
 (créneau générique) reste cochable uniquement à la main, comme avant. Pas de notification/toast dans
 l'UI quand une séance est validée automatiquement (l'utilisateur le découvre en consultant son
 calendrier ou la page KPI) — non demandé, ajout possible plus tard si le besoin se confirme.
+
+---
+
+## [2026-09-04, 8ᵉ session du jour] FIX — CI : job "Audit Dependencies (OWASP A06)" en échec (endpoint npm audit legacy en cours de retrait)
+
+**Contexte** — Signalé par l'utilisateur : le job `Audit Dependencies (OWASP A06)` de `ci.yml`
+(`npm audit --omit=dev --audit-level=high`) échoue avec `400 Bad Request` sur
+`POST https://registry.npmjs.org/-/npm/v1/security/audits/quick`, npm affichant lui-même
+`npm notice This endpoint is being retired. Use the bulk advisory endpoint instead`, puis un message
+générique trompeur `Invalid package tree, run npm install to rebuild your package-lock.json`.
+
+**Diagnostic** — Reproduction locale non concluante : `npm audit` réussit instantanément côté front
+(0 vulnérabilité) mais reste bloqué sans réponse côté API sur ce poste (npm local 11.9.0, contre le
+npm 10.x embarqué par `actions/setup-node@v4` sur Node 22 LTS en CI) — cohérent avec l'hypothèse que la
+CI, avec un npm plus ancien, appelle encore l'endpoint "quick audit" que le registre npm annonce
+retirer, sans que ce soit vérifiable de façon concluante sur ce poste. `package-lock.json` inchangé
+depuis le 2026-09-02 (`3d56f59`, déjà un correctif `npm audit fix`), `lockfileVersion: 3` standard —
+rien ne pointe vers un lockfile réellement corrompu.
+
+**Corrigé** : `.github/workflows/ci.yml` — nouvelle étape `Update npm` (`npm install -g npm@latest`)
+avant `npm ci`, dans le job `test_and_lint`. Même correctif déjà en place et documenté dans
+`my_memo_master_api/Dockerfile` pour une raison voisine (CVE npm embarqué) — appliqué ici pour la même
+philosophie : réaligner npm sur sa dernière version plutôt que dépendre de celle, non maîtrisée,
+qu'`actions/setup-node` installe par défaut.
+
+**Ce qui n'est PAS couvert** : correctif **non vérifié en conditions réelles** — aucun accès `gh`/token
+depuis ce poste pour déclencher un run CI et observer si le job passe désormais. À confirmer au
+prochain push. Si le symptôme persiste malgré la mise à jour de npm, la piste lockfile
+(`package-lock.json` réellement désynchronisé de `package.json`, malgré l'absence d'indice trouvé ici)
+resterait à investiguer en second lieu.
+
+**Tests** : YAML validé (`python -c "import yaml; yaml.safe_load(...)"`), aucun test automatisé
+n'exerce les workflows GitHub Actions eux-mêmes.

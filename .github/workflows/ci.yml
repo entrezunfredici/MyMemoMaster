@@ -48,6 +48,22 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package-lock.json
 
+      # CHOIX: npm réaligné sur la dernière version plutôt que celui embarqué par
+      # actions/setup-node (npm 10.x sur Node 22 LTS) — même correctif déjà en place
+      # dans my_memo_master_api/Dockerfile (voir son commentaire), appliqué ici pour
+      # la même raison : "Audit Dependencies (OWASP A06)" échouait en CI
+      # ("Invalid package tree, run npm install...", précédé d'un 400 Bad Request
+      # sur l'endpoint `/-/npm/v1/security/audits/quick`, que npm signale lui-même
+      # comme en cours de retrait — "Use the bulk advisory endpoint instead").
+      # RAISON: cet endpoint "quick audit" est celui qu'utilisent les npm 10.x ;
+      # les versions récentes de npm basculent sur l'endpoint bulk recommandé —
+      # non reproductible en local de façon concluante (npm local plus récent que
+      # celui de la CI), donc corrigé par la même stratégie déjà validée pour le
+      # même symptôme côté image Docker plutôt que par une hypothèse non vérifiable
+      # sur le contenu de package-lock.json.
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Install Dependencies
         working-directory: ${{ matrix.path }}
         run: npm ci

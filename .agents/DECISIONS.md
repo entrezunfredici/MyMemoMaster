@@ -2594,3 +2594,34 @@ CHANGELOG_AGENT.md pour le détail des cartes déplacées). `npx jest` (API) →
 vitest run` (front) → 760/760 (+2). **Dette assumée** : aucun rattrapage rétroactif (décision 1,
 assumée) ; pas de notification UI quand une validation automatique a lieu — l'utilisateur le découvre
 en consultant son calendrier, non demandé dans ce ticket.
+
+---
+
+### [2026-09-04, 8ᵉ session du jour] CI "Audit Dependencies (OWASP A06)" en échec : `npm install -g npm@latest` plutôt qu'une réparation du lockfile
+
+**Contexte** — Job CI en échec, signalé par l'utilisateur avec le log complet : `400 Bad Request` sur
+l'endpoint `quick audit` de npm, que npm annonce lui-même en cours de retrait, suivi d'un message
+générique (« Invalid package tree ») qui pointe vers le lockfile sans que ce soit la cause réelle.
+
+**Décision** : mettre à jour npm en CI (`npm install -g npm@latest`) avant `npm ci`, plutôt que
+d'investiguer/réparer `package-lock.json`. Deux éléments convergent vers cette piste : (1) le message
+d'erreur de npm nomme explicitement l'endpoint retiré, pas une incohérence de lockfile — l'"Invalid
+package tree" qui suit est la réaction générique de npm à un 400 qu'il ne sait pas interpréter autrement, pas
+un diagnostic fiable ; (2) `package-lock.json` n'a pas bougé depuis un correctif `npm audit fix` du
+2026-09-02, `lockfileVersion: 3` standard, rien d'anormal trouvé à l'inspection. Le correctif choisi
+reproduit une décision déjà prise et documentée dans ce projet pour un problème de nature identique
+(npm embarqué obsolète) : `my_memo_master_api/Dockerfile` fait déjà `npm install -g npm@latest` avant
+tout `npm ci`/`npm audit`, pour la CVE de l'npm embarqué dans l'image `node:22-bookworm-slim` — même
+levier, même raisonnement, appliqué ici au runner CI plutôt qu'à l'image Docker.
+
+**Alternative écartée (réparer/régénérer `package-lock.json`)** — écartée en l'absence d'indice
+concret de corruption : régénérer le lockfile sans savoir ce qui ne va pas aurait risqué de changer des
+versions résolues (donc du contenu réellement testé/déployé) pour un problème qui, au vu du message
+d'erreur, ne vient probablement pas de là.
+
+**Conséquences** : correctif **non vérifié empiriquement** — reproduction locale non concluante (audit
+instantané et sain côté front, bloqué sans réponse côté API sur ce poste, npm local 11.9.0 très
+différent du npm 10.x de la CI) ; aucun accès `gh`/token depuis ce poste pour observer un run CI réel.
+À confirmer au prochain push — si le symptôme persiste malgré la mise à jour de npm, la piste lockfile
+resterait à rouvrir, cette fois avec un vrai signal de la CI (le message d'erreur changerait probablement
+de forme si la cause réelle était le lockfile plutôt que l'endpoint).
