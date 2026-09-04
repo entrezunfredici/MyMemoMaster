@@ -454,16 +454,41 @@ jobs:
     needs: [push_images, tag_release, deploy_test, deploy_preprod, deploy_prod]
     if: always() && needs.push_images.result == 'success'
     steps:
+      # CHOIX: le job de déploiement réellement ciblé par la branche (deploy_test /
+      # deploy_preprod / deploy_prod) est distingué explicitement — "déployé" vs
+      # "SKIPPED" vs "échoué" — plutôt qu'un seul verdict global dérivé de
+      # contains(needs.*.result, 'failure').
+      # RAISON: un job conditionné par une variable GitHub (ex: deploy_prod, gardé par
+      # `vars.K8S_PROD_ENABLED == 'true'`) qui ne se déclenche pas prend le statut
+      # `skipped`, jamais `failure` — le message global restait donc "✅ réussi" alors
+      # que rien n'avait été propagé en prod. C'est exactement le symptôme "deploy_prod
+      # figé" documenté à répétition dans CHANGELOG_AGENT.md (27/08, 28/08, 31/08,
+      # 03/09) : jamais détecté par cette notification, seulement constaté a posteriori
+      # (image disponible sur Docker Hub, mais `helm history` resté sur une révision
+      # ancienne). Un skip qui ne correspond pas à la branche courante (ex: deploy_test
+      # sur un push main) reste ignoré — il est normal et ne doit pas alerter.
       - name: Send notification
         run: |
           BRANCH="${{ github.event.workflow_run.head_branch }}"
+
+          case "$BRANCH" in
+            main)    TARGET_JOB="deploy_prod";    TARGET_RESULT="${{ needs.deploy_prod.result }}" ;;
+            staging) TARGET_JOB="deploy_preprod"; TARGET_RESULT="${{ needs.deploy_preprod.result }}" ;;
+            dev)     TARGET_JOB="deploy_test";    TARGET_RESULT="${{ needs.deploy_test.result }}" ;;
+            *)       TARGET_JOB="";               TARGET_RESULT="" ;;
+          esac
+
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            STATUS="échoué"
             EMOJI="❌"
+            MESSAGE="Déploiement **${BRANCH}** échoué."
+          elif [[ -n "$TARGET_JOB" && "$TARGET_RESULT" == "skipped" ]]; then
+            EMOJI="⚠️"
+            MESSAGE="Images **${BRANCH}** buildées, mais **${TARGET_JOB}** non exécuté (skipped) — rien n'a été propagé sur le cluster. Vérifier la variable GitHub qui le conditionne (Settings → Secrets and variables → Actions → Variables)."
           else
-            STATUS="réussi"
             EMOJI="✅"
+            MESSAGE="Déploiement **${BRANCH}** réussi."
           fi
+
           curl -s -X POST -H "Content-Type: application/json" \
-            -d "{\"content\": \"${EMOJI} Déploiement **${BRANCH}** ${STATUS}.\"}" \
+            -d "{\"content\": \"${EMOJI} ${MESSAGE}\"}" \
             "${{ secrets.DISCORD_LOG }}"

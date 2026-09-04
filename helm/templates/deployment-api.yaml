@@ -8,6 +8,21 @@ metadata:
     app: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.replicas.api }}
+  # CHOIX: stratégie de rollout explicite (maxUnavailable: 0, maxSurge: 1) plutôt que
+  # les défauts Kubernetes (25 %/25 %, en % des replicas).
+  # RAISON: avec replicas: {1, 2} (preprod/prod), les défauts arrondis donnent déjà
+  # ce même résultat aujourd'hui (0 indispo/1 pod de surge) — les valeurs ci-dessous
+  # pinnent ce comportement plutôt que d'en dépendre implicitement, pour qu'il ne
+  # change pas silencieusement si le nombre de replicas évolue (ex: 4 replicas → 25 %
+  # donnerait 1 pod indisponible pendant le rollout). L'ancien pod ne quitte le
+  # Service qu'une fois le nouveau Ready (readinessProbe ci-dessous) — jamais les
+  # deux à la fois hors service. Le pod de surge est déjà budgété dans le
+  # resourceQuota preprod (voir values.yaml — commentaire resourceQuota).
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: {{ .Release.Name }}-api

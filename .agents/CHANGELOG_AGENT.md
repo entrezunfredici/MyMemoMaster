@@ -10051,3 +10051,74 @@ de test de volumétrie sur ce point, jugé disproportionné (chaque ligne reste 
 validateur, et `findByUser` ne fait qu'un `SUM` implicite via réduction JS, pas de `GROUP BY` coûteux).
 
 **Tests** : `npx vitest run` (front) → 755/755 (+3). `npm run lint` front propre (0 erreur).
+
+---
+
+## [2026-09-04, 4ᵉ session du jour] IMP — CD prod : rollout zero-downtime explicite + notification Discord qui ne cache plus un `deploy_prod` skipped ; `deploy_prod` toujours figé constaté en direct
+
+**Contexte** — Demande explicite de l'utilisateur : que la prod se redéploie automatiquement à chaque
+push sur `main`, sans coupure de service pendant la mise à jour (formulé comme un besoin d'instance de
+secours qui absorbe le trafic pendant que l'instance principale se met à jour, puis inversion). Avant de
+coder, audit de l'existant en direct plutôt que sur la seule foi de l'historique déjà consigné (leçon du
+2026-09-03 sur ce même fichier — ne jamais remplacer une vérification fraîche par le texte déjà en
+place) : `kubectl`/`helm` disponibles sur ce poste (`k8s/kubeconfig/pck-dkoyol2-kubeconfig`), et l'API
+GitHub publique en lecture seule (dépôt public, pas de token requis).
+
+**Constat en direct, avant tout code** :
+1. `helm history mmm-prod -n mymemomaster` → toujours figé en **révision 5** (déployée manuellement le
+   2026-09-02 23:06, cf. entrée du même jour), malgré plusieurs merges sur `main` depuis (dont `cd59d4f`
+   le 09-03, `7e9e7bf`/`2e2165b` le 09-03/09-04) — le correctif Secret→Variable de `K8S_PROD_ENABLED`
+   consigné le 2026-09-02 **n'a pas résolu le symptôme** : `deploy_prod` reste `skipped`.
+2. Confirmé via l'API GitHub (`GET .../actions/runs/33728782926/jobs`, run du commit `2e2165b`, HEAD
+   actuel de `main`) : job **"Deploy to Kubernetes (prod)" → `skipped`**, alors que "Build and Push
+   Docker Images" et "Notify Discord" sont tous les deux `success`. **La notification Discord de ce run
+   a donc annoncé un déploiement réussi alors que rien n'a été propagé en prod** — `contains(needs.*.result,
+   'failure')` ne voit pas un `skipped` comme un échec, donc rien ne distingue "propagé" de "pas
+   propagé" côté notification. C'est très probablement pourquoi les 4 occurrences précédentes du symptôme
+   n'ont été détectées que a posteriori, jamais par une alerte.
+
+**Ce qui a été fait** (fichiers du dépôt uniquement — voir "Ce qui n'est PAS couvert" pour ce qui reste
+bloqué côté GitHub Settings, hors dépôt) :
+1. `.github/workflows/cd.yml` — job `notify` : distingue désormais explicitement, par branche, le job
+   de déploiement réellement ciblé (`deploy_prod` pour `main`, `deploy_preprod` pour `staging`,
+   `deploy_test` pour `dev`). S'il est `skipped`, la notification Discord passe de "✅ réussi" à
+   "⚠️ Images buildées, mais **deploy_prod** non exécuté (skipped)…" avec l'endroit précis à vérifier
+   (Settings → Secrets and variables → Actions → Variables). Un `skipped` qui ne correspond pas à la
+   branche courante (ex: `deploy_test` sur un push `main`) reste ignoré — normal, pas une alerte.
+2. `helm/templates/deployment-api.yaml` et `deployment-front.yaml` — stratégie de rollout rendue
+   **explicite** (`maxUnavailable: 0`, `maxSurge: 1`) plutôt que les défauts Kubernetes en pourcentage
+   (25 %/25 %). Vérifié par `kubectl diff` contre le cluster réel : les défauts arrondis donnaient déjà
+   exactement ce résultat pour `replicas: {1, 2}` (preprod/prod actuels) — **ce changement ne modifie
+   rien au comportement actuel**, il le pin explicitement pour qu'il ne dérive pas silencieusement si le
+   nombre de replicas change un jour (ex: 4 replicas → 25 % donnerait 1 pod indisponible). C'est ce
+   mécanisme — pas une paire d'environnements nommés "principal"/"secours" — qui réalise ce que
+   l'utilisateur demande : le pod existant continue de servir tant que le nouveau n'est pas `Ready`
+   (`readinessProbe` déjà en place sur les deux Deployments), puis seulement ensuite l'ancien est retiré.
+   `helm upgrade --atomic` (déjà en place dans `cd.yml`) donne en prime le retour arrière automatique si
+   le nouveau rollout ne devient jamais stable dans le délai imparti.
+
+**Choix techniques** — voir `DECISIONS.md` : rollout Kubernetes natif (surge + readiness) plutôt qu'un
+blue/green à deux environnements persistants nommés ; notification qui distingue skip attendu (staging,
+volontairement désactivé) de skip anormal (main) plutôt qu'un binaire réussi/échoué.
+
+**Vérifié sans rien appliquer au cluster** : `helm lint`/`helm template` (prod + preprod) → aucune
+erreur ; `kubectl diff` du rendu contre l'état réel du cluster → seul le bloc `strategy` change, comme
+attendu, aucune autre dérive. Aucune commande `apply`/`upgrade` exécutée sur le cluster dans cette
+session — les fichiers modifiés prendront effet au prochain déploiement (CD ou `helm upgrade` manuel).
+
+**Ce qui n'est PAS couvert** :
+- **Le vrai blocage reste `K8S_PROD_ENABLED` non vu par `vars.*` au moment du run, malgré la correction
+  Secret→Variable du 2026-09-02** — cause exacte non identifiable depuis ce poste (pas de `gh` CLI, pas
+  de token — lecture seule via l'API publique GitHub, qui ne peut pas lire les Variables). Hypothèse la
+  plus probable, jamais vérifiée : la variable existe côté **Environment** GitHub (ex: "production")
+  plutôt qu'au niveau **Repository** — le job `deploy_prod` de `cd.yml` ne déclare aucun `environment:`,
+  donc une variable scoppée à un Environment reste invisible pour lui, même si son nom est identique.
+  Cette décision d'exploitation (vérifier/rebasculer la variable) reste — comme les 28/08 et 31/08 —
+  du ressort de l'utilisateur, jamais prise par l'agent à sa place.
+- Pas de `livenessProbe` sur l'API/le front (aucune des deux n'en avait avant cette session) — hors
+  périmètre : concerne la résilience en cours de vie du pod, pas la sécurité d'un déploiement.
+- Le `readinessProbe` de l'API vérifie uniquement la connectivité DB (`instance.authenticate()`), pas
+  l'état de pré-chauffage du modèle sémantique (tourne en tâche de fond, ~30 s, voir `server.js`) — un
+  pod fraîchement basculé Ready peut donc recevoir une requête de correction sémantique avant d'être
+  chaud. N'est pas une coupure de service (juste une réponse plus lente sur cette route précise pour la
+  toute première requête) — signalé, non traité, hors périmètre de la demande initiale.

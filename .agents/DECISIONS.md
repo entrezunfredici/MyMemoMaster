@@ -2385,3 +2385,74 @@ API (chaque segment reste indépendamment plafonné à 4h par le validateur). `n
 755/755 (+3, tous côté front — aucun changement API/backend dans ce ticket). **Dette assumée** :
 aucune nouvelle — les deux limites de l'entrée précédente sont couvertes, et la troisième s'est révélée
 non pertinente plutôt que reportée.
+
+---
+
+### [2026-09-04, 4ᵉ session du jour] CD prod zero-downtime : rollout Kubernetes natif (surge + readiness) plutôt qu'un blue/green à deux environnements nommés ; `K8S_PROD_ENABLED` toujours non fonctionnel, laissé à l'utilisateur
+
+**Contexte** — Demande explicite de l'utilisateur : déploiement automatique de la prod à chaque push
+`main`, sans coupure — décrit comme une instance de secours qui prend le trafic pendant que l'instance
+principale se met à jour, avant un retour puis une mise à jour symétrique de la secours. Avant de coder,
+vérification en direct plutôt que sur la foi du seul historique déjà écrit (accès `kubectl`/`helm`
+disponibles ce jour sur ce poste via `k8s/kubeconfig/`, API GitHub publique lisible sans token).
+
+**Décision 1 — rollout Kubernetes natif (Deployment + readinessProbe + `maxSurge`/`maxUnavailable`)
+plutôt qu'un blue/green à deux environnements/releases Helm persistants.**
+Un vrai blue/green (deux releases nommées, bascule de sélecteur de Service, mise à jour de la
+"secours" seulement après validation) donnerait un contrôle plus fin (rollback au niveau du routage,
+pas seulement au niveau des pods) mais double la question du dimensionnement permanent (deux
+environnements complets tournant en continu, pas seulement le temps d'un rollout) — coût difficile à
+justifier ici, sur un cluster déjà dimensionné au plus juste (`resourceQuota` preprod explicitement
+calé pour "un seul pod de surge", pas un second environnement entier — voir `values.yaml`/`values-preprod.yaml`).
+Le mécanisme déjà en place — `replicas: 2` en prod, `readinessProbe` sur les deux Deployments, Service
+qui ne route qu'aux pods `Ready` — réalise déjà, nativement, ce que l'utilisateur décrit : le pod
+existant continue de servir tant que le nouveau n'est pas prêt, puis seulement à ce moment l'ancien est
+retiré. Vérifié par `kubectl diff` contre le cluster réel : les défauts Kubernetes (`maxSurge: 25%`,
+`maxUnavailable: 25%`) arrondissent déjà, pour `replicas: {1, 2}`, exactement sur `maxSurge: 1`,
+`maxUnavailable: 0` — ce comportement existe donc déjà aujourd'hui, implicitement. Rendu explicite dans
+`deployment-api.yaml`/`deployment-front.yaml` pour ne plus en dépendre silencieusement (un futur passage
+à 4 replicas ferait dériver le calcul en pourcentage vers `maxUnavailable: 1`, ce qui ne serait plus
+zero-downtime). `helm upgrade --atomic` (déjà en place) complète ce mécanisme avec un rollback automatique
+de toute la release si le nouveau rollout ne stabilise jamais dans le délai imparti — l'équivalent du
+"retour à l'instance de secours" décrit par l'utilisateur si la mise à jour échoue, sans code supplémentaire.
+
+**Décision 2 — notification Discord qui distingue un job `skipped` d'un déploiement réellement propagé,
+plutôt que le binaire réussi/échoué existant.**
+Constat en direct, avant tout code : pour le run CD du commit `2e2165b` (HEAD actuel de `main`), le job
+`Deploy to Kubernetes (prod)` est `skipped`, mais le job `notify` a quand même annoncé "✅ réussi" — 
+`contains(needs.*.result, 'failure')` ne traite jamais un `skipped` comme un échec. C'est très
+probablement la raison pour laquelle les 4 occurrences précédentes du symptôme "deploy_prod figé"
+(27/08, 28/08, 31/08, 03/09, toutes documentées plus haut dans ce fichier et dans `CHANGELOG_AGENT.md`)
+n'ont jamais été détectées par la CD elle-même, seulement constatées a posteriori par l'utilisateur ou
+en inspectant le cluster. Le job `notify` calcule désormais, par branche, le job de déploiement
+réellement concerné et distingue explicitement son `skipped` (⚠️, avec l'endroit précis à vérifier) du
+cas normal où un déploiement a réellement eu lieu (✅).
+
+**Décision 3 — ne pas activer `K8S_PROD_ENABLED` moi-même, ni proposer de le faire par un autre biais.**
+Constat en direct : même après la correction Secret→Variable du 2026-09-02 (confirmée faite par
+l'utilisateur), `deploy_prod` reste `skipped` sur le run le plus récent — la cause exacte reste donc
+non identifiée aujourd'hui, deux jours après ce qui devait être le correctif de fond. Sans `gh` CLI ni
+token sur ce poste, impossible de lire la valeur ou le scope réel de la variable (Repository vs.
+Environment) pour le confirmer ; seule l'API publique GitHub (lecture seule, runs/jobs) a pu être
+utilisée. Cohérent avec les décisions déjà actées les 28/08 et 31/08 (voir entrées plus haut) : la
+bascule de cette variable est une décision d'exploitation, pas un correctif de code, et reste du
+ressort de l'utilisateur — même disponibilité d'accès `kubectl` ne change pas cet arbitrage, qui porte
+sur GitHub Settings, hors du dépôt.
+
+**Alternative écartée (readinessProbe qui attend le pré-chauffage du modèle sémantique)** : le
+`readinessProbe` actuel de l'API ne vérifie que la connectivité DB, pas l'état du pré-chauffage
+ONNX (~30 s, tourne en tâche de fond sans bloquer le démarrage — voir `server.js`) : un pod fraîchement
+`Ready` peut donc recevoir une requête de correction sémantique avant d'être chaud. Non traité : ce
+n'est pas une coupure de service (juste une latence accrue sur une route précise, pour la première
+requête), et gater la readiness sur l'état du modèle exigerait de faire remonter cet état jusqu'à
+`/api/v1/health` — changement plus large qu'une simple stratégie de rollout, non demandé ici.
+
+**Conséquences** : le rollout prod/preprod est désormais explicitement zero-downtime (documenté, pinné,
+vérifié sans changement de comportement réel aujourd'hui) et toute future désynchronisation
+`deploy_prod`/`push_images` sera visible dans Discord au lieu d'être silencieuse. **Le problème que
+l'utilisateur pensait résolu ("push sur main → prod à jour automatiquement") ne l'est toujours pas** :
+signalé explicitement plutôt que supposé corrigé par les changements de cette session, qui portent sur
+la robustesse du rollout et la visibilité de l'échec, pas sur sa cause. Aucune commande `helm
+upgrade`/`kubectl apply` exécutée sur le cluster réel dans cette session (uniquement `helm
+lint`/`template`, `kubectl diff`, tous en lecture seule) — les changements prennent effet au prochain
+déploiement réussi.

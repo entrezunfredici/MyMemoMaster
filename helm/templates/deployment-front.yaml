@@ -8,6 +8,12 @@ metadata:
     app: {{ .Release.Name }}-front
 spec:
   replicas: {{ .Values.replicas.front }}
+  # Stratégie de rollout explicite — voir le même CHOIX/RAISON dans deployment-api.yaml.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: {{ .Release.Name }}-front
