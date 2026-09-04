@@ -153,6 +153,99 @@ describe('AiCardGenerationPipelineService', () => {
       expect(error.usage).toBeUndefined()
     })
 
+    // Régression constatée en prod (2026-09-04) : un compte durablement rate-limité par Mistral
+    // faisait échouer chaque chunk indépendamment (chacun retentant son propre backoff en pure
+    // perte) au lieu de s'arrêter — voir RATE_LIMIT_CIRCUIT_BREAKER_THRESHOLD.
+    describe('circuit breaker (rate limit Mistral soutenu)', () => {
+      const longText5 = Array.from({ length: 5 }, (_, i) => `Paragraphe ${i} : ${'mot '.repeat(500)}`).join('\n\n')
+      const rateLimitError = () =>
+        Object.assign(new Error('Le service de génération IA est indisponible pour le moment.'), {
+          statusCode: 502,
+          rateLimited: true
+        })
+
+      it('2 chunks consécutifs en rate limit (seuil) - arrête avant les chunks restants', async () => {
+        AiCardGenerationService.generateCards
+          .mockRejectedValueOnce(rateLimitError())
+          .mockRejectedValueOnce(rateLimitError())
+
+        await AiCardGenerationPipelineService.generateCardsFromContent({
+          sourceText: longText5,
+          cardCount: 5
+        }).catch(() => {})
+
+        // 5 chunks au total, mais seulement les 2 premiers tentés avant l'arrêt anticipé
+        expect(AiCardGenerationService.generateCards).toHaveBeenCalledTimes(2)
+      })
+
+      it('2 chunks consécutifs en rate limit, aucun succès - lève un message dédié (pas le message générique)', async () => {
+        AiCardGenerationService.generateCards
+          .mockRejectedValueOnce(rateLimitError())
+          .mockRejectedValueOnce(rateLimitError())
+
+        const error = await AiCardGenerationPipelineService.generateCardsFromContent({
+          sourceText: longText5,
+          cardCount: 5
+        }).catch((e) => e)
+
+        expect(error).toMatchObject({
+          message: expect.stringContaining('limite de débit Mistral atteinte de façon soutenue'),
+          statusCode: 502
+        })
+      })
+
+      it('un succès entre deux échecs rate limit - le compteur se réinitialise, pas d\'arrêt anticipé', async () => {
+        AiCardGenerationService.generateCards
+          .mockRejectedValueOnce(rateLimitError())
+          .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+          .mockRejectedValueOnce(rateLimitError())
+          .mockResolvedValueOnce({ cards: [FAKE_CARD(2)], warning: null, usage: FAKE_USAGE })
+          .mockResolvedValueOnce({ cards: [FAKE_CARD(3)], warning: null, usage: FAKE_USAGE })
+
+        const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+          sourceText: longText5,
+          cardCount: 5
+        })
+
+        // Les 5 chunks ont été tentés — jamais 2 échecs rate limit consécutifs
+        expect(AiCardGenerationService.generateCards).toHaveBeenCalledTimes(5)
+        expect(result.cards).toHaveLength(3)
+      })
+
+      it('un échec non rate-limit entre deux échecs rate limit - le compteur se réinitialise aussi', async () => {
+        AiCardGenerationService.generateCards
+          .mockRejectedValueOnce(rateLimitError())
+          .mockRejectedValueOnce(new Error('Sortie non conforme.')) // pas rateLimited
+          .mockRejectedValueOnce(rateLimitError())
+          .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+          .mockResolvedValueOnce({ cards: [FAKE_CARD(2)], warning: null, usage: FAKE_USAGE })
+
+        const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+          sourceText: longText5,
+          cardCount: 5
+        })
+
+        expect(AiCardGenerationService.generateCards).toHaveBeenCalledTimes(5)
+        expect(result.cards).toHaveLength(2)
+      })
+
+      it('des succès avant l\'arrêt anticipé - retourne les cartes déjà obtenues avec un warning explicite (pas d\'erreur levée)', async () => {
+        AiCardGenerationService.generateCards
+          .mockResolvedValueOnce({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+          .mockRejectedValueOnce(rateLimitError())
+          .mockRejectedValueOnce(rateLimitError())
+
+        const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+          sourceText: longText5,
+          cardCount: 5
+        })
+
+        expect(AiCardGenerationService.generateCards).toHaveBeenCalledTimes(3)
+        expect(result.cards).toHaveLength(1)
+        expect(result.warnings.some((w) => w.includes('console.mistral.ai'))).toBe(true)
+      })
+    })
+
     it('generateCardsFromContent - tous les chunks échouent mais un usage réel a été facturé - l\'erreur porte l\'usage cumulé (C-01.06)', async () => {
       const longText = Array.from({ length: 2 }, (_, i) => `Paragraphe ${i} : ${'mot '.repeat(500)}`).join('\n\n')
       AiCardGenerationService.generateCards

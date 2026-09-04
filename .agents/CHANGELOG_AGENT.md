@@ -10463,6 +10463,59 @@ lui-même — le retry reste local à `callModel`, un chunk qui épuise ses 3 te
 comme un échec de ce chunk (comportement de tolérance à l'échec partiel déjà en place, inchangé). Pas
 de configuration par variable d'environnement pour le nombre de tentatives/le délai de base — constantes
 techniques (`RATE_LIMIT_MAX_RETRIES`, `RATE_LIMIT_BASE_DELAY_MS`) au même titre que `MAX_CHUNKS`/
-`MAX_CARD_COUNT`, déjà hors du système de config `helpers/mistralConfig.js`. Correctif non re-testé en
-conditions réelles en prod avec une génération volumineuse (le diagnostic vient des logs d'un échec
-réel, pas d'une reproduction contrôlée) — à confirmer par l'utilisateur au prochain essai.
+`MAX_CARD_COUNT`, déjà hors du système de config `helpers/mistralConfig.js`.
+
+**⚠️ Re-testé en conditions réelles le jour même : insuffisant.** L'utilisateur a retenté deux
+générations volumineuses après déploiement — chaque chunk épuise bien ses 3 tentatives (1s/2s/4s,
+confirmé dans les logs), mais échoue systématiquement quand même, sur au moins 8 chunks consécutifs
+observés d'affilée sur ~40-60 s. Mistral ne renvoie jamais d'en-tête `Retry-After` pour cette erreur
+(confirmé : le backoff observé correspond toujours exactement au calcul par défaut, jamais à une valeur
+lue depuis la réponse) — un rate limit soutenu (palier restrictif ou quota épuisé côté compte Mistral),
+pas un pic ponctuel que quelques secondes de backoff peuvent absorber. Voir l'entrée suivante pour le
+correctif complémentaire (circuit breaker au niveau du pipeline).
+
+---
+
+## [2026-09-04, 11ᵉ session du jour] ADD — Génération IA : circuit breaker sur rate limit Mistral soutenu (le backoff seul ne suffisait pas)
+
+**Contexte** — Suite immédiate de l'entrée précédente : le backoff par appel (1-2-4 s, 3 tentatives)
+s'exécute correctement mais échoue systématiquement sur un rate limit soutenu — chaque chunk repart de
+zéro sans jamais tenir compte de ce que les chunks précédents ont déjà appris, grillant du temps (et du
+quota, si le compte n'est pas encore totalement épuisé) sur 17 chunks à répéter la même séquence perdue
+d'avance. Demande explicite de l'utilisateur : vérifier le compte Mistral (bloqué — voir Ce qui n'est
+PAS couvert) et « faire un système qui s'y adapte ».
+
+**Ce qui a été fait** :
+- `AiCardGeneration.service.js#callModel` — une erreur `429` qui épuise ses `RATE_LIMIT_MAX_RETRIES`
+  tentatives porte désormais `err.rateLimited = true`, en plus du `statusCode: 502` déjà existant —
+  distingue ce mode d'échec précis (throttling) de tout autre (réseau, 500, contenu vide...).
+- `AiCardGenerationPipeline.service.js` — nouveau circuit breaker : compte les chunks **consécutifs**
+  en échec pour cause de `rateLimited` (remis à 0 dès qu'un chunk réussit, ou échoue pour une autre
+  raison). Après `RATE_LIMIT_CIRCUIT_BREAKER_THRESHOLD` (2) chunks consécutifs de ce type, arrête la
+  boucle immédiatement plutôt que de tenter les chunks restants en pure perte. Message d'erreur dédié
+  quand aucun chunk n'a abouti (« La génération a été interrompue : limite de débit Mistral atteinte de
+  façon soutenue (compte probablement sur un palier restrictif ou quota épuisé — voir
+  console.mistral.ai). ») plutôt que le générique « échoué sur tous les passages » — remonte
+  directement à l'utilisateur via `AiGenerationBatch.controller.js` → `{ message: error.message }`, seul
+  canal qui atteint le front sur un échec total (`warnings` n'est renvoyé qu'en cas de succès partiel).
+  Sur un succès partiel (au moins un chunk réussi avant l'arrêt anticipé), un warning explicite
+  équivalent est poussé dans `warnings` (visible dans l'écran de révision, bandeau jaune déjà existant).
+
+**Tests** : `test/services/AiCardGenerationPipeline.service.test.js` (+5) : arrêt après 2 échecs
+consécutifs (nombre d'appels vérifié — les chunks restants ne sont jamais tentés), message d'erreur
+dédié sur échec total, le compteur se réinitialise sur un succès intercalé, se réinitialise aussi sur
+un échec non lié au rate limit, warning explicite conservé sur un succès partiel avant arrêt anticipé.
+`npx jest` (API) → 1802/1802 (+5). `npm run lint` propre.
+
+**Choix techniques** : voir `DECISIONS.md` — seuil de 2 échecs consécutifs (pas 1, pour ne pas réagir à
+un simple aléa isolé ; pas plus, pour ne pas continuer à gaspiller du temps/quota une fois le doute
+raisonnablement levé).
+
+**Ce qui n'est PAS couvert** : la vérification du compte Mistral lui-même (palier, quota, statut de
+facturation) reste à faire par l'utilisateur sur console.mistral.ai — tentative d'extraire la clé API
+du Secret K8s prod pour un appel de diagnostic direct depuis ce poste, refusée par le classifieur de
+permissions de la session (accès à un identifiant de production jugé trop sensible). Ce correctif rend
+le pipeline plus robuste et plus rapide à échouer clairement, mais **ne résout pas** la cause si elle
+est réellement un quota épuisé côté compte — aucun code ne peut faire aboutir un appel qu'un compte à
+plat rejettera de toute façon. Non re-testé en conditions réelles depuis ce correctif (comme le
+précédent) — à confirmer par l'utilisateur.

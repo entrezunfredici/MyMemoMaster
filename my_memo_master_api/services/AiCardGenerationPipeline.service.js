@@ -18,6 +18,15 @@ const MAX_CHUNK_LENGTH = 4000
 // plusieurs centaines de pages), PAS une implémentation de Quotas.
 const MAX_CHUNKS = 20
 
+// Constaté en prod (2026-09-04) : le backoff par appel de AiCardGeneration.service.js#callModel
+// (jusqu'à 3 tentatives, 1-2-4 s) suffit pour un pic ponctuel, mais un compte durablement rate-limité
+// (palier restrictif, quota épuisé) fait échouer CHAQUE chunk de la même façon — chacun reparadant de
+// zéro son propre backoff sans jamais tenir compte de ce que les chunks précédents ont déjà appris.
+// Après ce nombre de chunks consécutifs en échec pour cette raison précise (`error.rateLimited`), le
+// pipeline s'arrête plutôt que de tenter les chunks restants en pure perte (temps ET quota, si le
+// throttling est un plafond par minute plutôt qu'un plafond déjà épuisé pour la journée).
+const RATE_LIMIT_CIRCUIT_BREAKER_THRESHOLD = 2
+
 class AiCardGenerationPipelineService {
   /**
    * Résout le texte source à traiter : exactement un des deux paramètres doit être fourni.
@@ -70,6 +79,13 @@ class AiCardGenerationPipelineService {
    * appelle le service d'inférence IA (C-01.04) sur chaque chunk, en répartissant le nombre de
    * cartes demandé. Agrège les résultats. Un chunk en échec ne fait pas échouer les autres (voir
    * §échec partiel ci-dessous) — seul un échec total lève une erreur.
+   *
+   * Circuit breaker rate limit (2026-09-04) : si `RATE_LIMIT_CIRCUIT_BREAKER_THRESHOLD` chunks
+   * consécutifs échouent spécifiquement pour cause de rate limit Mistral soutenu
+   * (`error.rateLimited`, malgré le backoff déjà tenté par `AiCardGeneration.service.js#callModel`),
+   * les chunks restants ne sont pas tentés — arrêt anticipé avec un warning explicite plutôt que de
+   * les faire tous échouer en pure perte. `successCount === 0` dans ce cas lève un message dédié
+   * (voir plus bas) distinct de l'échec générique "tous les passages ont échoué".
    *
    * Contrat de sortie DÉLIBÉRÉMENT différent de celui d'un appel unique (generation_ia_prompt_cartes.md
    * §4, `warning: string|null`) : `warnings` est un tableau (un message par chunk concerné), pas une
@@ -130,6 +146,11 @@ class AiCardGenerationPipelineService {
     const warnings = []
     const usage = { model: null, promptTokens: 0, completionTokens: 0, ocrPagesProcessed }
     let successCount = 0
+    // Nombre de chunks consécutifs en échec spécifiquement pour cause de rate limit Mistral
+    // (`error.rateLimited`, voir AiCardGeneration.service.js#callModel) — remis à 0 dès qu'un chunk
+    // aboutit ou échoue pour une autre raison ; ne compte que des échecs de MÊME nature à la suite.
+    let consecutiveRateLimitFailures = 0
+    let stoppedOnSustainedRateLimit = false
 
     if (hasEmbeddedImages) {
       warnings.push(
@@ -166,6 +187,7 @@ class AiCardGenerationPipelineService {
         usage.promptTokens += result.usage.promptTokens
         usage.completionTokens += result.usage.completionTokens
         successCount++
+        consecutiveRateLimitFailures = 0
       } catch (error) {
         logger.warn(
           `[AiCardGenerationPipeline] Passage ${i + 1}/${chunks.length} en échec : ${error?.message || error}`
@@ -181,11 +203,41 @@ class AiCardGenerationPipelineService {
           usage.promptTokens += error.usage.promptTokens || 0
           usage.completionTokens += error.usage.completionTokens || 0
         }
+
+        if (error.rateLimited) {
+          consecutiveRateLimitFailures++
+          if (consecutiveRateLimitFailures >= RATE_LIMIT_CIRCUIT_BREAKER_THRESHOLD) {
+            logger.error(
+              `[AiCardGenerationPipeline] ${consecutiveRateLimitFailures} passages consécutifs en rate limit Mistral — ` +
+                `arrêt anticipé après le passage ${i + 1}/${chunks.length} plutôt que de tenter les suivants en pure perte.`
+            )
+            stoppedOnSustainedRateLimit = true
+            warnings.push(
+              'Limite de débit Mistral atteinte de façon soutenue (plusieurs passages consécutifs rejetés malgré ' +
+                'plusieurs tentatives) — génération interrompue avant la fin du contenu. Vérifiez le palier/quota ' +
+                'de la clé API sur console.mistral.ai, ou réessayez plus tard.'
+            )
+            break
+          }
+        } else {
+          consecutiveRateLimitFailures = 0
+        }
       }
     }
 
     if (successCount === 0) {
-      const err = new Error('La génération a échoué sur tous les passages du contenu fourni.')
+      // Message distinct quand l'arrêt anticipé (circuit breaker) est la cause : le générique
+      // "échoué sur tous les passages" laisserait croire à 20 échecs indépendants plutôt qu'à un
+      // rate limit soutenu détecté après seulement quelques-uns. `warnings` (avec le détail complet)
+      // n'est renvoyé à l'appelant qu'en cas de succès partiel — sur un échec total, seul ce message
+      // atteint l'utilisateur (controller → { message: error.message }), donc l'indication
+      // console.mistral.ai est répétée directement ici plutôt que seulement dans `warnings`.
+      const err = new Error(
+        stoppedOnSustainedRateLimit
+          ? 'La génération a été interrompue : limite de débit Mistral atteinte de façon soutenue ' +
+            '(compte probablement sur un palier restrictif ou quota épuisé — voir console.mistral.ai).'
+          : 'La génération a échoué sur tous les passages du contenu fourni.'
+      )
       err.statusCode = 502
       // Le budget réel (C-01.06) ne doit pas être perdu même si la génération entière échoue —
       // l'usage cumulé peut être non nul si un ou plusieurs chunks ont réellement été facturés

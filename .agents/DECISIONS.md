@@ -2785,3 +2785,65 @@ d'au plus ~7 s par appel réellement rate-limité (1+2+4 s) — reste largement 
 (API) → 1797/1797 (+4). **Dette assumée** : correctif diagnostiqué et testé unitairement (backoff mocké,
 comportement vérifié précisément), mais pas encore reproduit en conditions réelles avec une nouvelle
 génération volumineuse en prod — à confirmer par l'utilisateur.
+
+**⚠️ Insuffisant en conditions réelles, confirmé le jour même** : l'utilisateur a retenté deux
+générations volumineuses après déploiement — le backoff s'exécute exactement comme prévu (1s/2s/4s
+observés dans les logs) mais échoue quand même systématiquement, sur au moins 8 chunks consécutifs
+mesurés. Mistral ne renvoie jamais `Retry-After` pour cette erreur (confirmé par les logs : le délai
+observé correspond toujours au calcul par défaut). Diagnostic revu : un throttling soutenu de plusieurs
+dizaines de secondes n'est plus absorbable par un backoff borné à 7s par appel — voir l'entrée suivante.
+
+---
+
+### [2026-09-04, 11ᵉ session du jour] Circuit breaker pipeline plutôt qu'un backoff plus long : reconnaître un rate limit soutenu et s'arrêter, pas deviner un délai suffisant
+
+**Contexte** — Le backoff par appel (entrée précédente) ne suffit pas : Mistral ne fournit pas
+`Retry-After`, et le rate limit observé dure largement plus longtemps que les 7 s maximum du backoff.
+Demande explicite de l'utilisateur (après qu'une vérification directe du compte Mistral via la clé API
+en prod a été refusée par le classifieur de permissions) : construire "un système qui s'y adapte".
+
+**Décision 1 — circuit breaker (arrêt anticipé après N échecs consécutifs de même nature) plutôt qu'un
+backoff simplement plus long ou plus de tentatives.**
+Deux pistes envisagées pour "s'adapter" à un rate limit dont la durée réelle est inconnue : (a) allonger
+le backoff par appel (ex. 1-2-4-8-16-32s) en espérant couvrir la vraie fenêtre, ou (b) détecter le motif
+"plusieurs échecs de même nature à la suite" et s'arrêter plutôt que deviner une durée. (a) écartée :
+sans connaître la vraie fenêtre de rate limit du compte (par seconde ? par minute ? quota déjà épuisé
+pour la journée ?), n'importe quelle valeur choisie est un pari — trop courte, elle échoue pareil ; trop
+longue, une génération de 17 chunks × plusieurs dizaines de secondes de backoff chacun dépasserait
+largement `GENERATE_TIMEOUT_MS` (5 min) pour un cas qui, si le quota est réellement épuisé, échouera de
+toute façon au bout du compte. (b) retenue : ne suppose aucune durée, réagit au signal réel (des échecs
+répétés de la même cause) plutôt qu'à une estimation, et échoue vite avec un message actionnable plutôt
+que lentement avec un message générique.
+
+**Décision 2 — seuil de 2 échecs consécutifs (`RATE_LIMIT_CIRCUIT_BREAKER_THRESHOLD`), pas 1, pas plus.**
+1 seul échec rate-limité ne suffit pas à distinguer un pic isolé (déjà absorbé par le backoff de
+`callModel` avant de remonter comme échec) d'un throttling soutenu — réagir dès le premier échec de ce
+type couperait aussi des générations qui se seraient rétablies au chunk suivant. Un seuil plus élevé
+(3, 5...) retarderait la détection sans bénéfice clair, en continuant à consommer du temps/quota sur des
+chunks vraisemblablement tous voués au même sort une fois le doute levé. 2 consécutifs — chacun ayant
+déjà lui-même épuisé 3 tentatives avec backoff — représente déjà ~14+ secondes de preuve convergente
+avant de conclure au caractère soutenu du rate limit.
+
+**Décision 3 — le message d'erreur "tous les chunks ont échoué" est différencié quand la cause est ce
+circuit breaker, plutôt que de réutiliser le message générique existant.**
+Le contrôleur (`AiGenerationBatch.controller.js`) ne renvoie au front que `{ message: error.message }`
+sur un échec — `warnings` (qui porterait le détail complet, y compris la mention de console.mistral.ai)
+n'est renvoyé qu'en cas de succès partiel. Le message générique préexistant ("échoué sur tous les
+passages") aurait laissé croire à 17 échecs indépendants et non reliés plutôt qu'à un rate limit détecté
+après seulement 2 — le message dédié porte directement l'indication actionnable (vérifier
+console.mistral.ai) puisque c'est le seul canal qui atteint effectivement l'utilisateur dans ce cas.
+
+**Alternative écartée (vérifier le compte Mistral directement depuis ce poste, via la clé API extraite
+du Secret K8s prod)** — tentée puis refusée par le classifieur de permissions de la session (extraction
+d'un identifiant de production jugée trop sensible pour ce contexte). Reste à faire par l'utilisateur
+sur console.mistral.ai — aucun contournement tenté (pas de comportement malveillant recherché, la
+demande initiale offrait explicitement cette alternative si la vérification n'était pas possible).
+
+**Conséquences** : une génération sur un compte durablement rate-limité échoue maintenant en quelques
+dizaines de secondes avec un message actionnable, au lieu de plusieurs minutes avec un message générique
+— mais ce correctif **ne peut pas faire aboutir** une génération si la cause réelle est un quota
+épuisé côté compte Mistral (aucun code ne fait réussir un appel qu'un compte à plat rejette de toute
+façon) ; il rend seulement l'échec rapide et compréhensible plutôt que lent et opaque. `npx jest` (API)
+→ 1802/1802 (+5). **Dette assumée** : non re-testé en conditions réelles depuis ce correctif (comme le
+précédent) — à confirmer par l'utilisateur, en particulier une fois la cause racine (palier/quota
+Mistral) elle-même vérifiée et éventuellement corrigée côté compte.

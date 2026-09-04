@@ -299,7 +299,9 @@ ${SCHEMA_DESCRIPTION}`
    * Une réponse `429` (rate limit Mistral) déclenche jusqu'à `RATE_LIMIT_MAX_RETRIES` nouvelles
    * tentatives avec un backoff exponentiel (respecte l'en-tête `Retry-After` si Mistral le fournit)
    * avant de se comporter comme n'importe quelle autre erreur HTTP — voir le commentaire sur
-   * `RATE_LIMIT_MAX_RETRIES` en tête de fichier.
+   * `RATE_LIMIT_MAX_RETRIES` en tête de fichier. Si les tentatives s'épuisent toujours sur un `429`,
+   * l'erreur levée porte `rateLimited: true` — l'appelant (le pipeline) l'utilise pour distinguer un
+   * throttling soutenu d'un échec ordinaire.
    *
    * @param {{ role: string, content: string }[]} messages
    * @returns {Promise<{ content: string, usage: { promptTokens: number, completionTokens: number } }>}
@@ -370,6 +372,11 @@ ${SCHEMA_DESCRIPTION}`
         logger.error(`[AiCardGeneration] Réponse Mistral ${response.status} : ${bodyText}`)
         const err = new Error('Le service de génération IA est indisponible pour le moment.')
         err.statusCode = 502
+        // Distingue un 429 qui a épuisé ses tentatives (throttling soutenu, pas un pic ponctuel —
+        // constaté en prod le 2026-09-04 : plusieurs chunks d'affilée en 429 malgré le backoff
+        // ci-dessus) d'un autre échec HTTP — permet à l'appelant (le pipeline) de réagir différemment
+        // (court-circuiter les chunks restants plutôt que de tous les tenter en pure perte).
+        if (response.status === 429) err.rateLimited = true
         throw err
       }
 
