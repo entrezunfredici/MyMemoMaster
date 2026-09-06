@@ -2847,3 +2847,49 @@ façon) ; il rend seulement l'échec rapide et compréhensible plutôt que lent 
 → 1802/1802 (+5). **Dette assumée** : non re-testé en conditions réelles depuis ce correctif (comme le
 précédent) — à confirmer par l'utilisateur, en particulier une fois la cause racine (palier/quota
 Mistral) elle-même vérifiée et éventuellement corrigée côté compte.
+
+---
+
+### [2026-09-06] Limite de taille des uploads de documents : une seule variable partagée (`MAX_UPLOAD_SIZE_MB`), pas une par middleware
+
+**Contexte** — Deux middlewares (`upload.middleware.js` pour `/storage/upload`, `aiPdfUpload.middleware.js`
+pour le PDF source de la génération IA) codaient chacun en dur une limite de 10 Mo, indépendante l'une
+de l'autre bien qu'identique. Demande explicite de l'utilisateur : supprimer le codage en dur, remonter
+le défaut à 20 Mo, passer par une variable d'environnement.
+
+**Décision** — Une seule variable d'environnement `MAX_UPLOAD_SIZE_MB` (défaut 20), résolue par un
+nouveau helper `helpers/uploadConfig.js`, consommée par les deux middlewares. Pattern repris tel quel
+de `helpers/mistralConfig.js`/`helpers/aiQuotaConfig.js` (C-01.03/C-01.06) : une fonction résolue à
+l'appel plutôt qu'un objet figé au chargement du module — reste testable sans `jest.resetModules()`.
+
+**Alternative écartée** : deux variables distinctes (`AI_PDF_MAX_UPLOAD_SIZE_MB` /
+`STORAGE_MAX_UPLOAD_SIZE_MB`) — les deux limites protègent le même concept (« un document déposé par
+l'utilisateur »), avec la même valeur depuis l'origine (10 Mo codés en dur des deux côtés,
+manifestement jamais pensées comme deux besoins différents) ; les séparer aujourd'hui aurait ajouté de
+la complexité de configuration sans cas d'usage identifié qui la justifie. Se limite à ces deux
+middlewares : `middlewares/mindmapImageUpload.js` (5 Mo, images de nœud de mind map) reste volontairement
+séparé — usage différent (image seule, pas un document), plafond déjà distinct avant ce ticket.
+
+**Décision 2 — l'ingress nginx (`proxy-body-size`) est relevé en dur (10m → 25m), pas rendu configurable.**
+Cette annotation Kubernetes n'est pilotable par aucune variable d'environnement (elle est lue par le
+contrôleur ingress-nginx à l'admission de la ressource `Ingress`, avant même que le pod API ne
+démarre) — la faire varier avec `MAX_UPLOAD_SIZE_MB` demanderait un templating (Helm côté chart, déjà
+en place pour `helm/templates/ingress.yaml`, mais pas côté manifests bruts `k8s/prod/`/`k8s/preprod/`)
+non justifié pour une valeur qui change rarement. Valeur choisie : 25 Mo, une marge délibérée au-delà
+des 20 Mo applicatifs pour absorber l'overhead multipart/form-data (boundary, en-têtes par partie) sans
+avoir à la retoucher à chaque ajustement fin de `MAX_UPLOAD_SIZE_MB`.
+
+**Alternative écartée** : synchroniser strictement l'ingress sur `MAX_UPLOAD_SIZE_MB` (25 Mo pile, ou
+templating dynamique) — complexité de maintenance (deux emplacements à garder cohérents à la main pour
+les manifests bruts, un seul fichier gagnant à right-sizer plutôt qu'à automatiser pour une valeur qui
+change rarement) sans bénéfice mesurable ; une marge fixe de 5 Mo au-dessus du défaut applicatif est
+suffisante pour ne pas avoir à y retoucher à chaque changement de `MAX_UPLOAD_SIZE_MB` en dev/preprod.
+
+**Conséquences** : relever `MAX_UPLOAD_SIZE_MB` au-delà de 20 Mo (ex. via la ConfigMap K8s ou le
+`.env`) ne suffit plus seul en prod/preprod au-delà de 25 Mo — il faut aussi relever l'annotation
+ingress dans le fichier de manifeste concerné, sans quoi la requête est rejetée par l'ingress avant
+d'atteindre l'API (comportement déjà présent avant ce ticket avec l'ancien plafond de 10 Mo, seule la
+valeur change). `k8s/app/ingress-test.yml` (déprécié, remplacé par `k8s/preprod/ingress.yml`) laissé
+à `10m` sans conséquence tant qu'il n'est pas appliqué. Le panneau de réglage "Documents" décrit par
+l'utilisateur (capture d'écran, slider 1-250 Mo) reste introuvable dans le dépôt — non traité ici,
+dette à clarifier avant tout travail futur qui en dépendrait (voir CHANGELOG_AGENT.md).

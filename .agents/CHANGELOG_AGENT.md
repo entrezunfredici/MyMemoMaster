@@ -75,7 +75,7 @@
 | ESLint / Prettier (front + back) | Stable — lint vert après revue M-03 (formatDate supprimée, globalThis→window, Reminder.controller normalisé) | 2026-06-14 |
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
-| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — 2026-07-06 : requireRole loggue les refus (F-M8), errorHandler anti log-injection (F-M7), uploads magic bytes via helpers/fileSignature (A08-M2) | 2026-07-06 |
+| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — 2026-07-06 : requireRole loggue les refus (F-M8), errorHandler anti log-injection (F-M7), uploads magic bytes via helpers/fileSignature (A08-M2) ; [REF] 2026-09-06 : la limite de taille (10 Mo, codée en dur) de `middlewares/upload.middleware.js` (`/storage/upload`, sous-jacent aux ressources de classe) devient configurable via `MAX_UPLOAD_SIZE_MB` (défaut 20 Mo, `helpers/uploadConfig.js`) — voir entrée dédiée | 2026-09-06 |
 | Tests intégration API (Supertest) | Stable — M-05.08 : 724 tests total (+8 : POST /refresh-token + POST /logout) | 2026-06-16 |
 | Tests unitaires auth (Bcrypt, JWT, RBAC) | Stable — M-05.12 : Auth.middleware (7 tests JWT) + bcrypt User.service (6 tests verifyPassword/setPassword/create) | 2026-06-17 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
@@ -150,6 +150,7 @@
 | Génération de Leitner par IA (C-01) — Pipeline traitement (PDF, chunking, LLM) | **Livré et vérifié en conditions réelles (pdfjs-dist + OCR Mistral)** — `services/PdfExtraction.service.js` : `pdfjs-dist` en 1er (gratuit, local), **repli automatique sur l'OCR Mistral** (`$4/1000 pages`) si aucun texte trouvé (PDF scanné — décision utilisateur explicite) ; détection (sans description) des images/schémas embarqués sur les deux chemins, remontée en avertissement par le pipeline plutôt qu'ignorée silencieusement. `helpers/textChunker.js` (découpage par paragraphes/phrases, sans dépendance), `services/AiCardGenerationPipeline.service.js` (C-01.05, orchestre le tout + `AiCardGenerationService` de C-01.04 sur chaque chunk, agrège `{ cards, warnings }`, tolère un échec partiel). Pas de controller/route (hors périmètre, comme C-01.04). 41 tests (chunker + extraction PDF/OCR mockés + pipeline), 0 régression sur les 1670 tests API | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Stockage cartes générées (en attente) | **Livré** — tables `AiGenerationBatch`/`AiGeneratedCard` (2 migrations + modèles Sequelize), `services/AiGenerationBatch.service.js` : persiste le résultat du pipeline (C-01.05, `{ cards, warnings }`) en statut `pending` (transaction batch+cartes), relecture (`findById`/`findPendingByUser`), mutation d'une carte tant que son batch est `pending` (`updateCard`), bookkeeping `validated`/`discarded` (`markBatchStatus` — ne crée AUCUNE ligne dans Question/Response/LeitnerCard, juste un statut), suppression (`deleteBatch`, cascade DB). 17 tests sur vraie base SQLite en mémoire (transaction, cascade, ownership), migrations vérifiées manuellement (up/down réels, FK enforced). **Branchement HTTP ajouté dans la foulée** (décision utilisateur explicite, avant l'Écran de validation) — voir entrée dédiée ci-dessous. 0 régression | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Endpoint HTTP (POST /ai-generation-batches + cycle de vie) | **Livré, Quotas maintenant branché** — referme la chaîne pipeline (C-01.05) → stockage (C-01.07) → HTTP → Quotas/budget (C-01.06) : `POST /ai-generation-batches` (texte ou PDF via upload mémoire dédié, droits vérifiés via `LeitnerCard.service#resolveUserRights`, quota/budget vérifiés via `AiQuota.service#checkQuota` **avant** tout appel LLM/OCR, usage réel journalisé **après** succès), `GET /ai-generation-batches` (liste pending), `GET /ai-generation-batches/:id`, `PATCH /ai-generation-batches/:id/status` (validated/discarded), `PATCH /ai-generation-batches/cards/:cardId` (accept/edit/reject), `DELETE /ai-generation-batches/:id`. 20 tests fonctionnels (routes réelles + DB réelle, pipeline LLM mocké) | 2026-09-02 |
+| Génération de Leitner par IA (C-01) — upload PDF (limite de taille) | [REF] 2026-09-06 — limite de taille du PDF source (`middlewares/aiPdfUpload.middleware.js`, 10 Mo codés en dur) devient configurable via `MAX_UPLOAD_SIZE_MB` (défaut 20 Mo, `helpers/uploadConfig.js`, partagé avec `upload.middleware.js`) — voir entrée dédiée en bas de fichier | 2026-09-06 |
 | Génération de Leitner par IA (C-01) — Gestion quotas et budget IA | **Livré** — table `AiUsageLog` (migration + modèle, pattern audit `SET NULL` comme `AuditLog`) + `services/AiQuota.service.js` (C-01.06) : **quota** personnel (générations/jour, compté sur `AiGenerationBatch`) et **budget** global (coût $ estimé/mois, tous utilisateurs, compté sur `AiUsageLog`) — deux garde-fous distincts et indépendants, tous deux réglables par variable d'environnement. `estimateCostUsd` (tarifs C-01.03 codés en dur, à revérifier périodiquement), `checkQuota` (429 si l'un des deux dépassé), `recordUsage` (journalisation best-effort après coup), `getUsageSummary` (prêt pour un futur affichage « quota restant », déjà maquetté en C-01.02). `AiCardGenerationService`/`PdfExtraction.service.js`/`AiCardGenerationPipeline.service.js` enrichis pour faire remonter l'usage réel (tokens/pages) sans le journaliser eux-mêmes. 18 nouveaux tests (`AiQuota.service.test.js` 16 + `aiQuotaConfig.test.js` 2) sur vraie base SQLite en mémoire, + tests des 3 services enrichis mis à jour, + 3 tests BDD (429 quota, 429 budget, vérification `AiUsageLog`). Suite complète : **1725/1725**, 0 régression | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Interface génération (upload, paramètres) | **Livré (front-end)** — Vues 1/2 de la maquette C-01.02 : `stores/aiCardGeneration.js` (`generate`/`fetchQuota`/`reset`), `components/AiGenerateCardsModalComponent.vue` (source texte/PDF drag&drop, matière en texte libre, slider 1-20, type de carte, quota affiché), `components/AiGenerationProgressModalComponent.vue` (attente illustrative + erreur/retry), bouton d'entrée sur `FlashcardsCardsPage.vue`. Écart comblé au passage : `getUsageSummary` (C-01.06) n'était exposé par aucune route — `GET /ai-generation-batches/quota` ajouté (controller+route+2 tests BDD). Écran de validation (Vue 3) explicitement hors périmètre (décision utilisateur) : succès = toast + fermeture, batch reste `pending` ; **infra corrigée le même jour** — `docker-compose.yml` ne transmettait aucune variable Mistral/IA au conteneur `api` (502 systématique en test manuel réel), 8 variables ajoutées | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Écran révision cartes générées | **Livré (front-end)** — Vue 3/4 de la maquette C-01.02 : `components/AiValidationScreenComponent.vue` (écran plein remplaçant `FlashcardsCardsPage.vue`, checkbox=statut `AiGeneratedCard.status` persistée à chaque interaction — résiste à un rechargement, accordéon `sourceExcerpt`, bandeau `warnings`, `[Tout accepter]`), `components/AiCardEditModalComponent.vue` (Vue 4, composant dédié plutôt que la modal manuelle existante — voir DECISIONS.md), promotion des cartes cochées via `aiCardGenerationStore.promoteCard` (3 endpoints existants, échec partiel toléré : cartes en échec gardées avec badge, réessayables). Bandeau "reprendre un brouillon pending" ajouté sur `FlashcardsCardsPage.vue` (question posée à l'utilisateur, tranchée le 2026-09-02) — `fetchPendingBatches`. 13 nouveaux tests store (22 au total sur `aiCardGeneration.js`) | 2026-09-02 |
@@ -10519,3 +10520,72 @@ le pipeline plus robuste et plus rapide à échouer clairement, mais **ne résou
 est réellement un quota épuisé côté compte — aucun code ne peut faire aboutir un appel qu'un compte à
 plat rejettera de toute façon. Non re-testé en conditions réelles depuis ce correctif (comme le
 précédent) — à confirmer par l'utilisateur.
+
+---
+
+## [2026-09-06] REF — Limite de taille des uploads de documents codée en dur (10 Mo) rendue configurable (`MAX_UPLOAD_SIZE_MB`, défaut 20 Mo)
+
+**Contexte** — Suite à une question de l'utilisateur sur un panneau de réglage "Documents / Taille
+maximale des fichiers" (slider 1-250 Mo, effectif 100 Mo) dont l'origine n'a pas pu être retrouvée
+dans le dépôt (aucun composant front ni modèle de config en base ne correspond à ce texte). En
+creusant la question annexe ("100 Mo est-il suffisant pour des cours ?"), deux limites codées en dur
+à 10 Mo ont été trouvées, indépendantes de ce panneau et de tout réglage : `middlewares/upload.middleware.js`
+(`POST /storage/upload`, utilisé entre autres par le flux d'upload des ressources de classe) et
+`middlewares/aiPdfUpload.middleware.js` (PDF source de la génération de cartes par IA, C-01). L'ingress
+nginx en prod/preprod plafonnait en plus à 10 Mo (`proxy-body-size`), donc même une hausse de ces
+constantes aurait été inopérante en prod. Demande explicite de l'utilisateur : retirer le codage en
+dur, remonter le défaut à 20 Mo, passer par une variable d'environnement.
+
+**Fait** :
+- `helpers/uploadConfig.js` (nouveau) — même pattern que `helpers/mistralConfig.js`/`helpers/aiQuotaConfig.js`
+  (fonction résolue à l'appel, pas un objet figé au chargement). Une seule variable
+  `MAX_UPLOAD_SIZE_MB` (défaut 20) partagée par les deux middlewares — ce sont deux entrées vers le
+  même concept ("un document utilisateur"), pas deux besoins distincts identifiés à ce jour.
+  `middlewares/mindmapImageUpload.js` (5 Mo, images de nœud de mind map) volontairement **non touché** —
+  usage différent, hors périmètre de la demande.
+- `middlewares/upload.middleware.js` et `middlewares/aiPdfUpload.middleware.js` — `MAX_FILE_SIZE`/
+  `MAX_PDF_SIZE` lisent désormais `getUploadConfig().maxFileSizeBytes` au lieu d'une constante en dur.
+- `.env.example` — `MAX_UPLOAD_SIZE_MB=20` ajouté (section Backend), avec avertissement explicite sur
+  la dépendance à l'annotation ingress (voir plus bas).
+- `docker-compose.yml` — `MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}` ajouté aux deux services
+  (`api` dev, `api_server` test/VPS), même défaut que le code au cas où l'hôte ne définit rien.
+- **Ingress nginx** (`nginx.ingress.kubernetes.io/proxy-body-size`, non pilotable par variable
+  d'environnement) relevé de `10m` à `25m` (marge au-delà des 20 Mo pour l'overhead multipart) dans
+  `helm/templates/ingress.yaml` (API + front), `k8s/prod/ingress.yml`, `k8s/preprod/ingress.yml`.
+  `k8s/app/ingress-test.yml` **non touché** — fichier déjà marqué déprécié en tête (remplacé par
+  `k8s/preprod/ingress.yml`), non appliqué.
+- Doc utilisateur (`docs/MANUEL_UTILISATION.md` §FAQ) et descriptions Swagger de `Storage.routes.js`
+  mises à jour (« 10 Mo » → mention de `MAX_UPLOAD_SIZE_MB`, défaut 20 Mo).
+
+**Tests** : `test/helpers/uploadConfig.test.js` (nouveau, 4 tests : défaut, variable renseignée,
+variable non numérique → défaut, réactivité au changement d'environnement — même structure que
+`mistralConfig.test.js`). `npx jest` (API) → **1806/1806**, 0 régression. `npm run lint` propre (0
+erreur — 1 warning préexistant, hors périmètre, sur un fichier généré `coverage/`).
+
+**Choix techniques** : voir `DECISIONS.md`.
+
+**Ce qui n'est PAS couvert** : le panneau "Documents / Taille maximale des fichiers" (capture fournie
+par l'utilisateur, slider 1-250 Mo) reste introuvable dans le dépôt — ni implémenté ni relié à
+`MAX_UPLOAD_SIZE_MB`. Si ce panneau existe ailleurs (maquette non versionnée, autre outil), il faudra
+soit l'implémenter et le relier à cette variable (ce qui demanderait de rendre la limite lisible/
+modifiable à chaud, pas seulement au démarrage du process comme c'est le cas ici), soit clarifier
+qu'il s'agit d'un panneau non lié à ce dépôt. `k8s/app/ingress-test.yml` (déprécié) laissé à 10 Mo —
+sans conséquence tant qu'il n'est pas appliqué. Le nouveau plafond (25 Mo côté ingress) n'a pas été
+testé en conditions réelles contre un vrai PDF de 15-20 Mo en prod (nécessiterait un déploiement).
+
+**Fichiers créés** :
+- `my_memo_master_api/helpers/uploadConfig.js`
+- `my_memo_master_api/test/helpers/uploadConfig.test.js`
+
+**Fichiers modifiés** :
+- `my_memo_master_api/middlewares/upload.middleware.js`
+- `my_memo_master_api/middlewares/aiPdfUpload.middleware.js`
+- `my_memo_master_api/routes/Storage.routes.js`
+- `.env.example`
+- `docker-compose.yml`
+- `helm/templates/ingress.yaml`
+- `k8s/prod/ingress.yml`
+- `k8s/preprod/ingress.yml`
+- `docs/MANUEL_UTILISATION.md`
+- `.agents/CHANGELOG_AGENT.md`
+- `.agents/DECISIONS.md`

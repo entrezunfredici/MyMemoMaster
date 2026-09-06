@@ -185,6 +185,8 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      # Taille max des uploads (Mo) — stockage générique + PDF génération IA, voir .env.example
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}
       # IA (C-01, génération de cartes par IA) — jamais transmises au conteneur jusqu'ici : le
       # service se croyait "non configuré" (502) même avec une vraie clé dans le .env de l'hôte,
       # trouvé en testant manuellement C-01.08 (interface upload/paramètres) le 2026-09-02.
@@ -348,6 +350,8 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      # Taille max des uploads (Mo) — stockage générique + PDF génération IA, voir .env.example
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}
       # IA (C-01, génération de cartes par IA) — jamais transmises au conteneur jusqu'ici : le
       # service se croyait "non configuré" (502) même avec une vraie clé dans le .env de l'hôte,
       # trouvé en testant manuellement C-01.08 (interface upload/paramètres) le 2026-09-02.

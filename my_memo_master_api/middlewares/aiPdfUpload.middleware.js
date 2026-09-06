@@ -1,4 +1,5 @@
 const multer = require('multer')
+const getUploadConfig = require('../helpers/uploadConfig')
 
 // Upload du PDF source pour la génération de cartes par IA (C-01). Volontairement distinct de
 // middlewares/upload.middleware.js : ce fichier stocke durablement (S3/disque) des assets
@@ -10,7 +11,9 @@ const multer = require('multer')
 // (comme s3SniffContentType le fait pour l'upload S3) — memoryStorage n'a pas d'équivalent
 // "contentType" pour intercepter le flux, le buffer est déjà entièrement disponible après multer.
 
-const MAX_PDF_SIZE = 10 * 1024 * 1024 // 10 Mo, même plafond que middlewares/upload.middleware.js
+// Même plafond configurable que middlewares/upload.middleware.js — voir helpers/uploadConfig.js
+// (MAX_UPLOAD_SIZE_MB, défaut 20 Mo).
+const MAX_PDF_SIZE = getUploadConfig().maxFileSizeBytes
 
 const fileFilter = (_req, file, cb) => {
   if (file.mimetype !== 'application/pdf') {
