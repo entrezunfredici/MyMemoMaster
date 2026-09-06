@@ -154,6 +154,8 @@
 | Génération de Leitner par IA (C-01) — Gestion quotas et budget IA | **Livré** — table `AiUsageLog` (migration + modèle, pattern audit `SET NULL` comme `AuditLog`) + `services/AiQuota.service.js` (C-01.06) : **quota** personnel (générations/jour, compté sur `AiGenerationBatch`) et **budget** global (coût $ estimé/mois, tous utilisateurs, compté sur `AiUsageLog`) — deux garde-fous distincts et indépendants, tous deux réglables par variable d'environnement. `estimateCostUsd` (tarifs C-01.03 codés en dur, à revérifier périodiquement), `checkQuota` (429 si l'un des deux dépassé), `recordUsage` (journalisation best-effort après coup), `getUsageSummary` (prêt pour un futur affichage « quota restant », déjà maquetté en C-01.02). `AiCardGenerationService`/`PdfExtraction.service.js`/`AiCardGenerationPipeline.service.js` enrichis pour faire remonter l'usage réel (tokens/pages) sans le journaliser eux-mêmes. 18 nouveaux tests (`AiQuota.service.test.js` 16 + `aiQuotaConfig.test.js` 2) sur vraie base SQLite en mémoire, + tests des 3 services enrichis mis à jour, + 3 tests BDD (429 quota, 429 budget, vérification `AiUsageLog`). Suite complète : **1725/1725**, 0 régression | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Interface génération (upload, paramètres) | **Livré (front-end)** — Vues 1/2 de la maquette C-01.02 : `stores/aiCardGeneration.js` (`generate`/`fetchQuota`/`reset`), `components/AiGenerateCardsModalComponent.vue` (source texte/PDF drag&drop, matière en texte libre, slider 1-20, type de carte, quota affiché), `components/AiGenerationProgressModalComponent.vue` (attente illustrative + erreur/retry), bouton d'entrée sur `FlashcardsCardsPage.vue`. Écart comblé au passage : `getUsageSummary` (C-01.06) n'était exposé par aucune route — `GET /ai-generation-batches/quota` ajouté (controller+route+2 tests BDD). Écran de validation (Vue 3) explicitement hors périmètre (décision utilisateur) : succès = toast + fermeture, batch reste `pending` ; **infra corrigée le même jour** — `docker-compose.yml` ne transmettait aucune variable Mistral/IA au conteneur `api` (502 systématique en test manuel réel), 8 variables ajoutées | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Écran révision cartes générées | **Livré (front-end)** — Vue 3/4 de la maquette C-01.02 : `components/AiValidationScreenComponent.vue` (écran plein remplaçant `FlashcardsCardsPage.vue`, checkbox=statut `AiGeneratedCard.status` persistée à chaque interaction — résiste à un rechargement, accordéon `sourceExcerpt`, bandeau `warnings`, `[Tout accepter]`), `components/AiCardEditModalComponent.vue` (Vue 4, composant dédié plutôt que la modal manuelle existante — voir DECISIONS.md), promotion des cartes cochées via `aiCardGenerationStore.promoteCard` (3 endpoints existants, échec partiel toléré : cartes en échec gardées avec badge, réessayables). Bandeau "reprendre un brouillon pending" ajouté sur `FlashcardsCardsPage.vue` (question posée à l'utilisateur, tranchée le 2026-09-02) — `fetchPendingBatches`. 13 nouveaux tests store (22 au total sur `aiCardGeneration.js`) | 2026-09-02 |
+| Génération d'exercices par IA (C-02) — Maquettes UI génération exercices | **Analyse livrée, aucun code** — `diagrams/generation_ia_exercices_ui.md` (C-02.02) : point d'entrée réel audité (`ExercisesPage.vue`, pas `CreateTestPage.vue` — route morte/orpheline, contrat obsolète, signalé) ; bouton « ✨ Générer par IA » dans la modal « Nouvel exercice »/« Modifier l'exercice » ; Vue 1 (modal config, 5 valeurs de `questionType` dont défaut `mixed`) ; Vue 2 **réutilisée intégralement sans modification** (`AiGenerationProgressModalComponent.vue`, déjà générique). **L'Interface de révision est explicitement hors périmètre** (élément IN distinct du feature list `C-02`, à la différence de `C-01.02`) — seul le point de raccordement vers `form.questions` (déjà existant, `contentToFormState`) est fixé. Aucune persistance intermédiaire nécessaire (contrairement à `AiGenerationBatch` en C-01) : le flux exercice ne persiste rien avant la soumission finale du formulaire, déjà le cas pour l'ajout manuel | 2026-09-06 |
+| Génération d'exercices par IA (C-02) — Spécification types exercices générables | **Analyse livrée, aucun code** — `diagrams/generation_ia_exercices_types.md` (C-02.01) : décision de générabilité sur les 4 types déjà persistables (`open`/`mcq`/`fill_blank`/`reorder`, `exercices_types_correction.md` §2), prompt système + prompt utilisateur, contrat d'entrée (`sourceText`/`subjectContext`/`questionCount`/`questionType`/`outputLanguage`), contrat de sortie JSON par type calé directement sur `Question.content` (aucune reconstruction nécessaire côté persistance, contrairement au mapping à 3 endpoints de `generation_ia_prompt_cartes.md`), garde-fous génériques (anti-hallucination, atomicité, contenu insuffisant) et propres à chaque type (`open` : réponse canonique complète vu la correction sémantique en aval ; `fill_blank` : cohérence stricte `template`/`blanks` ; `reorder` : ordre non ambigu) ; **orientation fournisseur Mistral AI étendue depuis `C-01` (RGPD)** le 2026-09-06, Benchmark LLM propre à `C-02` restant à faire. `C-02` reste à 0/9 dans Odoo — aucune ligne de code, feature voisine de `C-01` (implémentée) | 2026-09-06 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -10588,4 +10590,183 @@ testé en conditions réelles contre un vrai PDF de 15-20 Mo en prod (nécessite
 - `k8s/preprod/ingress.yml`
 - `docs/MANUEL_UTILISATION.md`
 - `.agents/CHANGELOG_AGENT.md`
+
+---
+
+## [2026-09-06] DOC — C-02.01 : Spécification types exercices générables (Génération d'exercices par IA)
+
+**Contexte** — Ticket `C-02.01` (feature list `C-02`, source planning, V2, tâche « Analyse », extension
+US-05A). Objectif : livrer la « Spécification types exercices générables » pour la fonctionnalité `C-02`
+(Génération d'exercices par IA), sans déborder sur les autres éléments IN du feature list (Service génération,
+Validation format, Mode dégradé, Interface de révision) — traités uniquement comme interfaces amont/aval.
+Périmètre OUT rappelé par le ticket : pas de correction officielle sans relecture, pas de génération illimitée,
+pas de banque publique automatique.
+
+**Audit préalable** — Vérifié avant rédaction (règle d'audit d'`AGENT.md`) : `C-02` est à **0/9 dans Odoo**,
+aucune ligne de code existante pour cette feature (contrairement à sa voisine `C-01`, intégralement
+implémentée). Les 4 types de questions d'exercice (`open`/`mcq`/`fill_blank`/`reorder`) sont en revanche déjà
+en production côté création manuelle et correction serveur (`diagrams/exercices_types_correction.md`,
+`services/Test.service.js`) — le contrat de sortie a été calé dessus, comme `C-01.01` l'avait fait pour les
+cartes Leitner sur `Question`/`Response`/`LeitnerCard`.
+
+**Ce qui a été fait** — `diagrams/generation_ia_exercices_types.md` (suit le format de
+`generation_ia_prompt_cartes.md`, C-01.01, feature voisine) : décision de générabilité par type (les 4 types
+existants retenus, aucun écarté, avec un niveau de difficulté/garde-fous différencié par type), prompt système
++ prompt utilisateur, contrat d'entrée (`sourceText`/`subjectContext`/`questionCount`/`questionType` — défaut
+`"mixed"`, différent du défaut `"open"` de `C-01.01`, justifié en §3.2 — /`outputLanguage`), contrat de sortie
+JSON par type (`questions[]` avec `statement`/`type`/`content`/`sourceExcerpt`, `content` calé 1:1 sur
+`Question.content`), garde-fous génériques (anti-hallucination, atomicité, contenu insuffisant, neutralité) et
+garde-fous propres à chaque type (`open` : réponse de référence en formulation canonique complète, la
+correction aval étant sémantique et non exacte — `exercices_types_correction.md` §6.1 ; `fill_blank` :
+cohérence stricte entre le nombre de marqueurs `{{n}}` et la longueur de `blanks` ; `reorder` : ordre non
+ambigu entre fragments), mapping de persistance explicitement marqué comme hypothèse (`POST /tests` puis
+`POST /questions`, plus simple que le mapping à 3 endpoints de `C-01.01` car `content` n'a besoin d'aucune
+reconstruction), tableau d'interfaces avec les 4 autres éléments IN du feature list, exemple concret complet
+(SVT/photosynthèse, une question de chaque type), tableau IN/OUT, section « Points ouverts / dette ».
+
+**Hypothèses posées, à confirmer** (documentées en §12 du document) :
+- Aucun modèle/fournisseur LLM retranché pour `C-02` — l'orientation Mistral AI actée pour `C-01`
+  (`DECISIONS.md`, 2026-09-01) est un candidat naturel par cohérence produit, non une décision reprise ici.
+- Aucun appel réel effectué — l'exemple du document est illustratif, pas mesuré empiriquement.
+- Le mapping de persistance (réutilisation de `POST /tests`/`POST /questions`) est une hypothèse de travail, à
+  trancher au moment où le Service génération et l'Interface de révision seront eux-mêmes scopés.
+- Aucune borne chiffrée sur `questionCount` (le feature list `C-02` fourni ne nomme pas explicitement un
+  élément « Quotas », contrairement à `C-01` — à clarifier si `C-02` a besoin d'un quota propre).
+
+**Ce qui n'est PAS couvert** — Service génération (orchestration LLM, fournisseur/modèle), Validation format
+(implémentation du validateur), Mode dégradé, Interface de révision (maquette/ergonomie), tout code (aucune
+ligne de code livrée — ticket d'analyse pur, comme C-01.01).
+
+**Fichiers créés**
+- `diagrams/generation_ia_exercices_types.md`
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md` (ligne État global ajoutée + présente entrée)
+- `.agents/DECISIONS.md` (décision C-02.01 ajoutée)
+
+**Dette signalée, non traitée ici** — Le document n'a été validé par aucun appel LLM réel ; sa robustesse
+(respect effectif du schéma JSON par type, en particulier la cohérence `template`/`blanks` de `fill_blank` et
+l'absence d'ambiguïté des `fragments` de `reorder`) reste à vérifier une fois un Service génération arbitré et
+une première intégration technique posée — même limite que C-01.01 avant l'arrivée du Service inférence C-01.04.
+
+---
+
+## [2026-09-06] DOC — C-02.01 : orientation fournisseur LLM étendue à Mistral AI (suite directe, RGPD)
+
+**Contexte** — Demande explicite de l'utilisateur (« occupe-toi de ce qui manque à la C-02.01 », précisée en
+« ce que tu juges, en fonction de ce qui est déjà fait »). Comparaison avec ce qui avait suivi C-01.01 :
+l'entrée C-01.01 (2026-09-01) avait été immédiatement suivie d'une décision utilisateur d'orientation
+fournisseur (Mistral AI, raison RGPD), documentée en `DECISIONS.md` et répercutée le jour même dans
+`generation_ia_prompt_cartes.md` §11. C-02.01 n'avait pas cet équivalent : le §12 du document laissait le choix
+de fournisseur entièrement ouvert. Le critère RGPD qui a tranché pour `C-01` (hébergement UE par défaut, pas de
+cadre de transfert international à mettre en place) ne dépend pas du type de contenu généré (cartes vs.
+exercices) — l'étendre à `C-02` est une extrapolation directe de la même contrainte de conformité, pas un
+nouvel arbitrage produit nécessitant une nouvelle question à l'utilisateur.
+
+**Ce qui a été fait** — `diagrams/generation_ia_exercices_types.md` §12 : le point « fournisseur/modèle LLM
+non tranché » reformulé en « orientation fournisseur étendue à Mistral AI », en gardant explicitement ouvert
+ce qui reste réellement à faire (le **Benchmark LLM** propre au prompt à 4 types de `C-02`, distinct de
+`C-01.03` car les garde-fous structurels supplémentaires — `template`/`blanks`, `fragments` — changent le
+profil de tâche). Entrée `DECISIONS.md` correspondante ajoutée, sur le modèle de l'entrée C-01 du 2026-09-01.
+
+**Ce qui n'est PAS couvert** — Aucun modèle précis choisi (pas un Benchmark LLM) ; mise à jour Odoo de la
+tâche `C-02.01` (#1071, encore à l'étape « spécification »/`04_waiting_normal` dans le cache local
+`odoo-plugin/tasks.json`, non revérifié en direct dans cette entrée) volontairement non faite, faute de
+confirmation explicite de l'utilisateur sur ce point précis lors de la clarification ; relecture croisée du
+document (façon revue de code) non faite, idem ; autres points ouverts du §12 (borne `questionCount`,
+répartition `"mixed"` non bornée, mapping de persistance) inchangés.
+
+**Fichiers modifiés**
+- `diagrams/generation_ia_exercices_types.md`
+- `.agents/DECISIONS.md`
+- `.agents/CHANGELOG_AGENT.md`
+
+---
+
+## [2026-09-06] DOC — C-02 : orientation fournisseur Mistral AI confirmée explicitement par l'utilisateur
+
+**Contexte** — L'entrée précédente posait l'extension de l'orientation Mistral AI à `C-02` par extrapolation
+(raisonnement RGPD indépendant du type de contenu généré), sous délégation de l'utilisateur (« je te laisse
+voir »). L'utilisateur a ensuite confirmé directement : « on restera chez Mistral pour C-02 aussi ».
+
+**Ce qui a été fait** — `DECISIONS.md` (entrée C-02 du 2026-09-06) mis à jour pour noter que l'orientation
+n'est plus une simple extrapolation mais une décision actée directement par l'utilisateur, au même titre que
+celle de `C-01`. Aucun changement de fond côté `diagrams/generation_ia_exercices_types.md` (§12 déjà rédigé de
+façon ferme, sans hedge à lever).
+
+**Ce qui n'est PAS couvert** — Toujours pas de Benchmark LLM (modèle précis) pour `C-02` ; mise à jour Odoo de
+`C-02.01` toujours non faite (aucune demande explicite sur ce point).
+
+---
+
+## [2026-09-06] DOC — C-02.02 : Maquettes UI génération exercices (Génération d'exercices par IA)
+
+**Contexte** — Ticket `C-02.02` (feature list `C-02`, source planning, V2, tâche « Analyse », extension
+US-05A, suite directe de C-02.01). Objectif : livrer les « Maquettes UI génération exercices », sans déborder
+sur les autres éléments IN du feature list (Spécification types générables — déjà livré en C-02.01 — Service
+génération, Validation format, Mode dégradé, **Interface de révision**). Point d'attention explicite du
+ticket : respecter le périmètre de « Maquettes UI génération exercices » sans étendre aux éléments hors
+version.
+
+**Écart de scoping trouvé avec la feature voisine `C-01`, avant rédaction** — Le feature list `C-01`
+(rappelé en tête de `generation_ia_ui.md`) ne nommait pas d'élément « Écran de validation » séparé : C-01.02
+avait donc maquetté tout le parcours (Vues 1 à 4, y compris l'écran de validation) en un seul document, même
+si son implémentation avait ensuite été scindée en deux tickets (C-01.08 upload/paramètres, C-01.09 écran de
+révision). Le feature list `C-02` fourni par l'utilisateur liste, lui, « Interface de révision » comme élément
+IN **distinct** de « Maquettes UI génération exercices » — les deux sont donc des livrables séparés dès le
+niveau planning, pas seulement au niveau implémentation. **Décision prise en conséquence** : ce document ne
+maquette PAS l'écran de validation des questions générées (contrairement à C-01.02), seulement le point
+d'entrée, la modal de configuration et l'état de génération — l'Interface de révision est traitée en interface
+amont/aval uniquement, comme les 3 autres éléments hors périmètre.
+
+**Audit préalable** (règle d'`AGENT.md`, avant de maquetter le point d'entrée) — Deux candidats trouvés pour
+« la page de création d'exercice » : `pages/CreateTestPage.vue` (route `/create-test`, **orpheline** — aucun
+lien dans toute l'application ne pointe vers cette route, contrat obsolète en plus — `type: 'text'` unique,
+utilise `POST /responses` alors que la table `Response` est réservée aux cartes Leitner depuis la décision du
+2026-06-19) et `pages/ExercisesPage.vue` (page réelle, liée depuis la navigation, modal « Nouvel exercice »
+avec les 4 types déjà branchés). **`CreateTestPage.vue` écarté, `ExercisesPage.vue` retenu.** Ce constat
+change la forme du document par rapport à C-01.02 : la modal exercice crée le `Test` et ses questions en une
+seule soumission finale (`form.questions` en mémoire jusqu'à `submitCreate()`), à la différence de
+`FlashcardsCardsPage.vue` qui ajoute des cartes une par une à un système déjà persisté.
+
+**Deuxième écart trouvé pendant l'audit, hors périmètre du ticket mais signalé** — `Test.service.js#_checkAnswer`
+utilise réellement `content.accepted_answers` pour le type `open` (comparaison de plusieurs formulations via
+`SemanticService.gradeSemantic`), alors que `generation_ia_exercices_types.md` (C-02.01, livré la veille)
+affirmait l'inverse en se fiant à `exercices_types_correction.md` (document tiers obsolète sur ce point). **Le
+document C-02.01 a été corrigé sur place** (voir entrée `DECISIONS.md` dédiée) avant de poursuivre — ce
+document (C-02.02) s'appuie donc sur le contrat corrigé.
+
+**Ce qui a été fait** — `diagrams/generation_ia_exercices_ui.md` : constat d'audit du point d'entrée (§1),
+flux général (§4, retour vers la modal parente plutôt qu'un écran plein), Vue 1 (§5 — bouton dans la modal
+« Nouvel exercice », modal de configuration avec 5 valeurs de `questionType` dont défaut `mixed` cohérent avec
+C-02.01 §3.2), Vue 2 (§6 — **réutilisation intégrale sans modification** de
+`AiGenerationProgressModalComponent.vue`, déjà générique), point de raccordement vers `form.questions` (§7,
+réutilise `contentToFormState` déjà existant), tableau d'interfaces avec les 4 autres éléments IN (§8, dont une
+observation notée pour l'Interface de révision : les sous-formulaires inline déjà existants par type dans
+`ExercisesPage.vue` sont un candidat de réutilisation, non conçu ici), composants à créer/réutiliser (§9),
+store Pinia squelette (§10), points ouverts (§11).
+
+**Troisième écart trouvé, hors périmètre, signalé pour un futur ticket** — `AiGenerateCardsModalComponent.vue`
+(C-01.08) code encore en dur `MAX_PDF_SIZE = 10 Mo`, devenu incohérent avec le backend passé à
+`MAX_UPLOAD_SIZE_MB` (défaut 20 Mo) par le ticket du 2026-09-06 — le front Leitner refuse localement un PDF
+que le backend accepterait. Non corrigé (concerne `C-01`, hors périmètre de `C-02.02`) ; ce document a pris
+soin de ne pas reproduire cette valeur figée dans la nouvelle modal de configuration.
+
+**Ce qui n'est PAS couvert** — Interface de révision (écran de validation, hors périmètre explicite — voir
+plus haut), Service génération, Validation format, Mode dégradé, endpoint(s) réel(s), architecture de
+persistance intermédiaire (avec ou sans tables type `AiGenerationBatch`), tout code.
+
+**Fichiers créés**
+- `diagrams/generation_ia_exercices_ui.md`
+
+**Fichiers modifiés**
+- `diagrams/generation_ia_exercices_types.md` (correction `accepted_answers`, voir plus haut)
+- `.agents/DECISIONS.md`
+- `.agents/CHANGELOG_AGENT.md`
+
+**Dette signalée, non traitée ici** — `CreateTestPage.vue` reste dans le dépôt, orpheline et avec un contrat
+obsolète ; ni supprimée ni corrigée (hors périmètre d'un ticket d'analyse). Incohérence `MAX_PDF_SIZE` front
+Leitner vs. `MAX_UPLOAD_SIZE_MB` backend, signalée mais non corrigée.
+
+---
 - `.agents/DECISIONS.md`

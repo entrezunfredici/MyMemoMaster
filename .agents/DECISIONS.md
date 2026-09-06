@@ -2893,3 +2893,148 @@ valeur change). `k8s/app/ingress-test.yml` (déprécié, remplacé par `k8s/prep
 à `10m` sans conséquence tant qu'il n'est pas appliqué. Le panneau de réglage "Documents" décrit par
 l'utilisateur (capture d'écran, slider 1-250 Mo) reste introuvable dans le dépôt — non traité ici,
 dette à clarifier avant tout travail futur qui en dépendrait (voir CHANGELOG_AGENT.md).
+
+---
+
+### [2026-09-06] C-02.01 — Contrat de sortie par type calé directement sur `Question.content`, tous les 4 types déjà persistables retenus comme générables
+
+**Contexte** — Ticket `C-02.01` demande la spécification des types d'exercice générables par IA (feature list
+`C-02`, aucune ligne de code existante côté cette feature, `C-02` à 0/9 dans Odoo). Deux questions à trancher :
+(1) faut-il exclure certains des 4 types de questions déjà supportés (`open`/`mcq`/`fill_blank`/`reorder`,
+`exercices_types_correction.md` §2) de la génération IA ? (2) le schéma JSON de sortie par type doit-il
+reprendre tel quel le contrat de persistance actuel, ou un format intermédiaire plus simple à écrire dans le
+prompt ?
+
+**Décision (2 points)** :
+1. **Aucun type exclu** — les 4 types déjà persistables sont retenus comme générables, avec un niveau de
+   garde-fou différencié par type documenté dans le document (§3.1) plutôt qu'une exclusion. Exclure un type
+   déjà supporté manuellement (ex. `reorder`, le plus complexe à générer sans ambiguïté d'ordre) aurait créé
+   une incohérence entre ce qu'un enseignant peut créer à la main et ce que l'IA peut proposer, sans
+   justification dans le périmètre du ticket qui ne nomme aucune restriction de type.
+2. **`content` du contrat de sortie reprend exactement la forme déjà persistée dans `Question.content`**
+   (même principe que la décision C-01.01 du 2026-09-01 pour les cartes Leitner), plutôt qu'un format
+   intermédiaire générique (ex. `{ question, answer, choices? }` unique à parser/transformer ensuite). Contrairement
+   à C-01.01 (3 endpoints à orchestrer, `content` reconstruit à partir de champs séparés `answer`/
+   `acceptedAnswers`/`options`), le mapping obtenu ici est encore plus direct : `content` du contrat de sortie
+   **est** la structure attendue par `POST /questions`, sans transformation.
+
+**Alternative écartée** : un schéma de sortie générique unique tous types confondus (`{ question, answer,
+choices?, blanks? }`), plus simple à décrire en un seul bloc dans le prompt mais qui aurait reporté sur la
+Validation format (hors périmètre de ce ticket) tout le travail de discrimination entre les 4 types et de
+construction du `content` propre à chacun — écarté pour la même raison que C-01.01 : ne pas déplacer une
+contrainte du modèle de données vers une étape qui n'a pas vocation à la connaître mieux que le prompt
+lui-même.
+
+**Conséquences** : le contrat de sortie (`diagrams/generation_ia_exercices_types.md` §5) est couplé au
+contrat de persistance actuel de `Question` — toute évolution future de la structure `content` par type
+(`exercices_types_correction.md` §3) devra être répercutée dans ce document. Le mapping de persistance
+(§7 du document) reste explicitement une hypothèse non tranchée, pas une décision actée, comme pour C-01.01.
+
+---
+
+### [2026-09-06] C-02 — Orientation fournisseur LLM étendue à Mistral AI, même raison RGPD que `C-01`
+
+**Contexte** — Le document `diagrams/generation_ia_exercices_types.md` (C-02.01) laissait initialement ouvert
+le choix du fournisseur LLM pour `C-02`, faute d'arbitrage explicite propre à cette feature. L'orientation
+Mistral AI avait été actée pour `C-01` (entrée du 2026-09-01) sur un seul critère : la conformité RGPD
+(hébergement UE par défaut, pas de cadre de transfert international à mettre en place face à une offre
+américaine type OpenAI/Anthropic). Ce critère ne dépend en rien du type de contenu généré (cartes de révision
+vs. questions d'exercice) — c'est une contrainte de conformité au niveau de l'application, pas une propriété
+du prompt `C-01.01` spécifiquement.
+
+**Décision** — Étendre l'orientation Mistral AI à `C-02`, pour la même raison RGPD, sans nouvel arbitrage
+multi-fournisseurs. Initialement posée par extrapolation (raisonnement ci-dessus, l'utilisateur ayant délégué
+l'appréciation de « ce qui manque » pour C-02.01), puis **confirmée explicitement par l'utilisateur le même
+jour** (« on restera chez Mistral pour C-02 aussi ») — ce n'est donc plus une simple extrapolation mais une
+orientation actée directement, au même titre que celle de `C-01`. **Ceci reste une orientation de
+fournisseur, pas un Benchmark LLM** : le modèle précis dans la gamme Mistral pour le prompt à 4 types de
+`C-02.01` (`open`/`mcq`/`fill_blank`/`reorder`) n'est pas choisi ici — le profil de tâche diffère de celui
+évalué en `C-01.03` (garde-fous de cohérence structurelle supplémentaires : `template`/`blanks` alignés,
+`fragments` non ambigus), ce qui peut justifier une mesure propre plutôt qu'une reprise automatique de
+`mistral-small-latest`.
+
+**Alternative écartée** : laisser le choix de fournisseur totalement ouvert pour `C-02` jusqu'à un futur
+Benchmark LLM dédié — écartée car le critère RGPD qui a tranché pour `C-01` n'est pas un critère « à
+rebenchmarker », c'est une contrainte de conformité déjà actée au niveau produit ; le rouvrir sans raison
+nouvelle aurait été une régression sur une décision déjà motivée, pas une prudence utile.
+
+**Conséquences** : `diagrams/generation_ia_exercices_types.md` §12 mis à jour pour refléter cette orientation.
+Le Benchmark LLM propre à `C-02` (modèle précis, mesure empirique sur le prompt à 4 types) reste un point
+ouvert, à traiter dans le cadre du Service génération (élément IN du feature list `C-02`, hors périmètre de
+C-02.01) — pas automatiquement délégué à `C-01.03`. Aucun code, aucune clé d'API, aucune variable
+d'environnement ajoutée — décision d'orientation documentaire uniquement, comme pour `C-01`.
+
+---
+
+### [2026-09-06] C-02.01 — Correction d'audit : `content.accepted_answers` existe bien pour `open`, contrairement à ce que documentait initialement le contrat de sortie
+
+**Contexte** — En préparant C-02.02 (maquettes UI), audit du code réel de création manuelle d'exercice
+(`ExercisesPage.vue#buildContent`, cas `'open'`) et de la correction serveur (`Test.service.js#_checkAnswer`,
+cas `'open'`) pour aligner l'écran de validation sur les vrais champs du formulaire. Trouvé : `_checkAnswer`
+compare en fait la réponse étudiante à `[content.correct_answer, ...content.accepted_answers]` via
+`SemanticService.gradeSemantic(accepted[], user)` (meilleure similarité retenue) — `content.accepted_answers`
+existe et est actif en correction. Le contrat de sortie posé en C-02.01 (§5 du document) affirmait l'inverse
+(« Pas de champ acceptedAnswers... une liste de variantes n'a pas d'utilité côté correction ») en s'appuyant
+sur `diagrams/exercices_types_correction.md` §3.1, qui ne documente que `correct_answer` — ce document
+(antérieur, M-06.14) s'est révélé obsolète sur ce point précis face au code réel, jamais mis à jour depuis
+l'ajout de `accepted_answers` au formulaire de création.
+
+**Décision** — Corriger directement `diagrams/generation_ia_exercices_types.md` (§4.1 nouvelle règle 5, §5,
+§6.1, exemple §10) pour inclure `content.accepted_answers` comme champ optionnel du type `open`, plutôt que de
+laisser le document erroné et signaler l'écart uniquement dans ce journal. Justification de l'édition directe
+(exception à la convention actée en C-01.08 — « les documents d'analyse restent figés, les écarts se
+documentent sans édition rétroactive ») : cette convention protège un document qui a déjà servi de base à une
+implémentation réelle (cas C-01.01) ; `C-02.01` n'a **aucune implémentation** à ce jour — il ne s'agit pas d'un
+écart entre le document et une réalité construite dessus, mais d'une erreur factuelle dans le document
+lui-même, découverte avant que quiconque ne s'appuie dessus. La corriger sur place évite de propager un
+contrat de sortie faux à qui implémentera `C-02` ensuite.
+
+**Alternative écartée** : laisser `generation_ia_exercices_types.md` tel quel et ajouter seulement une entrée
+correctrice ici — écartée précisément parce que le document, pas seulement le journal, est la source que lira
+l'implémenteur du Service génération ; une erreur dans le contrat de sortie qui persiste dans le document
+source serait bien plus coûteuse à rattraper après coup (cf. le cas symétrique C-01.04, où un écart de
+`cardType` non détecté avant l'implémentation avait dû être corrigé après coup dans le service).
+
+**Conséquences** : `diagrams/exercices_types_correction.md` (document tiers, M-06.14) reste lui-même non
+corrigé — hors périmètre de ce ticket, dette signalée dans `CHANGELOG_AGENT.md` pour qui touchera prochainement
+à ce document. Aucun impact sur du code existant (C-02 n'a aucune implémentation).
+
+---
+
+### [2026-09-06] C-02.02 — Maquette limitée au point d'entrée/config/génération, écran de validation explicitement hors périmètre
+
+**Contexte** — Le feature list `C-01` (rappelé en tête de `generation_ia_ui.md`, C-01.02) ne nommait pas
+d'élément « Écran de validation » distinct de « Maquettes UI » : la maquette C-01.02 avait donc couvert tout
+le parcours (config, génération, écran de validation, édition) en un seul document, l'implémentation ayant
+ensuite été scindée en deux tickets a posteriori (C-01.08/C-01.09). Le feature list `C-02` fourni pour ce
+ticket liste « Interface de révision » comme élément IN **distinct** de « Maquettes UI génération exercices » —
+séparation actée dès le planning, pas seulement à l'implémentation.
+
+**Décision** — `diagrams/generation_ia_exercices_ui.md` ne maquette pas l'écran de validation des questions
+générées : seuls le point d'entrée, la modal de configuration (Vue 1) et l'état de génération/erreur (Vue 2)
+sont couverts. L'Interface de révision est traitée comme une interface aval pure (§8 du document) : ce
+document fixe seulement ce qu'elle reçoit en entrée (`{ questions[], warning }`, contrat C-02.01 §5) et ce
+qu'elle doit produire en sortie pour rejoindre `form.questions` (§7) — pas sa maquette.
+
+**Alternative écartée** : suivre le même choix qu'en C-01.02 (tout maquetter en un document, quitte à ce que
+l'implémentation le scinde plus tard) — écartée car le feature list `C-02`, contrairement à celui de `C-01`,
+sépare déjà les deux livrables ; maquetter l'Interface de révision ici aurait empiété sur un ticket dont le
+périmètre exact (accept/edit/reject, ergonomie) n'est pas confié à celui-ci, contrairement au point
+d'attention explicite du ticket (« respecter le périmètre… sans étendre aux éléments hors version »).
+
+**Décision secondaire — pas de persistance serveur intermédiaire supposée pour le flux exercice** :
+contrairement à C-01 (`AiGenerationBatch`/`AiGeneratedCard`, cartes ajoutées une par une à un `LeitnerSystem`
+déjà existant), la modal « Nouvel exercice » d'`ExercisesPage.vue` ne persiste rien avant la soumission finale
+(`submitCreate()`) — `form.questions` n'est qu'un état local. Le document (§8) note donc qu'une architecture de
+Service génération plus simple (réponse HTTP synchrone sans table de brouillon) est plausible pour `C-02`,
+sans le trancher (ce n'est pas le rôle d'une maquette UI) — laissé au ticket Service génération.
+
+**Conséquences** : le contrat d'interface (§7 du document, réutilisation de `contentToFormState` déjà
+existant) est la seule chose actée côté persistance/mapping. Si l'Interface de révision ou le Service
+génération choisissent malgré tout une architecture à brouillon persisté (pour permettre une reprise après
+fermeture accidentelle, capacité que ce document n'offre pas), ce choix devra composer avec le fait que la
+modal exercice, elle, ne persiste jamais rien avant la soumission finale — une incohérence UX potentielle
+(brouillon IA récupérable, mais pas les questions ajoutées manuellement dans la même modal) à trancher
+explicitement le cas échéant, pas silencieusement.
+
+---
