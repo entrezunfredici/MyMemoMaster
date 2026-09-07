@@ -156,6 +156,8 @@
 | Génération de Leitner par IA (C-01) — Écran révision cartes générées | **Livré (front-end)** — Vue 3/4 de la maquette C-01.02 : `components/AiValidationScreenComponent.vue` (écran plein remplaçant `FlashcardsCardsPage.vue`, checkbox=statut `AiGeneratedCard.status` persistée à chaque interaction — résiste à un rechargement, accordéon `sourceExcerpt`, bandeau `warnings`, `[Tout accepter]`), `components/AiCardEditModalComponent.vue` (Vue 4, composant dédié plutôt que la modal manuelle existante — voir DECISIONS.md), promotion des cartes cochées via `aiCardGenerationStore.promoteCard` (3 endpoints existants, échec partiel toléré : cartes en échec gardées avec badge, réessayables). Bandeau "reprendre un brouillon pending" ajouté sur `FlashcardsCardsPage.vue` (question posée à l'utilisateur, tranchée le 2026-09-02) — `fetchPendingBatches`. 13 nouveaux tests store (22 au total sur `aiCardGeneration.js`) | 2026-09-02 |
 | Génération d'exercices par IA (C-02) — Maquettes UI génération exercices | **Analyse livrée, aucun code** — `diagrams/generation_ia_exercices_ui.md` (C-02.02) : point d'entrée réel audité (`ExercisesPage.vue`, pas `CreateTestPage.vue` — route morte/orpheline, contrat obsolète, signalé) ; bouton « ✨ Générer par IA » dans la modal « Nouvel exercice »/« Modifier l'exercice » ; Vue 1 (modal config, 5 valeurs de `questionType` dont défaut `mixed`) ; Vue 2 **réutilisée intégralement sans modification** (`AiGenerationProgressModalComponent.vue`, déjà générique). **L'Interface de révision est explicitement hors périmètre** (élément IN distinct du feature list `C-02`, à la différence de `C-01.02`) — seul le point de raccordement vers `form.questions` (déjà existant, `contentToFormState`) est fixé. Aucune persistance intermédiaire nécessaire (contrairement à `AiGenerationBatch` en C-01) : le flux exercice ne persiste rien avant la soumission finale du formulaire, déjà le cas pour l'ajout manuel | 2026-09-06 |
 | Génération d'exercices par IA (C-02) — Spécification types exercices générables | **Analyse livrée, aucun code** — `diagrams/generation_ia_exercices_types.md` (C-02.01) : décision de générabilité sur les 4 types déjà persistables (`open`/`mcq`/`fill_blank`/`reorder`, `exercices_types_correction.md` §2), prompt système + prompt utilisateur, contrat d'entrée (`sourceText`/`subjectContext`/`questionCount`/`questionType`/`outputLanguage`), contrat de sortie JSON par type calé directement sur `Question.content` (aucune reconstruction nécessaire côté persistance, contrairement au mapping à 3 endpoints de `generation_ia_prompt_cartes.md`), garde-fous génériques (anti-hallucination, atomicité, contenu insuffisant) et propres à chaque type (`open` : réponse canonique complète vu la correction sémantique en aval ; `fill_blank` : cohérence stricte `template`/`blanks` ; `reorder` : ordre non ambigu) ; **orientation fournisseur Mistral AI étendue depuis `C-01` (RGPD)** le 2026-09-06, Benchmark LLM propre à `C-02` restant à faire. `C-02` reste à 0/9 dans Odoo — aucune ligne de code, feature voisine de `C-01` (implémentée) | 2026-09-06 |
+| Génération d'exercices par IA (C-02) — Service génération exercices (LLM, parsing) | **Livré, aucun controller/route (comme C-01.04)** — `services/AiExerciseGeneration.service.js` (C-02.03) : exécute le prompt C-02.01 (`diagrams/generation_ia_exercices_types.md`) sur `mistral-small-latest` (config C-01.03 réutilisée telle quelle, via `helpers/mistralConfig.js`), appel HTTP natif `fetch` (aucune dépendance ajoutée), `response_format: json_object`, parsing + validation stricte du schéma de sortie par type (`open`/`mcq`/`fill_blank`/`reorder` — dont la cohérence stricte marqueurs `{{n}}` ↔ longueur de `blanks` pour `fill_blank`, et fragments ≥ 2 non tous identiques pour `reorder`, deux garde-fous absents de la génération de cartes Leitner), retry unique sur sortie non conforme puis échec explicite (502), filet anti-doublon inter-types (réutilise `dedupeCards` de `helpers/aiGenerationQualityChecks.js`, générique sur `statement`). Service autonome (pas une extension de `AiCardGeneration.service.js` — voir DECISIONS.md), même limite de périmètre que C-01.04 : pas de chunking/pipeline, pas de quotas, pas de persistance. 67 nouveaux tests (`test/services/AiExerciseGeneration.service.test.js`), 0 régression sur les 1873 tests API | 2026-09-07 |
+| Génération d'exercices par IA (C-02) — Validation format sortie avant import | **Livré, aucun controller/route (idem C-02.03)** — `services/AiExerciseImportValidation.service.js` (C-02.04) : revalide le format d'un brouillon de question (générée en C-02.03, potentiellement **éditée par l'utilisateur** en Interface de révision — hors périmètre) juste avant l'import réel (`POST /questions`, mapping C-02.01 §7), sur les seuls champs réellement persistés (`statement`/`type`/`content` — pas `sourceExcerpt`, jamais transmis à l'import, à la différence de la validation de C-02.03). `validateBatchForImport` partitionne un lot en `importable`/`rejected` (échec partiel toléré, même politique que la promotion des cartes Leitner C-01.09) ; `assertValidForImport` (variante stricte, lève 400) pour un futur import unitaire. **Refactor associé** : les 4 validateurs de `content` par type (C-02.03) extraits dans `helpers/exerciseContentValidation.js`, partagé par les deux services — évite de dupliquer ~90 lignes entre génération et import ; `AiExerciseGeneration.service.js` mis à jour pour déléguer à ce helper, comportement public inchangé (67 tests existants toujours verts sans modification). 24 nouveaux tests (`AiExerciseImportValidation.service.test.js`) + 0 régression sur les 1897 tests API | 2026-09-07 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -10769,4 +10771,127 @@ obsolète ; ni supprimée ni corrigée (hors périmètre d'un ticket d'analyse).
 Leitner vs. `MAX_UPLOAD_SIZE_MB` backend, signalée mais non corrigée.
 
 ---
+
+## [2026-09-07] C-02.03 : Service génération exercices (LLM, parsing) — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.03` (feature list `C-02`, source planning V2, extension US-05A, suite directe de
+C-02.01/C-02.02). Objectif : livrer le « Service génération exercices (LLM, parsing) » — même intitulé que le
+périmètre de `AiCardGeneration.service.js` (C-01.04) sur la feature voisine `C-01`, appliqué ici aux 4 types
+d'exercices plutôt qu'aux 2 types de cartes Leitner. Point d'attention explicite du ticket : respecter ce
+périmètre sans étendre aux autres éléments IN du feature list (Spécification types générables — déjà livré en
+C-02.01 — Service génération au sens orchestration, Validation format, Mode dégradé, Interface de révision).
+
+**Audit préalable** (règle d'`AGENT.md`) — Le contrat exact (prompt système/utilisateur, schéma de sortie par
+type, garde-fous) était déjà entièrement spécifié par `diagrams/generation_ia_exercices_types.md` (C-02.01,
+livré le 2026-09-06) : ce ticket l'implémente au pied de la lettre, sans redécision de contrat. Vérifié en plus
+dans le code réel (`models/Question.model.js`, `services/Test.service.js#_checkAnswer`,
+`validators/Question.validators.js`) : les 4 types (`open`/`mcq`/`fill_blank`/`reorder`) et la forme exacte de
+`content` par type sont bien celles déjà en production pour la création manuelle d'exercice — cohérent avec
+C-02.01, aucun écart trouvé entre le document et le code.
+
+**Ce qui a été fait** — `services/AiExerciseGeneration.service.js` : `buildSystemPrompt`/`buildUserPrompt`
+(texte repris à l'identique de C-02.01 §4), `validateInput` (mêmes garde-fous que C-01.04 : `sourceText`
+requis, `questionCount` entier 1-30, `questionType` parmi les 5 valeurs), 4 validateurs de `content` dédiés
+(`validateOpenContent`/`validateMcqContent`/`validateFillBlankContent`/`validateReorderContent`) appelés par
+`validateQuestion` selon le `type`, `validatePayload`/`parseAndValidate` (schéma racine `{ questions[],
+warning }`, contrôle de cohérence `questionType` demandé ↔ type réellement renvoyé par question — même
+contrôle que C-01.04 avait dû ajouter après un écart constaté en prod), `applyDedupeSafetyNet` (réutilise
+`dedupeCards` de `helpers/aiGenerationQualityChecks.js` tel quel — la fonction ne dépend que de `statement`,
+générique aux cartes comme aux questions), `callModel` (appel Mistral avec backoff 429, dupliqué depuis
+`AiCardGeneration.service.js` plutôt que factorisé — voir DECISIONS.md), `generateExercises` (point d'entrée,
+retry unique sur sortie non conforme, usage tokens remonté sur succès **et** sur échec après appel réel
+facturé — même contrat que C-01.06 pour un futur suivi de budget, non branché ici).
+
+**Ce qui n'est PAS couvert** — Chunking/pipeline pour un contenu source long (équivalent C-01.05, hors
+périmètre — ce service prend un `sourceText` déjà découpé), quotas/budget (hors périmètre, C-02 n'a pas
+d'élément « Quotas » nommé dans le feature list fourni, cf. C-02.01 §12), persistance (pas de
+`AiGenerationBatch`/table dédiée — le mapping de persistance reste l'hypothèse ouverte de C-02.01 §7 :
+réutilisation directe de `POST /tests` + `POST /questions`, `content` déjà dans la forme attendue sans
+reconstruction), controller/route HTTP (aucune requête entrante ne branche encore ce service, comme
+`AiCardGeneration.service.js` avant C-01.09), Interface de révision, Mode dégradé.
+
+**Choix techniques** — Service autonome `AiExerciseGeneration.service.js` plutôt qu'une extension de
+`AiCardGeneration.service.js` ; `MAX_QUESTION_COUNT = 30` repris de `MAX_CARD_COUNT` en l'absence de borne
+chiffrée actée pour C-02 ; logique d'appel Mistral/backoff dupliquée plutôt que factorisée dans un helper
+partagé — les trois choix et leur justification sont détaillés dans une entrée dédiée de `DECISIONS.md`.
+
+**Fichiers créés**
+- `services/AiExerciseGeneration.service.js`
+- `test/services/AiExerciseGeneration.service.test.js` (67 tests)
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md` (ligne État global + cette entrée)
 - `.agents/DECISIONS.md`
+
+**Tests** — 67 nouveaux tests (prompts, `validateInput`, les 4 validateurs de `content`, `validatePayload`,
+`parseAndValidate`, `callModel` dont 429/backoff/Retry-After, `generateExercises` dont retry sur incohérence
+`fill_blank`/`reorder` et dédoublonnage). Suite complète API relancée : **1873/1873, 0 régression**. Linter
+(`npx eslint`) propre sur les 2 fichiers.
+
+**Points d'attention / dette** — Comme pour C-01.04 à sa livraison, aucun appel réel à l'API Mistral n'a été
+effectué sur CE prompt précis (pas de clé API fournie pour ce ticket) — la conformité du prompt n'est vérifiée
+que structurellement (tests unitaires sur des réponses mockées), pas empiriquement (cf. C-02.01 §12, « aucun
+appel réel n'a été fait »). Le Benchmark LLM propre à `C-02` (modèle précis dans la gamme Mistral) reste non
+fait — `mistral-small-latest` est réutilisé par hypothèse, comme C-02.01 le documentait déjà. `C-02` reste à
+0/9 dans Odoo (mise à jour non demandée explicitement dans ce ticket).
+
+---
+
+## [2026-09-07] C-02.04 : Validation format sortie avant import — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.04` (feature list `C-02`, source planning V2, extension US-05A, suite directe de
+C-02.03). Objectif : livrer « Validation format sortie avant import », sans déborder sur les autres éléments IN
+(Spécification types générables, Service génération — tous deux déjà livrés — Mode dégradé, Interface de
+révision).
+
+**Écart de scoping trouvé avant implémentation, tranché en hypothèse documentée** — Aucun document de
+spécification dédié n'existe pour cet élément (contrairement à C-02.01/C-02.02). `generation_ia_exercices_types.md`
+§9 décrit « Validation format » comme : « Vérifie la conformité de la sortie du LLM au schéma §5 avant de
+l'exposer à l'Interface de révision » — ce qui, pris littéralement, chevaucherait presque entièrement la
+validation déjà embarquée dans `AiExerciseGeneration.service.js#validatePayload` (C-02.03, retry sur sortie non
+conforme avant de renvoyer le brouillon). Le titre exact de CE ticket (« Validation format sortie **avant
+import** », distinct du « avant… Interface de révision » de C-02.01 §9) a été retenu comme un second point de
+contrôle, décalé dans le temps : après que l'utilisateur a réellement édité/accepté une question en Interface
+de révision (hors périmètre), juste avant que le mapping d'import (`POST /questions`, C-02.01 §7) ne
+persiste `content`. Une édition utilisateur peut réintroduire une non-conformité qu'un contrôle uniquement
+au moment de la génération ne peut pas voir (ex. : suppression de la seule option `correct: true` d'un `mcq`,
+désynchronisation `template`/`blanks` après une modification manuelle d'un `fill_blank`). **Décision prise en
+conséquence**, documentée en détail dans `DECISIONS.md`.
+
+**Ce qui a été fait** —
+1. `helpers/exerciseContentValidation.js` (nouveau) : extraction des 4 validateurs de `content` par type
+   (`open`/`mcq`/`fill_blank`/`reorder`) depuis `AiExerciseGeneration.service.js`, + un dispatcher
+   `validateContentByType`. Fonctions pures, mêmes règles qu'en C-02.03 (aucun changement de comportement).
+2. `services/AiExerciseGeneration.service.js` (C-02.03) mis à jour pour déléguer à ce helper au lieu de ses 4
+   méthodes désormais supprimées — comportement public (`validateQuestion`, `validatePayload`,
+   `parseAndValidate`, `generateExercises`) strictement inchangé, les 67 tests existants passent sans
+   modification.
+3. `services/AiExerciseImportValidation.service.js` (nouveau, C-02.04) : `validateQuestionFormat` (une
+   question, sur `statement`/`type`/`content` uniquement — pas `sourceExcerpt`), `validateBatchForImport`
+   (partitionne un lot en `importable`/`rejected`, échec partiel toléré), `assertValidForImport` (variante
+   stricte, lève 400, pour un futur import unitaire).
+
+**Ce qui n'est PAS couvert** — L'import lui-même (aucun appel `POST /tests`/`POST /questions` — mapping non
+encore branché, hypothèse ouverte depuis C-02.01 §7), l'Interface de révision (accept/edit/reject), le Mode
+dégradé, tout controller/route HTTP exposant ces validations.
+
+**Fichiers créés**
+- `helpers/exerciseContentValidation.js`
+- `services/AiExerciseImportValidation.service.js`
+- `test/services/AiExerciseImportValidation.service.test.js` (24 tests)
+
+**Fichiers modifiés**
+- `services/AiExerciseGeneration.service.js` (délégation au helper, comportement public inchangé)
+- `.agents/CHANGELOG_AGENT.md`
+- `.agents/DECISIONS.md`
+
+**Tests** — 24 nouveaux tests (les 4 types valides, `statement`/`type`/`content` invalides, régressions
+post-édition par type, partitionnement d'un lot dont une partie invalide, variante stricte avec/sans index).
+67 tests existants de C-02.03 revérifiés verts après le refactor. Suite complète API : **1897/1897, 0
+régression**. Linter propre sur les 4 fichiers touchés/créés.
+
+**Points d'attention / dette** — Le mapping de persistance réel (quels champs partent réellement vers
+`POST /questions`, dans quel ordre, avec quelle gestion d'échec partiel HTTP) reste une hypothèse non tranchée
+(C-02.01 §7) — ce service valide un contrat qu'aucun code n'utilise encore réellement en HTTP. Comme pour
+C-02.03, aucun appel réel au flux complet (génération → édition → import) n'a été exercé de bout en bout,
+faute d'Interface de révision existante pour `C-02`.

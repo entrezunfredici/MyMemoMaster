@@ -3038,3 +3038,97 @@ modal exercice, elle, ne persiste jamais rien avant la soumission finale — une
 explicitement le cas échéant, pas silencieusement.
 
 ---
+
+### [2026-09-07] C-02.03 — Service génération exercices autonome, sans étendre `AiCardGeneration.service.js`
+
+**Contexte** : `generation_ia_exercices_types.md` §9 (C-02.01) laissait explicitement ouverte la question d'une
+réutilisation de `AiCardGeneration.service.js` (C-01.04) pour exécuter le prompt exercices, « plausible mais
+non actée ». Ce ticket devait trancher.
+
+**Décision** : nouveau service dédié `services/AiExerciseGeneration.service.js`, qui ne touche ni ne dépend de
+`AiCardGeneration.service.js`. Les deux services dupliquent une partie non négligeable de logique (structure
+`callModel` avec backoff 429, pattern `validateInput`/`validatePayload`/`parseAndValidate`, retry unique sur
+sortie non conforme, remontée d'`usage` sur succès et sur échec facturé).
+
+**Alternative écartée** : généraliser `AiCardGeneration.service.js` pour accepter soit un schéma « cartes »
+soit un schéma « exercices » (paramètre de mode, ou classe de base commune) — écartée pour deux raisons :
+(1) `AGENT.md` §2 interdit de modifier une interface/un module existant hors périmètre du ticket courant sans
+validation explicite, et généraliser un service déjà livré et utilisé en production (C-01, branché en HTTP
+depuis le 2026-09-02) est un risque de régression sans rapport avec ce ticket ; (2) les schémas de sortie
+divergent structurellement au-delà d'un simple paramètre — les cartes ont des champs plats
+(`answer`/`acceptedAnswers`/`options`) alors que les exercices ont un `content` unique dont la forme varie
+selon 4 types (`open`/`mcq`/`fill_blank`/`reorder`, dont deux — `fill_blank`, `reorder` — n'ont aucun
+équivalent côté cartes) ; un paramètre de mode aurait fini par bifurquer sur la quasi-totalité des méthodes,
+sans gain de lisibilité réel par rapport à deux services parallèles.
+
+**Conséquences** : duplication assumée de la logique d'appel Mistral (`callModel`) entre les deux services —
+signalée explicitement en commentaire `CHOIX/RAISON` dans `AiExerciseGeneration.service.js`. Piste de
+refactorisation (extraction d'un client Mistral partagé, ex. `helpers/mistralClient.js`) envisageable si un 3e
+service de génération IA voit le jour, mais non entreprise ici (hors périmètre, toucherait `AiCardGeneration.service.js`).
+
+---
+
+### [2026-09-07] C-02.03 — `MAX_QUESTION_COUNT = 30` repris de `MAX_CARD_COUNT`, garde-fou technique non chiffré par C-02.01
+
+**Contexte** : `generation_ia_exercices_types.md` §12 note explicitement l'absence de toute borne chiffrée sur
+`questionCount` — c'est un futur arbitrage de quotas, non nommé dans le feature list `C-02` fourni
+(contrairement à `C-01` qui a un élément « Quotas » dédié, C-01.06). Sans aucune borne, `validateInput` du
+service laisserait passer une valeur arbitrairement grande jusqu'au modèle.
+
+**Décision** : reprendre la même valeur que `MAX_CARD_COUNT` (30) dans `AiExerciseGeneration.service.js`,
+comme garde-fou **technique** (protège le service d'un appel manifestement aberrant), explicitement **pas**
+une politique de quota produit — même distinction déjà actée pour C-01.04.
+
+**Alternative écartée** : ne fixer aucune borne (laisser `questionCount` illimité côté service, à charge d'un
+futur endpoint HTTP de la plafonner) — écartée car ce service est appelable directement (pas seulement via un
+futur controller), et un appel avec un `questionCount` disproportionné gaspillerait des tokens/coût réel sur
+un seul appel LLM avant même d'atteindre une éventuelle limite HTTP en amont.
+
+**Conséquences** : purement un filet de sécurité, à ne pas confondre avec une décision produit — si un ticket
+Quotas dédié à `C-02` est un jour scopé (cf. point ouvert C-02.01 §12 : « à clarifier si C-02 a besoin d'un
+quota propre ou réutilise celui de C-01 »), cette constante technique reste indépendante de son résultat et
+n'a pas vocation à être le mécanisme de quota lui-même.
+
+---
+
+### [2026-09-07] C-02.04 — « Validation format sortie avant import » interprétée comme un 2ᵉ contrôle, post-édition, distinct de C-02.03
+
+**Contexte** : le feature list `C-02` nomme « Validation format » comme élément IN distinct de « Service
+génération », mais `generation_ia_exercices_types.md` §9 (C-02.01) décrivait déjà son interface comme
+« vérifie la conformité de la sortie du LLM au schéma avant de l'exposer à l'Interface de révision » — rôle
+en grande partie déjà rempli par `AiExerciseGeneration.service.js#validatePayload` (C-02.03, retry sur sortie
+non conforme avant de renvoyer le brouillon). Le ticket réel reçu pour C-02.04 porte un intitulé plus précis :
+« Validation format sortie **avant import** » — distinct du « avant… Interface de révision » de C-02.01 §9.
+Aucun document de spécification dédié n'existait pour trancher explicitement lequel des deux moments (avant
+révision vs avant import) ce ticket devait couvrir.
+
+**Décision** : interpréter « avant import » littéralement — un second point de contrôle, décalé après
+l'Interface de révision (accept/**edit**/reject, hors périmètre), juste avant que le mapping d'import
+(`POST /questions`, C-02.01 §7) ne persiste réellement `content`. Nouveau service dédié
+`services/AiExerciseImportValidation.service.js`, qui ne valide QUE les champs réellement envoyés à l'import
+(`statement`/`type`/`content`) — pas `sourceExcerpt` (traçabilité de génération, jamais transmis à
+`POST /questions`).
+
+**Alternative écartée** : traiter C-02.04 comme un doublon fonctionnel de la validation déjà faite en C-02.03
+(ne livrer qu'une revue/documentation de l'existant, sans nouveau code) — écartée parce qu'elle aurait laissé
+un vrai trou fonctionnel non couvert : une question ÉDITÉE par l'utilisateur en Interface de révision peut
+redevenir non conforme (ex. suppression de la seule option `correct: true` d'un `mcq`, désynchronisation
+`template`/`blanks` d'un `fill_blank` après modification manuelle) sans qu'aucun code existant ne le
+revérifie — la validation de C-02.03 s'exécute une seule fois, sur la sortie BRUTE du modèle, jamais rejouée
+après une édition. Traiter C-02.04 comme un doublon aurait donc livré « aucun code » sur un ticket qui en
+demande explicitement (DoD : tests, changelog, revue).
+
+**Conséquences** : deux surfaces de validation coexistent désormais pour `C-02`, avec des moments et des
+champs vérifiés différents (voir en-tête de `AiExerciseImportValidation.service.js`) — à ne pas fusionner
+naïvement en un seul point de contrôle si un futur ticket branche l'import réel, sous peine de perdre soit la
+vérification de `sourceExcerpt`/cohérence de type à la génération, soit la revalidation post-édition. Les 4
+règles de forme de `content` par type restent la seule source de vérité partagée
+(`helpers/exerciseContentValidation.js`, extrait de C-02.03 dans la foulée) — un seul endroit à faire évoluer
+si le contrat change, malgré les deux points d'appel.
+
+**Point ouvert** : cette interprétation reste une hypothèse de travail (comme celles déjà posées en C-02.01),
+non confirmée par l'utilisateur — à revoir si un futur ticket Interface de révision/Import révèle un besoin
+différent (ex. un seul point de contrôle suffisant si l'édition elle-même est contrainte côté UI à ne jamais
+pouvoir casser le format).
+
+---
