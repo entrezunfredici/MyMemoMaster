@@ -261,11 +261,34 @@ class SemanticService {
   }
 
   /**
-   * Extaction de mots-clés : tokens > 2 chars et pas dans stopwords
+   * Un token est « substantiel » s'il contient au moins une lettre ou un chiffre —
+   * exclut les résidus de ponctuation/opérateurs isolés (« = », « - »…) que la
+   * tokenization peut laisser passer sans qu'ils portent de sens lexical.
+   */
+  isSubstantialToken(token) {
+    return /[a-zà-öø-ÿͰ-Ͽ0-9]/i.test(token)
+  }
+
+  /**
+   * Extraction de mots-clés : tokens > 2 chars et pas dans stopwords, avec repli
+   * sur un filtre permissif (tokens ≥1 char hors stopwords) quand ce filtre
+   * strict ne laisse rien.
+   *
+   * CONTEXTE (2026-09-08) : une réponse très symbolique/courte (« dP = ρg dV »)
+   * ne produit que des tokens de 1-2 caractères (variables physiques : ρ, g, V,
+   * m, F…) — le filtre strict seul renvoie alors un ensemble vide, ce qui force
+   * `computeKeywordOverlap` à 0 (cf. son garde `size === 0`) et rejette la
+   * réponse en zone grise quel que soit son contenu réel, indépendamment du
+   * score sémantique affiché. Le repli ne s'active que si le filtre strict est
+   * vide : aucun changement pour les réponses en prose classiques (calibration
+   * DECISIONS.md 2026-07-18 inchangée).
    */
   extractKeywords(text) {
-    const tokens = this.tokenize(text)
-    return new Set(tokens.filter((token) => token.length > 2 && !STOPWORDS.has(token)))
+    const tokens = this.tokenize(text).filter(
+      (token) => this.isSubstantialToken(token) && !STOPWORDS.has(token)
+    )
+    const strict = tokens.filter((token) => token.length > 2)
+    return new Set(strict.length > 0 ? strict : tokens)
   }
 
   /**

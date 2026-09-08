@@ -62,6 +62,36 @@ describe('SemanticService', () => {
       const result = SemanticService.extractKeywords(text)
       expect(result.size).toBe(0) // All are stopwords or too short
     })
+
+    // Bug reproduit le 2026-09-08 (session Leitner) : une réponse physiquement
+    // correcte mais très symbolique (« dP = ρg dV ») ne produisait AUCUN mot-clé
+    // (tous les tokens ≤2 caractères), forçant computeKeywordOverlap à 0 et donc
+    // un rejet automatique en zone grise — indépendamment du score sémantique
+    // affiché (75 % dans le cas réel).
+    it('replie sur un filtre permissif quand une réponse symbolique/courte ne laisse aucun mot-clé de plus de 2 caractères', () => {
+      const result = SemanticService.extractKeywords('dP = ρg dV')
+      expect(result.size).toBeGreaterThan(0)
+      expect(result.has('ρg')).toBe(true)
+    })
+
+    it('le repli fonctionne aussi pour des variables latines pures (« F = ma »)', () => {
+      const result = SemanticService.extractKeywords('F = ma')
+      expect(result.has('f')).toBe(true)
+      expect(result.has('ma')).toBe(true)
+    })
+
+    it("n'introduit pas un opérateur isolé (« = ») comme mot-clé via le repli", () => {
+      const result = SemanticService.extractKeywords('F = ma')
+      expect(result.has('=')).toBe(false)
+    })
+
+    it('ne déclenche pas le repli quand le filtre strict trouve déjà des mots-clés (pas de régression sur la prose)', () => {
+      // « archimède » (>2 car.) suffit à alimenter le set strict : le repli ne
+      // doit pas s'activer et ajouter des tokens courts superflus.
+      const result = SemanticService.extractKeywords("le principe d'archimède")
+      expect(result.has('principe')).toBe(true)
+      expect(result.has('le')).toBe(false) // stopword, jamais réintroduit par le repli
+    })
   })
 
   describe('computeKeywordOverlap', () => {
@@ -80,6 +110,16 @@ describe('SemanticService', () => {
       const keywords2 = new Set()
       const overlap = SemanticService.computeKeywordOverlap(keywords1, keywords2)
       expect(overlap).toBe(0)
+    })
+
+    it('scénario réel : deux réponses symboliques ne diffèrent plus à tort par un recouvrement à 0', () => {
+      // Avant le repli de extractKeywords, les deux ensembles étaient vides
+      // (Set(0)) et computeKeywordOverlap retournait 0 systématiquement —
+      // rejet automatique en zone grise sans rapport avec le score sémantique.
+      const studentKeywords = SemanticService.extractKeywords('dP = ρg dV')
+      const referenceKeywords = SemanticService.extractKeywords('dP = -ρg dV')
+      const overlap = SemanticService.computeKeywordOverlap(studentKeywords, referenceKeywords)
+      expect(overlap).toBeGreaterThan(0)
     })
   })
 

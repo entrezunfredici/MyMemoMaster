@@ -303,7 +303,7 @@
                     <span v-if="s.type === 'rendu'" class="text-xs text-primary select-none">
                       {{ expandedRenduSections[s.id] ? '▲' : '▼ Voir rendus' }}
                     </span>
-                    <button @click.stop="sectionStore.delete(selectedId, s.id)" class="text-xs text-secondary hover:underline">Supprimer</button>
+                    <button @click.stop="confirmDeleteSection(s)" class="text-xs text-secondary hover:underline">Supprimer</button>
                   </div>
                 </div>
                 <!-- Rendus étudiants (uniquement pour type=rendu) -->
@@ -371,7 +371,7 @@
                   </p>
                   <p class="text-xs text-dark/60">Séance : {{ dl.occurrence?.calendarEvent?.name }}</p>
                 </div>
-                <button @click="deleteGroupDeadline(dl.id)" class="text-xs text-secondary hover:underline">Supprimer</button>
+                <button @click="confirmDeleteDeadline(dl)" class="text-xs text-secondary hover:underline">Supprimer</button>
               </div>
             </div>
           </section>
@@ -466,7 +466,7 @@
               </div>
               <div class="flex gap-2">
                 <button v-if="r.fileKey" @click="openFile(r.fileKey)" class="text-xs text-primary underline">Ouvrir</button>
-                <button aria-label="Supprimer la ressource" @click="resourceStore.delete(selectedId, r.id)" class="text-xs text-secondary hover:underline">×</button>
+                <button aria-label="Supprimer la ressource" @click="confirmDeleteResource(r)" class="text-xs text-secondary hover:underline">×</button>
               </div>
             </div>
           </div>
@@ -533,7 +533,7 @@
                     {{ m.role === 'teacher' ? 'Enseignant' : 'Étudiant' }}
                   </span>
                   <button aria-label="Retirer le membre" v-if="m.role === 'student'"
-                    @click="classGroupStore.removeMember(selectedId, m.userId)"
+                    @click="confirmRemoveMember(m)"
                     class="text-secondary text-xs hover:underline">×</button>
                 </div>
               </div>
@@ -561,10 +561,25 @@
       Sélectionnez un groupe pour accéder à votre espace enseignant.
     </div>
   </div>
+
+  <!-- Modal confirmation suppression/retrait -->
+  <ModalComponent
+    :visible="confirmModal.visible"
+    :title="confirmModal.title"
+    size="sm"
+    @close="closeConfirmModal"
+  >
+    <p class="text-sm text-dark/70">{{ confirmModal.message }}</p>
+    <template #footer>
+      <button class="btn-modal-cancel" @click="closeConfirmModal">Annuler</button>
+      <button class="btn-modal-danger" @click="runConfirmedAction">Confirmer</button>
+    </template>
+  </ModalComponent>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch, reactive } from 'vue'
+import ModalComponent from '@/components/ModalComponent.vue'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useDeadlineStore } from '@/stores/deadlines'
@@ -620,6 +635,61 @@ const sectionForm = reactive({ title: '', type: 'section', description: '', dueD
 const resourceForm = reactive({ title: '', type: 'cours', file: null, dragOver: false, error: '' })
 const deadlineForm = reactive({ name: '', type: 'ds', occurrenceId: '', dueDate: '', dueTime: '', testId: null, error: '' })
 const inviteForm = reactive({ targetEmail: '', role: 'student', message: '', error: false })
+
+// Modale de confirmation générique — réutilisée par toutes les actions destructrices de cette vue
+// (section, échéance, membre, ressource) plutôt qu'une modale dédiée par action.
+const confirmModal = reactive({ visible: false, title: '', message: '', action: null })
+
+function askConfirm(title, message, action) {
+  confirmModal.title = title
+  confirmModal.message = message
+  confirmModal.action = action
+  confirmModal.visible = true
+}
+
+function closeConfirmModal() {
+  confirmModal.visible = false
+  confirmModal.action = null
+}
+
+async function runConfirmedAction() {
+  const action = confirmModal.action
+  confirmModal.visible = false
+  confirmModal.action = null
+  if (action) await action()
+}
+
+function confirmDeleteSection(s) {
+  askConfirm(
+    s.type === 'rendu' ? 'Supprimer le rendu' : 'Supprimer la section',
+    `Supprimer « ${s.title} » ? Cette action est irréversible${s.type === 'rendu' ? ' et supprime aussi les soumissions déjà reçues' : ''}.`,
+    () => sectionStore.delete(selectedId.value, s.id)
+  )
+}
+
+function confirmDeleteResource(r) {
+  askConfirm(
+    'Supprimer la ressource',
+    `Supprimer « ${r.title} » ? Cette action est irréversible.`,
+    () => resourceStore.delete(selectedId.value, r.id)
+  )
+}
+
+function confirmDeleteDeadline(dl) {
+  askConfirm(
+    "Supprimer l'échéance",
+    `Supprimer « ${dl.name} » ? Cette action est irréversible.`,
+    () => deleteGroupDeadline(dl.id)
+  )
+}
+
+function confirmRemoveMember(m) {
+  askConfirm(
+    'Retirer le membre',
+    `Retirer ${m.user?.name ?? 'cet étudiant'} du groupe ? Il perdra l'accès à ce groupe.`,
+    () => classGroupStore.removeMember(selectedId.value, m.userId)
+  )
+}
 
 async function selectGroup(id) {
   selectedId.value = id
