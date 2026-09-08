@@ -91,6 +91,15 @@
               <p v-if="currentCard.question?.type !== 'mcq'" class="text-sm">
                 Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%
               </p>
+              <!-- Zone grise (55-78 %) : le verdict ne dépend PAS du score ci-dessus mais d'un
+                   recouvrement de mots-clés distinct — sans cette précision, un score élevé associé
+                   à un verdict "incorrect" (ou l'inverse face à une autre carte de la session) se lit
+                   comme une incohérence de notation plutôt que comme un critère différent (signalé
+                   par un utilisateur en session Leitner, cf. DECISIONS.md 2026-09-08). -->
+              <p v-if="cardStore.lastCorrection?.decision_zone === 'grey_zone'" class="text-xs italic mt-1 opacity-80">
+                Score proche du seuil : la décision se base ici sur les mots-clés de ta réponse, pas
+                uniquement sur ce pourcentage.
+              </p>
               <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
                 Réponse attendue : <FormulaText :text="cardStore.lastCorrection?.correction || ''" />
               </p>

@@ -162,6 +162,7 @@
 | Génération d'exercices par IA (C-02) — Interface génération exercices | **Livré (front-end + branchement HTTP backend minimal)** — referme la chaîne C-02.03/04/05 (jusque-là 0 route HTTP) par `POST /ai-exercise-generations` (`controllers/AiExerciseGeneration.controller.js` + `routes/AiExerciseGeneration.routes.js` + `validators/AiExerciseGeneration.validators.js`, réponse toujours 200 sur échec dégradé via `AiExerciseDegradedMode.service.js#attemptGeneration`, 400 uniquement sur entrée invalide — limiteur `aiGenerationLimiter` partagé avec C-01). Front : `stores/aiExerciseGeneration.js` (`generate`/`reset`, pas de `promoteQuestion`/brouillon persisté — rien ne survit à un rechargement, comme l'ajout manuel), `components/AiGenerateExercisesModalComponent.vue` (Vue 1 — **texte collé uniquement, pas de PDF** — écart d'audit : aucun pipeline chunking/extraction n'existe pour les exercices, voir DECISIONS.md), `components/AiGenerationProgressModalComponent.vue` **réutilisé intégralement sans modification** (Vue 2, comme prévu par C-02.02). Bouton « ✨ Générer par IA » dans la modal « Nouvel exercice »/« Modifier l'exercice » d'`ExercisesPage.vue`. **Écart de conception assumé vs la maquette C-02.02** : pas d'Interface de révision (élément IN distinct, hors périmètre) — remplacée par un geste de confirmation groupé minimal (liste des énoncés générés + `[Ajouter à l'exercice]`/`[Ignorer]`), qui respecte la règle « jamais ajouté automatiquement sans geste explicite » sans construire l'écran accept/edit/reject par question (réservé à un futur ticket dédié) ; les questions acceptées atterrissent dans `form.questions` et restent éditables via les sous-formulaires déjà existants. 34 nouveaux tests (7 route BDD + 7 store + 6 composant Vue1 + 6 wiring ExercisesPage, + 8 tests ExercisesPage déjà existants revérifiés), 0 régression (105 suites/1917 tests API, 52 suites/790 tests front) | 2026-09-07 |
 | Génération d'exercices par IA (C-02) — Écran révision questions générées | **Livré (front-end uniquement)** — `components/AiExerciseReviewModalComponent.vue` (C-02.07) : la vraie Interface de révision, accept/edit/reject par question avec accordéon `sourceExcerpt`, remplace la confirmation groupée minimale de C-02.06 (documentée à l'époque comme palliatif explicite). Modale empilée au-dessus de « Nouvel exercice » (pas d'écran plein, à la différence de `AiValidationScreenComponent.vue`/C-01.09 — cohérent avec l'absence de brouillon persisté côté serveur pour `C-02`) ; édition inline réutilisant les mêmes blocs de formulaire par type que la liste "Questions" existante, extraits dans `helpers/exerciseQuestionForm.js` (`defaultQuestionFormFields`/`contentToFormState`/`buildQuestionContent`, partagé avec `ExercisesPage.vue`, comportement strictement inchangé). Aucun appel réseau/persistance à cette étape (comme le reste de la chaîne C-02) — `confirm` renvoie directement les questions incluses dans la représentation `form.questions`, `ExercisesPage.vue#handleReviewConfirm` les `push`. 36 tests dédiés (17 helper + 12 composant + 7 wiring ExercisesPage, remplaçant les 6 tests de confirmation groupée de C-02.06), 0 régression — **54 suites/820 tests front** (contre 52/790). Aucun changement backend. **[FIX] 2026-09-08** — `handleReviewConfirm` laissait la question vide par défaut d'`ExercisesPage.vue` en tête de `form.questions`, faisant échouer la création de l'exercice (« Erreur question 1. ») — voir entrée dédiée en bas de fichier | 2026-09-08 |
 | Génération d'exercices par IA (C-02) — Import PDF (demande utilisateur, hors ticket du feature list) | **Livré** — comble l'écart assumé en C-02.06/C-02.02 (« aucun pipeline chunking/extraction n'existe pour les exercices ») : nouveau `services/AiExerciseGenerationPipeline.service.js` (chunking + appel LLM par passage, réutilise tel quel `services/PdfExtraction.service.js`/`helpers/textChunker.js` de `C-01`, mêmes constantes/garde-fous que `AiCardGenerationPipeline.service.js` dont le circuit breaker rate limit) ; `AiExerciseDegradedMode.service.js` gagne `attemptGenerationFromContent` (nouvelle méthode, `attemptGeneration` inchangée) ; route `POST /ai-exercise-generations` passe en `multipart/form-data` (`aiPdfUpload.middleware.js` réutilisé tel quel, `sanitize` post-multer comme C-01.11, magic bytes vérifiés) et accepte désormais `sourceText` OU `pdf`, exclusifs. **Changement de contrat HTTP assumé** : la réponse porte `warnings` (tableau) au lieu de `warning` (chaîne) sur tout succès, y compris texte collé — toute génération passe maintenant par le pipeline. Front : `stores/aiExerciseGeneration.js#generate` envoie un `FormData` (texte ou PDF, timeout 300000ms comme `C-01`), état `warnings` (tableau) ; `AiGenerateExercisesModalComponent.vue` regagne l'option "Importer un PDF" (radio + drag&drop, calquée sur `AiGenerateCardsModalComponent.vue`) — **sans reproduire le plafond de taille codé en dur** déjà signalé comme un écart côté cartes (10 Mo alors que le backend accepte `MAX_UPLOAD_SIZE_MB`, 20 Mo par défaut) : validation de taille laissée au serveur ; `AiExerciseReviewModalComponent.vue` affiche `warnings[]` (une ligne par avertissement) au lieu d'un `warning` unique. 34 tests dédiés (28 backend : 27 pipeline + 4 mode dégradé + BDD route réécrite pour mocker le pipeline comme `C-01` ; 24 front : 10 store + 8 modal PDF + 2 review modal warnings, + tests existants mis à jour pour le nouveau contrat). Suites complètes : API **106 suites/1950 tests**, front **54 suites/831 tests**, 0 régression. Linter et audit RGAA statique propres | 2026-09-08 |
+| Génération d'exercices par IA (C-02) — Tests fonctionnels flux génération | **Livré** — `test/bdd/aiExerciseGenerationFlow.test.js` (C-02.08, 7 tests) : referme la boucle Spécification → Service génération → Validation format → Mode dégradé → (Interface de révision simulée côté test) → persistance réelle, jamais exercée ensemble jusqu'ici — seuls les deux vrais points de sortie externes (appel réseau Mistral, extraction PDF) sont mockés, tout le reste (chunking, prompt/parsing/dédoublonnage, orchestration multi-chunks/circuit breaker, classification du mode dégradé, revalidation de format avant import, `POST /tests`+`POST /questions` réels) tourne pour de vrai sur SQLite en mémoire. Couvre : parcours nominal 4 types mixtes avec persistance vérifiée par `GET /tests/:id`, import PDF de bout en bout, mode dégradé LLM indisponible, mode dégradé sortie non exploitable après retry, échec partiel toléré (une question éditée en Interface de révision redevient invalide, seule la question valide est importée), contenu insuffisant (moins de questions que demandé + warning, sortie valide), rejet de saisie 400 (jamais un mode dégradé). **Constat fait en écrivant ce test** (pas une régression introduite ici, conséquence déjà actée du passage systématique par le pipeline le jour même) : un chunk unique qui épuise son retry est reclassé `service_unavailable` au lieu de `invalid_output` par `AiExerciseDegradedMode.service.js` — le pipeline remplace le message précis du chunk par son propre message générique dès que 100 % des chunks échouent, y compris s'il n'y en a qu'un — dégradation du signal assumée (les deux codes restent `degraded:true`/`suggestManualCreation:true`), voir DECISIONS.md. Suite complète API : **108 suites/1964 tests** (contre 107/1957), 0 régression. Linter propre. Aucun code de production modifié (ticket 100% tests) | 2026-09-08 |
 | Partage de ressources pédagogiques (C-03) — Maquettes UI bibliothèque ressources | **Audit-maquette rétroactif livré, aucun code** — `diagrams/bibliotheque_ressources_ui.md` (C-03.02) : l'implémentation (C-03.01, S-03.08/S-02.05) existait déjà en production, sans document `*_ui.md` dédié — traitement identique à S-06.02 (« l'implémentation Vue réelle a précédé les maquettes »). Document produit par audit de l'écran réel (`ClassroomEtudiantView.vue`/`ClassroomEnseignantView.vue`) : vue étudiant (lecture seule), vue enseignant (formulaire drag&drop + liste + suppression), icônes par `mimeType`, contrôle d'accès (rappel). **3 points de dette confirmés, non corrigés** (hors périmètre) : aucune UI d'édition malgré `PUT /resources/:resourceId` existant et testé, champ `url` du modèle inatteignable depuis le formulaire (upload de fichier imposé), aucun filtre par type de ressource dans la bibliothèque. 2 points initialement listés se sont révélés inexacts/incomplets après vérification le jour même : la recherche filtre en réalité déjà les ressources (erreur de lecture, corrigée) ; l'absence de confirmation avant suppression, présentée à tort comme spécifique aux ressources, s'est avérée être le comportement de **toute** la vue enseignant — corrigée en généralisant une modale de confirmation aux 4 actions destructrices (section/rendu, échéance, membre, ressource), voir entrée IMP dédiée | 2026-09-08 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
@@ -11557,3 +11558,214 @@ et recommandé dès que l'occasion se présente. Aucune autre table de jointure 
 même dérive potentielle (ex. `testClassGroups`, `questionSubject`, `cardQuestion`, `questionResponse`) — non
 vérifié ici (hors périmètre de ce correctif ponctuel, purement réactif au bug rapporté), à auditer si un
 symptôme similaire (500 sur un `addXxx()` d'association Sequelize) est un jour rapporté sur l'une d'elles.
+
+---
+
+### [2026-09-08] Addendum — Retest utilisateur du fix `Semantic.service.extractKeywords` (entrée du même jour ci-dessus) : conteneur non redémarré, puis vérifié avec les vraies données
+
+Voir `.agents/DECISIONS.md`, addendum sur l'entrée `extractKeywords` du 2026-09-08 pour le détail complet.
+Résumé : le premier retest utilisateur n'a montré aucun changement car le conteneur `mymemomaster-api-1`
+(bind mount, mais `node server.js` sans `nodemon`) n'avait pas rechargé le fichier corrigé — `docker restart`
+suffit (pas de rebuild). Revérifié ensuite avec les vraies réponses de référence tirées de la table `Response`
+(`correction=true`) plutôt que du texte reconstitué : le cas « poids d'une tranche de fluide » (Q30) passe
+maintenant à 92 % (contre rejet garanti avant, ensemble de mots-clés vide). Le cas « définition macroscopique »
+(Q24, 47 %) reste hors périmètre de ce fix — sous `LOW_THRESHOLD`, décidé par le score d'embedding seul, pas
+par le recouvrement de mots-clés ; reproduit à 0,52 avec les vraies réponses acceptées. Constat additionnel :
+le texte exact tapé par l'étudiant en session Leitner n'est jamais persisté (seuls les compteurs agrégés le
+sont sur `LeitnerCard`) — aucun rejeu à l'identique possible après coup, seulement par approximation.
+
+---
+
+## [2026-09-08] C-02.08 : Tests fonctionnels flux génération — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.08` (feature list `C-02`, source planning `C-02.08`, V2, extension US-05A,
+tâche « Tests », suite de C-02.07 et de l'ajout d'import PDF du même jour). Objectif : livrer « Tests
+fonctionnels flux génération » — le seul élément IN restant du feature list `C-02` qui n'ait pas déjà été
+livré (Spécification/Service/Validation/Mode dégradé/Interface de révision tous déjà livrés). Point
+d'attention : respecter ce périmètre strictement — ticket 100 % tests, aucun code de production à modifier
+sauf bug bloquant découvert en chemin (aucun trouvé ici).
+
+**Audit préalable (AGENT.md)** — Recensement des tests fonctionnels existants avant d'écrire quoi que ce
+soit : `test/bdd/aiExerciseGeneration.test.js` (C-02.06, seule route HTTP du flux, `AiExerciseGenerationPipeline.service.js`
+entièrement mocké) et ~120 tests unitaires par service (C-02.03/04/05/pipeline), chacun avec ses dépendances
+mockées. **Aucun test n'exerçait la chaîne complète en une seule fois** — génération réelle (prompt, parsing,
+dédoublonnage, chunking) jusqu'à la persistance réelle (`POST /tests`+`POST /questions`), alors que ce mapping
+de persistance est documenté comme une simple « hypothèse de travail » depuis C-02.01 §7 et n'avait jamais été
+prouvé par un test. C'est ce trou précis que ce ticket comble.
+
+**Ce qui a été fait** — `test/bdd/aiExerciseGenerationFlow.test.js` (7 tests), mockant seulement les deux
+vrais points de sortie externes du système (`AiExerciseGeneration.service.js#callModel` — l'appel réseau
+Mistral — et `PdfExtraction.service.js#extractText`) ; tout le reste tourne réellement sur une base SQLite en
+mémoire :
+1. Parcours nominal texte, mode `mixed`, 4 types en une génération → `AiExerciseImportValidation.service.js#validateBatchForImport`
+   (simule le geste de l'Interface de révision, C-02.07, front-end) → `POST /tests` + `POST /questions` réels
+   → `GET /tests/:id` confirme les 4 questions persistées, `content` du `fill_blank` vérifié intact (aucune
+   reconstruction, conforme à generation_ia_exercices_types.md §7).
+2. Import PDF de bout en bout (extraction mockée, chunking réel, LLM mocké) → persistance réelle.
+3. Mode dégradé — Service génération indisponible (502) → réponse discriminée exploitable, rien à persister.
+4. Mode dégradé — sortie non exploitable après retry (1 chunk, 2 échecs de parsing) → **constat fait en
+   écrivant ce test** (voir DECISIONS.md) : classé `service_unavailable` plutôt que `invalid_output` — le
+   pipeline masque le message précis du chunk unique par son propre message générique dès que 100 % des
+   chunks échouent.
+5. Validation format avant import — une question éditée en Interface de révision redevient invalide (mcq sans
+   option correcte) → échec partiel toléré, seule la question valide est réellement persistée, l'autre
+   n'atteint jamais `POST /questions`.
+6. Contenu source insuffisant — moins de questions que demandé + `warning` du modèle propagé dans `warnings`
+   (préfixé « Passage 1/1 : » même pour un chunk unique) → sortie valide, rien à importer de force.
+7. Rejet de saisie 400 (`questionCount` invalide) → jamais un mode dégradé, aucun appel au Service génération.
+
+**Ce qui n'est PAS couvert** — Correction officielle sans relecture, génération illimitée, banque publique
+automatique (rappel OUT du ticket) ; l'Interface de révision réelle (front-end, C-02.07, déjà testée par ses
+propres 12 tests composant) — ce fichier simule seulement le geste qu'elle produit (`validateBatchForImport`
+appelé directement) ; les scénarios déjà couverts en détail par les tests unitaires par service (circuit
+breaker rate limit multi-chunks avec 5 scénarios, 4 types de `content` invalides, etc. — non dupliqués ici,
+seule l'intégration bout-en-bout apporte une valeur nouvelle).
+
+**Fichiers créés**
+- `my_memo_master_api/test/bdd/aiExerciseGenerationFlow.test.js` (7 tests)
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 7 nouveaux tests. Suite complète API : **108 suites/1964 tests** (contre 107/1957), **0
+régression**. Linter propre. Aucun fichier de code de production touché.
+
+**Points d'attention / dette** — Le constat n°4 ci-dessus (`invalid_output` masqué en `service_unavailable`
+pour un chunk unique) n'a pas été corrigé dans ce ticket (portée : écrire des tests, pas modifier le pipeline)
+— documenté dans `DECISIONS.md` comme dégradation de signal assumée, symétrique à celle déjà tolérée côté
+cartes Leitner (même architecture de pipeline). À reconsidérer si un futur ticket touche de toute façon
+`AiExerciseGenerationPipeline.service.js`/`AiCardGenerationPipeline.service.js` (ex. propager l'erreur
+d'origine telle quelle quand un seul chunk a été tenté).
+
+---
+
+### [2026-09-08] FIX — Second bug distinct dans `Semantic.service` : les formules `$…$` (LaTeX brut) cassaient le recouvrement de mots-clés en zone grise
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet de l'investigation.
+Après le premier correctif `extractKeywords` (entrée précédente) et redémarrage du conteneur, l'utilisateur a
+reproduit le même résultat (75 %, « À revoir ») 3 fois à l'identique sur la carte « poids d'une tranche
+mésoscopique de fluide ». Cause : `FormulaHelperComponent` (front) entoure toute formule insérée via son
+bouton « ƒ » de `$…$` en LaTeX brut (`\rho`, `\cdot`…), mêlée au texte libre. `tokenize` ne coupait ni sur `$`
+ni sur `\` : les tokens de bordure devenaient `$dp`/`dv$` et les commandes LaTeX survivaient telles quelles —
+recouvrement de mots-clés à 0 en zone grise, indépendamment du contenu réel. Reproduit précisément : score
+0,7476, recalé par ce recouvrement nul — cohérent avec le 75 % observé.
+
+**Correctif** — Nouvelle méthode `splitFormulaAndProseTokens` : isole les segments `$…$`, les passe par
+`unifyFormulaNotation` (déjà utilisée pour la comparaison symbolique — `\rho` → `ρ`, `\cdot` → `*`, retire les
+`$`) puis les éclate sur leurs opérateurs canoniques pour redonner un token par variable. Les tokens de
+formule sont désormais **toujours** inclus dans les mots-clés (pas seulement en repli comme dans le premier
+fix) : une réponse mêlant formule et prose fournit déjà des mots-clés `> 2` caractères via la prose, donc le
+repli précédent ne se déclenchait jamais et les variables courtes de la formule disparaissaient
+silencieusement.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`splitFormulaAndProseTokens`, `tokenize`, `extractKeywords`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+3 tests : isolement/conversion d'un segment
+  `$…$`, inclusion systématique des variables courtes de formule malgré de la prose environnante, recouvrement
+  non-nul sur le scénario réel formule+prose)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 3 nouveaux tests (`Semantic.service.test.js` : 41→44). Suite API complète : **108/108 suites,
+1967/1967 tests**, 0 régression. Linter propre. Revérifié en conditions réelles (conteneur `mymemomaster-api-1`
+redémarré, vraies réponses de référence de la carte concernée, `idQuestion=30`) : la réponse reconstituée de
+l'utilisateur passe de 0,7476/incorrect à 0,7828/correct.
+
+**Points d'attention / dette** — Le score affiché (`Score : X%`) reste déconnecté de la logique de décision
+réelle en zone grise (non traité, dette déjà notée sur le premier fix). Cette classe de bug (notation de
+saisie non neutralisée avant tokenization) pourrait resurgir sous une forme non anticipée ici (plusieurs
+segments `$…$` dans une même réponse, formule en LaTeX tapée à la main sans les délimiteurs `$…$`) — non
+audité au-delà du cas rapporté. Deux redémarrages du conteneur `dev` ont été nécessaires au total pour ce
+signalement (pas de hot-reload malgré le commentaire du compose file — cf. addendum de l'entrée précédente) ;
+un `nodemon` en dev éviterait de reproduire ce type de faux négatif de retest à l'avenir.
+
+---
+
+### [2026-09-08] FIX — Troisième et quatrième variantes du même bug de tokenization : parenthèses/`_`/`#"` hors `$…$`, et confusion `∆`/`Δ`
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet. 3 cartes signalées par
+l'utilisateur sans utiliser l'assistant formule (donc sans `$…$`, écartant le fix précédent) : « barrage
+voûte », « force pressante élémentaire », toutes deux avec le même symptôme (score cohérent, verdict
+incorrect). Cause : `(`, `)`, `_` n'étaient séparateurs nulle part hors segment `$…$` (formule en texte simple
+fragmentée en tokens absurdes) ; et un artefact de corruption `#"` récurrent (6 questions en base, `~20`
+réponses de référence — vraisemblablement une extraction PDF ratée de notation vectorielle) collait aux
+tokens de bordure. Sur demande explicite de l'utilisateur (« analyse poussée pour vérifier qu'aucun bug de ce
+type ne subsiste »), audit élargi à toute la base (`Response.content` hors plage de caractères attendue) :
+trouvé 2 bugs latents supplémentaires de la même famille, non rencontrés par les cartes signalées mais
+vérifiés réels — point médian `·` (multiplication française, « kg·m⁻³ ») non séparateur hors `$…$`, et `∆`
+(U+2206, symbole INCREMENT, 3 questions de thermodynamique) visuellement indiscernable de `Δ` (U+0394, vraie
+lettre grecque) mais jamais égal en comparaison de chaînes.
+
+**Correctif** — Nouvelle constante `MATH_SEPARATORS` (remplace les regex dispersées), incluant désormais `(`,
+`)`, `_`, `#`, `"`, `·` en plus de l'existant, appliquée uniformément au texte libre et aux segments `$…$`.
+`normalizeText` unifie `∆` → `Δ` avant la mise en casse.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`MATH_SEPARATORS`, `normalizeText`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+4 tests : parenthèses/indices/opérateurs en
+  texte simple, recouvrement entre deux formulations, corruption `#"` neutralisée, point médian, `∆`/`Δ`)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 4 nouveaux tests (`Semantic.service.test.js` : 44→47 pour parenthèses/`#"`, puis 47→49 pour
+`·`/`∆`). Suite API complète : **108/108 suites, 1972/1972 tests**, 0 régression. Linter propre. Revérifié en
+conditions réelles (conteneur redémarré, vraies réponses de référence de 4 questions distinctes, dont 2 hors
+du périmètre initialement signalé) : les 4 cas passent désormais correct.
+
+**Points d'attention / dette** — La corruption `#"` reste en base (donnée, pas code) — ce correctif neutralise
+son effet sur la comparaison, ne la corrige pas à la source ; l'affichage de « Réponse attendue » montre donc
+toujours le texte corrompu tel quel (`LeitnerCard.service.js#correctResponse`, `correctAnswers.join(' / ')`
+sans transformation) — ce que l'utilisateur avait décrit comme un « bug de rendu LaTeX cassé » alors qu'il
+s'agit de texte source déjà corrompu, pas de LaTeX mal interprété. Un cas testé pendant l'analyse (Q33,
+« modèle isotherme ») reste en zone grise incorrect après ce fix, mais pour une raison distincte et non-bug :
+recouvrement lexical insuffisant entre synonymes/variantes morphologiques (« diminue » ≠ « décroît »,
+« exponentielle » ≠ « exponentiellement ») — hors de portée d'un fix de tokenization, nécessiterait une
+lemmatisation FR ou un dictionnaire de synonymes, non entrepris ici. Audit non exhaustif au-delà des
+caractères cherchés explicitement — un futur caractère de corruption/confusion non anticipé resterait à
+traiter au cas par cas s'il est un jour rapporté.
+
+---
+
+### [2026-09-08] ADD/FIX — Transparence UI zone grise, synonymes/morphologie FR, et 5ᵉ bug de la même famille (`bestRef` au lieu de toutes les réponses acceptées)
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet. Demande explicite de
+l'utilisateur : (1) traiter la dette UX notée dans toutes les entrées précédentes de la journée (score affiché
+déconnecté de la décision réelle en zone grise), (2) traiter le cas « modèle isotherme de l'atmosphère »
+(67 %), identifié dans l'entrée précédente comme une limite de synonymes/morphologie plutôt qu'un bug de
+tokenization.
+
+**Correctifs**
+1. **Transparence UI** — `decision_zone` était déjà transmis de bout en bout mais jamais affiché.
+   `FlashcardsSessionPage.vue` montre désormais une note dédiée en zone grise expliquant que le score n'a pas
+   décidé seul. Pur front, aucun changement API.
+2. **Synonymes/morphologie** — `canonicalizeKeyword` (nouvelle fonction dans `Semantic.service.js`) combine un
+   petit dictionnaire de synonymes curaté (`SYNONYM_GROUPS`, vocabulaire de croissance/décroissance, ~20 mots)
+   et une règle mécanique de suffixe adverbial français (`stripAdverbSuffix`, « -ment »), appliqués uniquement
+   au recouvrement de mots-clés — jamais à l'embedding.
+3. **5ᵉ bug, trouvé en creusant le cas isotherme même après (2)** — en zone grise, le recouvrement de
+   mots-clés n'était vérifié que contre `bestRef` (la référence gagnante par score d'**embedding**), jamais
+   contre les autres réponses acceptées de la même liste. Incohérent avec l'embedding, qui lui prend déjà le
+   meilleur score sur toute la liste. Corrigé : le recouvrement est désormais calculé contre chaque réponse
+   acceptée, le meilleur est retenu (`matchedRef`, aussi réutilisé par la garde anti-inversion).
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`canonicalizeKeyword`, `SYNONYM_GROUPS`,
+  `stripAdverbSuffix`, boucle de recouvrement sur `correctList` dans `gradeSemantic`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+4 tests)
+- `my_memo_master_front/src/pages/FlashcardsSessionPage.vue` (note zone grise)
+- `my_memo_master_front/test/components/FlashcardsSessionPage.test.js` (+2 tests)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — +4 API (`Semantic.service.test.js` : 49→53), +2 front (`FlashcardsSessionPage.test.js` : 17→19).
+Suite complète : **108/108 suites API (1976/1976 tests)**, **54/54 suites front (840/840 tests)**, 0
+régression. Linter propre sur les 4 fichiers touchés. Revérifié en conditions réelles (conteneur redémarré,
+5 vraies réponses de référence de `idQuestion=33/56`) : la reformulation « diminue de façon exponentielle »
+passe de `is_correct: false` à `is_correct: true`.
+
+**Points d'attention / dette** — Le 5ᵉ bug (boucle sur `correctList`) n'a pas de test d'intégration dédié dans
+la suite automatisée : le mock d'embedding du fichier de test ne permet pas de cibler une zone grise précise
+de façon fiable sans recherche empirique disproportionnée (essayé, abandonné après plusieurs dizaines de
+variantes sans succès). Couvert indirectement par les tests unitaires `extractKeywords`/`computeKeywordOverlap`
+et la vérification manuelle contre le vrai modèle — à surveiller si une régression future y touche.
+`SYNONYM_GROUPS` reste volontairement restreint (croissance/décroissance uniquement) : toute autre paire de
+synonymes rencontrée en pratique (ex. autre vocabulaire physique) devra être ajoutée au cas par cas plutôt que
+de généraliser vers un thésaurus, pour ne pas répéter le risque déjà écarté (calibration DECISIONS.md
+2026-07-18).

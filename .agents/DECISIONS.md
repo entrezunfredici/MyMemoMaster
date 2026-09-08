@@ -3570,6 +3570,30 @@ vocabulaire/symboles recouvre suffisamment la référence — le signe en tant q
 dans ce chemin (il l'est dans le court-circuit `exact`/`algebraicallyEqual`, qui rejette correctement un signe
 différent, mais qui ne s'applique qu'aux réponses purement symboliques identiques par ailleurs).
 
+**Addendum (2026-09-08, même jour)** — Premier retest utilisateur après le fix : aucun changement observé,
+mêmes scores/décisions qu'avant. Cause : le conteneur `api` (profil `dev`, `docker-compose.yml`) bind-monte
+`./my_memo_master_api:/app` mais `entrypoint.sh` lance `node server.js` en dur (pas de `nodemon` malgré le
+commentaire « hot-reload API » en tête du fichier compose) — le fichier sur disque était à jour, le process
+Node en mémoire ne l'était pas. `docker restart mymemomaster-api-1` a suffi (bind mount, pas de rebuild
+d'image nécessaire). Reste ouvert : soit corriger le commentaire trompeur, soit faire tourner `nodemon` dans
+le conteneur `dev` pour que ce type de décalage ne se reproduise pas.
+
+Vérification avec les **vraies** réponses de référence (table `Response`, `correction=true`, seule source
+réelle pour la correction Leitner sur `open` — `LeitnerCard.service.js#correctResponse`, pas
+`Question.content` qui est `NULL` pour ces questions physiques) : Q30 « dP = ρg dV » vs les 4 réponses
+acceptées (« dP = −ρ dV g », « −ρ dV g », « −ρ g dV », « −g ρ dV ») → 92 % après fix, contre un rejet garanti
+avant (ensemble de mots-clés vide). Le texte exact tapé par l'utilisateur lors de la session n'est pas
+récupérable — **le schéma ne persiste jamais la réponse libre saisie**, seulement les compteurs agrégés
+(`review_count`/`correct_count`/`incorrect_count` sur `LeitnerCard`) — donc validation par approximation, pas
+rejeu à l'identique.
+
+Le second cas (Q24, définition macroscopique, 47 %) est structurellement **hors du périmètre de ce fix** :
+47 % < `LOW_THRESHOLD` (0,55) → rejeté par le score d'embedding seul, avant même d'atteindre le calcul de
+recouvrement de mots-clés. Reproduit à 0,52 avec les 4 réponses acceptées réelles (toutes formulées autour de
+« s'écoule pour épouser la forme du récipient ») contre une réponse orientée « déformation sous contrainte de
+cisaillement » — deux caractérisations physiques valides d'un fluide, mais lexicalement/sémantiquement
+éloignées pour ce modèle d'embeddings. Gap de couverture des réponses acceptées, pas un bug de seuil.
+
 ---
 
 ### [2026-09-08] Dérive de schéma `testQuestions` — Migration idempotente plutôt qu'ALTER manuel
@@ -3600,5 +3624,200 @@ corrige aucun autre que celui sur lequel il est tapé.
 jointure du projet n'a été auditée pour la même dérive potentielle (`testClassGroups`, `questionSubject`,
 `cardQuestion`, `questionResponse`) — non vérifié ici (réactif au seul bug rapporté), à auditer si un 500
 similaire sur un `addXxx()`/`setXxx()` d'association Sequelize est un jour rapporté sur l'une d'elles.
+
+---
+
+### [2026-09-08] C-02.08 — Signal `invalid_output` masqué en `service_unavailable` pour un chunk unique : dégradation assumée, non corrigée
+
+**Contexte** : `test/bdd/aiExerciseGenerationFlow.test.js` (C-02.08, tests fonctionnels) a révélé que, depuis
+que `POST /ai-exercise-generations` passe systématiquement par `AiExerciseGenerationPipeline.service.js`
+(import PDF, décision du même jour ci-dessus), une génération sur un texte tenant en un seul chunk qui épuise
+son retry (« La génération n'a pas produit un résultat exploitable. Réessayez. », normalement classée
+`invalid_output` par `AiExerciseDegradedMode.service.js#describeFailure`) est reclassée `service_unavailable`.
+Cause : `generateExercisesFromContent` catch l'erreur du chunk, et comme `successCount === 0` (tous les chunks
+ont échoué — il n'y en avait qu'un), lève sa PROPRE erreur générique (« La génération a échoué sur tous les
+passages du contenu fourni. ») au lieu de repropager celle du chunk — `describeFailure` ne voit donc plus le
+message précis qui lui permettrait de distinguer `invalid_output` de `service_unavailable`.
+
+**Décision** : ne pas corriger dans ce ticket — portée de C-02.08 : écrire des tests fonctionnels, pas modifier
+le pipeline. Le test qui a révélé ce comportement l'documente et l'attend explicitement (`code:
+'service_unavailable'`) plutôt que de le contourner ou de le cacher.
+
+**Alternative écartée** : corriger `AiExerciseGenerationPipeline.service.js` pour repropager l'erreur
+d'origine telle quelle quand un seul chunk a été tenté (`chunks.length === 1`) — solution technique simple et
+identifiée, mais écartée ICI car elle sortirait du périmètre d'un ticket de tests (AGENT.md §2 : ne pas
+étendre hors périmètre) et toucherait un fichier livré dans le même lot de travail sans qu'un besoin
+fonctionnel explicite ne le demande — `service_unavailable` reste, comme `invalid_output`, `degraded: true,
+suggestManualCreation: true` : aucun blocage fonctionnel, seul le message affiché à l'utilisateur diffère
+(« indisponible » plutôt que « n'a pas pu produire un résultat, réessayez »).
+
+**Conséquences** : dette de précision assumée, symétrique à celle déjà implicitement présente côté cartes
+Leitner (`AiCardGenerationPipelineService`, même structure, jamais auditée sur ce point précis faute d'un
+test équivalent avant celui-ci). Si un futur ticket touche de toute façon l'un des deux pipelines, envisager
+de repropager l'erreur du chunk unique plutôt que la remplacer — sans quoi cette imprécision de message
+perdurera silencieusement pour toute génération dont le contenu source tient en un seul chunk (le cas le plus
+courant en pratique, un texte long/PDF étant l'exception qui déclenche réellement plusieurs chunks).
+
+---
+
+### [2026-09-08] Correction sémantique — second bug distinct : `$…$` (convention formule du front) cassait le recouvrement de mots-clés
+
+**Contexte** : Après le premier correctif `extractKeywords` (entrée du 2026-09-08 ci-dessus, addendum inclus)
+et le redémarrage du conteneur `mymemomaster-api-1`, l'utilisateur a rejoué la carte « poids d'une tranche
+mésoscopique de fluide » 3 fois avec le même texte de réponse — même résultat exact (75 %, « À revoir ») à
+chaque fois. Écarté d'emblée : un problème d'environnement (confirmé `localhost`, conteneur vérifié à jour
+via `docker exec ... grep`) ou de mauvaise carte (retrouvée en base : `idCard=26`, `idQuestion=30`, utilisateur
+`superfred2468@gmail.com`, réponses de référence réelles tirées de `Response` : `dP = −ρ dV g` / `−ρ dV g` /
+`−ρ g dV` / `−g ρ dV`).
+
+Investigation : `FlashcardsSessionPage.vue` envoie `normalizeFormulaSyntax(userAnswer.value)` —
+`FormulaHelperComponent` insère toute formule composée via son bouton « ƒ » entourée de `$…$`, en LaTeX brut
+(`\rho`, `\cdot`…), mêlée au texte libre autour (`$dP = -\rho \cdot g \cdot dV$, dirigé vers le bas`). Ni `$`
+ni `\` n'étaient des séparateurs dans `tokenize` : les tokens de bordure devenaient `$dp`/`dv$` et les
+commandes LaTeX survivaient telles quelles (`\rho`, pas `ρ`) — aucun recouvrement possible avec les réponses
+de référence, stockées en notation brute. Reproduit précisément : score 0,7476 (zone grise, 55–78 %), recalé
+par un recouvrement de mots-clés à 0 — cohérent avec le 75 % / « À revoir » observé. Un second bug distinct du
+premier (celui-ci vidait le set de mots-clés par une contamination des tokens de bordure, pas par le filtre de
+longueur), dans le même mécanisme, non prévu par le fix précédent qui ne traitait que le cas symbolique pur.
+
+**Décision** : `tokenize`/`extractKeywords` isolent désormais les segments `$…$` du texte libre autour
+(`splitFormulaAndProseTokens`). Le contenu de chaque segment passe par `unifyFormulaNotation` (même fonction
+que la comparaison symbolique — convertit `\rho` → `ρ`, `\cdot` → `*`, retire les `$`) puis est éclaté sur ses
+opérateurs canoniques (`*`, `/`, `+`, `^`, `=`) pour redonner un token par variable, comparable individuellement
+à une référence en notation espacée — sans ce découpage supplémentaire la formule unifiée ressortirait comme
+un seul bloc collé (`ρ*g*dv`), tout aussi incomparable. Second raffinement nécessaire : les tokens issus d'un
+segment `$…$` sont **toujours** inclus dans les mots-clés, pas seulement en repli (contrairement au premier
+fix) — une réponse mêlant formule et prose fournit déjà des mots-clés `> 2` caractères via la prose
+(« dirigé »), donc le repli du premier correctif ne se déclenche jamais et les variables courtes de la formule
+(ρ, g, dV) disparaissaient silencieusement. Vérifié en conditions réelles (conteneur redémarré, vraies réponses
+de référence de `idQuestion=30`) : la réponse reconstituée passe désormais à 78,3 % (zone haute, avant même le
+recours au recouvrement de mots-clés).
+
+**Alternative écartée** : étendre encore la liste de séparateurs de `tokenize` au lieu d'un traitement dédié
+aux segments `$…$` — insuffisant seul, puisque le problème n'est pas qu'un caractère manquant à la liste mais
+que le contenu *à l'intérieur* des `$…$` est du LaTeX (`\rho`, `\cdot`) qui doit être *converti*, pas seulement
+découpé autour.
+
+**Conséquences** : Le score affiché (`Score : X%`) reste pour l'instant déconnecté de la logique de décision
+réelle en zone grise (toujours pas traité, cf. entrée précédente). Cette classe de bug (délimiteurs/notation
+de saisie non neutralisés avant tokenization) pourrait resurgir sous une autre forme non anticipée ici (ex. un
+answer combinant plusieurs segments `$…$`, ou une formule dans du texte SANS les délimiteurs `$…$` si jamais
+saisie à la main) — non audité au-delà du cas rapporté. Suite API complète revérifiée après ce second fix :
+**108 suites/1967 tests**, 0 régression ; 3 tests ajoutés ciblant spécifiquement ce cas
+(`Semantic.service.test.js` : 41 → 44).
+
+---
+
+### [2026-09-08] Correction sémantique — troisième et quatrième variantes : ponctuation/opérateurs hors `$…$`, corruption `#"`, et confusion `∆`/`Δ`
+
+**Contexte** : Après le fix `$…$`/LaTeX (entrée précédente), l'utilisateur a signalé 3 autres cartes avec le
+même symptôme (score cohérent affiché, verdict incorrect), **sans avoir utilisé l'assistant formule** — donc
+sans `$…$`, écartant d'emblée le fix précédent comme cause. Investigation avec les vraies réponses de
+référence (table `Response`) et les cartes réelles de l'utilisateur :
+
+- **Q37 (barrage voûte, eau+air)** : réponse de référence en texte simple `dF_P = P(z)(-dS) + P_atm dS = ρ_0
+  g (z - H) dS`. `tokenize` ne coupait ni sur `(`, `)`, `+`, `_` hors segment `$…$` — la formule se
+  fragmentait en tokens absurdes (`p(z)(`, `ds)`, `(z`, `h)`), incomparables à la moindre reformulation avec un
+  espacement différent.
+- **Q34/27/65/70/72/73 (force pressante, densité de force, barrage, coordonnées cylindriques)** : les réponses
+  de référence stockées portent un artefact `#"` récurrent (6 questions, ~20 réponses) — vraisemblablement une
+  extraction PDF ratée d'une notation vectorielle (`d #"F P = P (M ) #"dS` pour ce qui devrait être
+  `d→F = P(M)·d→S`). `#` et `"` n'étaient séparateurs nulle part : ils collaient aux tokens de bordure
+  (`#"f`, `#"ds`), empêchant tout recouvrement quelle que soit la réponse étudiante.
+- **Audit élargi à toute la base** (`Response.content ~ '[^a-zA-Z0-9À-ÿͰ-Ͽ...]'`, hors périmètre des 3 cartes
+  signalées, sur demande explicite utilisateur d'une « analyse poussée ») : deux confusions supplémentaires de
+  la même famille (glyphes visuellement identiques, codepoints distincts ou séparateur manquant) — le point
+  médian `·` (U+00B7, multiplication française : « kg·m⁻³ », « -ρ·g », non traité comme séparateur hors `$…$`)
+  et `∆` (U+2206, symbole INCREMENT, utilisé dans les réponses de référence de 3 questions de thermodynamique —
+  18/20/21, `∆S`, `∆Ucycle`) vs `Δ` (U+0394, vraie lettre grecque Delta qu'un étudiant tape réellement) —
+  jamais rencontrées par les 3 cartes rapportées mais vérifiées comme bugs latents réels par lecture directe
+  de la base, pas par supposition.
+
+**Décision** : `MATH_SEPARATORS` (nouvelle constante module, remplace les regex de séparateurs dispersées dans
+`splitFormulaAndProseTokens`) inclut désormais `(`, `)`, `_`, `#`, `"`, `·` en plus de l'existant — appliquée
+uniformément au texte libre ET à l'intérieur des segments `$…$` (une seule regex, un seul endroit à maintenir).
+`normalizeText` unifie `∆` → `Δ` avant la mise en casse (qui minuscule ensuite les deux en `δ` comme toute
+lettre grecque). Vérifié en conditions réelles (conteneur redémarré, vraies réponses de référence des 4
+questions concernées) : les 4 cas passent désormais correct (barrage 88,1 %, force pressante 79,2 %, masse
+volumique 86,2 %, entropie 100 % — ce dernier étant un exemple construit pour vérifier spécifiquement
+`∆`/`Δ`, pas un cas rapporté par l'utilisateur).
+
+**Périmètre explicitement NON couvert par ce fix, distinct et documenté séparément** :
+- La corruption `#"` elle-même reste en base (donnée, pas code) — ce correctif neutralise son effet sur la
+  comparaison, il ne la corrige pas à la source. L'affichage de « Réponse attendue » à l'utilisateur montre
+  donc toujours le texte corrompu tel quel (`LeitnerCard.service.js#correctResponse` fait
+  `correctAnswers.join(' / ')` sans transformation) — signalé par l'utilisateur comme un « bug de rendu
+  LaTeX cassé », alors qu'il ne s'agit pas de LaTeX mal rendu mais de texte source déjà corrompu.
+- Un cas testé pendant l'analyse (Q33, « modèle isotherme de l'atmosphère », reformulation synthétique
+  « la pression diminue de façon exponentielle » vs référence « décroît exponentiellement ») reste en zone
+  grise incorrect (0,74) **après** ce fix — mais pour une raison différente et non-bug : recouvrement lexical
+  insuffisant entre synonymes/variantes morphologiques (« diminue » ≠ « décroît », « exponentielle » ≠
+  « exponentiellement »). `computeKeywordOverlap` compare des chaînes exactes, sans stemming ni synonymes —
+  hors de portée d'un fix de tokenization ; nécessiterait une lemmatisation FR ou un dictionnaire de synonymes,
+  non entrepris ici (texte réellement tapé par l'utilisateur pour ce cas non récupérable, cf. entrée
+  précédente — reformulation d'illustration, pas une reproduction exacte).
+
+**Conséquences** : Audit non exhaustif au-delà des caractères cherchés explicitement (`ascii` hors plage
+`[a-zA-Z0-9À-ÿͰ-Ͽ\s.,;:!?()+*/=^_'"«»%€$-]`) — un futur caractère de corruption/confusion non anticipé ici
+resterait à traiter au cas par cas. Le score affiché (`Score : X%`) reste déconnecté de la logique de décision
+réelle en zone grise (dette non traitée, cf. entrées précédentes). Suite API complète revérifiée :
+**108 suites/1972 tests**, 0 régression ; 4 tests ajoutés (`Semantic.service.test.js` : 44 → 49 — dont 1 dans
+`describe('normalizeText')`, fusionné avec le bloc existant plutôt que dupliqué).
+
+---
+
+### [2026-09-08] Transparence UI zone grise + synonymes/morphologie + 5ᵉ bug (recouvrement limité à `bestRef`)
+
+**Contexte** — Demande explicite de l'utilisateur : traiter (1) la dette UX notée dans toutes les entrées
+précédentes (le score affiché ne reflète pas la logique de décision réelle en zone grise) et (2) le cas
+« modèle isotherme de l'atmosphère » (67 %, resté incorrect après les 4 fixes précédents — cf. entrée
+ci-dessus, identifié comme une limite différente : synonymes/morphologie, pas un bug de tokenization).
+
+**(1) Transparence UI** — `decision_zone` était déjà calculé et transmis de bout en bout
+(`LeitnerCard.service.js` → contrôleur → `leitnerCards.js` store → `cardStore.lastCorrection`) mais jamais lu
+par le template. `FlashcardsSessionPage.vue` affiche désormais une note dédiée quand `decision_zone ===
+'grey_zone'` : « Score proche du seuil : la décision se base ici sur les mots-clés de ta réponse, pas
+uniquement sur ce pourcentage. » — pur ajout front, aucun changement API.
+
+**(2) Synonymes/morphologie** — Investigation du cas isotherme : `computeKeywordOverlap` compare des chaînes
+exactes, sans stemming ni synonymes — « décroît » ne recoupe jamais « diminue » (synonyme), ni
+« exponentiellement » « exponentielle » (adverbe/adjectif). **Décision** : `canonicalizeKeyword` (nouvelle
+fonction, appliquée dans `extractKeywords`) combine deux mécanismes bornés, appliqués UNIQUEMENT au
+recouvrement de mots-clés (jamais à l'embedding ni à la comparaison symbolique) :
+- `SYNONYM_GROUPS` : petit dictionnaire curaté (~20 mots), volontairement limité au vocabulaire non ambigu de
+  croissance/décroissance d'une grandeur (fréquent en physique) plutôt qu'un thésaurus général — un thésaurus
+  large aurait risqué de faire passer à tort le cas « réponse fausse même domaine » à 0,717 de la calibration
+  du 2026-07-18 (correctement rejeté par mots-clés à l'époque).
+- `stripAdverbSuffix` : règle mécanique régulière du français (adjectif féminin + « -ment » = adverbe),
+  appliquée sans liste de garde au-delà d'un plancher de longueur (risque de faux rapprochement jugé
+  négligeable).
+
+**(2bis) 5ᵉ bug trouvé en creusant le cas isotherme** — Même après canonicalisation, le recouvrement contre la
+référence longue choisie par l'embedding (`bestRef`) ne montait qu'à 0,27 (< seuil 0,3) — mesuré, pas supposé.
+Cause : en zone grise, `computeKeywordOverlap` n'était vérifié que contre **`bestRef`** (la référence gagnante
+par score d'embedding), jamais contre les autres réponses acceptées de la même liste — alors qu'une variante
+courte de la même liste (« Décroît exponentiellement ») recoupe à 0,4. Incohérent avec l'embedding, qui lui
+prend déjà le meilleur score sur TOUTE la liste. **Décision** : en zone grise, le recouvrement est désormais
+calculé contre chaque réponse acceptée (`correctList`), le meilleur est retenu (`matchedRef`, aussi réutilisé
+par la garde anti-inversion à sa place). Vérifié en conditions réelles (conteneur redémarré, 5 vraies réponses
+de référence de `idQuestion=33/56`) : passe de `is_correct: false` (0,74, zone grise, recouvrement 0,27) à
+`is_correct: true` (0,74, recouvrement calculé sur la meilleure référence).
+
+**Alternative écartée** (pour le 5ᵉ bug) : élargir/assouplir `KEYWORD_OVERLAP_THRESHOLD` ou faire peser
+davantage le score d'embedding dans la décision de zone grise — écarté après vérification que cela romprait la
+calibration existante (cas « réponse fausse même domaine » 0,717 correctement rejeté) ; le vrai défaut n'était
+pas le seuil mais le périmètre de la comparaison (une seule référence au lieu de toutes).
+
+**Conséquences** — Test d'intégration dédié pour le 5ᵉ bug (vérification du chemin `gradeSemantic` complet en
+zone grise avec plusieurs références) non ajouté à la suite automatisée : le mock d'embedding du fichier de
+test (vecteur dérivé d'une somme de character codes, cf. `jest.mock('@xenova/transformers', ...)` en tête de
+fichier) ne permet pas de cibler une zone grise précise de façon fiable/déterministe sans recherche empirique
+disproportionnée — recherché par brute-force sur des dizaines de variantes, sans succès en un temps
+raisonnable. Couverture retenue à la place : tests unitaires sur `extractKeywords`/`computeKeywordOverlap`
+(déterministes, pas de mock) pour les deux nouveaux mécanismes, + vérification manuelle contre le vrai modèle
+et les vraies données de la carte concernée (documentée ci-dessus). Le 5ᵉ bug (boucle sur `correctList`) reste
+donc seulement couvert indirectement — à surveiller si une régression future y touche. Suite complète
+revérifiée : **108 suites/1976 tests API** (+4), **54 suites/840 tests front** (+2, note zone grise), 0
+régression. Linter propre sur les 4 fichiers touchés.
 
 ---
