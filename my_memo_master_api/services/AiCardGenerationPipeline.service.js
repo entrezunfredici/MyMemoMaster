@@ -2,6 +2,7 @@ const logger = require('../helpers/logger')
 const { chunkText } = require('../helpers/textChunker')
 const pdfExtractionService = require('./PdfExtraction.service')
 const aiCardGenerationService = require('./AiCardGeneration.service')
+const imageCaptioningPipelineService = require('./ImageCaptioningPipeline.service')
 
 // Périmètre C-01.05 (« Pipeline traitement — PDF, chunking, LLM ») : orchestre les trois étapes
 // nommées par ce ticket — extraction PDF (services/PdfExtraction.service.js), découpage
@@ -31,11 +32,13 @@ class AiCardGenerationPipelineService {
   /**
    * Résout le texte source à traiter : exactement un des deux paramètres doit être fourni.
    * `hasEmbeddedImages` (toujours `false` pour un texte collé — pas de PDF, pas d'image) signale la
-   * présence d'images/schémas dans le PDF source SANS jamais les décrire (ni pdfjs-dist ni l'OCR
-   * Mistral n'interprètent le contenu visuel — voir services/PdfExtraction.service.js).
+   * présence d'images/schémas dans le PDF source ; `generateCardsFromContent` décide ensuite si elles
+   * sont captionnées (ImageCaptioningPipeline.service.js, 2026-09-09) — ce service se contente de la
+   * détection, comme avant. `pageTexts` (texte par page, `null` pour un texte collé — pas de page)
+   * permet cette insertion sur la bonne page.
    *
    * @param {{ sourceText: string|null, pdfBuffer: Buffer|null }} params
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number, pageTexts: string[]|null }>}
    * @throws {Error} Ni l'un ni l'autre, ou les deux à la fois fournis (400)
    */
   async resolveSourceText({ sourceText, pdfBuffer }) {
@@ -49,7 +52,7 @@ class AiCardGenerationPipelineService {
     }
 
     if (hasPdf) return pdfExtractionService.extractText(pdfBuffer)
-    return { text: sourceText.trim(), hasEmbeddedImages: false, ocrPagesProcessed: 0 }
+    return { text: sourceText.trim(), hasEmbeddedImages: false, ocrPagesProcessed: 0, pageTexts: null }
   }
 
   /**
@@ -128,10 +131,52 @@ class AiCardGenerationPipelineService {
     const {
       text: resolvedText,
       hasEmbeddedImages,
-      ocrPagesProcessed = 0
+      ocrPagesProcessed = 0,
+      pageTexts
     } = await this.resolveSourceText({ sourceText, pdfBuffer })
 
-    const allChunks = chunkText(resolvedText, { maxChunkLength: MAX_CHUNK_LENGTH })
+    const warnings = []
+    const usage = { model: null, promptTokens: 0, completionTokens: 0, ocrPagesProcessed }
+
+    // Captioning des images/schémas (ImageCaptioningPipeline.service.js, generation_ia_captioning_image.md)
+    // AVANT le découpage en chunks — la description retenue devient un paragraphe de texte ordinaire,
+    // fusionné sur la page où l'image a été détectée, sans extension du contrat de sortie (§5.1 du
+    // document). Ne fait jamais échouer la génération : toute erreur dégrade en warning, le texte déjà
+    // obtenu (pdfjs-dist ou OCR) reste exploitable seul.
+    let finalText = resolvedText
+    if (hasEmbeddedImages) {
+      try {
+        const captioningResult = await imageCaptioningPipelineService.captionEmbeddedImages({
+          pdfBuffer,
+          pageTexts,
+          subjectContext,
+          outputLanguage
+        })
+        finalText = captioningResult.pageTexts.join('\n\n').trim() || resolvedText
+        usage.promptTokens += captioningResult.usage.promptTokens
+        usage.completionTokens += captioningResult.usage.completionTokens
+        usage.ocrPagesProcessed += captioningResult.usage.ocrPagesProcessed
+        warnings.push(...captioningResult.warnings)
+        if (captioningResult.captionedCount === 0 && captioningResult.warnings.length === 0) {
+          // Détection positive (hasEmbeddedImages) mais rien captionné, sans erreur explicite (ex.
+          // uniquement des images décoratives filtrées, generation_ia_captioning_image.md §7) — la
+          // seule information restant utile à l'utilisateur est que rien n'a été ajouté au texte.
+          warnings.push(
+            'Ce contenu contient des images/schémas, mais aucun ne portait de contenu pédagogique ' +
+              'exploitable — seul le texte est pris en compte.'
+          )
+        }
+      } catch (error) {
+        logger.warn(`[AiCardGenerationPipeline] Captioning des images échoué : ${error?.message || error}`)
+        warnings.push(
+          'Ce contenu contient des images/schémas qui ne sont pas analysés par la génération IA ' +
+            '(seul le texte est pris en compte) — les notions illustrées uniquement par une image ' +
+            'risquent de ne donner lieu à aucune carte.'
+        )
+      }
+    }
+
+    const allChunks = chunkText(finalText, { maxChunkLength: MAX_CHUNK_LENGTH })
     if (allChunks.length === 0) {
       const err = new Error("Aucun contenu exploitable n'a été trouvé dans la source fournie.")
       err.statusCode = 422
@@ -143,22 +188,12 @@ class AiCardGenerationPipelineService {
     const perChunkCounts = this.distributeCardCount(cardCount, chunks.length)
 
     const cards = []
-    const warnings = []
-    const usage = { model: null, promptTokens: 0, completionTokens: 0, ocrPagesProcessed }
     let successCount = 0
     // Nombre de chunks consécutifs en échec spécifiquement pour cause de rate limit Mistral
     // (`error.rateLimited`, voir AiCardGeneration.service.js#callModel) — remis à 0 dès qu'un chunk
     // aboutit ou échoue pour une autre raison ; ne compte que des échecs de MÊME nature à la suite.
     let consecutiveRateLimitFailures = 0
     let stoppedOnSustainedRateLimit = false
-
-    if (hasEmbeddedImages) {
-      warnings.push(
-        'Ce contenu contient des images/schémas qui ne sont pas analysés par la génération IA ' +
-          '(seul le texte est pris en compte) — les notions illustrées uniquement par une image ' +
-          'risquent de ne donner lieu à aucune carte.'
-      )
-    }
 
     if (truncated) {
       warnings.push(

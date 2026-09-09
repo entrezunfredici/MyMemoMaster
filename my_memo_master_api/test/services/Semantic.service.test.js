@@ -45,6 +45,34 @@ describe('SemanticService', () => {
     it('unifie « ∆ » (symbole incrément) et « Δ » (lettre grecque Delta), visuellement identiques mais de codepoints différents', () => {
       expect(SemanticService.normalizeText('∆S')).toBe(SemanticService.normalizeText('ΔS'))
     })
+
+    // Bug reproduit le 2026-09-09 (carte Torricelli, Patm = ρ·g·h) : « rho » tapé
+    // au clavier scorait 76 % (zone grise, incorrect) et « ρ » 81 % (zone haute,
+    // correct) pour un contenu strictement identique — l'embedding lui-même traite
+    // les deux comme lexicalement différents, en amont de toute question de
+    // mots-clés. `unifyFormulaNotation` ne convertissait « rho » que préfixé d'un
+    // « \ » (commande LaTeX de l'éditeur) — jamais tapé tel quel par un étudiant
+    // sans clavier grec, le cas le plus probable en pratique.
+    it('unifie un nom grec en toutes lettres (« rho ») avec son symbole Unicode (« ρ »)', () => {
+      expect(SemanticService.normalizeText('Patm = rho * g * h')).toBe(
+        SemanticService.normalizeText('Patm = ρ * g * h')
+      )
+    })
+
+    it('ne touche pas à « \\rho » (commande LaTeX déjà gérée par unifyFormulaNotation, via un segment $…$)', () => {
+      // Non-régression : `\brho\b` matcherait aussi le « rho » de « \rho » (le
+      // « \ » est un caractère non-mot, donc une frontière `\b` existe avant le
+      // « r ») sans l'exclusion `(?<!\\)` — laissant un résidu « \ρ » corrompu.
+      const result = SemanticService.tokenize(String.raw`$-\rho * g$`)
+      expect(result).toContain('ρ')
+      expect(result.some((t) => t.includes('\\'))).toBe(false)
+    })
+
+    it('ne convertit pas un nom grec en sous-chaîne d\'un mot plus long', () => {
+      // « pi » ne doit pas matcher à l'intérieur de « pile », « delta » pas dans
+      // « deltaplane »… la frontière `\b` doit border le nom grec des deux côtés.
+      expect(SemanticService.normalizeText('la pile est déchargée')).toBe('la pile est déchargée')
+    })
   })
 
   describe('tokenize', () => {
@@ -381,7 +409,28 @@ describe('SemanticService', () => {
 
     it('should include decision_zone in response', async () => {
       const result = await SemanticService.gradeSemantic('test', 'test')
-      expect(['high', 'low', 'grey_zone']).toContain(result.decision_zone)
+      expect(['high', 'low']).toContain(result.decision_zone)
+    })
+
+    // Décision à seuil unique (2026-09-09, remplace la zone grise 55-78 % tranchée
+    // par recouvrement de mots-clés) : le verdict est une fonction strictement
+    // croissante du score — jamais l'inverse. Symptôme central signalé dès le
+    // premier retour utilisateur (« un score plus bas passe, un score plus haut
+    // échoue ») et jamais résolu par les correctifs ponctuels de la zone grise
+    // elle-même (cf. DECISIONS.md 2026-09-08/09) : seule la suppression du
+    // mécanisme le garantit structurellement.
+    it('is_correct est une fonction strictement croissante du score (plus de zone grise)', async () => {
+      const semanticCases = [
+        { correct: ['test1', 'test2'], student: 'student' },
+        { correct: 'correct', student: 'different answer' }
+      ]
+      for (const test of semanticCases) {
+        const result = await SemanticService.gradeSemantic(test.correct, test.student)
+        // Seuil unique : correct <=> score >= HIGH_THRESHOLD (0,78), jamais un
+        // autre critère (mots-clés, longueur de réponse...) ne peut faire
+        // diverger le verdict du score affiché.
+        expect(result.is_correct).toBe(result.score >= 0.78)
+      }
     })
 
     it('should have score as number between 0 and 1', async () => {

@@ -3821,3 +3821,222 @@ revérifiée : **108 suites/1976 tests API** (+4), **54 suites/840 tests front**
 régression. Linter propre sur les 4 fichiers touchés.
 
 ---
+
+### [2026-09-09] Captioning image des schémas — récupération via OCR Mistral dédié, plafond dédié par génération, pas d'extension du schéma `sourceExcerpt`
+
+**Contexte** — Question directe de l'utilisateur, suite à C-01.05 (qui détecte `hasEmbeddedImages` sans jamais
+décrire le contenu visuel, dette explicitement notée à l'époque) : est-il possible d'ajouter l'interprétation
+d'image au système de génération IA (cartes C-01, exercices C-02) ? Discussion préalable tranchée : plutôt que
+de faire générer les cartes/exercices directement depuis l'image par un modèle vision (un seul appel, mais
+fiabilité JSON non validée pour cette tâche, et `sourceExcerpt` casserait son hypothèse actuelle de texte),
+retenu : **texte d'abord** (captioning d'image → texte inséré dans le pipeline existant), pour réutiliser tel
+quel le protocole déjà validé empiriquement côté texte (C-01.03/C-01.04, `response_format: json_object`).
+Deux points d'architecture restaient ouverts avant de rédiger la spec (`diagrams/generation_ia_captioning_image.md`) :
+
+**Décision (2 volets, réponse utilisateur explicite)** :
+1. **Récupération des images = appel OCR Mistral dédié**, pas un décodage maison des XObjects `pdfjs-dist`. Un
+   appel `POST /v1/ocr` supplémentaire (récupère uniquement `pages[].images[]`, pas son texte — le texte
+   `pdfjs-dist` déjà obtenu gratuitement reste la source de vérité) dès que `hasEmbeddedImages: true`, y
+   compris sur un PDF déjà lu gratuitement par `pdfjs-dist`. Écarté : extraire/décoder les images XObject
+   directement depuis `pdfjs-dist` (JPEG/PNG) — resterait gratuit sur le cas majoritaire (PDF numériques), mais
+   demanderait un décodage d'image sans bibliothèque canvas (déjà écartée du projet, dépendance native — voir
+   entrée 2026-09-01 sur `pdf-parse`/`unpdf`) ; complexité et faisabilité non vérifiées, alors que le chemin OCR
+   réutilise un appel déjà testé en conditions réelles.
+2. **Plafond dédié `MAX_CAPTIONED_IMAGES_PER_GENERATION` dès cette version** (pas de report à un futur ticket
+   Quotas), même famille que `MAX_CHUNKS`/`MAX_CARD_COUNT` déjà en place (C-01.05/04) — protège une génération
+   individuelle d'un PDF très illustré, indépendamment du budget mensuel agrégé déjà couvert par
+   `AiQuota.service.js` (C-01.06).
+
+**Décision structurante additionnelle (prise en rédigeant la spec, pas posée à l'utilisateur — choix le plus
+simple à périmètre équivalent)** : la caption générée n'étend **pas** le contrat de sortie du prompt de cartes
+(C-01.01) ni celui des exercices (C-02.01) — elle est fusionnée comme un paragraphe de texte ordinaire dans le
+contenu source, avant `chunkText` (C-01.05), sous une forme explicitement marquée (« Schéma détecté... généré
+automatiquement par IA, non garantie exacte : ... »). Une carte qui cite ce paragraphe dans `sourceExcerpt`
+affiche cette mention à l'écran de validation **sans aucune modification de ce composant** — répond par
+construction à la dette notée en C-01.05 (« `sourceExcerpt` suppose un extrait de texte »), sans avoir besoin
+de trancher un nouveau format de sortie.
+
+**Alternative écartée (garde-fou de filtrage)** : capturer toute image détectée sans distinction — écarté, un
+cas réel déjà vérifié en C-01.05 (`2009_Karpicke_Butler_Roediger.pdf`, image de bandeau décorative) montre
+qu'`hasEmbeddedImages` capture aussi du contenu sans valeur pédagogique ; le prompt de captioning porte donc un
+champ `isPedagogicalContent` (§4/§5 du document), garde-fou principal de cette extension.
+
+**Conséquences** : coût OCR élargi assumé (l'appel image se déclenche désormais sur tout PDF avec au moins une
+image, pas seulement les PDF scannés comme en C-01.05) — non chiffré, dette explicite du document. Modèle
+vision Mistral non choisi/benchmarké (aucun ticket équivalent à C-01.03 pour la vision) — bloquant avant toute
+implémentation. Aucune ligne de code livrée à cette étape (document d'analyse, comme C-01.01/02/03) — voir
+`diagrams/generation_ia_captioning_image.md` pour le détail complet (prompt, contrats, garde-fous, cas
+d'erreur, interfaces, points ouverts).
+
+---
+
+### [2026-09-09] Captioning image — modèle vision résolu (`mistral-small-latest` supporte nativement la vision, aucun nouveau modèle/config)
+
+**Contexte** — Le point bloquant explicitement noté dans `generation_ia_captioning_image.md` §9 (« aucun
+modèle vision Mistral choisi ni benchmarké ») a été vérifié par revue documentaire (recherche web + pages
+officielles Mistral, `mistral.ai/news/mistral-small-4`, `docs.mistral.ai/capabilities/vision`) avant de
+démarrer l'implémentation demandée par l'utilisateur.
+
+**Constat** — `mistral-small-latest` (« Mistral Small 4 », daté du 2026-03-16, déjà le modèle configuré et
+utilisé pour C-01.04/C-02.03) supporte nativement la vision : Mistral le décrit comme unifiant Magistral
+(raisonnement), **Pixtral (multimodal)** et Devstral (agentique) en un seul modèle — « Native multimodality:
+Accepts both text and image inputs ». Format d'appel confirmé : `content` en tableau,
+`{ "type": "image_url", "image_url": "data:image/jpeg;base64,..." }` (chaîne, pas d'objet imbriqué `{ url }`
+contrairement à d'autres fournisseurs) aux côtés d'un bloc `{ "type": "text", "text": "..." }`. Facturation
+confirmée : une image est comptée comme des tokens de prompt sur le modèle appelé, pas via une grille tarifaire
+séparée.
+
+**Décision** — Le captioning (§4 du document) réutilise `helpers/mistralConfig.js` tel quel (`apiUrl`, `model`,
+`apiKey`, `timeoutMs`) : aucune nouvelle variable d'environnement, aucun nouveau modèle à benchmarker
+séparément (contrairement à ce que §9 anticipait comme prérequis bloquant). `AiQuota.service.js` n'a pas besoin
+d'une nouvelle table de tarifs par image — le captioning agrège dans `promptTokens`/`completionTokens` du même
+modèle, déjà couvert par `CHAT_PRICING_USD_PER_MILLION_TOKENS`.
+
+**Conséquences** : ce document reste une revue documentaire (pas encore un appel réel) — même statut que
+C-01.03 en son temps, à confirmer au premier appel réel comme le reste de ce projet le fait systématiquement.
+Débloque l'implémentation, qui démarre dans la foulée de cette entrée (voir entrées suivantes/CHANGELOG_AGENT.md).
+
+---
+
+### [2026-09-09] Correction sémantique — 6ᵉ bug : « rho » (toutes lettres) vs « ρ » (symbole), au niveau de l'embedding lui-même, pas des mots-clés
+
+**Contexte** : Après les 5 fixes du 2026-09-08 (tokenization, synonymes, `bestRef`), l'utilisateur signale que
+2 des 3 cartes restaient cassées (B « force pressante », C « barrage voûte », texte exact non récupérable, cf.
+entrées précédentes) et une anomalie nouvelle sur la carte Torricelli (`Patm = ρ·g·h`) : « rho » en toutes
+lettres → 77 % incorrect, « ρ » (symbole grec) → 83 % correct, contenu identique. Il pose aussi la question de
+fond : pourquoi ne pas se baser uniquement sur la proximité sémantique plutôt que sur des mots-clés ? (réponse
+donnée à l'utilisateur dans la conversation, résumée ici : l'entrée du 2026-07-18 documente que l'embedding
+SEUL avait déjà été essayé et présentait deux défauts réels — un paraphrase correcte à 0,61 rejetée à tort, et
+une inversion d'opérandes à 0,889 acceptée à tort ; la garde anti-inversion est désormais un mécanisme séparé
+et déterministe qui ne dépend plus du recouvrement de mots-clés, ce qui affaiblit une partie de la
+justification historique — mais le cas « paraphrase correcte sous-scorée » reste plausible avec le modèle
+actuel, non re-vérifié faute des textes de calibration originaux).
+
+Investigation du cas Torricelli, confirmée par test direct contre la vraie carte (`idQuestion=69`) : le score
+d'**embedding** lui-même diffère entre « rho » (0,7589, zone grise, incorrect) et « ρ » (0,8127, zone haute,
+correct) — ce n'est pas un bug de recouvrement de mots-clés (les deux formes produisent des tokens distincts
+mais le problème est en amont), c'est le modèle qui traite les deux graphies comme lexicalement différentes.
+`unifyFormulaNotation` convertissait déjà `\rho` → `ρ`, mais seulement préfixé du `\` de commande LaTeX de
+l'éditeur — jamais « rho » tapé tel quel, le cas le plus probable pour un étudiant sans clavier grec.
+
+**Décision** : `GREEK` (dictionnaire nom-grec → symbole Unicode, jusqu'ici local à
+`helpers/formulaNotation.js`) extrait en constante module-level exportée, réutilisée par
+`Semantic.service.normalizeText` via `GREEK_NAMES_PATTERN` — regex `\b(nom1|nom2|...)\b` insensible à la
+casse, triée par longueur décroissante (évite qu'« epsilon » ne laisse un résidu « εilon » en coupant
+« varepsilon » au milieu), avec exclusion `(?<!\\)` pour ne pas interférer avec `\rho` (déjà géré par
+`unifyFormulaNotation`, cf. bug immédiatement détecté par la suite de tests lors du premier essai sans cette
+exclusion — `\brho\b` matche aussi le « rho » de « \rho » puisque `\` est un caractère non-mot). Appliqué dans
+`normalizeText`, en amont à la fois de l'embedding et du recouvrement de mots-clés.
+
+**Alternative écartée** : ne traiter le cas que côté `extractKeywords` (comme les fixes du 2026-09-08) —
+insuffisant ici, puisque le score d'embedding lui-même (pas seulement le recouvrement de mots-clés en zone
+grise) diffère entre les deux graphies ; un fix localisé aux mots-clés n'aurait pas rapproché le score de
+« rho » du seuil haut comme il le fait maintenant (0,7589 → 0,8127, franchit `HIGH_THRESHOLD`).
+
+**Conséquences** : Les cartes B et C restent non confirmées réparées — texte exact non récupérable (cf.
+entrées du 2026-09-08), donc pas de garantie que ce fix (ou les précédents) les couvre. `GREEK_NAMES_PATTERN`
+matche des mots courts (pi, mu, nu, chi, eta…) qui pourraient coïncider avec un mot français/anglais sans
+rapport hors contexte physique — risque jugé faible et sans conséquence de notation, `normalizeText` étant
+appliqué symétriquement aux deux côtés de toute comparaison (texte interne, jamais affiché). Suite complète
+revérifiée : **108 suites/1979 tests API**, 0 régression (dont `test/helpers` 100/100 après extraction de
+`GREEK`) ; 3 tests ajoutés (`Semantic.service.test.js` : 53 → 56).
+
+---
+
+### [2026-09-09] Correction sémantique — suppression de la zone grise : décision à seuil unique sur le score sémantique
+
+**Contexte** : Malgré 6 correctifs ponctuels en 2 jours (tokenization `$…$`, parenthèses/`_`, corruption `#"`,
+`·`, `∆`/`Δ`, synonymes/`-ment`, meilleure référence, `rho`/`ρ`), l'utilisateur reformule le symptôme central,
+inchangé depuis le tout premier signalement : « le problème c'est pas le pourcentage annoncé, c'est que des
+fois pour 52% ça annonce validé et à 75% ça annonce à revoir ». Diagnostic explicite demandé : pourquoi ne pas
+se baser uniquement sur la proximité sémantique plutôt que sur des mots-clés ?
+
+Analyse : le symptôme n'est pas un bug résiduel mais une conséquence **structurelle** de l'architecture à zone
+grise (55-78 % tranchée par recouvrement de mots-clés, cf. entrée 2026-07-18) — un critère indépendant du
+score ne peut PAS garantir qu'un score plus haut batte toujours un score plus bas, par construction, quel que
+soit le nombre de bugs individuels corrigés dans ce critère. Re-lecture de la calibration d'origine
+(2026-07-18, 8 cas réels) : le seul cas alors tombé en zone grise (« réponse fausse même domaine », 0,717)
+était déjà sous `HIGH_THRESHOLD` (0,78) — un seuil unique l'aurait classé correctement sans aucune assistance
+de mots-clés. Les 7 autres cas de calibration étaient tous soit ≥0,806 soit à 0,15, jamais en zone grise. Rien
+dans les données de calibration d'origine ne validait donc la nécessité réelle de ce mécanisme — et il a
+produit 6 bugs distincts en 2 jours (2026-09-08/09, entrées ci-dessus).
+
+Par ailleurs, la seconde justification historique de la zone grise (garde contre une inversion d'opérandes
+scorée haut, 0,889) a depuis reçu son propre mécanisme dédié et déterministe (`detectInversion`, entrée
+2026-07-18 suivante), indépendant du recouvrement de mots-clés — cette partie de la justification d'origine
+ne tenait donc plus non plus.
+
+**Décision** — Option choisie explicitement par l'utilisateur parmi 2 proposées (seuil unique vs score
+affiché = score qui décide) : **seuil unique strict**, confirmé par « le résultat annoncé devrait se baser sur
+le pourcentage avancé par le modèle de proximité sémantique ». `gradeSemantic` : `is_correct = bestScore >=
+HIGH_THRESHOLD` (0,78, valeur inchangée — c'est le seul seuil qui classe correctement les 8 cas de calibration
+sans aucune assistance de mots-clés). `LOW_THRESHOLD` et `KEYWORD_OVERLAP_THRESHOLD` supprimés (dead code).
+`decision_zone` devient binaire (`'high'`/`'low'`, plus jamais `'grey_zone'`) — conservé tel quel plutôt que
+retiré du contrat de sortie, pour ne pas casser les consommateurs existants (front, tests) qui le lisent déjà.
+`extractKeywords`/`computeKeywordOverlap`/`canonicalizeKeyword`/`SYNONYM_GROUPS`/`stripAdverbSuffix` **conservés**
+(pas supprimés) : `extractKeywords` reste l'unique dépendance de `detectInversion`/`splitRatio`, seul appelant
+restant — retirer ces fonctions aurait cassé la garde anti-inversion pour un gain de lisibilité marginal.
+`computeKeywordOverlap` n'a donc plus d'appelant en production (uniquement testé directement) mais reste un
+utilitaire correct et sans risque à conserver.
+
+Front (`FlashcardsSessionPage.vue`) : la note de transparence « zone grise » ajoutée plus tôt dans la journée
+(2026-09-08, `decision_zone === 'grey_zone'`) devient un mort-code puisque cette valeur n'est plus jamais émise
+— retirée avec ses 2 tests associés plutôt que laissée en l'état (aurait induit en erreur un futur lecteur sur
+l'architecture réelle).
+
+**Alternative écartée** — « score affiché = score qui décide » (fusionner mots-clés + sémantique en un score
+final affiché, garantissant la cohérence par construction sans perdre le rattrapage de reformulations
+correctes comme le cas isotherme du jour) : proposée à l'utilisateur, qui a préféré le seuil unique strict —
+plus simple, sans nouveau poids à calibrer sans les textes de calibration d'origine, et alignée sur sa demande
+explicite (« se baser uniquement sur la proximité sémantique »).
+
+**Conséquences** — **Régression assumée et explicite** : le cas « modèle isotherme de l'atmosphère » corrigé
+quelques heures plus tôt le même jour (0,7407, correct grâce au recouvrement de mots-clés + synonymes) est
+**de nouveau classé incorrect** — sous 0,78, aucune assistance ne le rattrape plus. Accepté sciemment par
+l'utilisateur en échange de la garantie de monotonicité. Toute réponse correcte mais formulée très
+différemment de la référence, dont le score reste sous 0,78, aura désormais le même sort — c'est le
+compromis retenu, pas un bug. Vérifié après coup (conteneur redémarré) : sur 3 cas réels mélangés (poids
+tranche 0,918/correct, définition macroscopique 0,554/incorrect, Torricelli rho 0,813/correct), triés par
+score croissant, **aucune violation de monotonicité possible** — garanti par construction (`is_correct = score
+>= 0,78`, plus aucun autre critère). Suite complète revérifiée : **108 suites/1980 tests API**, **54 suites/838
+tests front** (-2, suppression des tests de la note zone grise devenue obsolète), 0 régression. Linter propre.
+
+---
+
+### [2026-09-09] Captioning image — implémentation : `ImageCaptioningPipeline.service.js` partagé (pas dupliqué) entre C-01 et C-02
+
+**Contexte** — Implémentation de `generation_ia_captioning_image.md` (spec livrée le même jour, modèle vision
+résolu — entrée précédente). `AiCardGenerationPipeline.service.js` (C-01.05) et
+`AiExerciseGenerationPipeline.service.js` (C-02.06) sont **délibérément dupliqués** entre eux depuis leur
+création (`MAX_CHUNKS`, `distributeCardCount`/`distributeQuestionCount`, wording des warnings — voir
+DECISIONS.md, entrée C-02.06) : fallait-il reproduire le même choix pour l'orchestration du captioning ?
+
+**Décision** — Non : un service dédié et **partagé**, `services/ImageCaptioningPipeline.service.js`
+(récupération des images via `PdfExtraction.service.js#extractImages` + un appel
+`ImageCaptioning.service.js#captionImage` par image + fusion dans `pageTexts`), requis à l'identique par les
+deux pipelines. Raison : ce service n'a AUCUNE notion de « carte » ni de « question » — il produit un texte
+enrichi, symétrique aux deux features, exactement comme `PdfExtraction.service.js`/`helpers/textChunker.js`
+sont déjà réutilisés tels quels par les deux (pas dupliqués). La duplication déjà en place ailleurs porte sur
+l'orchestration réellement spécifique à chaque feature (répartition du nombre de cartes/questions par chunk,
+formulation des warnings finaux) — pas sur toute logique touchant un PDF sans distinction.
+
+**Détail d'implémentation notable** : `PdfExtraction.service.js#extractText` gagne un champ `pageTexts`
+(texte par page, dans l'ordre) en plus de `text` — nécessaire pour que le captioning insère une description
+sur la bonne page avant le découpage en chunks (generation_ia_captioning_image.md §5.1). `pageTexts: null`
+pour un texte collé (pas de PDF, pas de page). Nouvel appel OCR dédié `PdfExtraction.service.js#extractImages`
+(`include_image_base64: true`, jamais demandé par `extractText`/`extractTextViaOcr` pour ne pas alourdir la
+réponse quand seul le texte est nécessaire) — `image_base64` reconstruit en data URI (documenté comme une
+chaîne brute sans préfixe par Mistral) sauf si un préfixe est déjà présent.
+
+**Tolérance aux pannes (par construction, pas ajoutée après coup)** : `ImageCaptioningPipeline.service.js`
+n'échoue JAMAIS (récupération des images en échec → warning + retour normal ; captioning d'une image en échec
+→ warning + les autres images continuent) — les deux pipelines appelants gardent un `try/catch` autour de
+l'appel malgré tout, par défense en profondeur (jamais déclenché en usage normal, seulement si le service
+partagé levait une exception non prévue).
+
+**Conséquences** : `AiUsageLog`/`AiQuota.service.js` (C-01.06) n'ont PAS été modifiés — confirmé en écrivant le
+code que le captioning agrège dans `promptTokens`/`completionTokens` du modèle déjà pricé
+(`CHAT_PRICING_USD_PER_MILLION_TOKENS`), comme anticipé dans l'entrée précédente. 51 nouveaux tests
+(`ImageCaptioning.service.test.js` 26, `ImageCaptioningPipeline.service.test.js` 12, `PdfExtraction.service.test.js`
++11 pour `extractImages`/`pageTexts`, +2 tests de wiring dans chacun des deux pipelines existants). Suite
+complète API : **110 suites/2031 tests** (contre 108/1980), 0 régression. Linter propre.

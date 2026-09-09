@@ -4,9 +4,13 @@ jest.mock('../../services/PdfExtraction.service', () => ({
 jest.mock('../../services/AiExerciseGeneration.service', () => ({
   generateExercises: jest.fn()
 }))
+jest.mock('../../services/ImageCaptioningPipeline.service', () => ({
+  captionEmbeddedImages: jest.fn()
+}))
 
 const PdfExtractionService = require('../../services/PdfExtraction.service')
 const AiExerciseGenerationService = require('../../services/AiExerciseGeneration.service')
+const ImageCaptioningPipelineService = require('../../services/ImageCaptioningPipeline.service')
 const AiExerciseGenerationPipelineService = require('../../services/AiExerciseGenerationPipeline.service')
 
 const FAKE_QUESTION = (n) => ({
@@ -40,7 +44,7 @@ describe('AiExerciseGenerationPipelineService', () => {
 
     it('resolveSourceText - texte seul - retourne le texte trimé, hasEmbeddedImages à false, sans appeler PdfExtraction', async () => {
       const result = await AiExerciseGenerationPipelineService.resolveSourceText({ sourceText: '  bonjour  ', pdfBuffer: null })
-      expect(result).toEqual({ text: 'bonjour', hasEmbeddedImages: false, ocrPagesProcessed: 0 })
+      expect(result).toEqual({ text: 'bonjour', hasEmbeddedImages: false, ocrPagesProcessed: 0, pageTexts: null })
       expect(PdfExtractionService.extractText).not.toHaveBeenCalled()
     })
 
@@ -284,8 +288,14 @@ describe('AiExerciseGenerationPipelineService', () => {
       expect(result.usage.ocrPagesProcessed).toBe(5)
     })
 
-    it('generateExercisesFromContent - PDF avec images/schémas détectés - ajoute un avertissement dédié', async () => {
-      PdfExtractionService.extractText.mockResolvedValue({ text: 'Texte extrait du PDF.', hasEmbeddedImages: true, ocrPagesProcessed: 0 })
+    it('generateExercisesFromContent - PDF avec images/schémas, captioning échoue - ajoute l\'avertissement générique dédié', async () => {
+      PdfExtractionService.extractText.mockResolvedValue({
+        text: 'Texte extrait du PDF.',
+        hasEmbeddedImages: true,
+        ocrPagesProcessed: 0,
+        pageTexts: ['Texte extrait du PDF.']
+      })
+      ImageCaptioningPipelineService.captionEmbeddedImages.mockRejectedValue(new Error('erreur inattendue'))
       AiExerciseGenerationService.generateExercises.mockResolvedValue({ questions: [FAKE_QUESTION(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiExerciseGenerationPipelineService.generateExercisesFromContent({
@@ -296,7 +306,7 @@ describe('AiExerciseGenerationPipelineService', () => {
       expect(result.warnings.some((w) => w.includes('images/schémas'))).toBe(true)
     })
 
-    it('generateExercisesFromContent - texte collé (pas de PDF) - jamais d\'avertissement images/schémas', async () => {
+    it('generateExercisesFromContent - texte collé (pas de PDF) - jamais d\'avertissement images/schémas, jamais de captioning', async () => {
       AiExerciseGenerationService.generateExercises.mockResolvedValue({ questions: [FAKE_QUESTION(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiExerciseGenerationPipelineService.generateExercisesFromContent({
@@ -305,6 +315,39 @@ describe('AiExerciseGenerationPipelineService', () => {
       })
 
       expect(result.warnings.some((w) => w.includes('images/schémas'))).toBe(false)
+      expect(ImageCaptioningPipelineService.captionEmbeddedImages).not.toHaveBeenCalled()
+    })
+
+    it('generateExercisesFromContent - captioning réussi - le texte enrichi est envoyé au modèle, usage agrégé, aucun avertissement générique', async () => {
+      PdfExtractionService.extractText.mockResolvedValue({
+        text: 'Texte extrait du PDF.',
+        hasEmbeddedImages: true,
+        ocrPagesProcessed: 1,
+        pageTexts: ['Texte extrait du PDF.']
+      })
+      ImageCaptioningPipelineService.captionEmbeddedImages.mockResolvedValue({
+        pageTexts: ['Texte extrait du PDF.\n\n[Schéma détecté sur cette page — description générée automatiquement par IA, non garantie exacte : Un schéma.]'],
+        warnings: [],
+        usage: { promptTokens: 200, completionTokens: 60, ocrPagesProcessed: 1 },
+        captionedCount: 1
+      })
+      AiExerciseGenerationService.generateExercises.mockResolvedValue({ questions: [FAKE_QUESTION(1)], warning: null, usage: FAKE_USAGE })
+
+      const result = await AiExerciseGenerationPipelineService.generateExercisesFromContent({
+        pdfBuffer: Buffer.from('%PDF-1.4'),
+        questionCount: 1
+      })
+
+      expect(AiExerciseGenerationService.generateExercises).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceText: expect.stringContaining('Un schéma.') })
+      )
+      expect(result.warnings.some((w) => w.includes('images/schémas'))).toBe(false)
+      expect(result.usage).toEqual({
+        model: 'mistral-small-latest',
+        promptTokens: 300,
+        completionTokens: 110,
+        ocrPagesProcessed: 2
+      })
     })
 
     it('generateExercisesFromContent - transmet questionType/outputLanguage/subjectContext à chaque chunk', async () => {

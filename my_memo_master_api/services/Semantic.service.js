@@ -6,7 +6,21 @@ try {
   console.error(error)
 }
 
-const { unifyFormulaNotation } = require('../helpers/formulaNotation')
+const { unifyFormulaNotation, GREEK } = require('../helpers/formulaNotation')
+
+// Noms grecs en toutes lettres -> symbole Unicode, pour reconnaître « rho » tapé
+// au clavier (sans le « \ » de commande LaTeX que `unifyFormulaNotation` attend) —
+// regex pré-compilée une fois : alternative des clés GREEK triée par longueur
+// décroissante (« varepsilon » avant « epsilon », sinon le remplacement partiel
+// laisserait un résidu « εilon »), bornée par `\b` pour ne jamais couper un mot
+// plus long qui contiendrait un nom grec en sous-chaîne. `(?<!\\)` exclut « \rho »
+// (commande LaTeX de l'éditeur, déjà traitée par `unifyFormulaNotation` — sans
+// cette exclusion, « rho » matche aussi le « rho » de « \rho » via `\b` entre le
+// « \ » non-mot et le « r », cassant ce chemin en un résidu « \ρ » corrompu).
+const GREEK_NAMES_PATTERN = new RegExp(
+  `(?<!\\\\)\\b(${Object.keys(GREEK).sort((a, b) => b.length - a.length).join('|')})\\b`,
+  'gi'
+)
 const { algebraicallyEqual: isAlgebraicallyEqual } = require('../helpers/algebraicEquivalence')
 
 // Stopwords anglais + français : l'application est francophone, la liste anglaise
@@ -162,9 +176,9 @@ const STOPWORDS = new Set([
   'just'
 ])
 
+// Seuil unique de décision (2026-09-09, remplace HIGH_THRESHOLD/LOW_THRESHOLD/
+// zone grise) — voir le commentaire dans gradeSemantic pour le détail complet.
 const HIGH_THRESHOLD = 0.78
-const LOW_THRESHOLD = 0.55
-const KEYWORD_OVERLAP_THRESHOLD = 0.3
 
 // Séparateurs antisymétriques de la famille division/rapport : l'ordre des opérandes
 // porte le sens (« masse par unité de volume » ≠ « volume par unité de masse »), mais
@@ -295,6 +309,18 @@ class SemanticService {
       // en δ comme n'importe quelle lettre grecque). Unifié avant la casse.
       .replace(/∆/g, 'Δ')
       .toLowerCase()
+      // Nom grec en toutes lettres -> symbole Unicode (« rho » -> « ρ »). Trouvé
+      // le 2026-09-09 (carte Torricelli, Patm = ρ·g·h) : « rho » scorait 76 %
+      // (zone grise, incorrect) et « ρ » 81 % (zone haute, correct) pour un
+      // contenu strictement identique — l'embedding traite « rho » et « ρ »
+      // comme lexicalement différents, ce n'est pas un problème de mots-clés
+      // mais du texte envoyé à l'embedding lui-même. `unifyFormulaNotation`
+      // faisait déjà cette conversion mais seulement pour « \rho » (commande
+      // LaTeX de l'éditeur) — jamais pour « rho » tapé tel quel au clavier, le
+      // cas le plus probable pour un étudiant sans clavier grec. Appliqué ici,
+      // en amont de l'embedding ET du recouvrement de mots-clés (les deux en
+      // bénéficient), pas seulement à l'intérieur d'un segment $…$.
+      .replace(GREEK_NAMES_PATTERN, (name) => GREEK[name] ?? name)
       .replace(/\s+/g, ' ')
   }
 
@@ -386,6 +412,11 @@ class SemanticService {
   /**
    * Extraction de mots-clés : tous les tokens substantiels hors stopwords,
    * sans plancher de longueur.
+   *
+   * USAGE (2026-09-09) — n'intervient plus dans `gradeSemantic` (la décision
+   * est désormais un seuil unique sur le score sémantique, cf. son commentaire ;
+   * `computeKeywordOverlap` n'a donc plus d'appelant en dehors des tests).
+   * Reste utilisée par `detectInversion`/`splitRatio`, seul appelant restant.
    *
    * HISTORIQUE — le filtre imposait à l'origine `length > 2`, avec un repli
    * permissif si ce filtre strict ne laissait rien. Deux angles morts trouvés
@@ -568,43 +599,31 @@ class SemanticService {
       const bestScore = best.score
       const bestRef = best.reference
 
-      let isCorrect = false
-      let decisionZone = 'low'
-      // Référence à laquelle on attribue la décision — la meilleure par score
-      // d'embedding par défaut (high/low), mais peut différer en zone grise
-      // (cf. ci-dessous) ; utilisée pour la garde anti-inversion.
-      let matchedRef = bestRef
-
-      if (bestScore >= HIGH_THRESHOLD) {
-        // High confidence: correct
-        isCorrect = true
-        decisionZone = 'high'
-      } else if (bestScore <= LOW_THRESHOLD) {
-        // Low confidence: incorrect
-        isCorrect = false
-        decisionZone = 'low'
-      } else {
-        // Grey zone: use keyword overlap
-        decisionZone = 'grey_zone'
-        const studentKeywords = this.extractKeywords(studentNorm)
-        // Recouvrement contre CHAQUE réponse acceptée, pas seulement `bestRef`
-        // (celle qui gagne par score d'embedding) : bug reproduit le 2026-09-08
-        // (carte « modèle isotherme de l'atmosphère ») — la référence longue/
-        // complète gagne souvent de peu au score d'embedding, alors qu'une
-        // variante courte de la même liste recoupe bien mieux les mots-clés
-        // exacts de l'étudiant. Prendre le meilleur recouvrement, comme
-        // l'embedding prend déjà le meilleur score.
-        let bestOverlap = 0
-        for (const ref of correctList) {
-          const overlap = this.computeKeywordOverlap(studentKeywords, this.extractKeywords(ref))
-          if (overlap > bestOverlap) {
-            bestOverlap = overlap
-            matchedRef = ref
-          }
-        }
-
-        isCorrect = bestOverlap >= KEYWORD_OVERLAP_THRESHOLD
-      }
+      // Décision à seuil unique (2026-09-09) : le verdict est une fonction
+      // strictement croissante du score de proximité sémantique affiché à
+      // l'étudiant — aucun autre critère n'intervient. Remplace l'ancienne
+      // « zone grise » (55-78 %, tranchée par recouvrement de mots-clés, un
+      // critère indépendant du score) : ce mécanisme a produit 6 bugs distincts
+      // en une seule journée (2026-09-08/09, cf. DECISIONS.md) et surtout
+      // rendait la décision non-monotone par construction — un score plus bas
+      // pouvait passer pendant qu'un score plus haut échouait sur une autre
+      // carte, symptôme central signalé dès le premier retour utilisateur et
+      // jamais résolu par les correctifs ponctuels de la zone grise elle-même.
+      // Choix explicite de l'utilisateur (2026-09-09) après ce constat : « le
+      // résultat annoncé devrait se baser sur le pourcentage avancé par le
+      // modèle de proximité sémantique ».
+      // Seuil retenu : `HIGH_THRESHOLD` (0,78) inchangé — c'est le seul qui
+      // classe correctement les 8 cas de la calibration DECISIONS.md
+      // 2026-07-18 sans aucune assistance de mots-clés (le seul cas alors tombé
+      // en "zone grise", une réponse fausse du même domaine à 0,717, est déjà
+      // sous 0,78 ; les 7 autres étaient tous soit ≥0,806 soit à 0,15).
+      // Coût assumé : une réponse correcte mais formulée très différemment
+      // dont le score reste sous 0,78 (ex. la carte « modèle isotherme » de
+      // l'audit du 2026-09-08, à 0,74) redevient « incorrect » — accepté en
+      // échange de la garantie de monotonicité.
+      const isCorrect = bestScore >= HIGH_THRESHOLD
+      const decisionZone = isCorrect ? 'high' : 'low'
+      const matchedRef = bestRef
 
       // Garde anti-inversion : les embeddings scorent haut sur « Y divisé par X »
       // quand la réponse attendue est « X divisé par Y » — on rejette explicitement.

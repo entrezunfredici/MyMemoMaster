@@ -2,6 +2,7 @@ const logger = require('../helpers/logger')
 const { chunkText } = require('../helpers/textChunker')
 const pdfExtractionService = require('./PdfExtraction.service')
 const aiExerciseGenerationService = require('./AiExerciseGeneration.service')
+const imageCaptioningPipelineService = require('./ImageCaptioningPipeline.service')
 
 // Périmètre : ajout de l'import PDF pour la génération de questions d'exercice par IA (`C-02`),
 // demandé explicitement par l'utilisateur après la livraison de C-02.07 — jusque-là, `C-02` n'avait
@@ -47,8 +48,11 @@ class AiExerciseGenerationPipelineService {
    * à `AiCardGenerationPipeline.service.js#resolveSourceText` (même contrat, même dépendance à
    * `PdfExtraction.service.js`, générique et non spécifique aux cartes).
    *
+   * `pageTexts` (texte par page, `null` pour un texte collé) permet au captioning d'images
+   * (ImageCaptioningPipeline.service.js, 2026-09-09) d'insérer une description sur la bonne page.
+   *
    * @param {{ sourceText: string|null, pdfBuffer: Buffer|null }} params
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number, pageTexts: string[]|null }>}
    * @throws {Error} Ni l'un ni l'autre, ou les deux à la fois fournis (400)
    */
   async resolveSourceText({ sourceText, pdfBuffer }) {
@@ -62,7 +66,7 @@ class AiExerciseGenerationPipelineService {
     }
 
     if (hasPdf) return pdfExtractionService.extractText(pdfBuffer)
-    return { text: sourceText.trim(), hasEmbeddedImages: false, ocrPagesProcessed: 0 }
+    return { text: sourceText.trim(), hasEmbeddedImages: false, ocrPagesProcessed: 0, pageTexts: null }
   }
 
   /**
@@ -126,10 +130,48 @@ class AiExerciseGenerationPipelineService {
     const {
       text: resolvedText,
       hasEmbeddedImages,
-      ocrPagesProcessed = 0
+      ocrPagesProcessed = 0,
+      pageTexts
     } = await this.resolveSourceText({ sourceText, pdfBuffer })
 
-    const allChunks = chunkText(resolvedText, { maxChunkLength: MAX_CHUNK_LENGTH })
+    const warnings = []
+    const usage = { model: null, promptTokens: 0, completionTokens: 0, ocrPagesProcessed }
+
+    // Captioning des images/schémas (ImageCaptioningPipeline.service.js, generation_ia_captioning_image.md)
+    // AVANT le découpage en chunks — même wiring que AiCardGenerationPipeline.service.js (C-01.05), voir
+    // ce fichier pour le détail du raisonnement (service partagé, générique, pas de notion de "question"
+    // ici). Ne fait jamais échouer la génération : toute erreur dégrade en warning.
+    let finalText = resolvedText
+    if (hasEmbeddedImages) {
+      try {
+        const captioningResult = await imageCaptioningPipelineService.captionEmbeddedImages({
+          pdfBuffer,
+          pageTexts,
+          subjectContext,
+          outputLanguage
+        })
+        finalText = captioningResult.pageTexts.join('\n\n').trim() || resolvedText
+        usage.promptTokens += captioningResult.usage.promptTokens
+        usage.completionTokens += captioningResult.usage.completionTokens
+        usage.ocrPagesProcessed += captioningResult.usage.ocrPagesProcessed
+        warnings.push(...captioningResult.warnings)
+        if (captioningResult.captionedCount === 0 && captioningResult.warnings.length === 0) {
+          warnings.push(
+            'Ce contenu contient des images/schémas, mais aucun ne portait de contenu pédagogique ' +
+              'exploitable — seul le texte est pris en compte.'
+          )
+        }
+      } catch (error) {
+        logger.warn(`[AiExerciseGenerationPipeline] Captioning des images échoué : ${error?.message || error}`)
+        warnings.push(
+          'Ce contenu contient des images/schémas qui ne sont pas analysés par la génération IA ' +
+            '(seul le texte est pris en compte) — les notions illustrées uniquement par une image ' +
+            'risquent de ne donner lieu à aucune question.'
+        )
+      }
+    }
+
+    const allChunks = chunkText(finalText, { maxChunkLength: MAX_CHUNK_LENGTH })
     if (allChunks.length === 0) {
       const err = new Error("Aucun contenu exploitable n'a été trouvé dans la source fournie.")
       err.statusCode = 422
@@ -141,19 +183,9 @@ class AiExerciseGenerationPipelineService {
     const perChunkCounts = this.distributeQuestionCount(questionCount, chunks.length)
 
     const questions = []
-    const warnings = []
-    const usage = { model: null, promptTokens: 0, completionTokens: 0, ocrPagesProcessed }
     let successCount = 0
     let consecutiveRateLimitFailures = 0
     let stoppedOnSustainedRateLimit = false
-
-    if (hasEmbeddedImages) {
-      warnings.push(
-        'Ce contenu contient des images/schémas qui ne sont pas analysés par la génération IA ' +
-          '(seul le texte est pris en compte) — les notions illustrées uniquement par une image ' +
-          'risquent de ne donner lieu à aucune question.'
-      )
-    }
 
     if (truncated) {
       warnings.push(

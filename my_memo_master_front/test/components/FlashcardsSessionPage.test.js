@@ -173,47 +173,6 @@ describe('FlashcardsSessionPage', () => {
     expect(wrapper.text()).toContain('10%')
   })
 
-  // ── Zone grise (2026-09-08) ───────────────────────────────────────────────
-  // En zone grise, le verdict ne dépend pas du score affiché mais d'un recouvrement
-  // de mots-clés distinct (Semantic.service, cf. DECISIONS.md) — sans la note ci-
-  // dessous, un score élevé associé à un verdict "incorrect" se lit comme une
-  // incohérence de notation plutôt que comme un critère différent.
-
-  it('zone grise — affiche une note précisant que le score n\'a pas décidé seul', async () => {
-    const wrapper = mountSession()
-    await flushPromises()
-
-    const cardStore = useLeitnerCardStore()
-    cardStore.submitResponse.mockImplementation(async () => {
-      cardStore.lastCorrection = { success: false, score: 0.75, correction: 'Paris', explanation: 'Incorrect.', decision_zone: 'grey_zone' }
-      return true
-    })
-
-    await wrapper.find('textarea').setValue('Lyon')
-    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('75%')
-    expect(wrapper.text()).toContain('mots-clés')
-  })
-
-  it('zone haute/basse — n\'affiche pas la note de zone grise', async () => {
-    const wrapper = mountSession()
-    await flushPromises()
-
-    const cardStore = useLeitnerCardStore()
-    cardStore.submitResponse.mockImplementation(async () => {
-      cardStore.lastCorrection = { success: true, score: 0.95, correction: 'Paris', explanation: 'Correct.', decision_zone: 'high' }
-      return true
-    })
-
-    await wrapper.find('textarea').setValue('Paris')
-    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).not.toContain('mots-clés')
-  })
-
   // ── Navigation entre cartes ───────────────────────────────────────────────
 
   it('clic Continuer — passe à la carte suivante', async () => {
