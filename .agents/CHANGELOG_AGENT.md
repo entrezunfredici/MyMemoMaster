@@ -164,6 +164,7 @@
 | Génération d'exercices par IA (C-02) — Import PDF (demande utilisateur, hors ticket du feature list) | **Livré** — comble l'écart assumé en C-02.06/C-02.02 (« aucun pipeline chunking/extraction n'existe pour les exercices ») : nouveau `services/AiExerciseGenerationPipeline.service.js` (chunking + appel LLM par passage, réutilise tel quel `services/PdfExtraction.service.js`/`helpers/textChunker.js` de `C-01`, mêmes constantes/garde-fous que `AiCardGenerationPipeline.service.js` dont le circuit breaker rate limit) ; `AiExerciseDegradedMode.service.js` gagne `attemptGenerationFromContent` (nouvelle méthode, `attemptGeneration` inchangée) ; route `POST /ai-exercise-generations` passe en `multipart/form-data` (`aiPdfUpload.middleware.js` réutilisé tel quel, `sanitize` post-multer comme C-01.11, magic bytes vérifiés) et accepte désormais `sourceText` OU `pdf`, exclusifs. **Changement de contrat HTTP assumé** : la réponse porte `warnings` (tableau) au lieu de `warning` (chaîne) sur tout succès, y compris texte collé — toute génération passe maintenant par le pipeline. Front : `stores/aiExerciseGeneration.js#generate` envoie un `FormData` (texte ou PDF, timeout 300000ms comme `C-01`), état `warnings` (tableau) ; `AiGenerateExercisesModalComponent.vue` regagne l'option "Importer un PDF" (radio + drag&drop, calquée sur `AiGenerateCardsModalComponent.vue`) — **sans reproduire le plafond de taille codé en dur** déjà signalé comme un écart côté cartes (10 Mo alors que le backend accepte `MAX_UPLOAD_SIZE_MB`, 20 Mo par défaut) : validation de taille laissée au serveur ; `AiExerciseReviewModalComponent.vue` affiche `warnings[]` (une ligne par avertissement) au lieu d'un `warning` unique. 34 tests dédiés (28 backend : 27 pipeline + 4 mode dégradé + BDD route réécrite pour mocker le pipeline comme `C-01` ; 24 front : 10 store + 8 modal PDF + 2 review modal warnings, + tests existants mis à jour pour le nouveau contrat). Suites complètes : API **106 suites/1950 tests**, front **54 suites/831 tests**, 0 régression. Linter et audit RGAA statique propres | 2026-09-08 |
 | Génération de Leitner/exercices par IA (C-01/C-02) — Captioning image des schémas (demande utilisateur, hors ticket du feature list) | **Livré et vérifié (110 suites/2031 tests, 0 régression)** — `diagrams/generation_ia_captioning_image.md` : étend C-01.05 (qui détecte `hasEmbeddedImages` sans jamais décrire le contenu visuel). Modèle vision résolu en cours de route : `mistral-small-latest` (déjà configuré) supporte nativement la vision depuis Mistral Small 4 — aucun modèle/config séparé, aucune nouvelle grille tarifaire (voir DECISIONS.md). Implémentation : `services/ImageCaptioning.service.js` (nouveau — un appel vision par image, `isPedagogicalContent`/`caption`/`warning`, filtre les images décoratives, même politique de retry/backoff 429 que `AiCardGeneration.service.js`) ; `services/ImageCaptioningPipeline.service.js` (nouveau, **partagé** par C-01 et C-02 — récupère les images via `PdfExtraction.service.js#extractImages` (nouvel appel OCR dédié, `include_image_base64: true`), plafond `MAX_CAPTIONED_IMAGES_PER_GENERATION` = 5, fusionne les descriptions retenues dans `pageTexts`, jamais d'échec propagé) ; `PdfExtraction.service.js#extractText` expose désormais `pageTexts` (texte par page) en plus de `text`. Aucune extension du contrat `sourceExcerpt`/C-01.01/C-02.01 : la caption devient un paragraphe de texte ordinaire, marqué explicitement (« généré automatiquement par IA, non garantie exacte »), fusionné avant `chunkText` — une carte/question qui la cite dans `sourceExcerpt` affiche cette mention à l'écran de révision sans aucun changement de ces composants. `AiCardGenerationPipeline.service.js`/`AiExerciseGenerationPipeline.service.js` branchés à l'identique (avant le découpage en chunks) ; l'ancien avertissement générique « images non analysées » n'apparaît plus que sur échec réel (récupération ou captioning en échec) — sinon le texte enrichi est utilisé silencieusement. `AiQuota.service.js` inchangé : le captioning est facturé comme des tokens de prompt sur le modèle déjà pricé, pas via une grille tarifaire séparée. 51 nouveaux tests (26 + 12 + 11 PdfExtraction + 2×wiring pipelines). **Points ouverts** : revue documentaire du format API/modèle vision, pas encore vérifiée par un appel réel ; coût OCR élargi (se déclenche désormais sur tout PDF avec une image, pas seulement les scans) non chiffré | 2026-09-09 |
 | Génération d'exercices par IA (C-02) — Tests fonctionnels flux génération | **Livré** — `test/bdd/aiExerciseGenerationFlow.test.js` (C-02.08, 7 tests) : referme la boucle Spécification → Service génération → Validation format → Mode dégradé → (Interface de révision simulée côté test) → persistance réelle, jamais exercée ensemble jusqu'ici — seuls les deux vrais points de sortie externes (appel réseau Mistral, extraction PDF) sont mockés, tout le reste (chunking, prompt/parsing/dédoublonnage, orchestration multi-chunks/circuit breaker, classification du mode dégradé, revalidation de format avant import, `POST /tests`+`POST /questions` réels) tourne pour de vrai sur SQLite en mémoire. Couvre : parcours nominal 4 types mixtes avec persistance vérifiée par `GET /tests/:id`, import PDF de bout en bout, mode dégradé LLM indisponible, mode dégradé sortie non exploitable après retry, échec partiel toléré (une question éditée en Interface de révision redevient invalide, seule la question valide est importée), contenu insuffisant (moins de questions que demandé + warning, sortie valide), rejet de saisie 400 (jamais un mode dégradé). **Constat fait en écrivant ce test** (pas une régression introduite ici, conséquence déjà actée du passage systématique par le pipeline le jour même) : un chunk unique qui épuise son retry est reclassé `service_unavailable` au lieu de `invalid_output` par `AiExerciseDegradedMode.service.js` — le pipeline remplace le message précis du chunk par son propre message générique dès que 100 % des chunks échouent, y compris s'il n'y en a qu'un — dégradation du signal assumée (les deux codes restent `degraded:true`/`suggestManualCreation:true`), voir DECISIONS.md. Suite complète API : **108 suites/1964 tests** (contre 107/1957), 0 régression. Linter propre. Aucun code de production modifié (ticket 100% tests) | 2026-09-08 |
+| Génération de Leitner/exercices par IA (C-01/C-02) — Syntaxe formules ($...$/LaTeX) dans les prompts LLM + correctif 500 réponse longue | [ADD/FIX] 2026-09-09 — les deux prompts système savent désormais produire des formules interprétables par le front (`$...$`/LaTeX) ; correctif d'un vrai bug latent (`Response.content` VARCHAR(255) implicite vs validateur 2000 caractères, même classe que `Question.statement` en 2026-08-31) — voir entrée dédiée en bas de fichier | 2026-09-09 |
 | Partage de ressources pédagogiques (C-03) — Maquettes UI bibliothèque ressources | **Audit-maquette rétroactif livré, aucun code** — `diagrams/bibliotheque_ressources_ui.md` (C-03.02) : l'implémentation (C-03.01, S-03.08/S-02.05) existait déjà en production, sans document `*_ui.md` dédié — traitement identique à S-06.02 (« l'implémentation Vue réelle a précédé les maquettes »). Document produit par audit de l'écran réel (`ClassroomEtudiantView.vue`/`ClassroomEnseignantView.vue`) : vue étudiant (lecture seule), vue enseignant (formulaire drag&drop + liste + suppression), icônes par `mimeType`, contrôle d'accès (rappel). **3 points de dette confirmés, non corrigés** (hors périmètre) : aucune UI d'édition malgré `PUT /resources/:resourceId` existant et testé, champ `url` du modèle inatteignable depuis le formulaire (upload de fichier imposé), aucun filtre par type de ressource dans la bibliothèque. 2 points initialement listés se sont révélés inexacts/incomplets après vérification le jour même : la recherche filtre en réalité déjà les ressources (erreur de lecture, corrigée) ; l'absence de confirmation avant suppression, présentée à tort comme spécifique aux ressources, s'est avérée être le comportement de **toute** la vue enseignant — corrigée en généralisant une modale de confirmation aux 4 actions destructrices (section/rendu, échéance, membre, ressource), voir entrée IMP dédiée | 2026-09-08 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
@@ -11860,3 +11861,78 @@ docs Swagger obsolètes non couvertes par la recherche initiale (`routes/Leitner
 `routes/Semantic.routes.js`) : `enum: [high, low, grey_zone]` corrigé en `enum: [high, low, inversion]`
 (la vraie 3ᵉ valeur possible de `decision_zone`, absente de ces deux docs même avant ce ticket). Confirmé
 par recherche finale : plus aucune occurrence de `grey_zone` dans `*.js`/`*.vue`.
+
+---
+
+## [2026-09-09] ADD/FIX — C-01/C-02 : le LLM sait produire des formules ($...$/LaTeX) + correctif 500 sur réponse longue
+
+**Contexte** — Question directe de l'utilisateur, en observant une carte générée par IA portant sur une
+formule physique (« P = Patm + pgh ») rendue en texte brut, non interprétée par `FormulaTextComponent`
+(convention `$...$`/KaTeX, `services/Semantic.service.js`/`helpers/formulaNotation.js`) : les prompts
+système de `AiCardGeneration.service.js`/`AiExerciseGeneration.service.js` ne mentionnaient jamais cette
+convention — audité, confirmé absent des deux prompts et d'aucun post-traitement. Signalée dans le même
+message : une erreur d'import (« Erreur lors de la création de la réponse. ») sur une carte "open" dont la
+réponse générée faisait 262 caractères.
+
+**ADD (formules)** — Nouvelle règle 8/12 ajoutée en fin de liste (pas d'insertion au milieu, pour ne pas
+décaler les renvois textuels existants — `buildUserPrompt` référence « règle 7 »/« règle 11 ») dans
+`buildSystemPrompt` des deux services : toute formule (`statement`/`answer`/`acceptedAnswers`/
+`options[].text` côté cartes ; mêmes champs + `template`/`blanks`/`fragments` côté exercices) doit être
+entourée de `$...$` et écrite en LaTeX standard (`\frac{}{}`, `\sqrt{}`, `x^{}`, `x_{}`, `\rho`...). **CHOIX**
+LaTeX standard plutôt que le micro-langage raccourcis du front (`over()`, `sqrt()`...) — **RAISON** : LaTeX
+est un format que le modèle connaît déjà nativement (contrairement à une syntaxe propriétaire jamais vue à
+l'entraînement) ; `unifyFormulaNotation`/l'éditeur MathLive V2 traitent déjà le LaTeX brut comme forme
+canonique de premier rang (DECISIONS.md 2026-07-19, « Interpréteur V2 ») — aucune conversion supplémentaire
+nécessaire côté front, `renderMath` (interpreter.js) est idempotent sur du LaTeX déjà présent. 2 nouveaux
+tests (1 par service) vérifient la présence de la règle dans le prompt généré.
+
+**FIX (bug import réponse longue)** — `models/Response.model.js#content` était en `DataTypes.STRING`
+(VARCHAR(255) implicite, jamais précisé à la création de la table) alors que `validators/Response.validators.js`
+annonce explicitement une limite de 2000 caractères — **exactement le même bug, sur le champ voisin**, déjà
+trouvé et corrigé une fois pour `Question.statement` (migration `20260831000001`, jamais répliqué à
+`Response.content` à l'époque). Corrigé en `STRING(2000)` (et non `TEXT` comme `Question.statement` : ce
+champ a une borne documentée et volontaire côté validateur, contrairement à `statement` qui n'en avait
+aucune — la colonne doit refléter exactement le contrat déjà annoncé par l'API). Migration
+`20260909000001-change-response-content-to-string2000.js`, même politique que `20260831000001` (`down()`
+no-op assumé, pas de retour arrière automatique vers VARCHAR(255) si des réponses > 255 caractères existent
+déjà en base).
+
+**Vérification** — Confirmé un vrai defect (précédent identique déjà corrigé une fois sur `Question.statement` =
+signal fort) et testé via appel direct `Response.create` (Sequelize) : la limite de 255 ne déclenche
+**aucune erreur sur SQLite** (type affinity, non enforced — testé empiriquement, 262 caractères stockés sans
+erreur), donc le bug corrigé ici est **certain en prod (Postgres, VARCHAR(255) réellement enforced :
+`value too long for type character varying(255)`)** mais n'explique probablement PAS, à lui seul, l'erreur
+observée par l'utilisateur en local (dev SQLite). Cause exacte de l'erreur locale **non confirmée** — API non
+démarrée pendant l'investigation, et `helpers/api.js#post()` avale volontairement (choix documenté,
+2026-09-01) tout détail d'erreur HTTP non-2xx/réseau et renvoie `undefined`, donc le même message générique
+français s'affiche identiquement pour un 400, un 500 ou une coupure réseau — aucune information de diagnostic
+récupérable a posteriori sans les logs serveur (console uniquement, `helpers/logger.js`, aucun fichier) ou
+l'onglet Réseau du navigateur au moment de l'échec.
+
+**Effet de bord constaté (pré-existant, non introduit ici)** — `my_memo_master_api/db.sqlite` (fichier
+versionné, base de dev vide — 0 ligne dans `User`/`Question`/`Response`/`LeitnerCard`/`Test`) portait des
+migrations `up` en base (`SequelizeMeta`) dont le schéma réel ne reflétait pas l'effet (`Question.content`
+absent malgré `20260619000001` marquée appliquée, `Question.statement` toujours VARCHAR(255) malgré
+`20260831000001`) — dérive antérieure à cette session, non investiguée plus avant (hors périmètre). `npm run
+migrate` relancé pour appliquer les migrations en attente (dont celle-ci) : `db.sqlite` local modifié en
+conséquence (git status `M`), à valider/committer par l'utilisateur.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiCardGeneration.service.js` (règle 8, `buildSystemPrompt`)
+- `my_memo_master_api/services/AiExerciseGeneration.service.js` (règle 12, `buildSystemPrompt`)
+- `my_memo_master_api/test/services/AiCardGeneration.service.test.js`, `test/services/AiExerciseGeneration.service.test.js` (+1 test chacun)
+- `my_memo_master_api/models/Response.model.js` (`content` : `STRING` -> `STRING(2000)`)
+- `my_memo_master_api/migrations/20260909000001-change-response-content-to-string2000.js` (nouveau)
+- `my_memo_master_api/db.sqlite` (migrations en attente appliquées, effet de bord — voir ci-dessus)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 4 suites ciblées relancées (`AiCardGeneration.service.test.js`, `AiExerciseGeneration.service.test.js`,
+`Response.service.test.js`, `Response.controller.test.js`) : **150/150 tests**, 0 régression. Suite complète
+non relancée (hors budget de ce ticket, aucun autre fichier de production touché).
+
+**Points d'attention / dette** — La cause exacte de l'erreur locale rapportée par l'utilisateur reste
+ouverte : à reproduire avec l'API démarrée et l'onglet Réseau du navigateur (ou les logs serveur) pour
+confirmer si le correctif VARCHAR(2000) suffit une fois déployé en conditions réelles (Postgres), ou si une
+autre cause était en jeu. La dérive de schéma de `db.sqlite` (paragraphe ci-dessus) n'a pas été corrigée —
+signalée à l'utilisateur, décision de reconstruction laissée à sa discrétion (fichier vide, sans donnée à
+perdre).

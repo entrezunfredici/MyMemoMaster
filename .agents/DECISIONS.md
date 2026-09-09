@@ -4040,3 +4040,78 @@ code que le captioning agrège dans `promptTokens`/`completionTokens` du modèle
 (`ImageCaptioning.service.test.js` 26, `ImageCaptioningPipeline.service.test.js` 12, `PdfExtraction.service.test.js`
 +11 pour `extractImages`/`pageTexts`, +2 tests de wiring dans chacun des deux pipelines existants). Suite
 complète API : **110 suites/2031 tests** (contre 108/1980), 0 régression. Linter propre.
+
+---
+
+### [2026-09-09] Syntaxe des formules dans les prompts LLM — LaTeX standard plutôt que le micro-langage raccourcis du front
+
+**Contexte** : L'utilisateur a demandé si le système de génération IA (C-01/C-02) pouvait produire des
+formules interprétables par le front (`$...$`/KaTeX, `FormulaTextComponent`). Audit : aucun des deux prompts
+système (`AiCardGeneration.service.js`/`AiExerciseGeneration.service.js`) ne mentionnait cette convention.
+
+**Décision** : instruire le LLM à entourer toute formule de `$...$` et à l'écrire en **LaTeX standard**
+(`\frac{}{}`, `\sqrt{}`, `x^{}`, `x_{}`, `\rho`...) plutôt que le micro-langage raccourcis du front
+(`over(a,b)`, `sqrt(x)`, `nsqrt(n,x)`...) documenté dans `helpers/formulaNotation.js`/
+`components/interpreter/interpreter.js`.
+
+**Alternative écartée** : enseigner au modèle le micro-langage raccourcis maison — écarté car (1) c'est une
+syntaxe propriétaire jamais vue à l'entraînement, contrairement à LaTeX que le modèle connaît nativement, ce
+qui maximise le risque de sortie malformée non couverte par `validateContentByType`/`validatePayload`
+(aucun de ces validateurs ne vérifie la syntaxe interne d'une formule, seulement la forme JSON) ; (2)
+`unifyFormulaNotation`/l'éditeur MathLive V2 traitent déjà le LaTeX brut comme forme canonique de premier
+rang, pas un cas dégradé (DECISIONS.md 2026-07-19, « Interpréteur V2 — Lots 4-5 ») — aucune conversion
+supplémentaire n'est nécessaire côté front, `interpreter.js#toLatex` étant explicitement conçu idempotent sur
+du LaTeX déjà présent (garde `(?<!\\)` sur chaque règle).
+
+**Conséquences** : la règle est ajoutée en **fin** de liste dans chaque prompt système (règle 8 pour les
+cartes, règle 12 pour les exercices), jamais insérée au milieu — `buildUserPrompt` des deux services
+référence textuellement des numéros de règle antérieurs (« règle 7 », « règle 11 ») qu'une insertion aurait
+décalés. Aucune garantie automatique que le modèle respecte la règle (pas de validation de contenu de
+formule côté service, comme documenté ci-dessus) — à vérifier en conditions réelles sur un prochain lot
+généré portant sur une matière scientifique. Si le modèle produit du LaTeX syntaxiquement invalide,
+`katex.renderToString` a `throwOnError: false` (déjà le comportement pour tout contenu utilisateur) : rendu
+dégradé, jamais de crash.
+
+---
+
+### [2026-09-09] Response.content — VARCHAR(255) implicite jamais élargi malgré un précédent identique corrigé (Question.statement)
+
+**Contexte** : Signalement utilisateur d'un échec d'import (« Erreur lors de la création de la réponse. »)
+sur une carte IA dont la réponse générée faisait 262 caractères. Audit de `models/Response.model.js` :
+`content: { type: DataTypes.STRING }` — VARCHAR(255) implicite (longueur jamais précisée), alors que
+`validators/Response.validators.js` annonce explicitement une limite de 2000 caractères. **Même bug, même
+symptôme, déjà trouvé et corrigé une fois** sur le champ voisin `Question.statement` (migration
+`20260831000001`, commentaire de l'époque : « défaut Sequelize jamais précisé à la création de la table »)
+— jamais répliqué à `Response.content`, qui présentait pourtant exactement la même forme (colonne `STRING`
+nue + validateur annonçant une limite bien supérieure à 255).
+
+**Décision** : `STRING(2000)` plutôt que `TEXT` (choix fait pour `Question.statement`). RAISON : `statement`
+n'avait **aucune** borne documentée côté validateur (juste `notEmpty()`) — `TEXT` reflétait fidèlement
+l'absence de contrat de longueur. `Response.content` a au contraire une borne **volontaire et déjà annoncée**
+par l'API (2000 caractères, `Response.validators.js`) : la colonne doit refléter exactement ce contrat déjà
+public plutôt que de le rendre illusoire (validateur permissif, colonne restrictive) ou de l'élargir
+silencieusement au-delà (colonne illimitée, validateur inchangé — un bypass du validateur, ex. import direct
+en base, ne serait alors plus borné du tout).
+
+**Alternative écartée** : élargir `Response.content` à `TEXT` par cohérence mécanique avec `Question.statement`
+— écartée car les deux champs n'ont pas le même statut : l'un est un contrat de longueur déjà défini côté
+validateur (à faire respecter par la colonne), l'autre ne l'était pas (à documenter par la colonne en
+l'absence de contrat).
+
+**Vérification** : testé empiriquement (script Node direct, `Response.create` via Sequelize) que **SQLite
+n'applique aucune contrainte de longueur** sur une colonne `VARCHAR(255)` — 262 caractères stockés sans
+erreur (type affinity SQLite, longueur déclarative non enforced). Le bug est donc **certain en prod
+(PostgreSQL, `dialect: 'postgres'` dans `config/dbms.config.js`, VARCHAR(255) réellement enforced)**, mais ne
+peut pas expliquer, à lui seul, une erreur observée sur l'environnement de dev local (SQLite, `config/db.config.js`,
+actif quand `PG_HOST` n'est pas défini). Cause exacte de l'erreur locale rapportée par l'utilisateur **non
+confirmée** — API non démarrée pendant l'investigation ; `helpers/api.js#post()` avale volontairement (choix
+documenté le 2026-09-01, cf. commentaire dans le fichier) tout détail d'erreur HTTP (non-2xx ou réseau) et
+renvoie `undefined`, donc le même message générique français s'affiche identiquement quelle qu'en soit la
+cause réelle — aucun log fichier côté API (`helpers/logger.js`, console uniquement) pour investiguer a
+posteriori.
+
+**Conséquences** : `db.sqlite` local (fichier versionné, base de dev **vide** — 0 ligne sur les tables
+vérifiées) présentait par ailleurs une dérive schéma/`SequelizeMeta` sans rapport avec ce ticket (colonnes
+manquantes malgré des migrations marquées `up`) — non corrigée ici (hors périmètre), signalée à l'utilisateur.
+Piste ouverte si ce type de bug (colonne `STRING` nue avec un validateur plus permissif) doit être audité
+systématiquement sur les autres modèles — non fait ici (recherche limitée au champ signalé).

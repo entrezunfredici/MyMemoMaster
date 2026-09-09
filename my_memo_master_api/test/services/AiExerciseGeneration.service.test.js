@@ -63,6 +63,13 @@ describe('AiExerciseGenerationService', () => {
       expect(prompt).toContain('fill_blank')
       expect(prompt).toContain('reorder')
     })
+
+    it('buildSystemPrompt - inclut la règle de syntaxe des formules ($...$ + LaTeX)', () => {
+      const prompt = AiExerciseGenerationService.buildSystemPrompt('fr')
+      expect(prompt).toContain('$...$')
+      expect(prompt).toContain('LaTeX')
+      expect(prompt).toContain('\\frac{a}{b}')
+    })
   })
 
   describe('buildUserPrompt', () => {
