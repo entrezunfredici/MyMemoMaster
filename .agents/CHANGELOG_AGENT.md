@@ -75,7 +75,7 @@
 | ESLint / Prettier (front + back) | Stable — lint vert après revue M-03 (formatDate supprimée, globalThis→window, Reminder.controller normalisé) | 2026-06-14 |
 | Variables d'environnement (.env) | Stable — .env.example racine + serveur + traefik complets, incohérence SMTP corrigée | 2026-06-13 |
 | Planning (charge + priorisation) | Stable — GET /planning/load + GET /planning/priorities, 22 tests | 2026-06-13 |
-| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — 2026-07-06 : requireRole loggue les refus (F-M8), errorHandler anti log-injection (F-M7), uploads magic bytes via helpers/fileSignature (A08-M2) | 2026-07-06 |
+| Middlewares (Auth, errorHandler, sanitize, validate) | Stable — 2026-07-06 : requireRole loggue les refus (F-M8), errorHandler anti log-injection (F-M7), uploads magic bytes via helpers/fileSignature (A08-M2) ; [REF] 2026-09-06 : la limite de taille (10 Mo, codée en dur) de `middlewares/upload.middleware.js` (`/storage/upload`, sous-jacent aux ressources de classe) devient configurable via `MAX_UPLOAD_SIZE_MB` (défaut 20 Mo, `helpers/uploadConfig.js`) — voir entrée dédiée | 2026-09-06 |
 | Tests intégration API (Supertest) | Stable — M-05.08 : 724 tests total (+8 : POST /refresh-token + POST /logout) | 2026-06-16 |
 | Tests unitaires auth (Bcrypt, JWT, RBAC) | Stable — M-05.12 : Auth.middleware (7 tests JWT) + bcrypt User.service (6 tests verifyPassword/setPassword/create) | 2026-06-17 |
 | Tests unitaires moteur répétition Leitner | Stable — M-02 : 23 tests LeitnerCard.service (algo, droits, next_review_at) | 2026-06-10 |
@@ -150,9 +150,22 @@
 | Génération de Leitner par IA (C-01) — Pipeline traitement (PDF, chunking, LLM) | **Livré et vérifié en conditions réelles (pdfjs-dist + OCR Mistral)** — `services/PdfExtraction.service.js` : `pdfjs-dist` en 1er (gratuit, local), **repli automatique sur l'OCR Mistral** (`$4/1000 pages`) si aucun texte trouvé (PDF scanné — décision utilisateur explicite) ; détection (sans description) des images/schémas embarqués sur les deux chemins, remontée en avertissement par le pipeline plutôt qu'ignorée silencieusement. `helpers/textChunker.js` (découpage par paragraphes/phrases, sans dépendance), `services/AiCardGenerationPipeline.service.js` (C-01.05, orchestre le tout + `AiCardGenerationService` de C-01.04 sur chaque chunk, agrège `{ cards, warnings }`, tolère un échec partiel). Pas de controller/route (hors périmètre, comme C-01.04). 41 tests (chunker + extraction PDF/OCR mockés + pipeline), 0 régression sur les 1670 tests API | 2026-09-01 |
 | Génération de Leitner par IA (C-01) — Stockage cartes générées (en attente) | **Livré** — tables `AiGenerationBatch`/`AiGeneratedCard` (2 migrations + modèles Sequelize), `services/AiGenerationBatch.service.js` : persiste le résultat du pipeline (C-01.05, `{ cards, warnings }`) en statut `pending` (transaction batch+cartes), relecture (`findById`/`findPendingByUser`), mutation d'une carte tant que son batch est `pending` (`updateCard`), bookkeeping `validated`/`discarded` (`markBatchStatus` — ne crée AUCUNE ligne dans Question/Response/LeitnerCard, juste un statut), suppression (`deleteBatch`, cascade DB). 17 tests sur vraie base SQLite en mémoire (transaction, cascade, ownership), migrations vérifiées manuellement (up/down réels, FK enforced). **Branchement HTTP ajouté dans la foulée** (décision utilisateur explicite, avant l'Écran de validation) — voir entrée dédiée ci-dessous. 0 régression | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Endpoint HTTP (POST /ai-generation-batches + cycle de vie) | **Livré, Quotas maintenant branché** — referme la chaîne pipeline (C-01.05) → stockage (C-01.07) → HTTP → Quotas/budget (C-01.06) : `POST /ai-generation-batches` (texte ou PDF via upload mémoire dédié, droits vérifiés via `LeitnerCard.service#resolveUserRights`, quota/budget vérifiés via `AiQuota.service#checkQuota` **avant** tout appel LLM/OCR, usage réel journalisé **après** succès), `GET /ai-generation-batches` (liste pending), `GET /ai-generation-batches/:id`, `PATCH /ai-generation-batches/:id/status` (validated/discarded), `PATCH /ai-generation-batches/cards/:cardId` (accept/edit/reject), `DELETE /ai-generation-batches/:id`. 20 tests fonctionnels (routes réelles + DB réelle, pipeline LLM mocké) | 2026-09-02 |
+| Génération de Leitner par IA (C-01) — upload PDF (limite de taille) | [REF] 2026-09-06 — limite de taille du PDF source (`middlewares/aiPdfUpload.middleware.js`, 10 Mo codés en dur) devient configurable via `MAX_UPLOAD_SIZE_MB` (défaut 20 Mo, `helpers/uploadConfig.js`, partagé avec `upload.middleware.js`) — voir entrée dédiée en bas de fichier | 2026-09-06 |
 | Génération de Leitner par IA (C-01) — Gestion quotas et budget IA | **Livré** — table `AiUsageLog` (migration + modèle, pattern audit `SET NULL` comme `AuditLog`) + `services/AiQuota.service.js` (C-01.06) : **quota** personnel (générations/jour, compté sur `AiGenerationBatch`) et **budget** global (coût $ estimé/mois, tous utilisateurs, compté sur `AiUsageLog`) — deux garde-fous distincts et indépendants, tous deux réglables par variable d'environnement. `estimateCostUsd` (tarifs C-01.03 codés en dur, à revérifier périodiquement), `checkQuota` (429 si l'un des deux dépassé), `recordUsage` (journalisation best-effort après coup), `getUsageSummary` (prêt pour un futur affichage « quota restant », déjà maquetté en C-01.02). `AiCardGenerationService`/`PdfExtraction.service.js`/`AiCardGenerationPipeline.service.js` enrichis pour faire remonter l'usage réel (tokens/pages) sans le journaliser eux-mêmes. 18 nouveaux tests (`AiQuota.service.test.js` 16 + `aiQuotaConfig.test.js` 2) sur vraie base SQLite en mémoire, + tests des 3 services enrichis mis à jour, + 3 tests BDD (429 quota, 429 budget, vérification `AiUsageLog`). Suite complète : **1725/1725**, 0 régression | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Interface génération (upload, paramètres) | **Livré (front-end)** — Vues 1/2 de la maquette C-01.02 : `stores/aiCardGeneration.js` (`generate`/`fetchQuota`/`reset`), `components/AiGenerateCardsModalComponent.vue` (source texte/PDF drag&drop, matière en texte libre, slider 1-20, type de carte, quota affiché), `components/AiGenerationProgressModalComponent.vue` (attente illustrative + erreur/retry), bouton d'entrée sur `FlashcardsCardsPage.vue`. Écart comblé au passage : `getUsageSummary` (C-01.06) n'était exposé par aucune route — `GET /ai-generation-batches/quota` ajouté (controller+route+2 tests BDD). Écran de validation (Vue 3) explicitement hors périmètre (décision utilisateur) : succès = toast + fermeture, batch reste `pending` ; **infra corrigée le même jour** — `docker-compose.yml` ne transmettait aucune variable Mistral/IA au conteneur `api` (502 systématique en test manuel réel), 8 variables ajoutées | 2026-09-02 |
 | Génération de Leitner par IA (C-01) — Écran révision cartes générées | **Livré (front-end)** — Vue 3/4 de la maquette C-01.02 : `components/AiValidationScreenComponent.vue` (écran plein remplaçant `FlashcardsCardsPage.vue`, checkbox=statut `AiGeneratedCard.status` persistée à chaque interaction — résiste à un rechargement, accordéon `sourceExcerpt`, bandeau `warnings`, `[Tout accepter]`), `components/AiCardEditModalComponent.vue` (Vue 4, composant dédié plutôt que la modal manuelle existante — voir DECISIONS.md), promotion des cartes cochées via `aiCardGenerationStore.promoteCard` (3 endpoints existants, échec partiel toléré : cartes en échec gardées avec badge, réessayables). Bandeau "reprendre un brouillon pending" ajouté sur `FlashcardsCardsPage.vue` (question posée à l'utilisateur, tranchée le 2026-09-02) — `fetchPendingBatches`. 13 nouveaux tests store (22 au total sur `aiCardGeneration.js`) | 2026-09-02 |
+| Génération d'exercices par IA (C-02) — Maquettes UI génération exercices | **Analyse livrée, aucun code** — `diagrams/generation_ia_exercices_ui.md` (C-02.02) : point d'entrée réel audité (`ExercisesPage.vue`, pas `CreateTestPage.vue` — route morte/orpheline, contrat obsolète, signalé) ; bouton « ✨ Générer par IA » dans la modal « Nouvel exercice »/« Modifier l'exercice » ; Vue 1 (modal config, 5 valeurs de `questionType` dont défaut `mixed`) ; Vue 2 **réutilisée intégralement sans modification** (`AiGenerationProgressModalComponent.vue`, déjà générique). **L'Interface de révision est explicitement hors périmètre** (élément IN distinct du feature list `C-02`, à la différence de `C-01.02`) — seul le point de raccordement vers `form.questions` (déjà existant, `contentToFormState`) est fixé. Aucune persistance intermédiaire nécessaire (contrairement à `AiGenerationBatch` en C-01) : le flux exercice ne persiste rien avant la soumission finale du formulaire, déjà le cas pour l'ajout manuel | 2026-09-06 |
+| Génération d'exercices par IA (C-02) — Spécification types exercices générables | **Analyse livrée, aucun code** — `diagrams/generation_ia_exercices_types.md` (C-02.01) : décision de générabilité sur les 4 types déjà persistables (`open`/`mcq`/`fill_blank`/`reorder`, `exercices_types_correction.md` §2), prompt système + prompt utilisateur, contrat d'entrée (`sourceText`/`subjectContext`/`questionCount`/`questionType`/`outputLanguage`), contrat de sortie JSON par type calé directement sur `Question.content` (aucune reconstruction nécessaire côté persistance, contrairement au mapping à 3 endpoints de `generation_ia_prompt_cartes.md`), garde-fous génériques (anti-hallucination, atomicité, contenu insuffisant) et propres à chaque type (`open` : réponse canonique complète vu la correction sémantique en aval ; `fill_blank` : cohérence stricte `template`/`blanks` ; `reorder` : ordre non ambigu) ; **orientation fournisseur Mistral AI étendue depuis `C-01` (RGPD)** le 2026-09-06, Benchmark LLM propre à `C-02` restant à faire. `C-02` reste à 0/9 dans Odoo — aucune ligne de code, feature voisine de `C-01` (implémentée) | 2026-09-06 |
+| Génération d'exercices par IA (C-02) — Service génération exercices (LLM, parsing) | **Livré, aucun controller/route (comme C-01.04)** — `services/AiExerciseGeneration.service.js` (C-02.03) : exécute le prompt C-02.01 (`diagrams/generation_ia_exercices_types.md`) sur `mistral-small-latest` (config C-01.03 réutilisée telle quelle, via `helpers/mistralConfig.js`), appel HTTP natif `fetch` (aucune dépendance ajoutée), `response_format: json_object`, parsing + validation stricte du schéma de sortie par type (`open`/`mcq`/`fill_blank`/`reorder` — dont la cohérence stricte marqueurs `{{n}}` ↔ longueur de `blanks` pour `fill_blank`, et fragments ≥ 2 non tous identiques pour `reorder`, deux garde-fous absents de la génération de cartes Leitner), retry unique sur sortie non conforme puis échec explicite (502), filet anti-doublon inter-types (réutilise `dedupeCards` de `helpers/aiGenerationQualityChecks.js`, générique sur `statement`). Service autonome (pas une extension de `AiCardGeneration.service.js` — voir DECISIONS.md), même limite de périmètre que C-01.04 : pas de chunking/pipeline, pas de quotas, pas de persistance. 67 nouveaux tests (`test/services/AiExerciseGeneration.service.test.js`), 0 régression sur les 1873 tests API | 2026-09-07 |
+| Génération d'exercices par IA (C-02) — Validation format sortie avant import | **Livré et câblé en production (C-02.09)** — `services/AiExerciseImportValidation.service.js` (C-02.04) : revalide le format d'un brouillon de question (générée en C-02.03, potentiellement **éditée par l'utilisateur** en Interface de révision) juste avant l'import réel (`POST /questions`, mapping C-02.01 §7), sur les seuls champs réellement persistés (`statement`/`type`/`content` — pas `sourceExcerpt`, jamais transmis à l'import, à la différence de la validation de C-02.03). `validateBatchForImport` partitionne un lot en `importable`/`rejected` (échec partiel toléré, même politique que la promotion des cartes Leitner C-01.09) ; `assertValidForImport` (variante stricte, lève 400) pour un futur import unitaire. **Refactor associé** : les 4 validateurs de `content` par type (C-02.03) extraits dans `helpers/exerciseContentValidation.js`, partagé par les deux services — évite de dupliquer ~90 lignes entre génération et import ; `AiExerciseGeneration.service.js` mis à jour pour déléguer à ce helper, comportement public inchangé (67 tests existants toujours verts sans modification). **[FIX] 2026-09-11 (C-02.09, revue de code)** : ce service n'était en réalité appelé nulle part en production (ni controller, ni front) — une question éditée en Interface de révision pouvait redevenir invalide au format (ex. mcq sans option `correct`) et être persistée sans aucun contrôle serveur. Câblé via un nouvel endpoint dédié `POST /ai-exercise-generations/validate-import` (`AiExerciseGeneration.controller.js#validateImport`), appelé par `ExercisesPage.vue#handleReviewConfirm` juste après l'Écran de révision et avant fusion dans `form.questions` — `POST /tests`/`POST /questions` restent inchangés. Échec partiel toléré : une question rejetée n'est jamais ajoutée silencieusement, l'utilisateur est notifié (`notif.notify`). 24 tests historiques (`AiExerciseImportValidation.service.test.js`) + 0 régression sur les 1897 tests API à l'origine ; +9 tests nouveaux (endpoint + front) en C-02.09. | 2026-09-07 |
+| Génération d'exercices par IA (C-02) — Mode dégradé sans IA | **Livré, aucun controller/route (idem C-02.03/C-02.04)** — `services/AiExerciseDegradedMode.service.js` (C-02.05) : `isAvailable()` (vérif config, sans appel réseau — clé Mistral présente ou non) pour proposer la création manuelle en amont plutôt qu'un bouton voué à échouer ; `describeFailure(error)` classifie toute erreur de `AiExerciseGeneration.service.js` en code stable (`not_configured`/`rate_limited`/`invalid_output`/`service_unavailable`/`unknown`) + message FR + `suggestManualCreation` — distingue explicitement une erreur 400 (saisie à corriger, PAS un mode dégradé) de tout le reste (500/502/erreur inattendue, toujours dégradé, jamais bloquant) ; `attemptGeneration(params)` enveloppe `generateExercises` en `{ success, ... }` discriminé, sans exception à catcher côté appelant. Le repli UI lui-même (proposer la création manuelle) reste trivial et hors périmètre — `generation_ia_exercices_ui.md` §8 notait déjà que c'est la même modal que la création manuelle. 13 nouveaux tests, 0 régression sur les 1910 tests API. **[FIX] 2026-09-11 (C-02.09, revue de code)** : branche `422` ajoutée (`invalid_content`, contenu source vide/inexploitable — tombait sur `unknown` auparavant) ; `AiExerciseGenerationPipeline.service.js` corrigé pour repropager `rateLimited`/le message précis d'un chunk en échec, rendant à nouveau atteignables les codes `rate_limited`/`invalid_output` via la route réelle (contenu tenant en un seul chunk, le cas le plus courant) | 2026-09-07 |
+| Génération d'exercices par IA (C-02) — Interface génération exercices | **Livré (front-end + branchement HTTP backend minimal)** — referme la chaîne C-02.03/04/05 (jusque-là 0 route HTTP) par `POST /ai-exercise-generations` (`controllers/AiExerciseGeneration.controller.js` + `routes/AiExerciseGeneration.routes.js` + `validators/AiExerciseGeneration.validators.js`, réponse toujours 200 sur échec dégradé via `AiExerciseDegradedMode.service.js#attemptGeneration`, 400 uniquement sur entrée invalide — limiteur `aiGenerationLimiter` partagé avec C-01). Front : `stores/aiExerciseGeneration.js` (`generate`/`reset`, pas de `promoteQuestion`/brouillon persisté — rien ne survit à un rechargement, comme l'ajout manuel), `components/AiGenerateExercisesModalComponent.vue` (Vue 1 — **texte collé uniquement, pas de PDF** — écart d'audit : aucun pipeline chunking/extraction n'existe pour les exercices, voir DECISIONS.md), `components/AiGenerationProgressModalComponent.vue` **réutilisé intégralement sans modification** (Vue 2, comme prévu par C-02.02). Bouton « ✨ Générer par IA » dans la modal « Nouvel exercice »/« Modifier l'exercice » d'`ExercisesPage.vue`. **Écart de conception assumé vs la maquette C-02.02** : pas d'Interface de révision (élément IN distinct, hors périmètre) — remplacée par un geste de confirmation groupé minimal (liste des énoncés générés + `[Ajouter à l'exercice]`/`[Ignorer]`), qui respecte la règle « jamais ajouté automatiquement sans geste explicite » sans construire l'écran accept/edit/reject par question (réservé à un futur ticket dédié) ; les questions acceptées atterrissent dans `form.questions` et restent éditables via les sous-formulaires déjà existants. 34 nouveaux tests (7 route BDD + 7 store + 6 composant Vue1 + 6 wiring ExercisesPage, + 8 tests ExercisesPage déjà existants revérifiés), 0 régression (105 suites/1917 tests API, 52 suites/790 tests front) | 2026-09-07 |
+| Génération d'exercices par IA (C-02) — Écran révision questions générées | **Livré (front-end uniquement)** — `components/AiExerciseReviewModalComponent.vue` (C-02.07) : la vraie Interface de révision, accept/edit/reject par question avec accordéon `sourceExcerpt`, remplace la confirmation groupée minimale de C-02.06 (documentée à l'époque comme palliatif explicite). Modale empilée au-dessus de « Nouvel exercice » (pas d'écran plein, à la différence de `AiValidationScreenComponent.vue`/C-01.09 — cohérent avec l'absence de brouillon persisté côté serveur pour `C-02`) ; édition inline réutilisant les mêmes blocs de formulaire par type que la liste "Questions" existante, extraits dans `helpers/exerciseQuestionForm.js` (`defaultQuestionFormFields`/`contentToFormState`/`buildQuestionContent`, partagé avec `ExercisesPage.vue`, comportement strictement inchangé). Aucun appel réseau/persistance à cette étape (comme le reste de la chaîne C-02) — `confirm` renvoie directement les questions incluses dans la représentation `form.questions`, `ExercisesPage.vue#handleReviewConfirm` les `push`. 36 tests dédiés (17 helper + 12 composant + 7 wiring ExercisesPage, remplaçant les 6 tests de confirmation groupée de C-02.06), 0 régression — **54 suites/820 tests front** (contre 52/790). Aucun changement backend. **[FIX] 2026-09-08** — `handleReviewConfirm` laissait la question vide par défaut d'`ExercisesPage.vue` en tête de `form.questions`, faisant échouer la création de l'exercice (« Erreur question 1. ») — voir entrée dédiée en bas de fichier | 2026-09-08 |
+| Génération d'exercices par IA (C-02) — Import PDF (demande utilisateur, hors ticket du feature list) | **Livré** — comble l'écart assumé en C-02.06/C-02.02 (« aucun pipeline chunking/extraction n'existe pour les exercices ») : nouveau `services/AiExerciseGenerationPipeline.service.js` (chunking + appel LLM par passage, réutilise tel quel `services/PdfExtraction.service.js`/`helpers/textChunker.js` de `C-01`, mêmes constantes/garde-fous que `AiCardGenerationPipeline.service.js` dont le circuit breaker rate limit) ; `AiExerciseDegradedMode.service.js` gagne `attemptGenerationFromContent` (nouvelle méthode, `attemptGeneration` inchangée) ; route `POST /ai-exercise-generations` passe en `multipart/form-data` (`aiPdfUpload.middleware.js` réutilisé tel quel, `sanitize` post-multer comme C-01.11, magic bytes vérifiés) et accepte désormais `sourceText` OU `pdf`, exclusifs. **Changement de contrat HTTP assumé** : la réponse porte `warnings` (tableau) au lieu de `warning` (chaîne) sur tout succès, y compris texte collé — toute génération passe maintenant par le pipeline. Front : `stores/aiExerciseGeneration.js#generate` envoie un `FormData` (texte ou PDF, timeout 300000ms comme `C-01`), état `warnings` (tableau) ; `AiGenerateExercisesModalComponent.vue` regagne l'option "Importer un PDF" (radio + drag&drop, calquée sur `AiGenerateCardsModalComponent.vue`) — **sans reproduire le plafond de taille codé en dur** déjà signalé comme un écart côté cartes (10 Mo alors que le backend accepte `MAX_UPLOAD_SIZE_MB`, 20 Mo par défaut) : validation de taille laissée au serveur ; `AiExerciseReviewModalComponent.vue` affiche `warnings[]` (une ligne par avertissement) au lieu d'un `warning` unique. 34 tests dédiés (28 backend : 27 pipeline + 4 mode dégradé + BDD route réécrite pour mocker le pipeline comme `C-01` ; 24 front : 10 store + 8 modal PDF + 2 review modal warnings, + tests existants mis à jour pour le nouveau contrat). Suites complètes : API **106 suites/1950 tests**, front **54 suites/831 tests**, 0 régression. Linter et audit RGAA statique propres | 2026-09-08 |
+| Génération de Leitner/exercices par IA (C-01/C-02) — Captioning image des schémas (demande utilisateur, hors ticket du feature list) | **Livré et vérifié (110 suites/2031 tests, 0 régression)** — `diagrams/generation_ia_captioning_image.md` : étend C-01.05 (qui détecte `hasEmbeddedImages` sans jamais décrire le contenu visuel). Modèle vision résolu en cours de route : `mistral-small-latest` (déjà configuré) supporte nativement la vision depuis Mistral Small 4 — aucun modèle/config séparé, aucune nouvelle grille tarifaire (voir DECISIONS.md). Implémentation : `services/ImageCaptioning.service.js` (nouveau — un appel vision par image, `isPedagogicalContent`/`caption`/`warning`, filtre les images décoratives, même politique de retry/backoff 429 que `AiCardGeneration.service.js`) ; `services/ImageCaptioningPipeline.service.js` (nouveau, **partagé** par C-01 et C-02 — récupère les images via `PdfExtraction.service.js#extractImages` (nouvel appel OCR dédié, `include_image_base64: true`), plafond `MAX_CAPTIONED_IMAGES_PER_GENERATION` = 5, fusionne les descriptions retenues dans `pageTexts`, jamais d'échec propagé) ; `PdfExtraction.service.js#extractText` expose désormais `pageTexts` (texte par page) en plus de `text`. Aucune extension du contrat `sourceExcerpt`/C-01.01/C-02.01 : la caption devient un paragraphe de texte ordinaire, marqué explicitement (« généré automatiquement par IA, non garantie exacte »), fusionné avant `chunkText` — une carte/question qui la cite dans `sourceExcerpt` affiche cette mention à l'écran de révision sans aucun changement de ces composants. `AiCardGenerationPipeline.service.js`/`AiExerciseGenerationPipeline.service.js` branchés à l'identique (avant le découpage en chunks) ; l'ancien avertissement générique « images non analysées » n'apparaît plus que sur échec réel (récupération ou captioning en échec) — sinon le texte enrichi est utilisé silencieusement. `AiQuota.service.js` inchangé : le captioning est facturé comme des tokens de prompt sur le modèle déjà pricé, pas via une grille tarifaire séparée. 51 nouveaux tests (26 + 12 + 11 PdfExtraction + 2×wiring pipelines). **Points ouverts** : revue documentaire du format API/modèle vision, pas encore vérifiée par un appel réel ; coût OCR élargi (se déclenche désormais sur tout PDF avec une image, pas seulement les scans) non chiffré | 2026-09-09 |
+| Génération d'exercices par IA (C-02) — Tests fonctionnels flux génération | **Livré** — `test/bdd/aiExerciseGenerationFlow.test.js` (C-02.08, 7 tests) : referme la boucle Spécification → Service génération → Validation format → Mode dégradé → (Interface de révision simulée côté test) → persistance réelle, jamais exercée ensemble jusqu'ici — seuls les deux vrais points de sortie externes (appel réseau Mistral, extraction PDF) sont mockés, tout le reste (chunking, prompt/parsing/dédoublonnage, orchestration multi-chunks/circuit breaker, classification du mode dégradé, revalidation de format avant import, `POST /tests`+`POST /questions` réels) tourne pour de vrai sur SQLite en mémoire. Couvre : parcours nominal 4 types mixtes avec persistance vérifiée par `GET /tests/:id`, import PDF de bout en bout, mode dégradé LLM indisponible, mode dégradé sortie non exploitable après retry, échec partiel toléré (une question éditée en Interface de révision redevient invalide, seule la question valide est importée), contenu insuffisant (moins de questions que demandé + warning, sortie valide), rejet de saisie 400 (jamais un mode dégradé). **Constat fait en écrivant ce test** (pas une régression introduite ici, conséquence déjà actée du passage systématique par le pipeline le jour même) : un chunk unique qui épuise son retry est reclassé `service_unavailable` au lieu de `invalid_output` par `AiExerciseDegradedMode.service.js` — le pipeline remplace le message précis du chunk par son propre message générique dès que 100 % des chunks échouent, y compris s'il n'y en a qu'un — dégradation du signal assumée (les deux codes restent `degraded:true`/`suggestManualCreation:true`), voir DECISIONS.md. Suite complète API : **108 suites/1964 tests** (contre 107/1957), 0 régression. Linter propre. Aucun code de production modifié (ticket 100% tests) | 2026-09-08 |
+| Génération de Leitner/exercices par IA (C-01/C-02) — Syntaxe formules ($...$/LaTeX) dans les prompts LLM + correctif 500 réponse longue | [ADD/FIX] 2026-09-09 — les deux prompts système savent désormais produire des formules interprétables par le front (`$...$`/LaTeX) ; correctif d'un vrai bug latent (`Response.content` VARCHAR(255) implicite vs validateur 2000 caractères, même classe que `Question.statement` en 2026-08-31) — voir entrée dédiée en bas de fichier | 2026-09-09 |
+| Partage de ressources pédagogiques (C-03) — Maquettes UI bibliothèque ressources | **Audit-maquette rétroactif livré, aucun code** — `diagrams/bibliotheque_ressources_ui.md` (C-03.02) : l'implémentation (C-03.01, S-03.08/S-02.05) existait déjà en production, sans document `*_ui.md` dédié — traitement identique à S-06.02 (« l'implémentation Vue réelle a précédé les maquettes »). Document produit par audit de l'écran réel (`ClassroomEtudiantView.vue`/`ClassroomEnseignantView.vue`) : vue étudiant (lecture seule), vue enseignant (formulaire drag&drop + liste + suppression), icônes par `mimeType`, contrôle d'accès (rappel). **3 points de dette confirmés, non corrigés** (hors périmètre) : aucune UI d'édition malgré `PUT /resources/:resourceId` existant et testé, champ `url` du modèle inatteignable depuis le formulaire (upload de fichier imposé), aucun filtre par type de ressource dans la bibliothèque. 2 points initialement listés se sont révélés inexacts/incomplets après vérification le jour même : la recherche filtre en réalité déjà les ressources (erreur de lecture, corrigée) ; l'absence de confirmation avant suppression, présentée à tort comme spécifique aux ressources, s'est avérée être le comportement de **toute** la vue enseignant — corrigée en généralisant une modale de confirmation aux 4 actions destructrices (section/rendu, échéance, membre, ressource), voir entrée IMP dédiée | 2026-09-08 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 
@@ -10519,3 +10532,1492 @@ le pipeline plus robuste et plus rapide à échouer clairement, mais **ne résou
 est réellement un quota épuisé côté compte — aucun code ne peut faire aboutir un appel qu'un compte à
 plat rejettera de toute façon. Non re-testé en conditions réelles depuis ce correctif (comme le
 précédent) — à confirmer par l'utilisateur.
+
+---
+
+## [2026-09-06] REF — Limite de taille des uploads de documents codée en dur (10 Mo) rendue configurable (`MAX_UPLOAD_SIZE_MB`, défaut 20 Mo)
+
+**Contexte** — Suite à une question de l'utilisateur sur un panneau de réglage "Documents / Taille
+maximale des fichiers" (slider 1-250 Mo, effectif 100 Mo) dont l'origine n'a pas pu être retrouvée
+dans le dépôt (aucun composant front ni modèle de config en base ne correspond à ce texte). En
+creusant la question annexe ("100 Mo est-il suffisant pour des cours ?"), deux limites codées en dur
+à 10 Mo ont été trouvées, indépendantes de ce panneau et de tout réglage : `middlewares/upload.middleware.js`
+(`POST /storage/upload`, utilisé entre autres par le flux d'upload des ressources de classe) et
+`middlewares/aiPdfUpload.middleware.js` (PDF source de la génération de cartes par IA, C-01). L'ingress
+nginx en prod/preprod plafonnait en plus à 10 Mo (`proxy-body-size`), donc même une hausse de ces
+constantes aurait été inopérante en prod. Demande explicite de l'utilisateur : retirer le codage en
+dur, remonter le défaut à 20 Mo, passer par une variable d'environnement.
+
+**Fait** :
+- `helpers/uploadConfig.js` (nouveau) — même pattern que `helpers/mistralConfig.js`/`helpers/aiQuotaConfig.js`
+  (fonction résolue à l'appel, pas un objet figé au chargement). Une seule variable
+  `MAX_UPLOAD_SIZE_MB` (défaut 20) partagée par les deux middlewares — ce sont deux entrées vers le
+  même concept ("un document utilisateur"), pas deux besoins distincts identifiés à ce jour.
+  `middlewares/mindmapImageUpload.js` (5 Mo, images de nœud de mind map) volontairement **non touché** —
+  usage différent, hors périmètre de la demande.
+- `middlewares/upload.middleware.js` et `middlewares/aiPdfUpload.middleware.js` — `MAX_FILE_SIZE`/
+  `MAX_PDF_SIZE` lisent désormais `getUploadConfig().maxFileSizeBytes` au lieu d'une constante en dur.
+- `.env.example` — `MAX_UPLOAD_SIZE_MB=20` ajouté (section Backend), avec avertissement explicite sur
+  la dépendance à l'annotation ingress (voir plus bas).
+- `docker-compose.yml` — `MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}` ajouté aux deux services
+  (`api` dev, `api_server` test/VPS), même défaut que le code au cas où l'hôte ne définit rien.
+- **Ingress nginx** (`nginx.ingress.kubernetes.io/proxy-body-size`, non pilotable par variable
+  d'environnement) relevé de `10m` à `25m` (marge au-delà des 20 Mo pour l'overhead multipart) dans
+  `helm/templates/ingress.yaml` (API + front), `k8s/prod/ingress.yml`, `k8s/preprod/ingress.yml`.
+  `k8s/app/ingress-test.yml` **non touché** — fichier déjà marqué déprécié en tête (remplacé par
+  `k8s/preprod/ingress.yml`), non appliqué.
+- Doc utilisateur (`docs/MANUEL_UTILISATION.md` §FAQ) et descriptions Swagger de `Storage.routes.js`
+  mises à jour (« 10 Mo » → mention de `MAX_UPLOAD_SIZE_MB`, défaut 20 Mo).
+
+**Tests** : `test/helpers/uploadConfig.test.js` (nouveau, 4 tests : défaut, variable renseignée,
+variable non numérique → défaut, réactivité au changement d'environnement — même structure que
+`mistralConfig.test.js`). `npx jest` (API) → **1806/1806**, 0 régression. `npm run lint` propre (0
+erreur — 1 warning préexistant, hors périmètre, sur un fichier généré `coverage/`).
+
+**Choix techniques** : voir `DECISIONS.md`.
+
+**Ce qui n'est PAS couvert** : le panneau "Documents / Taille maximale des fichiers" (capture fournie
+par l'utilisateur, slider 1-250 Mo) reste introuvable dans le dépôt — ni implémenté ni relié à
+`MAX_UPLOAD_SIZE_MB`. Si ce panneau existe ailleurs (maquette non versionnée, autre outil), il faudra
+soit l'implémenter et le relier à cette variable (ce qui demanderait de rendre la limite lisible/
+modifiable à chaud, pas seulement au démarrage du process comme c'est le cas ici), soit clarifier
+qu'il s'agit d'un panneau non lié à ce dépôt. `k8s/app/ingress-test.yml` (déprécié) laissé à 10 Mo —
+sans conséquence tant qu'il n'est pas appliqué. Le nouveau plafond (25 Mo côté ingress) n'a pas été
+testé en conditions réelles contre un vrai PDF de 15-20 Mo en prod (nécessiterait un déploiement).
+
+**Fichiers créés** :
+- `my_memo_master_api/helpers/uploadConfig.js`
+- `my_memo_master_api/test/helpers/uploadConfig.test.js`
+
+**Fichiers modifiés** :
+- `my_memo_master_api/middlewares/upload.middleware.js`
+- `my_memo_master_api/middlewares/aiPdfUpload.middleware.js`
+- `my_memo_master_api/routes/Storage.routes.js`
+- `.env.example`
+- `docker-compose.yml`
+- `helm/templates/ingress.yaml`
+- `k8s/prod/ingress.yml`
+- `k8s/preprod/ingress.yml`
+- `docs/MANUEL_UTILISATION.md`
+- `.agents/CHANGELOG_AGENT.md`
+
+---
+
+## [2026-09-06] DOC — C-02.01 : Spécification types exercices générables (Génération d'exercices par IA)
+
+**Contexte** — Ticket `C-02.01` (feature list `C-02`, source planning, V2, tâche « Analyse », extension
+US-05A). Objectif : livrer la « Spécification types exercices générables » pour la fonctionnalité `C-02`
+(Génération d'exercices par IA), sans déborder sur les autres éléments IN du feature list (Service génération,
+Validation format, Mode dégradé, Interface de révision) — traités uniquement comme interfaces amont/aval.
+Périmètre OUT rappelé par le ticket : pas de correction officielle sans relecture, pas de génération illimitée,
+pas de banque publique automatique.
+
+**Audit préalable** — Vérifié avant rédaction (règle d'audit d'`AGENT.md`) : `C-02` est à **0/9 dans Odoo**,
+aucune ligne de code existante pour cette feature (contrairement à sa voisine `C-01`, intégralement
+implémentée). Les 4 types de questions d'exercice (`open`/`mcq`/`fill_blank`/`reorder`) sont en revanche déjà
+en production côté création manuelle et correction serveur (`diagrams/exercices_types_correction.md`,
+`services/Test.service.js`) — le contrat de sortie a été calé dessus, comme `C-01.01` l'avait fait pour les
+cartes Leitner sur `Question`/`Response`/`LeitnerCard`.
+
+**Ce qui a été fait** — `diagrams/generation_ia_exercices_types.md` (suit le format de
+`generation_ia_prompt_cartes.md`, C-01.01, feature voisine) : décision de générabilité par type (les 4 types
+existants retenus, aucun écarté, avec un niveau de difficulté/garde-fous différencié par type), prompt système
++ prompt utilisateur, contrat d'entrée (`sourceText`/`subjectContext`/`questionCount`/`questionType` — défaut
+`"mixed"`, différent du défaut `"open"` de `C-01.01`, justifié en §3.2 — /`outputLanguage`), contrat de sortie
+JSON par type (`questions[]` avec `statement`/`type`/`content`/`sourceExcerpt`, `content` calé 1:1 sur
+`Question.content`), garde-fous génériques (anti-hallucination, atomicité, contenu insuffisant, neutralité) et
+garde-fous propres à chaque type (`open` : réponse de référence en formulation canonique complète, la
+correction aval étant sémantique et non exacte — `exercices_types_correction.md` §6.1 ; `fill_blank` :
+cohérence stricte entre le nombre de marqueurs `{{n}}` et la longueur de `blanks` ; `reorder` : ordre non
+ambigu entre fragments), mapping de persistance explicitement marqué comme hypothèse (`POST /tests` puis
+`POST /questions`, plus simple que le mapping à 3 endpoints de `C-01.01` car `content` n'a besoin d'aucune
+reconstruction), tableau d'interfaces avec les 4 autres éléments IN du feature list, exemple concret complet
+(SVT/photosynthèse, une question de chaque type), tableau IN/OUT, section « Points ouverts / dette ».
+
+**Hypothèses posées, à confirmer** (documentées en §12 du document) :
+- Aucun modèle/fournisseur LLM retranché pour `C-02` — l'orientation Mistral AI actée pour `C-01`
+  (`DECISIONS.md`, 2026-09-01) est un candidat naturel par cohérence produit, non une décision reprise ici.
+- Aucun appel réel effectué — l'exemple du document est illustratif, pas mesuré empiriquement.
+- Le mapping de persistance (réutilisation de `POST /tests`/`POST /questions`) est une hypothèse de travail, à
+  trancher au moment où le Service génération et l'Interface de révision seront eux-mêmes scopés.
+- Aucune borne chiffrée sur `questionCount` (le feature list `C-02` fourni ne nomme pas explicitement un
+  élément « Quotas », contrairement à `C-01` — à clarifier si `C-02` a besoin d'un quota propre).
+
+**Ce qui n'est PAS couvert** — Service génération (orchestration LLM, fournisseur/modèle), Validation format
+(implémentation du validateur), Mode dégradé, Interface de révision (maquette/ergonomie), tout code (aucune
+ligne de code livrée — ticket d'analyse pur, comme C-01.01).
+
+**Fichiers créés**
+- `diagrams/generation_ia_exercices_types.md`
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md` (ligne État global ajoutée + présente entrée)
+- `.agents/DECISIONS.md` (décision C-02.01 ajoutée)
+
+**Dette signalée, non traitée ici** — Le document n'a été validé par aucun appel LLM réel ; sa robustesse
+(respect effectif du schéma JSON par type, en particulier la cohérence `template`/`blanks` de `fill_blank` et
+l'absence d'ambiguïté des `fragments` de `reorder`) reste à vérifier une fois un Service génération arbitré et
+une première intégration technique posée — même limite que C-01.01 avant l'arrivée du Service inférence C-01.04.
+
+---
+
+## [2026-09-06] DOC — C-02.01 : orientation fournisseur LLM étendue à Mistral AI (suite directe, RGPD)
+
+**Contexte** — Demande explicite de l'utilisateur (« occupe-toi de ce qui manque à la C-02.01 », précisée en
+« ce que tu juges, en fonction de ce qui est déjà fait »). Comparaison avec ce qui avait suivi C-01.01 :
+l'entrée C-01.01 (2026-09-01) avait été immédiatement suivie d'une décision utilisateur d'orientation
+fournisseur (Mistral AI, raison RGPD), documentée en `DECISIONS.md` et répercutée le jour même dans
+`generation_ia_prompt_cartes.md` §11. C-02.01 n'avait pas cet équivalent : le §12 du document laissait le choix
+de fournisseur entièrement ouvert. Le critère RGPD qui a tranché pour `C-01` (hébergement UE par défaut, pas de
+cadre de transfert international à mettre en place) ne dépend pas du type de contenu généré (cartes vs.
+exercices) — l'étendre à `C-02` est une extrapolation directe de la même contrainte de conformité, pas un
+nouvel arbitrage produit nécessitant une nouvelle question à l'utilisateur.
+
+**Ce qui a été fait** — `diagrams/generation_ia_exercices_types.md` §12 : le point « fournisseur/modèle LLM
+non tranché » reformulé en « orientation fournisseur étendue à Mistral AI », en gardant explicitement ouvert
+ce qui reste réellement à faire (le **Benchmark LLM** propre au prompt à 4 types de `C-02`, distinct de
+`C-01.03` car les garde-fous structurels supplémentaires — `template`/`blanks`, `fragments` — changent le
+profil de tâche). Entrée `DECISIONS.md` correspondante ajoutée, sur le modèle de l'entrée C-01 du 2026-09-01.
+
+**Ce qui n'est PAS couvert** — Aucun modèle précis choisi (pas un Benchmark LLM) ; mise à jour Odoo de la
+tâche `C-02.01` (#1071, encore à l'étape « spécification »/`04_waiting_normal` dans le cache local
+`odoo-plugin/tasks.json`, non revérifié en direct dans cette entrée) volontairement non faite, faute de
+confirmation explicite de l'utilisateur sur ce point précis lors de la clarification ; relecture croisée du
+document (façon revue de code) non faite, idem ; autres points ouverts du §12 (borne `questionCount`,
+répartition `"mixed"` non bornée, mapping de persistance) inchangés.
+
+**Fichiers modifiés**
+- `diagrams/generation_ia_exercices_types.md`
+- `.agents/DECISIONS.md`
+- `.agents/CHANGELOG_AGENT.md`
+
+---
+
+## [2026-09-06] DOC — C-02 : orientation fournisseur Mistral AI confirmée explicitement par l'utilisateur
+
+**Contexte** — L'entrée précédente posait l'extension de l'orientation Mistral AI à `C-02` par extrapolation
+(raisonnement RGPD indépendant du type de contenu généré), sous délégation de l'utilisateur (« je te laisse
+voir »). L'utilisateur a ensuite confirmé directement : « on restera chez Mistral pour C-02 aussi ».
+
+**Ce qui a été fait** — `DECISIONS.md` (entrée C-02 du 2026-09-06) mis à jour pour noter que l'orientation
+n'est plus une simple extrapolation mais une décision actée directement par l'utilisateur, au même titre que
+celle de `C-01`. Aucun changement de fond côté `diagrams/generation_ia_exercices_types.md` (§12 déjà rédigé de
+façon ferme, sans hedge à lever).
+
+**Ce qui n'est PAS couvert** — Toujours pas de Benchmark LLM (modèle précis) pour `C-02` ; mise à jour Odoo de
+`C-02.01` toujours non faite (aucune demande explicite sur ce point).
+
+---
+
+## [2026-09-06] DOC — C-02.02 : Maquettes UI génération exercices (Génération d'exercices par IA)
+
+**Contexte** — Ticket `C-02.02` (feature list `C-02`, source planning, V2, tâche « Analyse », extension
+US-05A, suite directe de C-02.01). Objectif : livrer les « Maquettes UI génération exercices », sans déborder
+sur les autres éléments IN du feature list (Spécification types générables — déjà livré en C-02.01 — Service
+génération, Validation format, Mode dégradé, **Interface de révision**). Point d'attention explicite du
+ticket : respecter le périmètre de « Maquettes UI génération exercices » sans étendre aux éléments hors
+version.
+
+**Écart de scoping trouvé avec la feature voisine `C-01`, avant rédaction** — Le feature list `C-01`
+(rappelé en tête de `generation_ia_ui.md`) ne nommait pas d'élément « Écran de validation » séparé : C-01.02
+avait donc maquetté tout le parcours (Vues 1 à 4, y compris l'écran de validation) en un seul document, même
+si son implémentation avait ensuite été scindée en deux tickets (C-01.08 upload/paramètres, C-01.09 écran de
+révision). Le feature list `C-02` fourni par l'utilisateur liste, lui, « Interface de révision » comme élément
+IN **distinct** de « Maquettes UI génération exercices » — les deux sont donc des livrables séparés dès le
+niveau planning, pas seulement au niveau implémentation. **Décision prise en conséquence** : ce document ne
+maquette PAS l'écran de validation des questions générées (contrairement à C-01.02), seulement le point
+d'entrée, la modal de configuration et l'état de génération — l'Interface de révision est traitée en interface
+amont/aval uniquement, comme les 3 autres éléments hors périmètre.
+
+**Audit préalable** (règle d'`AGENT.md`, avant de maquetter le point d'entrée) — Deux candidats trouvés pour
+« la page de création d'exercice » : `pages/CreateTestPage.vue` (route `/create-test`, **orpheline** — aucun
+lien dans toute l'application ne pointe vers cette route, contrat obsolète en plus — `type: 'text'` unique,
+utilise `POST /responses` alors que la table `Response` est réservée aux cartes Leitner depuis la décision du
+2026-06-19) et `pages/ExercisesPage.vue` (page réelle, liée depuis la navigation, modal « Nouvel exercice »
+avec les 4 types déjà branchés). **`CreateTestPage.vue` écarté, `ExercisesPage.vue` retenu.** Ce constat
+change la forme du document par rapport à C-01.02 : la modal exercice crée le `Test` et ses questions en une
+seule soumission finale (`form.questions` en mémoire jusqu'à `submitCreate()`), à la différence de
+`FlashcardsCardsPage.vue` qui ajoute des cartes une par une à un système déjà persisté.
+
+**Deuxième écart trouvé pendant l'audit, hors périmètre du ticket mais signalé** — `Test.service.js#_checkAnswer`
+utilise réellement `content.accepted_answers` pour le type `open` (comparaison de plusieurs formulations via
+`SemanticService.gradeSemantic`), alors que `generation_ia_exercices_types.md` (C-02.01, livré la veille)
+affirmait l'inverse en se fiant à `exercices_types_correction.md` (document tiers obsolète sur ce point). **Le
+document C-02.01 a été corrigé sur place** (voir entrée `DECISIONS.md` dédiée) avant de poursuivre — ce
+document (C-02.02) s'appuie donc sur le contrat corrigé.
+
+**Ce qui a été fait** — `diagrams/generation_ia_exercices_ui.md` : constat d'audit du point d'entrée (§1),
+flux général (§4, retour vers la modal parente plutôt qu'un écran plein), Vue 1 (§5 — bouton dans la modal
+« Nouvel exercice », modal de configuration avec 5 valeurs de `questionType` dont défaut `mixed` cohérent avec
+C-02.01 §3.2), Vue 2 (§6 — **réutilisation intégrale sans modification** de
+`AiGenerationProgressModalComponent.vue`, déjà générique), point de raccordement vers `form.questions` (§7,
+réutilise `contentToFormState` déjà existant), tableau d'interfaces avec les 4 autres éléments IN (§8, dont une
+observation notée pour l'Interface de révision : les sous-formulaires inline déjà existants par type dans
+`ExercisesPage.vue` sont un candidat de réutilisation, non conçu ici), composants à créer/réutiliser (§9),
+store Pinia squelette (§10), points ouverts (§11).
+
+**Troisième écart trouvé, hors périmètre, signalé pour un futur ticket** — `AiGenerateCardsModalComponent.vue`
+(C-01.08) code encore en dur `MAX_PDF_SIZE = 10 Mo`, devenu incohérent avec le backend passé à
+`MAX_UPLOAD_SIZE_MB` (défaut 20 Mo) par le ticket du 2026-09-06 — le front Leitner refuse localement un PDF
+que le backend accepterait. Non corrigé (concerne `C-01`, hors périmètre de `C-02.02`) ; ce document a pris
+soin de ne pas reproduire cette valeur figée dans la nouvelle modal de configuration.
+
+**Ce qui n'est PAS couvert** — Interface de révision (écran de validation, hors périmètre explicite — voir
+plus haut), Service génération, Validation format, Mode dégradé, endpoint(s) réel(s), architecture de
+persistance intermédiaire (avec ou sans tables type `AiGenerationBatch`), tout code.
+
+**Fichiers créés**
+- `diagrams/generation_ia_exercices_ui.md`
+
+**Fichiers modifiés**
+- `diagrams/generation_ia_exercices_types.md` (correction `accepted_answers`, voir plus haut)
+- `.agents/DECISIONS.md`
+- `.agents/CHANGELOG_AGENT.md`
+
+**Dette signalée, non traitée ici** — `CreateTestPage.vue` reste dans le dépôt, orpheline et avec un contrat
+obsolète ; ni supprimée ni corrigée (hors périmètre d'un ticket d'analyse). Incohérence `MAX_PDF_SIZE` front
+Leitner vs. `MAX_UPLOAD_SIZE_MB` backend, signalée mais non corrigée.
+
+---
+
+## [2026-09-07] C-02.03 : Service génération exercices (LLM, parsing) — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.03` (feature list `C-02`, source planning V2, extension US-05A, suite directe de
+C-02.01/C-02.02). Objectif : livrer le « Service génération exercices (LLM, parsing) » — même intitulé que le
+périmètre de `AiCardGeneration.service.js` (C-01.04) sur la feature voisine `C-01`, appliqué ici aux 4 types
+d'exercices plutôt qu'aux 2 types de cartes Leitner. Point d'attention explicite du ticket : respecter ce
+périmètre sans étendre aux autres éléments IN du feature list (Spécification types générables — déjà livré en
+C-02.01 — Service génération au sens orchestration, Validation format, Mode dégradé, Interface de révision).
+
+**Audit préalable** (règle d'`AGENT.md`) — Le contrat exact (prompt système/utilisateur, schéma de sortie par
+type, garde-fous) était déjà entièrement spécifié par `diagrams/generation_ia_exercices_types.md` (C-02.01,
+livré le 2026-09-06) : ce ticket l'implémente au pied de la lettre, sans redécision de contrat. Vérifié en plus
+dans le code réel (`models/Question.model.js`, `services/Test.service.js#_checkAnswer`,
+`validators/Question.validators.js`) : les 4 types (`open`/`mcq`/`fill_blank`/`reorder`) et la forme exacte de
+`content` par type sont bien celles déjà en production pour la création manuelle d'exercice — cohérent avec
+C-02.01, aucun écart trouvé entre le document et le code.
+
+**Ce qui a été fait** — `services/AiExerciseGeneration.service.js` : `buildSystemPrompt`/`buildUserPrompt`
+(texte repris à l'identique de C-02.01 §4), `validateInput` (mêmes garde-fous que C-01.04 : `sourceText`
+requis, `questionCount` entier 1-30, `questionType` parmi les 5 valeurs), 4 validateurs de `content` dédiés
+(`validateOpenContent`/`validateMcqContent`/`validateFillBlankContent`/`validateReorderContent`) appelés par
+`validateQuestion` selon le `type`, `validatePayload`/`parseAndValidate` (schéma racine `{ questions[],
+warning }`, contrôle de cohérence `questionType` demandé ↔ type réellement renvoyé par question — même
+contrôle que C-01.04 avait dû ajouter après un écart constaté en prod), `applyDedupeSafetyNet` (réutilise
+`dedupeCards` de `helpers/aiGenerationQualityChecks.js` tel quel — la fonction ne dépend que de `statement`,
+générique aux cartes comme aux questions), `callModel` (appel Mistral avec backoff 429, dupliqué depuis
+`AiCardGeneration.service.js` plutôt que factorisé — voir DECISIONS.md), `generateExercises` (point d'entrée,
+retry unique sur sortie non conforme, usage tokens remonté sur succès **et** sur échec après appel réel
+facturé — même contrat que C-01.06 pour un futur suivi de budget, non branché ici).
+
+**Ce qui n'est PAS couvert** — Chunking/pipeline pour un contenu source long (équivalent C-01.05, hors
+périmètre — ce service prend un `sourceText` déjà découpé), quotas/budget (hors périmètre, C-02 n'a pas
+d'élément « Quotas » nommé dans le feature list fourni, cf. C-02.01 §12), persistance (pas de
+`AiGenerationBatch`/table dédiée — le mapping de persistance reste l'hypothèse ouverte de C-02.01 §7 :
+réutilisation directe de `POST /tests` + `POST /questions`, `content` déjà dans la forme attendue sans
+reconstruction), controller/route HTTP (aucune requête entrante ne branche encore ce service, comme
+`AiCardGeneration.service.js` avant C-01.09), Interface de révision, Mode dégradé.
+
+**Choix techniques** — Service autonome `AiExerciseGeneration.service.js` plutôt qu'une extension de
+`AiCardGeneration.service.js` ; `MAX_QUESTION_COUNT = 30` repris de `MAX_CARD_COUNT` en l'absence de borne
+chiffrée actée pour C-02 ; logique d'appel Mistral/backoff dupliquée plutôt que factorisée dans un helper
+partagé — les trois choix et leur justification sont détaillés dans une entrée dédiée de `DECISIONS.md`.
+
+**Fichiers créés**
+- `services/AiExerciseGeneration.service.js`
+- `test/services/AiExerciseGeneration.service.test.js` (67 tests)
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md` (ligne État global + cette entrée)
+- `.agents/DECISIONS.md`
+
+**Tests** — 67 nouveaux tests (prompts, `validateInput`, les 4 validateurs de `content`, `validatePayload`,
+`parseAndValidate`, `callModel` dont 429/backoff/Retry-After, `generateExercises` dont retry sur incohérence
+`fill_blank`/`reorder` et dédoublonnage). Suite complète API relancée : **1873/1873, 0 régression**. Linter
+(`npx eslint`) propre sur les 2 fichiers.
+
+**Points d'attention / dette** — Comme pour C-01.04 à sa livraison, aucun appel réel à l'API Mistral n'a été
+effectué sur CE prompt précis (pas de clé API fournie pour ce ticket) — la conformité du prompt n'est vérifiée
+que structurellement (tests unitaires sur des réponses mockées), pas empiriquement (cf. C-02.01 §12, « aucun
+appel réel n'a été fait »). Le Benchmark LLM propre à `C-02` (modèle précis dans la gamme Mistral) reste non
+fait — `mistral-small-latest` est réutilisé par hypothèse, comme C-02.01 le documentait déjà. `C-02` reste à
+0/9 dans Odoo (mise à jour non demandée explicitement dans ce ticket).
+
+---
+
+## [2026-09-07] C-02.04 : Validation format sortie avant import — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.04` (feature list `C-02`, source planning V2, extension US-05A, suite directe de
+C-02.03). Objectif : livrer « Validation format sortie avant import », sans déborder sur les autres éléments IN
+(Spécification types générables, Service génération — tous deux déjà livrés — Mode dégradé, Interface de
+révision).
+
+**Écart de scoping trouvé avant implémentation, tranché en hypothèse documentée** — Aucun document de
+spécification dédié n'existe pour cet élément (contrairement à C-02.01/C-02.02). `generation_ia_exercices_types.md`
+§9 décrit « Validation format » comme : « Vérifie la conformité de la sortie du LLM au schéma §5 avant de
+l'exposer à l'Interface de révision » — ce qui, pris littéralement, chevaucherait presque entièrement la
+validation déjà embarquée dans `AiExerciseGeneration.service.js#validatePayload` (C-02.03, retry sur sortie non
+conforme avant de renvoyer le brouillon). Le titre exact de CE ticket (« Validation format sortie **avant
+import** », distinct du « avant… Interface de révision » de C-02.01 §9) a été retenu comme un second point de
+contrôle, décalé dans le temps : après que l'utilisateur a réellement édité/accepté une question en Interface
+de révision (hors périmètre), juste avant que le mapping d'import (`POST /questions`, C-02.01 §7) ne
+persiste `content`. Une édition utilisateur peut réintroduire une non-conformité qu'un contrôle uniquement
+au moment de la génération ne peut pas voir (ex. : suppression de la seule option `correct: true` d'un `mcq`,
+désynchronisation `template`/`blanks` après une modification manuelle d'un `fill_blank`). **Décision prise en
+conséquence**, documentée en détail dans `DECISIONS.md`.
+
+**Ce qui a été fait** —
+1. `helpers/exerciseContentValidation.js` (nouveau) : extraction des 4 validateurs de `content` par type
+   (`open`/`mcq`/`fill_blank`/`reorder`) depuis `AiExerciseGeneration.service.js`, + un dispatcher
+   `validateContentByType`. Fonctions pures, mêmes règles qu'en C-02.03 (aucun changement de comportement).
+2. `services/AiExerciseGeneration.service.js` (C-02.03) mis à jour pour déléguer à ce helper au lieu de ses 4
+   méthodes désormais supprimées — comportement public (`validateQuestion`, `validatePayload`,
+   `parseAndValidate`, `generateExercises`) strictement inchangé, les 67 tests existants passent sans
+   modification.
+3. `services/AiExerciseImportValidation.service.js` (nouveau, C-02.04) : `validateQuestionFormat` (une
+   question, sur `statement`/`type`/`content` uniquement — pas `sourceExcerpt`), `validateBatchForImport`
+   (partitionne un lot en `importable`/`rejected`, échec partiel toléré), `assertValidForImport` (variante
+   stricte, lève 400, pour un futur import unitaire).
+
+**Ce qui n'est PAS couvert** — L'import lui-même (aucun appel `POST /tests`/`POST /questions` — mapping non
+encore branché, hypothèse ouverte depuis C-02.01 §7), l'Interface de révision (accept/edit/reject), le Mode
+dégradé, tout controller/route HTTP exposant ces validations.
+
+**Fichiers créés**
+- `helpers/exerciseContentValidation.js`
+- `services/AiExerciseImportValidation.service.js`
+- `test/services/AiExerciseImportValidation.service.test.js` (24 tests)
+
+**Fichiers modifiés**
+- `services/AiExerciseGeneration.service.js` (délégation au helper, comportement public inchangé)
+- `.agents/CHANGELOG_AGENT.md`
+- `.agents/DECISIONS.md`
+
+**Tests** — 24 nouveaux tests (les 4 types valides, `statement`/`type`/`content` invalides, régressions
+post-édition par type, partitionnement d'un lot dont une partie invalide, variante stricte avec/sans index).
+67 tests existants de C-02.03 revérifiés verts après le refactor. Suite complète API : **1897/1897, 0
+régression**. Linter propre sur les 4 fichiers touchés/créés.
+
+**Points d'attention / dette** — Le mapping de persistance réel (quels champs partent réellement vers
+`POST /questions`, dans quel ordre, avec quelle gestion d'échec partiel HTTP) reste une hypothèse non tranchée
+(C-02.01 §7) — ce service valide un contrat qu'aucun code n'utilise encore réellement en HTTP. Comme pour
+C-02.03, aucun appel réel au flux complet (génération → édition → import) n'a été exercé de bout en bout,
+faute d'Interface de révision existante pour `C-02`.
+
+---
+
+## [2026-09-07] C-02.05 : Mode dégradé sans IA — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.05` (feature list `C-02`, source planning V2, extension US-05A, suite directe de
+C-02.04). Objectif : livrer « Mode dégradé sans IA », sans déborder sur les autres éléments IN
+(Spécification types générables, Service génération, Validation format — tous déjà livrés — Interface de
+révision, hors périmètre).
+
+**Audit préalable** — Aucun document de spécification dédié pour cet élément (comme C-02.04). Deux sources
+déjà existantes cadrent le périmètre : `generation_ia_exercices_types.md` §9 (« Mécanisme de repli, ex.
+proposer la création manuelle en substitution, messages utilisateur — ce document ne fixe que le contrat
+qu'un mode dégradé devrait reconnaître comme indisponible ») et `generation_ia_exercices_ui.md` §8 (« le mode
+dégradé lui-même… n'est pas conçu ici », mais note déjà que le repli vers la création manuelle est **trivial**
+côté UI car c'est la même modal « Nouvel exercice » que la création manuelle, §5.1 — rien à construire côté
+navigation). Vérifié aussi : `C-01` (feature voisine) n'a jamais eu de ticket « Mode dégradé » explicite — ce
+concept est propre à `C-02`.
+
+**Ce qui a été fait** — `services/AiExerciseDegradedMode.service.js` : `isAvailable()` (contrôle de
+configuration sans appel réseau — même vérification que `AiExerciseGeneration.service.js#callModel`, mais
+consultable à l'avance) ; `describeFailure(error)` (classification stable de toute erreur de C-02.03 en
+`not_configured`/`rate_limited`/`invalid_output`/`service_unavailable`/`unknown`, avec message FR et
+`suggestManualCreation` — une erreur 400 de saisie utilisateur est explicitement exclue du mode dégradé,
+l'IA reste disponible dans ce cas) ; `attemptGeneration(params)` (enveloppe `generateExercises` en réponse
+discriminée `{ success, ... }`, prête pour un futur controller sans bloc try/catch dupliqué).
+
+**Ce qui n'est PAS couvert** — Le repli UI lui-même (proposer la création manuelle) — déjà trivial/hors
+périmètre par construction (`generation_ia_exercices_ui.md` §8) ; l'Interface de révision ; un mécanisme de
+Quotas propre à `C-02` (`rate_limited` ne couvre que le rate limit Mistral déjà détecté par C-02.03, pas un
+quota applicatif — aucun élément « Quotas » nommé dans le feature list `C-02` fourni, cf. C-02.01 §12) ; tout
+controller/route HTTP exposant ces fonctions.
+
+**Fichiers créés**
+- `services/AiExerciseDegradedMode.service.js`
+- `test/services/AiExerciseDegradedMode.service.test.js` (13 tests)
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md`
+- `.agents/DECISIONS.md`
+
+**Tests** — 13 nouveaux tests (`isAvailable` avec/sans clé, `describeFailure` sur les 5 codes + erreur sans
+`statusCode` reconnu + erreur sans message, `attemptGeneration` succès/échec dégradé/échec non dégradé/
+transmission des paramètres). Suite complète API : **1910/1910, 0 régression**. Linter propre.
+
+**Points d'attention / dette** — Comme C-02.03/C-02.04, aucun controller/route ne branche encore ce service à
+une requête HTTP entrante — reste un module pur, testé isolément. `rate_limited` et `invalid_output` sont
+déduits du message d'erreur de C-02.03 par une correspondance de sous-chaîne (`error.message.includes(...)`)
+faute de codes d'erreur structurés côté C-02.03 — fragile si ce message venait à changer sans mettre à jour
+ce service en même temps (signalé, non corrigé — modifier C-02.03 pour y ajouter un code structuré serait un
+changement d'interface hors périmètre strict de ce ticket).
+
+---
+
+## [2026-09-07] C-02.06 : Interface génération exercices — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.06` (feature list `C-02`, source planning V2, extension US-05A, front-end,
+suite directe de C-02.05). Objectif : livrer « Interface génération exercices » — Vue 1 (config) + Vue 2
+(attente/erreur) de `diagrams/generation_ia_exercices_ui.md` (C-02.02) — sans déborder sur Interface de
+révision (élément IN distinct, hors périmètre).
+
+**Écarts de scoping trouvés avant implémentation (audit obligatoire, AGENT.md), tranchés en hypothèses
+documentées dans `DECISIONS.md`** :
+1. **Aucune route HTTP n'existait** pour la génération d'exercices — C-02.03/04/05 sont restés des services
+   purs sans controller/route, par choix explicite de scope à chaque ticket. Une Interface génération sans
+   rien à appeler n'aurait pas été fonctionnelle (DoD : « fonctionnel conforme aux critères d'acceptation »).
+   **Décision** : construire la route minimale nécessaire (`POST /ai-exercise-generations`) dans ce ticket
+   plutôt que d'attendre un ticket dédié jamais nommé dans le feature list fourni — wiring pur, aucune
+   nouvelle décision de Service génération/Validation format/Mode dégradé (tous déjà tranchés, cette route ne
+   fait qu'appeler `AiExerciseDegradedMode.service.js#attemptGeneration`).
+2. **Aucun pipeline PDF pour les exercices** — la maquette C-02.02 §5.2 prévoyait une option "Importer un
+   PDF" (comme les cartes Leitner, C-01.05/PdfExtraction.service.js), mais aucun chunking/extraction
+   équivalent n'a jamais été construit côté `C-02` (confirmé par relecture de `AiExerciseGeneration.service.js`,
+   C-02.03 : ne prend qu'un `sourceText` déjà résolu). Proposer l'option dans la modal aurait menotté
+   l'utilisateur à un échec systématique après upload. **Décision** : modal texte collé uniquement, écart
+   assumé et documenté (pas de retrait silencieux — voir `DECISIONS.md`).
+3. **Pas d'Interface de révision** (élément IN distinct, hors périmètre) mais la maquette §2 interdit
+   explicitement d'ajouter les questions générées à `form.questions` sans « un geste explicite de
+   l'utilisateur ». **Décision** : confirmation groupée minimale (liste des énoncés + un seul bouton
+   `[Ajouter à l'exercice]`) plutôt qu'un écran accept/edit/reject par question — qui serait la vraie
+   Interface de révision, réservée à son propre ticket.
+
+**Ce qui a été fait** —
+- Backend : `validators/AiExerciseGeneration.validators.js`, `controllers/AiExerciseGeneration.controller.js`,
+  `routes/AiExerciseGeneration.routes.js`, câblés dans `app.js`. Réponse toujours 200 (succès ou échec dégradé,
+  contrat `attemptGeneration`), 400 réservé à l'entrée invalide (normalement déjà intercepté par les
+  validators). Limiteur `aiGenerationLimiter` réutilisé tel quel (partagé avec C-01, clé par utilisateur).
+- Front : `stores/aiExerciseGeneration.js` (`generate`/`reset`), `components/AiGenerateExercisesModalComponent.vue`
+  (Vue 1, texte uniquement, 5 valeurs de `questionType` défaut `mixed`), réutilisation intégrale de
+  `components/AiGenerationProgressModalComponent.vue` (Vue 2, 0 modification — confirmé conforme à C-02.02 §6).
+  `pages/ExercisesPage.vue` : bouton d'entrée, orchestration `showAiFlow`/`aiStep` (même pattern que
+  `FlashcardsCardsPage.vue#showAiFlow`, C-01.08), confirmation groupée (`pendingGeneratedQuestions`,
+  `acceptGeneratedQuestions`/`discardGeneratedQuestions`) réutilisant `contentToFormState` déjà existant
+  (aucune transformation supplémentaire, conforme à l'hypothèse actée en C-02.01 §7/C-02.02 §7).
+
+**Ce qui n'est PAS couvert** — Interface de révision réelle (accept/edit/reject par question,
+`sourceExcerpt` affiché) ; import PDF ; persistance intermédiaire (pas de table `AiGenerationBatch`
+équivalente — rien ne survit à la fermeture de la modal sans clic sur « Créer l'exercice », comme l'ajout
+manuel) ; quotas (aucun mécanisme, cohérent avec C-02.01 §12).
+
+**Fichiers créés**
+- `my_memo_master_api/validators/AiExerciseGeneration.validators.js`
+- `my_memo_master_api/controllers/AiExerciseGeneration.controller.js`
+- `my_memo_master_api/routes/AiExerciseGeneration.routes.js`
+- `my_memo_master_api/test/bdd/aiExerciseGeneration.test.js` (7 tests)
+- `my_memo_master_front/src/stores/aiExerciseGeneration.js`
+- `my_memo_master_front/src/components/AiGenerateExercisesModalComponent.vue`
+- `my_memo_master_front/test/stores/aiExerciseGeneration.store.test.js` (7 tests)
+- `my_memo_master_front/test/components/AiGenerateExercisesModalComponent.test.js` (6 tests)
+
+**Fichiers modifiés**
+- `my_memo_master_api/app.js` (câblage de la nouvelle route)
+- `my_memo_master_front/src/pages/ExercisesPage.vue` (bouton, orchestration Vue1/Vue2, confirmation groupée)
+- `my_memo_master_front/test/components/ExercisesPage.test.js` (+6 tests)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 26 nouveaux tests dédiés (7 route BDD + 7 store + 6 composant Vue1 + 6 wiring page) + 8 tests
+`ExercisesPage.test.js` déjà existants revérifiés verts. Suites complètes : API **105/105 suites, 1917/1917
+tests** ; front **52/52 suites, 790/790 tests**. 0 régression. Linter propre (ESLint API + ESLint front) sur
+tous les fichiers touchés/créés.
+
+**Points d'attention / dette** — La modal texte-only s'écarte de la maquette C-02.02 (qui prévoyait un import
+PDF) — à réévaluer si un pipeline d'extraction dédié aux exercices est un jour scopé pour `C-02` (dette
+similaire déjà notée en C-02.01 §12 pour d'autres aspects). La confirmation groupée introduite ici est un
+palliatif volontairement minimal : un futur ticket Interface de révision devra probablement la remplacer (ou
+l'étendre) par un vrai écran accept/edit/reject par question — ne pas la considérer comme la conception finale
+
+---
+
+## [2026-09-08] C-02.07 : Écran révision questions générées — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.07` (feature list `C-02`, source planning `C-02.07`, V2, extension US-05A,
+front-end, suite directe de C-02.06). Objectif : livrer « Écran révision questions générées » — la vraie
+Interface de révision (élément IN distinct du feature list `C-02`), sans déborder sur les autres éléments IN
+(Spécification types générables, Service génération, Validation format, Mode dégradé — tous déjà livrés).
+Point d'attention du ticket : respecter strictement ce périmètre.
+
+**Audit préalable (AGENT.md)** — C-02.06 avait explicitement livré, en lieu et place de cet écran, une
+« confirmation groupée minimale » (liste en lecture seule des énoncés + un seul bouton `[Ajouter à
+l'exercice]`/`[Ignorer]`) — documentée à l'époque dans `CHANGELOG_AGENT.md`/`DECISIONS.md` comme un palliatif
+volontairement sous-scopé, à remplacer par un futur ticket dédié. Ce ticket est ce futur ticket : aucun écart
+de scoping à trancher, le périmètre était déjà balisé par C-02.02 (`generation_ia_exercices_ui.md` §8, ligne
+« Interface de révision ») et par C-02.06 lui-même. Relecture de `generation_ia_exercices_ui.md` §4/§8 : le
+flux C-02 reste entièrement empilé en modales au-dessus de « Nouvel exercice » (rien n'est persisté avant
+`submitCreate()`/`submitEdit()`, pas de table `AiGenerationBatch` équivalente côté exercices) — à la
+différence de `AiValidationScreenComponent.vue` (C-01.09, cartes Leitner), qui est un écran plein remplaçant
+`FlashcardsCardsPage.vue` et persiste chaque interaction côté serveur (`AiGeneratedCard.status`). §8 notait
+aussi une piste : la modal « Nouvel exercice » rend déjà un sous-formulaire éditable inline par type de
+question, contrairement à `FlashcardsCardsPage.vue` (liste en lecture seule + modale d'édition séparée) —
+retenue ici (voir DECISIONS.md).
+
+**Ce qui a été fait** —
+1. `helpers/exerciseQuestionForm.js` (nouveau) : extraction de `defaultQuestion()` (partie champs par type),
+   `contentToFormState`, `buildContent` (renommé `buildQuestionContent`) depuis `pages/ExercisesPage.vue`,
+   sous forme de fonctions pures. Comportement strictement inchangé — `ExercisesPage.vue` délègue désormais à
+   ce helper (`onTypeChange` simplifié en un `Object.assign`), les 15 tests existants d'`ExercisesPage.test.js`
+   passent sans modification.
+2. `components/AiExerciseReviewModalComponent.vue` (nouveau, C-02.07) — la vraie Interface de révision :
+   modale empilée (`ModalComponent`, `size="lg"`) au-dessus de « Nouvel exercice », une carte par question
+   générée avec case à cocher (inclure/rejeter, décochée = rejetée), compteurs (incluses/modifiées/rejetées),
+   bouton `[Tout accepter]` si au moins une rejetée, accordéon `▸ Source` (`sourceExcerpt`, même pattern que
+   `AiValidationScreenComponent.vue`), bouton `[✎ Modifier]` basculant en édition inline (mêmes blocs de
+   formulaire par type — statement/type/open/mcq/fill_blank/reorder — que la liste "Questions" existante,
+   réutilisant `helpers/exerciseQuestionForm.js`). `[Annuler]` referme sans rien ajouter ; `[Ajouter N
+   question(s) à l'exercice]` (désactivé si 0 incluse) émet `confirm` avec les questions incluses déjà dans la
+   représentation `form.questions`.
+3. `pages/ExercisesPage.vue` : retrait de la confirmation groupée (bloc template + `pendingGeneratedQuestions`/
+   `aiGenerationWarning`/`acceptGeneratedQuestions`/`discardGeneratedQuestions`), remplacée par le montage de
+   `AiExerciseReviewModal` sur un nouvel état `aiStep === 'review'`. `handleAiGenerate` ne ferme plus le flux
+   ni ne reset le store sur succès — passe à `aiStep = 'review'` (le store garde `questions`/`warning` le temps
+   que l'écran de révision les affiche). Nouvelle fonction `handleReviewConfirm(acceptedQuestions)` : `push`
+   direct dans `form.questions` (même mécanique que `addQuestion()`), puis `closeAiFlow()`.
+
+**Ce qui n'est PAS couvert** — Aucune persistance/appel réseau à cette étape (cohérent avec l'architecture
+sans brouillon serveur actée pour `C-02`, `generation_ia_exercices_ui.md` §8/§10 — à la différence de
+`aiCardGenerationStore#updateCard`/`promoteCard`, C-01.09, qui persistent chaque interaction) ; validation de
+forme des champs édités dans l'écran de révision (déléguée à la validation HTML5 déjà présente sur les
+sous-formulaires identiques de `ExercisesPage.vue`, `required` sur les champs obligatoires — aucune double
+validation ajoutée) ; import PDF (toujours hors périmètre de `C-02`, cf. C-02.06) ; quotas (aucun mécanisme,
+cohérent avec C-02.01 §12).
+
+**Choix techniques** — Modale empilée plutôt qu'écran plein ; édition inline (blocs de formulaire par type
+extraits en helper partagé) plutôt qu'une modale d'édition séparée façon `AiCardEditModalComponent.vue`
+(C-01.09) ; aucune action `updateItem`/`promoteItem` côté store, l'écran reste un état 100% local à
+`AiExerciseReviewModalComponent.vue`, reconstruit à chaque ouverture via un `watch(() => props.visible, ...,
+{ immediate: true })` (le composant reste monté tout le temps du flux IA comme ses deux prédécesseurs, donc ne
+peut pas s'appuyer sur un montage initial pour lire `props.questions`, rempli seulement après la Vue 2) — les
+trois choix et leur justification complète sont dans `DECISIONS.md`.
+
+**Fichiers créés**
+- `my_memo_master_front/src/helpers/exerciseQuestionForm.js`
+- `my_memo_master_front/src/components/AiExerciseReviewModalComponent.vue`
+- `my_memo_master_front/test/helpers/exerciseQuestionForm.test.js` (17 tests)
+- `my_memo_master_front/test/components/AiExerciseReviewModalComponent.test.js` (12 tests)
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/pages/ExercisesPage.vue` (délégation au helper, retrait confirmation groupée,
+  ajout Écran de révision)
+- `my_memo_master_front/test/components/ExercisesPage.test.js` (section IA réécrite : 7 tests contre 6,
+  `handleReviewConfirm` remplace `acceptGeneratedQuestions`/`discardGeneratedQuestions`, + 1 test de parcours
+  complet config→génération→affichage de l'écran de révision)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 36 tests dédiés à ce ticket (17 helper, dont un round-trip `contentToFormState`/
+`buildQuestionContent` sur `mcq` ; 12 composant : affichage, reject/tout-accepter, édition inline, accordéon
+source, émission `confirm`/`close`, réinitialisation à la réouverture, écran vide ; 7 wiring `ExercisesPage`).
+Suite complète front relancée : **54/54 suites, 820/820 tests, 0 régression** (contre 52 suites/790 tests
+avant ce ticket). Linter (`npx eslint .`) propre. Audit RGAA statique (`node scripts/audit-a11y.mjs`) : 0
+non-conformité (85 fichiers, dont les deux nouveaux). Backend non touché (ticket front-end uniquement,
+conforme à l'audit préalable — aucun contrat d'API existant ne change).
+
+**Points d'attention / dette** — Cet écran clôt la chaîne fonctionnelle de `C-02` telle que balisée par le
+feature list fourni (Spécification/Service/Validation/Mode dégradé/Interface de révision/Écran de révision,
+tous livrés) — reste hors périmètre explicite (OUT du ticket, rappelé dans la demande) : correction officielle
+sans relecture, génération illimitée, banque publique automatique. Comme pour C-02.06, l'absence de
+persistance intermédiaire signifie qu'une question éditée puis acceptée, si l'utilisateur ferme ensuite la
+modale « Nouvel exercice » sans soumettre, est perdue — même comportement qu'une question ajoutée
+manuellement, pas une régression introduite ici. Le couplage fragile déjà signalé en C-02.05
+(`describeFailure` sur correspondance de sous-chaîne) n'est pas concerné par ce ticket (aucun changement côté
+`AiExerciseGeneration.service.js`/`AiExerciseDegradedMode.service.js`).
+
+---
+
+## [2026-09-08] DOC — C-03.02 : Maquettes UI bibliothèque ressources (Partage de ressources pédagogiques)
+
+**Contexte** — Ticket `C-03.02` (feature list `C-03`, source planning `C-03.02`, V2, US-17, tâche « Analyse »).
+Objectif : livrer les « Maquettes UI bibliothèque ressources », sans déborder sur les autres éléments IN du
+feature list (Types de ressources, Upload, Partage par groupe, Contrôle d'accès, Bibliothèque de groupe — tous
+déjà couverts par C-03.01). Point d'attention explicite du ticket : respecter le périmètre de « Maquettes UI
+bibliothèque ressources » sans étendre aux éléments hors version (LMS complet, versioning documentaire avancé,
+édition collaborative de fichiers).
+
+**Vérification préalable demandée par l'utilisateur** — avant ce ticket, audit de C-03.01 (« Définition types
+ressources partageables ») : confirmé **livré** (modèle `ClassGroupResource` avec 4 types, upload S3 en 2
+temps, `classGroupId`, contrôle d'accès `_canWrite`/`_isMember`, CRUD complet + 34 tests, S-03.08 puis S-02.05).
+Puis audit de C-03.02 lui-même : **aucun livrable trouvé**. Contrairement au pattern systématiquement suivi
+dans ce projet pour toute tâche « Maquettes UI X » (document dédié `diagrams/X_ui.md` avec wireframes ASCII —
+`ui_navigation_sujet.md`, `dashboard_enseignant_ui.md`, `kpi_consent_ui.md`, `etablissement_admin_ui.md`,
+`generation_ia_ui.md`, `generation_ia_exercices_ui.md`), rien n'existait pour la bibliothèque de ressources :
+`classroom_enseignant.md` §4.4/§5.3 (S-03.12) documente le modèle de données et les flux API, pas une maquette
+d'écran. Situation identique à S-06.02 (« Maquettes UI éditeur de formules » — *"n'avait aucun livrable : pas
+de document dans diagrams/, pas d'écran dans le prototype, l'implémentation Vue réelle a précédé les
+maquettes"*, clôturé le 2026-07-19 en intégrant une maquette au prototype interactif). Le code fonctionnel de
+la bibliothèque de ressources est en production depuis S-03.08/S-02.05 (2026-06-26/27) — bien avant ce ticket.
+
+**Ce qui a été fait** — `diagrams/bibliotheque_ressources_ui.md`, produit comme **audit-maquette rétroactif**
+de l'écran réel (et non une conception préalable, à la différence de la quasi-totalité des autres documents
+`*_ui.md` du projet) : audit du code de `ClassroomEtudiantView.vue`/`ClassroomEnseignantView.vue`/
+`stores/classGroupResources.js`, wireframes ASCII vue étudiant (lecture seule, §2 — liste, vide, chargement) et
+vue enseignant (formulaire drag & drop + liste + suppression, §3), détail des composants (icône par `mimeType`
+§4.2, libellé par type métier §4.3, formatage taille §4.4, téléchargement/ouverture par URL présignée §4.5),
+store Pinia existant documenté tel quel (§5, y compris le flux en 2 appels réseau séquentiels sans rollback),
+flux utilisateur nominal (§6), rappel du contrôle d'accès (§7, déjà couvert par C-03.01), responsive/a11y (§8).
+
+**5 points de dette identifiés pendant l'audit initial** — §9 du document (liste originale, avant vérification
+approfondie — voir correctif ci-dessous) :
+1. La recherche de la vue étudiant (`search`) ne filtre que les sections/rendus, jamais les ressources — le
+   message "Aucune ressource correspondante." conditionné à `search` est mort code (ne peut jamais s'afficher).
+2. Suppression d'une ressource côté enseignant sans aucune modale de confirmation, incohérent avec la
+   révocation de consentement KPI sur la même page (`kpi_consent_ui.md` §2.4, qui en a une).
+3. Aucune UI d'édition (titre/type/description) malgré `PUT /class-groups/:id/resources/:resourceId` existant
+   et testé côté API (20 tests controller) — dette d'UI pure, aucun blocage technique identifié.
+4. Le champ `url` du modèle (ressource "lien seul", sans fichier) est inatteignable depuis le formulaire actuel
+   — celui-ci impose un fichier (`resourceForm.file` requis) ; aucun rendu dédié dans le template pour une
+   ressource sans `fileKey`.
+5. Aucun filtre par type de ressource (`cours`/`carte_mentale`/`sujet`/`autre`) dans la bibliothèque, ni côté
+   étudiant ni côté enseignant — liste plate, sans le pattern de filtre déjà utilisé ailleurs dans le projet
+   (`TagSelectorComponent`, `ui_navigation_sujet.md`).
+
+**Correctif le jour même, avant tout code** — l'utilisateur a demandé si les points 1 et 2 devaient être
+corrigés immédiatement. Vérification plus poussée du code avant d'implémenter :
+- **Point 1 : faux positif.** Un second `computed filteredResources` (dédié aux ressources, distinct de celui
+  des sections/rendus, non vu lors du premier passage) filtre déjà `resourceStore.resources` par `title`/`type`
+  — la recherche fonctionne correctement. Retiré de la liste de dette.
+- **Point 2 : cause mal identifiée.** Aucune action destructrice de `ClassroomEnseignantView.vue` (section,
+  échéance, membre, ressource) n'avait de confirmation — ce n'était pas une incohérence isolée sur les
+  ressources par rapport à la modale KPI (qui est dans une autre vue, pour une autre action), mais le
+  comportement établi de toute la vue. **Corrigé en conséquence** (voir entrée IMP dédiée plus bas) : modale de
+  confirmation généralisée aux 4 actions, pas seulement à la ressource.
+
+Les points 3, 4 et 5 restent des points d'attention confirmés, non corrigés (hors périmètre d'un ticket
+d'analyse UI, signalés pour un futur ticket).
+
+**Ce qui n'est PAS couvert** — Aucune correction des points 3/4/5 (hors périmètre explicite du ticket, signalés
+pour un futur ticket) ; Types de ressources / Upload / Partage par groupe / Contrôle d'accès / Bibliothèque de
+groupe restent le périmètre de C-03.01, non repris ici sauf en rappel (§7).
+
+**Fichiers créés**
+- `diagrams/bibliotheque_ressources_ui.md`
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md`
+- `.agents/DECISIONS.md`
+
+**Dette signalée, non traitée ici** — Les points 3, 4 et 5 restent ouverts dans le code existant.
+
+---
+
+## [2026-09-08] Import PDF — Génération de questions d'exercice par IA (demande utilisateur, hors ticket du feature list)
+
+**Contexte** — Demande explicite de l'utilisateur, formulée après la livraison de C-02.07 : « est-ce que ça
+peut aussi être fait à partir du cours au format PDF ? ». Ne correspond à aucun ticket du feature list `C-02`
+fourni jusqu'ici — traité comme une extension directement demandée, confirmée avant codage
+(`AskUserQuestion` : « Oui, construire le pipeline complet »), conformément à `AGENT.md` §2 (« si une
+information manque, pose une question avant de coder » / « signale toute modification d'interface publique et
+attends validation »).
+
+**État constaté avant codage** — `AiGenerateExercisesModalComponent.vue` (C-02.06) n'offrait que « Coller du
+texte » ; `AiExerciseGeneration.service.js` (C-02.03) ne prend qu'un `sourceText` déjà résolu — écart déjà
+documenté à l'époque (`DECISIONS.md`, C-02.06) : aucun équivalent à `PdfExtraction.service.js`/
+`AiCardGenerationPipeline.service.js` (`C-01.05`) n'existait côté exercices.
+
+**Ce qui a été fait** —
+1. `services/AiExerciseGenerationPipeline.service.js` (nouveau) : `resolveSourceText` (texte ou PDF,
+   délègue à `PdfExtraction.service.js`, réutilisé tel quel — générique, déjà indépendant des cartes),
+   `distributeQuestionCount` (répartition sur les chunks), `generateExercisesFromContent` (orchestration
+   séquentielle sur `helpers/textChunker.js#chunkText`, appelle `AiExerciseGeneration.service.js#generateExercises`
+   par chunk, agrège `questions`/`warnings`/`usage`, même circuit breaker rate limit — seuil 2 — et mêmes
+   constantes `MAX_CHUNK_LENGTH`/`MAX_CHUNKS` que `AiCardGenerationPipeline.service.js`, C-01.05).
+2. `services/AiExerciseDegradedMode.service.js` : nouvelle méthode `attemptGenerationFromContent` (enveloppe
+   le pipeline, réutilise `describeFailure` tel quel) — `attemptGeneration` existante non touchée.
+3. Backend HTTP : `controllers/AiExerciseGeneration.controller.js` bascule sur `attemptGenerationFromContent`
+   et vérifie les magic bytes d'un PDF uploadé (`helpers/fileSignature.js#bufferMatchesMime`, comme
+   `AiGenerationBatch.controller.js`, C-01) ; `routes/AiExerciseGeneration.routes.js` ajoute
+   `aiPdfUpload.middleware.js` (réutilisé tel quel, générique) + un second passage `sanitize` après multer
+   (même correctif que C-01.11, la route est désormais multipart) ; `validators/AiExerciseGeneration.validators.js`
+   rend `sourceText` optionnel avec une exclusivité stricte vs `req.file`, plafond relevé à 80 000 caractères
+   (comme `C-01`, dimensionné sur `MAX_CHUNKS × MAX_CHUNK_LENGTH`).
+4. Front : `stores/aiExerciseGeneration.js#generate` envoie désormais un `FormData` (texte ou `pdfFile`,
+   exclusifs) avec un timeout étendu à 300000 ms (comme `stores/aiCardGeneration.js`, C-01.11) ; état
+   `warning` renommé `warnings` (tableau). `AiGenerateExercisesModalComponent.vue` regagne l'option PDF
+   (radio + zone drag&drop, calquée sur `AiGenerateCardsModalComponent.vue`). `AiExerciseReviewModalComponent.vue`
+   (C-02.07) affiche `warnings[]` (une ligne par avertissement) au lieu d'un `warning` unique.
+
+**Ce qui n'est PAS couvert** — Dédoublonnage inter-chunks (chaque chunk applique son propre filet anti-doublon
+intra-chunk, comme `AiCardGenerationPipelineService` pour les cartes — pas de dédoublonnage supplémentaire au
+niveau du pipeline, cohérence avec ce précédent) ; quotas (toujours aucun mécanisme pour `C-02`, cohérent avec
+C-02.01 §12) ; persistance intermédiaire (toujours aucune, cohérent avec toute la chaîne C-02).
+
+**Choix techniques** — Nouveau service dédié plutôt que généraliser `AiCardGenerationPipeline.service.js` pour
+accepter un service de génération en paramètre ; nouvelle méthode `attemptGenerationFromContent` plutôt que
+modifier `attemptGeneration` ; changement de contrat HTTP assumé (`warning` → `warnings` sur la route
+existante, toute génération passant désormais par le pipeline) ; aucune taille de fichier codée en dur côté
+front pour le PDF (contrairement à `AiGenerateCardsModalComponent.vue#MAX_PDF_SIZE`, écart déjà signalé en
+C-02.02 §11/§5.2) — les trois choix et leur justification complète sont détaillés dans `DECISIONS.md`.
+
+**Fichiers créés**
+- `my_memo_master_api/services/AiExerciseGenerationPipeline.service.js`
+- `my_memo_master_api/test/services/AiExerciseGenerationPipeline.service.test.js` (27 tests)
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiExerciseDegradedMode.service.js` (+ `attemptGenerationFromContent`)
+- `my_memo_master_api/controllers/AiExerciseGeneration.controller.js`
+- `my_memo_master_api/routes/AiExerciseGeneration.routes.js`
+- `my_memo_master_api/validators/AiExerciseGeneration.validators.js`
+- `my_memo_master_api/test/services/AiExerciseDegradedMode.service.test.js` (+ 4 tests)
+- `my_memo_master_api/test/bdd/aiExerciseGeneration.test.js` (réécrit — mock du pipeline comme C-01, + tests PDF)
+- `my_memo_master_front/src/stores/aiExerciseGeneration.js`
+- `my_memo_master_front/src/components/AiGenerateExercisesModalComponent.vue`
+- `my_memo_master_front/src/components/AiExerciseReviewModalComponent.vue`
+- `my_memo_master_front/src/pages/ExercisesPage.vue` (binding `warnings`)
+- `my_memo_master_front/test/stores/aiExerciseGeneration.store.test.js` (réécrit)
+- `my_memo_master_front/test/components/AiGenerateExercisesModalComponent.test.js` (+ 7 tests PDF)
+- `my_memo_master_front/test/components/AiExerciseReviewModalComponent.test.js` (+ 1 test, prop renommée)
+- `my_memo_master_front/test/components/ExercisesPage.test.js` (état initial store + 2 assertions renommées)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 27 nouveaux tests pipeline (résolution source, répartition, agrégation multi-chunks, échec
+partiel/total, circuit breaker rate limit — 5 scénarios, PDF/OCR/images embarquées) + 4 nouveaux tests mode
+dégradé (`attemptGenerationFromContent`) + BDD route réécrite (12 tests : texte/PDF nominal, magic bytes,
+exclusivité, bornes, sanitize, mode dégradé, 422). Front : store réécrit (10 tests, FormData + warnings) + 7
+tests PDF sur la modal de config + 1 test warnings multiples sur l'écran de révision. Suites complètes : API
+**106 suites/1950 tests** (contre 105/1917), front **54 suites/831 tests** (contre 54/820), **0 régression**.
+Linter (`npx eslint .`) propre des deux côtés. Audit RGAA statique (`node scripts/audit-a11y.mjs`) : 0
+non-conformité.
+
+**Points d'attention / dette** — Le changement `warning` → `warnings` sur `POST /ai-exercise-generations` est
+un changement de contrat HTTP sur une route déjà livrée (C-02.06) — assumé et documenté ici plutôt que silencieux,
+aucun consommateur externe connu de cette route hors du front de ce même dépôt (mis à jour dans le même
+changement). Comme pour `C-01`, aucun dédoublonnage inter-chunks : deux chunks différents peuvent en théorie
+produire des questions portant sur la même notion sans être filtrées — dette déjà acceptée côté cartes,
+reproduite ici par cohérence plutôt que traitée différemment sans raison. Odoo non mis à jour (aucune demande
+explicite sur ce point, `C-02` reste par ailleurs à 0/9 comme noté dans les entrées précédentes).
+
+---
+
+## [2026-09-08] FIX — Question vide en trop après acceptation des questions générées par IA (ExercisesPage.vue)
+
+**Contexte** — Bug signalé par l'utilisateur en conditions réelles (capture d'écran) : après avoir généré des
+questions par IA et cliqué sur « Ajouter à l'exercice » (Écran de révision, C-02.07), une « Question 1 » vide
+(énoncé et réponse non renseignés) restait en tête de la liste "Questions", avant les questions générées.
+**Pas seulement un résidu visuel** : au clic sur « Créer l'exercice », `submitCreate()` poste cette question
+vide en premier, le backend la rejette (`statement`/`content.correct_answer` requis) — l'exercice entier
+échouait à se créer (« Erreur question 1. »).
+
+**Cause** — `openCreateModal()` initialise `form.questions` avec une unique question vide
+(`[defaultQuestion()]`, type `open` par défaut, pour que la modal ne s'ouvre jamais sur une liste vide).
+`handleReviewConfirm` (C-02.07) se contentait de `push` les questions acceptées à la suite de
+`form.questions`, sans jamais retirer cette question par défaut si l'utilisateur ne l'avait pas remplie
+lui-même avant de lancer la génération IA — cas très probable en pratique : générer par IA est souvent le
+tout premier geste après avoir ouvert la modal « Nouvel exercice ».
+
+**Correctif** — Nouvelle fonction `isBlankUntouchedQuestion(q)` (`ExercisesPage.vue`) : une question est
+considérée intacte/jamais éditée si elle est encore de type `open` avec `statement`/`openAnswer` vides et
+aucune formulation acceptée ajoutée — exactement l'état produit par `defaultQuestion()`. `handleReviewConfirm`
+filtre désormais `form.questions` avec cette fonction avant d'ajouter les questions acceptées (uniquement s'il
+y en a au moins une — un rejet total ne touche plus à rien, la question vide reste disponible pour une saisie
+manuelle). Un changement de type, un énoncé ou une réponse partiellement tapés suffisent à préserver la
+question : le filtre ne retire jamais une question que l'utilisateur a commencé à renseigner, y compris une
+question ajoutée manuellement via « + Ajouter une question » avant de lancer la génération IA.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/pages/ExercisesPage.vue` (`isBlankUntouchedQuestion`, `handleReviewConfirm`)
+- `my_memo_master_front/test/components/ExercisesPage.test.js` (+2 tests dédiés, 1 test existant ajusté au
+  nouveau comportement — `form.questions` compte désormais exactement les questions générées quand la
+  question par défaut est intacte, plus `before + 1`)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 2 nouveaux tests (retire la question vide intacte / préserve une question déjà renseignée
+manuellement), 1 test existant mis à jour. Suite front complète : **54/54 suites, 833/833 tests**, 0
+régression. Linter propre.
+
+**Points d'attention / dette** — Le filtre ne couvre que le cas produit par `defaultQuestion()` (type `open`,
+tous champs vides) — un futur changement de la valeur par défaut de `defaultQuestion()` (ex. type initial
+différent) devra mettre à jour `isBlankUntouchedQuestion` en conséquence, sans quoi le filtre redeviendrait
+inopérant silencieusement.
+
+---
+
+## [2026-09-08] IMP — Confirmation avant suppression généralisée à `ClassroomEnseignantView.vue`
+
+**Contexte** — Suite à l'audit C-03.02 (`diagrams/bibliotheque_ressources_ui.md`), l'utilisateur a demandé de
+corriger tout de suite les 2 points de dette jugés triviaux (recherche ressources, confirmation suppression).
+Vérification avant implémentation (voir entrée DOC C-03.02, corrigée) : le point "recherche" était un faux
+positif (déjà fonctionnel) ; le point "confirmation" a été mal cadré au départ — ce n'est pas une suppression
+de ressource isolée sans confirmation, c'est **aucune action destructrice de toute la vue enseignant** qui
+n'en a. Soumis à l'utilisateur : corriger uniquement la ressource (nouvelle incohérence introduite au sein de
+la vue) ou généraliser aux 4 actions. **Décision utilisateur : généraliser.**
+
+**Ce qui a été fait** — `ClassroomEnseignantView.vue` : ajout d'une modale de confirmation générique
+(`ModalComponent`, pattern déjà utilisé pour la révocation KPI de `ClassroomEtudiantView.vue`) partagée par les
+4 actions destructrices de la vue :
+- État `confirmModal` (`visible`/`title`/`message`/`action`) + `askConfirm(title, message, action)` /
+  `closeConfirmModal()` / `runConfirmedAction()` — une seule modale, une action différée par callback plutôt que
+   4 modales dédiées.
+- `confirmDeleteSection(s)` — suppression section/rendu (message adapté : rappelle que les soumissions
+  associées sont supprimées en cascade pour un rendu).
+- `confirmDeleteResource(r)` — suppression ressource.
+- `confirmDeleteDeadline(dl)` — suppression échéance.
+- `confirmRemoveMember(m)` — retrait d'un membre étudiant du groupe.
+
+Les 4 boutons "Supprimer"/"×" du template appellent désormais ces fonctions au lieu du store directement ; la
+suppression réelle n'a lieu qu'au clic sur « Confirmer » dans la modale.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/pages/ClassroomEnseignantView.vue`
+- `diagrams/bibliotheque_ressources_ui.md` (§3.3, §9 — documentation du correctif)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Aucun test dédié préexistant sur `ClassroomEnseignantView.vue` (composant non couvert par un fichier
+de test spécifique, seul `ClassroomPage.test.js` teste le coordinateur de routage par rôle — non affecté par ce
+changement). Suite front complète relancée après modification : **54/54 suites, 833/833 tests**, 0 régression.
+Linter (`npx eslint`) propre sur le fichier modifié.
+
+**Points d'attention / dette** — Absence de test dédié pour `ClassroomEnseignantView.vue` : le comportement de
+la modale de confirmation (ouverture, annulation, confirmation effective) n'est donc vérifié que manuellement/
+par lecture de code, pas par une suite automatisée — dette déjà présente avant ce ticket (aucun test n'existait
+sur ce composant), non comblée ici (aurait dépassé le périmètre d'un correctif ponctuel demandé par
+l'utilisateur).
+
+---
+
+## [2026-09-08] FIX — "Erreur question 1." masquait la vraie cause de rejet (validate.middleware.js)
+
+**Contexte** — L'utilisateur signale que « Erreur question 1 » persiste à l'enregistrement d'un exercice
+après le FIX précédent (question vide retirée après acceptation IA, entrée du même jour ci-dessus). Investigation :
+`validate.middleware.js` (express-validator, partagé par toutes les routes validées de l'API) répond
+`{ errors: [...] }` sur un rejet de validation (ex. `body('statement').notEmpty()`), **jamais** `{ message }`.
+`ExercisesPage.vue#submitCreate/submitEdit` ne lisait que `resp?.data?.message` avant de retomber sur un
+message générique (« Erreur question N. ») — sur un rejet de validation, ce générique s'affichait
+systématiquement, **masquant la vraie raison** (quel champ, pourquoi) aussi bien à l'utilisateur qu'à toute
+investigation ultérieure. Le FIX précédent (question vide retirée) reste correct et nécessaire, mais ce
+deuxième bug, indépendant, empêchait de vérifier que la vraie cause d'un éventuel rejet restant était bien
+diagnostiquée plutôt que supposée.
+
+**Correctif** — Nouvelle fonction `extractErrorMessage(resp, fallback)` (`ExercisesPage.vue`) : priorité à
+`resp.data.message` (pattern controller `CONVENTIONS.md`), puis `resp.data.errors[0].msg` (premier message
+express-validator), puis seulement le message générique passé en `fallback`. Appliquée aux 4 points de
+`submitCreate`/`submitEdit` qui affichaient jusqu'ici un message généré localement sans lire `errors`.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/pages/ExercisesPage.vue` (`extractErrorMessage`, 4 appels dans
+  `submitCreate`/`submitEdit`)
+- `my_memo_master_front/test/components/ExercisesPage.test.js` (+3 tests : message de validation réel
+  affiché, priorité au message métier sur les erreurs de validation, repli générique conservé sur échec
+  réseau)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 3 nouveaux tests. Suite front complète : **54/54 suites, 836/836 tests**, 0 régression. Linter
+propre.
+
+**Points d'attention / dette** — Ce correctif est un filet de diagnostic général (n'importe quelle validation
+de `POST/PUT questions` ou `PUT tests/:id` bénéficie désormais d'un message précis) — il ne dit pas, à lui
+seul, si le bug initial (question vide) est totalement résolu chez l'utilisateur : si l'erreur persiste après
+ce correctif, le message affiché devrait maintenant nommer le champ en cause (ex. « L'énoncé de la question
+est requis ») plutôt que rester générique, ce qui permettra de confirmer ou d'infirmer que le premier correctif
+couvre bien tous les cas rencontrés en pratique. Le même écart (message de validation non lu) existe très
+probablement dans d'autres pages du front qui suivent le même pattern `resp?.data?.message || fallback` sans
+lire `errors` — non audité ni corrigé ailleurs (hors périmètre de cette demande, ponctuelle sur
+
+---
+
+### [2026-09-08] FIX — `Semantic.service.extractKeywords` renvoyait un ensemble vide sur réponse symbolique, faussant la décision en zone grise
+
+**Contexte** — Signalement utilisateur (session Leitner explorée via l'extension Chrome) : incohérence apparente
+entre le score affiché et la décision correct/incorrect (`61%→Excellent`, `75%→À revoir`, `47%→À revoir`).
+Investigation : voir `.agents/DECISIONS.md` entrée du même jour pour le détail du mécanisme (zone grise 0,55–0,78
+décidée par recouvrement de mots-clés, pas par le score) et du bug trouvé — `extractKeywords('dP = ρg dV')`
+renvoyait `Set(0)` (tous les tokens ≤2 caractères filtrés), donc `computeKeywordOverlap` retournait 0
+systématiquement pour toute réponse symbolique courte, indépendamment de sa pertinence.
+
+**Correctif** — `extractKeywords` garde le filtre strict (`length > 2` + hors stopwords) et replie sur un
+filtre permissif (hors stopwords, tokens substantiels ≥1 caractère) **seulement** si le filtre strict ne
+laisse aucun token. Nouvelle méthode `isSubstantialToken` (au moins une lettre/chiffre) pour exclure les
+résidus de ponctuation isolés (`=`) du repli.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`extractKeywords`, `isSubstantialToken`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+5 tests : repli symbolique grec/latin, non-
+  introduction de la ponctuation isolée, non-régression du filtre strict sur la prose, recouvrement non-nul
+  sur le scénario réel)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 5 nouveaux tests (`Semantic.service.test.js` : 36→41). Suite API complète : **106/106 suites,
+1955/1955 tests**, 0 régression.
+
+**Points d'attention / dette** — Le score affiché à l'étudiant (`Score : X%`) ne reflète toujours pas la
+logique de décision réelle en zone grise (recouvrement de mots-clés, pas le score) — ce point UX identifié
+dans l'échange reste ouvert ; l'utilisateur a explicitement choisi de traiter d'abord le calcul plutôt que
+l'affichage (4 options proposées). Une réponse purement symbolique avec un **signe** différent de la référence
+peut désormais être acceptée en zone grise si le reste du vocabulaire/symboles recouvre suffisamment la
+référence — le signe n'est vérifié nulle part dans ce chemin (il l'est dans le court-circuit `exact` /
+`algebraicallyEqual`, qui rejette correctement un signe différent, mais qui ne s'applique qu'aux réponses
+purement symboliques par ailleurs identiques).
+
+---
+`ExercisesPage.vue`), signalé pour un futur passage si le même symptôme est rapporté sur une autre page.
+
+---
+
+## [2026-09-08] FIX (suite) — "Erreur lors de la création de l'exercice." masquait aussi la vraie cause (submitCreate/testStore.createTest)
+
+**Contexte** — Après le FIX précédent (le même jour, `extractErrorMessage` sur les questions), l'utilisateur
+signale — capture à l'appui — un exercice de 20 questions toutes correctement remplies (dont un QCM et un
+texte à trous vérifiés visuellement) qui échoue désormais avec un message différent : « Erreur lors de la
+création de l'exercice. », toujours générique. Investigation : ce message précis n'est posé qu'à un seul
+endroit de `submitCreate()`, quand `testStore.createTest()` renvoie `false` — c'est-à-dire un échec de
+création du **test lui-même** (`POST /tests`), avant même la première question.
+
+**Cause** — `stores/tests.js#createTest()` ne renvoie qu'un booléen à son appelant ; la vraie raison d'un
+échec (message serveur, ou message de validation express-validator déjà normalisé côté `helpers/api.js#toResponse`
+par un correctif antérieur du dépôt) n'est affichée que dans un **toast interne au store**
+(`notif.notify(resp.data?.message || 'Erreur lors de la création', 'error')`), jamais transmise à
+`ExercisesPage.vue`, qui affichait donc systématiquement son propre message générique codé en dur — exactement
+la même classe de bug que le FIX précédent (message réel disponible mais jamais lu), simplement à un autre
+point du flux de soumission.
+
+**Correctif** — `submitCreate()` appelle désormais directement `api.post('tests', ...)` (au lieu de passer par
+`testStore.createTest()`), exactement comme `submitEdit()` le fait déjà pour la mise à jour du test
+(`api.put` direct) — cohérence rétablie entre les deux fonctions. `extractErrorMessage` (FIX précédent)
+s'applique donc aussi à l'échec de création du test. `testStore.createTest()` elle-même n'est pas modifiée
+(seul autre appelant : `pages/CreateTestPage.vue`, route morte/orpheline déjà documentée comme telle,
+`generation_ia_exercices_ui.md` §1 — aucun risque de régression).
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/pages/ExercisesPage.vue` (`submitCreate` — appel direct `api.post('tests', ...)`)
+- `my_memo_master_front/test/components/ExercisesPage.test.js` (3 tests existants adaptés au nouvel
+  enchaînement à 2 appels `api.post` — test puis question —, +2 nouveaux tests dédiés à l'échec de création
+  du test lui-même)
+- `.agents/CHANGELOG_AGENT.md`
+
+**Tests** — 2 nouveaux tests (message de validation réel affiché si le test échoue à la création ; repli
+générique conservé sur échec réseau), 3 tests existants adaptés. Suite front complète : **54/54 suites,
+838/838 tests**, 0 régression. Linter propre.
+
+**Points d'attention / dette** — **Non corrigé ici, signalé pour investigation/décision séparée** : les captures
+de l'utilisateur montrent plusieurs exercices au même nom ("Thermodynamique") déjà présents dans la liste
+avant même la résolution de ce bug — cohérent avec l'hypothèse qu'un `Test` a pu être créé avec succès lors
+d'une tentative précédente puis abandonné en l'état (0 ou quelques questions) quand une question suivante
+échouait ensuite dans la boucle, sans qu'aucun rollback ne supprime ce test partiel ni qu'aucune protection
+n'empêche une re-soumission de recréer un nouveau test dupliqué. `submitCreate()` n'a aucune transaction ni
+nettoyage sur échec partiel (contrairement à `AiGenerationBatch.service.js` côté IA, qui persiste tout en une
+transaction DB). Non traité dans ce correctif (portée : rendre le message d'erreur réel visible, pas revoir
+l'atomicité de la création d'exercice) — à trancher si l'utilisateur confirme que ces tests dupliqués posent
+réellement problème (ex. suppression automatique du test partiel si au moins une question échoue ensuite dans
+la boucle, pour qu'une nouvelle tentative ne s'ajoute pas à un doublon existant plutôt que de le remplacer).
+
+---
+
+## [2026-09-08] FIX (cause réelle) — `POST /questions` avec `idTest` échouait en 500 : dérive de schéma sur `testQuestions`
+
+**Contexte** — Après les deux FIX précédents du jour (message d'erreur réel affiché côté front, pour les
+questions puis pour le test lui-même), l'utilisateur continue de voir « Erreur question 1. » — signe que le
+front affiche désormais un message réel, mais qu'aucun message exploitable n'est disponible (donc un vrai
+échec réseau/serveur, pas un refus de validation). Sur demande explicite de l'utilisateur (« regarde les
+logs »), lecture des logs du conteneur API (`docker logs mymemomaster-api-1`) plutôt que d'attendre une
+capture de la console navigateur.
+
+**Cause réelle trouvée dans les logs** :
+```
+POST /api/v1/tests 201
+error: null value in column "createdAt" of relation "testQuestions" violates not-null constraint
+POST /api/v1/questions 500
+```
+`services/Question.service.js#create` appelle `question.addTest(test)` dès qu'un `idTest` est fourni — c'est-
+à-dire pour **toute** création de question rattachée à un exercice, IA ou manuelle. Vérification directe de la
+base Postgres du conteneur (`\d "testQuestions"`) : la table portait deux colonnes `createdAt`/`updatedAt`
+(NOT NULL, sans défaut) que ni le modèle (`models/TestQuestion.model.js`, `timestamps: false` — déjà corrigé
+par le passé, commentaire de tête daté) ni la migration de création
+(`20260226152800-create-testquestions-table.js`) ne définissent. Dérive de schéma : cette table a été créée
+par un `sequelize.sync()` (mode dev, log `[DB] Running Sequelize sync (dev/test mode)…` au démarrage) **avant**
+que le modèle explicite `timestamps: false` n'existe — Sequelize avait alors ajouté ces deux colonnes de son
+propre chef. La migration a ensuite été écrite sans elles (conforme au modèle corrigé), mais sur cette base où
+`testQuestions` existait déjà, `db:migrate` la considère "déjà appliquée" sans jamais retirer les colonnes en
+trop. Toute insertion via l'association Sequelize actuelle (qui ne connaît plus `createdAt`/`updatedAt`) viole
+donc la contrainte NOT NULL restée en base — **100 % des créations de question avec `idTest` échouaient**,
+IA ou manuelle, `testQuestions` comptait 0 ligne au moment du diagnostic malgré 5 exercices déjà en liste.
+
+**Correctif** — Nouvelle migration `20260908000001-drop-testquestions-timestamps.js` : retire `createdAt`/
+`updatedAt` de `testQuestions` si présentes (`describeTable`, idempotent — n'affecte pas une base sans dérive,
+ex. une base entièrement recréée depuis les migrations actuelles). Appliquée immédiatement sur l'environnement
+Docker Compose de l'utilisateur (`docker exec mymemomaster-api-1 npx sequelize-cli db:migrate`), vérifiée par
+lecture directe du schéma avant/après, et par un redémarrage du conteneur API (migration bien enregistrée,
+aucune erreur au boot).
+
+**Fichiers créés**
+- `my_memo_master_api/migrations/20260908000001-drop-testquestions-timestamps.js`
+- `my_memo_master_api/test/bdd/question.testQuestions.test.js` (2 tests — round-trip réel `POST /questions`
+  → `GET /tests/:id`, une puis deux questions liées au même test)
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md`
+
+**Tests** — 2 nouveaux tests fonctionnels (DB réelle SQLite en mémoire — ne peut pas reproduire la dérive
+historique elle-même, seulement garantir que le chemin applicatif `addTest()` fonctionne avec le schéma actuel
+des modèles, régression de code plutôt que de donnée). Suite complète API : **107 suites/1957 tests** (contre
+106/1950), **0 régression**. Linter propre. Migration vérifiée manuellement en conditions réelles (schéma
+avant/après, redémarrage conteneur) — pas seulement en local via les tests.
+
+**Points d'attention / dette** — **Cette dérive de schéma a pu exister sur d'autres environnements** créés de
+la même façon (base Postgres bootstrappée avant l'ajout du modèle `TestQuestion.model.js`/`timestamps:false`)
+— notamment une éventuelle base de production, non vérifiée ici (aucun accès signalé/demandé). La migration
+étant idempotente et sans effet sur une base saine, l'appliquer partout où `db:migrate` tourne est sans risque
+et recommandé dès que l'occasion se présente. Aucune autre table de jointure du projet n'a été auditée pour la
+même dérive potentielle (ex. `testClassGroups`, `questionSubject`, `cardQuestion`, `questionResponse`) — non
+vérifié ici (hors périmètre de ce correctif ponctuel, purement réactif au bug rapporté), à auditer si un
+symptôme similaire (500 sur un `addXxx()` d'association Sequelize) est un jour rapporté sur l'une d'elles.
+
+---
+
+### [2026-09-08] Addendum — Retest utilisateur du fix `Semantic.service.extractKeywords` (entrée du même jour ci-dessus) : conteneur non redémarré, puis vérifié avec les vraies données
+
+Voir `.agents/DECISIONS.md`, addendum sur l'entrée `extractKeywords` du 2026-09-08 pour le détail complet.
+Résumé : le premier retest utilisateur n'a montré aucun changement car le conteneur `mymemomaster-api-1`
+(bind mount, mais `node server.js` sans `nodemon`) n'avait pas rechargé le fichier corrigé — `docker restart`
+suffit (pas de rebuild). Revérifié ensuite avec les vraies réponses de référence tirées de la table `Response`
+(`correction=true`) plutôt que du texte reconstitué : le cas « poids d'une tranche de fluide » (Q30) passe
+maintenant à 92 % (contre rejet garanti avant, ensemble de mots-clés vide). Le cas « définition macroscopique »
+(Q24, 47 %) reste hors périmètre de ce fix — sous `LOW_THRESHOLD`, décidé par le score d'embedding seul, pas
+par le recouvrement de mots-clés ; reproduit à 0,52 avec les vraies réponses acceptées. Constat additionnel :
+le texte exact tapé par l'étudiant en session Leitner n'est jamais persisté (seuls les compteurs agrégés le
+sont sur `LeitnerCard`) — aucun rejeu à l'identique possible après coup, seulement par approximation.
+
+---
+
+## [2026-09-08] C-02.08 : Tests fonctionnels flux génération — Génération d'exercices par IA
+
+**Contexte** — Ticket `C-02.08` (feature list `C-02`, source planning `C-02.08`, V2, extension US-05A,
+tâche « Tests », suite de C-02.07 et de l'ajout d'import PDF du même jour). Objectif : livrer « Tests
+fonctionnels flux génération » — le seul élément IN restant du feature list `C-02` qui n'ait pas déjà été
+livré (Spécification/Service/Validation/Mode dégradé/Interface de révision tous déjà livrés). Point
+d'attention : respecter ce périmètre strictement — ticket 100 % tests, aucun code de production à modifier
+sauf bug bloquant découvert en chemin (aucun trouvé ici).
+
+**Audit préalable (AGENT.md)** — Recensement des tests fonctionnels existants avant d'écrire quoi que ce
+soit : `test/bdd/aiExerciseGeneration.test.js` (C-02.06, seule route HTTP du flux, `AiExerciseGenerationPipeline.service.js`
+entièrement mocké) et ~120 tests unitaires par service (C-02.03/04/05/pipeline), chacun avec ses dépendances
+mockées. **Aucun test n'exerçait la chaîne complète en une seule fois** — génération réelle (prompt, parsing,
+dédoublonnage, chunking) jusqu'à la persistance réelle (`POST /tests`+`POST /questions`), alors que ce mapping
+de persistance est documenté comme une simple « hypothèse de travail » depuis C-02.01 §7 et n'avait jamais été
+prouvé par un test. C'est ce trou précis que ce ticket comble.
+
+**Ce qui a été fait** — `test/bdd/aiExerciseGenerationFlow.test.js` (7 tests), mockant seulement les deux
+vrais points de sortie externes du système (`AiExerciseGeneration.service.js#callModel` — l'appel réseau
+Mistral — et `PdfExtraction.service.js#extractText`) ; tout le reste tourne réellement sur une base SQLite en
+mémoire :
+1. Parcours nominal texte, mode `mixed`, 4 types en une génération → `AiExerciseImportValidation.service.js#validateBatchForImport`
+   (simule le geste de l'Interface de révision, C-02.07, front-end) → `POST /tests` + `POST /questions` réels
+   → `GET /tests/:id` confirme les 4 questions persistées, `content` du `fill_blank` vérifié intact (aucune
+   reconstruction, conforme à generation_ia_exercices_types.md §7).
+2. Import PDF de bout en bout (extraction mockée, chunking réel, LLM mocké) → persistance réelle.
+3. Mode dégradé — Service génération indisponible (502) → réponse discriminée exploitable, rien à persister.
+4. Mode dégradé — sortie non exploitable après retry (1 chunk, 2 échecs de parsing) → **constat fait en
+   écrivant ce test** (voir DECISIONS.md) : classé `service_unavailable` plutôt que `invalid_output` — le
+   pipeline masque le message précis du chunk unique par son propre message générique dès que 100 % des
+   chunks échouent.
+5. Validation format avant import — une question éditée en Interface de révision redevient invalide (mcq sans
+   option correcte) → échec partiel toléré, seule la question valide est réellement persistée, l'autre
+   n'atteint jamais `POST /questions`.
+6. Contenu source insuffisant — moins de questions que demandé + `warning` du modèle propagé dans `warnings`
+   (préfixé « Passage 1/1 : » même pour un chunk unique) → sortie valide, rien à importer de force.
+7. Rejet de saisie 400 (`questionCount` invalide) → jamais un mode dégradé, aucun appel au Service génération.
+
+**Ce qui n'est PAS couvert** — Correction officielle sans relecture, génération illimitée, banque publique
+automatique (rappel OUT du ticket) ; l'Interface de révision réelle (front-end, C-02.07, déjà testée par ses
+propres 12 tests composant) — ce fichier simule seulement le geste qu'elle produit (`validateBatchForImport`
+appelé directement) ; les scénarios déjà couverts en détail par les tests unitaires par service (circuit
+breaker rate limit multi-chunks avec 5 scénarios, 4 types de `content` invalides, etc. — non dupliqués ici,
+seule l'intégration bout-en-bout apporte une valeur nouvelle).
+
+**Fichiers créés**
+- `my_memo_master_api/test/bdd/aiExerciseGenerationFlow.test.js` (7 tests)
+
+**Fichiers modifiés**
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 7 nouveaux tests. Suite complète API : **108 suites/1964 tests** (contre 107/1957), **0
+régression**. Linter propre. Aucun fichier de code de production touché.
+
+**Points d'attention / dette** — Le constat n°4 ci-dessus (`invalid_output` masqué en `service_unavailable`
+pour un chunk unique) n'a pas été corrigé dans ce ticket (portée : écrire des tests, pas modifier le pipeline)
+— documenté dans `DECISIONS.md` comme dégradation de signal assumée, symétrique à celle déjà tolérée côté
+cartes Leitner (même architecture de pipeline). À reconsidérer si un futur ticket touche de toute façon
+`AiExerciseGenerationPipeline.service.js`/`AiCardGenerationPipeline.service.js` (ex. propager l'erreur
+d'origine telle quelle quand un seul chunk a été tenté).
+
+---
+
+### [2026-09-08] FIX — Second bug distinct dans `Semantic.service` : les formules `$…$` (LaTeX brut) cassaient le recouvrement de mots-clés en zone grise
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet de l'investigation.
+Après le premier correctif `extractKeywords` (entrée précédente) et redémarrage du conteneur, l'utilisateur a
+reproduit le même résultat (75 %, « À revoir ») 3 fois à l'identique sur la carte « poids d'une tranche
+mésoscopique de fluide ». Cause : `FormulaHelperComponent` (front) entoure toute formule insérée via son
+bouton « ƒ » de `$…$` en LaTeX brut (`\rho`, `\cdot`…), mêlée au texte libre. `tokenize` ne coupait ni sur `$`
+ni sur `\` : les tokens de bordure devenaient `$dp`/`dv$` et les commandes LaTeX survivaient telles quelles —
+recouvrement de mots-clés à 0 en zone grise, indépendamment du contenu réel. Reproduit précisément : score
+0,7476, recalé par ce recouvrement nul — cohérent avec le 75 % observé.
+
+**Correctif** — Nouvelle méthode `splitFormulaAndProseTokens` : isole les segments `$…$`, les passe par
+`unifyFormulaNotation` (déjà utilisée pour la comparaison symbolique — `\rho` → `ρ`, `\cdot` → `*`, retire les
+`$`) puis les éclate sur leurs opérateurs canoniques pour redonner un token par variable. Les tokens de
+formule sont désormais **toujours** inclus dans les mots-clés (pas seulement en repli comme dans le premier
+fix) : une réponse mêlant formule et prose fournit déjà des mots-clés `> 2` caractères via la prose, donc le
+repli précédent ne se déclenchait jamais et les variables courtes de la formule disparaissaient
+silencieusement.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`splitFormulaAndProseTokens`, `tokenize`, `extractKeywords`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+3 tests : isolement/conversion d'un segment
+  `$…$`, inclusion systématique des variables courtes de formule malgré de la prose environnante, recouvrement
+  non-nul sur le scénario réel formule+prose)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 3 nouveaux tests (`Semantic.service.test.js` : 41→44). Suite API complète : **108/108 suites,
+1967/1967 tests**, 0 régression. Linter propre. Revérifié en conditions réelles (conteneur `mymemomaster-api-1`
+redémarré, vraies réponses de référence de la carte concernée, `idQuestion=30`) : la réponse reconstituée de
+l'utilisateur passe de 0,7476/incorrect à 0,7828/correct.
+
+**Points d'attention / dette** — Le score affiché (`Score : X%`) reste déconnecté de la logique de décision
+réelle en zone grise (non traité, dette déjà notée sur le premier fix). Cette classe de bug (notation de
+saisie non neutralisée avant tokenization) pourrait resurgir sous une forme non anticipée ici (plusieurs
+segments `$…$` dans une même réponse, formule en LaTeX tapée à la main sans les délimiteurs `$…$`) — non
+audité au-delà du cas rapporté. Deux redémarrages du conteneur `dev` ont été nécessaires au total pour ce
+signalement (pas de hot-reload malgré le commentaire du compose file — cf. addendum de l'entrée précédente) ;
+un `nodemon` en dev éviterait de reproduire ce type de faux négatif de retest à l'avenir.
+
+---
+
+### [2026-09-08] FIX — Troisième et quatrième variantes du même bug de tokenization : parenthèses/`_`/`#"` hors `$…$`, et confusion `∆`/`Δ`
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet. 3 cartes signalées par
+l'utilisateur sans utiliser l'assistant formule (donc sans `$…$`, écartant le fix précédent) : « barrage
+voûte », « force pressante élémentaire », toutes deux avec le même symptôme (score cohérent, verdict
+incorrect). Cause : `(`, `)`, `_` n'étaient séparateurs nulle part hors segment `$…$` (formule en texte simple
+fragmentée en tokens absurdes) ; et un artefact de corruption `#"` récurrent (6 questions en base, `~20`
+réponses de référence — vraisemblablement une extraction PDF ratée de notation vectorielle) collait aux
+tokens de bordure. Sur demande explicite de l'utilisateur (« analyse poussée pour vérifier qu'aucun bug de ce
+type ne subsiste »), audit élargi à toute la base (`Response.content` hors plage de caractères attendue) :
+trouvé 2 bugs latents supplémentaires de la même famille, non rencontrés par les cartes signalées mais
+vérifiés réels — point médian `·` (multiplication française, « kg·m⁻³ ») non séparateur hors `$…$`, et `∆`
+(U+2206, symbole INCREMENT, 3 questions de thermodynamique) visuellement indiscernable de `Δ` (U+0394, vraie
+lettre grecque) mais jamais égal en comparaison de chaînes.
+
+**Correctif** — Nouvelle constante `MATH_SEPARATORS` (remplace les regex dispersées), incluant désormais `(`,
+`)`, `_`, `#`, `"`, `·` en plus de l'existant, appliquée uniformément au texte libre et aux segments `$…$`.
+`normalizeText` unifie `∆` → `Δ` avant la mise en casse.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`MATH_SEPARATORS`, `normalizeText`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+4 tests : parenthèses/indices/opérateurs en
+  texte simple, recouvrement entre deux formulations, corruption `#"` neutralisée, point médian, `∆`/`Δ`)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 4 nouveaux tests (`Semantic.service.test.js` : 44→47 pour parenthèses/`#"`, puis 47→49 pour
+`·`/`∆`). Suite API complète : **108/108 suites, 1972/1972 tests**, 0 régression. Linter propre. Revérifié en
+conditions réelles (conteneur redémarré, vraies réponses de référence de 4 questions distinctes, dont 2 hors
+du périmètre initialement signalé) : les 4 cas passent désormais correct.
+
+**Points d'attention / dette** — La corruption `#"` reste en base (donnée, pas code) — ce correctif neutralise
+son effet sur la comparaison, ne la corrige pas à la source ; l'affichage de « Réponse attendue » montre donc
+toujours le texte corrompu tel quel (`LeitnerCard.service.js#correctResponse`, `correctAnswers.join(' / ')`
+sans transformation) — ce que l'utilisateur avait décrit comme un « bug de rendu LaTeX cassé » alors qu'il
+s'agit de texte source déjà corrompu, pas de LaTeX mal interprété. Un cas testé pendant l'analyse (Q33,
+« modèle isotherme ») reste en zone grise incorrect après ce fix, mais pour une raison distincte et non-bug :
+recouvrement lexical insuffisant entre synonymes/variantes morphologiques (« diminue » ≠ « décroît »,
+« exponentielle » ≠ « exponentiellement ») — hors de portée d'un fix de tokenization, nécessiterait une
+lemmatisation FR ou un dictionnaire de synonymes, non entrepris ici. Audit non exhaustif au-delà des
+caractères cherchés explicitement — un futur caractère de corruption/confusion non anticipé resterait à
+traiter au cas par cas s'il est un jour rapporté.
+
+---
+
+### [2026-09-08] ADD/FIX — Transparence UI zone grise, synonymes/morphologie FR, et 5ᵉ bug de la même famille (`bestRef` au lieu de toutes les réponses acceptées)
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet. Demande explicite de
+l'utilisateur : (1) traiter la dette UX notée dans toutes les entrées précédentes de la journée (score affiché
+déconnecté de la décision réelle en zone grise), (2) traiter le cas « modèle isotherme de l'atmosphère »
+(67 %), identifié dans l'entrée précédente comme une limite de synonymes/morphologie plutôt qu'un bug de
+tokenization.
+
+**Correctifs**
+1. **Transparence UI** — `decision_zone` était déjà transmis de bout en bout mais jamais affiché.
+   `FlashcardsSessionPage.vue` montre désormais une note dédiée en zone grise expliquant que le score n'a pas
+   décidé seul. Pur front, aucun changement API.
+2. **Synonymes/morphologie** — `canonicalizeKeyword` (nouvelle fonction dans `Semantic.service.js`) combine un
+   petit dictionnaire de synonymes curaté (`SYNONYM_GROUPS`, vocabulaire de croissance/décroissance, ~20 mots)
+   et une règle mécanique de suffixe adverbial français (`stripAdverbSuffix`, « -ment »), appliqués uniquement
+   au recouvrement de mots-clés — jamais à l'embedding.
+3. **5ᵉ bug, trouvé en creusant le cas isotherme même après (2)** — en zone grise, le recouvrement de
+   mots-clés n'était vérifié que contre `bestRef` (la référence gagnante par score d'**embedding**), jamais
+   contre les autres réponses acceptées de la même liste. Incohérent avec l'embedding, qui lui prend déjà le
+   meilleur score sur toute la liste. Corrigé : le recouvrement est désormais calculé contre chaque réponse
+   acceptée, le meilleur est retenu (`matchedRef`, aussi réutilisé par la garde anti-inversion).
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`canonicalizeKeyword`, `SYNONYM_GROUPS`,
+  `stripAdverbSuffix`, boucle de recouvrement sur `correctList` dans `gradeSemantic`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+4 tests)
+- `my_memo_master_front/src/pages/FlashcardsSessionPage.vue` (note zone grise)
+- `my_memo_master_front/test/components/FlashcardsSessionPage.test.js` (+2 tests)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — +4 API (`Semantic.service.test.js` : 49→53), +2 front (`FlashcardsSessionPage.test.js` : 17→19).
+Suite complète : **108/108 suites API (1976/1976 tests)**, **54/54 suites front (840/840 tests)**, 0
+régression. Linter propre sur les 4 fichiers touchés. Revérifié en conditions réelles (conteneur redémarré,
+5 vraies réponses de référence de `idQuestion=33/56`) : la reformulation « diminue de façon exponentielle »
+passe de `is_correct: false` à `is_correct: true`.
+
+**Points d'attention / dette** — Le 5ᵉ bug (boucle sur `correctList`) n'a pas de test d'intégration dédié dans
+la suite automatisée : le mock d'embedding du fichier de test ne permet pas de cibler une zone grise précise
+de façon fiable sans recherche empirique disproportionnée (essayé, abandonné après plusieurs dizaines de
+variantes sans succès). Couvert indirectement par les tests unitaires `extractKeywords`/`computeKeywordOverlap`
+et la vérification manuelle contre le vrai modèle — à surveiller si une régression future y touche.
+`SYNONYM_GROUPS` reste volontairement restreint (croissance/décroissance uniquement) : toute autre paire de
+synonymes rencontrée en pratique (ex. autre vocabulaire physique) devra être ajoutée au cas par cas plutôt que
+de généraliser vers un thésaurus, pour ne pas répéter le risque déjà écarté (calibration DECISIONS.md
+2026-07-18).
+
+---
+
+### [2026-09-09] FIX — « rho » (toutes lettres) vs « ρ » (symbole grec) : scores d'embedding différents pour un contenu identique
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet. Signalement utilisateur
+(carte Torricelli, `Patm = ρ·g·h`) : « rho » écrit en toutes lettres → 77 % incorrect, « ρ » (symbole) → 83 %
+correct, pour une réponse au contenu identique. Confirmé en conditions réelles avec la vraie carte
+(`idQuestion=69`) : 0,7589 (zone grise, incorrect) vs 0,8127 (zone haute, correct). Root cause différente des
+5 bugs précédents de la journée du 2026-09-08 : ce n'est pas un problème de tokenization/mots-clés, c'est le
+**score d'embedding lui-même** qui diffère — le modèle traite « rho » et « ρ » comme lexicalement distincts.
+`unifyFormulaNotation` convertissait déjà `\rho` → `ρ`, mais seulement préfixé du `\` de commande LaTeX de
+l'éditeur — jamais « rho » tapé tel quel au clavier, le cas le plus probable pour un étudiant sans clavier grec.
+
+**Correctif** — `GREEK` (dictionnaire nom-grec → symbole Unicode) extrait de `helpers/formulaNotation.js` vers
+une constante exportée, réutilisée dans `Semantic.service.normalizeText` via un nouveau
+`GREEK_NAMES_PATTERN` (regex `\b(nom1|nom2|...)\b` insensible à la casse, triée par longueur décroissante,
+avec exclusion `(?<!\\)` pour ne pas interférer avec `\rho` déjà géré par `unifyFormulaNotation`). Appliqué
+dans `normalizeText`, donc en amont à la fois de l'embedding ET du recouvrement de mots-clés — les deux
+bénéficient du fix, pas seulement l'un des deux.
+
+**Fichiers modifiés**
+- `my_memo_master_api/helpers/formulaNotation.js` (`GREEK` extrait en constante module-level, exportée)
+- `my_memo_master_api/services/Semantic.service.js` (`GREEK_NAMES_PATTERN`, `normalizeText`)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (+3 tests : unification rho/ρ, non-régression
+  sur `\rho` LaTeX, non-déclenchement sur un nom grec en sous-chaîne d'un mot plus long — « pile » ne doit
+  pas matcher « pi »)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — +3 (`Semantic.service.test.js` : 53→56 ; le refactor `GREEK` n'a rien changé côté
+`helpers/formulaNotation.test.js`/`algebraicEquivalence.test.js`, 100/100 verts sur `test/helpers`). Suite API
+complète : **108/108 suites, 1979/1979 tests**, 0 régression. Linter propre. Revérifié en conditions réelles
+(conteneur redémarré, vraie carte Torricelli `idQuestion=69`) : « rho » et « ρ » produisent désormais
+exactement le même score (0,8127) et le même verdict.
+
+**Points d'attention / dette** — Un premier essai sans l'exclusion `(?<!\\)` a cassé 3 tests existants
+(`\rho` LaTeX transformé en résidu corrompu `\ρ`) — détecté immédiatement par la suite, corrigé avant tout
+commit. `GREEK_NAMES_PATTERN` matche des mots courts (`pi`, `mu`, `nu`, `chi`, `eta`...) qui pourraient
+coïncider avec un mot français/anglais sans rapport dans un contexte hors physique — risque jugé faible et
+sans conséquence de notation puisque `normalizeText` est appliqué symétriquement aux deux côtés de la
+comparaison (un texte qui ne sert jamais à l'affichage, seulement au score interne).
+
+---
+
+### [2026-09-09] REF/FIX — Suppression de la zone grise : décision à seuil unique, monotonicité garantie par construction
+
+**Contexte** — Voir `.agents/DECISIONS.md` entrée du même jour pour le détail complet. Malgré 6 correctifs
+ponctuels en 2 jours, l'utilisateur reformule le symptôme central inchangé depuis le premier signalement : un
+score plus bas peut passer pendant qu'un score plus haut échoue. Diagnostic : ce n'est pas un bug résiduel
+mais une conséquence structurelle de la zone grise (critère de mots-clés indépendant du score) — aucun
+correctif ponctuel ne peut le résoudre tant que ce mécanisme existe. Re-lecture de la calibration d'origine
+(2026-07-18) : le seul cas alors en zone grise (0,717) était déjà sous le seuil haut — rien ne validait la
+nécessité réelle du mécanisme, qui a produit 6 bugs en 2 jours. Option choisie par l'utilisateur (sur 2
+proposées) : seuil unique strict, confirmé par « le résultat annoncé devrait se baser sur le pourcentage
+avancé par le modèle de proximité sémantique ».
+
+**Correctif** — `gradeSemantic` : `is_correct = bestScore >= HIGH_THRESHOLD` (0,78, inchangé — classe
+correctement les 8 cas de calibration sans mots-clés). `LOW_THRESHOLD`/`KEYWORD_OVERLAP_THRESHOLD` supprimés.
+`decision_zone` devient binaire (`'high'`/`'low'`). `extractKeywords`/`computeKeywordOverlap` conservés (seul
+appelant restant : `detectInversion`/`splitRatio`) — pas supprimés malgré la perte de leur rôle dans la
+décision, pour ne pas casser la garde anti-inversion. Front : note « zone grise » (ajoutée plus tôt le même
+jour) retirée avec ses tests — devenue mort-code, `decision_zone` n'émettant plus jamais cette valeur.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`gradeSemantic`, suppression `LOW_THRESHOLD`/
+  `KEYWORD_OVERLAP_THRESHOLD`, commentaires mis à jour)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (test `decision_zone` resserré à `['high',
+  'low']`, +1 test de non-régression sur la monotonicité : `is_correct === (score >= 0.78)`)
+- `my_memo_master_front/src/pages/FlashcardsSessionPage.vue` (retrait de la note zone grise)
+- `my_memo_master_front/test/components/FlashcardsSessionPage.test.js` (-2 tests devenus obsolètes)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — API : 57 (+1, `Semantic.service.test.js`). Front : 17 (-2, `FlashcardsSessionPage.test.js`). Suite
+complète : **108/108 suites API (1980/1980 tests)**, **54/54 suites front (838/838 tests)**, 0 régression.
+Linter propre. Vérifié en conditions réelles (conteneur redémarré) sur 3 cas mélangés triés par score
+croissant : aucune violation de monotonicité possible, garanti par construction.
+
+**Points d'attention / dette** — **Régression assumée et explicite** : le cas « modèle isotherme de
+l'atmosphère », corrigé quelques heures plus tôt le même jour grâce au recouvrement de mots-clés + synonymes
+(0,7407), est de nouveau classé incorrect (sous 0,78, plus aucune assistance ne le rattrape). Accepté
+sciemment par l'utilisateur en échange de la monotonicité — toute réponse correcte mais formulée très
+différemment de la référence, dont le score reste sous 0,78, aura désormais le même sort. `computeKeywordOverlap`
+n'a plus d'appelant en production (seulement testé) — utilitaire correct conservé pour `detectInversion`, pas
+du code mort au sens strict.
+
+**Addendum** — Le grep de vérification (relancé en tâche de fond car trop lent en avant-plan) a repéré 2
+docs Swagger obsolètes non couvertes par la recherche initiale (`routes/LeitnerCard.routes.js`,
+`routes/Semantic.routes.js`) : `enum: [high, low, grey_zone]` corrigé en `enum: [high, low, inversion]`
+(la vraie 3ᵉ valeur possible de `decision_zone`, absente de ces deux docs même avant ce ticket). Confirmé
+par recherche finale : plus aucune occurrence de `grey_zone` dans `*.js`/`*.vue`.
+
+---
+
+## [2026-09-09] ADD/FIX — C-01/C-02 : le LLM sait produire des formules ($...$/LaTeX) + correctif 500 sur réponse longue
+
+**Contexte** — Question directe de l'utilisateur, en observant une carte générée par IA portant sur une
+formule physique (« P = Patm + pgh ») rendue en texte brut, non interprétée par `FormulaTextComponent`
+(convention `$...$`/KaTeX, `services/Semantic.service.js`/`helpers/formulaNotation.js`) : les prompts
+système de `AiCardGeneration.service.js`/`AiExerciseGeneration.service.js` ne mentionnaient jamais cette
+convention — audité, confirmé absent des deux prompts et d'aucun post-traitement. Signalée dans le même
+message : une erreur d'import (« Erreur lors de la création de la réponse. ») sur une carte "open" dont la
+réponse générée faisait 262 caractères.
+
+**ADD (formules)** — Nouvelle règle 8/12 ajoutée en fin de liste (pas d'insertion au milieu, pour ne pas
+décaler les renvois textuels existants — `buildUserPrompt` référence « règle 7 »/« règle 11 ») dans
+`buildSystemPrompt` des deux services : toute formule (`statement`/`answer`/`acceptedAnswers`/
+`options[].text` côté cartes ; mêmes champs + `template`/`blanks`/`fragments` côté exercices) doit être
+entourée de `$...$` et écrite en LaTeX standard (`\frac{}{}`, `\sqrt{}`, `x^{}`, `x_{}`, `\rho`...). **CHOIX**
+LaTeX standard plutôt que le micro-langage raccourcis du front (`over()`, `sqrt()`...) — **RAISON** : LaTeX
+est un format que le modèle connaît déjà nativement (contrairement à une syntaxe propriétaire jamais vue à
+l'entraînement) ; `unifyFormulaNotation`/l'éditeur MathLive V2 traitent déjà le LaTeX brut comme forme
+canonique de premier rang (DECISIONS.md 2026-07-19, « Interpréteur V2 ») — aucune conversion supplémentaire
+nécessaire côté front, `renderMath` (interpreter.js) est idempotent sur du LaTeX déjà présent. 2 nouveaux
+tests (1 par service) vérifient la présence de la règle dans le prompt généré.
+
+**FIX (bug import réponse longue)** — `models/Response.model.js#content` était en `DataTypes.STRING`
+(VARCHAR(255) implicite, jamais précisé à la création de la table) alors que `validators/Response.validators.js`
+annonce explicitement une limite de 2000 caractères — **exactement le même bug, sur le champ voisin**, déjà
+trouvé et corrigé une fois pour `Question.statement` (migration `20260831000001`, jamais répliqué à
+`Response.content` à l'époque). Corrigé en `STRING(2000)` (et non `TEXT` comme `Question.statement` : ce
+champ a une borne documentée et volontaire côté validateur, contrairement à `statement` qui n'en avait
+aucune — la colonne doit refléter exactement le contrat déjà annoncé par l'API). Migration
+`20260909000001-change-response-content-to-string2000.js`, même politique que `20260831000001` (`down()`
+no-op assumé, pas de retour arrière automatique vers VARCHAR(255) si des réponses > 255 caractères existent
+déjà en base).
+
+**Vérification** — Confirmé un vrai defect (précédent identique déjà corrigé une fois sur `Question.statement` =
+signal fort) et testé via appel direct `Response.create` (Sequelize) : la limite de 255 ne déclenche
+**aucune erreur sur SQLite** (type affinity, non enforced — testé empiriquement, 262 caractères stockés sans
+erreur), donc le bug corrigé ici est **certain en prod (Postgres, VARCHAR(255) réellement enforced :
+`value too long for type character varying(255)`)** mais n'explique probablement PAS, à lui seul, l'erreur
+observée par l'utilisateur en local (dev SQLite). Cause exacte de l'erreur locale **non confirmée** — API non
+démarrée pendant l'investigation, et `helpers/api.js#post()` avale volontairement (choix documenté,
+2026-09-01) tout détail d'erreur HTTP non-2xx/réseau et renvoie `undefined`, donc le même message générique
+français s'affiche identiquement pour un 400, un 500 ou une coupure réseau — aucune information de diagnostic
+récupérable a posteriori sans les logs serveur (console uniquement, `helpers/logger.js`, aucun fichier) ou
+l'onglet Réseau du navigateur au moment de l'échec.
+
+**Effet de bord constaté (pré-existant, non introduit ici)** — `my_memo_master_api/db.sqlite` (fichier
+versionné, base de dev vide — 0 ligne dans `User`/`Question`/`Response`/`LeitnerCard`/`Test`) portait des
+migrations `up` en base (`SequelizeMeta`) dont le schéma réel ne reflétait pas l'effet (`Question.content`
+absent malgré `20260619000001` marquée appliquée, `Question.statement` toujours VARCHAR(255) malgré
+`20260831000001`) — dérive antérieure à cette session, non investiguée plus avant (hors périmètre). `npm run
+migrate` relancé pour appliquer les migrations en attente (dont celle-ci) : `db.sqlite` local modifié en
+conséquence (git status `M`), à valider/committer par l'utilisateur.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiCardGeneration.service.js` (règle 8, `buildSystemPrompt`)
+- `my_memo_master_api/services/AiExerciseGeneration.service.js` (règle 12, `buildSystemPrompt`)
+- `my_memo_master_api/test/services/AiCardGeneration.service.test.js`, `test/services/AiExerciseGeneration.service.test.js` (+1 test chacun)
+- `my_memo_master_api/models/Response.model.js` (`content` : `STRING` -> `STRING(2000)`)
+- `my_memo_master_api/migrations/20260909000001-change-response-content-to-string2000.js` (nouveau)
+- `my_memo_master_api/db.sqlite` (migrations en attente appliquées, effet de bord — voir ci-dessus)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — 4 suites ciblées relancées (`AiCardGeneration.service.test.js`, `AiExerciseGeneration.service.test.js`,
+`Response.service.test.js`, `Response.controller.test.js`) : **150/150 tests**, 0 régression. Suite complète
+non relancée (hors budget de ce ticket, aucun autre fichier de production touché).
+
+**Points d'attention / dette** — La cause exacte de l'erreur locale rapportée par l'utilisateur reste
+ouverte : à reproduire avec l'API démarrée et l'onglet Réseau du navigateur (ou les logs serveur) pour
+confirmer si le correctif VARCHAR(2000) suffit une fois déployé en conditions réelles (Postgres), ou si une
+autre cause était en jeu. La dérive de schéma de `db.sqlite` (paragraphe ci-dessus) n'a pas été corrigée —
+signalée à l'utilisateur, décision de reconstruction laissée à sa discrétion (fichier vide, sans donnée à
+perdre).
+
+---
+
+## [2026-09-11] C-02.09 — Revue de code & merge : Génération automatique d'exercices par IA (C-02)
+
+**Contexte** — Ticket `C-02.09` (feature list `C-02`, V2, extension US-05A, tâche « Tests / V2 / Post
+29/04/2026 »). Objectif : Revue de code & merge de la branche `dev_back_ia` (commits `3ff6342` → `dd62f3d` :
+Service génération, Validation format, Mode dégradé, Interface de révision) vers `dev`, dans le périmètre déjà
+livré — sans étendre aux éléments hors version (correction officielle sans relecture, génération illimitée,
+banque publique automatique).
+
+**Revue** — 8 agents d'analyse (reuse/duplication, simplification, efficacité, root-cause/altitude,
+conformité CLAUDE.md, traçage cross-file, scan ligne à ligne back/front) sur le diff `dev..dev_back_ia`. 5
+bugs bloquants trouvés dans le périmètre IN du ticket (DoD « aucun bug bloquant connu ») ; corrigés dans ce
+même ticket, avec validation explicite de l'utilisateur avant chaque changement d'interface publique
+(`AGENT.md` §2) :
+
+1. **Validation format jamais câblée en production** — voir ligne État global dédiée ci-dessus (nouvel
+   endpoint `POST /ai-exercise-generations/validate-import`).
+2. **Régression grading sémantique** — `Semantic.service.js#extractKeywords` (suppression du plancher de
+   longueur, 2026-09-09) laissait passer des mots de liaison courts non couverts par `STOPWORDS` (« si »,
+   « tu », « ai », « va »), risquant de fausser `detectInversion` (un mot partagé accidentellement entre les
+   deux membres d'une phrase-ratio pouvait masquer une vraie inversion d'opérandes). Complète le batch du
+   2026-09-08. Voir DECISIONS.md.
+3. **`AiExerciseGeneration.controller.js` faisait de la logique métier** (vérification magic-bytes du PDF)
+   au lieu de try/catch + service + réponse — déplacé dans `validators/AiExerciseGeneration.validators.js`
+   (rôle déjà établi de ce fichier pour toute validation d'entrée). Écart symétrique pré-existant côté
+   `AiGenerationBatch.controller.js` (C-01) signalé en `TODO`, non corrigé (hors périmètre de ce ticket).
+4. **Erreur 500 (clé Mistral manquante) jamais loguée** — `AiExerciseGeneration.service.js#callModel` catchait
+   silencieusement ce cas ; `logger.error` ajouté au point de throw.
+5. **Signal `invalid_output`/`rate_limited` perdu par le pipeline** — `AiExerciseGenerationPipeline.service.js`
+   ré-emballait toute erreur agrégée (tous chunks en échec) dans un message générique, masquant le
+   `rateLimited`/le message précis du dernier chunk que `AiExerciseDegradedMode.service.js#describeFailure`
+   cherche à reconnaître. **Corrige explicitement la dette assumée le 2026-09-08** (DECISIONS.md, « signal
+   invalid_output masqué en service_unavailable ») — ce ticket touchait de toute façon ce fichier, comme cette
+   entrée l'anticipait. Ajout au passage : branche `422` manquante dans `describeFailure` (contenu
+   source vide/inexploitable, tombait sur `unknown` au lieu du message actionnable déjà documenté dans le
+   swagger de la route) — le controller répond désormais `422` (nouveau code `invalid_content`, distinct
+   d'`invalid_input`/400).
+
+**Dette identifiée mais non corrigée dans ce ticket** (hors 5 points bloquants, signalée à l'utilisateur,
+laissée en l'état — pas de bug bloquant sur le périmètre livré) :
+- Triple duplication du client Mistral (appel/retry/backoff) entre `AiCardGeneration`, `AiExerciseGeneration`,
+  `ImageCaptioning.service.js` — assumée dès C-02.03 (voir commentaire `CHOIX` du fichier).
+- `MAX_QUESTION_COUNT` désynchronisé : front (`AiGenerateExercisesModalComponent.vue`) plafonne à 20, back/
+  validators autorisent 30.
+- Double appel OCR Mistral (texte + images) sur le même PDF ; chunks et création de questions envoyés
+  séquentiellement (latence proportionnelle).
+- `AiExerciseDegradedMode.service.js#attemptGeneration` jamais appelé en production (seul
+  `attemptGenerationFromContent` l'est) — mort en pratique, gardé pour ses tests unitaires.
+- `suggestManualCreation` calculé côté store front mais jamais transmis/affiché par
+  `AiGenerationProgressModalComponent.vue`.
+- `image.pageIndex` (légendes d'images) issu d'un appel OCR indépendant de celui ayant produit `pageTexts` —
+  désynchronisation possible non détectée si les deux appels ne s'accordent pas sur le découpage en pages.
+- Zone grise 55-78 % de correction sémantique supprimée le 2026-09-09 sans mécanisme de compensation
+  (changement de comportement assumé, documenté).
+- Migration `20260909000001-change-response-content-to-string2000.js` : `down()` est un no-op déguisé (même
+  `changeColumn` que `up()`).
+- `my_memo_master_api/db.sqlite` committé malgré `.gitignore` (`*.sqlite`) — déjà signalé en 2026-09-09
+  ci-dessus, laissé à la discrétion de l'utilisateur.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AiExerciseGeneration.service.js` (logger.error au throw clé manquante)
+- `my_memo_master_api/services/AiExerciseGenerationPipeline.service.js` (propagation `rateLimited`/message précis)
+- `my_memo_master_api/services/AiExerciseDegradedMode.service.js` (branche 422 `invalid_content`)
+- `my_memo_master_api/services/Semantic.service.js` (STOPWORDS : si/tu/ai/va)
+- `my_memo_master_api/controllers/AiExerciseGeneration.controller.js` (retrait logique métier, +`validateImport`)
+- `my_memo_master_api/validators/AiExerciseGeneration.validators.js` (magic bytes, +`validateImport`)
+- `my_memo_master_api/routes/AiExerciseGeneration.routes.js` (+`POST /ai-exercise-generations/validate-import`)
+- `my_memo_master_front/src/pages/ExercisesPage.vue` (`handleReviewConfirm` revalide avant fusion)
+- Tests : `test/bdd/aiExerciseGeneration.test.js` (+endpoint validate-import, 422 corrigé),
+  `test/bdd/aiExerciseGenerationFlow.test.js` (code `invalid_output` corrigé),
+  `test/services/AiExerciseDegradedMode.service.test.js` (+422),
+  `test/services/AiExerciseGenerationPipeline.service.test.js` (+2 cas lastError/rateLimited),
+  `test/services/Semantic.service.test.js` (+1 cas détection d'inversion),
+  `my_memo_master_front/test/components/ExercisesPage.test.js` (+1 cas rejet, 4 tests existants adaptés au round-trip async)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète relancée des deux côtés : **2041/2041 tests API** (0 régression, +10 vs avant ce
+ticket), **839/839 tests front** (0 régression, +10). Lint back (`eslint .`) et front
+(`eslint . --fix`) : 0 erreur.
+
+**Points d'attention / dette** — Merge vers `dev` non exécuté par l'agent (action outward-facing sur une
+branche partagée, confirmation utilisateur requise avant push — voir échanges de la session). La dette listée
+ci-dessus reste à trier en tickets de suivi si besoin.

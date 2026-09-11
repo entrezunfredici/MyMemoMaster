@@ -3,11 +3,24 @@
 // et texte libre (« U = R × I ») — vers une même syntaxe infixe explicite
 // (opérateurs +, -, *, /, ^ conservés).
 //
-// Partagée par deux consommateurs :
+// Partagée par trois consommateurs :
 // - Semantic.service.normalizeSymbolic : comparaison textuelle stricte, qui
 //   retire ensuite la multiplication (« ri » ≡ « r*i », l'opérateur ne compte pas)
 // - helpers/algebraicEquivalence : a besoin des opérateurs conservés pour
 //   construire un arbre et vérifier des équivalences (commutativité, a/b ≡ a·b⁻¹…)
+// - Semantic.service.normalizeText (2026-09-09) : réutilise directement GREEK
+//   (export ci-dessous) pour reconnaître un nom grec en toutes lettres SANS le
+//   « \ » de commande LaTeX (« rho » tapé au clavier, pas « \rho » inséré par
+//   l'éditeur) — cf. sa propre documentation pour le détail du bug corrigé.
+const GREEK = {
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε',
+  zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'µ',
+  nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ',
+  phi: 'φ', varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
+  Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π',
+  Sigma: 'Σ', Upsilon: 'Υ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
+}
+
 function unifyFormulaNotation(text) {
   if (!text || typeof text !== 'string') return ''
   let s = text
@@ -65,14 +78,6 @@ function unifyFormulaNotation(text) {
     .replace(/→/g, '->')
 
   // Grec LaTeX -> Unicode (les deux écritures coexistent : palette V1 vs V2)
-  const GREEK = {
-    alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε',
-    zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'µ',
-    nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ',
-    phi: 'φ', varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
-    Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π',
-    Sigma: 'Σ', Upsilon: 'Υ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
-  }
   s = s.replace(/\\([a-zA-Z]+)\b/g, (m, name) => GREEK[name] ?? m)
 
   // Exposants/indices : accolades -> parenthèses ; superscripts Unicode -> ^(n)
@@ -100,4 +105,4 @@ function unifyFormulaNotation(text) {
     .replace(/[$\s]/g, '')
 }
 
-module.exports = { unifyFormulaNotation }
+module.exports = { unifyFormulaNotation, GREEK }

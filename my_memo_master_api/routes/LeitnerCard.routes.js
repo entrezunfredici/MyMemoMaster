@@ -184,7 +184,7 @@ router.put(
  *                   type: string
  *                 decision_zone:
  *                   type: string
- *                   enum: [high, grey_zone, low]
+ *                   enum: [high, low, inversion]
  *       404:
  *         description: Carte introuvable ou aucune réponse correcte définie.
  *       500:

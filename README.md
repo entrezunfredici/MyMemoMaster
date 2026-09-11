@@ -495,3 +495,9 @@ k8s/
     ├── service.yml
     └── ingress.yml
 ```
+
+---
+
+## Licence
+
+Ce projet est distribué sous licence [MIT](LICENSE) — vous pouvez librement l'utiliser, le modifier et le redistribuer, y compris à des fins commerciales, à condition de conserver la mention de copyright.

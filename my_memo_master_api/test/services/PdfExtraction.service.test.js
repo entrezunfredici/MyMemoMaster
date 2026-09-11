@@ -82,6 +82,9 @@ describe('PdfExtractionService', () => {
       expect(result.hasEmbeddedImages).toBe(false)
       // Gratuit : jamais de page facturée sur ce chemin (voir AiQuota.service.js, C-01.06)
       expect(result.ocrPagesProcessed).toBe(0)
+      // pageTexts (generation_ia_captioning_image.md) : une entrée par page, dans l'ordre — permet au
+      // captioning d'insérer une description sur la bonne page, en amont du découpage en chunks.
+      expect(result.pageTexts).toEqual(['Ligne 1\nLigne 2', 'Page 2'])
     })
 
     it('extractTextViaPdfjs - items sans champ "str" (marqueurs de positionnement) - ignorés', async () => {
@@ -139,7 +142,12 @@ describe('PdfExtractionService', () => {
 
       const result = await PdfExtractionService.extractTextViaOcr(Buffer.from('%PDF-1.4'))
 
-      expect(result).toEqual({ text: 'Page 1\n\nPage 2', hasEmbeddedImages: true, ocrPagesProcessed: 2 })
+      expect(result).toEqual({
+        text: 'Page 1\n\nPage 2',
+        hasEmbeddedImages: true,
+        ocrPagesProcessed: 2,
+        pageTexts: ['Page 1', 'Page 2']
+      })
       const [url, options] = fetchMock.mock.calls[0]
       expect(url).toBe('https://api.mistral.ai/v1/ocr')
       const body = JSON.parse(options.body)
@@ -195,6 +203,111 @@ describe('PdfExtractionService', () => {
       const error = await PdfExtractionService.extractTextViaOcr(Buffer.from('%PDF-1.4')).catch((e) => e)
       expect(error).toMatchObject({ message: "L'OCR n'a extrait aucun texte de ce PDF.", statusCode: 422 })
       expect(error.usage).toEqual({ ocrPagesProcessed: 3 })
+    })
+  })
+
+  describe('extractImages', () => {
+    it('extractImages - buffer absent/vide/non-Buffer - lève une erreur 400 sans appeler l\'API', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch')
+
+      await expect(PdfExtractionService.extractImages(undefined)).rejects.toMatchObject({ statusCode: 400 })
+      await expect(PdfExtractionService.extractImages(Buffer.alloc(0))).rejects.toMatchObject({ statusCode: 400 })
+
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('extractImages - clé API absente - lève une erreur 500', async () => {
+      await expect(PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))).rejects.toMatchObject({
+        message: 'Extraction des images impossible : service IA non configuré (clé API manquante).',
+        statusCode: 500
+      })
+    })
+
+    it('extractImages - appel réussi - reconstruit un data URI, associe chaque image à sa page, ignore les pages sans image', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+        mockOcrFetchResponse(
+          [
+            { markdown: 'Page 1', images: [{ id: 'img-0', image_base64: 'QUJD' }] },
+            { markdown: 'Page 2', images: [] },
+            { markdown: 'Page 3', images: [{ id: 'img-1', image_base64: 'REVG' }, { id: 'img-2', image_base64: 'R0hJ' }] }
+          ],
+          { pages_processed: 3 }
+        )
+      )
+
+      const result = await PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))
+
+      expect(result).toEqual({
+        images: [
+          { pageIndex: 0, imageBase64: 'data:image/jpeg;base64,QUJD' },
+          { pageIndex: 2, imageBase64: 'data:image/jpeg;base64,REVG' },
+          { pageIndex: 2, imageBase64: 'data:image/jpeg;base64,R0hJ' }
+        ],
+        ocrPagesProcessed: 3
+      })
+      const [, options] = fetchMock.mock.calls[0]
+      const body = JSON.parse(options.body)
+      // CHOIX distinctif de extractImages (vs extractTextViaOcr, qui ne le demande jamais) : voir
+      // en-tête du service pour le détail.
+      expect(body.include_image_base64).toBe(true)
+    })
+
+    it('extractImages - image_base64 déjà préfixé en data URI - ne double pas le préfixe', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        mockOcrFetchResponse([{ markdown: 'Page 1', images: [{ id: 'img-0', image_base64: 'data:image/png;base64,QUJD' }] }])
+      )
+
+      const result = await PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))
+      expect(result.images).toEqual([{ pageIndex: 0, imageBase64: 'data:image/png;base64,QUJD' }])
+    })
+
+    it('extractImages - aucune image dans la réponse - retourne un tableau vide sans erreur (détection = indice, pas garantie)', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest.spyOn(global, 'fetch').mockResolvedValue(mockOcrFetchResponse([{ markdown: 'Page 1', images: [] }]))
+
+      const result = await PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))
+      expect(result.images).toEqual([])
+    })
+
+    it('extractImages - image sans image_base64 exploitable - ignorée', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        mockOcrFetchResponse([{ markdown: 'Page 1', images: [{ id: 'img-0', image_base64: null }] }])
+      )
+
+      const result = await PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))
+      expect(result.images).toEqual([])
+    })
+
+    it('extractImages - usage_info absent - retombe sur le nombre de pages retournées', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(mockOcrFetchResponse([{ markdown: 'Page 1', images: [] }, { markdown: 'Page 2', images: [] }]))
+
+      const result = await PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))
+      expect(result.ocrPagesProcessed).toBe(2)
+    })
+
+    it('extractImages - réponse HTTP en erreur - lève une erreur 502', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500, text: async () => 'internal error' })
+
+      await expect(PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))).rejects.toMatchObject({
+        message: "Le service d'extraction des images est indisponible pour le moment.",
+        statusCode: 502
+      })
+    })
+
+    it('extractImages - erreur réseau - lève une erreur 502', async () => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+      jest.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'))
+
+      await expect(PdfExtractionService.extractImages(Buffer.from('%PDF-1.4'))).rejects.toMatchObject({
+        statusCode: 502
+      })
     })
   })
 

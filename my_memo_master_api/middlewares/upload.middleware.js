@@ -6,6 +6,7 @@ const multerS3 = require('multer-s3')
 const { s3Client, bucket } = require('../config/storage.config')
 const { extensionMatchesMime, s3SniffContentType } = require('../helpers/fileSignature')
 const logger = require('../helpers/logger')
+const getUploadConfig = require('../helpers/uploadConfig')
 
 // Suffixe de nom de fichier tire d'un generateur CRYPTOGRAPHIQUE, pas de
 // Math.random() : les cles d'objets uploades ne doivent pas etre devinables.
@@ -28,7 +29,8 @@ const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 Mo
+// Configurable via MAX_UPLOAD_SIZE_MB (défaut 20 Mo) — voir helpers/uploadConfig.js
+const MAX_FILE_SIZE = getUploadConfig().maxFileSizeBytes
 
 const fileFilter = (_req, file, cb) => {
   if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
