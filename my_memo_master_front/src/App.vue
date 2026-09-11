@@ -18,10 +18,6 @@
             :class="[route?.name && route.name === 'home' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <HomeIcon class="size-8" />
           </router-link>
-          <router-link to="/tutorials" aria-label="Tutoriels"
-            :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-            <TutorialIcon class="size-8" />
-          </router-link>
           <router-link to="/mindmaps" data-tour="mindmaps" aria-label="Cartes mentales"
             :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <MindmapIcon class="size-8" />
@@ -100,10 +96,6 @@
         :class="[route?.name && route.name === 'home' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <HomeIcon class="size-8" />
       </router-link>
-      <router-link to="/tutorials" aria-label="Tutoriels"
-        :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <TutorialIcon class="size-8" />
-      </router-link>
       <router-link to="/mindmaps" data-tour="mindmaps" aria-label="Cartes mentales"
         :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
         <MindmapIcon class="size-8" />
@@ -159,7 +151,6 @@ import { RouterView } from 'vue-router'
 import ExercisesIcon from '@/icons/ExercisesIcon.vue'
 import FlashardIcon from '@/icons/FlashardIcon.vue'
 import MindmapIcon from '@/icons/MindmapIcon.vue'
-import TutorialIcon from '@/icons/TutorialIcon.vue'
 import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
