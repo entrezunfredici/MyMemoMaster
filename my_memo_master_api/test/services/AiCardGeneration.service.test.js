@@ -41,6 +41,13 @@ describe('AiCardGenerationService', () => {
       expect(prompt).toContain('sourceExcerpt')
       expect(prompt).toContain('JSON')
     })
+
+    it('buildSystemPrompt - inclut la règle de syntaxe des formules ($...$ + LaTeX)', () => {
+      const prompt = AiCardGenerationService.buildSystemPrompt('fr')
+      expect(prompt).toContain('$...$')
+      expect(prompt).toContain('LaTeX')
+      expect(prompt).toContain('\\frac{a}{b}')
+    })
   })
 
   describe('buildUserPrompt', () => {

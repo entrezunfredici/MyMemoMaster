@@ -5,6 +5,7 @@ import { createTestingPinia } from '@pinia/testing'
 import ExercisesPage from '@/pages/ExercisesPage.vue'
 import { useTestStore } from '@/stores/tests'
 import { useClassGroupStore } from '@/stores/classGroups'
+import { useAiExerciseGenerationStore } from '@/stores/aiExerciseGeneration'
 
 // ── Mocks globaux ─────────────────────────────────────────────────────────────
 
@@ -46,7 +47,8 @@ function mountPage({ user = TEACHER_USER, tests = [], groups = [] } = {}) {
       tests: { tests, test: null },
       subjects: { subjects: [] },
       tags: { tags: [] },
-      classGroups: { groups, group: null }
+      classGroups: { groups, group: null },
+      aiExerciseGeneration: { status: 'idle', questions: [], warnings: [], errorMessage: '', suggestManualCreation: false }
     }
   })
   setActivePinia(pinia)
@@ -186,8 +188,6 @@ describe('ExercisesPage', () => {
       const wrapper = mountPage({ user: TEACHER_USER, groups: [GROUP_MP2I] })
       await flushPromises()
 
-      const testStore = useTestStore()
-      testStore.createTest.mockResolvedValue(true)
       mockPost.mockResolvedValue({ status: 201, data: { idQuestion: 1 } })
 
       // Simule l'ouverture via la méthode
@@ -197,6 +197,335 @@ describe('ExercisesPage', () => {
         await flushPromises()
         expect(wrapper.text()).toContain('Partager dans des groupes classes')
       }
+    })
+  })
+
+  // ── extraction du message d'erreur (BUG : "Erreur question N."/"Erreur ... exercice." masquait
+  //    la vraie cause) ────────────────────────────────────────────────────────────────────────
+
+  describe('extractErrorMessage (submitCreate)', () => {
+    // Depuis le fix ci-dessous, submitCreate() appelle directement api.post('tests', ...) puis
+    // api.post('questions', ...) par question (BUG TROUVÉ EN CONDITIONS RÉELLES : passer par
+    // testStore.createTest(), qui ne renvoie qu'un booléen, empêchait tout accès au message réel
+    // d'un échec de création du test — "Erreur lors de la création de l'exercice." s'affichait
+    // systématiquement, quelle que soit la cause). Chaque test mocke donc 2 appels successifs :
+    // la création du test (1er, réussie sauf mention contraire) puis celle de la question testée.
+    const TEST_CREATED_OK = { status: 201, data: { testId: 42 } }
+
+    // BUG TROUVÉ EN CONDITIONS RÉELLES : validate.middleware.js répond `{ errors: [...] }`
+    // (express-validator), jamais `{ message }` — l'ancien code (`resp?.data?.message || fallback`)
+    // ignorait totalement ce tableau et affichait systématiquement le message générique
+    // "Erreur question N.", masquant la vraie raison du rejet (ex. énoncé vide) à l'utilisateur.
+    it('échec de création d\'une question — 400 avec { errors: [...] } (express-validator) — affiche le message de validation réel', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitCreate) return
+
+      mockPost
+        .mockResolvedValueOnce(TEST_CREATED_OK)
+        .mockResolvedValueOnce({ status: 400, data: { errors: [{ msg: "L'énoncé de la question est requis", path: 'statement' }] } })
+
+      vm.openCreateModal()
+      vm.form.name = 'Exercice test'
+      await vm.submitCreate()
+
+      expect(vm.formError).toBe("L'énoncé de la question est requis")
+    })
+
+    it('échec de création d\'une question — 500 avec { message } — priorité au message métier sur les erreurs de validation', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitCreate) return
+
+      mockPost
+        .mockResolvedValueOnce(TEST_CREATED_OK)
+        .mockResolvedValueOnce({ status: 500, data: { message: 'Erreur serveur inattendue.' } })
+
+      vm.openCreateModal()
+      vm.form.name = 'Exercice test'
+      await vm.submitCreate()
+
+      expect(vm.formError).toBe('Erreur serveur inattendue.')
+    })
+
+    it('échec de création d\'une question — échec réseau (resp undefined) — retombe sur le message générique', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitCreate) return
+
+      mockPost.mockResolvedValueOnce(TEST_CREATED_OK).mockResolvedValueOnce(undefined)
+
+      vm.openCreateModal()
+      vm.form.name = 'Exercice test'
+      await vm.submitCreate()
+
+      expect(vm.formError).toBe('Erreur question 1.')
+    })
+
+    // BUG TROUVÉ EN CONDITIONS RÉELLES (signalé par l'utilisateur, capture à l'appui) : la création
+    // du TEST lui-même échouait ("Erreur lors de la création de l'exercice.", générique) sans que la
+    // vraie cause serveur ne soit jamais visible — submitCreate() passait par testStore.createTest(),
+    // qui avale le message réel dans un toast interne au store.
+    it('échec de création du TEST lui-même — 400 avec { errors: [...] } — affiche le message de validation réel, pas le générique', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitCreate) return
+
+      mockPost.mockResolvedValueOnce({ status: 400, data: { errors: [{ msg: 'Le sujet est requis.', path: 'subjectId' }] } })
+
+      vm.openCreateModal()
+      vm.form.name = 'Exercice test'
+      await vm.submitCreate()
+
+      expect(vm.formError).toBe('Le sujet est requis.')
+      // Aucune question ne doit être postée si le test lui-même n'a pas pu être créé
+      expect(mockPost).toHaveBeenCalledTimes(1)
+    })
+
+    it('échec de création du TEST lui-même — échec réseau (resp undefined) — retombe sur le message générique', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitCreate) return
+
+      mockPost.mockResolvedValueOnce(undefined)
+
+      vm.openCreateModal()
+      vm.form.name = 'Exercice test'
+      await vm.submitCreate()
+
+      expect(vm.formError).toBe('Erreur lors de la création de l\'exercice.')
+    })
+  })
+
+  // ── génération de questions par IA (C-02.06/C-02.07) ─────────────────────────
+
+  describe('génération de questions par IA', () => {
+    it('ouvre le flux de configuration IA au clic sur "✨ Générer par IA"', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+
+      const vm = wrapper.vm
+      if (vm.openCreateModal) {
+        vm.openCreateModal()
+        await flushPromises()
+      }
+
+      const aiButton = wrapper.findAll('button').find((b) => b.text().includes('Générer par IA'))
+      if (aiButton) {
+        await aiButton.trigger('click')
+        await flushPromises()
+        expect(wrapper.text()).toContain('Générer des questions par IA')
+      }
+    })
+
+    it('handleAiGenerate — succès — passe à l\'Écran de révision sans toucher à form.questions', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleAiGenerate) return
+
+      vm.openAiFlow()
+      const aiExerciseGenerationStore = useAiExerciseGenerationStore()
+      aiExerciseGenerationStore.generate.mockImplementation(async () => {
+        aiExerciseGenerationStore.questions = [
+          { statement: 'Qu\'est-ce que la photosynthèse ?', type: 'open', content: { correct_answer: 'R' } }
+        ]
+        aiExerciseGenerationStore.warnings = ['Une notion sur deux seulement.']
+        return true
+      })
+
+      const questionsCountBefore = vm.form.questions.length
+      await vm.handleAiGenerate({ sourceText: 'texte', questionCount: 1, questionType: 'mixed' })
+      await flushPromises()
+
+      expect(vm.form.questions).toHaveLength(questionsCountBefore)
+      expect(vm.aiStep).toBe('review')
+      expect(vm.showAiFlow).toBe(true)
+    })
+
+    it('handleAiGenerate — échec — reste sur l\'étape en cours (pas de transition vers "review")', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleAiGenerate) return
+
+      const aiExerciseGenerationStore = useAiExerciseGenerationStore()
+      aiExerciseGenerationStore.generate.mockResolvedValue(false)
+
+      await vm.handleAiGenerate({ sourceText: 'texte', questionCount: 1, questionType: 'mixed' })
+      await flushPromises()
+
+      expect(vm.aiStep).not.toBe('review')
+    })
+
+    it('handleReviewConfirm — ajoute les questions acceptées à form.questions puis referme le flux', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleReviewConfirm) return
+
+      const aiExerciseGenerationStore = useAiExerciseGenerationStore()
+      vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({ status: 200, data: { importable: [], rejected: [] } })
+
+      await vm.handleReviewConfirm([
+        {
+          statement: 'Capitale de la France ?',
+          type: 'mcq',
+          openAnswer: '',
+          openAltAnswers: [],
+          mcqOptions: [{ text: 'Paris' }, { text: 'Madrid' }],
+          mcqCorrectIdx: 0,
+          fillTemplate: '',
+          fillBlanks: [],
+          reorderFragments: ['', ''],
+        }
+      ])
+      await flushPromises()
+
+      const added = vm.form.questions[vm.form.questions.length - 1]
+      expect(added.statement).toBe('Capitale de la France ?')
+      expect(added.type).toBe('mcq')
+      expect(added.mcqCorrectIdx).toBe(0)
+      expect(vm.showAiFlow).toBe(false)
+      expect(aiExerciseGenerationStore.reset).toHaveBeenCalled()
+    })
+
+    // BUG TROUVÉ EN CONDITIONS RÉELLES : la question vide ouverte par défaut à la création du
+    // formulaire ("Question 1", jamais touchée) restait dans form.questions après acceptation des
+    // questions générées — form.questions.filter/submitCreate() échouait ensuite sur cette question
+    // vide ("Erreur question 1.", statement/openAnswer requis côté serveur).
+    it('handleReviewConfirm — retire la question vide par défaut, jamais touchée, avant d\'ajouter les questions générées', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleReviewConfirm) return
+
+      vm.openCreateModal() // form.questions = [defaultQuestion()] — une seule question vide, jamais éditée
+      vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({ status: 200, data: { importable: [], rejected: [] } })
+
+      await vm.handleReviewConfirm([
+        { statement: 'Q générée', type: 'open', openAnswer: 'Réponse', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
+      ])
+      await flushPromises()
+
+      expect(vm.form.questions).toHaveLength(1)
+      expect(vm.form.questions[0].statement).toBe('Q générée')
+    })
+
+    it('handleReviewConfirm — ne retire PAS une question déjà renseignée manuellement par l\'utilisateur', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleReviewConfirm) return
+
+      vm.openCreateModal()
+      vm.form.questions[0].statement = 'Ma propre question' // l'utilisateur a commencé à la remplir
+      vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({ status: 200, data: { importable: [], rejected: [] } })
+
+      await vm.handleReviewConfirm([
+        { statement: 'Q générée', type: 'open', openAnswer: 'Réponse', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
+      ])
+      await flushPromises()
+
+      expect(vm.form.questions).toHaveLength(2)
+      expect(vm.form.questions[0].statement).toBe('Ma propre question')
+      expect(vm.form.questions[1].statement).toBe('Q générée')
+    })
+
+    it('handleReviewConfirm — liste vide (tout rejeté) referme le flux sans toucher à form.questions (garde la question vide par défaut)', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleReviewConfirm) return
+
+      vm.openCreateModal()
+      vm.showAiFlow = true
+      const before = vm.form.questions.length
+
+      vm.handleReviewConfirm([])
+
+      expect(vm.form.questions).toHaveLength(before)
+      expect(vm.showAiFlow).toBe(false)
+    })
+
+    // C-02.09 (revue de code) : AiExerciseImportValidation.service.js n'était appelé nulle part —
+    // une question éditée en Interface de révision pouvait redevenir invalide au format (ex. mcq sans
+    // option marquée correcte) et être persistée sans contrôle. Revalidée ici avant fusion dans
+    // form.questions, jamais ajoutée silencieusement si rejetée.
+    it('handleReviewConfirm — une question rejetée par la revalidation format n\'est pas ajoutée, l\'utilisateur est notifié', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleReviewConfirm) return
+
+      vm.openCreateModal()
+      vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          importable: [],
+          rejected: [{ index: 0, errors: ['Question #1 : mcq doit avoir exactement une option "correct".'] }]
+        }
+      })
+
+      await vm.handleReviewConfirm([
+        { statement: 'Q cassée', type: 'mcq', openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: 'A' }, { text: 'B' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
+      ])
+      await flushPromises()
+
+      // Ni ajoutée, ni la question vide par défaut retirée (rien d'importable à mettre à sa place).
+      expect(vm.form.questions.some((q) => q.statement === 'Q cassée')).toBe(false)
+      expect(vm.form.questions).toHaveLength(1)
+      expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('1 question'), 'error')
+      expect(vm.showAiFlow).toBe(false)
+    })
+
+    it('closeAiFlow — referme le flux et réinitialise le store de génération', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.closeAiFlow) return
+
+      const aiExerciseGenerationStore = useAiExerciseGenerationStore()
+      vm.showAiFlow = true
+      vm.closeAiFlow()
+
+      expect(vm.showAiFlow).toBe(false)
+      expect(aiExerciseGenerationStore.reset).toHaveBeenCalled()
+    })
+
+    it('parcours complet — config -> génération réussie -> Écran de révision affiché avec les questions du store', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.openCreateModal || !vm.handleAiGenerate) return
+
+      vm.openCreateModal()
+      vm.openAiFlow()
+      await flushPromises()
+
+      const aiExerciseGenerationStore = useAiExerciseGenerationStore()
+      aiExerciseGenerationStore.generate.mockImplementation(async () => {
+        aiExerciseGenerationStore.questions = [
+          { statement: 'Qu\'est-ce que la photosynthèse ?', type: 'open', content: { correct_answer: 'R' }, sourceExcerpt: 'Extrait' }
+        ]
+        aiExerciseGenerationStore.warnings = []
+        return true
+      })
+
+      await vm.handleAiGenerate({ sourceText: 'texte', questionCount: 1, questionType: 'mixed' })
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Relecture des questions générées')
+      expect(wrapper.text()).toContain('Qu\'est-ce que la photosynthèse ?')
     })
   })
 })

@@ -84,7 +84,13 @@ RÈGLES STRICTES :
    demandé SANS enfreindre la règle 3, génère MOINS de cartes que demandé plutôt que de combler par
    reformulation, paraphrase ou découpage artificiel d'un même fait. Un nombre de cartes inférieur à
    la demande, accompagné d'un "warning" expliquant pourquoi, est une sortie valide et préférable à
-   des cartes redondantes.`
+   des cartes redondantes.
+8. Pour toute formule mathématique ou physique (équation, expression symbolique, unité composée),
+   où qu'elle apparaisse ("statement", "answer", "acceptedAnswers", "options[].text"), entoure-la de
+   signes dollar ($...$) et écris-la en LaTeX standard : \\frac{a}{b} pour une fraction, \\sqrt{x},
+   x^{2} pour un exposant, x_{i} pour un indice, \\rho/\\Delta/\\times... pour les symboles. Exemple :
+   "la pression est donnée par $P = \\rho g h$". N'utilise ce balisage $...$ QUE pour une formule,
+   jamais pour du texte normal.`
   }
 
   /**

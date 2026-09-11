@@ -4,9 +4,13 @@ jest.mock('../../services/PdfExtraction.service', () => ({
 jest.mock('../../services/AiCardGeneration.service', () => ({
   generateCards: jest.fn()
 }))
+jest.mock('../../services/ImageCaptioningPipeline.service', () => ({
+  captionEmbeddedImages: jest.fn()
+}))
 
 const PdfExtractionService = require('../../services/PdfExtraction.service')
 const AiCardGenerationService = require('../../services/AiCardGeneration.service')
+const ImageCaptioningPipelineService = require('../../services/ImageCaptioningPipeline.service')
 const AiCardGenerationPipelineService = require('../../services/AiCardGenerationPipeline.service')
 
 const FAKE_CARD = (n) => ({ statement: `Q${n}`, type: 'open', answer: `A${n}`, sourceExcerpt: `E${n}` })
@@ -35,7 +39,7 @@ describe('AiCardGenerationPipelineService', () => {
 
     it('resolveSourceText - texte seul - retourne le texte trimé, hasEmbeddedImages à false, sans appeler PdfExtraction', async () => {
       const result = await AiCardGenerationPipelineService.resolveSourceText({ sourceText: '  bonjour  ', pdfBuffer: null })
-      expect(result).toEqual({ text: 'bonjour', hasEmbeddedImages: false, ocrPagesProcessed: 0 })
+      expect(result).toEqual({ text: 'bonjour', hasEmbeddedImages: false, ocrPagesProcessed: 0, pageTexts: null })
       expect(PdfExtractionService.extractText).not.toHaveBeenCalled()
     })
 
@@ -324,8 +328,14 @@ describe('AiCardGenerationPipelineService', () => {
       expect(result.usage.ocrPagesProcessed).toBe(5)
     })
 
-    it('generateCardsFromContent - PDF avec images/schémas détectés - ajoute un avertissement dédié', async () => {
-      PdfExtractionService.extractText.mockResolvedValue({ text: 'Texte extrait du PDF.', hasEmbeddedImages: true, ocrPagesProcessed: 0 })
+    it('generateCardsFromContent - PDF avec images/schémas, captioning échoue - ajoute l\'avertissement générique dédié', async () => {
+      PdfExtractionService.extractText.mockResolvedValue({
+        text: 'Texte extrait du PDF.',
+        hasEmbeddedImages: true,
+        ocrPagesProcessed: 0,
+        pageTexts: ['Texte extrait du PDF.']
+      })
+      ImageCaptioningPipelineService.captionEmbeddedImages.mockRejectedValue(new Error('erreur inattendue'))
       AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
@@ -336,7 +346,7 @@ describe('AiCardGenerationPipelineService', () => {
       expect(result.warnings.some((w) => w.includes('images/schémas'))).toBe(true)
     })
 
-    it('generateCardsFromContent - texte collé (pas de PDF) - jamais d\'avertissement images/schémas', async () => {
+    it('generateCardsFromContent - texte collé (pas de PDF) - jamais d\'avertissement images/schémas, jamais de captioning', async () => {
       AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
 
       const result = await AiCardGenerationPipelineService.generateCardsFromContent({
@@ -345,6 +355,97 @@ describe('AiCardGenerationPipelineService', () => {
       })
 
       expect(result.warnings.some((w) => w.includes('images/schémas'))).toBe(false)
+      expect(ImageCaptioningPipelineService.captionEmbeddedImages).not.toHaveBeenCalled()
+    })
+
+    describe('captioning des images/schémas (generation_ia_captioning_image.md)', () => {
+      it('generateCardsFromContent - captioning réussi - le texte enrichi est envoyé au modèle, usage agrégé, aucun avertissement générique', async () => {
+        PdfExtractionService.extractText.mockResolvedValue({
+          text: 'Texte extrait du PDF.',
+          hasEmbeddedImages: true,
+          ocrPagesProcessed: 1,
+          pageTexts: ['Texte extrait du PDF.']
+        })
+        ImageCaptioningPipelineService.captionEmbeddedImages.mockResolvedValue({
+          pageTexts: ['Texte extrait du PDF.\n\n[Schéma détecté sur cette page — description générée automatiquement par IA, non garantie exacte : Un schéma de chloroplaste.]'],
+          warnings: [],
+          usage: { promptTokens: 200, completionTokens: 60, ocrPagesProcessed: 1 },
+          captionedCount: 1
+        })
+        AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+
+        const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+          pdfBuffer: Buffer.from('%PDF-1.4'),
+          subjectContext: 'SVT',
+          cardCount: 1
+        })
+
+        expect(ImageCaptioningPipelineService.captionEmbeddedImages).toHaveBeenCalledWith(
+          expect.objectContaining({ pageTexts: ['Texte extrait du PDF.'], subjectContext: 'SVT' })
+        )
+        expect(AiCardGenerationService.generateCards).toHaveBeenCalledWith(
+          expect.objectContaining({ sourceText: expect.stringContaining('Un schéma de chloroplaste.') })
+        )
+        expect(result.warnings.some((w) => w.includes('images/schémas'))).toBe(false)
+        // OCR (1 page, récupération des images) + captioning (200/60) + génération de cartes (FAKE_USAGE 100/50)
+        expect(result.usage).toEqual({
+          model: 'mistral-small-latest',
+          promptTokens: 300,
+          completionTokens: 110,
+          ocrPagesProcessed: 2
+        })
+      })
+
+      it('generateCardsFromContent - captioning sans image pédagogique (toutes décoratives) - avertissement dédié, pas le message générique', async () => {
+        PdfExtractionService.extractText.mockResolvedValue({
+          text: 'Texte extrait du PDF.',
+          hasEmbeddedImages: true,
+          ocrPagesProcessed: 0,
+          pageTexts: ['Texte extrait du PDF.']
+        })
+        ImageCaptioningPipelineService.captionEmbeddedImages.mockResolvedValue({
+          pageTexts: ['Texte extrait du PDF.'],
+          warnings: [],
+          usage: { promptTokens: 50, completionTokens: 20, ocrPagesProcessed: 0 },
+          captionedCount: 0
+        })
+        AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+
+        const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+          pdfBuffer: Buffer.from('%PDF-1.4'),
+          cardCount: 1
+        })
+
+        expect(result.warnings).toEqual(
+          expect.arrayContaining([expect.stringContaining('aucun ne portait de contenu pédagogique')])
+        )
+        expect(result.warnings.some((w) => w.includes('ne sont pas analysés'))).toBe(false)
+      })
+
+      it('generateCardsFromContent - captioning renvoie ses propres avertissements - propagés tels quels', async () => {
+        PdfExtractionService.extractText.mockResolvedValue({
+          text: 'Texte extrait du PDF.',
+          hasEmbeddedImages: true,
+          ocrPagesProcessed: 0,
+          pageTexts: ['Texte extrait du PDF.']
+        })
+        ImageCaptioningPipelineService.captionEmbeddedImages.mockResolvedValue({
+          pageTexts: ['Texte extrait du PDF.'],
+          warnings: ["1 image(s)/schéma(s) sur 2 n'a/n'ont pas pu être analysé(s) — les autres descriptions restent prises en compte."],
+          usage: { promptTokens: 50, completionTokens: 20, ocrPagesProcessed: 0 },
+          captionedCount: 1
+        })
+        AiCardGenerationService.generateCards.mockResolvedValue({ cards: [FAKE_CARD(1)], warning: null, usage: FAKE_USAGE })
+
+        const result = await AiCardGenerationPipelineService.generateCardsFromContent({
+          pdfBuffer: Buffer.from('%PDF-1.4'),
+          cardCount: 1
+        })
+
+        expect(result.warnings).toEqual(
+          expect.arrayContaining([expect.stringContaining("n'a/n'ont pas pu être analysé")])
+        )
+      })
     })
   })
 })

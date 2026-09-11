@@ -6,7 +6,21 @@ try {
   console.error(error)
 }
 
-const { unifyFormulaNotation } = require('../helpers/formulaNotation')
+const { unifyFormulaNotation, GREEK } = require('../helpers/formulaNotation')
+
+// Noms grecs en toutes lettres -> symbole Unicode, pour reconnaître « rho » tapé
+// au clavier (sans le « \ » de commande LaTeX que `unifyFormulaNotation` attend) —
+// regex pré-compilée une fois : alternative des clés GREEK triée par longueur
+// décroissante (« varepsilon » avant « epsilon », sinon le remplacement partiel
+// laisserait un résidu « εilon »), bornée par `\b` pour ne jamais couper un mot
+// plus long qui contiendrait un nom grec en sous-chaîne. `(?<!\\)` exclut « \rho »
+// (commande LaTeX de l'éditeur, déjà traitée par `unifyFormulaNotation` — sans
+// cette exclusion, « rho » matche aussi le « rho » de « \rho » via `\b` entre le
+// « \ » non-mot et le « r », cassant ce chemin en un résidu « \ρ » corrompu).
+const GREEK_NAMES_PATTERN = new RegExp(
+  `(?<!\\\\)\\b(${Object.keys(GREEK).sort((a, b) => b.length - a.length).join('|')})\\b`,
+  'gi'
+)
 const { algebraicallyEqual: isAlgebraicallyEqual } = require('../helpers/algebraicEquivalence')
 
 // Stopwords anglais + français : l'application est francophone, la liste anglaise
@@ -90,6 +104,26 @@ const STOPWORDS = new Set([
   'lui',
   'ne',
   'en',
+  // Mots de liaison courts (2026-09-08) : absents jusqu'ici, sans conséquence
+  // tant que le plancher de longueur (`> 2` caractères) les filtrait déjà —
+  // devenus nécessaires en STOPWORDS le jour où ce plancher a été retiré
+  // (extractKeywords, cf. DECISIONS.md du même jour) pour ne pas polluer les
+  // mots-clés d'une réponse en prose classique de bruit grammatical.
+  'à',
+  'a',
+  'y',
+  'où',
+  'eu',
+  'ça',
+  'là',
+  // C-02.09 (revue de code) : le batch du 2026-09-08 ci-dessus n'était pas exhaustif — d'autres mots
+  // de liaison ≤ 2 caractères passaient encore, avec le même risque qu'à l'origine (ex. « si » commun
+  // aux deux membres d'une phrase de type ratio peut faire passer `detectInversion` à `straight: true`
+  // via ce seul mot, masquant une vraie inversion d'opérandes par ailleurs correctement détectée).
+  'si',
+  'tu',
+  'ai',
+  'va',
   // Anglais
   'the',
   'a',
@@ -150,14 +184,72 @@ const STOPWORDS = new Set([
   'just'
 ])
 
+// Seuil unique de décision (2026-09-09, remplace HIGH_THRESHOLD/LOW_THRESHOLD/
+// zone grise) — voir le commentaire dans gradeSemantic pour le détail complet.
 const HIGH_THRESHOLD = 0.78
-const LOW_THRESHOLD = 0.55
-const KEYWORD_OVERLAP_THRESHOLD = 0.3
 
 // Séparateurs antisymétriques de la famille division/rapport : l'ordre des opérandes
 // porte le sens (« masse par unité de volume » ≠ « volume par unité de masse »), mais
 // les embeddings y sont quasi insensibles — d'où une vérification déterministe dédiée.
 const RATIO_SEPARATOR = /\s(?:divisée?s? par|par unité de|rapportée?s? (?:à|au)|sur)\s/
+
+// Séparateurs de tokenization pour extractKeywords/tokenize : espace + ponctuation
+// « classique » (/, -, ., ,, :) + opérateurs/regroupements courants d'une formule
+// tapée en texte simple, sans passer par l'assistant formule (=, *, +, ^, (, ), _ —
+// bug reproduit le 2026-09-08, carte « barrage voûte » : « dF_P = P(z)(-dS) + P_atm
+// dS » se fragmentait sinon en tokens absurdes à chaque parenthèse/indice) + « − »
+// (signe moins Unicode des réponses de référence stockées, distinct du tiret ASCII)
+// + « # »/« " » (résidu de corruption constaté sur plusieurs réponses de référence
+// de ce même contenu physique — vraisemblablement un artefact d'extraction PDF sur
+// une notation vectorielle, ex. « d #"F P = P (M ) #"dS » pour « d→F = P(M)·d→S » —
+// non corrigé à la source ici (donnée, pas code), mais neutralisé comme séparateur
+// pour ne pas polluer les tokens de bordure qu'il contamine) + « · » (point médian
+// U+00B7, multiplication en notation française : « kg·m⁻³ », « -ρ·g » — déjà
+// converti en « * » par unifyFormulaNotation à l'intérieur d'un segment $…$, mais
+// pas ailleurs ; sans séparateur ici, colle les variables entre elles hors $…$).
+const MATH_SEPARATORS = /[\s/\-−.,:=*+^()_#"·]+/
+
+// Petits groupes de synonymes/variantes morphologiques FR unifiés vers un
+// représentant canonique commun — pour `computeKeywordOverlap` uniquement,
+// jamais pour l'embedding ni la comparaison symbolique. Trouvé le 2026-09-08 :
+// « la pression décroît exponentiellement » (référence) et « la pression
+// diminue de façon exponentielle » (étudiant, sens strictement identique) ne
+// se recoupaient sur AUCUN mot, la comparaison de mots-clés étant purement
+// littérale — l'embedding capte déjà cette proximité (~0,74) mais la zone
+// grise retombe sur le recouvrement de mots-clés, aveugle aux synonymes.
+// Volontairement borné à un vocabulaire non ambigu et fréquent en physique
+// (croissance/décroissance d'une grandeur) plutôt qu'un thésaurus général,
+// pour limiter le risque de rapprocher à tort des réponses sans rapport —
+// cf. calibration DECISIONS.md 2026-07-18 (« réponse fausse même domaine »
+// à 0,717 correctement rejetée par mots-clés : un thésaurus trop large
+// aurait pu la faire passer à tort).
+const SYNONYM_GROUPS = [
+  ['augmente', 'augmenter', 'augmentation', 'croît', 'croit', 'croître', 'croitre', 'croissance', 'croissant', 'croissante', 'monte', 'monter', 'hausse'],
+  ['diminue', 'diminuer', 'diminution', 'décroît', 'décroit', 'décroître', 'decroitre', 'décroissance', 'décroissant', 'décroissante', 'baisse', 'baisser']
+]
+const SYNONYM_CANONICAL = new Map(
+  SYNONYM_GROUPS.flatMap((group) => group.map((word) => [word, group[0]]))
+)
+
+// Un adverbe français en « -ment » dérive presque toujours de l'adjectif au
+// féminin qui le précède (« exponentielle » + « ment » = « exponentiellement »,
+// « rapide » + « ment » = « rapidement ») — deux réponses qui n'emploient pas
+// la même forme grammaticale du même mot (« décroît EXPONENTIELLEMENT » vs
+// « de façon EXPONENTIELLE ») ne se recoupent sinon jamais en comparaison
+// littérale. Règle mécanique et régulière : risque de faux rapprochement
+// négligeable (peu de paires de mots français distincts qui ne diffèrent que
+// par ce suffixe), donc appliquée sans liste de garde. Le seuil de longueur
+// exclut les mots courts où « -ment » ne serait pas ce suffixe (« ciment »,
+// « moment »).
+function stripAdverbSuffix(token) {
+  return token.length > 8 && token.endsWith('ment') ? token.slice(0, -4) : token
+}
+
+// Normalisation d'un mot-clé pour le recouvrement uniquement : synonymes puis
+// suffixe adverbial (ordre neutre ici, les deux mécanismes ne se recouvrent pas).
+function canonicalizeKeyword(token) {
+  return SYNONYM_CANONICAL.get(token) ?? stripAdverbSuffix(token)
+}
 
 class SemanticService {
   constructor() {
@@ -215,7 +307,29 @@ class SemanticService {
    */
   normalizeText(text) {
     if (!text || typeof text !== 'string') return ''
-    return text.trim().toLowerCase().replace(/\s+/g, ' ')
+    return text
+      .trim()
+      // « ∆ » (U+2206, symbole INCREMENT) et « Δ » (U+0394, lettre grecque Delta)
+      // sont visuellement indiscernables mais des codepoints distincts — trouvé
+      // le 2026-09-08 dans les réponses de référence de plusieurs questions de
+      // thermodynamique (« ∆S », « ∆Ucycle », U+2206), qui ne matcheraient jamais
+      // un Δ grec réellement tapé par l'étudiant (U+0394, se minusculise ensuite
+      // en δ comme n'importe quelle lettre grecque). Unifié avant la casse.
+      .replace(/∆/g, 'Δ')
+      .toLowerCase()
+      // Nom grec en toutes lettres -> symbole Unicode (« rho » -> « ρ »). Trouvé
+      // le 2026-09-09 (carte Torricelli, Patm = ρ·g·h) : « rho » scorait 76 %
+      // (zone grise, incorrect) et « ρ » 81 % (zone haute, correct) pour un
+      // contenu strictement identique — l'embedding traite « rho » et « ρ »
+      // comme lexicalement différents, ce n'est pas un problème de mots-clés
+      // mais du texte envoyé à l'embedding lui-même. `unifyFormulaNotation`
+      // faisait déjà cette conversion mais seulement pour « \rho » (commande
+      // LaTeX de l'éditeur) — jamais pour « rho » tapé tel quel au clavier, le
+      // cas le plus probable pour un étudiant sans clavier grec. Appliqué ici,
+      // en amont de l'embedding ET du recouvrement de mots-clés (les deux en
+      // bénéficient), pas seulement à l'intérieur d'un segment $…$.
+      .replace(GREEK_NAMES_PATTERN, (name) => GREEK[name] ?? name)
+      .replace(/\s+/g, ' ')
   }
 
   /**
@@ -253,19 +367,92 @@ class SemanticService {
   }
 
   /**
-   * tokenization simple
+   * Isole les segments $…$ (formules, convention FormulaHelperComponent — une
+   * réponse peut mêler texte libre et formule insérée en LaTeX brut : « $-\rho
+   * \cdot g \cdot dV$, dirigé vers le bas ») du texte libre autour, chacun
+   * segmenté séparément :
+   * - formule : passée par `unifyFormulaNotation` (\rho -> ρ, \cdot -> *,
+   *   retire les $) puis éclatée sur `MATH_SEPARATORS` pour que chaque
+   *   variable redevienne un token individuel comparable à une référence en
+   *   notation espacée (« −ρ dV g ») — sans ce découpage la formule unifiée
+   *   ressortirait comme un seul bloc collé (« ρ*g*dv »).
+   * - texte libre : mêmes séparateurs `MATH_SEPARATORS`, plus les espaces —
+   *   nécessaire aussi hors segment $…$ : une formule physique tapée en texte
+   *   simple, sans passer par l'assistant formule (« dF_P = P(z)(-dS) +
+   *   P_atm dS = ρ_0 g (z - H) dS »), utilise déjà parenthèses/exposant/
+   *   indice/opérateurs — sans les traiter en séparateurs ici aussi, elle se
+   *   fragmenterait en tokens absurdes (« p(z)( », « ds) », « (z », « h) »),
+   *   incomparables à la moindre reformulation avec un espacement différent
+   *   (bug reproduit le 2026-09-08, carte « barrage voûte », sans aucun $…$).
+   * Le résultat des deux segments est ensuite simplement concaténé par
+   * `tokenize` — seule la formule a besoin d'`unifyFormulaNotation` en amont
+   * (conversion LaTeX -> notation brute), `extractKeywords` traite le tout
+   * de façon uniforme une fois tokenizé (aucun filtre différencié entre
+   * formule et texte libre).
    */
-  tokenize(text) {
-    const normalized = this.normalizeText(text)
-    return normalized.split(/[\s/\-.,:]+/).filter(Boolean)
+  splitFormulaAndProseTokens(normalizedText) {
+    const formulaTokens = []
+    const prose = normalizedText.replace(/\$([^$]+)\$/g, (_, formula) => {
+      formulaTokens.push(...unifyFormulaNotation(formula).split(MATH_SEPARATORS).filter(Boolean))
+      return ' '
+    })
+    const proseTokens = prose.split(MATH_SEPARATORS).filter(Boolean)
+    return { formulaTokens, proseTokens }
   }
 
   /**
-   * Extaction de mots-clés : tokens > 2 chars et pas dans stopwords
+   * tokenization simple (liste à plat, formule et texte libre confondus)
+   */
+  tokenize(text) {
+    const { formulaTokens, proseTokens } = this.splitFormulaAndProseTokens(this.normalizeText(text))
+    return [...formulaTokens, ...proseTokens]
+  }
+
+  /**
+   * Un token est « substantiel » s'il contient au moins une lettre ou un chiffre —
+   * exclut les résidus de ponctuation/opérateurs isolés (« = », « - »…) que la
+   * tokenization peut laisser passer sans qu'ils portent de sens lexical.
+   */
+  isSubstantialToken(token) {
+    return /[a-zà-öø-ÿͰ-Ͽ0-9]/i.test(token)
+  }
+
+  /**
+   * Extraction de mots-clés : tous les tokens substantiels hors stopwords,
+   * sans plancher de longueur.
+   *
+   * USAGE (2026-09-09) — n'intervient plus dans `gradeSemantic` (la décision
+   * est désormais un seuil unique sur le score sémantique, cf. son commentaire ;
+   * `computeKeywordOverlap` n'a donc plus d'appelant en dehors des tests).
+   * Reste utilisée par `detectInversion`/`splitRatio`, seul appelant restant.
+   *
+   * HISTORIQUE — le filtre imposait à l'origine `length > 2`, avec un repli
+   * permissif si ce filtre strict ne laissait rien. Deux angles morts trouvés
+   * le 2026-09-08 (session Leitner, cf. DECISIONS.md) :
+   * 1. Une réponse entièrement symbolique/courte (« dP = ρg dV ») ne produit
+   *    que des tokens de 1-2 caractères (variables physiques : ρ, g, V, m,
+   *    F…) — le filtre strict seul renvoyait un ensemble vide, forçant
+   *    `computeKeywordOverlap` à 0 (cf. son garde `size === 0`) et rejetant
+   *    la réponse en zone grise indépendamment de son contenu réel.
+   * 2. Le repli conditionnel (n'agir que si le strict est vide) échouait dès
+   *    qu'UN SEUL token « accidentellement » long traînait à côté des
+   *    variables courtes — une prose environnante (« dirigé » dans « $ρg
+   *    dV$, dirigé vers le bas ») ou même un fragment de formule qui se
+   *    trouve dépasser 2 caractères par hasard (« atm » dans « dF_P =
+   *    P(z)(-dS) + P_atm dS » coupé sur l'indice — cf. `MATH_SEPARATORS`) :
+   *    le repli ne se déclenchait alors jamais, et les variables courtes
+   *    disparaissaient silencieusement du set de mots-clés.
+   * Le plancher de longueur n'apportait plus rien que `STOPWORDS` (~75 mots
+   * FR/EN) ne couvre déjà : il est retiré plutôt que rafistolé une troisième
+   * fois. `isSubstantialToken` continue d'exclure les résidus de ponctuation
+   * purs qu'un stopword ne peut pas voir (« = », « - »…).
    */
   extractKeywords(text) {
-    const tokens = this.tokenize(text)
-    return new Set(tokens.filter((token) => token.length > 2 && !STOPWORDS.has(token)))
+    return new Set(
+      this.tokenize(text)
+        .filter((token) => this.isSubstantialToken(token) && !STOPWORDS.has(token))
+        .map(canonicalizeKeyword)
+    )
   }
 
   /**
@@ -420,30 +607,35 @@ class SemanticService {
       const bestScore = best.score
       const bestRef = best.reference
 
-      let isCorrect = false
-      let decisionZone = 'low'
-
-      if (bestScore >= HIGH_THRESHOLD) {
-        // High confidence: correct
-        isCorrect = true
-        decisionZone = 'high'
-      } else if (bestScore <= LOW_THRESHOLD) {
-        // Low confidence: incorrect
-        isCorrect = false
-        decisionZone = 'low'
-      } else {
-        // Grey zone: use keyword overlap
-        decisionZone = 'grey_zone'
-        const studentKeywords = this.extractKeywords(studentNorm)
-        const correctKeywords = this.extractKeywords(bestRef)
-        const overlap = this.computeKeywordOverlap(studentKeywords, correctKeywords)
-
-        isCorrect = overlap >= KEYWORD_OVERLAP_THRESHOLD
-      }
+      // Décision à seuil unique (2026-09-09) : le verdict est une fonction
+      // strictement croissante du score de proximité sémantique affiché à
+      // l'étudiant — aucun autre critère n'intervient. Remplace l'ancienne
+      // « zone grise » (55-78 %, tranchée par recouvrement de mots-clés, un
+      // critère indépendant du score) : ce mécanisme a produit 6 bugs distincts
+      // en une seule journée (2026-09-08/09, cf. DECISIONS.md) et surtout
+      // rendait la décision non-monotone par construction — un score plus bas
+      // pouvait passer pendant qu'un score plus haut échouait sur une autre
+      // carte, symptôme central signalé dès le premier retour utilisateur et
+      // jamais résolu par les correctifs ponctuels de la zone grise elle-même.
+      // Choix explicite de l'utilisateur (2026-09-09) après ce constat : « le
+      // résultat annoncé devrait se baser sur le pourcentage avancé par le
+      // modèle de proximité sémantique ».
+      // Seuil retenu : `HIGH_THRESHOLD` (0,78) inchangé — c'est le seul qui
+      // classe correctement les 8 cas de la calibration DECISIONS.md
+      // 2026-07-18 sans aucune assistance de mots-clés (le seul cas alors tombé
+      // en "zone grise", une réponse fausse du même domaine à 0,717, est déjà
+      // sous 0,78 ; les 7 autres étaient tous soit ≥0,806 soit à 0,15).
+      // Coût assumé : une réponse correcte mais formulée très différemment
+      // dont le score reste sous 0,78 (ex. la carte « modèle isotherme » de
+      // l'audit du 2026-09-08, à 0,74) redevient « incorrect » — accepté en
+      // échange de la garantie de monotonicité.
+      const isCorrect = bestScore >= HIGH_THRESHOLD
+      const decisionZone = isCorrect ? 'high' : 'low'
+      const matchedRef = bestRef
 
       // Garde anti-inversion : les embeddings scorent haut sur « Y divisé par X »
       // quand la réponse attendue est « X divisé par Y » — on rejette explicitement.
-      if (isCorrect && this.detectInversion(bestRef, studentNorm)) {
+      if (isCorrect && this.detectInversion(matchedRef, studentNorm)) {
         return {
           is_correct: false,
           score: parseFloat(bestScore.toFixed(4)),

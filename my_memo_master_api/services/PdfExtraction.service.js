@@ -30,8 +30,13 @@ const getMistralConfig = require('../helpers/mistralConfig')
 // DÉTECTION D'IMAGES/SCHÉMAS (transparence, pas de compréhension) : les deux chemins signalent la
 // présence d'images/schémas embarqués (`hasEmbeddedImages`) sans les décrire — ni pdfjs-dist ni
 // l'OCR Mistral n'interprètent le contenu d'un schéma (l'OCR l'extrait comme une image, pas comme
-// une description textuelle). Une vraie compréhension du contenu visuel (captioning via un modèle
-// multimodal) est une fonctionnalité distincte, non couverte ici — voir DECISIONS.md.
+// une description textuelle).
+//
+// CAPTIONING (2026-09-09, generation_ia_captioning_image.md) : la compréhension du contenu visuel
+// (décrire un schéma) est faite par ImageCaptioningPipeline.service.js, PAS par ce fichier — ce
+// service se limite à la RÉCUPÉRATION des images (`extractImages`, appel OCR dédié séparé de
+// `extractText`) et du texte par page (`pageTexts`), l'orchestration LLM/insertion reste ailleurs
+// (même séparation que PdfExtraction.service.js/AiCardGeneration.service.js).
 
 class PdfExtractionService {
   constructor() {
@@ -74,8 +79,13 @@ class PdfExtractionService {
    * Extraction via pdfjs-dist (chemin par défaut, gratuit, local). Détecte au passage la présence
    * d'images/schémas embarqués (sans les décrire — voir en-tête de fichier).
    *
+   * `pageTexts` (ajouté pour generation_ia_captioning_image.md, 2026-09-09) : texte par page, dans
+   * l'ordre — permet au pipeline appelant de fusionner une description d'image générée (captioning)
+   * sur la page exacte où l'image a été détectée, avant le découpage en chunks. `text` reste la
+   * concaténation de `pageTexts` (comportement inchangé pour tout appelant qui l'ignore).
+   *
    * @param {Buffer} pdfBuffer
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number, pageTexts: string[] }>}
    * @throws {Error} PDF illisible/corrompu (400), ou sans texte extractible (422 — déclenche le repli OCR)
    */
   async extractTextViaPdfjs(pdfBuffer) {
@@ -124,7 +134,7 @@ class PdfExtractionService {
     }
 
     // Gratuit : aucune page n'est facturée via ce chemin (voir services/AiQuota.service.js, C-01.06).
-    return { text: fullText, hasEmbeddedImages, ocrPagesProcessed: 0 }
+    return { text: fullText, hasEmbeddedImages, ocrPagesProcessed: 0, pageTexts }
   }
 
   /**
@@ -136,8 +146,11 @@ class PdfExtractionService {
    * l'erreur porte un champ `usage: { ocrPagesProcessed }` — l'appelant peut journaliser ce coût
    * réel même sur cet échec (C-01.06). Absent sur les échecs qui n'ont rien facturé (500, 502).
    *
+   * `pageTexts` (voir extractTextViaPdfjs ci-dessus pour le détail) : ici, le `markdown` de chaque page
+   * de la réponse OCR, dans l'ordre.
+   *
    * @param {Buffer} pdfBuffer
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number, pageTexts: string[] }>}
    * @throws {Error} Configuration manquante (500), appel réseau/API en échec (502), ou aucun texte (422)
    */
   async extractTextViaOcr(pdfBuffer) {
@@ -209,7 +222,8 @@ class PdfExtractionService {
       throw err
     }
 
-    return { text, hasEmbeddedImages, ocrPagesProcessed }
+    const pageTexts = pages.map((p) => (typeof p.markdown === 'string' ? p.markdown : ''))
+    return { text, hasEmbeddedImages, ocrPagesProcessed, pageTexts }
   }
 
   /**
@@ -218,7 +232,7 @@ class PdfExtractionService {
    * fichier). Signale (`hasEmbeddedImages`) la présence d'images/schémas sans jamais les décrire.
    *
    * @param {Buffer} pdfBuffer
-   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number }>}
+   * @returns {Promise<{ text: string, hasEmbeddedImages: boolean, ocrPagesProcessed: number, pageTexts: string[] }>}
    * @throws {Error} Buffer invalide (400), PDF illisible/corrompu (400), configuration OCR manquante
    *   (500), échec réseau/API OCR (502), ou aucun texte extractible par aucun des deux moyens (422)
    */
@@ -237,6 +251,97 @@ class PdfExtractionService {
       logger.warn('[PdfExtraction] Aucun texte via pdfjs-dist (probable PDF scanné) — repli sur Mistral OCR.')
       return this.extractTextViaOcr(pdfBuffer)
     }
+  }
+
+  /**
+   * Récupère les images/schémas embarqués dans un PDF, en vue de leur captioning
+   * (generation_ia_captioning_image.md, 2026-09-09) — appel OCR Mistral DÉDIÉ, séparé de
+   * `extractText`/`extractTextViaOcr` ci-dessus : ceux-ci ne demandent jamais `include_image_base64`
+   * (pour ne pas alourdir la réponse quand seul le texte est nécessaire, cas majoritaire). Pertinent
+   * uniquement si `hasEmbeddedImages` (renvoyé par `extractText`) vaut `true` — l'appelant décide quand
+   * appeler cette méthode, ce service ne le décide pas lui-même.
+   *
+   * `pages[].images[].image_base64` est documenté par Mistral comme une chaîne base64 brute, sans
+   * préfixe data URI (revue documentaire, à reconfirmer au premier appel réel — voir
+   * generation_ia_captioning_image.md §9) : reconstruit ici en data URI, sauf si un préfixe est déjà
+   * présent (robuste aux deux formats plutôt que de supposer lequel est correct).
+   *
+   * Ne lève jamais d'erreur si aucune image n'est effectivement trouvée (`images: []`) — la détection
+   * qui a déclenché cet appel (`hasEmbeddedImages`) est un indice, pas une garantie.
+   *
+   * @param {Buffer} pdfBuffer
+   * @returns {Promise<{ images: { pageIndex: number, imageBase64: string }[], ocrPagesProcessed: number }>}
+   * @throws {Error} Buffer invalide (400), configuration manquante (500), ou appel réseau/API en échec (502)
+   */
+  async extractImages(pdfBuffer) {
+    if (!Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
+      const err = new Error('Le fichier PDF fourni est vide ou invalide.')
+      err.statusCode = 400
+      throw err
+    }
+
+    const config = getMistralConfig()
+    if (!config.apiKey) {
+      const err = new Error("Extraction des images impossible : service IA non configuré (clé API manquante).")
+      err.statusCode = 500
+      throw err
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+
+    let response
+    try {
+      response = await fetch(config.ocrApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.ocrModel,
+          document: {
+            type: 'document_url',
+            document_url: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`
+          },
+          include_image_base64: true
+        }),
+        signal: controller.signal
+      })
+    } catch (error) {
+      logger.error(`[PdfExtraction] Appel Mistral OCR (images) échoué : ${error?.message || error}`)
+      const err = new Error("Le service d'extraction des images est indisponible pour le moment.")
+      err.statusCode = 502
+      throw err
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => '')
+      logger.error(`[PdfExtraction] Réponse Mistral OCR (images) ${response.status} : ${bodyText}`)
+      const err = new Error("Le service d'extraction des images est indisponible pour le moment.")
+      err.statusCode = 502
+      throw err
+    }
+
+    const data = await response.json()
+    const pages = Array.isArray(data?.pages) ? data.pages : []
+    const images = []
+    pages.forEach((page, pageIndex) => {
+      const pageImages = Array.isArray(page?.images) ? page.images : []
+      pageImages.forEach((image) => {
+        const raw = typeof image?.image_base64 === 'string' ? image.image_base64 : null
+        if (!raw) return
+        const imageBase64 = raw.startsWith('data:') ? raw : `data:image/jpeg;base64,${raw}`
+        images.push({ pageIndex, imageBase64 })
+      })
+    })
+
+    const ocrPagesProcessed =
+      typeof data?.usage_info?.pages_processed === 'number' ? data.usage_info.pages_processed : pages.length
+
+    return { images, ocrPagesProcessed }
   }
 }
 

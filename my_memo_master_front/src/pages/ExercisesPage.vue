@@ -116,9 +116,14 @@
             <div class="mb-6">
               <div class="flex justify-between items-center mb-4">
                 <label class="form-label">Questions</label>
-                <button type="button" @click="addQuestion" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition border-2 border-green-800">
-                  + Ajouter une question
-                </button>
+                <div class="flex gap-2">
+                  <button type="button" @click="openAiFlow" class="bg-primary hover:bg-primary/90 text-white font-bold py-1 px-3 rounded text-sm transition">
+                    ✨ Générer par IA
+                  </button>
+                  <button type="button" @click="addQuestion" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition border-2 border-green-800">
+                    + Ajouter une question
+                  </button>
+                </div>
               </div>
 
               <div class="space-y-6">
@@ -259,6 +264,35 @@
           </form>
         </div>
       </div>
+
+      <!-- Génération de questions par IA (C-02.06/C-02.07) — Vue 1 (configuration) → Vue 2
+           (attente/erreur) → Écran de révision (accept/edit/reject par question, C-02.07). Montées via
+           v-if pour toute la durée du flux : l'état saisi en Vue 1 survit à un aller-retour par
+           [Réessayer] (voir AiGenerateExercisesModalComponent.vue). Empilées au-dessus de la modal
+           "Nouvel exercice"/"Modifier l'exercice", qui reste montée (generation_ia_exercices_ui.md §5.1). -->
+      <template v-if="showAiFlow">
+        <AiGenerateExercisesModal
+          :visible="aiStep === 'config'"
+          :default-subject-context="formSubjectName"
+          @close="closeAiFlow"
+          @submit="handleAiGenerate"
+        />
+        <AiGenerationProgressModal
+          :visible="aiStep === 'progress'"
+          :status="aiExerciseGenerationStore.status === 'error' ? 'error' : 'generating'"
+          :error-message="aiExerciseGenerationStore.errorMessage"
+          @cancel="closeAiFlow"
+          @close="closeAiFlow"
+          @retry="aiStep = 'config'"
+        />
+        <AiExerciseReviewModal
+          :visible="aiStep === 'review'"
+          :questions="aiExerciseGenerationStore.questions"
+          :warnings="aiExerciseGenerationStore.warnings"
+          @close="closeAiFlow"
+          @confirm="handleReviewConfirm"
+        />
+      </template>
     </template>
   </ItemListLayout>
 </template>
@@ -279,6 +313,11 @@ import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
+import AiGenerateExercisesModal from '@/components/AiGenerateExercisesModalComponent.vue'
+import AiGenerationProgressModal from '@/components/AiGenerationProgressModalComponent.vue'
+import AiExerciseReviewModal from '@/components/AiExerciseReviewModalComponent.vue'
+import { useAiExerciseGenerationStore } from '@/stores/aiExerciseGeneration'
+import { defaultQuestionFormFields, contentToFormState, buildQuestionContent } from '@/helpers/exerciseQuestionForm'
 
 const router = useRouter()
 const testStore = useTestStore()
@@ -287,6 +326,7 @@ const tagStore = useTagStore()
 const classGroupStore = useClassGroupStore()
 const authStore = useAuthStore()
 const guidedTourStore = useGuidedTourStore()
+const aiExerciseGenerationStore = useAiExerciseGenerationStore()
 const { isEnseignant } = useRole()
 
 const loading = ref(true)
@@ -339,28 +379,119 @@ const defaultQuestion = () => ({
   idQuestion: null,
   statement: '',
   type: 'open',
-  openAnswer: '',
-  openAltAnswers: [],
-  mcqOptions: [{ text: '' }, { text: '' }],
-  mcqCorrectIdx: 0,
-  fillTemplate: '',
-  fillBlanks: [],
-  reorderFragments: ['', ''],
+  ...defaultQuestionFormFields(),
 })
 
 const form = reactive({ name: '', subjectId: '', tagIds: [], groupIds: [], questions: [defaultQuestion()] })
 const editingTestUserId = ref(null)
 
+// ── génération de questions par IA (C-02.06/C-02.07) ─────────────────────────────
+// Vue 1 (config) → Vue 2 (attente/erreur) → Écran de révision (C-02.07, accept/edit/reject par
+// question) → form.questions. Même orchestration que FlashcardsCardsPage.vue#showAiFlow/aiStep
+// (C-01.08), à une différence près : pas d'écran plein remplaçant la page (Interface de révision
+// ici empilée en modale, cf. AiExerciseReviewModalComponent.vue) — les questions générées ne
+// rejoignent `form.questions` qu'après confirmation explicite depuis cet écran (rappel périmètre
+// OUT : « Correction officielle sans relecture »).
+const showAiFlow = ref(false)
+const aiStep = ref('config') // 'config' | 'progress' | 'review'
+
+// Nom du sujet déjà sélectionné dans le formulaire, pour pré-remplir le champ "Matière" de la
+// génération IA (subjectContext) — même choix que AiGenerateCardsModalComponent.vue (C-01.08) : un
+// simple indice textuel pour l'IA, pas une FK.
+const formSubjectName = computed(() => subjectStore.subjects.find(s => s.subjectId === form.subjectId)?.name || '')
+
+function openAiFlow() {
+  aiStep.value = 'config'
+  showAiFlow.value = true
+}
+
+function closeAiFlow() {
+  showAiFlow.value = false
+  aiExerciseGenerationStore.reset()
+}
+
+async function handleAiGenerate(config) {
+  aiStep.value = 'progress'
+  const success = await aiExerciseGenerationStore.generate(config)
+  if (success) {
+    // Ne ferme PAS showAiFlow ni ne reset le store ici : l'Écran de révision (aiStep = 'review')
+    // a besoin de aiExerciseGenerationStore.questions/warnings pour s'afficher (voir template).
+    aiStep.value = 'review'
+  }
+  // Échec : aiExerciseGenerationStore.status passe à 'error', AiGenerationProgressModal affiche
+  // l'état d'erreur (+ éventuel message "création manuelle" si suggestManualCreation, mode dégradé
+  // C-02.05) ; [Réessayer] repasse aiStep à 'config' sans perdre la saisie (voir modal Vue 1).
+}
+
+/**
+ * Une question de formulaire encore à sa valeur d'origine (`defaultQuestion()`, jamais éditée par
+ * l'utilisateur) — sert à retirer la question vide ouverte automatiquement à la création du
+ * formulaire (`openCreateModal()`/`form.questions = [defaultQuestion()]`) quand des questions
+ * générées par IA sont ajoutées, sans jamais toucher à une question que l'utilisateur a commencé à
+ * renseigner (énoncé, réponse, changement de type...). BUG TROUVÉ EN CONDITIONS RÉELLES : sans ce
+ * filtre, cette question vide restait en tête de `form.questions` après acceptation des questions
+ * générées et faisait échouer `submitCreate()`/`submitEdit()` (« Erreur question 1. », `statement`/
+ * `openAnswer` requis côté validation serveur) — pas seulement un résidu visuel.
+ *
+ * @param {object} q
+ * @returns {boolean}
+ */
+function isBlankUntouchedQuestion(q) {
+  return q.type === 'open' && !q.statement.trim() && !q.openAnswer.trim() && q.openAltAnswers.length === 0
+}
+
+/**
+ * Reçoit les questions acceptées (éventuellement éditées) par l'Écran de révision (C-02.07,
+ * AiExerciseReviewModalComponent.vue#confirm) — déjà dans la représentation `form.questions`
+ * (mêmes clés que `defaultQuestion()`/`contentToFormState`).
+ *
+ * Ajout C-02.09 (revue de code) : les revalide d'abord via `POST
+ * /ai-exercise-generations/validate-import` (AiExerciseImportValidation.service.js, C-02.04) —
+ * jusqu'ici jamais appelé en production, alors qu'une édition en Interface de révision peut casser le
+ * format d'une question (ex. mcq dont on retire la seule option marquée correcte) sans qu'aucun
+ * contrôle serveur n'existe pour le bloquer avant persistance. Échec partiel toléré, comme le service
+ * le prévoit lui-même : une question rejetée n'empêche pas l'ajout des autres, mais n'est jamais
+ * ajoutée silencieusement — l'utilisateur en est notifié (pas de correction automatique).
+ *
+ * Ajoute ensuite les questions importables par un simple `push`, exactement comme `addQuestion()` le
+ * fait pour une question manuelle (§7 de generation_ia_exercices_ui.md). Retire au passage la question
+ * vide par défaut si elle est encore intacte (voir `isBlankUntouchedQuestion`), pour ne jamais laisser
+ * un exercice se créer avec une question fantôme en plus des questions générées — sauf si aucune
+ * question n'est finalement importable, pour ne pas vider le formulaire. Referme ensuite tout le flux IA.
+ *
+ * @param {object[]} acceptedQuestions
+ */
+async function handleReviewConfirm(acceptedQuestions) {
+  let toAdd = acceptedQuestions
+
+  if (acceptedQuestions.length) {
+    const questions = acceptedQuestions.map((q) => ({ statement: q.statement, type: q.type, content: buildContent(q) }))
+    const resp = await api.post('ai-exercise-generations/validate-import', { questions })
+    const rejected = resp?.status === 200 ? resp.data.rejected : []
+    if (rejected.length) {
+      const rejectedIndexes = new Set(rejected.map((r) => r.index))
+      toAdd = acceptedQuestions.filter((_, i) => !rejectedIndexes.has(i))
+      notif.notify(
+        `${rejected.length} question(s) écartée(s) au format après relecture (à recréer manuellement) : ` +
+          rejected.map((r) => r.errors.join(' ')).join(' '),
+        'error'
+      )
+    }
+  }
+
+  if (toAdd.length) {
+    form.questions = form.questions.filter((q) => !isBlankUntouchedQuestion(q))
+  }
+  for (const q of toAdd) {
+    form.questions.push({ ...defaultQuestion(), ...q })
+  }
+  closeAiFlow()
+}
+
 // ── helpers questions ─────────────────────────────────────────────────────────
 
 function onTypeChange(q) {
-  q.openAnswer = ''
-  q.openAltAnswers = []
-  q.mcqOptions = [{ text: '' }, { text: '' }]
-  q.mcqCorrectIdx = 0
-  q.fillTemplate = ''
-  q.fillBlanks = []
-  q.reorderFragments = ['', '']
+  Object.assign(q, defaultQuestionFormFields())
 }
 
 function setExerciseOptionText(q, idx, value) {
@@ -384,37 +515,11 @@ function syncFillBlanks(q) {
   if (q.fillBlanks.length > count) q.fillBlanks.splice(count)
 }
 
-function buildContent(q) {
-  switch (q.type) {
-    case 'open': {
-      const alts = (q.openAltAnswers ?? []).map((a) => a.trim()).filter(Boolean)
-      return { correct_answer: q.openAnswer, ...(alts.length ? { accepted_answers: alts } : {}) }
-    }
-    case 'mcq':       return { options: q.mcqOptions.map((o, i) => ({ text: o.text, correct: i === q.mcqCorrectIdx })) }
-    case 'fill_blank':return { template: q.fillTemplate, blanks: q.fillBlanks }
-    case 'reorder':   return { fragments: q.reorderFragments, solution: q.reorderFragments.map((_, i) => i) }
-    default:          return null
-  }
-}
-
-function contentToFormState(q) {
-  const c = q.content ?? {}
-  switch (q.type) {
-    case 'open':
-      return { openAnswer: c.correct_answer ?? '', openAltAnswers: [...(c.accepted_answers ?? [])], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
-    case 'mcq': {
-      const opts = c.options ?? [{ text: '', correct: true }, { text: '', correct: false }]
-      const correctIdx = opts.findIndex(o => o.correct)
-      return { openAnswer: '', openAltAnswers: [], mcqOptions: opts.map(o => ({ text: o.text })), mcqCorrectIdx: correctIdx >= 0 ? correctIdx : 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
-    }
-    case 'fill_blank':
-      return { openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: c.template ?? '', fillBlanks: [...(c.blanks ?? [])], reorderFragments: ['', ''] }
-    case 'reorder':
-      return { openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: [...(c.fragments ?? ['', ''])] }
-    default:
-      return { openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
-  }
-}
+// CHOIX : `buildContent`/`contentToFormState` extraites dans helpers/exerciseQuestionForm.js (C-02.07,
+// sous les noms `buildQuestionContent`/`contentToFormState`) pour être réutilisées telles quelles par
+// AiExerciseReviewModalComponent.vue (Écran de révision) — comportement strictement inchangé, voir
+// DECISIONS.md.
+const buildContent = buildQuestionContent
 
 function addQuestion() { form.questions.push(defaultQuestion()) }
 
@@ -479,6 +584,21 @@ async function openEditModal(test) {
 function closeModal() { showModal.value = false }
 
 // ── soumission ────────────────────────────────────────────────────────────────
+
+/**
+ * Message d'erreur à afficher pour une réponse HTTP en échec : priorité au message métier du
+ * controller (`{ message }`, pattern CONVENTIONS.md), puis au premier message de validation
+ * express-validator (`{ errors: [{ msg, ... }] }`, posé par `validate.middleware.js` — jusqu'ici
+ * ignoré ici, ce qui masquait la vraie cause derrière un message générique "Erreur question N.").
+ *
+ * @param {{ data?: { message?: string, errors?: { msg: string }[] } }} resp
+ * @param {string} fallback - Utilisé seulement si ni message ni erreurs de validation ne sont présents
+ * @returns {string}
+ */
+function extractErrorMessage(resp, fallback) {
+  return resp?.data?.message || resp?.data?.errors?.[0]?.msg || fallback
+}
+
 async function submitExercise() {
   if (isEditMode.value) await submitEdit()
   else await submitCreate()
@@ -488,16 +608,22 @@ async function submitCreate() {
   submitting.value = true
   formError.value = ''
   try {
-    testStore.test = { name: form.name, subjectId: Number(form.subjectId) }
-    const created = await testStore.createTest()
-    if (!created) { formError.value = 'Erreur lors de la création de l\'exercice.'; return }
-    const testId = testStore.test.testId
+    // CHOIX : appel direct à l'API plutôt que testStore.createTest() (BUG TROUVÉ EN CONDITIONS
+    // RÉELLES : createTest() ne renvoie qu'un booléen, la vraie raison d'un échec — message
+    // d'erreur serveur ou de validation — n'était accessible qu'via un toast interne au store,
+    // jamais remontée ici ; le formulaire affichait alors systématiquement le message générique
+    // "Erreur lors de la création de l'exercice.", quelle que soit la cause réelle). Même choix
+    // déjà fait par submitEdit() ci-dessous pour la mise à jour du test (api.put direct).
+    const testResp = await api.post('tests', { name: form.name, subjectId: Number(form.subjectId) })
+    if (!testResp || testResp.status !== 201) { formError.value = extractErrorMessage(testResp, 'Erreur lors de la création de l\'exercice.'); return }
+    testStore.test = testResp.data
+    const testId = testResp.data.testId
     guidedTourStore.recordLinks({ testId })
 
     for (let i = 0; i < form.questions.length; i++) {
       const q = form.questions[i]
       const resp = await api.post('questions', { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q), idTest: testId })
-      if (!resp || resp.status !== 201) { formError.value = resp?.data?.message || `Erreur question ${i + 1}.`; return }
+      if (!resp || resp.status !== 201) { formError.value = extractErrorMessage(resp, `Erreur question ${i + 1}.`); return }
     }
 
     await tagStore.setEntityTags('test', testId, form.tagIds)
@@ -515,7 +641,7 @@ async function submitEdit() {
   formError.value = ''
   try {
     const testResp = await api.put(`tests/${editTestId.value}`, { name: form.name, subjectId: Number(form.subjectId) })
-    if (!testResp || testResp.status !== 200) { formError.value = testResp?.data?.message || 'Erreur mise à jour exercice.'; return }
+    if (!testResp || testResp.status !== 200) { formError.value = extractErrorMessage(testResp, 'Erreur mise à jour exercice.'); return }
 
     for (const qId of questionsToDelete.value) {
       const resp = await api.del(`questions/${qId}`)
@@ -527,10 +653,10 @@ async function submitEdit() {
       const payload = { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q) }
       if (q.idQuestion) {
         const resp = await api.put(`questions/edit/${q.idQuestion}`, payload)
-        if (!resp || resp.status !== 200) { formError.value = resp?.data?.message || `Erreur mise à jour question ${i + 1}.`; return }
+        if (!resp || resp.status !== 200) { formError.value = extractErrorMessage(resp, `Erreur mise à jour question ${i + 1}.`); return }
       } else {
         const resp = await api.post('questions', { ...payload, idTest: editTestId.value })
-        if (!resp || resp.status !== 201) { formError.value = resp?.data?.message || `Erreur création question ${i + 1}.`; return }
+        if (!resp || resp.status !== 201) { formError.value = extractErrorMessage(resp, `Erreur création question ${i + 1}.`); return }
       }
     }
 
