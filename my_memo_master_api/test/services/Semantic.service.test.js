@@ -542,6 +542,18 @@ describe('SemanticService', () => {
         )
       ).toBe(false)
     })
+
+    // C-02.09 (revue de code) : régression trouvée dans extractKeywords — sans STOPWORDS complet, un
+    // mot de liaison commun aux deux membres (ici « si ») faisait passer `straight` à true via ce seul
+    // mot partagé, masquant une inversion pourtant réelle et détectable sur le reste de la phrase.
+    it('détecte toujours une inversion quand un mot de liaison court ("si") est présent des deux côtés, dans des clauses par ailleurs différentes', () => {
+      expect(
+        SemanticService.detectInversion(
+          'la masse divisée par le volume si on néglige les frottements',
+          'le volume divisé par la masse si la vitesse est nulle'
+        )
+      ).toBe(true)
+    })
   })
 
   describe('Model loading (lazy singleton)', () => {

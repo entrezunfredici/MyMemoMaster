@@ -1,4 +1,5 @@
 const { body } = require('express-validator')
+const { bufferMatchesMime } = require('../helpers/fileSignature')
 
 // Plafond dupliqué de services/AiExerciseGeneration.service.js#MAX_QUESTION_COUNT — même choix
 // assumé que AiGenerationBatch.validators.js (C-01) et documenté dans DECISIONS.md (2026-09-01) :
@@ -38,5 +39,24 @@ exports.generate = [
       throw new Error("Fournir soit un texte source (sourceText), soit un fichier PDF (l'un des deux exactement).")
     }
     return true
+  }),
+  // Magic bytes (OWASP A08-M2) : déplacé du controller (qui ne doit faire que try/catch + appel
+  // service + réponse HTTP, AGENT.md §3/CLAUDE.md « Règles rapides ») vers le validateur, comme
+  // c'est déjà le rôle de ce fichier pour toute validation d'entrée. Même vérification que
+  // AiGenerationBatch.controller.js#generate (C-01) faisait déjà dans son controller — écart
+  // pré-existant, hors périmètre de ce ticket (voir TODO ci-dessous côté C-01).
+  body().custom((_, { req }) => {
+    if (req.file && !bufferMatchesMime(req.file.buffer, 'application/pdf')) {
+      throw new Error("Le fichier envoyé n'est pas un PDF valide.")
+    }
+    return true
   })
+]
+
+// Ajout C-02.09 (revue de code) : POST /ai-exercise-generations/validate-import — voir
+// controllers/AiExerciseGeneration.controller.js#validateImport.
+exports.validateImport = [
+  body('questions')
+    .isArray({ min: 1 })
+    .withMessage('questions doit être un tableau non vide.')
 ]

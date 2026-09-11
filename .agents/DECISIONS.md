@@ -3629,6 +3629,11 @@ similaire sur un `addXxx()`/`setXxx()` d'association Sequelize est un jour rappo
 
 ### [2026-09-08] C-02.08 — Signal `invalid_output` masqué en `service_unavailable` pour un chunk unique : dégradation assumée, non corrigée
 
+> **SUPERSÉDÉE le [2026-09-11] (C-02.09, revue de code)** : ce ticket touchait de toute façon
+> `AiExerciseGenerationPipeline.service.js` (5 bugs bloquants trouvés en revue) — la correction envisagée
+> ci-dessous en « Alternative écartée » a été appliquée, généralisée à `rateLimited` en plus du message.
+> Voir l'entrée dédiée du 2026-09-11 plus bas dans ce fichier.
+
 **Contexte** : `test/bdd/aiExerciseGenerationFlow.test.js` (C-02.08, tests fonctionnels) a révélé que, depuis
 que `POST /ai-exercise-generations` passe systématiquement par `AiExerciseGenerationPipeline.service.js`
 (import PDF, décision du même jour ci-dessus), une génération sur un texte tenant en un seul chunk qui épuise
@@ -4115,3 +4120,62 @@ vérifiées) présentait par ailleurs une dérive schéma/`SequelizeMeta` sans r
 manquantes malgré des migrations marquées `up`) — non corrigée ici (hors périmètre), signalée à l'utilisateur.
 Piste ouverte si ce type de bug (colonne `STRING` nue avec un validateur plus permissif) doit être audité
 systématiquement sur les autres modèles — non fait ici (recherche limitée au champ signalé).
+
+---
+
+### [2026-09-11] C-02.09 — Validation format : nouvel endpoint dédié plutôt qu'extension de POST /questions
+
+**Contexte** : revue de code de `dev_back_ia` (C-02.09) — `AiExerciseImportValidation.service.js` (C-02.04)
+n'était appelé nulle part en production. Le câbler est un ajout/changement d'interface publique
+(`AGENT.md` §2, « signale-le explicitement et attends validation ») : question posée à l'utilisateur avant
+d'agir (voir session), 3 options présentées.
+
+**Décision** : nouvel endpoint dédié `POST /ai-exercise-generations/validate-import` (auth requise, pas de
+rate limiter dédié — pas d'appel LLM, validation de forme pure), appelé côté front par
+`ExercisesPage.vue#handleReviewConfirm` juste après l'Écran de révision (C-02.07), avant la fusion dans
+`form.questions` — donc avant tout `POST /tests`/`POST /questions`, qui restent inchangés (cohérent avec le
+choix déjà posé en C-02.06 : « endpoints existants, inchangés »). Échec partiel toléré : une question rejetée
+n'est jamais ajoutée silencieusement (`toAdd` filtré), l'utilisateur est notifié (`notif.notify`) — jamais de
+correction automatique, comme le service le prévoyait déjà lui-même.
+
+**Alternative écartée** : étendre `validators/Question.validators.js` pour valider la forme de `content` par
+type sur toute création de question. Rejetée car `POST /questions` est un endpoint **partagé** avec la
+création manuelle (hors périmètre `C-02`) — resserrer sa validation aurait pu casser des flux de création
+manuelle existants sans lien avec la génération IA, un risque non justifié pour ce ticket de revue/merge.
+
+**Alternative écartée (2)** : valider dans `submitCreate()`/`submitEdit()` (juste avant la persistance finale,
+pour TOUTES les questions du formulaire, pas seulement celles issues de l'IA) — écartée après un premier essai
+qui cassait 5 tests front existants (`ExercisesPage.test.js`, mocks `api.post` non conscients de l'ordre
+d'appel) et validait aussi les questions saisies manuellement, hors périmètre de `AiExerciseImportValidation`
+(conçu spécifiquement pour un brouillon IA potentiellement édité, cf. son propre commentaire d'en-tête).
+
+**Conséquences** : la validation ne protège que le flux IA (accept/edit/reject → fusion), pas la création
+manuelle classique — cohérent avec le périmètre `C-02`, mais une question manuelle malformée reste possible
+via `POST /questions` (déjà le cas avant ce ticket, pas une régression). `test/components/ExercisesPage.test.js`
+adapté : `handleReviewConfirm` est désormais asynchrone (round-trip réseau avant la fusion), 4 tests existants
+mis à jour (`await` + mock de la nouvelle route), 1 test ajouté pour le cas de rejet.
+
+---
+
+### [2026-09-11] C-02.09 — STOPWORDS `Semantic.service.js` : complète le batch du 2026-09-08 plutôt que de réintroduire un plancher de longueur
+
+**Contexte** : agent de revue « removed-behavior audit » — depuis le retrait du plancher `length > 2` dans
+`extractKeywords` (2026-09-09), un mot de liaison court non couvert par `STOPWORDS` (« si », « tu », « ai »,
+« va ») peut apparaître comme mot-clé des deux côtés d'une phrase-ratio et fausser `detectInversion` (overlap
+accidentel via ce seul mot, masquant une inversion d'opérandes par ailleurs réelle et détectable).
+
+**Décision** : ajouter les 4 mots à `STOPWORDS` (même liste, même raisonnement que le batch du 2026-09-08),
+plutôt que de réintroduire un plancher de longueur — les deux angles morts qui avaient motivé son retrait
+(réponse purement symbolique courte type variables physiques `ρ`/`g`/`V`, et un seul token long qui désactivait
+un repli conditionnel) restent valables et ne sont pas réintroduits par cet ajout ciblé.
+
+**Alternative écartée** : liste de stopwords générée/exhaustive (dictionnaire complet des mots grammaticaux
+français) — écartée, disproportionné pour ce ticket de revue et risque de sur-filtrer des mots qui pourraient
+légitimement porter du sens dans une réponse d'élève (cohérent avec le choix déjà fait pour `SYNONYM_GROUPS`,
+volontairement borné plutôt qu'un thésaurus général).
+
+**Conséquences** : le batch `STOPWORDS` reste, par construction, incomplet à 100 % — un futur mot de liaison
+court non couvert peut réintroduire un cas similaire. Pas d'audit systématique fait ici (recherche limitée aux
+4 mots trouvés par l'agent de revue). Test de régression ajouté (`Semantic.service.test.js`,
+`detectInversion`) isolant spécifiquement la contamination par un mot de liaison partagé (clauses par ailleurs
+différentes des deux côtés, pour ne pas confondre avec un recouvrement de contenu réel).

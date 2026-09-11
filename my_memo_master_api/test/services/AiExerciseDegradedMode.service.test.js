@@ -44,6 +44,20 @@ describe('AiExerciseDegradedModeService', () => {
       expect(result.message).toContain('manuellement')
     })
 
+    // C-02.09 (revue de code) : 422 (contenu source résolu mais vide/inexploitable) n'avait aucune
+    // branche dédiée — repliait sur "unknown" (message générique) au lieu du message actionnable déjà
+    // porté par l'erreur, et le controller ne pouvait donc jamais répondre 422 (contrat pourtant déjà
+    // documenté dans le swagger de la route).
+    it('describeFailure - erreur 422 (contenu source vide/inexploitable) - pas un mode dégradé, message d\'origine conservé', () => {
+      const error = Object.assign(new Error("Aucun contenu exploitable n'a été trouvé dans la source fournie."), { statusCode: 422 })
+      expect(AiExerciseDegradedModeService.describeFailure(error)).toEqual({
+        degraded: false,
+        code: 'invalid_content',
+        message: "Aucun contenu exploitable n'a été trouvé dans la source fournie.",
+        suggestManualCreation: false
+      })
+    })
+
     it('describeFailure - erreur 502 avec rateLimited - mode dégradé "rate_limited"', () => {
       const error = Object.assign(new Error('Le service de génération IA est indisponible pour le moment.'), {
         statusCode: 502,

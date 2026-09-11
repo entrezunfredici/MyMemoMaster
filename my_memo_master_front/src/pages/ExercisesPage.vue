@@ -443,19 +443,46 @@ function isBlankUntouchedQuestion(q) {
 /**
  * Reçoit les questions acceptées (éventuellement éditées) par l'Écran de révision (C-02.07,
  * AiExerciseReviewModalComponent.vue#confirm) — déjà dans la représentation `form.questions`
- * (mêmes clés que `defaultQuestion()`/`contentToFormState`) — et les ajoute par un simple `push`,
- * exactement comme `addQuestion()` le fait pour une question manuelle (§7 de
- * generation_ia_exercices_ui.md). Retire au passage la question vide par défaut si elle est encore
- * intacte (voir `isBlankUntouchedQuestion`), pour ne jamais laisser un exercice se créer avec une
- * question fantôme en plus des questions générées. Referme ensuite tout le flux IA.
+ * (mêmes clés que `defaultQuestion()`/`contentToFormState`).
+ *
+ * Ajout C-02.09 (revue de code) : les revalide d'abord via `POST
+ * /ai-exercise-generations/validate-import` (AiExerciseImportValidation.service.js, C-02.04) —
+ * jusqu'ici jamais appelé en production, alors qu'une édition en Interface de révision peut casser le
+ * format d'une question (ex. mcq dont on retire la seule option marquée correcte) sans qu'aucun
+ * contrôle serveur n'existe pour le bloquer avant persistance. Échec partiel toléré, comme le service
+ * le prévoit lui-même : une question rejetée n'empêche pas l'ajout des autres, mais n'est jamais
+ * ajoutée silencieusement — l'utilisateur en est notifié (pas de correction automatique).
+ *
+ * Ajoute ensuite les questions importables par un simple `push`, exactement comme `addQuestion()` le
+ * fait pour une question manuelle (§7 de generation_ia_exercices_ui.md). Retire au passage la question
+ * vide par défaut si elle est encore intacte (voir `isBlankUntouchedQuestion`), pour ne jamais laisser
+ * un exercice se créer avec une question fantôme en plus des questions générées — sauf si aucune
+ * question n'est finalement importable, pour ne pas vider le formulaire. Referme ensuite tout le flux IA.
  *
  * @param {object[]} acceptedQuestions
  */
-function handleReviewConfirm(acceptedQuestions) {
+async function handleReviewConfirm(acceptedQuestions) {
+  let toAdd = acceptedQuestions
+
   if (acceptedQuestions.length) {
+    const questions = acceptedQuestions.map((q) => ({ statement: q.statement, type: q.type, content: buildContent(q) }))
+    const resp = await api.post('ai-exercise-generations/validate-import', { questions })
+    const rejected = resp?.status === 200 ? resp.data.rejected : []
+    if (rejected.length) {
+      const rejectedIndexes = new Set(rejected.map((r) => r.index))
+      toAdd = acceptedQuestions.filter((_, i) => !rejectedIndexes.has(i))
+      notif.notify(
+        `${rejected.length} question(s) écartée(s) au format après relecture (à recréer manuellement) : ` +
+          rejected.map((r) => r.errors.join(' ')).join(' '),
+        'error'
+      )
+    }
+  }
+
+  if (toAdd.length) {
     form.questions = form.questions.filter((q) => !isBlankUntouchedQuestion(q))
   }
-  for (const q of acceptedQuestions) {
+  for (const q of toAdd) {
     form.questions.push({ ...defaultQuestion(), ...q })
   }
   closeAiFlow()

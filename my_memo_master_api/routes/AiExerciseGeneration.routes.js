@@ -83,4 +83,49 @@ module.exports = (router) => {
     validate,
     aiExerciseGeneration.generate
   )
+
+  /**
+   * @swagger
+   * /ai-exercise-generations/validate-import:
+   *   post:
+   *     summary: Revalide le format d'un lot de questions de brouillon juste avant leur import réel
+   *     description: >
+   *       Périmètre C-02.04/C-02.09 : à appeler par le front juste avant les POST /tests + POST
+   *       /questions existants (inchangés), pour les questions issues de l'Écran de révision
+   *       (générées par IA, éventuellement éditées). Échec partiel toléré : les questions non
+   *       conformes sont renvoyées dans `rejected` (avec le détail des erreurs), pas persistées ; les
+   *       autres dans `importable`. Aucune persistance n'est faite par cette route elle-même.
+   *     tags: [AiExerciseGeneration]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [questions]
+   *             properties:
+   *               questions:
+   *                 type: array
+   *                 items:
+   *                   type: object
+   *                   properties:
+   *                     statement: { type: string }
+   *                     type: { type: string }
+   *                     content: { type: object }
+   *     responses:
+   *       200:
+   *         description: Lot partitionné entre `importable` et `rejected`
+   *       400:
+   *         description: questions manquant ou vide
+   *       401:
+   *         description: Non authentifié
+   */
+  router.post(
+    '/ai-exercise-generations/validate-import',
+    authMiddleware,
+    sanitize,
+    aiExerciseGenerationValidators.validateImport,
+    validate,
+    aiExerciseGeneration.validateImport
+  )
 }

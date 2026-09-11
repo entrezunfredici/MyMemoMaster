@@ -336,6 +336,7 @@ ${SCHEMA_DESCRIPTION}`
     const config = getMistralConfig()
 
     if (!config.apiKey) {
+      logger.error('[AiExerciseGeneration] Clé API Mistral manquante — génération impossible.')
       const err = new Error('Service de génération IA non configuré (clé API manquante).')
       err.statusCode = 500
       throw err

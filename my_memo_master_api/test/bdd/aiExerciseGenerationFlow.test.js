@@ -200,17 +200,12 @@ describe('Flux génération complet (C-02.08) — Spécification → Service →
     // manuelle, déjà la même modal — generation_ia_exercices_ui.md §8).
   })
 
-  // TROUVÉ EN ÉCRIVANT CE TEST (pas une régression du PDF, comportement déjà partagé avec les cartes
-  // Leitner, cf. AiCardGenerationPipelineService) : depuis que la route passe systématiquement par le
-  // pipeline (import PDF, DECISIONS.md 2026-09-08), un chunk qui épuise son retry ("La génération n'a
-  // pas produit un résultat exploitable. Réessayez.", classé "invalid_output" par
-  // AiExerciseDegradedMode.service.js) est réattrapé par le pipeline, qui — puisque TOUS les chunks
-  // ont échoué (ici il n'y en a qu'un) — relève sa propre erreur générique ("La génération a échoué
-  // sur tous les passages du contenu fourni.") : le message précis du chunk est perdu, `describeFailure`
-  // retombe donc sur "service_unavailable" plutôt que "invalid_output". Les deux codes restent
-  // `degraded: true, suggestManualCreation: true` (seul le message affiché change) — dégradation du
-  // signal assumée, pas une régression bloquante, symétrique à celle déjà acceptée côté cartes.
-  it('mode dégradé — sortie non exploitable après retry (2 échecs de parsing, 1 seul chunk) — réponse dégradée "service_unavailable" (signal précis perdu par le pipeline, assumé)', async () => {
+  // CORRIGÉ EN C-02.09 (revue de code) — voir DECISIONS.md [2026-09-08] pour le bug d'origine (signal
+  // "invalid_output" perdu, dégradation alors assumée) et son entrée de suite du 2026-09-11 : le
+  // pipeline réutilise désormais le message du dernier chunk en échec (`lastError`) quand tous les
+  // chunks échouent, `describeFailure` distingue donc à nouveau "invalid_output" de
+  // "service_unavailable" même sur un contenu tenant en un seul chunk.
+  it('mode dégradé — sortie non exploitable après retry (2 échecs de parsing, 1 seul chunk) — réponse dégradée "invalid_output"', async () => {
     jest.spyOn(aiExerciseGenerationService, 'callModel')
       .mockResolvedValueOnce(mockLlmContent({ notQuestions: [] })) // 1er essai : hors schéma
       .mockResolvedValueOnce(mockLlmContent({ notQuestions: [] })) // retry : toujours hors schéma
@@ -222,7 +217,7 @@ describe('Flux génération complet (C-02.08) — Spécification → Service →
 
     expect(genRes.status).toBe(200)
     expect(genRes.body.success).toBe(false)
-    expect(genRes.body.code).toBe('service_unavailable')
+    expect(genRes.body.code).toBe('invalid_output')
     expect(genRes.body.suggestManualCreation).toBe(true)
     expect(aiExerciseGenerationService.callModel).toHaveBeenCalledTimes(2) // 1 essai + 1 retry, jamais plus
   })

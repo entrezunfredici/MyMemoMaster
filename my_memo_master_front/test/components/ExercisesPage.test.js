@@ -371,8 +371,9 @@ describe('ExercisesPage', () => {
 
       const aiExerciseGenerationStore = useAiExerciseGenerationStore()
       vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({ status: 200, data: { importable: [], rejected: [] } })
 
-      vm.handleReviewConfirm([
+      await vm.handleReviewConfirm([
         {
           statement: 'Capitale de la France ?',
           type: 'mcq',
@@ -407,10 +408,12 @@ describe('ExercisesPage', () => {
 
       vm.openCreateModal() // form.questions = [defaultQuestion()] — une seule question vide, jamais éditée
       vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({ status: 200, data: { importable: [], rejected: [] } })
 
-      vm.handleReviewConfirm([
+      await vm.handleReviewConfirm([
         { statement: 'Q générée', type: 'open', openAnswer: 'Réponse', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
       ])
+      await flushPromises()
 
       expect(vm.form.questions).toHaveLength(1)
       expect(vm.form.questions[0].statement).toBe('Q générée')
@@ -425,10 +428,12 @@ describe('ExercisesPage', () => {
       vm.openCreateModal()
       vm.form.questions[0].statement = 'Ma propre question' // l'utilisateur a commencé à la remplir
       vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({ status: 200, data: { importable: [], rejected: [] } })
 
-      vm.handleReviewConfirm([
+      await vm.handleReviewConfirm([
         { statement: 'Q générée', type: 'open', openAnswer: 'Réponse', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
       ])
+      await flushPromises()
 
       expect(vm.form.questions).toHaveLength(2)
       expect(vm.form.questions[0].statement).toBe('Ma propre question')
@@ -448,6 +453,38 @@ describe('ExercisesPage', () => {
       vm.handleReviewConfirm([])
 
       expect(vm.form.questions).toHaveLength(before)
+      expect(vm.showAiFlow).toBe(false)
+    })
+
+    // C-02.09 (revue de code) : AiExerciseImportValidation.service.js n'était appelé nulle part —
+    // une question éditée en Interface de révision pouvait redevenir invalide au format (ex. mcq sans
+    // option marquée correcte) et être persistée sans contrôle. Revalidée ici avant fusion dans
+    // form.questions, jamais ajoutée silencieusement si rejetée.
+    it('handleReviewConfirm — une question rejetée par la revalidation format n\'est pas ajoutée, l\'utilisateur est notifié', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleReviewConfirm) return
+
+      vm.openCreateModal()
+      vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          importable: [],
+          rejected: [{ index: 0, errors: ['Question #1 : mcq doit avoir exactement une option "correct".'] }]
+        }
+      })
+
+      await vm.handleReviewConfirm([
+        { statement: 'Q cassée', type: 'mcq', openAnswer: '', openAltAnswers: [], mcqOptions: [{ text: 'A' }, { text: 'B' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''] }
+      ])
+      await flushPromises()
+
+      // Ni ajoutée, ni la question vide par défaut retirée (rien d'importable à mettre à sa place).
+      expect(vm.form.questions.some((q) => q.statement === 'Q cassée')).toBe(false)
+      expect(vm.form.questions).toHaveLength(1)
+      expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('1 question'), 'error')
       expect(vm.showAiFlow).toBe(false)
     })
 

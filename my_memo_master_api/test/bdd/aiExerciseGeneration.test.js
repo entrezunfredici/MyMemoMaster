@@ -216,7 +216,10 @@ describe('AiExerciseGeneration — POST /ai-exercise-generations (tests fonction
     expect(res.body.code).toBe('not_configured')
   })
 
-  it('POST — contenu source vide/illisible (422 pipeline) — 200, mode dégradé générique "unknown"', async () => {
+  // C-02.09 (revue de code) : le 422 remonte désormais tel quel (code `invalid_content`), conformément
+  // au contrat déjà documenté dans le swagger de la route — voir DECISIONS.md
+  // [2026-09-11] « 422 replié en mode dégradé "unknown" : corrigé en C-02.09 ».
+  it('POST — contenu source vide/illisible (422 pipeline) — 422, pas un mode dégradé', async () => {
     const error = Object.assign(new Error("Aucun contenu exploitable n'a été trouvé dans la source fournie."), { statusCode: 422 })
     aiExerciseGenerationPipelineService.generateExercisesFromContent.mockRejectedValue(error)
 
@@ -226,8 +229,77 @@ describe('AiExerciseGeneration — POST /ai-exercise-generations (tests fonction
       .field('sourceText', 'Un texte source suffisant.')
       .field('questionCount', '3')
 
+    expect(res.status).toBe(422)
+    expect(res.body.message).toBe("Aucun contenu exploitable n'a été trouvé dans la source fournie.")
+  })
+})
+
+// C-02.09 (revue de code) : AiExerciseImportValidation.service.js (C-02.04) n'était appelé nulle
+// part — ni ici, ni côté front — donc une question éditée en Interface de révision pouvait redevenir
+// invalide au format et être persistée sans aucun contrôle serveur. Endpoint dédié plutôt que
+// d'étendre validators/Question.validators.js (POST /tests + POST /questions restent inchangés).
+describe('AiExerciseGeneration — POST /ai-exercise-generations/validate-import (tests fonctionnels)', () => {
+  let token
+
+  beforeAll(async () => {
+    const role = await Role.create({ name: 'Étudiant validate-import' })
+    const user = await User.create({
+      name: 'Validate Import Tester',
+      email: 'validate-import@test.fr',
+      password: await bcrypt.hash('Test1234!', 10),
+      roleId: role.roleId,
+      hasValidatedEmail: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })
+    token = makeToken(user.userId)
+  })
+
+  it('POST — lot valide — 200, tout dans importable, rejected vide', async () => {
+    const res = await request(app)
+      .post(`${BASE}/ai-exercise-generations/validate-import`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ questions: [VALID_QUESTION] })
+
     expect(res.status).toBe(200)
-    expect(res.body.success).toBe(false)
-    expect(res.body.degraded).toBe(true)
+    expect(res.body.importable).toHaveLength(1)
+    expect(res.body.rejected).toHaveLength(0)
+  })
+
+  it('POST — mcq éditée sans option "correct" — 200, échec partiel : rejetée avec le détail de l\'erreur, le reste importable', async () => {
+    const brokenMcq = {
+      statement: 'Capitale de la France ?',
+      type: 'mcq',
+      content: { options: [{ text: 'Paris', correct: false }, { text: 'Madrid', correct: false }, { text: 'Rome', correct: false }] }
+    }
+
+    const res = await request(app)
+      .post(`${BASE}/ai-exercise-generations/validate-import`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ questions: [VALID_QUESTION, brokenMcq] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.importable).toHaveLength(1)
+    expect(res.body.importable[0].statement).toBe(VALID_QUESTION.statement)
+    expect(res.body.rejected).toHaveLength(1)
+    expect(res.body.rejected[0].index).toBe(1)
+    expect(res.body.rejected[0].errors.join(' ')).toContain('correct')
+  })
+
+  it('POST — questions manquant — 400 (validators)', async () => {
+    const res = await request(app)
+      .post(`${BASE}/ai-exercise-generations/validate-import`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+
+    expect(res.status).toBe(400)
+  })
+
+  it('POST — sans token — 401', async () => {
+    const res = await request(app)
+      .post(`${BASE}/ai-exercise-generations/validate-import`)
+      .send({ questions: [VALID_QUESTION] })
+
+    expect(res.status).toBe(401)
   })
 })

@@ -186,6 +186,7 @@ class AiExerciseGenerationPipelineService {
     let successCount = 0
     let consecutiveRateLimitFailures = 0
     let stoppedOnSustainedRateLimit = false
+    let lastError = null
 
     if (truncated) {
       warnings.push(
@@ -220,6 +221,7 @@ class AiExerciseGenerationPipelineService {
           `[AiExerciseGenerationPipeline] Passage ${i + 1}/${chunks.length} en échec : ${error?.message || error}`
         )
         warnings.push(`Passage ${i + 1}/${chunks.length} n'a pas pu être traité (${error?.message || 'erreur inconnue'}).`)
+        lastError = error
         if (error.usage) {
           usage.model = usage.model ?? error.usage.model ?? null
           usage.promptTokens += error.usage.promptTokens || 0
@@ -248,13 +250,28 @@ class AiExerciseGenerationPipelineService {
     }
 
     if (successCount === 0) {
-      const err = new Error(
-        stoppedOnSustainedRateLimit
-          ? 'La génération a été interrompue : limite de débit Mistral atteinte de façon soutenue ' +
-            '(compte probablement sur un palier restrictif ou quota épuisé — voir console.mistral.ai).'
-          : 'La génération a échoué sur tous les passages du contenu fourni.'
-      )
+      // CHOIX : réutiliser le `rateLimited`/message du dernier échec de chunk plutôt qu'un message
+      // toujours générique.
+      // RAISON : AiExerciseDegradedMode.service.js#describeFailure classe une erreur 502 en
+      // `rate_limited`/`invalid_output` en lisant `error.rateLimited`/le texte exact du message — un
+      // message générique ici rendait ces deux branches inatteignables via cette route (le seul appelant
+      // HTTP réel), l'utilisateur voyait toujours "service indisponible" même sur un rate limit ou une
+      // sortie non exploitable.
+      const rateLimited = stoppedOnSustainedRateLimit || Boolean(lastError?.rateLimited)
+      const isInvalidOutput =
+        typeof lastError?.message === 'string' && lastError.message.includes("n'a pas produit un résultat exploitable")
+
+      let message = 'La génération a échoué sur tous les passages du contenu fourni.'
+      if (stoppedOnSustainedRateLimit) {
+        message = 'La génération a été interrompue : limite de débit Mistral atteinte de façon soutenue ' +
+          '(compte probablement sur un palier restrictif ou quota épuisé — voir console.mistral.ai).'
+      } else if (isInvalidOutput) {
+        message = lastError.message
+      }
+
+      const err = new Error(message)
       err.statusCode = 502
+      if (rateLimited) err.rateLimited = true
       if (usage.promptTokens > 0 || usage.completionTokens > 0 || usage.ocrPagesProcessed > 0) {
         err.usage = usage
       }

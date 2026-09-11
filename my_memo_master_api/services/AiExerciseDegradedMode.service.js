@@ -67,10 +67,12 @@ class AiExerciseDegradedModeService {
    * Classifie une erreur levée par `AiExerciseGeneration.service.js#generateExercises` (ou
    * `callModel`) en un code de dégradation stable, avec un message utilisateur prêt à afficher.
    *
-   * Distingue explicitement une erreur de **saisie utilisateur** (400 — `sourceText`/`questionCount`/
-   * `questionType` invalides, cf. C-02.03 `validateInput`) : ce n'est PAS un mode dégradé, l'IA reste
-   * disponible, l'utilisateur doit juste corriger sa saisie — `suggestManualCreation` reste `false`
-   * et le message d'origine (déjà en français, déjà actionnable) est renvoyé tel quel.
+   * Distingue explicitement une erreur de **saisie utilisateur** (400 `invalid_input` —
+   * `sourceText`/`questionCount`/`questionType` invalides, cf. C-02.03 `validateInput` ; ou 422
+   * `invalid_content` — contenu source résolu mais vide/inexploitable) : ce n'est PAS un mode dégradé,
+   * l'IA reste disponible, l'utilisateur doit juste corriger sa saisie/son fichier —
+   * `suggestManualCreation` reste `false` et le message d'origine (déjà en français, déjà actionnable)
+   * est renvoyé tel quel.
    *
    * Toute autre erreur (500 config manquante, 502 service indisponible/rate limit soutenu/sortie non
    * conforme après retry, ou une erreur inattendue sans `statusCode` reconnu) est traitée comme un
@@ -86,6 +88,16 @@ class AiExerciseDegradedModeService {
 
     if (statusCode === 400) {
       return { degraded: false, code: 'invalid_input', message: error.message, suggestManualCreation: false }
+    }
+
+    // 422 : contenu source résolu mais vide/inexploitable (PDF scanné sans texte, texte filtré au
+    // chunking) — cf. AiExerciseGenerationPipeline.service.js#generateExercisesFromContent. Comme le
+    // 400, ce n'est pas un mode dégradé (l'IA reste disponible) : message déjà actionnable, transmis
+    // tel quel plutôt que de tomber sur le message générique `unknown`. Code distinct de
+    // `invalid_input` (le controller y répond 422, conformément au contrat déjà documenté dans le
+    // swagger de la route — voir routes/AiExerciseGeneration.routes.js).
+    if (statusCode === 422) {
+      return { degraded: false, code: 'invalid_content', message: error.message, suggestManualCreation: false }
     }
 
     if (statusCode === 500) {

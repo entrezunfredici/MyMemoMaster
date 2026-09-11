@@ -116,6 +116,14 @@ const STOPWORDS = new Set([
   'eu',
   'ça',
   'là',
+  // C-02.09 (revue de code) : le batch du 2026-09-08 ci-dessus n'était pas exhaustif — d'autres mots
+  // de liaison ≤ 2 caractères passaient encore, avec le même risque qu'à l'origine (ex. « si » commun
+  // aux deux membres d'une phrase de type ratio peut faire passer `detectInversion` à `straight: true`
+  // via ce seul mot, masquant une vraie inversion d'opérandes par ailleurs correctement détectée).
+  'si',
+  'tu',
+  'ai',
+  'va',
   // Anglais
   'the',
   'a',

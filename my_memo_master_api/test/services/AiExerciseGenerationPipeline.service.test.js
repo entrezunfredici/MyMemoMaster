@@ -163,6 +163,44 @@ describe('AiExerciseGenerationPipelineService', () => {
         statusCode: 502
       })
       expect(error.usage).toBeUndefined()
+      expect(error.rateLimited).toBeUndefined()
+    })
+
+    // C-02.09 (revue de code) : le message générique masquait "n'a pas produit un résultat
+    // exploitable" (invalid_output) et le flag `rateLimited`, rendant ces deux branches de
+    // AiExerciseDegradedMode.service.js#describeFailure inatteignables via la route réelle (un seul
+    // chunk = le cas le plus courant). Corrigé en réutilisant le dernier échec de chunk.
+    it('generateExercisesFromContent - tous les chunks échouent avec une sortie non exploitable - repropage le message précis (invalid_output)', async () => {
+      AiExerciseGenerationService.generateExercises.mockRejectedValue(
+        Object.assign(new Error("La génération n'a pas produit un résultat exploitable. Réessayez."), { statusCode: 502 })
+      )
+
+      const error = await AiExerciseGenerationPipelineService.generateExercisesFromContent({
+        sourceText: 'Un texte court.',
+        questionCount: 1
+      }).catch((e) => e)
+
+      expect(error).toMatchObject({
+        message: "La génération n'a pas produit un résultat exploitable. Réessayez.",
+        statusCode: 502
+      })
+      expect(error.rateLimited).toBeUndefined()
+    })
+
+    it('generateExercisesFromContent - un seul chunk, rate limité (sous le seuil du circuit breaker) - repropage rateLimited', async () => {
+      AiExerciseGenerationService.generateExercises.mockRejectedValue(
+        Object.assign(new Error('Le service de génération IA est indisponible pour le moment.'), {
+          statusCode: 502,
+          rateLimited: true
+        })
+      )
+
+      const error = await AiExerciseGenerationPipelineService.generateExercisesFromContent({
+        sourceText: 'Un texte court.',
+        questionCount: 1
+      }).catch((e) => e)
+
+      expect(error).toMatchObject({ statusCode: 502, rateLimited: true })
     })
 
     describe('circuit breaker (rate limit Mistral soutenu)', () => {
