@@ -186,7 +186,17 @@ const STOPWORDS = new Set([
 
 // Seuil unique de décision (2026-09-09, remplace HIGH_THRESHOLD/LOW_THRESHOLD/
 // zone grise) — voir le commentaire dans gradeSemantic pour le détail complet.
-const HIGH_THRESHOLD = 0.78
+// Abaissé de 0,78 à 0,75 (2026-09-12, demande explicite utilisateur) : l'usage
+// réel depuis le 2026-09-09 n'a remonté que des faux négatifs proches du seuil
+// (réponses correctes rejetées, ex. « modèle isotherme » à 0,7407), jamais de
+// faux positif — la calibration d'origine (DECISIONS.md 2026-07-18) n'ancrait
+// 0,78 que sur un seul point négatif (0,717, « réponse fausse même domaine »),
+// marge insuffisante pour trancher entre 0,75 et 0,78. 0,75 garde encore 0,033
+// de marge sous ce seul cas négatif connu. NE corrige PAS le cas isotherme
+// (0,7407 < 0,75) ni un score à 0,73 : reste sous le nouveau seuil aussi — voir
+// DECISIONS.md 2026-09-12 pour le détail et pourquoi ces cas précis ne sont
+// pas rattrapés par ce changement.
+const HIGH_THRESHOLD = 0.75
 
 // Séparateurs antisymétriques de la famille division/rapport : l'ordre des opérandes
 // porte le sens (« masse par unité de volume » ≠ « volume par unité de masse »), mais
@@ -620,15 +630,19 @@ class SemanticService {
       // Choix explicite de l'utilisateur (2026-09-09) après ce constat : « le
       // résultat annoncé devrait se baser sur le pourcentage avancé par le
       // modèle de proximité sémantique ».
-      // Seuil retenu : `HIGH_THRESHOLD` (0,78) inchangé — c'est le seul qui
-      // classe correctement les 8 cas de la calibration DECISIONS.md
+      // Seuil retenu à l'origine (2026-09-09) : `HIGH_THRESHOLD` (0,78) — le seul
+      // qui classait correctement les 8 cas de la calibration DECISIONS.md
       // 2026-07-18 sans aucune assistance de mots-clés (le seul cas alors tombé
-      // en "zone grise", une réponse fausse du même domaine à 0,717, est déjà
+      // en "zone grise", une réponse fausse du même domaine à 0,717, était déjà
       // sous 0,78 ; les 7 autres étaient tous soit ≥0,806 soit à 0,15).
-      // Coût assumé : une réponse correcte mais formulée très différemment
-      // dont le score reste sous 0,78 (ex. la carte « modèle isotherme » de
-      // l'audit du 2026-09-08, à 0,74) redevient « incorrect » — accepté en
-      // échange de la garantie de monotonicité.
+      // Abaissé à 0,75 le 2026-09-12 (cf. commentaire sur la constante) : cette
+      // calibration n'avait qu'un seul point négatif (0,717) pour ancrer la
+      // limite basse — marge jugée insuffisante face aux faux négatifs remontés
+      // en usage réel. Coût assumé inchangé dans son principe : une réponse
+      // correcte mais formulée très différemment dont le score reste sous le
+      // seuil (ex. la carte « modèle isotherme » de l'audit du 2026-09-08, à
+      // 0,74, reste incorrecte même après cet abaissement) redevient
+      // « incorrect » — accepté en échange de la garantie de monotonicité.
       const isCorrect = bestScore >= HIGH_THRESHOLD
       const decisionZone = isCorrect ? 'high' : 'low'
       const matchedRef = bestRef

@@ -65,14 +65,55 @@ RÈGLES STRICTES :
    une date, une définition ou un chiffre absent du texte. Si une carte nécessiterait une information
    non présente dans le texte, ne la génère pas.
 2. Une carte = une notion atomique. N'empile jamais plusieurs questions dans un même énoncé.
-3. Ne produis jamais deux cartes portant sur exactement la même notion.
+3. Ne produis jamais deux cartes portant sur exactement la même notion — y compris en la reformulant
+   sous un angle différent (ex : "Quelle est la valeur de X ?", "Dans quel contexte X est-elle vraie ?"
+   et "Citez X" portent sur UNE SEULE notion, jamais trois cartes séparées).
 4. Formule les questions et réponses en langue {{outputLanguage}}, dans un registre neutre,
    sans jugement de valeur, sans contenu sensible, discriminatoire ou hors sujet. Si le texte source
    contient un tel passage, ignore-le plutôt que de le retranscrire dans une carte.
 5. Chaque carte doit citer, dans le champ "sourceExcerpt", le passage exact du texte source qui
    justifie la carte (traçabilité pour la relecture utilisateur).
 6. Réponds UNIQUEMENT avec un objet JSON conforme au schéma fourni. Aucun texte avant ou après le JSON.
+7. Si le texte source ne contient pas assez de faits distincts pour atteindre le nombre de cartes
+   demandé SANS enfreindre la règle 3, génère MOINS de cartes que demandé plutôt que de combler par
+   reformulation, paraphrase ou découpage artificiel d'un même fait. Un nombre de cartes inférieur à
+   la demande, accompagné d'un "warning" expliquant pourquoi, est une sortie valide et préférable à
+   des cartes redondantes.
+8. Pour toute formule mathématique ou physique (équation, expression symbolique, unité composée),
+   où qu'elle apparaisse ("statement", "answer", "acceptedAnswers", "options[].text") et MÊME quand
+   elle est insérée au milieu d'une phrase, entoure-la de signes dollar ($...$) et écris-la en LaTeX
+   standard : \frac{a}{b} pour une fraction, \sqrt{x}, x^{2} pour un exposant, x_{i} pour un indice,
+   \rho/\Delta/\times... pour les symboles. Cette conversion s'applique MÊME SI le texte source n'est
+   lui-même pas en LaTeX (Δ Unicode, exposants en texte brut, mise en page PDF dégradée) — ne recopie
+   jamais une notation Unicode/texte brut telle quelle, convertis-la systématiquement. Exemples :
+   source "la pression est donnée par P = ρ g h" → sortie "la pression est donnée par $P = \rho g h$" ;
+   source "∆U + ∆Ec = Wtot + Q" → sortie "$\Delta U + \Delta E_c = W_{tot} + Q$" (jamais "∆U + ∆Ec =
+   Wtot + Q" recopié sans balisage). N'utilise ce balisage $...$ QUE pour une formule, jamais pour du
+   texte normal.
+9. Le champ "answer" doit être une réponse AUTONOME et COMPLÈTE : reformule explicitement le sujet
+   de la question (le concept, la grandeur, l'objet interrogé) plutôt que d'utiliser un pronom, une
+   clause elliptique ou une tournure qui ne se comprend qu'en connaissant l'énoncé — SANS ajouter une
+   information absente du texte source (règle 1) : il s'agit de nommer le sujet, pas d'enrichir la
+   définition. À ÉVITER (exemple réel rejeté, source : "on peut associer une grandeur notée U, appelée
+   énergie interne, telle que : U est une fonction d'état, U est extensive") : pour la question
+   "Qu'est-ce que l'énergie interne U d'un système ?", la réponse "Une fonction d'état extensive
+   associée au système." ne mentionne même pas le mot "énergie" et n'a aucun sens hors contexte.
+   Réponse correcte attendue, à partir des MÊMES informations du texte (rien ajouté, seul le sujet est
+   restitué) : "L'énergie interne U est une fonction d'état extensive associée à un système."
+10. Pour une carte "open" dont la réponse est une phrase ou une définition (pas une simple valeur
+    numérique ou un terme isolé), remplis "acceptedAnswers" avec AU MOINS 2 reformulations
+    alternatives de "answer" : même sens, mais vocabulaire et/ou structure de phrase différents. La
+    correction (Semantic.service.js) compare la réponse de l'étudiant à CHACUNE de ces formulations —
+    plus il y a de variantes plausibles couvertes, moins un étudiant risque d'être compté faux pour
+    une reformulation correcte mais différemment exprimée. Un tableau vide reste acceptable
+    uniquement pour une réponse strictement factuelle (valeur, nom, date).
 ```
+
+> Mis à jour le 2026-09-12 (règles 9-10 ajoutées, règles 7-8 rattrapées — ce bloc avait pris du retard
+> sur `services/AiCardGeneration.service.js#buildSystemPrompt`, source de vérité en cas de divergence).
+> Contexte règles 9-10 : cartes générées par IA sur un cours utilisateur, réponse de référence de la
+> carte « énergie interne » (Q4, système Thermodynamique) jugée trop vague pour être reconnue comme
+> correcte par la correction sémantique — cf. DECISIONS.md 2026-09-12.
 
 ### 3.2 Prompt utilisateur (template)
 

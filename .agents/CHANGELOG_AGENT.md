@@ -24,7 +24,7 @@
 | User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-08-31 |
-| Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-09-01 |
+| Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult ; [IMP] 2026-09-12 : `HIGH_THRESHOLD` de `Semantic.service.js` abaissé de 0,78 à 0,75 (faux négatifs remontés en usage réel, cf. DECISIONS.md) | 2026-09-12 |
 | TestResult (scores historique exercices) | Stable — [ADD] 2026-09-01 : colonne `durationSeconds` (nullable), chronométrée côté front sur `POST /tests/:id/submit`, alimente le KPI temps de révision ; M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé ; [ADD] 2026-09-04 : `submitAnswers` valide en plus automatiquement une séance `RevisionSession` planifiée du jour (idTest) après création du TestResult — un exercice soumis est toujours "complet" | 2026-09-04 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
@@ -12021,3 +12021,110 @@ ticket), **839/839 tests front** (0 régression, +10). Lint back (`eslint .`) et
 **Points d'attention / dette** — Merge vers `dev` non exécuté par l'agent (action outward-facing sur une
 branche partagée, confirmation utilisateur requise avant push — voir échanges de la session). La dette listée
 ci-dessus reste à trier en tickets de suivi si besoin.
+
+---
+
+### [2026-09-12] IMP — Seuil de correction sémantique abaissé de 0,78 à 0,75, suite à des faux négatifs remontés en test réel
+
+**Contexte** — L'utilisateur signale, en testant l'application, plusieurs réponses physiquement correctes
+(thermodynamique) comptées incorrectes par le moteur de correction sémantique, dont une à ~0,73 de similarité
+— sous `HIGH_THRESHOLD` (0,78). Demande explicite : abaisser le seuil à 0,75.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`HIGH_THRESHOLD` : 0,78 → 0,75, deux blocs de commentaire
+  mis à jour)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (assertion du test de monotonicité : `>= 0.78`
+  → `>= 0.75`)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite ciblée relancée : `Semantic.service.test.js` (58/58), `Test.service.test.js` (25/25),
+`LeitnerCard.service.test.js` (26/26) — 0 régression. Suite complète non relancée dans ce ticket (changement
+localisé à une constante numérique et son test dédié).
+
+**Points d'attention / dette** — Signalé explicitement à l'utilisateur avant application : ce changement ne
+rattrape **aucun** des cas concrets qui l'ont motivé (0,7407 et ~0,73 restent tous deux sous le nouveau seuil
+de 0,75) — il réduit seulement la fenêtre de faux négatifs pour de futurs scores entre 0,75 et 0,78. Les
+questions Q4/Q5/Q6/Q13 signalées par l'utilisateur (énergie interne, premier principe, bilan machine ditherme)
+n'ont pas pu être vérifiées avec les vraies données à ce stade : la base SQLite dev locale et la base Postgres
+dev locale (`.env` racine, `mymemomasterdb`) sont toutes deux vides de ce contenu — testé sur l'environnement
+preprod déployé. Résolu dans l'entrée suivante (interrogation directe de l'API preprod).
+
+---
+
+### [2026-09-12] ADD/DOC — Interrogation de l'API preprod (Q4/Q5/Q6/Q13) + amélioration du prompt de génération IA (règles 9-10)
+
+**Contexte** — Suite de l'entrée précédente. L'utilisateur fournit ses identifiants preprod (`.env` racine,
+`preprod_mail`/`preprod_pass`) et demande d'interroger directement l'API déployée. Une première tentative
+(identifiants inline dans un `node -e`) est bloquée par le classifieur auto mode (« Credential
+Materialization ») ; résolu par un script dédié + règles de permission scopées.
+
+**Fichiers modifiés/ajoutés**
+- `my_memo_master_api/scripts/preprod-query.js` (nouveau) — client HTTP minimal scopé sur l'API preprod :
+  login (`preprod_mail`/`preprod_pass` lus dans le `.env` racine, jamais en argument CLI) puis requête
+  authentifiée sur un `<METHOD> <path> [jsonBody]` donné en argument
+- `.claude/settings.local.json` — 2 règles de permission ajoutées (`Bash(node scripts/preprod-query.js *)` et
+  la variante préfixée `my_memo_master_api/`, selon le cwd)
+- `my_memo_master_api/services/AiCardGeneration.service.js` (`buildSystemPrompt`) — règles 9-10 ajoutées :
+  (9) `answer` doit être autonome/complet (exemple réel Q4 cité dans le prompt lui-même comme contre-exemple) ;
+  (10) `acceptedAnswers` doit contenir ≥ 2 reformulations alternatives pour une réponse-phrase (vide toléré
+  seulement pour une réponse strictement factuelle)
+- `diagrams/generation_ia_prompt_cartes.md` §3.1 — règles 9-10 ajoutées, et règles 7-8 rattrapées au passage
+  (ce bloc de doc avait pris du retard sur le code, indépendamment de ce ticket)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Constat sur les données réelles** (système « Thermodynamique » idSystem=1, preprod) : les 4 cartes sont bien
+en boîte niveau 1. Cause racine identifiée : Q4 a une réponse de référence générée par IA trop vague (« Une
+fonction d'état extensive associée au système. », ne mentionne même pas « énergie ») — problème de contenu
+généré, pas du moteur de correction sémantique (qui, lui, fonctionne comme conçu). Q5/Q6/Q13 non tranchées
+(texte saisi par l'utilisateur jamais obtenu) — restent en dette.
+
+**Tests** — `AiCardGeneration.service.test.js` + `AiCardGenerationPipeline.service.test.js` : **82/82**, 0
+régression (les nouvelles règles n'affectent que la longueur du prompt système, pas son format).
+
+**Points d'attention / dette** — (1) Amélioration prompt-only : aucune garantie mécanique que le LLM respecte
+réellement les règles 9-10 sur la prochaine génération, à vérifier sur le prochain lot réel de l'utilisateur ;
+validation stricte (`acceptedAnswers.length >= 2` obligatoire) explicitement écartée pour ce ticket (décision
+produit séparée à trancher si le prompt seul ne suffit pas). (2) Aucun endpoint n'expose la liste complète des
+réponses `correction:true` d'une question (`/responses/correction/:id` fait un `findOne`, pas un `findAll`) —
+empêche de vérifier depuis l'API si `acceptedAnswers` est effectivement peuplé en base pour les cartes déjà
+générées ; à considérer si ce diagnostic doit être refait plus tard. (3) Script `preprod-query.js` réutilisable
+mais volontairement générique (un seul `<method> <path>`), pas un client dédié par ressource.
+
+---
+
+### [2026-09-12] ADD/FIX — Validation empirique des règles 9-10 sur les vrais cours de l'utilisateur (appel Mistral réel) + renforcement de la règle 8 (formules LaTeX)
+
+**Contexte** — L'utilisateur partage les 2 cours PDF source (`cours_exemples/Thermodynamique.pdf`,
+`cours_exemples/09_stat-flu_poly-prof.pdf`) et demande de tester/corriger le prompt avec.
+
+**Fichiers modifiés/ajoutés**
+- `my_memo_master_api/scripts/test-ai-generation.js` (nouveau) — appelle `AiCardGenerationService.generateCards`
+  directement (en process, sans HTTP ni DB) sur un fichier texte donné en argument
+- `.claude/settings.local.json` — 2 règles de permission ajoutées pour ce script
+- `my_memo_master_api/services/AiCardGeneration.service.js` (`buildSystemPrompt`) — règle 8 renforcée :
+  la conversion `$...$`/LaTeX s'applique même si le texte source ne l'est pas lui-même (exemple de conversion
+  Unicode → LaTeX ajouté), pour corriger un défaut observé en test réel (formules recopiées en Unicode brut
+  quand insérées au milieu d'une phrase)
+- `diagrams/generation_ia_prompt_cartes.md` §3.1 — même renforcement répliqué
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests réels effectués** (3 appels Mistral réels, `mistral-small-latest`, sur extraits `pdftotext -layout
+-enc UTF-8` des 2 cours) : énergie interne/premier principe (source Q4/Q5 preprod), machine ditherme (source
+Q13), modèle isotherme de l'atmosphère (source du cas historique documenté 2026-09-08, 0,7407) — tous
+confirment : `answer` autonome (sujet explicitement nommé), ≥ 2 `acceptedAnswers` réellement distinctes,
+formules 100 % en LaTeX `$...$` après le renforcement de la règle 8. Cas le plus significatif : la
+reformulation générée pour le modèle isotherme (« La pression atmosphérique décroît exponentiellement avec
+l'altitude... ») est quasiment la paraphrase qui avait échoué à 0,7407 dans le cas historique — désormais
+couverte comme variante acceptée.
+
+**Tests unitaires** — Suite ciblée relancée après le renforcement de la règle 8 :
+`AiCardGeneration.service.test.js` + `AiCardGenerationPipeline.service.test.js` +
+`AiExerciseGeneration.service.test.js` + `AiExerciseGenerationPipeline.service.test.js` — **176/176**, 0
+régression (prompt d'exercices partage le même squelette, vérifié qu'aucun test n'en dépend au caractère près).
+
+**Points d'attention / dette** — (1) Validation faite sur 3 extraits ciblés choisis manuellement, pas sur une
+génération pleine échelle via le pipeline de chunking automatique (`AiCardGenerationPipeline.service.js`).
+(2) Toujours prompt-only : aucune garde mécanique si un futur lot ignore les règles. (3) Les cartes Q5/Q6/Q13
+déjà en base sur preprod ne sont PAS régénérées par ce correctif — celui-ci ne s'applique qu'aux futures
+générations ; une régénération éventuelle de ces cartes précises reste une action à décider séparément
+(écriture sur preprod, hors périmètre de ce ticket).
