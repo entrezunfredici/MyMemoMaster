@@ -1,4 +1,5 @@
 const { instance, AiGenerationBatch, AiGeneratedCard } = require('../models/index')
+const AnswerQualityService = require('./AnswerQuality.service')
 
 // Périmètre C-01.07 (« Stockage cartes générées — en attente ») : persiste le brouillon produit par
 // le pipeline (C-01.05, `{ cards, warnings }`) dans un état "pending", et permet de le relire/le
@@ -16,6 +17,45 @@ const { instance, AiGenerationBatch, AiGeneratedCard } = require('../models/inde
 const BATCH_INCLUDE = { model: AiGeneratedCard, as: 'cards' }
 const BATCH_STATUSES = ['validated', 'discarded']
 const CARD_STATUSES = ['pending', 'accepted', 'edited', 'rejected']
+
+/**
+ * Attache des champs calculés `qualityWarnings`/`qualityLevel` (AnswerQuality.service.js) à une
+ * carte "open" — jamais persistés (pas de colonne dédiée), recalculés à chaque lecture pour rester
+ * à jour si la carte est éditée entre deux affichages. `[]`/`null` pour une carte "mcq" (pas de
+ * "answer"/"acceptedAnswers" à évaluer) ou sans statement/answer — `null` signale "non applicable",
+ * pas "bonne qualité", pour ne pas afficher à tort un badge vert sur un QCM côté écran de validation.
+ *
+ * Écrits à deux endroits chacun, pas par redondance inutile : `dataValues` est ce que lit `toJSON()`
+ * (donc la réponse HTTP réelle, cf. sanity-check DECISIONS.md 2026-09-12 — un champ non déclaré
+ * comme attribut du modèle n'apparaît PAS dans `toJSON()` s'il n'est écrit qu'en propriété directe) ;
+ * la propriété directe `card.qualityWarnings`/`card.qualityLevel` est ce que lit tout code appelant
+ * `card.x` sans passer par `toJSON()` (accès direct en JS, y compris les tests unitaires de ce fichier).
+ *
+ * @param {AiGeneratedCard} card
+ */
+function attachQualityWarnings(card) {
+  const isEvaluable = card.type === 'open' && card.statement && card.answer
+  const warnings = isEvaluable
+    ? AnswerQualityService.assess(card.statement, [card.answer, ...(card.acceptedAnswers || [])])
+    : []
+  const level = isEvaluable ? AnswerQualityService.levelFromWarnings(warnings) : null
+
+  card.dataValues.qualityWarnings = warnings
+  card.qualityWarnings = warnings
+  card.dataValues.qualityLevel = level
+  card.qualityLevel = level
+}
+
+/**
+ * Applique `attachQualityWarnings` à toutes les cartes d'un batch (association `cards`, si chargée).
+ *
+ * @param {AiGenerationBatch} batch
+ * @returns {AiGenerationBatch} le même batch, muté
+ */
+function attachQualityWarningsToBatch(batch) {
+  (batch.cards || []).forEach(attachQualityWarnings)
+  return batch
+}
 
 class AiGenerationBatchService {
   /**
@@ -63,7 +103,8 @@ class AiGenerationBatchService {
       )
 
       await t.commit()
-      return await AiGenerationBatch.findByPk(batch.id, { include: [BATCH_INCLUDE] })
+      const created = await AiGenerationBatch.findByPk(batch.id, { include: [BATCH_INCLUDE] })
+      return attachQualityWarningsToBatch(created)
     } catch (err) {
       await t.rollback()
       throw err
@@ -74,13 +115,16 @@ class AiGenerationBatchService {
    * Récupère un batch et ses cartes — retourne `null` si absent ou n'appartenant pas à
    * l'utilisateur (pas de distinction 403/404, cf. pattern déjà utilisé pour les ressources
    * strictement personnelles de ce projet — évite de confirmer l'existence d'un batch d'autrui).
+   * Chaque carte "open" porte un champ calculé `qualityWarnings` (AnswerQuality.service.js —
+   * DECISIONS.md 2026-09-12), à l'attention de l'écran de validation IA.
    *
    * @param {number} idBatch
    * @param {number} userId
    * @returns {Promise<AiGenerationBatch|null>}
    */
   async findById(idBatch, userId) {
-    return await AiGenerationBatch.findOne({ where: { id: idBatch, userId }, include: [BATCH_INCLUDE] })
+    const batch = await AiGenerationBatch.findOne({ where: { id: idBatch, userId }, include: [BATCH_INCLUDE] })
+    return batch ? attachQualityWarningsToBatch(batch) : null
   }
 
   /**
@@ -91,11 +135,12 @@ class AiGenerationBatchService {
    * @returns {Promise<AiGenerationBatch[]>}
    */
   async findPendingByUser(userId) {
-    return await AiGenerationBatch.findAll({
+    const batches = await AiGenerationBatch.findAll({
       where: { userId, status: 'pending' },
       include: [BATCH_INCLUDE],
       order: [['createdAt', 'DESC']]
     })
+    return batches.map(attachQualityWarningsToBatch)
   }
 
   /**
@@ -131,6 +176,7 @@ class AiGenerationBatchService {
       ...(mindMapNodeId !== undefined ? { mindMapNodeId } : {}),
       ...(status !== undefined ? { status } : {})
     })
+    attachQualityWarnings(card)
     return card
   }
 

@@ -79,6 +79,36 @@ describe('AiGenerationBatchService', () => {
       })
       expect(batch.warnings).toEqual([])
     })
+
+    it('createFromPipelineResult - carte "open" à réponse peu autonome - qualityWarnings non vide (AnswerQuality.service.js)', async () => {
+      // Cas réel du 2026-09-12 (Q4 preprod, énergie interne) : réponse elliptique qui ne mentionne
+      // pas le sujet de la question.
+      const batch = await AiGenerationBatchService.createFromPipelineResult({
+        userId,
+        idSystem,
+        cards: [
+          {
+            statement: "Qu'est-ce que l'énergie interne U d'un système ?",
+            type: 'open',
+            answer: "Une fonction d'état extensive associée au système.",
+            acceptedAnswers: [],
+            sourceExcerpt: 'E'
+          }
+        ]
+      })
+      expect(batch.cards[0].qualityWarnings.length).toBeGreaterThan(0)
+      expect(batch.cards[0].qualityLevel).toBe('low')
+    })
+
+    it('createFromPipelineResult - carte "mcq" - qualityWarnings/qualityLevel non applicables (rien à évaluer)', async () => {
+      const batch = await AiGenerationBatchService.createFromPipelineResult({
+        userId,
+        idSystem,
+        cards: [VALID_CARDS[1]]
+      })
+      expect(batch.cards[0].qualityWarnings).toEqual([])
+      expect(batch.cards[0].qualityLevel).toBeNull()
+    })
   })
 
   describe('findById', () => {
@@ -142,6 +172,22 @@ describe('AiGenerationBatchService', () => {
 
       expect(updated.statement).toBe('Question modifiée')
       expect(updated.status).toBe('edited')
+    })
+
+    it('updateCard - édition de "answer" - qualityWarnings recalculé sur le nouveau contenu', async () => {
+      const batch = await AiGenerationBatchService.createFromPipelineResult({
+        userId,
+        idSystem,
+        cards: [{ statement: "Qu'est-ce que l'énergie interne U d'un système ?", type: 'open', answer: 'A1', acceptedAnswers: [], sourceExcerpt: 'E1' }]
+      })
+      const cardId = batch.cards[0].id
+
+      const updated = await AiGenerationBatchService.updateCard(cardId, userId, {
+        answer: "Une fonction d'état extensive associée au système."
+      })
+
+      expect(updated.qualityWarnings.length).toBeGreaterThan(0)
+      expect(updated.qualityLevel).toBe('low')
     })
 
     it('updateCard - statut invalide - lève une erreur 400', async () => {

@@ -4329,3 +4329,201 @@ lot ; (2) validation faite sur 3 extraits ciblés choisis manuellement, pas sur 
 réelles complètes (chunking automatique du PDF entier via `AiCardGenerationPipeline.service.js`) ; (3) Q5/Q6/Q13
 de la carte preprod existante restent des cartes déjà générées AVANT ce correctif — non régénérées, la
 correction ne s'applique qu'aux futures générations.
+
+---
+
+### [2026-09-12] Nouveau service `AnswerQuality.service.js` — évaluation consultative de la qualité des réponses de référence (IA ou manuelles)
+
+**Contexte** — Suite logique des deux entrées précédentes : l'utilisateur demande un mécanisme qui détecte
+en amont ce type de défaut (réponse de référence trop pauvre), qu'elle soit générée par IA ou saisie à la main,
+plutôt que de compter uniquement sur un prompt bien rédigé (qui n'offre aucune garantie mécanique) ou sur une
+découverte tardive lors d'une session Leitner réelle. Deux points d'intégration choisis explicitement par
+l'utilisateur parmi 3 proposés : écran de validation IA existant, et création/édition manuelle d'une réponse.
+L'option "outil d'audit séparé" (scanner le contenu déjà en base) n'a pas été retenue pour ce ticket.
+
+**Décision** — Nouveau service `my_memo_master_api/services/AnswerQuality.service.js`, purement consultatif
+(ne bloque jamais une création/édition — cohérent avec le refus déjà acté d'une validation stricte dans
+l'entrée `AiCardGeneration.service.js` du même jour). Méthode unique `assess(statement, answers)` → tableau
+d'avertissements en français, calculée par 4 heuristiques déterministes (aucun nouvel appel modèle) :
+1. **Autonomie** (règle 9 du prompt IA) : recouvrement de mots-clés distinctifs entre l'énoncé et la réponse
+   principale — nul = réponse probablement elliptique. Nécessite un filtre de mots topicalement génériques
+   (`GENERIC_FILLER_KEYWORDS` : système, grandeur, transformation, fonction, état...) car un recouvrement
+   naïf sur `Semantic.service.extractKeywords` ne détectait PAS le cas réel Q4 ("système" apparaît des deux
+   côtés sans identifier le vrai sujet, "énergie") — vérifié en écrivant le test avant le filtre, qui échouait.
+2. **Longueur** : réponse-phrase très courte (hors formule/valeur, légitimement courte).
+3. **Formule non balisée** (règle 8) : lettre grecque isolée ou motif "X = ..." hors segment `$...$`.
+4. **Richesse des reformulations** (règle 10) : réponse-phrase sans aucune reformulation, ou reformulations
+   quasi-identiques (recouvrement de mots-clés ≥ 0,85) à la réponse principale.
+
+**Intégration** :
+- `Response.service.js#create`/`update` — calcule les avertissements sur la réponse en cours de
+  création/édition, en tenant compte des autres réponses `correction:true` déjà enregistrées pour la même
+  question comme reformulations ; renvoyés dans le corps de la réponse HTTP (`qualityWarnings`), jamais
+  persistés (pas de colonne dédiée — recalculé à chaque lecture, reste à jour si le contenu change).
+- `AiGenerationBatch.service.js` — `createFromPipelineResult`/`findById`/`findPendingByUser`/`updateCard`
+  attachent un `qualityWarnings` par carte "open" (`[]` pour "mcq", rien à évaluer). Écrit à la fois dans
+  `card.dataValues.qualityWarnings` (lu par `toJSON()`, donc la réponse HTTP réelle) ET `card.qualityWarnings`
+  en propriété directe (lu par tout code accédant à l'instance sans passer par `toJSON()`, dont les tests
+  unitaires) — vérifié empiriquement qu'un champ non déclaré comme attribut du modèle Sequelize n'apparaît
+  dans AUCUN des deux sans cette double écriture (une seule des deux ne suffit pas).
+
+**Alternative écartée** : recalculer via un appel à l'embedding sémantique (similarité question/réponse)
+plutôt qu'un recouvrement de mots-clés — écarté pour cette V1, plus lent (nécessite le modèle NLP chargé,
+~30 s au premier appel) pour un gain de précision non démontré sur les heuristiques 1-4 ; le mot-clé filtré
+suffit sur les cas réels rencontrés. Pourrait être reconsidéré si les faux positifs/négatifs s'accumulent.
+
+**Conséquences** — Fichiers ajoutés : `services/AnswerQuality.service.js`,
+`test/services/AnswerQuality.service.test.js` (15 tests, dont le cas réel Q4 avant/après correction du prompt).
+Fichiers modifiés : `services/Response.service.js` (+`computeQualityWarnings`), `services/
+AiGenerationBatch.service.js` (+`attachQualityWarnings`/`attachQualityWarningsToBatch`), tests des deux mis à
+jour/étendus. Suite complète relancée : **2061/2061 tests API**, 0 régression. Lint propre.
+**Dette** : (1) heuristiques calibrées sur les cas réels rencontrés aujourd'hui (Q4 énergie interne,
+photosynthèse, capitale de la France) — pas de calibration à grande échelle comme pour `HIGH_THRESHOLD` ;
+(2) le front (composants Vue de l'écran de validation IA et de création de réponse) ne consomme pas encore ce
+nouveau champ `qualityWarnings` — reste une action séparée pour l'afficher réellement à l'écran, non demandée
+dans ce ticket ; (3) l'option "outil d'audit du contenu déjà en base" (Q5/Q6/Q13, cartes existantes) reste
+non implémentée, écartée explicitement par l'utilisateur pour ce ticket.
+
+---
+
+### [2026-09-12] Front — badge de qualité (couleur + libellé) branché sur les deux points d'intégration
+
+**Contexte** — Suite de l'entrée précédente : demande explicite d'afficher `qualityWarnings` à l'écran, avec
+en plus "une note globale ou un code couleur permettant de voir directement la qualité de la correction"
+plutôt que la seule liste détaillée d'avertissements.
+
+**Décision** — Ajout de `AnswerQualityService.levelFromWarnings(warnings)` côté back : traduit le tableau
+d'avertissements en 3 paliers `'high'` (0)/`'medium'` (1)/`'low'` (2+), même vocabulaire que `decision_zone`
+de `Semantic.service.js` pour rester cohérent, avec un palier intermédiaire en plus (ici une jauge de qualité,
+pas un verdict binaire). Exposé comme `qualityLevel` aux côtés de `qualityWarnings` par `Response.service.js`
+(`create`/`update`) et `AiGenerationBatch.service.js` (mêmes 4 méthodes que l'entrée précédente) — `null`
+explicitement pour "non applicable" (carte QCM, réponse `correction:false`), pour ne jamais afficher à tort un
+badge vert là où rien n'a été évalué.
+
+Côté front, nouveau composant `AnswerQualityBadgeComponent.vue` (pastille colorée + liste détaillée) branché
+aux deux endroits déjà choisis :
+- `AiValidationScreenComponent.vue` — badge sous la réponse de chaque carte "open" proposée par l'IA.
+- `FlashcardsCardsPage.vue` (modale de création/édition manuelle) — badge affiché **après** l'enregistrement
+  réel de la réponse (pas de prévisualisation en direct sans sauvegarder, hors périmètre de ce ticket) ; la
+  modale ne se referme plus automatiquement si le niveau n'est pas `'high'`, pour que l'avertissement reste
+  visible plutôt que de disparaître avec la fermeture immédiate déjà en place avant ce ticket.
+
+**Point technique notable** : pour la création manuelle avec plusieurs formulations acceptées (`form.answer` +
+`form.altAnswers`, boucle de `POST /responses`), la réponse principale ne voit encore AUCUNE des formulations
+suivantes au moment de sa propre création (elles n'existent pas encore en base à cet instant précis) — son
+`qualityWarnings` renvoyé par le premier appel serait donc faussement pessimiste ("aucune reformulation").
+Corrigé par un `PUT` supplémentaire (contenu inchangé) sur la réponse principale une fois la boucle terminée,
+qui redéclenche le calcul de qualité avec toutes les formulations réellement en base à ce moment — pas de
+nouvel endpoint, juste un appel de plus. N'affecte pas `handleUpdate` (une seule réponse modifiée à la fois,
+pas de boucle) ni `AiGenerationBatch.service.js` (toutes les cartes d'un batch existent déjà en base au
+moment de la lecture, `answer`/`acceptedAnswers` sont sur la même ligne dès la création).
+
+**Alternative écartée** : prévisualisation en direct pendant la saisie (avant tout enregistrement) — nécessite
+soit un nouvel endpoint de calcul sans persistance, soit dupliquer les heuristiques en JS côté front ; écarté
+pour ce ticket (scope), le badge post-sauvegarde couvre déjà le besoin exprimé ("voir directement la qualité").
+
+**Conséquences** — Fichiers ajoutés : `services/AnswerQuality.service.js#levelFromWarnings` (méthode, pas un
+fichier séparé), `my_memo_master_front/src/components/AnswerQualityBadgeComponent.vue`,
+`my_memo_master_front/test/components/AnswerQualityBadge.test.js` (5 tests). Fichiers modifiés :
+`Response.service.js`/`AiGenerationBatch.service.js` (+`qualityLevel`, tests étendus),
+`AiValidationScreenComponent.vue` (+badge, 3 nouveaux tests), `FlashcardsCardsPage.vue` (capture + fermeture
+conditionnelle de la modale, PUT supplémentaire après création multiple). Suite complète relancée : **2065/
+2065 tests API**, **847/847 tests front** (a11y inclus), 0 régression. Lint propre des deux côtés.
+**Dette** : (1) `FlashcardsCardsPage.vue` n'a aucun test dédié (fichier volumineux, aucune suite existante
+avant ce ticket — gap préexistant, pas introduit ici) : le câblage n'y est vérifié que par lint + relecture,
+pas par un test automatisé ; (2) pas de prévisualisation en direct avant sauvegarde (cf. alternative écartée) ;
+(3) l'outil d'audit du contenu déjà en base reste non implémenté (écarté par l'utilisateur, entrée précédente).
+
+---
+
+### [2026-09-12] Endpoint `POST /responses/quality-preview` — aperçu de qualité SANS persistance, prévisualisation en direct pendant la saisie
+
+**Contexte** — Suite immédiate de l'entrée précédente : l'alternative "prévisualisation en direct" y avait été
+explicitement écartée pour rester dans le scope du ticket (badge affiché seulement après sauvegarde). Demande
+explicite de l'utilisateur juste après : l'ajouter.
+
+**Décision** — Nouvel endpoint dédié plutôt que réutiliser `POST /responses`/`PUT /responses/edit/:id` avec un
+flag "dry-run" : `statement`/`answer`/`acceptedAnswers` fournis directement par l'appelant dans le corps de la
+requête, sans `idQuestion` — la Question n'existe pas encore à ce stade côté `FlashcardsCardsPage.vue`
+(création). Nouvelle méthode `ResponseService.previewQuality(statement, answer, acceptedAnswers)`, **synchrone,
+sans aucun accès base** (ni lecture ni écriture) — contrairement à `computeQuality` (entrée du 2026-09-12
+précédente) qui va chercher les reformulations sœurs déjà enregistrées, ici l'appelant doit fournir la liste
+complète lui-même (ce qui est justement déjà le cas côté front à ce stade : le formulaire les a toutes, non
+encore sauvegardées).
+
+Côté front (`FlashcardsCardsPage.vue`) : `watch` sur `[form.statement, form.answer, form.type, ...
+form.altAnswers]`, débounce 500 ms, avec un compteur de séquence (`previewSeq`) pour ignorer la réponse d'un
+appel devenu obsolète si une saisie plus récente en a déjà relancé un autre entre-temps (pas d'annulation
+réseau réelle, juste un garde applicatif — suffisant ici, le volume d'appels reste faible). Nouveau booléen
+`qualitySaved` pour distinguer dans le libellé affiché : aperçu non enregistré ("Aperçu (non enregistré) :")
+vs résultat confirmé après sauvegarde ("✓ Carte enregistrée...") — sans cette distinction, le badge affiché
+pendant la frappe aurait affirmé à tort que la carte était déjà enregistrée.
+
+**Bug trouvé et corrigé en écrivant `schedulePreview`** : le garde initial `if (form.type !== 'open') return`
+sortait avant de réinitialiser `lastQuality` — passer de "Ouverte" à "QCM" laissait le badge de la précédente
+réponse "open" affiché à tort. Corrigé en réinitialisant `lastQuality`/`qualitySaved` dans la même branche que
+la sortie anticipée, plutôt qu'après elle.
+
+**Alternative écartée** : réutiliser `POST /responses`/`PUT /responses/edit/:id` avec un paramètre `dryRun`
+— écarté, aurait mélangé deux responsabilités dans les mêmes routes (persister vs prévisualiser), rendant les
+validators et la doc Swagger plus ambigus pour un gain de code minime (un seul nouveau contrôleur/service très
+court de toute façon).
+
+**Conséquences** — Fichiers ajoutés/modifiés : `validators/Response.validators.js` (+`qualityPreview`),
+`services/Response.service.js` (+`previewQuality`), `controllers/Response.controller.js`
+(+`qualityPreview`), `routes/Response.routes.js` (+`POST /responses/quality-preview`, doc Swagger), tests
+back (`Response.service.test.js` +4, `Response.controller.test.js` +5) ; front `FlashcardsCardsPage.vue`
+(debounce + séquencement + distinction `qualitySaved`). Suite complète relancée : **2074/2074 tests API**
+(0 régression), **847/847 tests front** (inchangé — pas de nouveau test front sur ce point précis, cf. dette).
+Build front (`vite build`) relancé à vide en sanity-check : compile sans erreur.
+**Dette** : (1) toujours aucun test dédié pour `FlashcardsCardsPage.vue` (gap préexistant, cf. entrée
+précédente) — le debounce/séquencement n'est vérifié que par relecture + build, pas par un test automatisé ;
+(2) le garde de séquence (`previewSeq`) est applicatif, pas une vraie annulation réseau (`AbortController`) —
+suffisant tant que le volume d'appels reste faible (un formulaire de modale, pas une liste) ; (3) l'écran de
+validation IA (`AiCardEditModalComponent.vue`, édition d'une carte IA avant acceptation) n'a pas reçu la même
+prévisualisation en direct — seul `FlashcardsCardsPage.vue` en bénéficie pour l'instant, non demandé pour l'IA.
+
+---
+
+### [2026-09-12] Vérification manuelle en conditions réelles (API + front lancés en local, navigateur piloté par Playwright)
+
+**Contexte** — Demande explicite de l'utilisateur : tester que la fonctionnalité marche réellement, pas
+seulement via les tests automatisés (mockés) déjà verts. Environnement de test jetable monté de toutes
+pièces : API lancée avec SQLite forcé (`PG_HOST=` vide) plutôt que Postgres (vide, non peuplé) ; utilisateur
+de test créé directement en base (bcrypt + `hasValidatedEmail: true`) après échec de l'inscription réelle
+(SMTP Brevo du `.env` racine refusé — "Unauthorized IP address", IP non autorisée depuis ce poste) ; rôles
+"Admin"/"Étudiant" absents de la base fraîchement synchronisée, créés manuellement (aucun seeder de données
+n'est déclenché automatiquement au démarrage, seul le schéma l'est) ; session injectée dans le front via
+`localStorage` avec un token JWT réel obtenu par un vrai `POST /users/login` (pas de mock) ; `CORS_ORIGIN`
+ajusté pour autoriser le port du serveur de dev Vite (5173) face à l'API (8001) — deux origines distinctes en
+local, contrairement à la prod où front/API partagent une origine via le reverse-proxy.
+
+**Résultats** — (1) `POST /responses/quality-preview` via `curl` direct : confirmé 0 écriture en base
+(compteur de lignes `Response` identique avant/après l'appel), résultat exact sur le cas Q4 réel (2
+avertissements, `low`) et sur la version corrigée (0 avertissement, `high`) — un premier essai avait donné un
+résultat différent à cause d'un échappement d'apostrophes défaillant dans la commande curl elle-même (fichier
+JSON utilisé ensuite pour éliminer ce risque), pas d'un bug du code. Validations 400 (statement/answer
+manquants) confirmées sur le serveur réel. (2) Navigateur piloté (Playwright, `chromium-cli` indisponible sur
+Windows) sur l'application réelle : badge "Aperçu (non enregistré)" rouge "À revoir" avec les 2 avertissements
+exacts pendant la frappe (réponse elliptique, rien d'enregistré) ; passe à vert "Bonne qualité" en direct après
+amélioration de la réponse + ajout de 2 reformulations, toujours sans sauvegarde ; après clic sur "Ajouter" :
+la carte de bonne qualité ferme la modale automatiquement (comportement voulu), une seconde carte volontairement
+de mauvaise qualité reste dans une modale qui NE se ferme PAS, avec le libellé qui bascule correctement de
+"Aperçu (non enregistré)" à "✓ Carte enregistrée — réponse créée." — les 4 captures d'écran confirment chaque
+étape visuellement (générées dans un dossier temporaire, non conservées).
+
+**Incident opérationnel pendant le test** : `node seeder.js` exécuté par erreur sur la base SQLite déjà
+synchronisée par le serveur a corrompu son schéma (repli sur seulement 4 tables) — corrigé en supprimant le
+fichier `db.sqlite` **local, jetable, non suivi par git** et en relançant le serveur (resynchronisation propre).
+Point de vigilance distinct détecté en nettoyant après le test : `my_memo_master_api/db.sqlite` est en réalité
+suivi par git (pas seulement ignoré comme le suggérait le `*.sqlite` du `.gitignore` — les fichiers déjà
+trackés avant l'ajout d'une règle restent trackés) ; un `rm` de nettoyage l'avait supprimé du répertoire de
+travail par réflexe, restauré immédiatement via `git checkout` avant tout commit — aucune conséquence, mais
+retenu ici pour la prochaine session : ne pas supprimer ce fichier sans vérifier `git status` d'abord.
+
+**Conséquences** — Aucun changement de code (vérification pure). Confirme que les entrées des 2026-09-12
+précédentes (badge de qualité + endpoint de prévisualisation) fonctionnent réellement de bout en bout, pas
+seulement dans les tests mockés. Nettoyage complet effectué : serveurs arrêtés, `.env` temporaire du front et
+scripts de pilotage supprimés, base SQLite de test jetable supprimée (fichier non suivi, recréée à chaque
+lancement local), `db.sqlite` suivi par git restauré. `git status` propre après coup (uniquement les fichiers
+de fonctionnalité de cette session, rien de résiduel du test).

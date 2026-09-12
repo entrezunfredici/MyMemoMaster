@@ -24,7 +24,7 @@
 | User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-08-31 |
-| Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult ; [IMP] 2026-09-12 : `HIGH_THRESHOLD` de `Semantic.service.js` abaissé de 0,78 à 0,75 (faux négatifs remontés en usage réel, cf. DECISIONS.md) | 2026-09-12 |
+| Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult ; [IMP] 2026-09-12 : `HIGH_THRESHOLD` de `Semantic.service.js` abaissé de 0,78 à 0,75 (faux négatifs remontés en usage réel, cf. DECISIONS.md) ; [ADD] 2026-09-12 : `AnswerQuality.service.js` — évaluation consultative de la qualité des réponses de référence (IA ou manuelles), branchée sur `Response.service.js` (create/update) et `AiGenerationBatch.service.js` (écran de validation IA), champ `qualityWarnings` non persisté | 2026-09-12 |
 | TestResult (scores historique exercices) | Stable — [ADD] 2026-09-01 : colonne `durationSeconds` (nullable), chronométrée côté front sur `POST /tests/:id/submit`, alimente le KPI temps de révision ; M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé ; [ADD] 2026-09-04 : `submitAnswers` valide en plus automatiquement une séance `RevisionSession` planifiée du jour (idTest) après création du TestResult — un exercice soumis est toujours "complet" | 2026-09-04 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
@@ -12128,3 +12128,139 @@ génération pleine échelle via le pipeline de chunking automatique (`AiCardGen
 déjà en base sur preprod ne sont PAS régénérées par ce correctif — celui-ci ne s'applique qu'aux futures
 générations ; une régénération éventuelle de ces cartes précises reste une action à décider séparément
 (écriture sur preprod, hors périmètre de ce ticket).
+
+---
+
+### [2026-09-12] ADD — Service `AnswerQuality.service.js` : évaluation consultative de la qualité des réponses de référence (IA ou manuelles)
+
+**Contexte** — Demande utilisateur : un système qui évalue la qualité des réponses de référence (IA ou
+saisies à la main) pour aider à produire une correction sémantique la plus efficace possible, plutôt que de
+compter uniquement sur le prompt de génération (aucune garantie mécanique). Intégré à 2 points choisis
+explicitement par l'utilisateur : écran de validation IA, et création/édition manuelle d'une réponse.
+
+**Fichiers ajoutés**
+- `my_memo_master_api/services/AnswerQuality.service.js` — `assess(statement, answers)`, 4 heuristiques
+  déterministes (autonomie de la réponse, longueur, formule non balisée en LaTeX, richesse des
+  reformulations), purement consultatif, jamais bloquant
+- `my_memo_master_api/test/services/AnswerQuality.service.test.js` — 15 tests, dont le cas réel Q4 (énergie
+  interne, preprod) avant/après correction du prompt de génération IA (entrée précédente)
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Response.service.js` — `create`/`update` calculent et renvoient
+  `qualityWarnings` (jamais persisté) quand `correction: true`, en tenant compte des autres réponses
+  acceptées déjà enregistrées pour la même question
+- `my_memo_master_api/services/AiGenerationBatch.service.js` — `createFromPipelineResult`/`findById`/
+  `findPendingByUser`/`updateCard` attachent `qualityWarnings` à chaque carte "open" (`[]` pour "mcq")
+- `my_memo_master_api/test/services/Response.service.test.js`,
+  `my_memo_master_api/test/services/AiGenerationBatch.service.test.js` — tests étendus pour couvrir le
+  nouveau champ (2 tests modifiés côté Response pour le crash `toJSON` des mocks existants + 1 nouveau ;
+  4 nouveaux tests côté AiGenerationBatch)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète relancée : **2061/2061 tests API**, 0 régression. Lint propre.
+
+**Points d'attention / dette** — (1) Heuristiques calibrées sur les cas réels rencontrés dans cette session
+(énergie interne, photosynthèse, capitale de la France) — pas de calibration à grande échelle. (2) Le front
+(composants Vue de l'écran de validation IA et de création de réponse) ne consomme pas encore `qualityWarnings`
+— reste à afficher réellement à l'écran, action séparée non demandée dans ce ticket. (3) L'option "outil
+d'audit du contenu déjà en base" (pour auditer Q5/Q6/Q13 et le reste du contenu existant) a été explicitement
+écartée par l'utilisateur pour ce ticket.
+
+---
+
+### [2026-09-12] ADD — Badge de qualité (couleur + libellé) affiché sur l'écran de validation IA et la modale de création/édition de réponse
+
+**Contexte** — Suite de l'entrée précédente : demande explicite d'afficher `qualityWarnings` à l'écran, avec
+en plus une note globale/un code couleur pour voir directement la qualité d'une réponse de référence.
+
+**Fichiers ajoutés**
+- `my_memo_master_front/src/components/AnswerQualityBadgeComponent.vue` — pastille colorée (vert/jaune/rouge,
+  jamais la couleur seule : icône + libellé texte, RGAA 3.3) + liste détaillée des avertissements
+- `my_memo_master_front/test/components/AnswerQualityBadge.test.js` — 5 tests
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AnswerQuality.service.js` — `levelFromWarnings(warnings)` : 'high' (0 avert.)/
+  'medium' (1)/'low' (2+), même vocabulaire que `decision_zone` de `Semantic.service.js`
+- `my_memo_master_api/services/Response.service.js`, `my_memo_master_api/services/AiGenerationBatch.service.js`
+  — exposent `qualityLevel` aux côtés de `qualityWarnings` (`null` = non applicable : QCM, `correction:false`)
+- `my_memo_master_front/src/components/AiValidationScreenComponent.vue` — badge sous chaque carte "open"
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` — badge affiché après enregistrement réel de la
+  réponse ; modale non refermée automatiquement si le niveau n'est pas "high" ; `PUT` supplémentaire sur la
+  réponse principale après la boucle de création des formulations acceptées (sinon son `qualityWarnings`
+  serait calculé avant que les autres formulations n'existent en base, faussement pessimiste)
+- Tests back (`Response.service.test.js`, `AiGenerationBatch.service.test.js`, `AnswerQuality.service.test.js`)
+  et front (`AiValidationScreenComponent.test.js`, +3 tests) étendus pour le nouveau champ
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète relancée des deux côtés : **2065/2065 tests API**, **847/847 tests front**
+(a11y inclus), 0 régression. Lint propre.
+
+**Points d'attention / dette** — (1) `FlashcardsCardsPage.vue` n'a aucun test dédié (gap préexistant à ce
+ticket, fichier volumineux sans suite avant) — câblage vérifié par lint + relecture seulement, pas par un test
+automatisé. (2) Pas de prévisualisation en direct avant sauvegarde — le badge n'apparaît qu'après un
+enregistrement réel ; une prévisualisation nécessiterait soit un nouvel endpoint sans persistance, soit
+dupliquer les heuristiques en JS côté front, écarté pour ce ticket. (3) L'outil d'audit du contenu déjà en
+base reste non implémenté (écarté par l'utilisateur, entrée précédente).
+
+---
+
+### [2026-09-12] ADD — `POST /responses/quality-preview` : aperçu de qualité sans persistance, prévisualisation en direct dans la modale de création/édition
+
+**Contexte** — Demande explicite immédiatement après l'entrée précédente : ajouter la prévisualisation en
+direct qui y avait été volontairement écartée du scope.
+
+**Fichiers ajoutés/modifiés**
+- `my_memo_master_api/validators/Response.validators.js` (+`qualityPreview`)
+- `my_memo_master_api/services/Response.service.js` (+`previewQuality` — synchrone, aucun accès base)
+- `my_memo_master_api/controllers/Response.controller.js` (+`qualityPreview`)
+- `my_memo_master_api/routes/Response.routes.js` (+`POST /responses/quality-preview`, doc Swagger)
+- `my_memo_master_api/test/services/Response.service.test.js` (+4), `test/controllers/Response.controller.
+  test.js` (+5)
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` — `watch` débounce (500 ms) sur
+  statement/answer/type/altAnswers, compteur de séquence pour ignorer une réponse réseau obsolète, nouveau
+  booléen `qualitySaved` pour distinguer aperçu non enregistré vs résultat confirmé après sauvegarde
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Bug trouvé et corrigé pendant l'implémentation** : le garde de type ("QCM" n'a rien à évaluer) sortait avant
+de réinitialiser le badge — passer de "Ouverte" à "QCM" laissait affiché à tort le badge de la précédente
+réponse "open".
+
+**Tests** — Suite complète relancée : **2074/2074 tests API** (0 régression). Front : **847/847** (inchangé,
+pas de nouveau test front sur ce point précis — cf. dette), `vite build` relancé en sanity-check (compile sans
+erreur). Lint propre des deux côtés.
+
+**Points d'attention / dette** — (1) `FlashcardsCardsPage.vue` toujours sans test dédié (gap préexistant) — le
+debounce/séquencement n'est vérifié que par relecture + build. (2) Séquencement applicatif (`previewSeq`), pas
+une vraie annulation réseau (`AbortController`) — suffisant pour ce volume d'appels. (3) `AiCardEditModalComponent.vue`
+(édition d'une carte IA avant acceptation) n'a pas reçu la même prévisualisation en direct — non demandé.
+
+---
+
+### [2026-09-12] VÉRIF — Test manuel en conditions réelles (API + front locaux, navigateur piloté) du badge de qualité et de la prévisualisation en direct
+
+**Contexte** — Demande explicite de l'utilisateur de vérifier que ça fonctionne réellement, pas seulement via
+les tests automatisés déjà verts.
+
+**Méthode** — API lancée en local avec SQLite forcé (Postgres du `.env` racine vide) ; utilisateur de test
+créé directement en base (email SMTP réel refusé par Brevo, IP non autorisée) ; rôles manquants créés (aucun
+seed de données au démarrage) ; session injectée dans le front via un vrai JWT (`POST /users/login` réel, pas
+de mock) ; `CORS_ORIGIN` ajusté pour le port du dev-server Vite ; navigateur piloté avec Playwright
+(`chromium-cli` indisponible sur Windows).
+
+**Résultats** — `POST /responses/quality-preview` : 0 écriture DB confirmée, résultats exacts sur le cas Q4
+réel et sa version corrigée, validations 400 confirmées (un premier essai erroné via `curl` venait d'un
+échappement d'apostrophes défaillant dans ma commande, pas d'un bug). Dans l'app réelle : badge rouge "À
+revoir" en direct pendant la frappe d'une réponse elliptique (rien enregistré), passe au vert "Bonne qualité"
+en direct après correction + 2 reformulations (toujours rien enregistré), la carte de bonne qualité ferme la
+modale après sauvegarde tandis qu'une carte de mauvaise qualité la laisse ouverte avec le libellé "✓ Carte
+enregistrée" — 4 captures d'écran confirment chaque étape (non conservées, environnement jetable).
+
+**Incident + point de vigilance** — `node seeder.js` a corrompu le schéma SQLite en cours de test (base
+recréée). En nettoyant après coup, un `rm` a supprimé par réflexe `my_memo_master_api/db.sqlite`, qui s'avère
+être **suivi par git** malgré le `*.sqlite` du `.gitignore` (règle qui n'affecte pas les fichiers déjà
+trackés) — restauré immédiatement via `git checkout` avant tout commit, aucune conséquence, mais retenu pour
+la prochaine session.
+
+**Conséquences** — Aucun changement de code, vérification pure. Confirme le fonctionnement réel de bout en
+bout des deux entrées précédentes. Nettoyage complet : serveurs arrêtés, fichiers temporaires (`.env` front,
+scripts de pilotage, base SQLite jetable) supprimés, `db.sqlite` suivi par git restauré, `git status` propre.
