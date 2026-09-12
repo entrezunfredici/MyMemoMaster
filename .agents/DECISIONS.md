@@ -4178,6 +4178,7 @@ volontairement borné plutôt qu'un thésaurus général).
 court non couvert peut réintroduire un cas similaire. Pas d'audit systématique fait ici (recherche limitée aux
 4 mots trouvés par l'agent de revue). Test de régression ajouté (`Semantic.service.test.js`,
 `detectInversion`) isolant spécifiquement la contamination par un mot de liaison partagé (clauses par ailleurs
+différentes des deux côtés, pour ne pas confondre avec un recouvrement de contenu réel).
 
 ---
 
@@ -4247,4 +4248,3 @@ données, cohérent avec le choix déjà fait sur `ClassGroupResource`. Le écar
 `ClassGroupResource.controller.js#create` (ne transmet pas `fileKey`/`mimeType`/`originalName`/`fileSize` au
 service malgré des validators qui les acceptent) n'est pas corrigé ici (hors périmètre de ce ticket) — signalé
 à l'utilisateur et dans `CHANGELOG_AGENT.md`.
-différentes des deux côtés, pour ne pas confondre avec un recouvrement de contenu réel).
