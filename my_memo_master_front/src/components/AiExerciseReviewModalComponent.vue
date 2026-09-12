@@ -187,6 +187,26 @@
                 « {{ item.sourceExcerpt || '—' }} »
               </p>
             </template>
+
+            <!-- Revue de l'image proposée par l'IA (Ticket C) — visible en aperçu comme en édition,
+                 indépendante du type de question. -->
+            <div v-if="item.imageUrl" class="mt-3 flex items-center gap-3">
+              <img
+                :src="item.imageUrl"
+                :alt="item.imageOriginalName || 'Schéma proposé par l\'IA'"
+                class="h-14 w-14 object-cover rounded-lg border border-gray-200 shrink-0"
+              />
+              <span
+                v-if="item.imageSource === 'ai'"
+                class="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full shrink-0"
+              >🖼️ Image IA</span>
+              <button
+                type="button"
+                :aria-label="`Retirer l'image de la question générée ${idx + 1}`"
+                class="text-xs text-gray-400 hover:text-red-500 underline"
+                @click="removeImage(item)"
+              >Retirer l'image</button>
+            </div>
           </div>
 
           <div v-if="!item.editing" class="flex gap-2 flex-shrink-0">
@@ -225,7 +245,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import ModalComponent from '@/components/ModalComponent.vue'
-import { defaultQuestionFormFields, contentToFormState } from '@/helpers/exerciseQuestionForm'
+import { defaultQuestionFormFields, contentToFormState, defaultQuestionImageFields, questionImageFieldsFrom } from '@/helpers/exerciseQuestionForm'
 
 // Écran de révision des questions générées par IA (C-02.07), feature "Génération d'exercices par IA"
 // (C-02) — accept/edit/reject par question avant ajout à `form.questions` d'ExercisesPage.vue.
@@ -255,6 +275,15 @@ import { defaultQuestionFormFields, contentToFormState } from '@/helpers/exercis
 // avec l'architecture sans brouillon serveur actée pour C-02 (generation_ia_exercices_ui.md §8/§10).
 // `confirm` renvoie directement au parent la liste des questions incluses, déjà dans la représentation
 // `form.questions` (mêmes clés que `defaultQuestion()`/`contentToFormState`), pour un simple `push`.
+//
+// Ticket C (2026-09-12, « images sur les questions ») : une question générée peut porter un schéma
+// rattaché par l'IA (imageUrl/imageKey/.../imageSource:'ai', Ticket B,
+// AiExerciseGenerationPipeline.service.js#attachImagesToQuestions) — jusqu'ici jamais lu ni reporté par
+// cet écran ni par `confirm()`, alors qu'il s'agit précisément de l'« Interface de révision » censée
+// couvrir « revue utilisateur de l'image proposée par l'IA avant validation » (cadrage initial, voir
+// CHANGELOG_AGENT.md entrée Ticket A). Ajout : aperçu miniature + badge de provenance + bouton
+// [Retirer l'image] (retire uniquement l'image, jamais toute la question — `rejectItem` reste le seul
+// moyen d'exclure la question entière), et report de ces champs jusqu'à `confirm()`.
 
 const props = defineProps({
   visible: { type: Boolean, required: true },
@@ -289,6 +318,7 @@ watch(
       type: q.type,
       sourceExcerpt: q.sourceExcerpt || '',
       ...contentToFormState(q),
+      ...questionImageFieldsFrom(q),
     }))
   },
   { immediate: true },
@@ -307,6 +337,10 @@ function typeLabel(type) { return TYPE_LABELS[type] || type }
 function toggleInclude(item) { item.included = !item.included }
 function rejectItem(item) { item.included = false }
 function acceptAll() { for (const item of items.value) item.included = true }
+
+// Retire uniquement l'image rattachée par l'IA (revue utilisateur, Ticket C) — la question elle-même
+// reste incluse/éditable, seul `rejectItem` exclut la question entière.
+function removeImage(item) { Object.assign(item, defaultQuestionImageFields()) }
 
 function startEdit(item) { item.editing = true }
 function finishEdit(item) {
@@ -338,8 +372,12 @@ function syncFillBlanks(item) {
 function confirm() {
   const accepted = items.value
     .filter((i) => i.included)
-    .map(({ statement, type, openAnswer, openAltAnswers, mcqOptions, mcqCorrectIdx, fillTemplate, fillBlanks, reorderFragments }) => ({
+    .map(({
       statement, type, openAnswer, openAltAnswers, mcqOptions, mcqCorrectIdx, fillTemplate, fillBlanks, reorderFragments,
+      imageUrl, imageKey, imageMimeType, imageOriginalName, imageSize, imageSource,
+    }) => ({
+      statement, type, openAnswer, openAltAnswers, mcqOptions, mcqCorrectIdx, fillTemplate, fillBlanks, reorderFragments,
+      imageUrl, imageKey, imageMimeType, imageOriginalName, imageSize, imageSource,
     }))
   emit('confirm', accepted)
 }

@@ -169,7 +169,8 @@
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 | Images/schémas sur les questions — Ticket A (upload manuel) | **Livré (backend + front)** — demande utilisateur (« intégrer une image aux questions, et que l'IA puisse le faire ») scindée en 3 tickets après audit (voir DECISIONS.md) : ce ticket ne couvre que l'upload manuel, réutilisant l'infra `POST /storage/upload` existante (S3, déjà utilisée par `ClassGroupResource`) — même pattern « front uploade puis attache l'URL/clé », aucun nouvel endpoint d'upload dédié à Question. 6 nouvelles colonnes (`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource`, migration `20260912000001`), `DELETE /questions/:id/image` (retire l'image + nettoie l'objet S3, best-effort comme `ClassGroupResourceService.delete`). Front : bouton "Insérer une image" déjà présent (mort) sur `CreateTestPage.vue` branché, aperçu + suppression ; affichage de l'image dans `ExerciseDetailPage.vue` (mode quiz + mode résultats, `alt` renseigné pour RGAA). **Ticket B (l'IA rattache une image extraite d'un PDF source à une question générée) et Ticket C (revue de l'image IA avant validation) restent à faire** — non couverts ici. 8 tests service + 4 tests controller (API), 6 tests store + 2 tests composant (front), 0 régression (2053/2053 API, 847/847 front) | 2026-09-12 |
-| Images/schémas sur les questions — Ticket B (l'IA rattache une image du PDF source à une question générée) | **Livré (backend uniquement, aucun front)** — suite du Ticket A. `ImageCaptioningPipeline.service.js` numérote désormais chaque schéma retenu (marqueur texte « Schéma n°X ») et renvoie la liste des images retenues (`images: [{id, pageIndex, caption, imageBase64}]`, champ additionnel, `AiCardGenerationPipeline.service.js` inchangé). `AiExerciseGeneration.service.js` gagne un champ de sortie optionnel `imageRef` (règle 13 du prompt système : le LLM cite le numéro exact d'un schéma si une question en dépend directement, jamais inventé) + validation (entier positif ou null). `AiExerciseGenerationPipeline.service.js` résout `imageRef` après génération : upload direct S3 (`PutObjectCommand`, pas de requête HTTP entrante à parser) de l'image référencée, un seul upload même si plusieurs questions citent le même schéma, échec dégradé en warning (jamais bloquant) ; `imageRef` toujours retiré de la question en sortie, remplacé le cas échéant par `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"` (mêmes noms que `Question.model.js`, Ticket A). **Écart au Ticket A corrigé au passage** : `Question.service.js#extractImageFields` forçait `imageSource` à `"manual"` dès qu'une `imageUrl` était fournie — bloquait toute provenance IA de bout en bout ; accepte désormais explicitement `imageSource: "ai"` du client (jamais `"manual"`, qui reste dérivé), voir DECISIONS.md. **Non couvert (Ticket C)** : aucun câblage front — `AiExerciseReviewModalComponent.vue`/`helpers/exerciseQuestionForm.js` ne préservent pas encore ces champs à travers l'Écran de révision jusqu'à `POST /questions` ; sans Ticket C, l'image générée par l'IA reste dans la réponse HTTP de génération mais n'atteint pas encore une question persistée via ce flux. Scindé au flux exercices (C-02) uniquement — la génération de cartes Leitner (C-01) n'est pas concernée. 10 tests `AiExerciseGeneration.service.test.js` (imageRef), 2 tests `ImageCaptioningPipeline.service.test.js` (numérotation), 15 tests `AiExerciseGenerationPipeline.service.test.js` (upload + attach + intégration), 4 tests `Question.service.test.js`/`Question.controller.test.js` (imageSource "ai"), 0 régression (2079/2079 API) | 2026-09-12 |
+| Images/schémas sur les questions — Ticket B (l'IA rattache une image du PDF source à une question générée) | **Livré (backend uniquement, aucun front)** — suite du Ticket A. `ImageCaptioningPipeline.service.js` numérote désormais chaque schéma retenu (marqueur texte « Schéma n°X ») et renvoie la liste des images retenues (`images: [{id, pageIndex, caption, imageBase64}]`, champ additionnel, `AiCardGenerationPipeline.service.js` inchangé). `AiExerciseGeneration.service.js` gagne un champ de sortie optionnel `imageRef` (règle 13 du prompt système : le LLM cite le numéro exact d'un schéma si une question en dépend directement, jamais inventé) + validation (entier positif ou null). `AiExerciseGenerationPipeline.service.js` résout `imageRef` après génération : upload direct S3 (`PutObjectCommand`, pas de requête HTTP entrante à parser) de l'image référencée, un seul upload même si plusieurs questions citent le même schéma, échec dégradé en warning (jamais bloquant) ; `imageRef` toujours retiré de la question en sortie, remplacé le cas échéant par `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"` (mêmes noms que `Question.model.js`, Ticket A). **Écart au Ticket A corrigé au passage** : `Question.service.js#extractImageFields` forçait `imageSource` à `"manual"` dès qu'une `imageUrl` était fournie — bloquait toute provenance IA de bout en bout ; accepte désormais explicitement `imageSource: "ai"` du client (jamais `"manual"`, qui reste dérivé), voir DECISIONS.md. **Non couvert à l'époque (Ticket C, livré depuis — voir ligne suivante)** : aucun câblage front. Scindé au flux exercices (C-02) uniquement — la génération de cartes Leitner (C-01) n'est pas concernée. 10 tests `AiExerciseGeneration.service.test.js` (imageRef), 2 tests `ImageCaptioningPipeline.service.test.js` (numérotation), 15 tests `AiExerciseGenerationPipeline.service.test.js` (upload + attach + intégration), 4 tests `Question.service.test.js`/`Question.controller.test.js` (imageSource "ai"), 0 régression (2079/2079 API) | 2026-09-12 |
+| Images/schémas sur les questions — Ticket C (revue utilisateur + persistance côté front) | **Livré (front uniquement, aucun changement backend)** — clôt la feature (Tickets A+B+C). Audit préalable confirmé : `AiExerciseReviewModalComponent.vue`/`helpers/exerciseQuestionForm.js` lisaient `props.questions` (contrat `generation_ia_exercices_types.md` §5, désormais enrichi par le Ticket B d'`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource:"ai"`) sans jamais recopier ces 6 champs — ni dans l'état local des cartes de révision, ni dans `confirm()` — et `ExercisesPage.vue#submitCreate`/`submitEdit` construisaient leur payload `POST /questions`/`PUT /questions/edit/:id` avec une liste de champs explicite qui les omettait aussi : une image générée par l'IA restait visible dans la réponse HTTP de `POST /ai-exercise-generations` mais n'atteignait jamais une question persistée, exactement comme documenté à la fin du Ticket B. `helpers/exerciseQuestionForm.js` : 3 nouvelles fonctions — `defaultQuestionImageFields()` (valeurs par défaut, séparées de `defaultQuestionFormFields()` car l'image n'est jamais liée au type de question et ne doit pas être réinitialisée par `onTypeChange`), `questionImageFieldsFrom(q)` (copie depuis une question générée), `questionImagePayload(q)` (sous-ensemble à transmettre au serveur — objet **vide**, jamais des `null` explicites, quand aucune image n'est rattachée : `Question.service.js#extractImageFields` traite un champ absent comme « ne pas toucher » et un `null` explicite comme « retirer l'image », donc envoyer des `null` sur une question sans image aurait pu écraser une image existante lors d'une édition qui ne la concerne pas). `AiExerciseReviewModalComponent.vue` : reporte désormais les champs image dans l'état local (`watch` sur `props.visible`) et dans `confirm()` ; ajoute l'aperçu réellement attendu par le cadrage initial (« revue utilisateur de l'image proposée par l'IA avant validation », voir entrée Ticket A) — miniature + badge « 🖼️ Image IA » (`imageSource === 'ai'`) + bouton « Retirer l'image » qui n'efface que l'image (jamais toute la question, `rejectItem` reste le seul moyen de rejeter la question entière). `ExercisesPage.vue` : `defaultQuestion()` inclut désormais `defaultQuestionImageFields()` (forme cohérente pour le merge `{ ...defaultQuestion(), ...q }` de `handleReviewConfirm`, qui ne nécessitait lui-même aucun changement — il ne fait que fusionner l'objet reçu de `confirm()`, déjà complet) ; `submitCreate`/`submitEdit` ajoutent `...questionImagePayload(q)` à leur payload par question. | 2026-09-12 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -12195,3 +12196,104 @@ Aucun changement front dans ce ticket.
 **Points d'attention / dette** — Ticket réalisé sur `dev_back_question_images_ai`, branché sur
 `dev_back_question_images` (Ticket A, pas encore mergé sur `dev`) plutôt que sur `dev` directement — dépendance
 technique directe (colonnes `Question`), signalée à l'utilisateur. Pas encore poussé/mergé.
+
+---
+
+### [2026-09-12] Images/schémas sur les questions — Ticket C (revue utilisateur + persistance côté front)
+
+**Contexte** : dernier des 3 tickets de la feature (cadrage initial, voir entrée Ticket A). Audit préalable
+(`AGENT.md` §2) avant implémentation, conformément à la description transmise : confirmé exactement l'écart
+documenté à la fin du Ticket B — `AiExerciseGenerationPipeline.service.js#attachImagesToQuestions` attache
+bien `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"` sur le
+brouillon de question (visible dans la réponse HTTP de `POST /ai-exercise-generations`,
+`stores/aiExerciseGeneration.js#generate` les transmet tels quels à `props.questions`), mais
+`AiExerciseReviewModalComponent.vue` ne les recopiait ni dans l'état local des cartes de révision (`watch`
+sur `props.visible`) ni dans `confirm()` (mapping explicite de champs, image absente de la liste) —
+`helpers/exerciseQuestionForm.js` ne les connaissait pas non plus (`contentToFormState`/
+`buildQuestionContent` ne couvrent que `content`, colonnes distinctes sur `Question`). Même en corrigeant ce
+premier maillon, `ExercisesPage.vue#submitCreate`/`submitEdit` construisent leur payload
+`POST /questions`/`PUT /questions/edit/:id` avec une liste de champs explicite (`statement`/
+`questionPosition`/`type`/`content`) qui aurait continué à filtrer l'image même une fois portée jusqu'à
+`form.questions`. Réalisé sur la branche `dev_back_question_images_ai` (suite directe des Tickets A/B, non
+mergés sur `dev`).
+
+**Ce qui a été fait** :
+- `helpers/exerciseQuestionForm.js` : 3 nouvelles fonctions, volontairement séparées de
+  `defaultQuestionFormFields()`/`contentToFormState`/`buildQuestionContent` (l'image n'est pas une donnée de
+  `content`, ni liée au type de question) :
+  - `defaultQuestionImageFields()` — les 6 champs à `null`.
+  - `questionImageFieldsFrom(q)` — copie les champs présents sur une source (question générée par IA ou
+    question existante), `null` sinon.
+  - `questionImagePayload(q)` — sous-ensemble à transmettre au serveur : objet **vide** (aucune clé) quand
+    `q.imageUrl` est absent/`null`, jamais un objet à valeurs `null` (voir Choix techniques) ; `imageSource`
+    n'est inclus que s'il vaut exactement `'ai'`.
+- `components/AiExerciseReviewModalComponent.vue` :
+  - `watch(() => props.visible, ...)` reconstruit désormais chaque carte avec
+    `...questionImageFieldsFrom(q)` en plus de `...contentToFormState(q)`.
+  - Nouveau bloc visuel (aperçu **et** édition, indépendant du type de question) : miniature `<img>`,
+    badge « 🖼️ Image IA » quand `imageSource === 'ai'`, bouton **[Retirer l'image]** — nouvelle fonction
+    `removeImage(item)` qui réinitialise uniquement les champs image de la carte (`rejectItem` reste le seul
+    moyen d'exclure la question entière). Comble l'écart avec le cadrage initial de la feature (« Ticket C :
+    revue utilisateur de l'image proposée par l'IA avant validation », voir CHANGELOG_AGENT.md entrée
+    Ticket A) — jusqu'ici aucune revue réelle n'était possible, l'image aurait été attachée silencieusement.
+  - `confirm()` inclut désormais les 6 champs image dans chaque question acceptée émise au parent.
+- `pages/ExercisesPage.vue` :
+  - `defaultQuestion()` inclut `...defaultQuestionImageFields()` — cohérence de forme pour le merge
+    `{ ...defaultQuestion(), ...q }` de `handleReviewConfirm` (déjà correct par ailleurs : il ne fait que
+    fusionner l'objet reçu de `confirm()`, désormais complet — aucun changement de logique nécessaire là).
+  - `submitCreate`/`submitEdit` : le payload envoyé par question gagne `...questionImagePayload(q)`.
+
+**Choix techniques** :
+- `questionImagePayload` renvoie un objet **vide**, jamais `{ imageUrl: null, ... }`, quand une question
+  n'a pas d'image — `Question.service.js#extractImageFields` (Ticket A/B) distingue explicitement un champ
+  **absent** (« ne pas toucher à l'image existante ») d'un champ **`null` explicite** (« retirer l'image »).
+  Comme `ExercisesPage.vue` n'a toujours aucune UI d'upload manuel (seul `CreateTestPage.vue` en a une,
+  Ticket A) et que `submitEdit` peut mettre à jour une question qui porte déjà une image sans que
+  l'utilisateur y touche, envoyer des `null` inconditionnels aurait silencieusement effacé cette image à
+  chaque édition non liée à l'image — régression qu'aucun test n'aurait détectée sans un scénario dédié
+  (ajouté, voir Tests).
+- `imageSource` n'est transmis par `questionImagePayload` que s'il vaut exactement `'ai'`, jamais
+  `'manual'` : seule valeur acceptée du client par `Question.validators.js` (Ticket B) — envoyer `'manual'`
+  explicitement aurait échoué la validation (400) sans aucun bénéfice, cette valeur restant de toute façon
+  dérivée côté serveur de la présence d'`imageUrl`.
+- Champs image séparés de `defaultQuestionFormFields()` plutôt qu'ajoutés dedans : cette dernière est
+  réinitialisée à chaque changement de type de question (`onTypeChange`/`Object.assign(item,
+  defaultQuestionFormFields())`, aussi bien dans `ExercisesPage.vue` que dans l'Écran de révision) — une
+  image rattachée par l'IA n'a aucun rapport avec le type de la question (`open`/`mcq`/`fill_blank`/
+  `reorder`) et n'a donc aucune raison d'être perdue si l'utilisateur change le type en éditant la question
+  générée.
+- Aucun changement dans `AiExerciseReviewModalComponent.vue#watch`/`ExercisesPage.vue#openEditModal` pour
+  faire réapparaître l'image d'une question **déjà persistée** en cours d'édition (`fullTest.question` →
+  `form.questions`) : non nécessaire à la correction du bug (un champ image absent du payload
+  `submitEdit` ne touche pas à l'image existante, voir ci-dessus — aucune perte de données), et
+  `ExercisesPage.vue` n'a de toute façon aucune UI pour la modifier une fois affichée. Noté comme non
+  couvert plutôt que corrigé silencieusement (AGENT.md §2).
+
+**Ce qui n'est PAS couvert** :
+- `ExercisesPage.vue#openEditModal` ne recopie pas les champs image d'une question existante dans
+  `form.questions` — sans conséquence sur la persistance (voir Choix techniques ci-dessus) mais l'image
+  d'une question déjà enregistrée (manuelle via `CreateTestPage.vue` ou IA via ce ticket) ne s'affiche pas
+  dans la modale d'édition d'`ExercisesPage.vue`, qui n'a de toute façon aucune UI d'upload/suppression
+  d'image (seul `CreateTestPage.vue` en a une, Ticket A, sur un flux `type: 'open'` distinct).
+- Pas de nettoyage de l'objet S3 orphelin quand l'utilisateur retire l'image en Interface de révision avant
+  validation (`removeImage`) — l'image a déjà été uploadée par le pipeline IA (Ticket B, avant même que
+  l'utilisateur ne voie l'écran de révision) ; dette déjà assumée et documentée côté Ticket B (DECISIONS.md,
+  « une question avec image générée puis rejetée laisse un objet S3 orphelin »), simplement élargie ici au
+  cas où seule l'image (pas la question) est retirée.
+
+**Fichiers modifiés**
+- `my_memo_master_front/src/helpers/exerciseQuestionForm.js`
+- `my_memo_master_front/src/components/AiExerciseReviewModalComponent.vue`
+- `my_memo_master_front/src/pages/ExercisesPage.vue`
+- `my_memo_master_front/test/helpers/exerciseQuestionForm.test.js` (+6 tests)
+- `my_memo_master_front/test/components/AiExerciseReviewModalComponent.test.js` (+5 tests)
+- `my_memo_master_front/test/components/ExercisesPage.test.js` (+4 tests)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Aucun changement backend, suite API inchangée : **2079/2079** (0 régression), lint (`eslint`)
+propre. Front : **862/862** (55 suites, 0 régression, +15 vs avant ce ticket), lint propre.
+
+**Points d'attention / dette** — Ticket réalisé sur `dev_back_question_images_ai` (suite directe des
+Tickets A/B). Feature complète (Tickets A+B+C) mais **toujours pas poussée/mergée** — les 3 tickets restent
+sur des branches locales (`dev_back_question_images`, `dev_back_question_images_ai`), à revoir/merger par
+l'utilisateur.

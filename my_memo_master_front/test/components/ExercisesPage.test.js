@@ -488,6 +488,34 @@ describe('ExercisesPage', () => {
       expect(vm.showAiFlow).toBe(false)
     })
 
+    // Ticket C (2026-09-12, « images sur les questions ») : une question générée par IA peut porter un
+    // schéma rattaché (Ticket B, imageUrl/.../imageSource:'ai') — AiExerciseReviewModalComponent.vue#
+    // confirm() le reporte désormais, il doit survivre jusqu'à form.questions.
+    it('handleReviewConfirm — préserve les champs image d\'une question générée par IA', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.handleReviewConfirm) return
+
+      vm.showAiFlow = true
+      mockPost.mockResolvedValueOnce({ status: 200, data: { importable: [], rejected: [] } })
+
+      await vm.handleReviewConfirm([
+        {
+          statement: 'Que représente ce schéma ?', type: 'open', openAnswer: 'Réponse', openAltAnswers: [],
+          mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0, fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''],
+          imageUrl: 'https://s3.example.com/uploads/1/schema.png', imageKey: 'uploads/1/schema.png',
+          imageMimeType: 'image/png', imageOriginalName: 'schema-genere-ia-1.png', imageSize: 999, imageSource: 'ai',
+        }
+      ])
+      await flushPromises()
+
+      const added = vm.form.questions[vm.form.questions.length - 1]
+      expect(added.imageUrl).toBe('https://s3.example.com/uploads/1/schema.png')
+      expect(added.imageKey).toBe('uploads/1/schema.png')
+      expect(added.imageSource).toBe('ai')
+    })
+
     it('closeAiFlow — referme le flux et réinitialise le store de génération', async () => {
       const wrapper = mountPage({ user: TEACHER_USER })
       await flushPromises()
@@ -526,6 +554,95 @@ describe('ExercisesPage', () => {
 
       expect(wrapper.text()).toContain('Relecture des questions générées')
       expect(wrapper.text()).toContain('Qu\'est-ce que la photosynthèse ?')
+    })
+  })
+
+  // Ticket C (2026-09-12, « images sur les questions ») : jusqu'ici, une question issue de l'Écran de
+  // révision IA avec une image rattachée n'atteignait jamais POST /questions avec ses champs image —
+  // submitCreate()/submitEdit() ne les transmettaient pas, même une fois form.questions corrigé.
+  describe('persistance de l\'image générée par IA (Ticket C)', () => {
+    const TEST_CREATED_OK = { status: 201, data: { testId: 42 } }
+    const QUESTION_CREATED_OK = { status: 201, data: { idQuestion: 1 } }
+
+    it('submitCreate — transmet les champs image d\'une question à POST /questions', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitCreate) return
+
+      vm.openCreateModal()
+      vm.form.name = 'Exercice test'
+      vm.form.questions = [{
+        _key: 1, idQuestion: null, statement: 'Que représente ce schéma ?', type: 'open',
+        openAnswer: 'Réponse', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0,
+        fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''],
+        imageUrl: 'https://s3.example.com/x.png', imageKey: 'uploads/1/x.png', imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png', imageSize: 999, imageSource: 'ai',
+      }]
+
+      mockPost.mockResolvedValueOnce(TEST_CREATED_OK).mockResolvedValueOnce(QUESTION_CREATED_OK)
+      await vm.submitCreate()
+
+      expect(mockPost).toHaveBeenNthCalledWith(2, 'questions', expect.objectContaining({
+        imageUrl: 'https://s3.example.com/x.png',
+        imageKey: 'uploads/1/x.png',
+        imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png',
+        imageSize: 999,
+        imageSource: 'ai',
+      }))
+    })
+
+    it('submitCreate — question sans image : aucun champ image envoyé (ne force pas de valeur null qui écraserait une image existante)', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitCreate) return
+
+      vm.openCreateModal()
+      vm.form.name = 'Exercice test'
+      vm.form.questions[0].statement = 'Q sans image'
+      vm.form.questions[0].openAnswer = 'R'
+
+      mockPost.mockResolvedValueOnce(TEST_CREATED_OK).mockResolvedValueOnce(QUESTION_CREATED_OK)
+      await vm.submitCreate()
+
+      const [, payload] = mockPost.mock.calls[1]
+      expect(payload.imageUrl).toBeUndefined()
+      expect(payload.imageKey).toBeUndefined()
+      expect(payload.imageSource).toBeUndefined()
+    })
+
+    it('submitEdit — transmet les champs image d\'une question à PUT /questions/edit/:id', async () => {
+      const wrapper = mountPage({ user: TEACHER_USER })
+      await flushPromises()
+      const vm = wrapper.vm
+      if (!vm.submitEdit) return
+
+      vm.isEditMode = true
+      vm.editTestId = 7
+      vm.form.name = 'Exercice modifié'
+      vm.form.subjectId = 1
+      vm.form.tagIds = []
+      vm.form.groupIds = []
+      vm.form.questions = [{
+        _key: 1, idQuestion: 55, statement: 'Que représente ce schéma ?', type: 'open',
+        openAnswer: 'Réponse', openAltAnswers: [], mcqOptions: [{ text: '' }, { text: '' }], mcqCorrectIdx: 0,
+        fillTemplate: '', fillBlanks: [], reorderFragments: ['', ''],
+        imageUrl: 'https://s3.example.com/x.png', imageKey: 'uploads/1/x.png', imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png', imageSize: 999, imageSource: 'ai',
+      }]
+
+      mockPut
+        .mockResolvedValueOnce({ status: 200, data: {} }) // tests/:id
+        .mockResolvedValueOnce({ status: 200, data: {} }) // questions/edit/:id
+      await vm.submitEdit()
+
+      expect(mockPut).toHaveBeenNthCalledWith(2, 'questions/edit/55', expect.objectContaining({
+        imageUrl: 'https://s3.example.com/x.png',
+        imageKey: 'uploads/1/x.png',
+        imageSource: 'ai',
+      }))
     })
   })
 })

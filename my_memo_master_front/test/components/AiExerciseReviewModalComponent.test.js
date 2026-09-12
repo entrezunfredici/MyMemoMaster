@@ -123,6 +123,73 @@ describe('AiExerciseReviewModalComponent', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
+  // Ticket C (2026-09-12, « images sur les questions ») : une question générée peut porter un schéma
+  // rattaché par l'IA (Ticket B) — jusqu'ici jamais affiché ni reporté par cet écran.
+  describe('image rattachée par l\'IA (Ticket C)', () => {
+    const QUESTION_WITH_IMAGE = {
+      statement: 'Que représente ce schéma ?',
+      type: 'open',
+      content: { correct_answer: 'Le cycle de l\'eau.' },
+      sourceExcerpt: 'Le schéma n°1 illustre...',
+      imageUrl: 'https://s3.example.com/uploads/1/schema.png',
+      imageKey: 'uploads/1/schema.png',
+      imageMimeType: 'image/png',
+      imageOriginalName: 'schema-genere-ia-1.png',
+      imageSize: 4321,
+      imageSource: 'ai',
+    }
+
+    it('affiche la miniature et le badge "Image IA" quand la question générée en porte une', () => {
+      const wrapper = mountModal({ questions: [QUESTION_WITH_IMAGE] })
+      const img = wrapper.find('img')
+      expect(img.exists()).toBe(true)
+      expect(img.attributes('src')).toBe('https://s3.example.com/uploads/1/schema.png')
+      expect(wrapper.text()).toContain('Image IA')
+    })
+
+    it('n\'affiche ni miniature ni badge quand la question générée n\'a pas d\'image', () => {
+      const wrapper = mountModal()
+      expect(wrapper.find('img').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Image IA')
+    })
+
+    it('"Retirer l\'image" efface l\'image de la question sans la rejeter', async () => {
+      const wrapper = mountModal({ questions: [QUESTION_WITH_IMAGE] })
+      expect(wrapper.find('img').exists()).toBe(true)
+
+      const removeBtn = wrapper.findAll('button').find((b) => b.text() === 'Retirer l\'image')
+      await removeBtn.trigger('click')
+
+      expect(wrapper.find('img').exists()).toBe(false)
+      expect(wrapper.text()).toContain('1 incluse') // toujours incluse, seule l'image a été retirée
+      expect(wrapper.text()).not.toContain('1 rejetée')
+    })
+
+    it('émet "confirm" avec les champs image de la question générée', async () => {
+      const wrapper = mountModal({ questions: [QUESTION_WITH_IMAGE] })
+      await wrapper.find('.btn-modal-submit').trigger('click')
+
+      const [accepted] = wrapper.emitted('confirm')[0]
+      expect(accepted[0]).toMatchObject({
+        imageUrl: 'https://s3.example.com/uploads/1/schema.png',
+        imageKey: 'uploads/1/schema.png',
+        imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png',
+        imageSize: 4321,
+        imageSource: 'ai',
+      })
+    })
+
+    it('émet "confirm" avec des champs image à null pour une question sans image', async () => {
+      const wrapper = mountModal() // QUESTIONS par défaut, sans image
+      await wrapper.find('.btn-modal-submit').trigger('click')
+
+      const [accepted] = wrapper.emitted('confirm')[0]
+      expect(accepted[0].imageUrl).toBeNull()
+      expect(accepted[0].imageSource).toBeNull()
+    })
+  })
+
   it('accordéon "Source" affiche le sourceExcerpt au clic', async () => {
     const wrapper = mountModal()
     expect(wrapper.text()).not.toContain('La photosynthèse est le processus...')

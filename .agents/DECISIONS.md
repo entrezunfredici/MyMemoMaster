@@ -4316,3 +4316,34 @@ cartes Leitner C-01) — introduire une table dédiée uniquement pour tracer la
 — cf. AGENT.md §2, « toute modification d'une interface publique doit être signalée ». `Question.validators.js`
 accepte désormais un troisième champ de plus sur `POST /questions`/`PUT /questions/edit/:id` que ce que le
 Ticket A avait initialement prévu.
+
+---
+
+### [2026-09-12] Images sur les questions — Ticket C : `questionImagePayload` omet le champ plutôt que d'envoyer `null`
+
+**Contexte** : dernier ticket de la feature — reporter les champs image d'une question générée par IA
+(Ticket B) à travers `AiExerciseReviewModalComponent.vue` jusqu'à `POST /questions`/
+`PUT /questions/edit/:id` (`ExercisesPage.vue#submitCreate`/`submitEdit`). Une question de formulaire sans
+image doit produire un payload qui n'affecte jamais une image existante côté serveur.
+
+**Décision** : `helpers/exerciseQuestionForm.js#questionImagePayload(q)` renvoie un objet **vide** (aucune
+clé) quand `q.imageUrl` est absent/`null`, jamais `{ imageUrl: null, imageKey: null, ... }`. Repose sur le
+contrat déjà en place côté serveur (`Question.service.js#extractImageFields`, Ticket A) : un champ **absent**
+du payload signifie « ne pas toucher à l'image existante », un `null` **explicite** signifie « la retirer ».
+`imageSource` n'est inclus dans le payload que s'il vaut exactement `'ai'` (seule valeur acceptée du client
+par `Question.validators.js`, Ticket B) — jamais `'manual'`, qui reste dérivé côté serveur.
+
+**Alternative écartée** : toujours transmettre les 6 champs (à `null` en l'absence d'image), pour un payload
+de forme constante quel que soit l'état de la question. Écartée : `ExercisesPage.vue` n'a toujours aucune UI
+d'upload/suppression d'image (seul `CreateTestPage.vue` en a une, Ticket A, sur un flux distinct) —
+`submitEdit` peut donc mettre à jour une question qui porte déjà une image (manuelle ou IA) sans que
+l'utilisateur y touche ; des `null` inconditionnels auraient silencieusement effacé cette image à chaque
+édition sans rapport avec elle. Un objet vide, filtré par `extractImageFields` (`hasImage = false` si aucun
+des 5 champs n'est présent), ne modifie jamais l'image existante.
+
+**Conséquences** : `defaultQuestionFormFields()` (types de question) n'a pas été étendu pour porter les champs
+image — nouvelles fonctions dédiées (`defaultQuestionImageFields`/`questionImageFieldsFrom`/
+`questionImagePayload`) à la place, pour ne pas faire réinitialiser l'image par `onTypeChange`
+(`Object.assign(item, defaultQuestionFormFields())`, sans rapport avec l'image) et pour garder la
+distinction « champ absent » / « champ à `null` » au niveau du payload, que la fusion aveugle dans un seul
+gros objet de valeurs par défaut aurait rendue plus difficile à exprimer correctement.

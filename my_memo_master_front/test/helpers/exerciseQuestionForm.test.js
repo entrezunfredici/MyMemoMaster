@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { defaultQuestionFormFields, contentToFormState, buildQuestionContent } from '@/helpers/exerciseQuestionForm'
+import {
+  defaultQuestionFormFields,
+  contentToFormState,
+  buildQuestionContent,
+  defaultQuestionImageFields,
+  questionImageFieldsFrom,
+  questionImagePayload,
+} from '@/helpers/exerciseQuestionForm'
 
 describe('exerciseQuestionForm', () => {
   describe('defaultQuestionFormFields', () => {
@@ -104,6 +111,71 @@ describe('exerciseQuestionForm', () => {
       const original = { options: [{ text: 'Paris', correct: true }, { text: 'Madrid', correct: false }, { text: 'Berlin', correct: false }] }
       const state = contentToFormState({ type: 'mcq', content: original })
       expect(buildQuestionContent({ type: 'mcq', ...state })).toEqual(original)
+    })
+  })
+
+  // Ticket C (2026-09-12, « images sur les questions ») : champs image, colonnes dédiées sur `Question`
+  // (Ticket A), PAS une partie de `content` — jusqu'ici jamais lus par l'Écran de révision IA ni
+  // reportés jusqu'à la persistance (voir AiExerciseReviewModalComponent.vue/ExercisesPage.vue).
+  describe('defaultQuestionImageFields', () => {
+    it('retourne les 6 champs image à null (aucune image)', () => {
+      expect(defaultQuestionImageFields()).toEqual({
+        imageUrl: null,
+        imageKey: null,
+        imageMimeType: null,
+        imageOriginalName: null,
+        imageSize: null,
+        imageSource: null,
+      })
+    })
+  })
+
+  describe('questionImageFieldsFrom', () => {
+    it('copie les champs image présents sur la source (question générée par IA)', () => {
+      const q = {
+        statement: 'Q', type: 'open',
+        imageUrl: 'https://s3/x.png', imageKey: 'uploads/1/x.png', imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png', imageSize: 1234, imageSource: 'ai',
+      }
+      expect(questionImageFieldsFrom(q)).toEqual({
+        imageUrl: 'https://s3/x.png',
+        imageKey: 'uploads/1/x.png',
+        imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png',
+        imageSize: 1234,
+        imageSource: 'ai',
+      })
+    })
+
+    it('aucun champ image sur la source -> valeurs par défaut (à null)', () => {
+      expect(questionImageFieldsFrom({ statement: 'Q', type: 'open' })).toEqual(defaultQuestionImageFields())
+    })
+  })
+
+  describe('questionImagePayload', () => {
+    it('aucune image (imageUrl absent/null) -> objet vide, ne doit jamais écraser une image existante côté serveur', () => {
+      expect(questionImagePayload({})).toEqual({})
+      expect(questionImagePayload({ imageUrl: null })).toEqual({})
+    })
+
+    it('image IA -> transmet les 5 champs + imageSource:"ai"', () => {
+      const q = {
+        imageUrl: 'https://s3/x.png', imageKey: 'uploads/1/x.png', imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png', imageSize: 1234, imageSource: 'ai',
+      }
+      expect(questionImagePayload(q)).toEqual({
+        imageUrl: 'https://s3/x.png',
+        imageKey: 'uploads/1/x.png',
+        imageMimeType: 'image/png',
+        imageOriginalName: 'schema-genere-ia-1.png',
+        imageSize: 1234,
+        imageSource: 'ai',
+      })
+    })
+
+    it('imageSource autre que "ai" -> jamais transmis (Question.validators.js ne l\'accepte pas du client)', () => {
+      const q = { imageUrl: 'https://s3/x.png', imageKey: 'k', imageMimeType: 'image/png', imageOriginalName: 'x.png', imageSize: 1, imageSource: 'manual' }
+      expect(questionImagePayload(q).imageSource).toBeUndefined()
     })
   })
 })
