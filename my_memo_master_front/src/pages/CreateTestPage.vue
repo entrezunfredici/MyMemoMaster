@@ -29,8 +29,36 @@
         </div>
 
         <div class="py-4 flex justify-end">
-          <button class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-[#F5F5F5]">
-            Insert image
+          <input
+            ref="imageInput"
+            type="file"
+            accept="image/*"
+            class="hidden"
+            aria-label="Choisir une image pour la question"
+            @change="handleImageChange"
+          />
+          <div v-if="question.imageUrl" class="flex items-center gap-3">
+            <img
+              :src="question.imageUrl"
+              :alt="question.imageOriginalName || 'Image de la question'"
+              class="h-16 w-16 object-cover rounded-lg border border-gray"
+            />
+            <span class="text-sm text-gray-light truncate max-w-[160px]">{{ question.imageOriginalName }}</span>
+            <XMarkIcon
+              class="size-6 text-dark cursor-pointer hover:brightness-50"
+              role="button"
+              aria-label="Retirer l'image"
+              @click="handleRemoveImage"
+            />
+          </div>
+          <button
+            v-else
+            type="button"
+            class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-[#F5F5F5] disabled:opacity-50"
+            :disabled="questionStore.uploading"
+            @click="imageInput.click()"
+          >
+            {{ questionStore.uploading ? 'Envoi en cours…' : 'Insérer une image' }}
           </button>
         </div>
 
@@ -44,8 +72,11 @@
           </h4>
           <div class="flex flex-col gap-4">
             <div v-for="(q) in questions" :key="q.idQuestion"
-              class="flex justify-between border-2 bg-[#FFF] border-gray rounded-lg px-4 py-2">
-              <span class="text-lg text-dark"><FormulaText :text="q.statement || ''" /></span>
+              class="flex justify-between items-center border-2 bg-[#FFF] border-gray rounded-lg px-4 py-2">
+              <div class="flex items-center gap-2">
+                <img v-if="q.imageUrl" :src="q.imageUrl" :alt="q.imageOriginalName || ''" class="h-10 w-10 object-cover rounded" />
+                <span class="text-lg text-dark"><FormulaText :text="q.statement || ''" /></span>
+              </div>
               <XMarkIcon class="size-6 text-dark cursor-pointer hover:brightness-50" @click="deleteQuestion(q.idQuestion)" />
             </div>
           </div>
@@ -89,8 +120,28 @@ const test = ref({
   subjectId: 1
 })
 
-const question = ref({ statement: '', questionPosition: 0, type: 'text', idTest: null })
+const emptyImageFields = () => ({ imageUrl: null, imageKey: null, imageMimeType: null, imageOriginalName: null, imageSize: null })
+
+const question = ref({ statement: '', questionPosition: 0, type: 'text', idTest: null, ...emptyImageFields() })
 const response = ref({ content: '', correction: true, questionId: null })
+const imageInput = ref(null)
+
+const handleImageChange = async (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = '' // permet de resélectionner le même fichier ensuite
+  if (!file) return
+  const uploaded = await questionStore.uploadImage(file)
+  if (uploaded) Object.assign(question.value, uploaded)
+}
+
+const handleRemoveImage = async () => {
+  // Question pas encore créée côté serveur : on efface juste le brouillon local, pas d'appel API.
+  if (question.value.idQuestion) {
+    const removed = await questionStore.removeImage(question.value.idQuestion)
+    if (!removed) return
+  }
+  Object.assign(question.value, emptyImageFields())
+}
 
 const handleAddQuestion = async () => {
   // Étape 1 - Créer le test une seule fois
@@ -118,7 +169,7 @@ const handleAddQuestion = async () => {
       questions.value.push({ ...questionStore.question })
 
       // Réinitialise les champs
-      question.value = { statement: '', questionPosition: 0, type: 'text', idTest: testStore.test.id }
+      question.value = { statement: '', questionPosition: 0, type: 'text', idTest: testStore.test.id, ...emptyImageFields() }
       response.value = { content: '', correction: true, questionId: null }
     }
   }

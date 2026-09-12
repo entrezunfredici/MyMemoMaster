@@ -24,6 +24,12 @@
         >
           <h3 class="text-lg font-semibold text-heading mb-4">Question {{ idx + 1 }}</h3>
           <p :id="`question-statement-${idx}`" class="text-base text-body mb-5"><FormulaText :text="question.statement || ''" /></p>
+          <img
+            v-if="question.imageUrl"
+            :src="question.imageUrl"
+            :alt="question.imageOriginalName || `Illustration de la question ${idx + 1}`"
+            class="max-w-full rounded-lg border border-gray-200 mb-5"
+          />
 
           <!-- open -->
           <template v-if="question.type === 'open'">
@@ -150,6 +156,12 @@
             </span>
           </div>
           <p class="text-base text-body mb-4"><FormulaText :text="question.statement || ''" /></p>
+          <img
+            v-if="question.imageUrl"
+            :src="question.imageUrl"
+            :alt="question.imageOriginalName || `Illustration de la question ${idx + 1}`"
+            class="max-w-full rounded-lg border border-gray-200 mb-4"
+          />
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-white p-4 rounded-lg border border-gray-200">

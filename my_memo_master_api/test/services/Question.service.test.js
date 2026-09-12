@@ -22,6 +22,17 @@ jest.mock('../../models/index', () => ({
   }
 }))
 
+jest.mock('@aws-sdk/client-s3', () => ({
+  DeleteObjectCommand: jest.fn()
+}))
+
+jest.mock('../../config/storage.config', () => ({
+  s3Client: { send: jest.fn() },
+  bucket: 'test-bucket'
+}))
+
+jest.mock('../../helpers/logger', () => ({ error: jest.fn(), warn: jest.fn(), info: jest.fn() }))
+
 describe('QuestionService', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -124,6 +135,35 @@ describe('QuestionService', () => {
     expect(question).toEqual(mockQuestion)
   })
 
+  test('should create a question with an image - sets imageSource to manual', async () => {
+    const newQuestion = {
+      statement: 'New Question',
+      questionPosition: 1,
+      type: 'Type 1',
+      imageUrl: 'https://bucket.s3.amazonaws.com/uploads/1/img.png',
+      imageKey: 'uploads/1/img.png',
+      imageMimeType: 'image/png',
+      imageOriginalName: 'schema.png',
+      imageSize: 12345
+    }
+    Question.create.mockResolvedValue({ idQuestion: 4, ...newQuestion })
+
+    await QuestionService.create(newQuestion)
+
+    expect(Question.create).toHaveBeenCalledWith({
+      statement: 'New Question',
+      questionPosition: 1,
+      type: 'Type 1',
+      content: null,
+      imageUrl: 'https://bucket.s3.amazonaws.com/uploads/1/img.png',
+      imageKey: 'uploads/1/img.png',
+      imageMimeType: 'image/png',
+      imageOriginalName: 'schema.png',
+      imageSize: 12345,
+      imageSource: 'manual'
+    })
+  })
+
   test('should update an existing question', async () => {
     const mockQuestion = {
       update: jest.fn().mockResolvedValue({
@@ -155,6 +195,42 @@ describe('QuestionService', () => {
     })
   })
 
+  test('should delete the previous S3 image when the image is replaced', async () => {
+    const { s3Client } = require('../../config/storage.config')
+    s3Client.send.mockResolvedValue({})
+    const mockQuestion = {
+      imageKey: 'uploads/1/old.png',
+      update: jest.fn().mockResolvedValue({ idQuestion: 1, imageKey: 'uploads/1/new.png' })
+    }
+    Question.findByPk.mockResolvedValue(mockQuestion)
+
+    await QuestionService.update(1, {
+      statement: 'Question',
+      questionPosition: 1,
+      type: 'Type 1',
+      imageUrl: 'https://bucket.s3.amazonaws.com/uploads/1/new.png',
+      imageKey: 'uploads/1/new.png'
+    })
+
+    expect(s3Client.send).toHaveBeenCalledTimes(1)
+    expect(mockQuestion.update).toHaveBeenCalledWith(
+      expect.objectContaining({ imageKey: 'uploads/1/new.png', imageSource: 'manual' })
+    )
+  })
+
+  test('should not delete the S3 image when the image key is unchanged', async () => {
+    const { s3Client } = require('../../config/storage.config')
+    const mockQuestion = {
+      imageKey: 'uploads/1/same.png',
+      update: jest.fn().mockResolvedValue({ idQuestion: 1 })
+    }
+    Question.findByPk.mockResolvedValue(mockQuestion)
+
+    await QuestionService.update(1, { statement: 'Question', imageKey: 'uploads/1/same.png', imageUrl: 'https://x/uploads/1/same.png' })
+
+    expect(s3Client.send).not.toHaveBeenCalled()
+  })
+
   test('should delete a question by ID', async () => {
     const mockQuestion = {
       destroy: jest.fn().mockResolvedValue(true)
@@ -166,5 +242,72 @@ describe('QuestionService', () => {
     expect(Question.findByPk).toHaveBeenCalledWith(1)
     expect(mockQuestion.destroy).toHaveBeenCalled()
     expect(result).toBe(true)
+  })
+
+  test('should delete the S3 image when deleting a question that has one', async () => {
+    const { s3Client } = require('../../config/storage.config')
+    s3Client.send.mockResolvedValue({})
+    const mockQuestion = {
+      imageKey: 'uploads/1/img.png',
+      destroy: jest.fn().mockResolvedValue(true)
+    }
+    Question.findByPk.mockResolvedValue(mockQuestion)
+
+    const result = await QuestionService.delete(1)
+
+    expect(s3Client.send).toHaveBeenCalledTimes(1)
+    expect(mockQuestion.destroy).toHaveBeenCalled()
+    expect(result).toBe(true)
+  })
+
+  test('should delete a question by ID - NOT_FOUND', async () => {
+    Question.findByPk.mockResolvedValue(null)
+
+    await expect(QuestionService.delete(99)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+
+  describe('removeImage', () => {
+    test('should remove the image and delete the S3 object', async () => {
+      const { s3Client } = require('../../config/storage.config')
+      s3Client.send.mockResolvedValue({})
+      const mockQuestion = {
+        imageKey: 'uploads/1/img.png',
+        update: jest.fn().mockResolvedValue({ idQuestion: 1, imageUrl: null })
+      }
+      Question.findByPk.mockResolvedValue(mockQuestion)
+
+      const result = await QuestionService.removeImage(1)
+
+      expect(s3Client.send).toHaveBeenCalledTimes(1)
+      expect(mockQuestion.update).toHaveBeenCalledWith({
+        imageUrl: null,
+        imageKey: null,
+        imageMimeType: null,
+        imageOriginalName: null,
+        imageSize: null,
+        imageSource: null
+      })
+      expect(result).toEqual({ idQuestion: 1, imageUrl: null })
+    })
+
+    test('should not call S3 when the question has no image', async () => {
+      const { s3Client } = require('../../config/storage.config')
+      const mockQuestion = {
+        imageKey: null,
+        update: jest.fn().mockResolvedValue({ idQuestion: 1 })
+      }
+      Question.findByPk.mockResolvedValue(mockQuestion)
+
+      await QuestionService.removeImage(1)
+
+      expect(s3Client.send).not.toHaveBeenCalled()
+      expect(mockQuestion.update).toHaveBeenCalled()
+    })
+
+    test('should throw NOT_FOUND when the question does not exist', async () => {
+      Question.findByPk.mockResolvedValue(null)
+
+      await expect(QuestionService.removeImage(99)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    })
   })
 })

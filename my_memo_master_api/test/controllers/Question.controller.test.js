@@ -30,7 +30,8 @@ jest.mock('../../services/Question.service', () => ({
   getCorrectionByQuestion: jest.fn(),
   create: jest.fn(),
   update: jest.fn(),
-  delete: jest.fn()
+  delete: jest.fn(),
+  removeImage: jest.fn()
 }))
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -334,6 +335,47 @@ describe('Question Controller', () => {
 
       const res = await request(app)
         .delete(`${BASE}/questions/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(500)
+    })
+  })
+
+  // ── DELETE /questions/:id/image ────────────────────────────────────────────
+  describe('DELETE /questions/:id/image', () => {
+    it('200 — retire l\'image et retourne la question mise à jour', async () => {
+      questionService.removeImage.mockResolvedValue({ ...mockQuestion, imageUrl: null })
+
+      const res = await request(app)
+        .delete(`${BASE}/questions/1/image`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.imageUrl).toBeNull()
+    })
+
+    it('401 — sans token', async () => {
+      const res = await request(app).delete(`${BASE}/questions/1/image`)
+      expect(res.status).toBe(401)
+      expect(questionService.removeImage).not.toHaveBeenCalled()
+    })
+
+    it('404 — question introuvable', async () => {
+      questionService.removeImage.mockRejectedValue(Object.assign(new Error('Question introuvable'), { code: 'NOT_FOUND' }))
+
+      const res = await request(app)
+        .delete(`${BASE}/questions/99/image`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(404)
+      expect(res.body.message).toBeDefined()
+    })
+
+    it('500 — le service échoue', async () => {
+      questionService.removeImage.mockRejectedValue(new Error('S3 error'))
+
+      const res = await request(app)
+        .delete(`${BASE}/questions/1/image`)
         .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)

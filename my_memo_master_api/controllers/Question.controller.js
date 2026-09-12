@@ -96,6 +96,20 @@ exports.update = async (req, res) => {
   }
 }
 
+exports.removeImage = async (req, res) => {
+  try {
+    const { id } = req.params
+    const question = await QuestionService.removeImage(id)
+    res.status(200).json(question)
+  } catch (error) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ message: error.message })
+    logger.error(error?.message || error)
+    res
+      .status(500)
+      .json({ message: "Une erreur s'est produite lors de la suppression de l'image de la question." })
+  }
+}
+
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params

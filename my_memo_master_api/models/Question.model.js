@@ -40,6 +40,41 @@ module.exports = (instance) => {
         set(value) {
           this.setDataValue('content', value != null ? JSON.stringify(value) : null)
         }
+      },
+      // Image/schéma rattaché à la question (upload manuel ou repris par l'IA depuis un PDF source —
+      // voir migration 20260912000001-add-image-fields-to-question.js). `imageKey` est la clé S3
+      // (nécessaire pour la suppression de l'objet, voir Question.service.js#removeImage), `imageUrl`
+      // le lien exploitable directement par le front.
+      imageUrl: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        defaultValue: null
+      },
+      imageKey: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        defaultValue: null
+      },
+      imageMimeType: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        defaultValue: null
+      },
+      imageOriginalName: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        defaultValue: null
+      },
+      imageSize: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null
+      },
+      // 'manual' | 'ai' | null (aucune image) — voir DECISIONS.md 2026-09-12.
+      imageSource: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        defaultValue: null
       }
     },
     {

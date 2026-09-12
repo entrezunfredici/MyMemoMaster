@@ -244,6 +244,28 @@ router.get('/correction/:id', QuestionController.getCorrectionByQuestion)
  *               idSystem:
  *                 type: integer
  *                 example: 1
+ *               imageUrl:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "URL de l'image/schéma rattaché (obtenue via POST /storage/upload)"
+ *                 example: "https://my-bucket.s3.eu-west-3.amazonaws.com/uploads/1/170000-abc.png"
+ *               imageKey:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Clé S3 de l'image (renvoyée par POST /storage/upload)"
+ *                 example: "uploads/1/170000-abc.png"
+ *               imageMimeType:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "image/png"
+ *               imageOriginalName:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "schema-circuit.png"
+ *               imageSize:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 204800
  *     responses:
  *       201:
  *         description: Question créée avec succès
@@ -295,6 +317,27 @@ router.post('/', authMiddleware, questionValidators.create, validate, QuestionCo
  *               idCard:
  *                 type: integer
  *                 example: 1
+ *               imageUrl:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "URL de l'image/schéma rattaché (obtenue via POST /storage/upload) ; null pour retirer l'image"
+ *                 example: "https://my-bucket.s3.eu-west-3.amazonaws.com/uploads/1/170000-abc.png"
+ *               imageKey:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "uploads/1/170000-abc.png"
+ *               imageMimeType:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "image/png"
+ *               imageOriginalName:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "schema-circuit.png"
+ *               imageSize:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 204800
  *     responses:
  *       200:
  *         description: Question mise à jour avec succès
@@ -306,6 +349,30 @@ router.post('/', authMiddleware, questionValidators.create, validate, QuestionCo
  *         description: Erreur interne du serveur
  */
 router.put('/edit/:id', authMiddleware, questionValidators.update, validate, QuestionController.update)
+
+/**
+ * @swagger
+ * /questions/{id}/image:
+ *   delete:
+ *     summary: Retire l'image/schéma rattaché à une question (supprime aussi l'objet S3 associé)
+ *     tags:
+ *       - Questions
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID de la question
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Image retirée avec succès, question mise à jour renvoyée
+ *       404:
+ *         description: Question non trouvée
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.delete('/:id/image', authMiddleware, QuestionController.removeImage)
 
 /**
  * @swagger

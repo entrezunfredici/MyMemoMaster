@@ -2,6 +2,18 @@ const { body } = require('express-validator')
 
 const QUESTION_TYPES = ['open', 'mcq', 'fill_blank', 'reorder']
 
+// Champs image : renseignés par le front après un upload via POST /storage/upload (voir
+// Storage.controller.js#upload), même pattern que ClassGroupResource.validators.js. `imageSource`
+// n'est volontairement pas exposé ici — il est fixé par le serveur (Question.service.js), jamais par
+// le client (réservé à 'ai' pour la génération automatique, Ticket B).
+const imageFieldsValidators = [
+  body('imageUrl').optional({ nullable: true }).trim().isLength({ max: 500 }).withMessage("L'URL de l'image ne peut pas dépasser 500 caractères"),
+  body('imageKey').optional({ nullable: true }).trim().isLength({ max: 500 }).withMessage("La clé de l'image ne peut pas dépasser 500 caractères"),
+  body('imageMimeType').optional({ nullable: true }).trim().isLength({ max: 100 }).withMessage("Le type MIME de l'image ne peut pas dépasser 100 caractères"),
+  body('imageOriginalName').optional({ nullable: true }).trim().isLength({ max: 255 }).withMessage("Le nom du fichier image ne peut pas dépasser 255 caractères"),
+  body('imageSize').optional({ nullable: true }).isInt({ min: 0 }).withMessage("La taille de l'image doit être un entier positif ou nul")
+]
+
 exports.create = [
   body('statement').trim().notEmpty().withMessage("L'énoncé de la question est requis"),
   body('questionPosition')
@@ -32,7 +44,8 @@ exports.create = [
   body('idSystem')
     .optional({ nullable: true })
     .isInt({ min: 1 })
-    .withMessage('idSystem doit être un entier positif')
+    .withMessage('idSystem doit être un entier positif'),
+  ...imageFieldsValidators
 ]
 
 exports.update = [
@@ -63,5 +76,6 @@ exports.update = [
   body('idCard')
     .optional({ nullable: true })
     .isInt({ min: 1 })
-    .withMessage('idCard doit être un entier positif')
+    .withMessage('idCard doit être un entier positif'),
+  ...imageFieldsValidators
 ]

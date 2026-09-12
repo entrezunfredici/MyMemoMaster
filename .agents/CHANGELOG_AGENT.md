@@ -168,6 +168,7 @@
 | Partage de ressources pédagogiques (C-03) — Maquettes UI bibliothèque ressources | **Audit-maquette rétroactif livré, aucun code** — `diagrams/bibliotheque_ressources_ui.md` (C-03.02) : l'implémentation (C-03.01, S-03.08/S-02.05) existait déjà en production, sans document `*_ui.md` dédié — traitement identique à S-06.02 (« l'implémentation Vue réelle a précédé les maquettes »). Document produit par audit de l'écran réel (`ClassroomEtudiantView.vue`/`ClassroomEnseignantView.vue`) : vue étudiant (lecture seule), vue enseignant (formulaire drag&drop + liste + suppression), icônes par `mimeType`, contrôle d'accès (rappel). **3 points de dette confirmés, non corrigés** (hors périmètre) : aucune UI d'édition malgré `PUT /resources/:resourceId` existant et testé, champ `url` du modèle inatteignable depuis le formulaire (upload de fichier imposé), aucun filtre par type de ressource dans la bibliothèque. 2 points initialement listés se sont révélés inexacts/incomplets après vérification le jour même : la recherche filtre en réalité déjà les ressources (erreur de lecture, corrigée) ; l'absence de confirmation avant suppression, présentée à tort comme spécifique aux ressources, s'est avérée être le comportement de **toute** la vue enseignant — corrigée en généralisant une modale de confirmation aux 4 actions destructrices (section/rendu, échéance, membre, ressource), voir entrée IMP dédiée | 2026-09-08 |
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
+| Images/schémas sur les questions — Ticket A (upload manuel) | **Livré (backend + front)** — demande utilisateur (« intégrer une image aux questions, et que l'IA puisse le faire ») scindée en 3 tickets après audit (voir DECISIONS.md) : ce ticket ne couvre que l'upload manuel, réutilisant l'infra `POST /storage/upload` existante (S3, déjà utilisée par `ClassGroupResource`) — même pattern « front uploade puis attache l'URL/clé », aucun nouvel endpoint d'upload dédié à Question. 6 nouvelles colonnes (`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource`, migration `20260912000001`), `DELETE /questions/:id/image` (retire l'image + nettoie l'objet S3, best-effort comme `ClassGroupResourceService.delete`). Front : bouton "Insérer une image" déjà présent (mort) sur `CreateTestPage.vue` branché, aperçu + suppression ; affichage de l'image dans `ExerciseDetailPage.vue` (mode quiz + mode résultats, `alt` renseigné pour RGAA). **Ticket B (l'IA rattache une image extraite d'un PDF source à une question générée) et Ticket C (revue de l'image IA avant validation) restent à faire** — non couverts ici. 8 tests service + 4 tests controller (API), 6 tests store + 2 tests composant (front), 0 régression (2053/2053 API, 847/847 front) | 2026-09-12 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -12021,3 +12022,95 @@ ticket), **839/839 tests front** (0 régression, +10). Lint back (`eslint .`) et
 **Points d'attention / dette** — Merge vers `dev` non exécuté par l'agent (action outward-facing sur une
 branche partagée, confirmation utilisateur requise avant push — voir échanges de la session). La dette listée
 ci-dessus reste à trier en tickets de suivi si besoin.
+
+---
+
+### [2026-09-12] Images/schémas sur les questions — Ticket A (upload manuel)
+
+**Contexte** : demande utilisateur (« est-ce qu'on peut rajouter la possibilité d'intégrer une image ou un
+schéma aux questions, et la possibilité à l'IA de le faire ? »). Audit préalable (`AGENT.md` §2) : le modèle
+`Question` n'a aucun champ image ; `ImageCaptioning.service.js`/`ImageCaptioningPipeline.service.js`
+(2026-09-09) savent déjà décrire une image extraite d'un PDF mais la **jettent** après avoir fusionné sa
+description en texte — aucune image n'est jamais persistée ni rattachée à une question. Deux questions posées
+à l'utilisateur avant de coder (portée IA : réutiliser une image du PDF source vs en générer une de toutes
+pièces ; upload manuel dans le périmètre ou non) : réponses **« réutiliser les images du PDF source »** et
+**« oui, upload manuel aussi »**. Travail scindé en 3 tickets (Ticket A : upload manuel, fondation ; Ticket B :
+l'IA rattache une image déjà extraite à une question générée ; Ticket C : revue utilisateur de l'image
+proposée par l'IA avant validation) — seul le Ticket A est couvert ici. Branche dédiée `dev_back_question_images`
+(partie de `dev`, conforme à `AGENT.md` §8), après un merge `staging` → `main` demandé explicitement par
+l'utilisateur en préalable (voir DECISIONS.md pour le détail de ce merge, sans lien fonctionnel avec ce ticket).
+
+**Ce qui a été fait** :
+- Migration `20260912000001-add-image-fields-to-question.js` : 6 colonnes nullables sur `Question`
+  (`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize` STRING/INTEGER, `imageSource`
+  STRING(20) `'manual'|'ai'|null`) — vérifiée manuellement (up/down/up réels sur SQLite dev).
+- `models/Question.model.js` : 6 nouveaux attributs (defaultValue `null`).
+- `validators/Question.validators.js` : 5 champs image optionnels ajoutés à `create`/`update`
+  (`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`) — `imageSource` volontairement
+  **non exposé** au client (fixé par le service, réservé à `'ai'` pour le Ticket B).
+- `services/Question.service.js` : `extractImageFields(data)` (dérive `imageSource: 'manual'` si `imageUrl`
+  fourni, sinon `null`) injecté dans `create`/`update` ; `update` supprime l'ancien objet S3 quand `imageKey`
+  change (best-effort, même politique que `ClassGroupResourceService.delete`) ; `delete` nettoie l'image
+  avant de détruire la question ; nouvelle méthode `removeImage(id)` (efface les 6 champs + supprime l'objet
+  S3, `NOT_FOUND` si la question n'existe pas).
+- `controllers/Question.controller.js` / `routes/Question.routes.js` : nouvelle route
+  `DELETE /questions/:id/image` (authMiddleware), Swagger des routes POST/PUT existantes complété avec les
+  5 champs image.
+- Front : `stores/questions.js` gagne `uploadImage(file)` (upload via `POST /storage/upload`, **ne mute pas
+  `this.question`** — retourne les champs à l'appelant, contrairement à `classGroupResources.js#uploadAndCreate`
+  qui persiste directement, car ici l'appelant gère un brouillon local avant `createQuestion`/`updateQuestion`)
+  et `removeImage(id)` (`DELETE /questions/:id/image`). `CreateTestPage.vue` : le bouton "Insert image" déjà
+  présent dans le template (mort, aucun handler) est branché — input file caché, aperçu miniature + bouton
+  retirer, vignette dans le récap des questions. `ExerciseDetailPage.vue` : affichage de l'image (mode quiz et
+  mode résultats), `alt` renseigné (`imageOriginalName` ou texte générique) pour rester conforme RGAA.
+
+**Choix techniques** :
+- Aucun nouvel endpoint d'upload dédié à `Question` — réutilisation de `POST /storage/upload` (générique,
+  S3, déjà utilisé par `ClassGroupResource`) : le front uploade d'abord, puis envoie `imageUrl`/`imageKey`/...
+  à `POST /questions` ou `PUT /questions/edit/:id`, exactement le pattern déjà en place pour
+  `class-groups/:id/resources`. Voir DECISIONS.md pour le détail et l'alternative écartée (endpoint multipart
+  dédié).
+- `imageSource` non exposé aux validators clients : seul le serveur peut le positionner, pour que le Ticket B
+  (l'IA) puisse le distinguer de `'manual'` sans dépendre d'une déclaration du client.
+
+**Ce qui n'est PAS couvert** :
+- Ticket B (l'IA rattache une image déjà extraite d'un PDF à une question qu'elle génère) — nécessite
+  d'étendre `AiExerciseGeneration.service.js` (schéma de sortie, champ `imageRef`) et
+  `AiExerciseGenerationPipeline.service.js` (garder l'image au lieu de la jeter après captioning).
+- Ticket C (revue de l'image proposée par l'IA dans `AiExerciseReviewModalComponent.vue` avant validation).
+- Écran d'édition dédié pour les questions `mcq`/`fill_blank`/`reorder` : le bouton branché ici ne l'est que
+  sur `CreateTestPage.vue` (flux `type: 'open'` uniquement) — un futur formulaire d'édition pour les autres
+  types de questions devra rebrancher `uploadImage`/`removeImage` du store de la même façon.
+- Suite Playwright `e2e-a11y/contrast.spec.js` non rejouée sur les pages modifiées (hors temps de ce ticket) —
+  seuls les tests Vitest + `test/a11y/axe.test.js` (composants isolés) ont tourné.
+
+**Points d'attention** :
+- **Écart pré-existant signalé, non corrigé** (hors périmètre de ce ticket) :
+  `ClassGroupResource.controller.js#create` ne transmet pas `fileKey`/`mimeType`/`originalName`/`fileSize` au
+  service alors que `ClassGroupResource.validators.js` les valide et que le front
+  (`stores/classGroupResources.js#uploadAndCreate`) les envoie bien — ces colonnes sont donc silencieusement
+  jamais renseignées à la création. Ticket `Question` conçu pour ne pas reproduire ce bug (le controller
+  transmet tout `req.body`, le service extrait explicitement les champs image).
+- Migration testée en up/down/up sur SQLite dev uniquement — pas rejouée sur PostgreSQL.
+
+**Fichiers modifiés**
+- `my_memo_master_api/migrations/20260912000001-add-image-fields-to-question.js` (nouveau)
+- `my_memo_master_api/models/Question.model.js`
+- `my_memo_master_api/validators/Question.validators.js`
+- `my_memo_master_api/services/Question.service.js`
+- `my_memo_master_api/controllers/Question.controller.js`
+- `my_memo_master_api/routes/Question.routes.js`
+- `my_memo_master_api/test/services/Question.service.test.js` (+8 tests)
+- `my_memo_master_api/test/controllers/Question.controller.test.js` (+4 tests)
+- `my_memo_master_front/src/stores/questions.js`
+- `my_memo_master_front/src/pages/CreateTestPage.vue`
+- `my_memo_master_front/src/pages/ExerciseDetailPage.vue`
+- `my_memo_master_front/test/stores/questions.store.test.js` (nouveau, 6 tests)
+- `my_memo_master_front/test/components/ExerciseDetailPage.test.js` (+2 tests)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — API : **2053/2053** (0 régression, +12 vs avant ce ticket), lint (`eslint`) propre, migration
+vérifiée up/down/up sur SQLite dev. Front : **847/847** (55 suites, 0 régression, +8), lint propre.
+
+**Points d'attention / dette** — Ticket réalisé sur une branche dédiée `dev_back_question_images` (partie de
+`dev`), pas encore mergé — laissé à l'utilisateur pour revue avant merge/PR.
