@@ -206,6 +206,17 @@
             </button>
           </div>
 
+          <!-- Qualité de la réponse de référence (AnswerQuality.service.js) — aperçu EN DIRECT
+               pendant la saisie (rien n'est encore enregistré), remplacé par le résultat réel une
+               fois la sauvegarde effectuée ; la modale reste alors ouverte tant qu'il y a un point
+               à vérifier plutôt que de se refermer immédiatement (DECISIONS.md 2026-09-12). -->
+          <div v-if="lastQuality.level" class="form-group--lg">
+            <p class="text-sm mb-1" :class="qualitySaved ? 'text-green-700' : 'text-gray-500'">
+              {{ qualitySaved ? `✓ Carte enregistrée — ${editingCard ? 'réponse mise à jour' : 'réponse créée'}.` : 'Aperçu (non enregistré) :' }}
+            </p>
+            <AnswerQualityBadge :level="lastQuality.level" :warnings="lastQuality.warnings" />
+          </div>
+
           <!-- Nœud de la carte mentale liée (création uniquement) -->
           <div v-if="!editingCard && mindMapJson" class="form-group--lg">
             <label class="form-label">
@@ -354,7 +365,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
@@ -364,6 +375,7 @@ import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
 import AiGenerateCardsModal from '@/components/AiGenerateCardsModalComponent.vue'
 import AiGenerationProgressModal from '@/components/AiGenerationProgressModalComponent.vue'
 import AiValidationScreen from '@/components/AiValidationScreenComponent.vue'
+import AnswerQualityBadge from '@/components/AnswerQualityBadgeComponent.vue'
 import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
 import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
@@ -396,6 +408,52 @@ const form = reactive({
   mcqOptions: [{ text: '', correct: true }, { text: '', correct: false }],
   mindMapNodeId: null,
 })
+// Résultat de AnswerQuality.service.js (back) affiché dans la modale (DECISIONS.md 2026-09-12) —
+// alimenté de deux façons : en direct pendant la saisie via POST /responses/quality-preview
+// (aucune persistance, `schedulePreview` ci-dessous), puis remplacé par le résultat réel renvoyé
+// par la sauvegarde (POST /responses ou PUT /responses/edit/:id) une fois enregistré. `level: null`
+// = pas encore évalué (champs incomplets, ou carte QCM sans réponse à évaluer).
+const lastQuality = reactive({ level: null, warnings: [] })
+// true seulement quand lastQuality reflète la réponse RÉELLEMENT enregistrée (POST /responses ou
+// PUT /responses/edit/:id) ; false pendant l'aperçu en direct (rien n'est encore sauvegardé) —
+// distingue les deux dans le libellé affiché sous le badge (cf. template).
+const qualitySaved = ref(false)
+
+// Aperçu de qualité EN DIRECT pendant la saisie, avant tout enregistrement — débounce (500 ms)
+// pour ne pas interroger l'API à chaque frappe ; `seq` ignore la réponse d'un appel devenu obsolète
+// si une saisie plus récente a déjà relancé un nouvel appel entre-temps (réponses réseau pouvant
+// arriver dans le désordre).
+let previewTimer = null
+let previewSeq = 0
+function schedulePreview() {
+  clearTimeout(previewTimer)
+
+  const statement = form.statement.trim()
+  const answer = form.answer.trim()
+  if (form.type !== 'open' || !statement || !answer) {
+    lastQuality.level = null
+    lastQuality.warnings = []
+    qualitySaved.value = false
+    return
+  }
+
+  previewTimer = setTimeout(async () => {
+    const mySeq = ++previewSeq
+    const acceptedAnswers = form.altAnswers.map((a) => a.trim()).filter(Boolean)
+    const resp = await api.post('responses/quality-preview', { statement, answer, acceptedAnswers })
+    if (mySeq !== previewSeq) return
+    if (resp && resp.status === 200) {
+      lastQuality.level = resp.data.qualityLevel
+      lastQuality.warnings = resp.data.qualityWarnings || []
+      qualitySaved.value = false
+    }
+  }, 500)
+}
+
+watch(
+  () => [form.statement, form.answer, form.type, ...form.altAnswers],
+  schedulePreview
+)
 
 // --- boîtes ---
 const showBoxModal = ref(false)
@@ -509,6 +567,9 @@ const openAddModal = () => {
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
   form.mindMapNodeId = null
   formError.value = ''
+  lastQuality.level = null
+  lastQuality.warnings = []
+  qualitySaved.value = false
   showModal.value = true
 }
 
@@ -530,6 +591,9 @@ const openEditModal = async (card) => {
     form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
   }
   formError.value = ''
+  lastQuality.level = null
+  lastQuality.warnings = []
+  qualitySaved.value = false
   showModal.value = true
 }
 
@@ -543,6 +607,9 @@ const closeModal = () => {
   form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
   form.mindMapNodeId = null
   formError.value = ''
+  lastQuality.level = null
+  lastQuality.warnings = []
+  qualitySaved.value = false
 }
 
 const submitForm = async () => {
@@ -596,7 +663,8 @@ const handleCreate = async () => {
     const acceptedAnswers = [form.answer, ...form.altAnswers]
       .map((a) => a.trim())
       .filter(Boolean)
-    for (const answer of acceptedAnswers) {
+    let mainResponseId = null
+    for (const [i, answer] of acceptedAnswers.entries()) {
       const rResp = await api.post('responses', {
         content: normalizeFormulaSyntax(answer),
         correction: true,
@@ -605,6 +673,22 @@ const handleCreate = async () => {
       if (!rResp || rResp.status !== 201) {
         formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
         return
+      }
+      if (i === 0) mainResponseId = rResp.data.idResponse
+    }
+    // AnswerQuality.service.js (back) tient compte des reformulations déjà en base au moment de
+    // CHAQUE création ci-dessus — la réponse principale (1ʳᵉ créée) ne voyait donc encore AUCUNE
+    // des formulations suivantes à cet instant. On la ré-enregistre à l'identique juste après
+    // (PUT, contenu inchangé) uniquement pour redéclencher le calcul de qualité une fois toutes
+    // les formulations réellement en base — DECISIONS.md 2026-09-12.
+    if (mainResponseId) {
+      const qualityResp = await api.put(`responses/edit/${mainResponseId}`, {
+        content: normalizeFormulaSyntax(acceptedAnswers[0]),
+      })
+      if (qualityResp && qualityResp.status === 200) {
+        lastQuality.level = qualityResp.data.qualityLevel
+        lastQuality.warnings = qualityResp.data.qualityWarnings || []
+        qualitySaved.value = true
       }
     }
   }
@@ -621,10 +705,10 @@ const handleCreate = async () => {
   }
 
   notif.notify('Carte ajoutée avec succès.', 'success')
-  closeModal()
   loading.value = true
   await loadCards()
   loading.value = false
+  if (!lastQuality.level || lastQuality.level === 'high') closeModal()
 }
 
 const handleUpdate = async () => {
@@ -655,6 +739,9 @@ const handleUpdate = async () => {
         formError.value = rResp?.data?.message || 'Erreur lors de la mise à jour de la réponse.'
         return
       }
+      lastQuality.level = rResp.data.qualityLevel
+      lastQuality.warnings = rResp.data.qualityWarnings || []
+      qualitySaved.value = true
     } else if (form.answer.trim()) {
       const rResp = await api.post('responses', {
         content: normalizeFormulaSyntax(form.answer),
@@ -665,14 +752,17 @@ const handleUpdate = async () => {
         formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
         return
       }
+      lastQuality.level = rResp.data.qualityLevel
+      lastQuality.warnings = rResp.data.qualityWarnings || []
+      qualitySaved.value = true
     }
   }
 
   notif.notify('Carte mise à jour avec succès.', 'success')
-  closeModal()
   loading.value = true
   await loadCards()
   loading.value = false
+  if (!lastQuality.level || lastQuality.level === 'high') closeModal()
 }
 
 const handleDelete = async (card) => {

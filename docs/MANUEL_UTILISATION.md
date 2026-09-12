@@ -152,4 +152,4 @@ Sur `/classroom`, la vue enseignant permet de :
 | Aucune carte proposée en session | Aucune carte n'est **due** : la répétition espacée attend l'échéance de chaque boîte — revenez plus tard ou réduisez l'intervalle des boîtes |
 | Trop de tentatives de connexion | Après 10 échecs, le compte est protégé 15 minutes — patientez puis réessayez |
 | Mon enseignant ne voit pas ma progression | Le partage des KPI exige votre consentement explicite (page Classroom / Réglages) |
-| L'envoi d'un fichier est refusé | Formats acceptés : images, PDF, Word, PowerPoint, Excel — 10 Mo maximum ; l'extension doit correspondre au contenu réel du fichier |
+| L'envoi d'un fichier est refusé | Formats acceptés : images, PDF, Word, PowerPoint, Excel — 20 Mo maximum par défaut (configurable côté serveur) ; l'extension doit correspondre au contenu réel du fichier |

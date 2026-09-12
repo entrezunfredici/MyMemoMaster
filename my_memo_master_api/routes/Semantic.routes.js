@@ -55,7 +55,7 @@ module.exports = function (app) {
    *                   type: string
    *                 decision_zone:
    *                   type: string
-   *                   enum: [high, low, grey_zone]
+   *                   enum: [high, low, inversion]
    *       400:
    *         description: Champs manquants ou invalides
    *       500:

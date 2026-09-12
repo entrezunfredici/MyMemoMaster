@@ -41,7 +41,7 @@ const handleUpload = (multerMiddleware) => (req, res, next) => {
  *               file:
  *                 type: string
  *                 format: binary
- *                 description: "Fichier à uploader (max 10 Mo, types : jpeg, png, gif, webp, pdf)"
+ *                 description: "Fichier à uploader (max MAX_UPLOAD_SIZE_MB, 20 Mo par défaut ; types : jpeg, png, gif, webp, pdf)"
  *     responses:
  *       201:
  *         description: Fichier uploadé avec succès.
@@ -129,7 +129,7 @@ router.post('/upload', authMiddleware, handleUpload(upload.single('file')), stor
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: "Fichiers à uploader (max 5, 10 Mo chacun)"
+ *                 description: "Fichiers à uploader (max 5, MAX_UPLOAD_SIZE_MB chacun, 20 Mo par défaut)"
  *     responses:
  *       201:
  *         description: Fichiers uploadés avec succès.

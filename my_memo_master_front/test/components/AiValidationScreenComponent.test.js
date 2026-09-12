@@ -94,4 +94,51 @@ describe('AiValidationScreenComponent', () => {
       expect.objectContaining({ idSystem: 5, mindMapNodeId: 'n-ohm' })
     )
   })
+
+  // Badge de qualité (AnswerQualityBadgeComponent) — AnswerQuality.service.js, DECISIONS.md 2026-09-12
+  it('affiche le badge "Bonne qualité" pour une carte "open" sans avertissement', () => {
+    const wrapper = mountScreen({
+      batch: {
+        ...BATCH,
+        cards: [{ ...BATCH.cards[0], qualityLevel: 'high', qualityWarnings: [] }],
+      },
+    })
+    expect(wrapper.text()).toContain('Bonne qualité')
+    expect(wrapper.text()).not.toContain('À revoir')
+  })
+
+  it('affiche le badge "À revoir" et le détail des avertissements pour une réponse de mauvaise qualité', () => {
+    const wrapper = mountScreen({
+      batch: {
+        ...BATCH,
+        cards: [{
+          ...BATCH.cards[0],
+          qualityLevel: 'low',
+          qualityWarnings: ['La réponse ne semble mentionner aucun mot-clé distinctif de l\'énoncé…'],
+        }],
+      },
+    })
+    expect(wrapper.text()).toContain('À revoir')
+    expect(wrapper.text()).toContain('mot-clé distinctif')
+  })
+
+  it('n\'affiche aucun badge de qualité pour une carte "mcq" (qualityLevel null)', () => {
+    const wrapper = mountScreen({
+      batch: {
+        ...BATCH,
+        cards: [{
+          id: 2,
+          statement: 'Q mcq',
+          type: 'mcq',
+          options: [{ text: 'A', correct: true }, { text: 'B', correct: false }],
+          status: 'pending',
+          qualityLevel: null,
+          qualityWarnings: [],
+        }],
+      },
+    })
+    expect(wrapper.text()).not.toContain('Bonne qualité')
+    expect(wrapper.text()).not.toContain('À vérifier')
+    expect(wrapper.text()).not.toContain('À revoir')
+  })
 })
