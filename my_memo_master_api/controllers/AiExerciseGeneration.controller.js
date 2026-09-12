@@ -39,7 +39,11 @@ exports.generate = async (req, res) => {
       subjectContext,
       questionCount,
       questionType,
-      outputLanguage
+      outputLanguage,
+      // Ticket B (« images sur les questions ») : préfixe de la clé S3 d'une éventuelle image de schéma
+      // attachée par le pipeline (AiExerciseGenerationPipeline.service.js#uploadGeneratedImage) — même
+      // convention que middlewares/upload.middleware.js (uploads/<userId>/...).
+      userId: req.user.id
     })
 
     if (!result.success && result.code === 'invalid_input') {

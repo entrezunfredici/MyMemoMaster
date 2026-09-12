@@ -169,6 +169,7 @@
 | Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 | Images/schémas sur les questions — Ticket A (upload manuel) | **Livré (backend + front)** — demande utilisateur (« intégrer une image aux questions, et que l'IA puisse le faire ») scindée en 3 tickets après audit (voir DECISIONS.md) : ce ticket ne couvre que l'upload manuel, réutilisant l'infra `POST /storage/upload` existante (S3, déjà utilisée par `ClassGroupResource`) — même pattern « front uploade puis attache l'URL/clé », aucun nouvel endpoint d'upload dédié à Question. 6 nouvelles colonnes (`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource`, migration `20260912000001`), `DELETE /questions/:id/image` (retire l'image + nettoie l'objet S3, best-effort comme `ClassGroupResourceService.delete`). Front : bouton "Insérer une image" déjà présent (mort) sur `CreateTestPage.vue` branché, aperçu + suppression ; affichage de l'image dans `ExerciseDetailPage.vue` (mode quiz + mode résultats, `alt` renseigné pour RGAA). **Ticket B (l'IA rattache une image extraite d'un PDF source à une question générée) et Ticket C (revue de l'image IA avant validation) restent à faire** — non couverts ici. 8 tests service + 4 tests controller (API), 6 tests store + 2 tests composant (front), 0 régression (2053/2053 API, 847/847 front) | 2026-09-12 |
+| Images/schémas sur les questions — Ticket B (l'IA rattache une image du PDF source à une question générée) | **Livré (backend uniquement, aucun front)** — suite du Ticket A. `ImageCaptioningPipeline.service.js` numérote désormais chaque schéma retenu (marqueur texte « Schéma n°X ») et renvoie la liste des images retenues (`images: [{id, pageIndex, caption, imageBase64}]`, champ additionnel, `AiCardGenerationPipeline.service.js` inchangé). `AiExerciseGeneration.service.js` gagne un champ de sortie optionnel `imageRef` (règle 13 du prompt système : le LLM cite le numéro exact d'un schéma si une question en dépend directement, jamais inventé) + validation (entier positif ou null). `AiExerciseGenerationPipeline.service.js` résout `imageRef` après génération : upload direct S3 (`PutObjectCommand`, pas de requête HTTP entrante à parser) de l'image référencée, un seul upload même si plusieurs questions citent le même schéma, échec dégradé en warning (jamais bloquant) ; `imageRef` toujours retiré de la question en sortie, remplacé le cas échéant par `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"` (mêmes noms que `Question.model.js`, Ticket A). **Écart au Ticket A corrigé au passage** : `Question.service.js#extractImageFields` forçait `imageSource` à `"manual"` dès qu'une `imageUrl` était fournie — bloquait toute provenance IA de bout en bout ; accepte désormais explicitement `imageSource: "ai"` du client (jamais `"manual"`, qui reste dérivé), voir DECISIONS.md. **Non couvert (Ticket C)** : aucun câblage front — `AiExerciseReviewModalComponent.vue`/`helpers/exerciseQuestionForm.js` ne préservent pas encore ces champs à travers l'Écran de révision jusqu'à `POST /questions` ; sans Ticket C, l'image générée par l'IA reste dans la réponse HTTP de génération mais n'atteint pas encore une question persistée via ce flux. Scindé au flux exercices (C-02) uniquement — la génération de cartes Leitner (C-01) n'est pas concernée. 10 tests `AiExerciseGeneration.service.test.js` (imageRef), 2 tests `ImageCaptioningPipeline.service.test.js` (numérotation), 15 tests `AiExerciseGenerationPipeline.service.test.js` (upload + attach + intégration), 4 tests `Question.service.test.js`/`Question.controller.test.js` (imageSource "ai"), 0 régression (2079/2079 API) | 2026-09-12 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -12114,3 +12115,83 @@ vérifiée up/down/up sur SQLite dev. Front : **847/847** (55 suites, 0 régress
 
 **Points d'attention / dette** — Ticket réalisé sur une branche dédiée `dev_back_question_images` (partie de
 `dev`), pas encore mergé — laissé à l'utilisateur pour revue avant merge/PR.
+
+---
+
+### [2026-09-12] Images/schémas sur les questions — Ticket B (l'IA rattache une image du PDF source)
+
+**Contexte** : suite du Ticket A (upload manuel). Ce ticket couvre la portée IA validée par l'utilisateur
+lors du cadrage initial : **réutiliser** une image déjà extraite du PDF source (pas en générer une de toutes
+pièces) et l'attacher à la question de l'exercice généré qui en dépend directement. Réalisé sur une nouvelle
+branche `dev_back_question_images_ai`, partant de `dev_back_question_images` (pas de `dev`) puisque ce ticket
+dépend directement des colonnes image ajoutées sur `Question` par le Ticket A, pas encore mergé sur `dev`.
+
+**Ce qui a été fait** :
+- `services/ImageCaptioningPipeline.service.js` : `insertCaption` prend un `id` (numéro séquentiel parmi les
+  images retenues, à partir de 1) et l'inscrit dans le marqueur texte (« Schéma n°X détecté... ») ;
+  `captionEmbeddedImages` renvoie un nouveau champ `images: [{id, pageIndex, caption, imageBase64}]` (les
+  images réellement retenues, dans l'ordre) — champ additionnel, `AiCardGenerationPipeline.service.js`
+  (C-01, consommateur partagé de ce service) continue de l'ignorer sans rien changer à son fonctionnement.
+- `services/AiExerciseGeneration.service.js` : nouveau champ de sortie optionnel `imageRef` sur chaque
+  question du schéma JSON (les 4 types) + règle système 13 (cite le numéro exact d'un « Schéma n°X » du
+  texte source si une question en dépend directement, jamais un numéro halluciné) + validation
+  (`validateQuestion` : `imageRef` doit être un entier positif ou `null`).
+- `services/AiExerciseGenerationPipeline.service.js` : nouvelles méthodes `uploadGeneratedImage` (upload
+  direct S3 via `PutObjectCommand` d'une image base64 déjà en mémoire, renvoie les champs
+  `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"` — mêmes noms que
+  `Question.model.js` — ou `null` en best-effort sur tout échec) et `attachImagesToQuestions` (résout
+  `imageRef` sur chaque question générée contre les images captionnées disponibles, un seul upload même si
+  plusieurs questions citent le même schéma, retire toujours `imageRef` de la question en sortie — jamais un
+  contrat de `Question`, même traitement que `sourceExcerpt`). Branchées juste avant le retour final de
+  `generateExercisesFromContent`, après le garde-fou `successCount === 0`.
+- `controllers/AiExerciseGeneration.controller.js` : transmet `userId: req.user.id` au pipeline (préfixe de
+  la clé S3, même convention que `middlewares/upload.middleware.js`).
+- **Écart au Ticket A corrigé** : `services/Question.service.js#extractImageFields` forçait `imageSource` à
+  `'manual'` dès qu'une `imageUrl` était présente, sans possibilité pour le client de déclarer `'ai'` — ce
+  qui aurait fait perdre la provenance IA dès que le front transmettrait le brouillon de question à
+  `POST /questions`. `Question.validators.js` accepte désormais `imageSource` du client, restreint à la
+  seule valeur `'ai'` (jamais `'manual'`, qui reste dérivé côté serveur) ; `extractImageFields` la respecte.
+
+**Choix techniques** :
+- Résolution `imageRef` → image réelle faite dans le pipeline, PAS dans `AiExerciseGeneration.service.js` :
+  ce dernier n'a connaissance ni de la liste des images disponibles ni de leur contenu binaire (séparation
+  des responsabilités déjà en place entre les deux fichiers).
+- Upload S3 direct (`PutObjectCommand`) plutôt que de réutiliser `middlewares/upload.middleware.js`/`multer` :
+  l'image existe déjà en mémoire (base64 extrait du PDF côté serveur), aucune requête HTTP multipart à
+  parser — voir DECISIONS.md pour le détail et les alternatives écartées.
+- Une référence à un schéma inexistant (hors plafond de 5, ou captioning en échec) est ignorée silencieusement
+  (pas comptée en échec) — seul un échec réel d'upload (S3 indisponible/non configuré) remonte un
+  avertissement, cohérent avec la tolérance déjà en place sur tout le reste du pipeline.
+
+**Ce qui n'est PAS couvert** :
+- **Ticket C** (revue de l'image proposée par l'IA avant validation) : aucun changement front. En l'état,
+  `AiExerciseReviewModalComponent.vue`/`helpers/exerciseQuestionForm.js#contentToFormState`/
+  `buildQuestionContent` ne connaissent pas ces nouveaux champs et ne les préservent probablement pas
+  intacts à travers l'Écran de révision jusqu'à `POST /questions` (non vérifié dans ce ticket, hors
+  périmètre) — l'image reste présente dans la réponse HTTP de `POST /ai-exercise-generations`, mais son
+  chemin jusqu'à une question réellement persistée dépend du Ticket C.
+- Génération de cartes Leitner (C-01, `AiCardGenerationPipeline.service.js`) : scope volontairement limité
+  aux exercices (C-02), comme annoncé lors du cadrage. `LeitnerCard`/`AiGeneratedCard` n'ont aucun équivalent
+  `imageRef`/attachement d'image.
+- Pas de test dédié pour la garde « bucket S3 non configuré » d'`uploadGeneratedImage` (même niveau de
+  couverture que la garde équivalente de `ClassGroupResourceService`, jamais testée isolément) — une
+  tentative via `jest.isolateModules`/`jest.doMock` s'est révélée peu fiable (le mock hoisté au niveau du
+  fichier de test prend le dessus), jugé disproportionné d'investiguer davantage pour ce ticket.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/ImageCaptioningPipeline.service.js`
+- `my_memo_master_api/services/AiExerciseGeneration.service.js`
+- `my_memo_master_api/services/AiExerciseGenerationPipeline.service.js`
+- `my_memo_master_api/controllers/AiExerciseGeneration.controller.js`
+- `my_memo_master_api/services/Question.service.js`
+- `my_memo_master_api/validators/Question.validators.js`
+- `my_memo_master_api/routes/Question.routes.js`, `routes/AiExerciseGeneration.routes.js` (Swagger)
+- Tests : `test/services/ImageCaptioningPipeline.service.test.js` (+2), `test/services/AiExerciseGeneration.service.test.js` (+10), `test/services/AiExerciseGenerationPipeline.service.test.js` (+15, dont l'intégration `imageRef` bout en bout), `test/services/Question.service.test.js` (+2), `test/controllers/Question.controller.test.js` (+2)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète API : **2079/2079** (0 régression, +26 vs avant ce ticket). Lint (`eslint`) propre.
+Aucun changement front dans ce ticket.
+
+**Points d'attention / dette** — Ticket réalisé sur `dev_back_question_images_ai`, branché sur
+`dev_back_question_images` (Ticket A, pas encore mergé sur `dev`) plutôt que sur `dev` directement — dépendance
+technique directe (colonnes `Question`), signalée à l'utilisateur. Pas encore poussé/mergé.

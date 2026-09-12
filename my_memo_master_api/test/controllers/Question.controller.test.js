@@ -234,6 +234,26 @@ describe('Question Controller', () => {
       expect(res.status).toBe(400)
     })
 
+    it('400 — imageSource "manual" refusé (Ticket B, valeur réservée à "ai")', async () => {
+      const res = await request(app)
+        .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ ...validBody, imageUrl: 'https://s3/img.png', imageSource: 'manual' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('201 — imageSource "ai" accepté (Ticket B)', async () => {
+      questionService.create.mockResolvedValue({ ...mockQuestion, imageSource: 'ai' })
+
+      const res = await request(app)
+        .post(`${BASE}/questions`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ ...validBody, imageUrl: 'https://s3/img.png', imageSource: 'ai' })
+
+      expect(res.status).toBe(201)
+    })
+
     it('500 — le service échoue', async () => {
       questionService.create.mockRejectedValue(new Error('DB error'))
 

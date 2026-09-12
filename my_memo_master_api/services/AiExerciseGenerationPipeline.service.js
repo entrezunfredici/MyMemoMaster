@@ -1,8 +1,11 @@
+const crypto = require('crypto')
+const { PutObjectCommand } = require('@aws-sdk/client-s3')
 const logger = require('../helpers/logger')
 const { chunkText } = require('../helpers/textChunker')
 const pdfExtractionService = require('./PdfExtraction.service')
 const aiExerciseGenerationService = require('./AiExerciseGeneration.service')
 const imageCaptioningPipelineService = require('./ImageCaptioningPipeline.service')
+const { s3Client, bucket, publicUrl } = require('../config/storage.config')
 
 // Périmètre : ajout de l'import PDF pour la génération de questions d'exercice par IA (`C-02`),
 // demandé explicitement par l'utilisateur après la livraison de C-02.07 — jusque-là, `C-02` n'avait
@@ -30,6 +33,19 @@ const imageCaptioningPipelineService = require('./ImageCaptioningPipeline.servic
 //   entre deux chunks différents n'est pas retiré ici, exactement comme `AiCardGenerationPipelineService`
 //   ne le fait pas non plus pour les cartes — cohérence avec ce précédent plutôt qu'un comportement
 //   plus strict d'un seul côté de deux features autrement symétriques.
+//
+// Ticket B (2026-09-12, « images sur les questions ») : après génération, une question qui référence un
+// schéma (`imageRef`, résolu contre `ImageCaptioningPipeline.service.js#captionEmbeddedImages` → champ
+// `images`) se voit attacher l'image réellement uploadée (`imageUrl`/`imageKey`/`imageMimeType`/
+// `imageOriginalName`/`imageSize`/`imageSource: 'ai'`) — mêmes noms de champs que Question.model.js
+// (Ticket A), pour que le front puisse transmettre le brouillon tel quel à `POST /questions` une fois
+// la question acceptée en Interface de révision (C-02.07). Ce pipeline reste cohérent avec son
+// périmètre : aucune écriture en base ici, seulement un upload de fichier (S3) — la persistance de la
+// question elle-même reste hors périmètre, comme avant ce ticket.
+// CHOIX : upload direct via `PutObjectCommand` (pas `multer`/`multer-s3`, réservés à une vraie requête
+// HTTP multipart) — l'image existe déjà en mémoire (base64, extraite du PDF), aucune requête entrante à
+// parser. Voir DECISIONS.md pour le détail et les alternatives écartées (upload différé côté front,
+// endpoint dédié).
 
 // Mêmes valeurs que AiCardGenerationPipeline.service.js (C-01.05) — dupliquées plutôt que partagées
 // (pas de constante exportée côté cartes à réutiliser sans y toucher, voir CHOIX ci-dessus).
@@ -91,6 +107,98 @@ class AiExerciseGenerationPipelineService {
   }
 
   /**
+   * Uploade sur S3 une image de schéma déjà extraite (base64, `ImageCaptioningPipeline.service.js`) et
+   * renvoie les champs prêts à être transmis tels quels à `POST /questions` (mêmes noms que
+   * `Question.model.js`, Ticket A). Ne lève jamais d'erreur (best-effort, cohérent avec le reste du
+   * pipeline) — renvoie `null` sur tout échec (S3 non configuré, format inattendu, appel réseau en échec).
+   *
+   * @param {{ id: number, imageBase64: string }} sourceImage
+   * @param {string|number} userId - Préfixe de la clé S3 (`uploads/<userId>/...`, même convention que
+   *   `middlewares/upload.middleware.js`)
+   * @returns {Promise<{ imageUrl: string, imageKey: string, imageMimeType: string, imageOriginalName: string, imageSize: number, imageSource: 'ai' } | null>}
+   */
+  async uploadGeneratedImage(sourceImage, userId) {
+    if (!bucket) {
+      logger.warn('[AiExerciseGenerationPipeline] S3 non configuré — image générée par IA non attachée.')
+      return null
+    }
+
+    const match = /^data:([^;]+);base64,(.+)$/.exec(sourceImage.imageBase64)
+    if (!match) {
+      logger.warn('[AiExerciseGenerationPipeline] Image générée par IA dans un format inattendu (pas une data URI) — ignorée.')
+      return null
+    }
+    const [, mimeType, base64Data] = match
+    const buffer = Buffer.from(base64Data, 'base64')
+    const extension = mimeType.split('/')[1] || 'jpg'
+    const key = `uploads/${userId || 'anon'}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${extension}`
+
+    try {
+      await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: buffer, ContentType: mimeType }))
+    } catch (error) {
+      logger.warn(`[AiExerciseGenerationPipeline] Upload S3 de l'image générée par IA échoué : ${error?.message || error}`)
+      return null
+    }
+
+    return {
+      imageUrl: `${publicUrl}/${key}`,
+      imageKey: key,
+      imageMimeType: mimeType,
+      imageOriginalName: `schema-genere-ia-${sourceImage.id}.${extension}`,
+      imageSize: buffer.length,
+      imageSource: 'ai'
+    }
+  }
+
+  /**
+   * Résout `imageRef` sur chaque question générée : retrouve l'image source correspondante (`images`,
+   * renvoyé par `ImageCaptioningPipeline.service.js#captionEmbeddedImages`), l'uploade (une seule fois
+   * par schéma même si plusieurs questions le référencent — `uploadedByImageId`), et attache le résultat
+   * directement sur l'objet question (mêmes noms de champs que `Question.model.js`). `imageRef` est
+   * TOUJOURS retiré de la question en sortie (champ de génération interne, jamais un contrat de
+   * `Question` — cf. `sourceExcerpt`, même traitement).
+   *
+   * Une référence à un schéma inexistant (hors plafond, ou aucune image n'a jamais été captionnée) est
+   * ignorée silencieusement — pas un échec, le LLM peut avoir mal lu le texte source. Seul un échec réel
+   * d'upload (S3 indisponible/non configuré) compte dans `failedCount`, remonté à l'appelant sous forme
+   * d'avertissement.
+   *
+   * @param {object[]} questions - Muté en place (ajout des champs image, retrait d'`imageRef`)
+   * @param {{ id: number, imageBase64: string }[]} availableImages
+   * @param {string|number} userId
+   * @returns {Promise<{ failedCount: number }>}
+   */
+  async attachImagesToQuestions(questions, availableImages, userId) {
+    const imagesById = new Map(availableImages.map((image) => [image.id, image]))
+    const uploadedByImageId = new Map()
+    let failedCount = 0
+
+    for (const question of questions) {
+      const imageRef = question.imageRef
+      delete question.imageRef
+
+      if (imageRef === null || imageRef === undefined) continue
+      const sourceImage = imagesById.get(imageRef)
+      if (!sourceImage) continue
+
+      if (!uploadedByImageId.has(imageRef)) {
+        // Séquentiel : au plus MAX_CAPTIONED_IMAGES_PER_GENERATION uploads (5), pas de gain réel à
+        // paralléliser, cohérent avec le choix déjà fait sur le captioning lui-même.
+        uploadedByImageId.set(imageRef, await this.uploadGeneratedImage(sourceImage, userId))
+      }
+
+      const uploaded = uploadedByImageId.get(imageRef)
+      if (uploaded) {
+        Object.assign(question, uploaded)
+      } else {
+        failedCount++
+      }
+    }
+
+    return { failedCount }
+  }
+
+  /**
    * Point d'entrée du pipeline : résout le contenu source (texte ou PDF), le découpe si besoin, et
    * appelle le Service génération (C-02.03) sur chaque chunk, en répartissant le nombre de questions
    * demandé. Agrège les résultats. Un chunk en échec ne fait pas échouer les autres — seul un échec
@@ -110,6 +218,8 @@ class AiExerciseGenerationPipelineService {
    * @param {number} params.questionCount - Nombre total de questions cible, réparti sur les chunks
    * @param {string} [params.questionType] - "mixed" | "open" | "mcq" | "fill_blank" | "reorder" (défaut "mixed")
    * @param {string} [params.outputLanguage] - Défaut "fr"
+   * @param {string|number|null} [params.userId] - Utilisateur à l'origine de la génération (Ticket B,
+   *   préfixe de la clé S3 d'une éventuelle image attachée — voir `uploadGeneratedImage`)
    * @returns {Promise<{ questions: object[], warnings: string[], usage: { model: string|null, promptTokens: number, completionTokens: number, ocrPagesProcessed: number } }>}
    * @throws {Error} Contenu source invalide/vide (400/422) ou échec sur la totalité des chunks (502)
    */
@@ -119,7 +229,8 @@ class AiExerciseGenerationPipelineService {
     subjectContext = null,
     questionCount,
     questionType = 'mixed',
-    outputLanguage = 'fr'
+    outputLanguage = 'fr',
+    userId = null
   }) {
     if (!Number.isInteger(questionCount) || questionCount < 1) {
       const err = new Error('Le nombre de questions demandé doit être un entier positif.')
@@ -142,6 +253,7 @@ class AiExerciseGenerationPipelineService {
     // ce fichier pour le détail du raisonnement (service partagé, générique, pas de notion de "question"
     // ici). Ne fait jamais échouer la génération : toute erreur dégrade en warning.
     let finalText = resolvedText
+    let availableImages = []
     if (hasEmbeddedImages) {
       try {
         const captioningResult = await imageCaptioningPipelineService.captionEmbeddedImages({
@@ -151,6 +263,7 @@ class AiExerciseGenerationPipelineService {
           outputLanguage
         })
         finalText = captioningResult.pageTexts.join('\n\n').trim() || resolvedText
+        availableImages = captioningResult.images || []
         usage.promptTokens += captioningResult.usage.promptTokens
         usage.completionTokens += captioningResult.usage.completionTokens
         usage.ocrPagesProcessed += captioningResult.usage.ocrPagesProcessed
@@ -276,6 +389,17 @@ class AiExerciseGenerationPipelineService {
         err.usage = usage
       }
       throw err
+    }
+
+    // Ticket B : résout imageRef sur les questions générées (retire toujours le champ, même si aucune
+    // image n'était disponible — cf. attachImagesToQuestions). Après le garde-fou successCount === 0
+    // ci-dessus : aucune image à attacher à un résultat qu'on n'a pas produit.
+    const { failedCount: failedImageCount } = await this.attachImagesToQuestions(questions, availableImages, userId)
+    if (failedImageCount > 0) {
+      warnings.push(
+        `${failedImageCount} question(s) référençaient un schéma détecté qui n'a pas pu être attaché ` +
+          '(stockage indisponible) — la question reste valide, simplement sans image.'
+      )
     }
 
     return { questions, warnings, usage }

@@ -7,11 +7,23 @@ jest.mock('../../services/AiExerciseGeneration.service', () => ({
 jest.mock('../../services/ImageCaptioningPipeline.service', () => ({
   captionEmbeddedImages: jest.fn()
 }))
+jest.mock('@aws-sdk/client-s3', () => ({
+  PutObjectCommand: jest.fn()
+}))
+jest.mock('../../config/storage.config', () => ({
+  s3Client: { send: jest.fn() },
+  bucket: 'test-bucket',
+  publicUrl: 'https://cdn.example.com'
+}))
+jest.mock('../../helpers/logger', () => ({ error: jest.fn(), warn: jest.fn(), info: jest.fn() }))
 
 const PdfExtractionService = require('../../services/PdfExtraction.service')
 const AiExerciseGenerationService = require('../../services/AiExerciseGeneration.service')
 const ImageCaptioningPipelineService = require('../../services/ImageCaptioningPipeline.service')
 const AiExerciseGenerationPipelineService = require('../../services/AiExerciseGenerationPipeline.service')
+const { s3Client } = require('../../config/storage.config')
+
+const FAKE_SOURCE_IMAGE = { id: 1, pageIndex: 0, caption: 'Un schéma.', imageBase64: 'data:image/png;base64,QUJD' }
 
 const FAKE_QUESTION = (n) => ({
   statement: `Q${n}`,
@@ -388,6 +400,57 @@ describe('AiExerciseGenerationPipelineService', () => {
       })
     })
 
+    it('generateExercisesFromContent - Ticket B : question avec imageRef résolu - l\'image est uploadée et attachée', async () => {
+      PdfExtractionService.extractText.mockResolvedValue({
+        text: 'Texte extrait du PDF.',
+        hasEmbeddedImages: true,
+        ocrPagesProcessed: 0,
+        pageTexts: ['Texte extrait du PDF.']
+      })
+      ImageCaptioningPipelineService.captionEmbeddedImages.mockResolvedValue({
+        pageTexts: ['Texte avec [Schéma n°1 détecté...].'],
+        warnings: [],
+        usage: { promptTokens: 0, completionTokens: 0, ocrPagesProcessed: 0 },
+        captionedCount: 1,
+        images: [FAKE_SOURCE_IMAGE]
+      })
+      AiExerciseGenerationService.generateExercises.mockResolvedValue({
+        questions: [{ ...FAKE_QUESTION(1), imageRef: 1 }],
+        warning: null,
+        usage: FAKE_USAGE
+      })
+      s3Client.send.mockResolvedValue({})
+
+      const result = await AiExerciseGenerationPipelineService.generateExercisesFromContent({
+        pdfBuffer: Buffer.from('%PDF-1.4'),
+        questionCount: 1,
+        userId: 42
+      })
+
+      expect(result.questions[0]).toMatchObject({ imageMimeType: 'image/png', imageSource: 'ai' })
+      expect(result.questions[0].imageKey).toMatch(/^uploads\/42\/.+\.png$/)
+      expect(result.questions[0].imageUrl).toBe(`https://cdn.example.com/${result.questions[0].imageKey}`)
+      expect(result.questions[0].imageRef).toBeUndefined()
+      expect(s3Client.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('generateExercisesFromContent - Ticket B : imageRef sans image disponible (captioning en échec) - question inchangée, imageRef retiré', async () => {
+      AiExerciseGenerationService.generateExercises.mockResolvedValue({
+        questions: [{ ...FAKE_QUESTION(1), imageRef: 3 }],
+        warning: null,
+        usage: FAKE_USAGE
+      })
+
+      const result = await AiExerciseGenerationPipelineService.generateExercisesFromContent({
+        sourceText: 'Un texte sans image.',
+        questionCount: 1
+      })
+
+      expect(result.questions[0].imageUrl).toBeUndefined()
+      expect(result.questions[0].imageRef).toBeUndefined()
+      expect(s3Client.send).not.toHaveBeenCalled()
+    })
+
     it('generateExercisesFromContent - transmet questionType/outputLanguage/subjectContext à chaque chunk', async () => {
       AiExerciseGenerationService.generateExercises.mockResolvedValue({ questions: [FAKE_QUESTION(1)], warning: null, usage: FAKE_USAGE })
 
@@ -402,6 +465,108 @@ describe('AiExerciseGenerationPipelineService', () => {
       expect(AiExerciseGenerationService.generateExercises).toHaveBeenCalledWith(
         expect.objectContaining({ questionType: 'mcq', outputLanguage: 'en', subjectContext: 'Physique' })
       )
+    })
+  })
+
+  describe('uploadGeneratedImage', () => {
+    it('succès - uploade sur S3 et renvoie les champs prêts pour Question.model.js', async () => {
+      s3Client.send.mockResolvedValue({})
+
+      const result = await AiExerciseGenerationPipelineService.uploadGeneratedImage(FAKE_SOURCE_IMAGE, 7)
+
+      expect(s3Client.send).toHaveBeenCalledTimes(1)
+      expect(result.imageMimeType).toBe('image/png')
+      expect(result.imageSource).toBe('ai')
+      expect(result.imageKey).toMatch(/^uploads\/7\/.+\.png$/)
+      expect(result.imageUrl).toBe(`https://cdn.example.com/${result.imageKey}`)
+      expect(result.imageOriginalName).toBe('schema-genere-ia-1.png')
+      expect(result.imageSize).toBeGreaterThan(0)
+    })
+
+    it('format inattendu (pas une data URI) - retourne null sans appeler S3', async () => {
+      const result = await AiExerciseGenerationPipelineService.uploadGeneratedImage(
+        { id: 1, imageBase64: 'not-a-data-uri' },
+        7
+      )
+      expect(result).toBeNull()
+      expect(s3Client.send).not.toHaveBeenCalled()
+    })
+
+    it('échec S3 - retourne null (best-effort, ne lève jamais)', async () => {
+      s3Client.send.mockRejectedValue(new Error('S3 indisponible'))
+
+      const result = await AiExerciseGenerationPipelineService.uploadGeneratedImage(FAKE_SOURCE_IMAGE, 7)
+
+      expect(result).toBeNull()
+    })
+
+    it('userId absent - retombe sur "anon" dans la clé', async () => {
+      s3Client.send.mockResolvedValue({})
+
+      const result = await AiExerciseGenerationPipelineService.uploadGeneratedImage(FAKE_SOURCE_IMAGE, null)
+
+      expect(result.imageKey).toMatch(/^uploads\/anon\//)
+    })
+
+    // NOTE : la garde "bucket non configuré" (if (!bucket) return null, tout en haut de la méthode)
+    // n'a pas de test dédié — même niveau de couverture que ClassGroupResourceService (garde `bucket`
+    // équivalente, jamais testée séparément), `bucket` étant résolu une seule fois à l'import du module
+    // (comme storage.config.js partout ailleurs), un test isolé nécessiterait de recharger le module
+    // avec un mock différent, jugé disproportionné pour ce ticket.
+  })
+
+  describe('attachImagesToQuestions', () => {
+    it('question sans imageRef - inchangée, aucun upload', async () => {
+      const questions = [FAKE_QUESTION(1)]
+
+      const { failedCount } = await AiExerciseGenerationPipelineService.attachImagesToQuestions(questions, [FAKE_SOURCE_IMAGE], 1)
+
+      expect(failedCount).toBe(0)
+      expect(s3Client.send).not.toHaveBeenCalled()
+      expect(questions[0].imageUrl).toBeUndefined()
+    })
+
+    it('imageRef résolu - attache les champs image et retire imageRef', async () => {
+      s3Client.send.mockResolvedValue({})
+      const questions = [{ ...FAKE_QUESTION(1), imageRef: 1 }]
+
+      const { failedCount } = await AiExerciseGenerationPipelineService.attachImagesToQuestions(questions, [FAKE_SOURCE_IMAGE], 1)
+
+      expect(failedCount).toBe(0)
+      expect(questions[0].imageSource).toBe('ai')
+      expect(questions[0].imageRef).toBeUndefined()
+    })
+
+    it('imageRef référence un schéma inexistant - ignoré silencieusement, pas compté en échec', async () => {
+      const questions = [{ ...FAKE_QUESTION(1), imageRef: 99 }]
+
+      const { failedCount } = await AiExerciseGenerationPipelineService.attachImagesToQuestions(questions, [FAKE_SOURCE_IMAGE], 1)
+
+      expect(failedCount).toBe(0)
+      expect(questions[0].imageUrl).toBeUndefined()
+      expect(questions[0].imageRef).toBeUndefined()
+      expect(s3Client.send).not.toHaveBeenCalled()
+    })
+
+    it('deux questions référençant le même schéma - un seul upload S3, les deux sont attachées', async () => {
+      s3Client.send.mockResolvedValue({})
+      const questions = [{ ...FAKE_QUESTION(1), imageRef: 1 }, { ...FAKE_QUESTION(2), imageRef: 1 }]
+
+      await AiExerciseGenerationPipelineService.attachImagesToQuestions(questions, [FAKE_SOURCE_IMAGE], 1)
+
+      expect(s3Client.send).toHaveBeenCalledTimes(1)
+      expect(questions[0].imageKey).toBe(questions[1].imageKey)
+    })
+
+    it('upload échoué - failedCount incrémenté, question laissée sans image', async () => {
+      s3Client.send.mockRejectedValue(new Error('S3 indisponible'))
+      const questions = [{ ...FAKE_QUESTION(1), imageRef: 1 }]
+
+      const { failedCount } = await AiExerciseGenerationPipelineService.attachImagesToQuestions(questions, [FAKE_SOURCE_IMAGE], 1)
+
+      expect(failedCount).toBe(1)
+      expect(questions[0].imageUrl).toBeUndefined()
+      expect(questions[0].imageRef).toBeUndefined()
     })
   })
 })

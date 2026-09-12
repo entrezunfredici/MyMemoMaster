@@ -4178,6 +4178,7 @@ volontairement borné plutôt qu'un thésaurus général).
 court non couvert peut réintroduire un cas similaire. Pas d'audit systématique fait ici (recherche limitée aux
 4 mots trouvés par l'agent de revue). Test de régression ajouté (`Semantic.service.test.js`,
 `detectInversion`) isolant spécifiquement la contamination par un mot de liaison partagé (clauses par ailleurs
+différentes des deux côtés, pour ne pas confondre avec un recouvrement de contenu réel).
 
 ---
 
@@ -4247,4 +4248,71 @@ données, cohérent avec le choix déjà fait sur `ClassGroupResource`. Le écar
 `ClassGroupResource.controller.js#create` (ne transmet pas `fileKey`/`mimeType`/`originalName`/`fileSize` au
 service malgré des validators qui les acceptent) n'est pas corrigé ici (hors périmètre de ce ticket) — signalé
 à l'utilisateur et dans `CHANGELOG_AGENT.md`.
-différentes des deux côtés, pour ne pas confondre avec un recouvrement de contenu réel).
+
+---
+
+### [2026-09-12] Images sur les questions — Ticket B : upload S3 direct plutôt que réutiliser `upload.middleware.js`
+
+**Contexte** : quand l'IA génère une question qui dépend d'un schéma déjà décrit (« Schéma n°X », inséré par
+`ImageCaptioningPipeline.service.js`), l'image source existe déjà en mémoire côté serveur (base64, extraite
+du PDF par `PdfExtraction.service.js#extractImages`) — il faut la faire atterrir sur S3 pour produire une
+`imageUrl` exploitable par le front, avant même qu'aucune requête HTTP multipart n'existe (contrairement à
+l'upload manuel du Ticket A, initié par un vrai formulaire).
+
+**Décision** : nouvelle méthode `AiExerciseGenerationPipeline.service.js#uploadGeneratedImage` qui appelle
+directement `s3Client.send(new PutObjectCommand(...))` (`@aws-sdk/client-s3`, déjà une dépendance du projet)
+sur le buffer décodé depuis la data URI base64, avec la même convention de clé que
+`middlewares/upload.middleware.js` (`uploads/<userId>/<timestamp>-<random>.<ext>`). Best-effort : ne lève
+jamais, renvoie `null` sur tout échec (S3 non configuré, format inattendu, erreur réseau) — dégradé en
+avertissement par l'appelant, jamais bloquant pour la génération elle-même.
+
+**Alternative écartée** : réutiliser `middlewares/upload.middleware.js`/`multer`/`multer-s3`. Écartée :
+`multer` s'attache au cycle de vie d'une requête Express (`req`/`res`, parsing d'un flux multipart entrant)
+— il n'y a ici ni requête HTTP à parser, ni fichier envoyé par un client, seulement un buffer déjà en mémoire
+côté serveur. Plier `multer` à ce cas (ex. simuler un flux) aurait été plus complexe que d'appeler directement
+le SDK S3 sous-jacent, que `multer-s3` utilise de toute façon en interne.
+
+**Alternative écartée (2)** : différer l'upload — renvoyer l'image en base64 inline dans la réponse de
+génération, et ne l'uploader qu'au moment où l'utilisateur accepte réellement la question (Ticket C). Plus
+« paresseuse » (aucun upload orphelin pour une question finalement rejetée en Interface de révision), mais
+reportée hors de ce ticket : elle aurait demandé un endpoint dédié (accepter un base64 côté client authentifié
+et l'uploader) OU une conversion base64→Blob côté front avant de rappeler `POST /storage/upload` — complexité
+que le Ticket C, dédié à l'intégration front, est mieux placé pour trancher en connaissance du flux réel de
+l'Écran de révision. Assumé comme dette : une question avec image générée puis rejetée laisse un objet S3
+orphelin (coût de stockage négligeable au vu du plafond de 5 images par génération).
+
+**Conséquences** : un upload S3 a lieu pour CHAQUE schéma effectivement référencé par au moins une question
+retenue, même si cette question est ensuite rejetée en Interface de révision (pas de nettoyage a posteriori,
+assumé ci-dessus). Un seul upload par schéma même si plusieurs questions le citent (`attachImagesToQuestions`
+met en cache par `imageRef`).
+
+---
+
+### [2026-09-12] Images sur les questions — Ticket B : `imageSource: 'ai'` désormais accepté du client, restreint à cette seule valeur
+
+**Contexte** : le Ticket A avait délibérément exclu `imageSource` des champs acceptés par
+`Question.validators.js` (« fixé par le serveur, jamais par le client ») en anticipant que seul le Ticket B
+aurait une raison légitime de le faire varier. Une fois le Ticket B implémenté, ce choix bloquait de bout en
+bout la fonctionnalité : `AiExerciseGenerationPipeline.service.js` attache bien `imageSource: 'ai'` sur le
+brouillon de question, mais `Question.service.js#extractImageFields` le réécrivait systématiquement en
+`'manual'` dès qu'une `imageUrl` était présente — la provenance IA ne pouvait jamais atteindre la base, quel
+que soit le travail fait côté génération.
+
+**Décision** : `Question.validators.js` accepte désormais `imageSource` du client, mais restreint sa valeur à
+`'ai'` exclusivement (`.equals('ai')`) — jamais `'manual'`, qui reste dérivé côté serveur de la présence
+d'`imageUrl` (`Question.service.js#extractImageFields`, inchangé sur ce point). Un client qui déclarerait
+`imageSource: 'ai'` sur une image en réalité uploadée à la main n'a qu'un impact cosmétique (le badge
+d'affichage prévu en Ticket C) — aucune conséquence de sécurité ou d'intégrité des données, la valeur ne
+pilotant ni un contrôle d'accès ni une logique métier.
+
+**Alternative écartée** : garder `imageSource` entièrement fixé côté serveur, et faire porter la provenance
+IA par un mécanisme distinct (ex. une table de traçabilité séparée, ou un flag sur le batch de génération
+comme `AiGeneratedCard.status` en C-01). Écartée : `Question` n'a pas d'équivalent à `AiGenerationBatch`/
+`AiGeneratedCard` (aucune persistance intermédiaire pour les exercices générés, C-02, contrairement aux
+cartes Leitner C-01) — introduire une table dédiée uniquement pour tracer la provenance d'une image aurait
+été disproportionné par rapport à un simple badge d'affichage.
+
+**Conséquences** : révision explicite d'une décision du Ticket A, documentée ici plutôt que silencieusement
+— cf. AGENT.md §2, « toute modification d'une interface publique doit être signalée ». `Question.validators.js`
+accepte désormais un troisième champ de plus sur `POST /questions`/`PUT /questions/edit/:id` que ce que le
+Ticket A avait initialement prévu.
