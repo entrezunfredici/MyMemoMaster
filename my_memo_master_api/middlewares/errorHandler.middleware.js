@@ -16,6 +16,15 @@ module.exports = (err, req, res, _next) => {
     return res.status(400).json({ message: err.message })
   }
 
+  // CHOIX: cas dédié pour le dépassement de plafond body-parser (err.type === 'entity.too.large',
+  // levé par raw-body avec status 413 — voir node_modules/raw-body/index.js).
+  // RAISON: sans ce branchement, un 413 tombait dans le cas générique ci-dessous et renvoyait
+  // "Erreur interne du serveur." en prod — message trompeur pour une erreur client (payload trop
+  // volumineux), pas une erreur serveur.
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'Le contenu envoyé dépasse la taille maximale autorisée.' })
+  }
+
   const status = err.status || err.statusCode || 500
   const isProd = process.env.NODE_ENV === 'production'
   res

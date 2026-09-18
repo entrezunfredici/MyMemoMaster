@@ -135,6 +135,30 @@ describe('ExerciseDetailPage', () => {
     expect(wrapper.find('textarea').exists()).toBe(true)
   })
 
+  it("question avec imageUrl — affiche l'image avec un alt exploitable", async () => {
+    const { wrapper } = mountPage({
+      testData: {
+        ...mockTest,
+        question: [
+          { ...mockQuestions[0], imageUrl: 'https://s3/uploads/1/img.png', imageOriginalName: 'schema.png' },
+          mockQuestions[1]
+        ]
+      }
+    })
+    await flushPromises()
+
+    const img = wrapper.find('img[src="https://s3/uploads/1/img.png"]')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('alt')).toBe('schema.png')
+  })
+
+  it("question sans imageUrl — n'affiche aucune image", async () => {
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    expect(wrapper.find('img').exists()).toBe(false)
+  })
+
   it('question MCQ — affiche les options et les inputs radio', async () => {
     const { wrapper } = mountPage()
     await flushPromises()
