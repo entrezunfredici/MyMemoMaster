@@ -5,7 +5,7 @@ const { chunkText } = require('../helpers/textChunker')
 const pdfExtractionService = require('./PdfExtraction.service')
 const aiExerciseGenerationService = require('./AiExerciseGeneration.service')
 const imageCaptioningPipelineService = require('./ImageCaptioningPipeline.service')
-const { s3Client, bucket, publicUrl } = require('../config/storage.config')
+const { s3Client, bucket, buildPublicUrl } = require('../config/storage.config')
 
 // Périmètre : ajout de l'import PDF pour la génération de questions d'exercice par IA (`C-02`),
 // demandé explicitement par l'utilisateur après la livraison de C-02.07 — jusque-là, `C-02` n'avait
@@ -141,7 +141,7 @@ class AiExerciseGenerationPipelineService {
     }
 
     return {
-      imageUrl: `${publicUrl}/${key}`,
+      imageUrl: buildPublicUrl(key),
       imageKey: key,
       imageMimeType: mimeType,
       imageOriginalName: `schema-genere-ia-${sourceImage.id}.${extension}`,

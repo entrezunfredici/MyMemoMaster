@@ -13,7 +13,8 @@ jest.mock('@aws-sdk/client-s3', () => ({
 jest.mock('../../config/storage.config', () => ({
   s3Client: { send: jest.fn() },
   bucket: 'test-bucket',
-  publicUrl: 'https://cdn.example.com'
+  publicUrl: 'https://cdn.example.com',
+  buildPublicUrl: jest.fn((key) => `https://cdn.example.com/test-bucket/${key}`)
 }))
 jest.mock('../../helpers/logger', () => ({ error: jest.fn(), warn: jest.fn(), info: jest.fn() }))
 
@@ -429,7 +430,7 @@ describe('AiExerciseGenerationPipelineService', () => {
 
       expect(result.questions[0]).toMatchObject({ imageMimeType: 'image/png', imageSource: 'ai' })
       expect(result.questions[0].imageKey).toMatch(/^uploads\/42\/.+\.png$/)
-      expect(result.questions[0].imageUrl).toBe(`https://cdn.example.com/${result.questions[0].imageKey}`)
+      expect(result.questions[0].imageUrl).toBe(`https://cdn.example.com/test-bucket/${result.questions[0].imageKey}`)
       expect(result.questions[0].imageRef).toBeUndefined()
       expect(s3Client.send).toHaveBeenCalledTimes(1)
     })
@@ -478,7 +479,7 @@ describe('AiExerciseGenerationPipelineService', () => {
       expect(result.imageMimeType).toBe('image/png')
       expect(result.imageSource).toBe('ai')
       expect(result.imageKey).toMatch(/^uploads\/7\/.+\.png$/)
-      expect(result.imageUrl).toBe(`https://cdn.example.com/${result.imageKey}`)
+      expect(result.imageUrl).toBe(`https://cdn.example.com/test-bucket/${result.imageKey}`)
       expect(result.imageOriginalName).toBe('schema-genere-ia-1.png')
       expect(result.imageSize).toBeGreaterThan(0)
     })

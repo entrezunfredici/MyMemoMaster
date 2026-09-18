@@ -201,7 +201,20 @@ Les zones sont des conteneurs visuels rectangulaires (pas de hiérarchie structu
 | Suppression d'une zone | Détache tous les nœuds (`node.zoneId = null`) sans supprimer les nœuds |
 | Repliage | `collapsed` sur la zone (gestion visuelle front) |
 
-### 4.8 Upload d'image
+### 4.8 Taille de la carte (`mindMapJson`)
+
+| Règle | Valeur |
+|-------|--------|
+| Plafond body-parser dédié (`POST`/`PUT /diagrammes`) | 100 Mo — `app.js`, posé avant le plafond global 10kb qui borne le reste de l'API |
+| Plafond ingress (prod/preprod, K8s) | 100 Mo — `nginx.ingress.kubernetes.io/proxy-body-size` |
+| Plafond métier (nombre de nœuds/liens/zones) | Aucun — 100 Mo est une marge technique, pas une limite fonctionnelle réfléchie |
+| Erreur au-delà du plafond | 413 — `"Le contenu envoyé dépasse la taille maximale autorisée."` |
+
+> Avant 2026-09-18, le plafond global de l'API (10 Ko, historiquement pensé pour des payloads courts)
+> s'appliquait aussi à `mindMapJson` — une carte de ~15-25 nœuds suffisait à le dépasser et échouait en
+> 413 avant même le validator. Voir `DECISIONS.md` (2026-09-18) pour le détail du correctif.
+
+### 4.9 Upload d'image
 
 | Règle | Valeur |
 |-------|--------|
@@ -254,6 +267,7 @@ Les zones sont des conteneurs visuels rectangulaires (pas de hiérarchie structu
 | Nœud racine supprimé côté front | `subjectNodeId` est mis à jour vers le premier nœud restant, ou `null` si la carte est vide |
 | Lien vers un nœud inexistant (`from` ou `to` absent) | `addLink()` est permissif — le nœud peut avoir été supprimé. Le rendu front gère l'absence |
 | Canvas vide (aucun nœud) | `exportPayload()` retourne un objet valide avec `nodes: {}`, `links: []` |
+| `mindMapJson` > 100 Mo | 413 — aucun message d'erreur dédié ne remonte côté front (pas de gestion spécifique de ce code dans `MindmapsPage.vue`) |
 | Accès à `GET /diagrammes/:id` avec l'ID d'une carte appartenant à un autre utilisateur | 403 Accès refusé |
 
 ---
@@ -267,6 +281,7 @@ Les zones sont des conteneurs visuels rectangulaires (pas de hiérarchie structu
 | `POST /diagrammes` sans nom → risque de doublon si l'ID n'est pas retourné correctement | Cartes orphelines sans ID côté front | Faible |
 | Nœud racine suppressible côté front (pas de garde API) | Carte sans racine logiquement incohérente | Faible |
 | `timestamps: false` sur le modèle | Pas de `createdAt` en base — la date de modification n'est trackée qu'en JSON | Faible |
+| Pas de gestion dédiée du 413 côté front (auto-save) | Une carte dépassant 100 Mo échoue silencieusement/erreur générique dans `MindmapsPage.vue`, sans message clair pour l'utilisateur | Faible |
 
 ---
 

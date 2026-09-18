@@ -240,6 +240,23 @@ describe('Diagramme Controller', () => {
 
       expect(res.status).toBe(201)
     })
+
+    // FIX: /diagrammes dispose désormais d'un plafond body-parser dédié à 100 Mo (app.js), posé
+    // avant le plafond global de 10kb qui bornait jusqu'ici toutes les routes JSON de l'API —
+    // un mindMapJson de plusieurs dizaines de nœuds dépassait 10 Ko et échouait en 413 avant même
+    // d'atteindre ce controller (voir DECISIONS.md).
+    it('201 — accepte un mindMapJson volumineux (~50 Ko, au-delà de l’ancien plafond global 10kb)', async () => {
+      diagrammeService.create.mockResolvedValue(mockDiagramme)
+      const bigMindMapJson = JSON.stringify({ nodes: { root: { label: 'x'.repeat(50000) } } })
+
+      const res = await request(app)
+        .post(`${BASE}/diagrammes`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ mmName: 'Grande carte', mindMapJson: bigMindMapJson, subjectId: 1 })
+
+      expect(res.status).toBe(201)
+      expect(diagrammeService.create).toHaveBeenCalledTimes(1)
+    })
   })
 
   // ── PUT /diagrammes/:id ────────────────────────────────────────────────────
@@ -308,6 +325,19 @@ describe('Diagramme Controller', () => {
         .send({ mmName: 'Mis à jour', mindMapJson: '{}' })
 
       expect(res.status).toBe(401)
+    })
+
+    it('200 — accepte un mindMapJson volumineux (~50 Ko, au-delà de l’ancien plafond global 10kb)', async () => {
+      diagrammeService.findById.mockResolvedValue({ ...mockDiagramme, userId: 1 })
+      diagrammeService.update.mockResolvedValue(mockDiagramme)
+      const bigMindMapJson = JSON.stringify({ nodes: { root: { label: 'x'.repeat(50000) } } })
+
+      const res = await request(app)
+        .put(`${BASE}/diagrammes/1`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+        .send({ mmName: 'Grande carte', mindMapJson: bigMindMapJson })
+
+      expect(res.status).toBe(200)
     })
   })
 

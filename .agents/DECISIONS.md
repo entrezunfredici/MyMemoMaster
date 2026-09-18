@@ -4347,3 +4347,97 @@ image — nouvelles fonctions dédiées (`defaultQuestionImageFields`/`questionI
 (`Object.assign(item, defaultQuestionFormFields())`, sans rapport avec l'image) et pour garder la
 distinction « champ absent » / « champ à `null` » au niveau du payload, que la fusion aveugle dans un seul
 gros objet de valeurs par défaut aurait rendue plus difficile à exprimer correctement.
+
+---
+
+### [2026-09-18] Cartes mentales : plafond body-parser dédié à 100 Mo sur `/api/v1/diagrammes`
+
+**Contexte** : signalé par l'utilisateur — aucune limite de taille n'est documentée pour une carte
+mentale (`diagrams/mindmap_rules.md` §6/§7 ne mentionnent rien de tel), mais `app.js` pose depuis
+toujours un plafond `bodyParser.json({ limit: '10kb' })` **global**, appliqué avant le montage des
+routes, donc à `POST`/`PUT /diagrammes` comme à tout le reste de l'API. `mindMapJson` (nœuds + liens
++ zones, voir structure §3.2 de `mindmap_rules.md`) est envoyé en entier dans ce corps JSON — chaque
+nœud porte `style`/`layout`/`meta`, donc 10 Ko se remplissait dès ~15-25 nœuds, avant même d'atteindre
+le validator. Le dépassement remontait en 413 mais via le handler d'erreur générique, qui renvoyait
+`"Erreur interne du serveur."` en prod (message trompeur pour une erreur 413, côté client).
+
+**Décision** : demande explicite de l'utilisateur — plafond relevé à **100 Mo**, mais uniquement pour
+le préfixe `/api/v1/diagrammes` (`app.js`), pas pour le plafond global qui reste à 10kb pour le reste
+de l'API. Techniquement : un second `bodyParser.json({ limit: '100mb' })` scopé à
+`/api/v1/diagrammes` est monté **avant** le plafond global — `body-parser` ignore un second parsing
+JSON dès que `req._body` est déjà positionné (`node_modules/body-parser/lib/types/json.js`), donc le
+middleware le plus spécifique "gagne" pour ces routes sans qu'il soit nécessaire d'exclure `/diagrammes`
+du plafond global. `errorHandler.middleware.js` gagne en plus un cas dédié sur `err.type ===
+'entity.too.large'`, avec un message français correct (`"Le contenu envoyé dépasse la taille maximale
+autorisée."`) au lieu de tomber dans le cas générique — bénéficie à toutes les routes, pas seulement
+`/diagrammes`.
+
+**Alternative écartée** : suivre le précédent `AiGenerationBatch`/`AiExerciseGeneration`
+(`MAX_SOURCE_TEXT_LENGTH`, validateur `express-validator` avec une borne de caractères précise plutôt
+que de toucher au plafond body-parser). Écartée ici : ces routes-là sont multipart (déjà hors du
+plafond global) et bornaient un champ texte unique à une valeur dérivée d'une contrainte de pipeline
+connue (`MAX_CHUNKS × MAX_CHUNK_LENGTH`). `mindMapJson` n'a pas d'équivalent — sa taille dépend du
+nombre de nœuds/liens/zones que l'utilisateur choisit de créer, sans plafond métier documenté ; relever
+le plafond body-parser plutôt qu'inventer une limite de caractères arbitraire sur un champ structuré
+correspond à la demande explicite de l'utilisateur.
+
+**Conséquences** : 100 Mo est une marge large, pas un plafond fonctionnel réfléchi (aucune règle
+métier ne borne le nombre de nœuds d'une carte) — une carte de cette taille resterait de toute façon
+probablement inutilisable côté rendu front avant d'atteindre cette limite technique. `MindMap.mindMapJson`
+est en colonne `JSON` (pas `TEXT`, commentaire déjà présent sur `Diagramme.model.js` : « `TEXT` est plus
+approprié pour du JSON volumineux ») — non traité ici, resterait à revoir si des cartes proches de cette
+taille apparaissent réellement en usage.
+
+**Addendum (même jour)** — l'ingress nginx devant l'API bornait déjà toute requête à 25 Mo en prod/preprod
+(`nginx.ingress.kubernetes.io/proxy-body-size`, `k8s/prod/ingress.yml`, `k8s/preprod/ingress.yml`,
+`helm/templates/ingress.yaml`) — sans y toucher, une carte mentale entre 25 Mo et 100 Mo aurait été
+rejetée par l'ingress (page d'erreur nginx générique, pas le message JSON français d'`errorHandler.
+middleware.js`) avant même d'atteindre le plafond applicatif tout juste relevé. Confirmé avec
+l'utilisateur (question posée) : les 3 manifests sont alignés sur `"100m"`. `k8s/app/ingress-test.yml`
+(borné à `10m`) volontairement laissé inchangé — fichier explicitement marqué DÉPRÉCIÉ en tête, remplacé
+par `k8s/preprod/ingress.yml`. Le proxy Traefik (docker-compose, dev/test hors k8s) n'impose aucun
+plafond de taille de requête propre (pas de middleware `maxRequestBodyBytes` configuré) — rien à changer
+de ce côté.
+
+---
+
+### [2026-09-18] Images IA sur les questions — URL publique S3 construite via un helper centralisé (`buildPublicUrl`) plutôt qu'un correctif local
+
+**Contexte** : `AiExerciseGenerationPipeline.service.js#uploadGeneratedImage` (Ticket B, 2026-09-12)
+uploade une image en mémoire (base64 extrait d'un PDF) via `PutObjectCommand` du SDK AWS brut — pas
+`multer-s3`, réservé à une vraie requête HTTP multipart (choix déjà acté à l'époque, voir entrée Ticket B
+du 2026-09-12). Il construisait ensuite l'URL publique lui-même : `` `${publicUrl}/${key}` ``. Bug remonté
+par l'utilisateur après un test réel (Claude Desktop) : l'image ne s'affichait pas. Cause confirmée par
+audit de `.env` : ce dépôt tourne avec `S3_FORCE_PATH_STYLE=true` (bucket Infomaniak, pas AWS standard) —
+en path-style, le nom du bucket fait partie du **chemin** de l'URL (`publicUrl/bucket/key`), pas seulement
+de son domaine. L'URL construite manuellement omettait ce segment. Personne ne l'avait vu ailleurs dans le
+code parce que tous les autres flux d'upload (`middlewares/upload.middleware.js`, `mindmapImageUpload.js`)
+passent par `multer-s3`, qui délègue ce calcul au SDK AWS (`req.file.location`, déjà correct pour
+n'importe quel style d'adressage) — `uploadGeneratedImage` est le seul endroit du dépôt qui construit une
+URL S3 publique "à la main".
+
+**Décision** : ajouter `buildPublicUrl(key)` à `config/storage.config.js` (le point d'entrée déjà partagé
+par tout code touchant S3) plutôt que de corriger l'expression uniquement dans
+`AiExerciseGenerationPipeline.service.js`. La fonction respecte `S3_FORCE_PATH_STYLE` : retourne
+`publicUrl/bucket/key` si vrai, sinon `publicUrl/key` (comportement observé jusqu'ici, valide en
+virtual-hosted-style AWS standard où le bucket est déjà dans le domaine de `publicUrl`, cf.
+`.env.example` : `https://my-bucket.s3.eu-west-3.amazonaws.com`).
+
+**Alternative écartée** : corriger uniquement la ligne dans `uploadGeneratedImage`
+(`` `${publicUrl}/${bucket}/${key}` `` en dur). Plus rapide, mais duplique une logique déjà implicite
+ailleurs (le calcul que fait `multer-s3`) sans lui donner de nom — le prochain appel S3 direct (hors
+`multer`) aurait pu réintroduire exactement le même bug sans le savoir. Le fallback de
+`Storage.controller.js#upload`/`uploadMultiple` (`req.file.location || \`${publicUrl}/${req.file.key}\``)
+porte déjà ce même motif bugué, mais volontairement **non migré vers `buildPublicUrl` dans ce ticket** —
+chemin mort en pratique (jamais atteint tant que `S3_BUCKET` est configuré, ce qui est le cas ici et en
+prod) : le corriger aurait élargi le périmètre sans aucun moyen de le vérifier par un test (personne
+n'exerce ce chemin). Signalé en `TODO` dans le code plutôt que corrigé silencieusement (`AGENT.md` §2) —
+à migrer vers `buildPublicUrl` si ce fallback devient un jour réellement atteignable.
+
+**Conséquences** : toute image uploadée par le pipeline IA après ce correctif obtient une URL correcte,
+qu'elle soit servie par un provider path-style (Infomaniak, MinIO, Scaleway, Backblaze) ou
+virtual-hosted-style (AWS standard). Les questions déjà persistées avec l'ancienne URL cassée (si elles
+existent sur un environnement de test) ne sont pas réparées rétroactivement — hors périmètre, la feature
+Tickets A/B/C n'étant sur aucune branche mergée/déployée à ce jour. Non vérifié avec un appel S3 réel dans
+cette session (pas d'accès réseau sortant) : la correction est déduite de la configuration `.env` et du
+comportement documenté du path-style S3, à confirmer par l'utilisateur au prochain test réel.

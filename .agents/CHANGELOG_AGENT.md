@@ -46,7 +46,7 @@
 | Interpréteur V2 — équivalences algébriques | Livré — helpers/algebraicEquivalence.js (AST canonicalisé) complète normalizeSymbolic dans le court-circuit `exact` : commutativité, a/b ≡ a·b⁻¹, termes semblables, racines en exposant, équations symétriques ; pas un CAS (pas de distributivité) | 2026-07-19 |
 | Interpréteur V2 — commandes matrice (+C/+L) | Corrigé — l'API de commande MathLive s'est révélée peu fiable (corruption `\begin{split}` possible, y compris matrice seule) ; remplacée par addMatrixColumn/addMatrixRow (manipulation LaTeX déterministe, interpreter.js) ; portée : formule = uniquement une matrice/cas | 2026-07-19 |
 | Interpréteur V2 — palette (glyphes résolus) | Livré — les 2 boutons « T » et la flèche blanche de la planche formules retirés (erreurs de planche) ; section « Lettres fraktur » (\mathfrak{}, 52 lettres, vrais glyphes Unicode générés par point de code) ajoutée à l'onglet Caractères (4ᵉ groupe, scroll interne requis) | 2026-07-19 |
-| Diagramme (mind maps) | Stable — [FIX] 2026-09-03 : `MindMap.userId` sans `onDelete` explicite (modèle + migration de création) → PostgreSQL en `NO ACTION`, bloquait `DELETE /users/:id` (500) dès qu'un utilisateur avait au moins une carte mentale, signalé par l'utilisateur en prod, non reproduit en dev avant (base vide) ; corrigé en `SET NULL` (pattern déjà retenu pour `LeitnerSystem.idUser`, DECISIONS 2026-09-02) ; [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `MindMapTag` — modèle Sequelize enregistré préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `mmName` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-09-03 |
+| Diagramme (mind maps) | Stable — [FIX] 2026-09-18 : plafond body-parser global (10kb, `app.js`) bloquait `POST`/`PUT /diagrammes` dès ~15-25 nœuds (413, message trompeur) — plafond dédié 100 Mo posé sur `/api/v1/diagrammes` (avant le plafond global, inchangé pour le reste de l'API), `errorHandler.middleware.js` gagne un message français dédié sur 413, ingress nginx prod/preprod + Helm relevés de 25m à 100m (bloquaient déjà en amont de l'API) ; [FIX] 2026-09-03 : `MindMap.userId` sans `onDelete` explicite (modèle + migration de création) → PostgreSQL en `NO ACTION`, bloquait `DELETE /users/:id` (500) dès qu'un utilisateur avait au moins une carte mentale, signalé par l'utilisateur en prod, non reproduit en dev avant (base vide) ; corrigé en `SET NULL` (pattern déjà retenu pour `LeitnerSystem.idUser`, DECISIONS 2026-09-02) ; [FIX] 2026-09-01 : même défaut que `testQuestions` (voir Test/Question) trouvé sur `MindMapTag` — modèle Sequelize enregistré préventivement, non encore déclenché en prod ; [FIX] 2026-08-31 : validateur `mmName` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; M-02.14 : upload images migré S3 (multer-s3, fallback disque local dev) + auto-resize nœud aux proportions image + static route /api/uploads | 2026-09-18 |
 | Documentation règles métier Mind Maps | Stable — M-01/M-02.01 : modèle données, acteurs, règles CRUD/auto-save/zones/nœuds, cas limites, dette | 2026-06-22 |
 | Documentation technique Éditeur de cartes mentales | Stable — M-02.14 : DOC_mindmap_editor.md (architecture, format JSON, composants, store, helpers, tests, dette) | 2026-06-23 |
 | Fields / FieldsType | Stable — M-00b.07 : authMiddleware ajouté sur POST/PUT/DELETE | 2026-06-23 |
@@ -171,6 +171,7 @@
 | Images/schémas sur les questions — Ticket A (upload manuel) | **Livré (backend + front)** — demande utilisateur (« intégrer une image aux questions, et que l'IA puisse le faire ») scindée en 3 tickets après audit (voir DECISIONS.md) : ce ticket ne couvre que l'upload manuel, réutilisant l'infra `POST /storage/upload` existante (S3, déjà utilisée par `ClassGroupResource`) — même pattern « front uploade puis attache l'URL/clé », aucun nouvel endpoint d'upload dédié à Question. 6 nouvelles colonnes (`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource`, migration `20260912000001`), `DELETE /questions/:id/image` (retire l'image + nettoie l'objet S3, best-effort comme `ClassGroupResourceService.delete`). Front : bouton "Insérer une image" déjà présent (mort) sur `CreateTestPage.vue` branché, aperçu + suppression ; affichage de l'image dans `ExerciseDetailPage.vue` (mode quiz + mode résultats, `alt` renseigné pour RGAA). **Ticket B (l'IA rattache une image extraite d'un PDF source à une question générée) et Ticket C (revue de l'image IA avant validation) restent à faire** — non couverts ici. 8 tests service + 4 tests controller (API), 6 tests store + 2 tests composant (front), 0 régression (2053/2053 API, 847/847 front) | 2026-09-12 |
 | Images/schémas sur les questions — Ticket B (l'IA rattache une image du PDF source à une question générée) | **Livré (backend uniquement, aucun front)** — suite du Ticket A. `ImageCaptioningPipeline.service.js` numérote désormais chaque schéma retenu (marqueur texte « Schéma n°X ») et renvoie la liste des images retenues (`images: [{id, pageIndex, caption, imageBase64}]`, champ additionnel, `AiCardGenerationPipeline.service.js` inchangé). `AiExerciseGeneration.service.js` gagne un champ de sortie optionnel `imageRef` (règle 13 du prompt système : le LLM cite le numéro exact d'un schéma si une question en dépend directement, jamais inventé) + validation (entier positif ou null). `AiExerciseGenerationPipeline.service.js` résout `imageRef` après génération : upload direct S3 (`PutObjectCommand`, pas de requête HTTP entrante à parser) de l'image référencée, un seul upload même si plusieurs questions citent le même schéma, échec dégradé en warning (jamais bloquant) ; `imageRef` toujours retiré de la question en sortie, remplacé le cas échéant par `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"` (mêmes noms que `Question.model.js`, Ticket A). **Écart au Ticket A corrigé au passage** : `Question.service.js#extractImageFields` forçait `imageSource` à `"manual"` dès qu'une `imageUrl` était fournie — bloquait toute provenance IA de bout en bout ; accepte désormais explicitement `imageSource: "ai"` du client (jamais `"manual"`, qui reste dérivé), voir DECISIONS.md. **Non couvert à l'époque (Ticket C, livré depuis — voir ligne suivante)** : aucun câblage front. Scindé au flux exercices (C-02) uniquement — la génération de cartes Leitner (C-01) n'est pas concernée. 10 tests `AiExerciseGeneration.service.test.js` (imageRef), 2 tests `ImageCaptioningPipeline.service.test.js` (numérotation), 15 tests `AiExerciseGenerationPipeline.service.test.js` (upload + attach + intégration), 4 tests `Question.service.test.js`/`Question.controller.test.js` (imageSource "ai"), 0 régression (2079/2079 API) | 2026-09-12 |
 | Images/schémas sur les questions — Ticket C (revue utilisateur + persistance côté front) | **Livré (front uniquement, aucun changement backend)** — clôt la feature (Tickets A+B+C). Audit préalable confirmé : `AiExerciseReviewModalComponent.vue`/`helpers/exerciseQuestionForm.js` lisaient `props.questions` (contrat `generation_ia_exercices_types.md` §5, désormais enrichi par le Ticket B d'`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource:"ai"`) sans jamais recopier ces 6 champs — ni dans l'état local des cartes de révision, ni dans `confirm()` — et `ExercisesPage.vue#submitCreate`/`submitEdit` construisaient leur payload `POST /questions`/`PUT /questions/edit/:id` avec une liste de champs explicite qui les omettait aussi : une image générée par l'IA restait visible dans la réponse HTTP de `POST /ai-exercise-generations` mais n'atteignait jamais une question persistée, exactement comme documenté à la fin du Ticket B. `helpers/exerciseQuestionForm.js` : 3 nouvelles fonctions — `defaultQuestionImageFields()` (valeurs par défaut, séparées de `defaultQuestionFormFields()` car l'image n'est jamais liée au type de question et ne doit pas être réinitialisée par `onTypeChange`), `questionImageFieldsFrom(q)` (copie depuis une question générée), `questionImagePayload(q)` (sous-ensemble à transmettre au serveur — objet **vide**, jamais des `null` explicites, quand aucune image n'est rattachée : `Question.service.js#extractImageFields` traite un champ absent comme « ne pas toucher » et un `null` explicite comme « retirer l'image », donc envoyer des `null` sur une question sans image aurait pu écraser une image existante lors d'une édition qui ne la concerne pas). `AiExerciseReviewModalComponent.vue` : reporte désormais les champs image dans l'état local (`watch` sur `props.visible`) et dans `confirm()` ; ajoute l'aperçu réellement attendu par le cadrage initial (« revue utilisateur de l'image proposée par l'IA avant validation », voir entrée Ticket A) — miniature + badge « 🖼️ Image IA » (`imageSource === 'ai'`) + bouton « Retirer l'image » qui n'efface que l'image (jamais toute la question, `rejectItem` reste le seul moyen de rejeter la question entière). `ExercisesPage.vue` : `defaultQuestion()` inclut désormais `defaultQuestionImageFields()` (forme cohérente pour le merge `{ ...defaultQuestion(), ...q }` de `handleReviewConfirm`, qui ne nécessitait lui-même aucun changement — il ne fait que fusionner l'objet reçu de `confirm()`, déjà complet) ; `submitCreate`/`submitEdit` ajoutent `...questionImagePayload(q)` à leur payload par question. | 2026-09-12 |
+| Images/schémas sur les questions — [FIX] URL S3 des images IA cassée (path-style) | **Livré** — bug remonté par un test utilisateur réel (Claude Desktop via l'outil : image jointe par l'IA visible en icône de fichier générique, jamais l'image elle-même). Cause : `AiExerciseGenerationPipeline.service.js#uploadGeneratedImage` (Ticket B) construisait l'URL publique en `${publicUrl}/${key}`, sans le segment bucket — or ce dépôt utilise `S3_FORCE_PATH_STYLE=true` (Infomaniak), qui exige `publicUrl/bucket/key`. L'upload manuel (Ticket A, via `POST /storage/upload`/`multer-s3`) n'était pas touché : `req.file.location` est calculé par le SDK AWS, qui respecte déjà le style d'adressage. Nouveau `config/storage.config.js#buildPublicUrl(key)` (respecte `forcePathStyle`), branché dans `uploadGeneratedImage`. **Signalé en TODO, non corrigé** (hors périmètre) : le même motif bugué existe dans le fallback mort de `Storage.controller.js#upload`/`uploadMultiple` (atteint seulement si `S3_BUCKET` est absent). 2083/2083 tests API (0 régression), lint propre | 2026-09-18 |
 
 **Modules implémentés et stables :**
 - API complète avec 18 entités (routes + controllers + services + models)
@@ -12297,3 +12298,141 @@ propre. Front : **862/862** (55 suites, 0 régression, +15 vs avant ce ticket), 
 Tickets A/B). Feature complète (Tickets A+B+C) mais **toujours pas poussée/mergée** — les 3 tickets restent
 sur des branches locales (`dev_back_question_images`, `dev_back_question_images_ai`), à revoir/merger par
 l'utilisateur.
+
+---
+
+### [2026-09-18] Images/schémas sur les questions — [FIX] URL S3 des images IA cassée (path-style non géré)
+
+**Contexte** : bug remonté par l'utilisateur après un test réel de bout en bout mené par Claude Desktop
+(via l'outil de l'application) — l'IA a bien généré des exercices et rattaché des schémas (Ticket B) sur
+un cours de statique des fluides, mais l'outil ne voyait qu'« une icône de fichier générique » à la place
+de l'image, jamais l'image elle-même ; Claude Desktop en avait conclu (à raison, mais pour la mauvaise
+cause visible côté outil) qu'il ne pouvait pas vérifier son exactitude visuelle et avait retiré les 2
+images de son rendu. Audit (`AGENT.md` §2) : `AiExerciseGenerationPipeline.service.js#uploadGeneratedImage`
+(Ticket B, 2026-09-12) uploade l'image via `PutObjectCommand` (S3 SDK brut, pas `multer`/`multer-s3` —
+l'image existe déjà en mémoire en base64) puis construit lui-même l'URL publique en
+`` `${publicUrl}/${key}` ``. Or `.env` de ce dépôt a `S3_FORCE_PATH_STYLE=true` (bucket Infomaniak,
+`S3_PUBLIC_URL=https://s3.swiss-backup04.infomaniak.com`, `S3_BUCKET=default`) : en path-style, le nom du
+bucket fait partie du chemin (`publicUrl/bucket/key`), pas seulement du domaine — l'URL produite pointait
+donc sur un chemin sans le bucket, invalide. L'upload manuel (Ticket A, `POST /storage/upload`, `multer-s3`)
+n'a jamais été affecté : `req.file.location` est calculé par le SDK AWS lui-même, qui respecte déjà
+`forcePathStyle` — c'est ce qui explique que seules les images « IA » étaient concernées, jamais les
+images uploadées manuellement.
+
+**Ce qui a été fait** :
+- `config/storage.config.js` : nouvel export `buildPublicUrl(key)` — retourne `publicUrl/bucket/key` si
+  `S3_FORCE_PATH_STYLE=true`, sinon `publicUrl/key` (bucket déjà dans le domaine, cas AWS standard/
+  virtual-hosted-style). `bucket`/`publicUrl`/`forcePathStyle` remontés en constantes de module (calculés
+  une seule fois, comme partout ailleurs dans ce fichier).
+- `services/AiExerciseGenerationPipeline.service.js#uploadGeneratedImage` : `imageUrl: \`${publicUrl}/${key}\``
+  remplacé par `imageUrl: buildPublicUrl(key)`.
+- `controllers/Storage.controller.js` : commentaire `TODO` ajouté sur `upload`/`uploadMultiple` — même motif
+  bugué présent dans leur fallback (`req.file.location || \`${publicUrl}/${req.file.key}\``), mais mort en
+  pratique dès que `S3_BUCKET` est configuré (branche `req.file.location`, via `multer-s3`, toujours prise) ;
+  non corrigé (hors périmètre de ce fix, signalé plutôt que corrigé silencieusement, `AGENT.md` §2).
+- `test/services/AiExerciseGenerationPipeline.service.test.js` : mock de `storage.config` étendu avec
+  `buildPublicUrl`, 2 assertions (`uploadGeneratedImage`, `generateExercisesFromContent` Ticket B) mises à
+  jour pour refléter l'URL désormais correcte (avec segment bucket).
+
+**Choix techniques** :
+- Helper centralisé dans `storage.config.js` plutôt qu'un correctif local dans le pipeline : c'est le même
+  calcul que celui déjà fait implicitement par `multer-s3`/le SDK AWS pour toute autre feature (mindmaps,
+  ressources de classe, upload générique) — une seule source de vérité pour la prochaine fois qu'un appel
+  S3 direct (hors `multer`) aura besoin de construire une URL publique.
+- Fallback `Storage.controller.js` signalé en `TODO`, non corrigé : chemin mort tant que `S3_BUCKET` est
+  configuré (le cas dans cet environnement et en prod) — corriger un chemin jamais exercé aurait élargi le
+  périmètre de ce fix sans bénéfice vérifiable immédiatement, et sans test pour le prouver.
+
+**Ce qui n'est PAS couvert** :
+- Aucune réparation rétroactive des lignes déjà écrites en base avec l'ancienne URL cassée (`imageUrl`
+  sans segment bucket) — non pertinent ici : la feature (Tickets A/B/C) n'est sur aucune branche mergée/
+  déployée, ces données n'existent que sur l'environnement de test local ayant servi à la démonstration.
+- Le `TODO` de `Storage.controller.js` (voir ci-dessus) reste un chemin mort non corrigé.
+
+**Fichiers modifiés**
+- `my_memo_master_api/config/storage.config.js`
+- `my_memo_master_api/services/AiExerciseGenerationPipeline.service.js`
+- `my_memo_master_api/controllers/Storage.controller.js` (commentaire seulement)
+- `my_memo_master_api/test/services/AiExerciseGenerationPipeline.service.test.js`
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète API : **2083/2083** (0 régression). Lint (`eslint`) propre. Aucun changement
+front (le bug était uniquement dans la construction de l'URL côté serveur, pas dans son affichage —
+`ExerciseDetailPage.vue`/`AiExerciseReviewModalComponent.vue`/`CreateTestPage.vue` affichent déjà
+`question.imageUrl` tel quel).
+
+**Points d'attention / dette** — Corrigé sur `dev_back_question_images_ai` (même branche que les Tickets
+A/B/C, toujours pas mergée). Non vérifié avec un vrai appel S3 Infomaniak réel dans cette session (pas
+d'accès réseau sortant) — la correction est déduite de la configuration `.env` (`S3_FORCE_PATH_STYLE=true`,
+`S3_PUBLIC_URL` sans le bucket) et du comportement documented de path-style S3, pas rejouée en conditions
+réelles ; à confirmer par l'utilisateur au prochain test réel (régénérer un exercice avec image IA et
+vérifier que l'image s'affiche).
+
+---
+
+### [2026-09-18] Cartes mentales — [FIX] plafond body-parser dédié à 100 Mo sur `/api/v1/diagrammes`
+
+**Contexte** : question de l'utilisateur (« y a-t-il une limite à la taille des mind maps ? »). Audit
+préalable : aucune limite métier n'est documentée (`diagrams/mindmap_rules.md` §6/§7), mais `app.js`
+posait un plafond `bodyParser.json({ limit: '10kb' })` **global**, avant le montage des routes — donc
+appliqué aussi à `POST`/`PUT /diagrammes`, qui transmettent l'intégralité de `mindMapJson` (nœuds + liens
++ zones) dans le corps JSON, contrairement à l'upload d'image (`multipart`, déjà hors de ce plafond). Ce
+plafond se remplissait dès ~15-25 nœuds et échouait en 413 avant même le validator, avec un message
+trompeur (« Erreur interne du serveur. ») car `errorHandler.middleware.js` n'avait pas de cas dédié pour
+`err.type === 'entity.too.large'`. Demande explicite de l'utilisateur : relever ce plafond à 100 Mo.
+
+**Ce qui a été fait** :
+- `app.js` : nouveau `bodyParser.json({ limit: '100mb' })` scopé au préfixe `/api/v1/diagrammes`, monté
+  **avant** le plafond global `10kb` — `body-parser` ignore un second parsing JSON dès que `req._body` est
+  déjà positionné, donc le middleware le plus spécifique s'applique pour ces routes sans toucher au
+  plafond global qui continue de protéger le reste de l'API.
+- `middlewares/errorHandler.middleware.js` : nouveau cas dédié sur `err.type === 'entity.too.large'` →
+  413 avec un message français correct (« Le contenu envoyé dépasse la taille maximale autorisée. »),
+  au lieu du message générique trompeur. Bénéficie à toutes les routes de l'API, pas seulement
+  `/diagrammes`.
+- Audit du chemin réseau complet suite à une question posée à l'utilisateur (voir Choix techniques) :
+  l'ingress nginx (prod/preprod) plafonnait déjà toute requête à 25 Mo
+  (`nginx.ingress.kubernetes.io/proxy-body-size`), en amont de l'API — relevé à `"100m"` dans
+  `k8s/prod/ingress.yml`, `k8s/preprod/ingress.yml` et `helm/templates/ingress.yaml` (annotation de
+  l'ingress `-api` uniquement ; l'ingress `-front` sert la SPA statique, sans rapport). `k8s/app/
+  ingress-test.yml` (10m) volontairement laissé inchangé — fichier explicitement marqué DÉPRÉCIÉ en tête,
+  remplacé par `k8s/preprod/ingress.yml`. Traefik (docker-compose, dev/test hors k8s) ne pose aucun
+  plafond de taille de requête propre — rien à changer de ce côté.
+- Tests : 2 nouveaux cas dans `test/controllers/Diagramme.controller.test.js` (POST et PUT acceptent un
+  `mindMapJson` de ~50 Ko, au-delà de l'ancien plafond global 10kb) + nouveau fichier `test/middlewares/
+  errorHandler.middleware.test.js` (message français sur 413 générique hors `/diagrammes` ; `/diagrammes`
+  ne déclenche pas de 413 en dessous de 100 Mo — vérifié via un 401 sans token, qui prouve que le corps a
+  été accepté par le body-parser avant d'atteindre `Auth.middleware`).
+
+**Choix techniques** :
+- Plafond posé uniquement sur `/api/v1/diagrammes`, pas relevé globalement : le reste de l'API n'a aucun
+  besoin identifié de dépasser 10 Ko, et un plafond global à 100 Mo aurait élargi la surface d'exposition
+  à des payloads abusifs sur des routes qui n'en ont pas l'usage (déni de service applicatif).
+- Écarté : suivre le précédent `AiGenerationBatch`/`AiExerciseGeneration` (`MAX_SOURCE_TEXT_LENGTH`,
+  validateur borné à une valeur dérivée d'une contrainte de pipeline connue). Ces routes-là sont
+  multipart (déjà hors du plafond global) et bornent un champ texte unique ; `mindMapJson` n'a pas
+  d'équivalent — sa taille dépend du nombre de nœuds/liens/zones créés par l'utilisateur, sans plafond
+  métier documenté. Relever le plafond body-parser correspond à la demande explicite de l'utilisateur.
+- Question posée à l'utilisateur avant de toucher à la configuration d'infra (ingress prod/preprod) :
+  confirmé de relever aussi l'ingress à 100 Mo plutôt que de laisser le plafond applicatif inatteignable
+  en pratique au-delà de 25 Mo.
+
+**Ce qui n'est PAS couvert** :
+- 100 Mo est une marge large, pas un plafond fonctionnel réfléchi — aucune règle métier ne borne le
+  nombre de nœuds/liens/zones d'une carte mentale ; resterait à revoir si des cartes proches de cette
+  taille apparaissaient réellement en usage.
+- `MindMap.mindMapJson` reste en colonne `JSON` (pas `TEXT`, commentaire déjà présent sur
+  `Diagramme.model.js`) — non traité ici.
+
+**Fichiers modifiés**
+- `my_memo_master_api/app.js`
+- `my_memo_master_api/middlewares/errorHandler.middleware.js`
+- `my_memo_master_api/test/controllers/Diagramme.controller.test.js`
+- `my_memo_master_api/test/middlewares/errorHandler.middleware.test.js` (nouveau)
+- `k8s/prod/ingress.yml`, `k8s/preprod/ingress.yml`, `helm/templates/ingress.yaml`
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète API : **2082/2083** (1 échec `security.test.js` — `apiLimiter` — dû à un
+`ENOBUFS` local, épuisement de sockets éphémères sous 200 requêtes rafale sur cette machine Windows,
+confirmé pré-existant et sans rapport : le fichier passe seul en isolation, 8/8). Lint non relancé (aucun
+changement front). Manifests k8s/Helm non appliqués/déployés dans cette session (pas d'accès cluster).

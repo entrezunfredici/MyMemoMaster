@@ -8,6 +8,12 @@ exports.upload = async (req, res) => {
     if (!req.file) {
       return res.status(400).send({ message: 'Aucun fichier envoyé.' })
     }
+    // TODO: ce fallback (déclenché seulement si `req.file.location` est absent, ex. stockage local
+    // dev sans S3) ne gère pas le style path-style (`S3_FORCE_PATH_STYLE=true`, ex. Infomaniak) —
+    // même bug que celui corrigé sur `AiExerciseGenerationPipeline.service.js#uploadGeneratedImage`
+    // (2026-09-18), voir `config/storage.config.js#buildPublicUrl`. Non corrigé ici : hors périmètre,
+    // et la branche `req.file.location` (multer-s3) est celle réellement empruntée dès que le bucket
+    // est configuré.
     return res.status(201).send({
       key: req.file.key,
       url: req.file.location || `${publicUrl}/${req.file.key}`,
