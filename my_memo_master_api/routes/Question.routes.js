@@ -266,6 +266,12 @@ router.get('/correction/:id', QuestionController.getCorrectionByQuestion)
  *                 type: integer
  *                 nullable: true
  *                 example: 204800
+ *               imageSource:
+ *                 type: string
+ *                 nullable: true
+ *                 enum: [ai]
+ *                 description: "Uniquement 'ai' (génération automatique, Ticket B) ; 'manual' est déterminé automatiquement, jamais accepté du client"
+ *                 example: "ai"
  *     responses:
  *       201:
  *         description: Question créée avec succès
@@ -338,6 +344,12 @@ router.post('/', authMiddleware, questionValidators.create, validate, QuestionCo
  *                 type: integer
  *                 nullable: true
  *                 example: 204800
+ *               imageSource:
+ *                 type: string
+ *                 nullable: true
+ *                 enum: [ai]
+ *                 description: "Uniquement 'ai' (génération automatique, Ticket B) ; 'manual' est déterminé automatiquement, jamais accepté du client"
+ *                 example: "ai"
  *     responses:
  *       200:
  *         description: Question mise à jour avec succès

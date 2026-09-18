@@ -164,6 +164,39 @@ describe('QuestionService', () => {
     })
   })
 
+  test('should create a question with imageSource "ai" - preserves it (Ticket B)', async () => {
+    const newQuestion = {
+      statement: 'New Question',
+      questionPosition: 1,
+      type: 'Type 1',
+      imageUrl: 'https://bucket.s3.amazonaws.com/uploads/1/img.png',
+      imageKey: 'uploads/1/img.png',
+      imageSource: 'ai'
+    }
+    Question.create.mockResolvedValue({ idQuestion: 5, ...newQuestion })
+
+    await QuestionService.create(newQuestion)
+
+    expect(Question.create).toHaveBeenCalledWith(
+      expect.objectContaining({ imageSource: 'ai', imageUrl: newQuestion.imageUrl })
+    )
+  })
+
+  test('should create a question with an unrecognized imageSource - falls back to manual', async () => {
+    const newQuestion = {
+      statement: 'New Question',
+      questionPosition: 1,
+      type: 'Type 1',
+      imageUrl: 'https://bucket.s3.amazonaws.com/uploads/1/img.png',
+      imageSource: 'something-else'
+    }
+    Question.create.mockResolvedValue({ idQuestion: 6, ...newQuestion })
+
+    await QuestionService.create(newQuestion)
+
+    expect(Question.create).toHaveBeenCalledWith(expect.objectContaining({ imageSource: 'manual' }))
+  })
+
   test('should update an existing question', async () => {
     const mockQuestion = {
       update: jest.fn().mockResolvedValue({

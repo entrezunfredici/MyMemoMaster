@@ -4,15 +4,22 @@ const { s3Client, bucket } = require('../config/storage.config')
 const logger = require('../helpers/logger')
 
 // Champs image transmis par le client (le front uploade d'abord via POST /storage/upload, puis
-// envoie ces champs — même pattern que ClassGroupResource, voir Question.validators.js). `imageSource`
-// n'en fait pas partie : fixé par le serveur, jamais par le client.
+// envoie ces champs — même pattern que ClassGroupResource, voir Question.validators.js).
 const IMAGE_FIELDS = ['imageUrl', 'imageKey', 'imageMimeType', 'imageOriginalName', 'imageSize']
 
 /**
  * Extrait les champs image d'un payload client et détermine `imageSource`.
  *
+ * Ticket B (2026-09-12) : `imageSource` peut désormais être explicitement `'ai'` côté client — cas du
+ * flux de génération d'exercices (AiExerciseGenerationPipeline.service.js#uploadGeneratedImage), qui
+ * attache déjà `imageSource: 'ai'` sur le brouillon de question avant que le front ne le transmette tel
+ * quel à `POST /questions`/`PUT /questions/edit/:id`. `Question.validators.js` restreint la valeur
+ * acceptée à `'ai'` uniquement (jamais `'manual'` depuis le client — reste dérivé de la présence
+ * d'`imageUrl`, comme avant ce ticket) : une fausse déclaration `'ai'` sur une image réellement
+ * uploadée à la main n'a qu'un impact cosmétique (badge d'affichage), pas de conséquence de sécurité.
+ *
  * @param {object} data
- * @returns {{ imageUrl: string|null, imageKey: string|null, imageMimeType: string|null, imageOriginalName: string|null, imageSize: number|null, imageSource: 'manual'|null }}
+ * @returns {{ imageUrl: string|null, imageKey: string|null, imageMimeType: string|null, imageOriginalName: string|null, imageSize: number|null, imageSource: 'manual'|'ai'|null }}
  */
 function extractImageFields(data) {
   const hasImage = IMAGE_FIELDS.some((field) => data[field] !== undefined)
@@ -22,7 +29,7 @@ function extractImageFields(data) {
     image[field] = data[field] ?? null
   }
   // Une URL vide/nulle envoyée explicitement retire l'image (imageSource repasse à null).
-  image.imageSource = image.imageUrl ? 'manual' : null
+  image.imageSource = image.imageUrl ? (data.imageSource === 'ai' ? 'ai' : 'manual') : null
   return image
 }
 

@@ -4248,3 +4248,196 @@ données, cohérent avec le choix déjà fait sur `ClassGroupResource`. Le écar
 `ClassGroupResource.controller.js#create` (ne transmet pas `fileKey`/`mimeType`/`originalName`/`fileSize` au
 service malgré des validators qui les acceptent) n'est pas corrigé ici (hors périmètre de ce ticket) — signalé
 à l'utilisateur et dans `CHANGELOG_AGENT.md`.
+
+---
+
+### [2026-09-12] Images sur les questions — Ticket B : upload S3 direct plutôt que réutiliser `upload.middleware.js`
+
+**Contexte** : quand l'IA génère une question qui dépend d'un schéma déjà décrit (« Schéma n°X », inséré par
+`ImageCaptioningPipeline.service.js`), l'image source existe déjà en mémoire côté serveur (base64, extraite
+du PDF par `PdfExtraction.service.js#extractImages`) — il faut la faire atterrir sur S3 pour produire une
+`imageUrl` exploitable par le front, avant même qu'aucune requête HTTP multipart n'existe (contrairement à
+l'upload manuel du Ticket A, initié par un vrai formulaire).
+
+**Décision** : nouvelle méthode `AiExerciseGenerationPipeline.service.js#uploadGeneratedImage` qui appelle
+directement `s3Client.send(new PutObjectCommand(...))` (`@aws-sdk/client-s3`, déjà une dépendance du projet)
+sur le buffer décodé depuis la data URI base64, avec la même convention de clé que
+`middlewares/upload.middleware.js` (`uploads/<userId>/<timestamp>-<random>.<ext>`). Best-effort : ne lève
+jamais, renvoie `null` sur tout échec (S3 non configuré, format inattendu, erreur réseau) — dégradé en
+avertissement par l'appelant, jamais bloquant pour la génération elle-même.
+
+**Alternative écartée** : réutiliser `middlewares/upload.middleware.js`/`multer`/`multer-s3`. Écartée :
+`multer` s'attache au cycle de vie d'une requête Express (`req`/`res`, parsing d'un flux multipart entrant)
+— il n'y a ici ni requête HTTP à parser, ni fichier envoyé par un client, seulement un buffer déjà en mémoire
+côté serveur. Plier `multer` à ce cas (ex. simuler un flux) aurait été plus complexe que d'appeler directement
+le SDK S3 sous-jacent, que `multer-s3` utilise de toute façon en interne.
+
+**Alternative écartée (2)** : différer l'upload — renvoyer l'image en base64 inline dans la réponse de
+génération, et ne l'uploader qu'au moment où l'utilisateur accepte réellement la question (Ticket C). Plus
+« paresseuse » (aucun upload orphelin pour une question finalement rejetée en Interface de révision), mais
+reportée hors de ce ticket : elle aurait demandé un endpoint dédié (accepter un base64 côté client authentifié
+et l'uploader) OU une conversion base64→Blob côté front avant de rappeler `POST /storage/upload` — complexité
+que le Ticket C, dédié à l'intégration front, est mieux placé pour trancher en connaissance du flux réel de
+l'Écran de révision. Assumé comme dette : une question avec image générée puis rejetée laisse un objet S3
+orphelin (coût de stockage négligeable au vu du plafond de 5 images par génération).
+
+**Conséquences** : un upload S3 a lieu pour CHAQUE schéma effectivement référencé par au moins une question
+retenue, même si cette question est ensuite rejetée en Interface de révision (pas de nettoyage a posteriori,
+assumé ci-dessus). Un seul upload par schéma même si plusieurs questions le citent (`attachImagesToQuestions`
+met en cache par `imageRef`).
+
+---
+
+### [2026-09-12] Images sur les questions — Ticket B : `imageSource: 'ai'` désormais accepté du client, restreint à cette seule valeur
+
+**Contexte** : le Ticket A avait délibérément exclu `imageSource` des champs acceptés par
+`Question.validators.js` (« fixé par le serveur, jamais par le client ») en anticipant que seul le Ticket B
+aurait une raison légitime de le faire varier. Une fois le Ticket B implémenté, ce choix bloquait de bout en
+bout la fonctionnalité : `AiExerciseGenerationPipeline.service.js` attache bien `imageSource: 'ai'` sur le
+brouillon de question, mais `Question.service.js#extractImageFields` le réécrivait systématiquement en
+`'manual'` dès qu'une `imageUrl` était présente — la provenance IA ne pouvait jamais atteindre la base, quel
+que soit le travail fait côté génération.
+
+**Décision** : `Question.validators.js` accepte désormais `imageSource` du client, mais restreint sa valeur à
+`'ai'` exclusivement (`.equals('ai')`) — jamais `'manual'`, qui reste dérivé côté serveur de la présence
+d'`imageUrl` (`Question.service.js#extractImageFields`, inchangé sur ce point). Un client qui déclarerait
+`imageSource: 'ai'` sur une image en réalité uploadée à la main n'a qu'un impact cosmétique (le badge
+d'affichage prévu en Ticket C) — aucune conséquence de sécurité ou d'intégrité des données, la valeur ne
+pilotant ni un contrôle d'accès ni une logique métier.
+
+**Alternative écartée** : garder `imageSource` entièrement fixé côté serveur, et faire porter la provenance
+IA par un mécanisme distinct (ex. une table de traçabilité séparée, ou un flag sur le batch de génération
+comme `AiGeneratedCard.status` en C-01). Écartée : `Question` n'a pas d'équivalent à `AiGenerationBatch`/
+`AiGeneratedCard` (aucune persistance intermédiaire pour les exercices générés, C-02, contrairement aux
+cartes Leitner C-01) — introduire une table dédiée uniquement pour tracer la provenance d'une image aurait
+été disproportionné par rapport à un simple badge d'affichage.
+
+**Conséquences** : révision explicite d'une décision du Ticket A, documentée ici plutôt que silencieusement
+— cf. AGENT.md §2, « toute modification d'une interface publique doit être signalée ». `Question.validators.js`
+accepte désormais un troisième champ de plus sur `POST /questions`/`PUT /questions/edit/:id` que ce que le
+Ticket A avait initialement prévu.
+
+---
+
+### [2026-09-12] Images sur les questions — Ticket C : `questionImagePayload` omet le champ plutôt que d'envoyer `null`
+
+**Contexte** : dernier ticket de la feature — reporter les champs image d'une question générée par IA
+(Ticket B) à travers `AiExerciseReviewModalComponent.vue` jusqu'à `POST /questions`/
+`PUT /questions/edit/:id` (`ExercisesPage.vue#submitCreate`/`submitEdit`). Une question de formulaire sans
+image doit produire un payload qui n'affecte jamais une image existante côté serveur.
+
+**Décision** : `helpers/exerciseQuestionForm.js#questionImagePayload(q)` renvoie un objet **vide** (aucune
+clé) quand `q.imageUrl` est absent/`null`, jamais `{ imageUrl: null, imageKey: null, ... }`. Repose sur le
+contrat déjà en place côté serveur (`Question.service.js#extractImageFields`, Ticket A) : un champ **absent**
+du payload signifie « ne pas toucher à l'image existante », un `null` **explicite** signifie « la retirer ».
+`imageSource` n'est inclus dans le payload que s'il vaut exactement `'ai'` (seule valeur acceptée du client
+par `Question.validators.js`, Ticket B) — jamais `'manual'`, qui reste dérivé côté serveur.
+
+**Alternative écartée** : toujours transmettre les 6 champs (à `null` en l'absence d'image), pour un payload
+de forme constante quel que soit l'état de la question. Écartée : `ExercisesPage.vue` n'a toujours aucune UI
+d'upload/suppression d'image (seul `CreateTestPage.vue` en a une, Ticket A, sur un flux distinct) —
+`submitEdit` peut donc mettre à jour une question qui porte déjà une image (manuelle ou IA) sans que
+l'utilisateur y touche ; des `null` inconditionnels auraient silencieusement effacé cette image à chaque
+édition sans rapport avec elle. Un objet vide, filtré par `extractImageFields` (`hasImage = false` si aucun
+des 5 champs n'est présent), ne modifie jamais l'image existante.
+
+**Conséquences** : `defaultQuestionFormFields()` (types de question) n'a pas été étendu pour porter les champs
+image — nouvelles fonctions dédiées (`defaultQuestionImageFields`/`questionImageFieldsFrom`/
+`questionImagePayload`) à la place, pour ne pas faire réinitialiser l'image par `onTypeChange`
+(`Object.assign(item, defaultQuestionFormFields())`, sans rapport avec l'image) et pour garder la
+distinction « champ absent » / « champ à `null` » au niveau du payload, que la fusion aveugle dans un seul
+gros objet de valeurs par défaut aurait rendue plus difficile à exprimer correctement.
+
+---
+
+### [2026-09-18] Cartes mentales : plafond body-parser dédié à 100 Mo sur `/api/v1/diagrammes`
+
+**Contexte** : signalé par l'utilisateur — aucune limite de taille n'est documentée pour une carte
+mentale (`diagrams/mindmap_rules.md` §6/§7 ne mentionnent rien de tel), mais `app.js` pose depuis
+toujours un plafond `bodyParser.json({ limit: '10kb' })` **global**, appliqué avant le montage des
+routes, donc à `POST`/`PUT /diagrammes` comme à tout le reste de l'API. `mindMapJson` (nœuds + liens
++ zones, voir structure §3.2 de `mindmap_rules.md`) est envoyé en entier dans ce corps JSON — chaque
+nœud porte `style`/`layout`/`meta`, donc 10 Ko se remplissait dès ~15-25 nœuds, avant même d'atteindre
+le validator. Le dépassement remontait en 413 mais via le handler d'erreur générique, qui renvoyait
+`"Erreur interne du serveur."` en prod (message trompeur pour une erreur 413, côté client).
+
+**Décision** : demande explicite de l'utilisateur — plafond relevé à **100 Mo**, mais uniquement pour
+le préfixe `/api/v1/diagrammes` (`app.js`), pas pour le plafond global qui reste à 10kb pour le reste
+de l'API. Techniquement : un second `bodyParser.json({ limit: '100mb' })` scopé à
+`/api/v1/diagrammes` est monté **avant** le plafond global — `body-parser` ignore un second parsing
+JSON dès que `req._body` est déjà positionné (`node_modules/body-parser/lib/types/json.js`), donc le
+middleware le plus spécifique "gagne" pour ces routes sans qu'il soit nécessaire d'exclure `/diagrammes`
+du plafond global. `errorHandler.middleware.js` gagne en plus un cas dédié sur `err.type ===
+'entity.too.large'`, avec un message français correct (`"Le contenu envoyé dépasse la taille maximale
+autorisée."`) au lieu de tomber dans le cas générique — bénéficie à toutes les routes, pas seulement
+`/diagrammes`.
+
+**Alternative écartée** : suivre le précédent `AiGenerationBatch`/`AiExerciseGeneration`
+(`MAX_SOURCE_TEXT_LENGTH`, validateur `express-validator` avec une borne de caractères précise plutôt
+que de toucher au plafond body-parser). Écartée ici : ces routes-là sont multipart (déjà hors du
+plafond global) et bornaient un champ texte unique à une valeur dérivée d'une contrainte de pipeline
+connue (`MAX_CHUNKS × MAX_CHUNK_LENGTH`). `mindMapJson` n'a pas d'équivalent — sa taille dépend du
+nombre de nœuds/liens/zones que l'utilisateur choisit de créer, sans plafond métier documenté ; relever
+le plafond body-parser plutôt qu'inventer une limite de caractères arbitraire sur un champ structuré
+correspond à la demande explicite de l'utilisateur.
+
+**Conséquences** : 100 Mo est une marge large, pas un plafond fonctionnel réfléchi (aucune règle
+métier ne borne le nombre de nœuds d'une carte) — une carte de cette taille resterait de toute façon
+probablement inutilisable côté rendu front avant d'atteindre cette limite technique. `MindMap.mindMapJson`
+est en colonne `JSON` (pas `TEXT`, commentaire déjà présent sur `Diagramme.model.js` : « `TEXT` est plus
+approprié pour du JSON volumineux ») — non traité ici, resterait à revoir si des cartes proches de cette
+taille apparaissent réellement en usage.
+
+**Addendum (même jour)** — l'ingress nginx devant l'API bornait déjà toute requête à 25 Mo en prod/preprod
+(`nginx.ingress.kubernetes.io/proxy-body-size`, `k8s/prod/ingress.yml`, `k8s/preprod/ingress.yml`,
+`helm/templates/ingress.yaml`) — sans y toucher, une carte mentale entre 25 Mo et 100 Mo aurait été
+rejetée par l'ingress (page d'erreur nginx générique, pas le message JSON français d'`errorHandler.
+middleware.js`) avant même d'atteindre le plafond applicatif tout juste relevé. Confirmé avec
+l'utilisateur (question posée) : les 3 manifests sont alignés sur `"100m"`. `k8s/app/ingress-test.yml`
+(borné à `10m`) volontairement laissé inchangé — fichier explicitement marqué DÉPRÉCIÉ en tête, remplacé
+par `k8s/preprod/ingress.yml`. Le proxy Traefik (docker-compose, dev/test hors k8s) n'impose aucun
+plafond de taille de requête propre (pas de middleware `maxRequestBodyBytes` configuré) — rien à changer
+de ce côté.
+
+---
+
+### [2026-09-18] Images IA sur les questions — URL publique S3 construite via un helper centralisé (`buildPublicUrl`) plutôt qu'un correctif local
+
+**Contexte** : `AiExerciseGenerationPipeline.service.js#uploadGeneratedImage` (Ticket B, 2026-09-12)
+uploade une image en mémoire (base64 extrait d'un PDF) via `PutObjectCommand` du SDK AWS brut — pas
+`multer-s3`, réservé à une vraie requête HTTP multipart (choix déjà acté à l'époque, voir entrée Ticket B
+du 2026-09-12). Il construisait ensuite l'URL publique lui-même : `` `${publicUrl}/${key}` ``. Bug remonté
+par l'utilisateur après un test réel (Claude Desktop) : l'image ne s'affichait pas. Cause confirmée par
+audit de `.env` : ce dépôt tourne avec `S3_FORCE_PATH_STYLE=true` (bucket Infomaniak, pas AWS standard) —
+en path-style, le nom du bucket fait partie du **chemin** de l'URL (`publicUrl/bucket/key`), pas seulement
+de son domaine. L'URL construite manuellement omettait ce segment. Personne ne l'avait vu ailleurs dans le
+code parce que tous les autres flux d'upload (`middlewares/upload.middleware.js`, `mindmapImageUpload.js`)
+passent par `multer-s3`, qui délègue ce calcul au SDK AWS (`req.file.location`, déjà correct pour
+n'importe quel style d'adressage) — `uploadGeneratedImage` est le seul endroit du dépôt qui construit une
+URL S3 publique "à la main".
+
+**Décision** : ajouter `buildPublicUrl(key)` à `config/storage.config.js` (le point d'entrée déjà partagé
+par tout code touchant S3) plutôt que de corriger l'expression uniquement dans
+`AiExerciseGenerationPipeline.service.js`. La fonction respecte `S3_FORCE_PATH_STYLE` : retourne
+`publicUrl/bucket/key` si vrai, sinon `publicUrl/key` (comportement observé jusqu'ici, valide en
+virtual-hosted-style AWS standard où le bucket est déjà dans le domaine de `publicUrl`, cf.
+`.env.example` : `https://my-bucket.s3.eu-west-3.amazonaws.com`).
+
+**Alternative écartée** : corriger uniquement la ligne dans `uploadGeneratedImage`
+(`` `${publicUrl}/${bucket}/${key}` `` en dur). Plus rapide, mais duplique une logique déjà implicite
+ailleurs (le calcul que fait `multer-s3`) sans lui donner de nom — le prochain appel S3 direct (hors
+`multer`) aurait pu réintroduire exactement le même bug sans le savoir. Le fallback de
+`Storage.controller.js#upload`/`uploadMultiple` (`req.file.location || \`${publicUrl}/${req.file.key}\``)
+porte déjà ce même motif bugué, mais volontairement **non migré vers `buildPublicUrl` dans ce ticket** —
+chemin mort en pratique (jamais atteint tant que `S3_BUCKET` est configuré, ce qui est le cas ici et en
+prod) : le corriger aurait élargi le périmètre sans aucun moyen de le vérifier par un test (personne
+n'exerce ce chemin). Signalé en `TODO` dans le code plutôt que corrigé silencieusement (`AGENT.md` §2) —
+à migrer vers `buildPublicUrl` si ce fallback devient un jour réellement atteignable.
+
+**Conséquences** : toute image uploadée par le pipeline IA après ce correctif obtient une URL correcte,
+qu'elle soit servie par un provider path-style (Infomaniak, MinIO, Scaleway, Backblaze) ou
+virtual-hosted-style (AWS standard). Les questions déjà persistées avec l'ancienne URL cassée (si elles
+existent sur un environnement de test) ne sont pas réparées rétroactivement — hors périmètre, la feature
+Tickets A/B/C n'étant sur aucune branche mergée/déployée à ce jour. Non vérifié avec un appel S3 réel dans
+cette session (pas d'accès réseau sortant) : la correction est déduite de la configuration `.env` et du
+comportement documenté du path-style S3, à confirmer par l'utilisateur au prochain test réel.

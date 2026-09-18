@@ -19,6 +19,14 @@ const { QUESTION_TYPES, validateContentByType } = require('../helpers/exerciseCo
 //   LLM (avant toute édition utilisateur), pas un brouillon potentiellement modifié en Interface de
 //   révision ; les deux services partagent néanmoins les mêmes règles de forme pour `content`
 //   (helpers/exerciseContentValidation.js), un seul endroit à faire évoluer si le contrat change.
+// - la résolution d'`imageRef` en image réelle (upload, attachement à la question) — Ticket B
+//   (« images sur les questions », 2026-09-12) : ce service se contente de demander au LLM de citer,
+//   par son numéro, un schéma déjà décrit dans le texte source (marqueur « Schéma n°X », inséré par
+//   ImageCaptioningPipeline.service.js AVANT le chunking) et de valider que ce numéro est un entier
+//   positif ou null — il n'a connaissance ni de la liste des images disponibles, ni de leur contenu
+//   binaire. La résolution (retrouver l'image n°X, l'uploader, attacher `imageUrl`/`imageKey`/...) est
+//   faite par l'appelant (AiExerciseGenerationPipeline.service.js), seul à connaître à la fois le texte
+//   ET les images d'origine.
 
 // Garde-fou technique du service (protège CE service d'un appel manifestement aberrant), PAS une
 // implémentation de Quotas — même statut que MAX_CARD_COUNT dans AiCardGeneration.service.js
@@ -44,7 +52,8 @@ const SCHEMA_DESCRIPTION = `{
       "statement": "string — l'énoncé de la question",
       "type": "open",
       "content": { "correct_answer": "string", "accepted_answers": ["string", "..."] },
-      "sourceExcerpt": "string — extrait exact du texte source justifiant la question"
+      "sourceExcerpt": "string — extrait exact du texte source justifiant la question",
+      "imageRef": null
     },
     {
       "statement": "string",
@@ -56,7 +65,8 @@ const SCHEMA_DESCRIPTION = `{
           { "text": "string", "correct": false }
         ]
       },
-      "sourceExcerpt": "string"
+      "sourceExcerpt": "string",
+      "imageRef": null
     },
     {
       "statement": "string",
@@ -65,13 +75,15 @@ const SCHEMA_DESCRIPTION = `{
         "template": "string avec marqueurs {{0}}, {{1}}...",
         "blanks": ["string", "..."]
       },
-      "sourceExcerpt": "string"
+      "sourceExcerpt": "string",
+      "imageRef": null
     },
     {
       "statement": "string",
       "type": "reorder",
       "content": { "fragments": ["string", "..."] },
-      "sourceExcerpt": "string"
+      "sourceExcerpt": "string",
+      "imageRef": null
     }
   ],
   "warning": null
@@ -130,7 +142,14 @@ RÈGLES STRICTES :
     signes dollar ($...$) et écris-la en LaTeX standard : \\frac{a}{b} pour une fraction, \\sqrt{x}, x^{2}
     pour un exposant, x_{i} pour un indice, \\rho/\\Delta/\\times... pour les symboles. Exemple : "la
     pression est donnée par $P = \\rho g h$". N'utilise ce balisage $...$ QUE pour une formule, jamais
-    pour du texte normal.`
+    pour du texte normal.
+13. Le texte source peut contenir une ou plusieurs mentions explicites "Schéma n°X" (description d'une
+    image générée automatiquement). Si une question porte DIRECTEMENT sur le contenu décrit par l'un de
+    ces schémas (la question serait incompréhensible ou perdrait son sens sans lui), renseigne
+    "imageRef": X (le numéro entier exact, tel qu'il apparaît dans le texte). Dans tous les autres cas
+    (aucun schéma, ou schéma non déterminant pour cette question précise), laisse "imageRef": null.
+    N'invente JAMAIS un numéro de schéma absent du texte source, et ne réutilise jamais le même numéro
+    pour plus d'une question sans raison — un schéma peut illustrer au plus une notion par question.`
   }
 
   /**
@@ -210,6 +229,13 @@ ${SCHEMA_DESCRIPTION}`
     }
     if (typeof question.sourceExcerpt !== 'string' || !question.sourceExcerpt.trim()) {
       errors.push(`${prefix} : "sourceExcerpt" manquant ou vide.`)
+    }
+    if (
+      question.imageRef !== null &&
+      question.imageRef !== undefined &&
+      (!Number.isInteger(question.imageRef) || question.imageRef < 1)
+    ) {
+      errors.push(`${prefix} : "imageRef" doit être un entier positif ou null.`)
     }
 
     errors.push(...validateContentByType(question.type, question.content, prefix))

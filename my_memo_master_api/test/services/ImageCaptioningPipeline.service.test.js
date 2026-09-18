@@ -19,14 +19,14 @@ describe('ImageCaptioningPipelineService', () => {
 
   describe('insertCaption', () => {
     it('insertCaption - page vide - la description devient le seul contenu de la page, marquée explicitement', () => {
-      const result = ImageCaptioningPipelineService.insertCaption('', 'Un schéma de chloroplaste.')
+      const result = ImageCaptioningPipelineService.insertCaption('', 'Un schéma de chloroplaste.', 1)
       expect(result).toContain('générée automatiquement par IA')
       expect(result).toContain('Un schéma de chloroplaste.')
     })
 
-    it('insertCaption - page avec du texte existant - ajoute la description comme paragraphe séparé (double saut de ligne)', () => {
-      const result = ImageCaptioningPipelineService.insertCaption('Texte de la page.', 'Un schéma.')
-      expect(result.startsWith('Texte de la page.\n\n[Schéma détecté')).toBe(true)
+    it('insertCaption - page avec du texte existant - ajoute la description comme paragraphe séparé (double saut de ligne), numérotée', () => {
+      const result = ImageCaptioningPipelineService.insertCaption('Texte de la page.', 'Un schéma.', 2)
+      expect(result.startsWith('Texte de la page.\n\n[Schéma n°2 détecté')).toBe(true)
     })
   })
 
@@ -81,9 +81,13 @@ describe('ImageCaptioningPipelineService', () => {
       expect(result.pageTexts[0]).toBe('Page 1')
       expect(result.pageTexts[1]).toContain('Page 2')
       expect(result.pageTexts[1]).toContain('Un schéma de chloroplaste.')
+      expect(result.pageTexts[1]).toContain('Schéma n°1')
       expect(result.captionedCount).toBe(1)
       expect(result.warnings).toEqual([])
       expect(result.usage).toEqual({ promptTokens: 200, completionTokens: 60, ocrPagesProcessed: 2 })
+      expect(result.images).toEqual([
+        { id: 1, pageIndex: 1, caption: 'Un schéma de chloroplaste.', imageBase64: 'data:image/jpeg;base64,QUJD' }
+      ])
       expect(ImageCaptioningService.captionImage).toHaveBeenCalledWith(
         expect.objectContaining({
           imageBase64: 'data:image/jpeg;base64,QUJD',
@@ -92,6 +96,30 @@ describe('ImageCaptioningPipelineService', () => {
           outputLanguage: 'fr'
         })
       )
+    })
+
+    it('captionEmbeddedImages - plusieurs images retenues - numérote séquentiellement en ignorant les images filtrées/échouées', async () => {
+      PdfExtractionService.extractImages.mockResolvedValue({
+        images: [
+          { pageIndex: 0, imageBase64: 'data:image/jpeg;base64,AAA' }, // décorative, filtrée
+          { pageIndex: 1, imageBase64: 'data:image/jpeg;base64,BBB' }, // échec de captioning
+          { pageIndex: 2, imageBase64: 'data:image/jpeg;base64,CCC' } // pédagogique, retenue
+        ],
+        ocrPagesProcessed: 0
+      })
+      ImageCaptioningService.captionImage
+        .mockResolvedValueOnce({ isPedagogicalContent: false, caption: null, warning: null, usage: { promptTokens: 1, completionTokens: 1 } })
+        .mockRejectedValueOnce(Object.assign(new Error('indisponible'), { statusCode: 502 }))
+        .mockResolvedValueOnce({ isPedagogicalContent: true, caption: 'Un schéma.', warning: null, usage: { promptTokens: 1, completionTokens: 1 } })
+
+      const result = await ImageCaptioningPipelineService.captionEmbeddedImages({
+        pdfBuffer: FAKE_PDF,
+        pageTexts: ['Page 1', 'Page 2', 'Page 3']
+      })
+
+      // La seule image retenue porte l'id 1, pas 3 — la numérotation ignore les images filtrées/échouées.
+      expect(result.images).toEqual([{ id: 1, pageIndex: 2, caption: 'Un schéma.', imageBase64: 'data:image/jpeg;base64,CCC' }])
+      expect(result.pageTexts[2]).toContain('Schéma n°1')
     })
 
     it('captionEmbeddedImages - pageTexts null/vide (aucun texte de page connu) - l\'image devient le seul contenu de sa page', async () => {

@@ -10,7 +10,8 @@ metadata:
     cert-manager.io/cluster-issuer: {{ .Values.certManager.clusterIssuer }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+    # CHOIX: relevé de 25m à 100m — voir k8s/prod/ingress.yml (même raison, DECISIONS.md 2026-09-18).
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
 spec:

@@ -22,7 +22,11 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+    # CHOIX: relevé de 25m à 100m pour aligner sur le plafond body-parser dédié à
+    # /api/v1/diagrammes (cartes mentales, voir app.js et DECISIONS.md 2026-09-18) — sans ce
+    # relèvement, l'ingress rejetait déjà toute carte mentale au-delà de 25 Mo avant même
+    # d'atteindre l'API. Le reste de l'API reste borné à 10kb côté applicatif (app.js).
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
 spec:

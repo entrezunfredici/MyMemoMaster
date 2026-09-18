@@ -29,6 +29,10 @@ module.exports = (router) => {
    *       Aucune persistance : les questions renvoyées ne sont ajoutées à un exercice qu'au clic
    *       explicite de l'utilisateur sur « Créer l'exercice »/« Enregistrer les modifications »
    *       (endpoints POST /tests, POST /questions existants, inchangés).
+   *       Une question portant sur un schéma détecté dans le PDF source peut porter en plus
+   *       `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"`
+   *       (Ticket B, image déjà uploadée par le pipeline) — à transmettre tel quel à `POST /questions`
+   *       si la question est acceptée sans modification de l'image.
    *     tags: [AiExerciseGeneration]
    *     requestBody:
    *       required: true

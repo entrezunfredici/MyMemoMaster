@@ -181,6 +181,18 @@ describe('AiExerciseGenerationService', () => {
       expect(AiExerciseGenerationService.validateQuestion(null, 0)).toEqual(['Question #1 : doit être un objet.'])
     })
 
+    describe('imageRef', () => {
+      it.each([null, undefined, 1, 2, 42])('validateQuestion - imageRef %s - aucune erreur', (imageRef) => {
+        const errors = AiExerciseGenerationService.validateQuestion({ ...VALID_OPEN_QUESTION, imageRef }, 0)
+        expect(errors).toEqual([])
+      })
+
+      it.each([0, -1, 1.5, '1', true])('validateQuestion - imageRef %s invalide - erreur dédiée', (imageRef) => {
+        const errors = AiExerciseGenerationService.validateQuestion({ ...VALID_OPEN_QUESTION, imageRef }, 0)
+        expect(errors.some((e) => e.includes('"imageRef"'))).toBe(true)
+      })
+    })
+
     describe('type "open"', () => {
       it('validateQuestion - correct_answer manquant - erreur dédiée', () => {
         const question = { ...VALID_OPEN_QUESTION, content: { correct_answer: '' } }
