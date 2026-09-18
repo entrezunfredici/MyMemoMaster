@@ -317,7 +317,7 @@ import AiGenerateExercisesModal from '@/components/AiGenerateExercisesModalCompo
 import AiGenerationProgressModal from '@/components/AiGenerationProgressModalComponent.vue'
 import AiExerciseReviewModal from '@/components/AiExerciseReviewModalComponent.vue'
 import { useAiExerciseGenerationStore } from '@/stores/aiExerciseGeneration'
-import { defaultQuestionFormFields, contentToFormState, buildQuestionContent } from '@/helpers/exerciseQuestionForm'
+import { defaultQuestionFormFields, contentToFormState, buildQuestionContent, defaultQuestionImageFields, questionImagePayload } from '@/helpers/exerciseQuestionForm'
 
 const router = useRouter()
 const testStore = useTestStore()
@@ -380,6 +380,10 @@ const defaultQuestion = () => ({
   statement: '',
   type: 'open',
   ...defaultQuestionFormFields(),
+  // Ticket C : jamais rempli manuellement ici (pas d'upload d'image dans ExercisesPage.vue, seul
+  // CreateTestPage.vue en a un, Ticket A) — présent pour que le merge `{ ...defaultQuestion(), ...q }`
+  // (handleReviewConfirm) ait une forme cohérente, image rattachée ou non par l'IA.
+  ...defaultQuestionImageFields(),
 })
 
 const form = reactive({ name: '', subjectId: '', tagIds: [], groupIds: [], questions: [defaultQuestion()] })
@@ -622,7 +626,7 @@ async function submitCreate() {
 
     for (let i = 0; i < form.questions.length; i++) {
       const q = form.questions[i]
-      const resp = await api.post('questions', { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q), idTest: testId })
+      const resp = await api.post('questions', { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q), idTest: testId, ...questionImagePayload(q) })
       if (!resp || resp.status !== 201) { formError.value = extractErrorMessage(resp, `Erreur question ${i + 1}.`); return }
     }
 
@@ -650,7 +654,7 @@ async function submitEdit() {
 
     for (let i = 0; i < form.questions.length; i++) {
       const q = form.questions[i]
-      const payload = { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q) }
+      const payload = { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q), ...questionImagePayload(q) }
       if (q.idQuestion) {
         const resp = await api.put(`questions/edit/${q.idQuestion}`, payload)
         if (!resp || resp.status !== 200) { formError.value = extractErrorMessage(resp, `Erreur mise à jour question ${i + 1}.`); return }

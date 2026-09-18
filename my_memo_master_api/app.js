@@ -121,6 +121,16 @@ app.use(
 )
 
 // Body parser
+// CHOIX: plafond dédié 100 Mo pour /api/v1/diagrammes (cartes mentales), posé AVANT le plafond
+// global 10kb ci-dessous.
+// RAISON: mindMapJson (nœuds + liens + zones, voir diagrams/mindmap_rules.md) est envoyé en entier
+// dans le corps JSON de POST/PUT /diagrammes (pas de multipart ici, contrairement à l'upload
+// d'image) — 10 Ko se remplissait dès ~15-25 nœuds et échouait en 413 avant même le validator,
+// sans qu'aucune règle métier ne documente une telle limite (voir DECISIONS.md). body-parser
+// ignore un second parsing JSON une fois `req._body` déjà positionné (node_modules/body-parser/
+// lib/types/json.js) : ce middleware scopé au préfixe /api/v1/diagrammes "gagne" donc pour ces
+// routes, et le plafond global 10kb continue de s'appliquer inchangé à tout le reste de l'API.
+app.use('/api/v1/diagrammes', bodyParser.json({ limit: '100mb' }))
 app.use(bodyParser.json({ limit: '10kb' }))
 
 // Sanitize HTML tags from all body string fields
