@@ -21,3 +21,7 @@ k8s/secrets*.env
 helm-sonarqube/secrets.env
 helm-sonarqube/credentials.local
 helm-sonarqube/KUBECONFIG_SONAR.b64
+
+# Cours PDF fournis par l'utilisateur pour tester la génération IA (droits d'auteur tiers) —
+# usage local ponctuel, ne doit pas entrer dans l'historique git (2026-09-12)
+cours_exemples/

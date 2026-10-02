@@ -27,7 +27,8 @@ jest.mock('../../services/Response.service', () => ({
   findOne: jest.fn(),
   create: jest.fn(),
   update: jest.fn(),
-  delete: jest.fn()
+  delete: jest.fn(),
+  previewQuality: jest.fn()
 }))
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -127,6 +128,62 @@ describe('Response Controller', () => {
       responseService.findOne.mockRejectedValue(new Error('DB error'))
 
       const res = await request(app).get(`${BASE}/responses/1`)
+
+      expect(res.status).toBe(500)
+    })
+  })
+
+  // ── POST /responses/quality-preview ────────────────────────────────────────
+  describe('POST /responses/quality-preview', () => {
+    const validBody = {
+      statement: "Qu'est-ce que l'énergie interne U d'un système ?",
+      answer: "Une fonction d'état extensive associée au système.",
+      acceptedAnswers: []
+    }
+
+    it('200 — retourne qualityWarnings/qualityLevel sans toucher au service de persistance', async () => {
+      responseService.previewQuality.mockReturnValue({
+        qualityWarnings: ['un point à vérifier'],
+        qualityLevel: 'low'
+      })
+
+      const res = await request(app).post(`${BASE}/responses/quality-preview`).send(validBody)
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ qualityWarnings: ['un point à vérifier'], qualityLevel: 'low' })
+      expect(responseService.previewQuality).toHaveBeenCalledWith(validBody.statement, validBody.answer, [])
+      expect(responseService.create).not.toHaveBeenCalled()
+    })
+
+    it('400 — statement manquant', async () => {
+      const res = await request(app)
+        .post(`${BASE}/responses/quality-preview`)
+        .send({ answer: 'Une réponse.' })
+
+      expect(res.status).toBe(400)
+      expect(res.body.errors).toBeDefined()
+    })
+
+    it('400 — answer manquant', async () => {
+      const res = await request(app)
+        .post(`${BASE}/responses/quality-preview`)
+        .send({ statement: 'Une question ?' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('400 — acceptedAnswers n\'est pas un tableau', async () => {
+      const res = await request(app)
+        .post(`${BASE}/responses/quality-preview`)
+        .send({ statement: 'Une question ?', answer: 'Une réponse.', acceptedAnswers: 'pas un tableau' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('500 — le service échoue', async () => {
+      responseService.previewQuality.mockImplementation(() => { throw new Error('boom') })
+
+      const res = await request(app).post(`${BASE}/responses/quality-preview`).send(validBody)
 
       expect(res.status).toBe(500)
     })

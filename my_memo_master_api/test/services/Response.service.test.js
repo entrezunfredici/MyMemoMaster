@@ -101,7 +101,29 @@ describe('ResponseService', () => {
 
     expect(Question.findByPk).toHaveBeenCalledWith(42)
     expect(Response.create).toHaveBeenCalledWith(newResponse)
-    expect(response).toEqual(mockResponse)
+    // correction: false -> pas d'évaluation de qualité (AnswerQuality.service.js) : niveau non applicable
+    expect(response).toEqual({ ...mockResponse, qualityWarnings: [], qualityLevel: null })
+  })
+
+  test('should create a correct response and attach quality warnings + level', async () => {
+    const newResponse = {
+      content: 'Une fonction d\'état extensive associée au système.',
+      correction: true,
+      idQuestion: 42
+    }
+    const mockResponse = { idResponse: 4, ...newResponse }
+    Question.findByPk.mockResolvedValue({
+      idQuestion: 42,
+      statement: "Qu'est-ce que l'énergie interne U d'un système ?"
+    })
+    Response.create.mockResolvedValue(mockResponse)
+    Response.findAll.mockResolvedValue([]) // aucune autre réponse correction:true existante
+
+    const response = await ResponseService.create(newResponse)
+
+    // Cas réel du 2026-09-12 (Q4 preprod) : réponse elliptique, ne mentionne pas "énergie" -> signalée
+    expect(response.qualityWarnings.length).toBeGreaterThan(0)
+    expect(response.qualityLevel).toBe('low')
   })
 
   test('should update an existing response', async () => {
@@ -114,6 +136,8 @@ describe('ResponseService', () => {
       })
     }
     Response.findByPk.mockResolvedValue(mockResponse)
+    Question.findByPk.mockResolvedValue({ idQuestion: 42, statement: 'Sample question' })
+    Response.findAll.mockResolvedValue([])
 
     const updatedResponse = await ResponseService.update(1, {
       content: 'Réponse mise à jour',
@@ -125,12 +149,37 @@ describe('ResponseService', () => {
       content: 'Réponse mise à jour',
       correction: true
     })
+    // correction: true -> Question rechargée pour évaluer la qualité (AnswerQuality.service.js)
+    expect(Question.findByPk).toHaveBeenCalledWith(42)
     expect(updatedResponse).toEqual({
       idResponse: 1,
       content: 'Réponse mise à jour',
       correction: true,
-      idQuestion: 42
+      idQuestion: 42,
+      qualityWarnings: expect.any(Array),
+      qualityLevel: expect.stringMatching(/^(high|medium|low)$/)
     })
+  })
+
+  test('should update a response without recomputing quality when correction is false', async () => {
+    const mockResponse = {
+      update: jest.fn().mockResolvedValue({
+        idResponse: 2,
+        content: 'Distracteur modifié',
+        correction: false,
+        idQuestion: 42
+      })
+    }
+    Response.findByPk.mockResolvedValue(mockResponse)
+
+    const updatedResponse = await ResponseService.update(2, {
+      content: 'Distracteur modifié',
+      correction: false
+    })
+
+    expect(Question.findByPk).not.toHaveBeenCalled()
+    expect(updatedResponse.qualityWarnings).toEqual([])
+    expect(updatedResponse.qualityLevel).toBeNull()
   })
 
   test('should delete a response by ID', async () => {
@@ -144,5 +193,45 @@ describe('ResponseService', () => {
     expect(Response.findByPk).toHaveBeenCalledWith(1)
     expect(mockResponse.destroy).toHaveBeenCalled()
     expect(result).toBe(true)
+  })
+
+  describe('previewQuality', () => {
+    it('n\'interroge jamais la base (aucune persistance ni lecture)', () => {
+      ResponseService.previewQuality(
+        "Qu'est-ce que l'énergie interne U d'un système ?",
+        "Une fonction d'état extensive associée au système."
+      )
+      expect(Response.findAll).not.toHaveBeenCalled()
+      expect(Response.findByPk).not.toHaveBeenCalled()
+      expect(Response.create).not.toHaveBeenCalled()
+      expect(Question.findByPk).not.toHaveBeenCalled()
+    })
+
+    it('reproduit le cas réel Q4 (2026-09-12) sans qu\'aucune reformulation ne soit encore en base', () => {
+      const preview = ResponseService.previewQuality(
+        "Qu'est-ce que l'énergie interne U d'un système ?",
+        "Une fonction d'état extensive associée au système."
+      )
+      expect(preview.qualityWarnings.length).toBeGreaterThan(0)
+      expect(preview.qualityLevel).toBe('low')
+    })
+
+    it('tient compte des acceptedAnswers fournies directement par l\'appelant', () => {
+      const preview = ResponseService.previewQuality(
+        "Qu'est-ce que l'énergie interne U d'un système ?",
+        "L'énergie interne U est une fonction d'état extensive associée à un système.",
+        [
+          "U est une fonction d'état extensive associée à un système.",
+          'Une grandeur extensive et fonction d\'état notée U, appelée énergie interne.'
+        ]
+      )
+      expect(preview.qualityWarnings).toEqual([])
+      expect(preview.qualityLevel).toBe('high')
+    })
+
+    it('fonctionne sans acceptedAnswers (paramètre optionnel)', () => {
+      const preview = ResponseService.previewQuality('Une question ?', 'Une réponse suffisamment longue et complète.')
+      expect(preview.qualityLevel).toMatch(/^(high|medium|low)$/)
+    })
   })
 })

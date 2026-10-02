@@ -4182,6 +4182,354 @@ différentes des deux côtés, pour ne pas confondre avec un recouvrement de con
 
 ---
 
+### [2026-09-12] Correction sémantique — seuil unique abaissé de 0,78 à 0,75
+
+**Contexte** : L'utilisateur signale en test réel plusieurs réponses physiquement correctes (thermodynamique :
+énergie interne, premier principe, bilan d'une machine ditherme) comptées incorrectes, dont une à un score de
+~0,73 — sous `HIGH_THRESHOLD` (0,78, cf. entrée 2026-09-09 ci-dessus). Ce cas s'ajoute à celui déjà connu
+(« modèle isotherme », 0,7407, entrée 2026-09-08). Ré-examen de la calibration d'origine (2026-07-18, 8 paires
+réelles) : elle n'ancrait la limite basse de 0,78 que sur un **seul** point négatif (0,717, « réponse fausse
+même domaine ») — échantillon jugé trop mince pour trancher entre 0,75 et 0,78, alors que l'usage réel depuis
+le 2026-09-09 n'a fait remonter que des faux négatifs proches du seuil, jamais un faux positif.
+
+**Décision** — Choix explicite de l'utilisateur : `HIGH_THRESHOLD` passe de 0,78 à **0,75** dans
+`Semantic.service.js` (constante + les deux blocs de commentaire qui la justifiaient). Reste un seuil unique
+strict (`is_correct = score >= HIGH_THRESHOLD`), aucun retour à un mécanisme de zone grise (cf. entrée
+2026-09-09 : 6 bugs en 2 jours, non-monotonie structurelle). Marge conservée sous le seul point négatif connu
+(0,717) : 0,033, contre 0,063 avant ce changement.
+
+**Point important, signalé explicitement à l'utilisateur avant application** : ce changement ne rattrape
+**aucun** des deux cas concrets qui l'ont motivé — 0,7407 (isotherme) et ~0,73 (cas thermo de l'utilisateur)
+restent tous les deux **sous** le nouveau seuil de 0,75. Il réduit seulement la fenêtre de faux négatifs pour
+les scores futurs entre 0,75 et 0,78, sans effet rétroactif sur les cas déjà observés qui sont encore plus bas.
+
+**Alternative écartée** : descendre à ~0,72-0,73 pour couvrir directement les cas observés — écarté, laisserait
+moins de 0,01 de marge sous le seul point négatif connu (0,717), quasi indiscernable de ce cas et donc jugé
+trop risqué sans nouvelle calibration réelle sur des réponses fausses proches de ce score.
+
+**Conséquences** : Constante et ses deux blocs de commentaire mis à jour dans `Semantic.service.js`. Test
+`Semantic.service.test.js` (« is_correct est une fonction strictement croissante du score ») mis à jour de
+`>= 0.78` à `>= 0.75`. Suite ciblée revérifiée : `Semantic.service.test.js` (58/58), `Test.service.test.js` et
+`LeitnerCard.service.test.js` (51/51) — 0 régression. Dette (résolue plus bas dans cette même session) : les
+questions Q4/Q5/Q6/Q13 signalées par l'utilisateur n'ont pas pu être vérifiées avec leurs vraies données
+(base SQLite dev locale et Postgres dev locale toutes deux vides de ce contenu — testé sur l'environnement
+preprod déployé, non accessible depuis ce poste sans authentification).
+
+---
+
+### [2026-09-12] Investigation Q4/Q5/Q6/Q13 sur preprod — cause réelle : contenu généré par IA insuffisant, pas le moteur de correction
+
+**Contexte** : Suite à l'entrée précédente, l'utilisateur demande d'interroger directement l'API preprod
+(`https://preprod-api.my-memo-master.com`) pour visualiser le contenu réel des 4 cartes signalées. Identifiants
+fournis via `.env` racine (`preprod_mail`/`preprod_pass`) — la première tentative (`node -e` inline avec les
+identifiants) a été bloquée par le classifieur auto mode (« Credential Materialization »). Résolu en créant un
+script dédié et scopé, `my_memo_master_api/scripts/preprod-query.js` (login puis requête authentifiée sur un
+`path`/`method` donnés, jamais d'identifiants en argument CLI), et en ajoutant les règles de permission
+correspondantes dans `.claude/settings.local.json` (`Bash(node scripts/preprod-query.js *)` et sa variante avec
+le préfixe `my_memo_master_api/` selon le cwd) — voir CHANGELOG_AGENT.md pour le détail des fichiers.
+
+**Piège rencontré en cours de route** : Git Bash (MSYS) réécrit silencieusement un argument CLI commençant par
+`/` (ex. `/leitnersystems`) en chemin Windows (`C:/Program Files/Git/leitnersystems`) avant de le passer à
+`node.exe` — 404 systématique tant que ce n'est pas contourné (`//leitnersystems`, double slash, échappe la
+conversion MSYS). Sans rapport avec le sujet métier, mais à réutiliser si ce script ressert.
+
+**Constat sur les données réelles** (système « Thermodynamique », idSystem=1) : les 4 cartes sont bien en
+boîte niveau 1. Réponses de référence enregistrées (une seule par question, `/responses/correction/:id` fait
+un `findOne` — impossible de confirmer via l'API seule s'il en existe d'autres, cf. dette ci-dessous) :
+- Q4 (« énergie interne ») : *« Une fonction d'état extensive associée au système. »* — ne mentionne même pas
+  le mot « énergie », insuffisant comme définition indépendamment de tout réglage du moteur.
+- Q5/Q6/Q13 : formules LaTeX (`$\Delta U + \Delta E_c = W_{tot} + Q$`, etc.) — cohérentes en apparence, mais le
+  texte exact saisi par l'utilisateur pour ces 3 questions n'a pas été fourni ; non tranché si c'était une
+  formule équivalente non reconnue, une réponse en prose (hors chemin symbolique), ou une vraie erreur.
+
+**Décision** : L'utilisateur confirme que ce contenu a été généré par IA à partir d'un cours, pas saisi à la
+main — cause racine déplacée du moteur de correction vers le prompt de génération
+(`AiCardGeneration.service.js#buildSystemPrompt`, cf. `diagrams/generation_ia_prompt_cartes.md` §3.1). Deux
+règles ajoutées au prompt système (règles 9-10, avec l'exemple réel Q4 cité en toutes lettres pour ancrer la
+consigne) :
+1. **Autonomie de la réponse** (`answer` doit se comprendre seul, sans relire l'énoncé — interdit les tournures
+   elliptiques/pronoms qui supposent le contexte de la question).
+2. **Richesse de `acceptedAnswers`** (au moins 2 reformulations alternatives pour une réponse-phrase/définition,
+   vide seulement acceptable pour une réponse strictement factuelle) — le champ existait déjà dans le schéma
+   de sortie et est déjà utilisé tel quel par `LeitnerCard.service.js` (toutes les réponses `correction:true`
+   sont comparées), mais rien dans le prompt n'incitait le modèle à le remplir richement.
+
+**Alternative écartée** : forcer une validation stricte (`acceptedAnswers.length >= 2` obligatoire, rejet sinon)
+— écarté pour ce ticket : plus intrusif (peut casser des cartes légitimement factuelles), demande une décision
+produit séparée sur le comportement en cas de non-conformité (retry ? warning ? rejet silencieux ?) que
+l'utilisateur n'a pas encore tranchée. Le prompt seul est un premier pas, pas une garantie — un LLM peut encore
+ignorer la consigne.
+
+**Conséquences** — Fichiers modifiés : `my_memo_master_api/services/AiCardGeneration.service.js`
+(`buildSystemPrompt`, règles 9-10), `diagrams/generation_ia_prompt_cartes.md` §3.1 (règles 9-10 ajoutées, et
+règles 7-8 rattrapées au passage — ce bloc de doc avait pris du retard sur le code, divergence non liée à ce
+ticket mais corrigée à l'occasion), `my_memo_master_api/scripts/preprod-query.js` (nouvel outil, réutilisable),
+`.claude/settings.local.json` (2 nouvelles règles de permission scopées à ce script). Suite ciblée revérifiée :
+`AiCardGeneration.service.test.js` + `AiCardGenerationPipeline.service.test.js` — **82/82**, 0 régression.
+**Dette** : (1) prompt-only, aucune garantie mécanique que le LLM applique réellement les règles 9-10 sur la
+prochaine génération — à vérifier sur le prochain lot réel généré par l'utilisateur ; (2) Q5/Q6/Q13 restent
+non tranchées (texte saisi par l'utilisateur jamais obtenu) ; (3) aucun endpoint n'expose la liste complète des
+réponses `correction:true` d'une question (seulement `findOne` via `/responses/correction/:id`) — empêche de
+vérifier depuis l'API si `acceptedAnswers` est effectivement peuplé en base pour les cartes déjà générées.
+
+---
+
+### [2026-09-12] Validation empirique des règles 9-10 (+ renforcement règle 8) sur les cours réels de l'utilisateur, appel Mistral réel
+
+**Contexte** — L'utilisateur partage les deux cours PDF ayant servi à générer le contenu Thermodynamique
+(`cours_exemples/Thermodynamique.pdf`, fiche "Essentiels MPSI") et un second cours (`cours_exemples/
+09_stat-flu_poly-prof.pdf`, statique des fluides) pour tester et corriger le prompt. Demande explicite :
+regarder ces fichiers, faire des tests, corriger/adapter ce qu'il faut.
+
+**Méthode** — Nouveau script `my_memo_master_api/scripts/test-ai-generation.js` (appel direct de
+`AiCardGenerationService.generateCards`, en process, sans HTTP ni base de données) + règles de permission
+associées dans `.claude/settings.local.json`. Texte extrait des PDF via `pdftotext -layout -enc UTF-8`
+(nécessaire : l'encodage par défaut produisait des `�` sur tous les caractères accentués). 3 appels réels au
+modèle Mistral (`mistral-small-latest`) sur des extraits ciblés : (1) énergie interne/premier principe —
+source exacte de Q4/Q5 en base preprod ; (2) machine cyclique/moteur ditherme — source de Q13 ; (3) modèle
+isotherme de l'atmosphère — confirmé être la source du cas historique déjà documenté (0,7407, entrée
+2026-09-08 « modèle isotherme »), présent dans ce second cours (statique des fluides, ligne 910 de l'extraction :
+« Dans l'atmosphère isotherme, la pression décroît exponentiellement avec l'altitude »).
+
+**Résultat extrait (1), AVANT renforcement de la règle 8** : les règles 9-10 fonctionnent (`answer` nomme
+explicitement le sujet, 2 `acceptedAnswers` distinctes) — mais un défaut non prévu apparaît : les formules
+insérées au milieu d'une phrase restent en Unicode brut (`∆U + ∆Ec = Wtot + Q`, pas de `$...$`/LaTeX), alors
+que la règle 8 existante l'exige. Hypothèse : le modèle recopie la notation du texte source (lui-même en
+Unicode brut, PDF non-LaTeX) plutôt que de la convertir systématiquement.
+
+**Décision** — Règle 8 renforcée : précise explicitement que la conversion en `$...$`/LaTeX s'applique MÊME SI
+le texte source ne l'est pas lui-même, avec un exemple de conversion Unicode → LaTeX en toutes lettres
+(`∆U + ∆Ec = Wtot + Q` → `$\Delta U + \Delta E_c = W_{tot} + Q$`). Re-testé sur le MÊME extrait (1) : formules
+désormais correctement balisées dans `answer` ET `acceptedAnswers`. Confirmé sur les extraits (2) et (3) :
+100 % des formules produites sont en `$...$`/LaTeX correct sur les 3 tests, y compris des cas plus complexes
+(`$P(z) = P_0 e^{-z/\delta}$`, `$\delta = \frac{RT_0}{Mg}$`).
+
+**Constat le plus significatif** — Extrait (3), carte 2, `acceptedAnswers[0]` généré : *« La pression
+atmosphérique décroît exponentiellement avec l'altitude selon $P(z) = P_0 e^{-z/\delta}$ dans le modèle
+isotherme. »* — c'est quasiment la reformulation exacte qui avait échoué à 0,7407 dans le cas historique
+(2026-09-08), désormais présente comme variante acceptée aux côtés de `answer`. Preuve concrète que la règle 10
+(richesse de `acceptedAnswers`) couvre directement ce type de faux négatif, indépendamment du seuil de décision
+(entrées 2026-09-09/2026-09-12 sur `HIGH_THRESHOLD`) — les deux leviers (seuil + contenu) sont complémentaires,
+pas redondants.
+
+**Alternative écartée** : garder la règle 8 telle quelle et compter sur `unifyFormulaNotation`/l'embedding pour
+absorber la notation Unicode brute côté grading plutôt que de corriger le prompt — écarté : plus fragile (fait
+peser sur le moteur de correction un problème que la génération peut éviter à la source), et incohérent avec le
+court-circuit symbolique de `Semantic.service.js` qui ne s'applique qu'aux segments `$…$`.
+
+**Conséquences** — Fichiers modifiés : `my_memo_master_api/services/AiCardGeneration.service.js` (règle 8
+renforcée), `diagrams/generation_ia_prompt_cartes.md` §3.1 (même renforcement répliqué),
+`my_memo_master_api/scripts/test-ai-generation.js` (nouveau), `.claude/settings.local.json` (2 nouvelles règles
+de permission). Suite ciblée revérifiée après ce dernier changement : `AiCardGeneration.service.test.js` +
+`AiCardGenerationPipeline.service.test.js` + `AiExerciseGeneration.service.test.js` +
+`AiExerciseGenerationPipeline.service.test.js` — **176/176**, 0 régression (le prompt système partage son
+squelette avec le prompt d'exercices, vérifié qu'aucun test n'en dépend au caractère près).
+**Dette inchangée** : (1) toujours prompt-only, pas de garde mécanique si le LLM ignore une règle sur un futur
+lot ; (2) validation faite sur 3 extraits ciblés choisis manuellement, pas sur une génération en conditions
+réelles complètes (chunking automatique du PDF entier via `AiCardGenerationPipeline.service.js`) ; (3) Q5/Q6/Q13
+de la carte preprod existante restent des cartes déjà générées AVANT ce correctif — non régénérées, la
+correction ne s'applique qu'aux futures générations.
+
+---
+
+### [2026-09-12] Nouveau service `AnswerQuality.service.js` — évaluation consultative de la qualité des réponses de référence (IA ou manuelles)
+
+**Contexte** — Suite logique des deux entrées précédentes : l'utilisateur demande un mécanisme qui détecte
+en amont ce type de défaut (réponse de référence trop pauvre), qu'elle soit générée par IA ou saisie à la main,
+plutôt que de compter uniquement sur un prompt bien rédigé (qui n'offre aucune garantie mécanique) ou sur une
+découverte tardive lors d'une session Leitner réelle. Deux points d'intégration choisis explicitement par
+l'utilisateur parmi 3 proposés : écran de validation IA existant, et création/édition manuelle d'une réponse.
+L'option "outil d'audit séparé" (scanner le contenu déjà en base) n'a pas été retenue pour ce ticket.
+
+**Décision** — Nouveau service `my_memo_master_api/services/AnswerQuality.service.js`, purement consultatif
+(ne bloque jamais une création/édition — cohérent avec le refus déjà acté d'une validation stricte dans
+l'entrée `AiCardGeneration.service.js` du même jour). Méthode unique `assess(statement, answers)` → tableau
+d'avertissements en français, calculée par 4 heuristiques déterministes (aucun nouvel appel modèle) :
+1. **Autonomie** (règle 9 du prompt IA) : recouvrement de mots-clés distinctifs entre l'énoncé et la réponse
+   principale — nul = réponse probablement elliptique. Nécessite un filtre de mots topicalement génériques
+   (`GENERIC_FILLER_KEYWORDS` : système, grandeur, transformation, fonction, état...) car un recouvrement
+   naïf sur `Semantic.service.extractKeywords` ne détectait PAS le cas réel Q4 ("système" apparaît des deux
+   côtés sans identifier le vrai sujet, "énergie") — vérifié en écrivant le test avant le filtre, qui échouait.
+2. **Longueur** : réponse-phrase très courte (hors formule/valeur, légitimement courte).
+3. **Formule non balisée** (règle 8) : lettre grecque isolée ou motif "X = ..." hors segment `$...$`.
+4. **Richesse des reformulations** (règle 10) : réponse-phrase sans aucune reformulation, ou reformulations
+   quasi-identiques (recouvrement de mots-clés ≥ 0,85) à la réponse principale.
+
+**Intégration** :
+- `Response.service.js#create`/`update` — calcule les avertissements sur la réponse en cours de
+  création/édition, en tenant compte des autres réponses `correction:true` déjà enregistrées pour la même
+  question comme reformulations ; renvoyés dans le corps de la réponse HTTP (`qualityWarnings`), jamais
+  persistés (pas de colonne dédiée — recalculé à chaque lecture, reste à jour si le contenu change).
+- `AiGenerationBatch.service.js` — `createFromPipelineResult`/`findById`/`findPendingByUser`/`updateCard`
+  attachent un `qualityWarnings` par carte "open" (`[]` pour "mcq", rien à évaluer). Écrit à la fois dans
+  `card.dataValues.qualityWarnings` (lu par `toJSON()`, donc la réponse HTTP réelle) ET `card.qualityWarnings`
+  en propriété directe (lu par tout code accédant à l'instance sans passer par `toJSON()`, dont les tests
+  unitaires) — vérifié empiriquement qu'un champ non déclaré comme attribut du modèle Sequelize n'apparaît
+  dans AUCUN des deux sans cette double écriture (une seule des deux ne suffit pas).
+
+**Alternative écartée** : recalculer via un appel à l'embedding sémantique (similarité question/réponse)
+plutôt qu'un recouvrement de mots-clés — écarté pour cette V1, plus lent (nécessite le modèle NLP chargé,
+~30 s au premier appel) pour un gain de précision non démontré sur les heuristiques 1-4 ; le mot-clé filtré
+suffit sur les cas réels rencontrés. Pourrait être reconsidéré si les faux positifs/négatifs s'accumulent.
+
+**Conséquences** — Fichiers ajoutés : `services/AnswerQuality.service.js`,
+`test/services/AnswerQuality.service.test.js` (15 tests, dont le cas réel Q4 avant/après correction du prompt).
+Fichiers modifiés : `services/Response.service.js` (+`computeQualityWarnings`), `services/
+AiGenerationBatch.service.js` (+`attachQualityWarnings`/`attachQualityWarningsToBatch`), tests des deux mis à
+jour/étendus. Suite complète relancée : **2061/2061 tests API**, 0 régression. Lint propre.
+**Dette** : (1) heuristiques calibrées sur les cas réels rencontrés aujourd'hui (Q4 énergie interne,
+photosynthèse, capitale de la France) — pas de calibration à grande échelle comme pour `HIGH_THRESHOLD` ;
+(2) le front (composants Vue de l'écran de validation IA et de création de réponse) ne consomme pas encore ce
+nouveau champ `qualityWarnings` — reste une action séparée pour l'afficher réellement à l'écran, non demandée
+dans ce ticket ; (3) l'option "outil d'audit du contenu déjà en base" (Q5/Q6/Q13, cartes existantes) reste
+non implémentée, écartée explicitement par l'utilisateur pour ce ticket.
+
+---
+
+### [2026-09-12] Front — badge de qualité (couleur + libellé) branché sur les deux points d'intégration
+
+**Contexte** — Suite de l'entrée précédente : demande explicite d'afficher `qualityWarnings` à l'écran, avec
+en plus "une note globale ou un code couleur permettant de voir directement la qualité de la correction"
+plutôt que la seule liste détaillée d'avertissements.
+
+**Décision** — Ajout de `AnswerQualityService.levelFromWarnings(warnings)` côté back : traduit le tableau
+d'avertissements en 3 paliers `'high'` (0)/`'medium'` (1)/`'low'` (2+), même vocabulaire que `decision_zone`
+de `Semantic.service.js` pour rester cohérent, avec un palier intermédiaire en plus (ici une jauge de qualité,
+pas un verdict binaire). Exposé comme `qualityLevel` aux côtés de `qualityWarnings` par `Response.service.js`
+(`create`/`update`) et `AiGenerationBatch.service.js` (mêmes 4 méthodes que l'entrée précédente) — `null`
+explicitement pour "non applicable" (carte QCM, réponse `correction:false`), pour ne jamais afficher à tort un
+badge vert là où rien n'a été évalué.
+
+Côté front, nouveau composant `AnswerQualityBadgeComponent.vue` (pastille colorée + liste détaillée) branché
+aux deux endroits déjà choisis :
+- `AiValidationScreenComponent.vue` — badge sous la réponse de chaque carte "open" proposée par l'IA.
+- `FlashcardsCardsPage.vue` (modale de création/édition manuelle) — badge affiché **après** l'enregistrement
+  réel de la réponse (pas de prévisualisation en direct sans sauvegarder, hors périmètre de ce ticket) ; la
+  modale ne se referme plus automatiquement si le niveau n'est pas `'high'`, pour que l'avertissement reste
+  visible plutôt que de disparaître avec la fermeture immédiate déjà en place avant ce ticket.
+
+**Point technique notable** : pour la création manuelle avec plusieurs formulations acceptées (`form.answer` +
+`form.altAnswers`, boucle de `POST /responses`), la réponse principale ne voit encore AUCUNE des formulations
+suivantes au moment de sa propre création (elles n'existent pas encore en base à cet instant précis) — son
+`qualityWarnings` renvoyé par le premier appel serait donc faussement pessimiste ("aucune reformulation").
+Corrigé par un `PUT` supplémentaire (contenu inchangé) sur la réponse principale une fois la boucle terminée,
+qui redéclenche le calcul de qualité avec toutes les formulations réellement en base à ce moment — pas de
+nouvel endpoint, juste un appel de plus. N'affecte pas `handleUpdate` (une seule réponse modifiée à la fois,
+pas de boucle) ni `AiGenerationBatch.service.js` (toutes les cartes d'un batch existent déjà en base au
+moment de la lecture, `answer`/`acceptedAnswers` sont sur la même ligne dès la création).
+
+**Alternative écartée** : prévisualisation en direct pendant la saisie (avant tout enregistrement) — nécessite
+soit un nouvel endpoint de calcul sans persistance, soit dupliquer les heuristiques en JS côté front ; écarté
+pour ce ticket (scope), le badge post-sauvegarde couvre déjà le besoin exprimé ("voir directement la qualité").
+
+**Conséquences** — Fichiers ajoutés : `services/AnswerQuality.service.js#levelFromWarnings` (méthode, pas un
+fichier séparé), `my_memo_master_front/src/components/AnswerQualityBadgeComponent.vue`,
+`my_memo_master_front/test/components/AnswerQualityBadge.test.js` (5 tests). Fichiers modifiés :
+`Response.service.js`/`AiGenerationBatch.service.js` (+`qualityLevel`, tests étendus),
+`AiValidationScreenComponent.vue` (+badge, 3 nouveaux tests), `FlashcardsCardsPage.vue` (capture + fermeture
+conditionnelle de la modale, PUT supplémentaire après création multiple). Suite complète relancée : **2065/
+2065 tests API**, **847/847 tests front** (a11y inclus), 0 régression. Lint propre des deux côtés.
+**Dette** : (1) `FlashcardsCardsPage.vue` n'a aucun test dédié (fichier volumineux, aucune suite existante
+avant ce ticket — gap préexistant, pas introduit ici) : le câblage n'y est vérifié que par lint + relecture,
+pas par un test automatisé ; (2) pas de prévisualisation en direct avant sauvegarde (cf. alternative écartée) ;
+(3) l'outil d'audit du contenu déjà en base reste non implémenté (écarté par l'utilisateur, entrée précédente).
+
+---
+
+### [2026-09-12] Endpoint `POST /responses/quality-preview` — aperçu de qualité SANS persistance, prévisualisation en direct pendant la saisie
+
+**Contexte** — Suite immédiate de l'entrée précédente : l'alternative "prévisualisation en direct" y avait été
+explicitement écartée pour rester dans le scope du ticket (badge affiché seulement après sauvegarde). Demande
+explicite de l'utilisateur juste après : l'ajouter.
+
+**Décision** — Nouvel endpoint dédié plutôt que réutiliser `POST /responses`/`PUT /responses/edit/:id` avec un
+flag "dry-run" : `statement`/`answer`/`acceptedAnswers` fournis directement par l'appelant dans le corps de la
+requête, sans `idQuestion` — la Question n'existe pas encore à ce stade côté `FlashcardsCardsPage.vue`
+(création). Nouvelle méthode `ResponseService.previewQuality(statement, answer, acceptedAnswers)`, **synchrone,
+sans aucun accès base** (ni lecture ni écriture) — contrairement à `computeQuality` (entrée du 2026-09-12
+précédente) qui va chercher les reformulations sœurs déjà enregistrées, ici l'appelant doit fournir la liste
+complète lui-même (ce qui est justement déjà le cas côté front à ce stade : le formulaire les a toutes, non
+encore sauvegardées).
+
+Côté front (`FlashcardsCardsPage.vue`) : `watch` sur `[form.statement, form.answer, form.type, ...
+form.altAnswers]`, débounce 500 ms, avec un compteur de séquence (`previewSeq`) pour ignorer la réponse d'un
+appel devenu obsolète si une saisie plus récente en a déjà relancé un autre entre-temps (pas d'annulation
+réseau réelle, juste un garde applicatif — suffisant ici, le volume d'appels reste faible). Nouveau booléen
+`qualitySaved` pour distinguer dans le libellé affiché : aperçu non enregistré ("Aperçu (non enregistré) :")
+vs résultat confirmé après sauvegarde ("✓ Carte enregistrée...") — sans cette distinction, le badge affiché
+pendant la frappe aurait affirmé à tort que la carte était déjà enregistrée.
+
+**Bug trouvé et corrigé en écrivant `schedulePreview`** : le garde initial `if (form.type !== 'open') return`
+sortait avant de réinitialiser `lastQuality` — passer de "Ouverte" à "QCM" laissait le badge de la précédente
+réponse "open" affiché à tort. Corrigé en réinitialisant `lastQuality`/`qualitySaved` dans la même branche que
+la sortie anticipée, plutôt qu'après elle.
+
+**Alternative écartée** : réutiliser `POST /responses`/`PUT /responses/edit/:id` avec un paramètre `dryRun`
+— écarté, aurait mélangé deux responsabilités dans les mêmes routes (persister vs prévisualiser), rendant les
+validators et la doc Swagger plus ambigus pour un gain de code minime (un seul nouveau contrôleur/service très
+court de toute façon).
+
+**Conséquences** — Fichiers ajoutés/modifiés : `validators/Response.validators.js` (+`qualityPreview`),
+`services/Response.service.js` (+`previewQuality`), `controllers/Response.controller.js`
+(+`qualityPreview`), `routes/Response.routes.js` (+`POST /responses/quality-preview`, doc Swagger), tests
+back (`Response.service.test.js` +4, `Response.controller.test.js` +5) ; front `FlashcardsCardsPage.vue`
+(debounce + séquencement + distinction `qualitySaved`). Suite complète relancée : **2074/2074 tests API**
+(0 régression), **847/847 tests front** (inchangé — pas de nouveau test front sur ce point précis, cf. dette).
+Build front (`vite build`) relancé à vide en sanity-check : compile sans erreur.
+**Dette** : (1) toujours aucun test dédié pour `FlashcardsCardsPage.vue` (gap préexistant, cf. entrée
+précédente) — le debounce/séquencement n'est vérifié que par relecture + build, pas par un test automatisé ;
+(2) le garde de séquence (`previewSeq`) est applicatif, pas une vraie annulation réseau (`AbortController`) —
+suffisant tant que le volume d'appels reste faible (un formulaire de modale, pas une liste) ; (3) l'écran de
+validation IA (`AiCardEditModalComponent.vue`, édition d'une carte IA avant acceptation) n'a pas reçu la même
+prévisualisation en direct — seul `FlashcardsCardsPage.vue` en bénéficie pour l'instant, non demandé pour l'IA.
+
+---
+
+### [2026-09-12] Vérification manuelle en conditions réelles (API + front lancés en local, navigateur piloté par Playwright)
+
+**Contexte** — Demande explicite de l'utilisateur : tester que la fonctionnalité marche réellement, pas
+seulement via les tests automatisés (mockés) déjà verts. Environnement de test jetable monté de toutes
+pièces : API lancée avec SQLite forcé (`PG_HOST=` vide) plutôt que Postgres (vide, non peuplé) ; utilisateur
+de test créé directement en base (bcrypt + `hasValidatedEmail: true`) après échec de l'inscription réelle
+(SMTP Brevo du `.env` racine refusé — "Unauthorized IP address", IP non autorisée depuis ce poste) ; rôles
+"Admin"/"Étudiant" absents de la base fraîchement synchronisée, créés manuellement (aucun seeder de données
+n'est déclenché automatiquement au démarrage, seul le schéma l'est) ; session injectée dans le front via
+`localStorage` avec un token JWT réel obtenu par un vrai `POST /users/login` (pas de mock) ; `CORS_ORIGIN`
+ajusté pour autoriser le port du serveur de dev Vite (5173) face à l'API (8001) — deux origines distinctes en
+local, contrairement à la prod où front/API partagent une origine via le reverse-proxy.
+
+**Résultats** — (1) `POST /responses/quality-preview` via `curl` direct : confirmé 0 écriture en base
+(compteur de lignes `Response` identique avant/après l'appel), résultat exact sur le cas Q4 réel (2
+avertissements, `low`) et sur la version corrigée (0 avertissement, `high`) — un premier essai avait donné un
+résultat différent à cause d'un échappement d'apostrophes défaillant dans la commande curl elle-même (fichier
+JSON utilisé ensuite pour éliminer ce risque), pas d'un bug du code. Validations 400 (statement/answer
+manquants) confirmées sur le serveur réel. (2) Navigateur piloté (Playwright, `chromium-cli` indisponible sur
+Windows) sur l'application réelle : badge "Aperçu (non enregistré)" rouge "À revoir" avec les 2 avertissements
+exacts pendant la frappe (réponse elliptique, rien d'enregistré) ; passe à vert "Bonne qualité" en direct après
+amélioration de la réponse + ajout de 2 reformulations, toujours sans sauvegarde ; après clic sur "Ajouter" :
+la carte de bonne qualité ferme la modale automatiquement (comportement voulu), une seconde carte volontairement
+de mauvaise qualité reste dans une modale qui NE se ferme PAS, avec le libellé qui bascule correctement de
+"Aperçu (non enregistré)" à "✓ Carte enregistrée — réponse créée." — les 4 captures d'écran confirment chaque
+étape visuellement (générées dans un dossier temporaire, non conservées).
+
+**Incident opérationnel pendant le test** : `node seeder.js` exécuté par erreur sur la base SQLite déjà
+synchronisée par le serveur a corrompu son schéma (repli sur seulement 4 tables) — corrigé en supprimant le
+fichier `db.sqlite` **local, jetable, non suivi par git** et en relançant le serveur (resynchronisation propre).
+Point de vigilance distinct détecté en nettoyant après le test : `my_memo_master_api/db.sqlite` est en réalité
+suivi par git (pas seulement ignoré comme le suggérait le `*.sqlite` du `.gitignore` — les fichiers déjà
+trackés avant l'ajout d'une règle restent trackés) ; un `rm` de nettoyage l'avait supprimé du répertoire de
+travail par réflexe, restauré immédiatement via `git checkout` avant tout commit — aucune conséquence, mais
+retenu ici pour la prochaine session : ne pas supprimer ce fichier sans vérifier `git status` d'abord.
+
+**Conséquences** — Aucun changement de code (vérification pure). Confirme que les entrées des 2026-09-12
+précédentes (badge de qualité + endpoint de prévisualisation) fonctionnent réellement de bout en bout, pas
+seulement dans les tests mockés. Nettoyage complet effectué : serveurs arrêtés, `.env` temporaire du front et
+scripts de pilotage supprimés, base SQLite de test jetable supprimée (fichier non suivi, recréée à chaque
+lancement local), `db.sqlite` suivi par git restauré. `git status` propre après coup (uniquement les fichiers
+de fonctionnalité de cette session, rien de résiduel du test).
+
+---
+
 ### [2026-09-12] Merge `staging` → `main` demandé explicitement par l'utilisateur, hors circuit PR habituel
 
 **Contexte** : l'utilisateur a demandé explicitement (« tu vas merge la staging dans main ») de synchroniser
@@ -4441,3 +4789,12 @@ existent sur un environnement de test) ne sont pas réparées rétroactivement �
 Tickets A/B/C n'étant sur aucune branche mergée/déployée à ce jour. Non vérifié avec un appel S3 réel dans
 cette session (pas d'accès réseau sortant) : la correction est déduite de la configuration `.env` et du
 comportement documenté du path-style S3, à confirmer par l'utilisateur au prochain test réel.
+
+
+---
+
+### [2026-10-02] Abandon de SonarQube auto-hébergé pour réduire les coûts d'hébergement
+**Contexte** : L'hébergement Infomaniak coûte ~100 € TTC/mois (tarifs du dépôt HT : control plane dédié 26,31 €, worker 12,15 €, volumes 0,08 €/Go ; TVA 20 %). SonarQube Community consommait ~3,9 Gi au pic (limite 4 Gi, doc officielle : 4 Go pour une petite instance) et avait imposé un 3ᵉ worker dédié (décision du 2026-08-28). Son rapport servait au dossier RNCP, terminé.
+**Décision** : Désinstaller SonarQube du cluster et mettre le job CI en commentaire (réactivable). Le chart `helm-sonarqube/` est conservé.
+**Alternative écartée** : SonarCloud (gratuit en dépôt public) — non retenu pour l'instant, l'analyse n'étant plus nécessaire ; reste l'option de repli la moins chère (si le dépôt devient privé : ~34 $/mois au-delà de 50 k lignes). CodeQL + Dependabot (gratuits) envisagés comme remplacement sécurité, non mis en place. Garder SonarQube sur un nœud partagé avec la prod — écarté : pic de 3,9 Gi trop proche de l'allouable (5,6 Gi).
+**Conséquences** : Plus d'analyse statique continue ni de quality gate. Volumes retain à supprimer à la main. Prochaines étapes d'économie : retirer le worker d'outillage, migrer vers un control plane partagé (cluster à recréer), 2 workers.

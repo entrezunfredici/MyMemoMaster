@@ -86,11 +86,34 @@ RÈGLES STRICTES :
    la demande, accompagné d'un "warning" expliquant pourquoi, est une sortie valide et préférable à
    des cartes redondantes.
 8. Pour toute formule mathématique ou physique (équation, expression symbolique, unité composée),
-   où qu'elle apparaisse ("statement", "answer", "acceptedAnswers", "options[].text"), entoure-la de
-   signes dollar ($...$) et écris-la en LaTeX standard : \\frac{a}{b} pour une fraction, \\sqrt{x},
-   x^{2} pour un exposant, x_{i} pour un indice, \\rho/\\Delta/\\times... pour les symboles. Exemple :
-   "la pression est donnée par $P = \\rho g h$". N'utilise ce balisage $...$ QUE pour une formule,
-   jamais pour du texte normal.`
+   où qu'elle apparaisse ("statement", "answer", "acceptedAnswers", "options[].text") et MÊME quand
+   elle est insérée au milieu d'une phrase, entoure-la de signes dollar ($...$) et écris-la en LaTeX
+   standard : \\frac{a}{b} pour une fraction, \\sqrt{x}, x^{2} pour un exposant, x_{i} pour un indice,
+   \\rho/\\Delta/\\times... pour les symboles. Cette conversion s'applique MÊME SI le texte source
+   n'est lui-même pas en LaTeX (Δ Unicode, exposants en texte brut, mise en page PDF dégradée) — ne
+   recopie jamais une notation Unicode/texte brut telle quelle, convertis-la systématiquement.
+   Exemples : source "la pression est donnée par P = ρ g h" → sortie "la pression est donnée par
+   $P = \\rho g h$" ; source "∆U + ∆Ec = Wtot + Q" → sortie "$\\Delta U + \\Delta E_c = W_{tot} + Q$"
+   (jamais "∆U + ∆Ec = Wtot + Q" recopié sans balisage). N'utilise ce balisage $...$ QUE pour une
+   formule, jamais pour du texte normal.
+9. Le champ "answer" doit être une réponse AUTONOME et COMPLÈTE : reformule explicitement le sujet
+   de la question (le concept, la grandeur, l'objet interrogé) plutôt que d'utiliser un pronom, une
+   clause elliptique ou une tournure qui ne se comprend qu'en connaissant l'énoncé — SANS ajouter une
+   information absente du texte source (règle 1) : il s'agit de nommer le sujet, pas d'enrichir la
+   définition. À ÉVITER (exemple réel rejeté, source : "on peut associer une grandeur notée U, appelée
+   énergie interne, telle que : U est une fonction d'état, U est extensive") : pour la question
+   "Qu'est-ce que l'énergie interne U d'un système ?", la réponse "Une fonction d'état extensive
+   associée au système." ne mentionne même pas le mot "énergie" et n'a aucun sens hors contexte.
+   Réponse correcte attendue, à partir des MÊMES informations du texte (rien ajouté, seul le sujet est
+   restitué) : "L'énergie interne U est une fonction d'état extensive associée à un système."
+10. Pour une carte "open" dont la réponse est une phrase ou une définition (pas une simple valeur
+    numérique ou un terme isolé), remplis "acceptedAnswers" avec AU MOINS 2 reformulations
+    alternatives de "answer" : même sens, mais vocabulaire et/ou structure de phrase différents —
+    jamais une copie ou une variation triviale de ponctuation de "answer". La correction compare la
+    réponse de l'étudiant à CHACUNE de ces formulations : plus il y a de variantes plausibles
+    couvertes, moins un étudiant risque d'être compté faux pour une reformulation correcte mais
+    différemment exprimée. Un tableau vide reste acceptable uniquement pour une réponse strictement
+    factuelle (valeur, nom, date) où la paraphrase n'apporte rien.`
   }
 
   /**

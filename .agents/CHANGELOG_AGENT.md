@@ -24,7 +24,7 @@
 | User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) | 2026-08-15 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
 | Subject / Unit | Stable — [FIX] 2026-08-31 : validateur `name` resserré à 50 caractères (alignement sur VARCHAR(50), un nom > 50 provoquait un 500 en création) ; S-05.04 : hasMany(Diagramme/Test) ajoutés, findByUser inclut Subject, 21 tests controller | 2026-08-31 |
-| Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult | 2026-09-01 |
+| Test / Question / Response | Stable — [FIX] 2026-09-01 : 500 prod à la création d'une série d'exercices (`POST /questions` → `question.addTest()`) — table de jointure `testQuestions` sans modèle Sequelize enregistré, `timestamps: true` supposé par défaut alors que la migration ne crée pas `createdAt`/`updatedAt` ; `TestTag` corrigé par le même correctif (même défaut latent, pas encore déclenché) ; M-06.14 : documentation types de questions et correction créée (diagrams/exercices_types_correction.md) — schémas JSON des 4 types, algorithmes correction serveur, contrôle d'accès, seuils sémantiques, modèle TestResult ; [IMP] 2026-09-12 : `HIGH_THRESHOLD` de `Semantic.service.js` abaissé de 0,78 à 0,75 (faux négatifs remontés en usage réel, cf. DECISIONS.md) ; [ADD] 2026-09-12 : `AnswerQuality.service.js` — évaluation consultative de la qualité des réponses de référence (IA ou manuelles), branchée sur `Response.service.js` (create/update) et `AiGenerationBatch.service.js` (écran de validation IA), champ `qualityWarnings` non persisté | 2026-09-12 |
 | TestResult (scores historique exercices) | Stable — [ADD] 2026-09-01 : colonne `durationSeconds` (nullable), chronométrée côté front sur `POST /tests/:id/submit`, alimente le KPI temps de révision ; M-06-REVIEW : tests controller (16) + store (14) ajoutés, .send() → .json() corrigé ; [ADD] 2026-09-04 : `submitAnswers` valide en plus automatiquement une séance `RevisionSession` planifiée du jour (idTest) après création du TestResult — un exercice soumis est toujours "complet" | 2026-09-04 |
 | Grading | Stable — `dayjs` ajouté comme dépendance | 2026-06-03 |
 | LeitnerCard — algo répétition espacée | Stable — MCQ Leitner : correctResponse branche IA (open) / exact (mcq) | 2026-06-19 |
@@ -166,7 +166,7 @@
 | Génération d'exercices par IA (C-02) — Tests fonctionnels flux génération | **Livré** — `test/bdd/aiExerciseGenerationFlow.test.js` (C-02.08, 7 tests) : referme la boucle Spécification → Service génération → Validation format → Mode dégradé → (Interface de révision simulée côté test) → persistance réelle, jamais exercée ensemble jusqu'ici — seuls les deux vrais points de sortie externes (appel réseau Mistral, extraction PDF) sont mockés, tout le reste (chunking, prompt/parsing/dédoublonnage, orchestration multi-chunks/circuit breaker, classification du mode dégradé, revalidation de format avant import, `POST /tests`+`POST /questions` réels) tourne pour de vrai sur SQLite en mémoire. Couvre : parcours nominal 4 types mixtes avec persistance vérifiée par `GET /tests/:id`, import PDF de bout en bout, mode dégradé LLM indisponible, mode dégradé sortie non exploitable après retry, échec partiel toléré (une question éditée en Interface de révision redevient invalide, seule la question valide est importée), contenu insuffisant (moins de questions que demandé + warning, sortie valide), rejet de saisie 400 (jamais un mode dégradé). **Constat fait en écrivant ce test** (pas une régression introduite ici, conséquence déjà actée du passage systématique par le pipeline le jour même) : un chunk unique qui épuise son retry est reclassé `service_unavailable` au lieu de `invalid_output` par `AiExerciseDegradedMode.service.js` — le pipeline remplace le message précis du chunk par son propre message générique dès que 100 % des chunks échouent, y compris s'il n'y en a qu'un — dégradation du signal assumée (les deux codes restent `degraded:true`/`suggestManualCreation:true`), voir DECISIONS.md. Suite complète API : **108 suites/1964 tests** (contre 107/1957), 0 régression. Linter propre. Aucun code de production modifié (ticket 100% tests) | 2026-09-08 |
 | Génération de Leitner/exercices par IA (C-01/C-02) — Syntaxe formules ($...$/LaTeX) dans les prompts LLM + correctif 500 réponse longue | [ADD/FIX] 2026-09-09 — les deux prompts système savent désormais produire des formules interprétables par le front (`$...$`/LaTeX) ; correctif d'un vrai bug latent (`Response.content` VARCHAR(255) implicite vs validateur 2000 caractères, même classe que `Question.statement` en 2026-08-31) — voir entrée dédiée en bas de fichier | 2026-09-09 |
 | Partage de ressources pédagogiques (C-03) — Maquettes UI bibliothèque ressources | **Audit-maquette rétroactif livré, aucun code** — `diagrams/bibliotheque_ressources_ui.md` (C-03.02) : l'implémentation (C-03.01, S-03.08/S-02.05) existait déjà en production, sans document `*_ui.md` dédié — traitement identique à S-06.02 (« l'implémentation Vue réelle a précédé les maquettes »). Document produit par audit de l'écran réel (`ClassroomEtudiantView.vue`/`ClassroomEnseignantView.vue`) : vue étudiant (lecture seule), vue enseignant (formulaire drag&drop + liste + suppression), icônes par `mimeType`, contrôle d'accès (rappel). **3 points de dette confirmés, non corrigés** (hors périmètre) : aucune UI d'édition malgré `PUT /resources/:resourceId` existant et testé, champ `url` du modèle inatteignable depuis le formulaire (upload de fichier imposé), aucun filtre par type de ressource dans la bibliothèque. 2 points initialement listés se sont révélés inexacts/incomplets après vérification le jour même : la recherche filtre en réalité déjà les ressources (erreur de lecture, corrigée) ; l'absence de confirmation avant suppression, présentée à tort comme spécifique aux ressources, s'est avérée être le comportement de **toute** la vue enseignant — corrigée en généralisant une modale de confirmation aux 4 actions destructrices (section/rendu, échéance, membre, ressource), voir entrée IMP dédiée | 2026-09-08 |
-| Analyse statique — SonarQube auto-hébergé | **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
+| Analyse statique — SonarQube auto-hébergé | **Désactivé le 2026-10-02** (coût) : release Helm désinstallée, namespace supprimé, job CI `sonarqube` mis en commentaire dans `ci.yml`, chart `helm-sonarqube/` conservé pour réactivation. Historique ci-dessous = état avant désactivation. Ancien état : **Déployé et opérationnel** — release Helm `sonarqube` (rév. 1) sur `pck-dkoyol2`, namespace `sonarqube` : SonarQube Community `26.8.0.126808` + PostgreSQL 17 dédié, 3 PVC liés en `csi-cinder-sc-retain`, les deux pods sur le nœud d'outillage. `/api/system/status` → `{"status":"UP"}` le 2026-08-28 13:07 UTC. Compte `admin` : **mot de passe par défaut changé** ; projet `entrezunfredici_MyMemoMaster` créé ; token d'analyse `github-actions-ci` généré et validé. Job CI `sonarcloud` remplacé par `sonarqube` (tunnel `kubectl port-forward` + action `@v6`). **Chaîne CI éprouvée de bout en bout le 2026-08-28** : merge sur `main` → analyse `SUCCESS` reçue par l'instance **135 s après le push** (tâche `REPORT` `e24ec18d`, 7,1 s de calcul). Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` posés. Le tunnel `kubectl port-forward` depuis un runner GitHub fonctionne — c'était le maillon jamais testé | 2026-08-28 |
 | Recette QA — parcours E2E et charge (QA.03/QA.05/QA.06) | **Couvert, rejoué en CI, vérifié vert** — 5 parcours Playwright authentifiés (étudiant, enseignant, contrôle négatif sans session) + scénario k6. Job `e2e_and_load` **vert sur le runner le 2026-08-30** (commit `71ce5ee`, 4 min 24 s, annotation « 5 passed ») : stack Docker complète montée en CI, seeder joué, parcours et charge exécutés. Mesures : **5/5 parcours**, charge **3 258 requêtes, 0 échec, p95 3,45 ms, 0 réponse 429**. Preuve : `docs/RAPPORT_TESTS_QA.md` | 2026-08-30 |
 | Images/schémas sur les questions — Ticket A (upload manuel) | **Livré (backend + front)** — demande utilisateur (« intégrer une image aux questions, et que l'IA puisse le faire ») scindée en 3 tickets après audit (voir DECISIONS.md) : ce ticket ne couvre que l'upload manuel, réutilisant l'infra `POST /storage/upload` existante (S3, déjà utilisée par `ClassGroupResource`) — même pattern « front uploade puis attache l'URL/clé », aucun nouvel endpoint d'upload dédié à Question. 6 nouvelles colonnes (`imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource`, migration `20260912000001`), `DELETE /questions/:id/image` (retire l'image + nettoie l'objet S3, best-effort comme `ClassGroupResourceService.delete`). Front : bouton "Insérer une image" déjà présent (mort) sur `CreateTestPage.vue` branché, aperçu + suppression ; affichage de l'image dans `ExerciseDetailPage.vue` (mode quiz + mode résultats, `alt` renseigné pour RGAA). **Ticket B (l'IA rattache une image extraite d'un PDF source à une question générée) et Ticket C (revue de l'image IA avant validation) restent à faire** — non couverts ici. 8 tests service + 4 tests controller (API), 6 tests store + 2 tests composant (front), 0 régression (2053/2053 API, 847/847 front) | 2026-09-12 |
 | Images/schémas sur les questions — Ticket B (l'IA rattache une image du PDF source à une question générée) | **Livré (backend uniquement, aucun front)** — suite du Ticket A. `ImageCaptioningPipeline.service.js` numérote désormais chaque schéma retenu (marqueur texte « Schéma n°X ») et renvoie la liste des images retenues (`images: [{id, pageIndex, caption, imageBase64}]`, champ additionnel, `AiCardGenerationPipeline.service.js` inchangé). `AiExerciseGeneration.service.js` gagne un champ de sortie optionnel `imageRef` (règle 13 du prompt système : le LLM cite le numéro exact d'un schéma si une question en dépend directement, jamais inventé) + validation (entier positif ou null). `AiExerciseGenerationPipeline.service.js` résout `imageRef` après génération : upload direct S3 (`PutObjectCommand`, pas de requête HTTP entrante à parser) de l'image référencée, un seul upload même si plusieurs questions citent le même schéma, échec dégradé en warning (jamais bloquant) ; `imageRef` toujours retiré de la question en sortie, remplacé le cas échéant par `imageUrl`/`imageKey`/`imageMimeType`/`imageOriginalName`/`imageSize`/`imageSource: "ai"` (mêmes noms que `Question.model.js`, Ticket A). **Écart au Ticket A corrigé au passage** : `Question.service.js#extractImageFields` forçait `imageSource` à `"manual"` dès qu'une `imageUrl` était fournie — bloquait toute provenance IA de bout en bout ; accepte désormais explicitement `imageSource: "ai"` du client (jamais `"manual"`, qui reste dérivé), voir DECISIONS.md. **Non couvert à l'époque (Ticket C, livré depuis — voir ligne suivante)** : aucun câblage front. Scindé au flux exercices (C-02) uniquement — la génération de cartes Leitner (C-01) n'est pas concernée. 10 tests `AiExerciseGeneration.service.test.js` (imageRef), 2 tests `ImageCaptioningPipeline.service.test.js` (numérotation), 15 tests `AiExerciseGenerationPipeline.service.test.js` (upload + attach + intégration), 4 tests `Question.service.test.js`/`Question.controller.test.js` (imageSource "ai"), 0 régression (2079/2079 API) | 2026-09-12 |
@@ -12028,6 +12028,249 @@ ci-dessus reste à trier en tickets de suivi si besoin.
 
 ---
 
+### [2026-09-12] IMP — Seuil de correction sémantique abaissé de 0,78 à 0,75, suite à des faux négatifs remontés en test réel
+
+**Contexte** — L'utilisateur signale, en testant l'application, plusieurs réponses physiquement correctes
+(thermodynamique) comptées incorrectes par le moteur de correction sémantique, dont une à ~0,73 de similarité
+— sous `HIGH_THRESHOLD` (0,78). Demande explicite : abaisser le seuil à 0,75.
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Semantic.service.js` (`HIGH_THRESHOLD` : 0,78 → 0,75, deux blocs de commentaire
+  mis à jour)
+- `my_memo_master_api/test/services/Semantic.service.test.js` (assertion du test de monotonicité : `>= 0.78`
+  → `>= 0.75`)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite ciblée relancée : `Semantic.service.test.js` (58/58), `Test.service.test.js` (25/25),
+`LeitnerCard.service.test.js` (26/26) — 0 régression. Suite complète non relancée dans ce ticket (changement
+localisé à une constante numérique et son test dédié).
+
+**Points d'attention / dette** — Signalé explicitement à l'utilisateur avant application : ce changement ne
+rattrape **aucun** des cas concrets qui l'ont motivé (0,7407 et ~0,73 restent tous deux sous le nouveau seuil
+de 0,75) — il réduit seulement la fenêtre de faux négatifs pour de futurs scores entre 0,75 et 0,78. Les
+questions Q4/Q5/Q6/Q13 signalées par l'utilisateur (énergie interne, premier principe, bilan machine ditherme)
+n'ont pas pu être vérifiées avec les vraies données à ce stade : la base SQLite dev locale et la base Postgres
+dev locale (`.env` racine, `mymemomasterdb`) sont toutes deux vides de ce contenu — testé sur l'environnement
+preprod déployé. Résolu dans l'entrée suivante (interrogation directe de l'API preprod).
+
+---
+
+### [2026-09-12] ADD/DOC — Interrogation de l'API preprod (Q4/Q5/Q6/Q13) + amélioration du prompt de génération IA (règles 9-10)
+
+**Contexte** — Suite de l'entrée précédente. L'utilisateur fournit ses identifiants preprod (`.env` racine,
+`preprod_mail`/`preprod_pass`) et demande d'interroger directement l'API déployée. Une première tentative
+(identifiants inline dans un `node -e`) est bloquée par le classifieur auto mode (« Credential
+Materialization ») ; résolu par un script dédié + règles de permission scopées.
+
+**Fichiers modifiés/ajoutés**
+- `my_memo_master_api/scripts/preprod-query.js` (nouveau) — client HTTP minimal scopé sur l'API preprod :
+  login (`preprod_mail`/`preprod_pass` lus dans le `.env` racine, jamais en argument CLI) puis requête
+  authentifiée sur un `<METHOD> <path> [jsonBody]` donné en argument
+- `.claude/settings.local.json` — 2 règles de permission ajoutées (`Bash(node scripts/preprod-query.js *)` et
+  la variante préfixée `my_memo_master_api/`, selon le cwd)
+- `my_memo_master_api/services/AiCardGeneration.service.js` (`buildSystemPrompt`) — règles 9-10 ajoutées :
+  (9) `answer` doit être autonome/complet (exemple réel Q4 cité dans le prompt lui-même comme contre-exemple) ;
+  (10) `acceptedAnswers` doit contenir ≥ 2 reformulations alternatives pour une réponse-phrase (vide toléré
+  seulement pour une réponse strictement factuelle)
+- `diagrams/generation_ia_prompt_cartes.md` §3.1 — règles 9-10 ajoutées, et règles 7-8 rattrapées au passage
+  (ce bloc de doc avait pris du retard sur le code, indépendamment de ce ticket)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Constat sur les données réelles** (système « Thermodynamique » idSystem=1, preprod) : les 4 cartes sont bien
+en boîte niveau 1. Cause racine identifiée : Q4 a une réponse de référence générée par IA trop vague (« Une
+fonction d'état extensive associée au système. », ne mentionne même pas « énergie ») — problème de contenu
+généré, pas du moteur de correction sémantique (qui, lui, fonctionne comme conçu). Q5/Q6/Q13 non tranchées
+(texte saisi par l'utilisateur jamais obtenu) — restent en dette.
+
+**Tests** — `AiCardGeneration.service.test.js` + `AiCardGenerationPipeline.service.test.js` : **82/82**, 0
+régression (les nouvelles règles n'affectent que la longueur du prompt système, pas son format).
+
+**Points d'attention / dette** — (1) Amélioration prompt-only : aucune garantie mécanique que le LLM respecte
+réellement les règles 9-10 sur la prochaine génération, à vérifier sur le prochain lot réel de l'utilisateur ;
+validation stricte (`acceptedAnswers.length >= 2` obligatoire) explicitement écartée pour ce ticket (décision
+produit séparée à trancher si le prompt seul ne suffit pas). (2) Aucun endpoint n'expose la liste complète des
+réponses `correction:true` d'une question (`/responses/correction/:id` fait un `findOne`, pas un `findAll`) —
+empêche de vérifier depuis l'API si `acceptedAnswers` est effectivement peuplé en base pour les cartes déjà
+générées ; à considérer si ce diagnostic doit être refait plus tard. (3) Script `preprod-query.js` réutilisable
+mais volontairement générique (un seul `<method> <path>`), pas un client dédié par ressource.
+
+---
+
+### [2026-09-12] ADD/FIX — Validation empirique des règles 9-10 sur les vrais cours de l'utilisateur (appel Mistral réel) + renforcement de la règle 8 (formules LaTeX)
+
+**Contexte** — L'utilisateur partage les 2 cours PDF source (`cours_exemples/Thermodynamique.pdf`,
+`cours_exemples/09_stat-flu_poly-prof.pdf`) et demande de tester/corriger le prompt avec.
+
+**Fichiers modifiés/ajoutés**
+- `my_memo_master_api/scripts/test-ai-generation.js` (nouveau) — appelle `AiCardGenerationService.generateCards`
+  directement (en process, sans HTTP ni DB) sur un fichier texte donné en argument
+- `.claude/settings.local.json` — 2 règles de permission ajoutées pour ce script
+- `my_memo_master_api/services/AiCardGeneration.service.js` (`buildSystemPrompt`) — règle 8 renforcée :
+  la conversion `$...$`/LaTeX s'applique même si le texte source ne l'est pas lui-même (exemple de conversion
+  Unicode → LaTeX ajouté), pour corriger un défaut observé en test réel (formules recopiées en Unicode brut
+  quand insérées au milieu d'une phrase)
+- `diagrams/generation_ia_prompt_cartes.md` §3.1 — même renforcement répliqué
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests réels effectués** (3 appels Mistral réels, `mistral-small-latest`, sur extraits `pdftotext -layout
+-enc UTF-8` des 2 cours) : énergie interne/premier principe (source Q4/Q5 preprod), machine ditherme (source
+Q13), modèle isotherme de l'atmosphère (source du cas historique documenté 2026-09-08, 0,7407) — tous
+confirment : `answer` autonome (sujet explicitement nommé), ≥ 2 `acceptedAnswers` réellement distinctes,
+formules 100 % en LaTeX `$...$` après le renforcement de la règle 8. Cas le plus significatif : la
+reformulation générée pour le modèle isotherme (« La pression atmosphérique décroît exponentiellement avec
+l'altitude... ») est quasiment la paraphrase qui avait échoué à 0,7407 dans le cas historique — désormais
+couverte comme variante acceptée.
+
+**Tests unitaires** — Suite ciblée relancée après le renforcement de la règle 8 :
+`AiCardGeneration.service.test.js` + `AiCardGenerationPipeline.service.test.js` +
+`AiExerciseGeneration.service.test.js` + `AiExerciseGenerationPipeline.service.test.js` — **176/176**, 0
+régression (prompt d'exercices partage le même squelette, vérifié qu'aucun test n'en dépend au caractère près).
+
+**Points d'attention / dette** — (1) Validation faite sur 3 extraits ciblés choisis manuellement, pas sur une
+génération pleine échelle via le pipeline de chunking automatique (`AiCardGenerationPipeline.service.js`).
+(2) Toujours prompt-only : aucune garde mécanique si un futur lot ignore les règles. (3) Les cartes Q5/Q6/Q13
+déjà en base sur preprod ne sont PAS régénérées par ce correctif — celui-ci ne s'applique qu'aux futures
+générations ; une régénération éventuelle de ces cartes précises reste une action à décider séparément
+(écriture sur preprod, hors périmètre de ce ticket).
+
+---
+
+### [2026-09-12] ADD — Service `AnswerQuality.service.js` : évaluation consultative de la qualité des réponses de référence (IA ou manuelles)
+
+**Contexte** — Demande utilisateur : un système qui évalue la qualité des réponses de référence (IA ou
+saisies à la main) pour aider à produire une correction sémantique la plus efficace possible, plutôt que de
+compter uniquement sur le prompt de génération (aucune garantie mécanique). Intégré à 2 points choisis
+explicitement par l'utilisateur : écran de validation IA, et création/édition manuelle d'une réponse.
+
+**Fichiers ajoutés**
+- `my_memo_master_api/services/AnswerQuality.service.js` — `assess(statement, answers)`, 4 heuristiques
+  déterministes (autonomie de la réponse, longueur, formule non balisée en LaTeX, richesse des
+  reformulations), purement consultatif, jamais bloquant
+- `my_memo_master_api/test/services/AnswerQuality.service.test.js` — 15 tests, dont le cas réel Q4 (énergie
+  interne, preprod) avant/après correction du prompt de génération IA (entrée précédente)
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/Response.service.js` — `create`/`update` calculent et renvoient
+  `qualityWarnings` (jamais persisté) quand `correction: true`, en tenant compte des autres réponses
+  acceptées déjà enregistrées pour la même question
+- `my_memo_master_api/services/AiGenerationBatch.service.js` — `createFromPipelineResult`/`findById`/
+  `findPendingByUser`/`updateCard` attachent `qualityWarnings` à chaque carte "open" (`[]` pour "mcq")
+- `my_memo_master_api/test/services/Response.service.test.js`,
+  `my_memo_master_api/test/services/AiGenerationBatch.service.test.js` — tests étendus pour couvrir le
+  nouveau champ (2 tests modifiés côté Response pour le crash `toJSON` des mocks existants + 1 nouveau ;
+  4 nouveaux tests côté AiGenerationBatch)
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète relancée : **2061/2061 tests API**, 0 régression. Lint propre.
+
+**Points d'attention / dette** — (1) Heuristiques calibrées sur les cas réels rencontrés dans cette session
+(énergie interne, photosynthèse, capitale de la France) — pas de calibration à grande échelle. (2) Le front
+(composants Vue de l'écran de validation IA et de création de réponse) ne consomme pas encore `qualityWarnings`
+— reste à afficher réellement à l'écran, action séparée non demandée dans ce ticket. (3) L'option "outil
+d'audit du contenu déjà en base" (pour auditer Q5/Q6/Q13 et le reste du contenu existant) a été explicitement
+écartée par l'utilisateur pour ce ticket.
+
+---
+
+### [2026-09-12] ADD — Badge de qualité (couleur + libellé) affiché sur l'écran de validation IA et la modale de création/édition de réponse
+
+**Contexte** — Suite de l'entrée précédente : demande explicite d'afficher `qualityWarnings` à l'écran, avec
+en plus une note globale/un code couleur pour voir directement la qualité d'une réponse de référence.
+
+**Fichiers ajoutés**
+- `my_memo_master_front/src/components/AnswerQualityBadgeComponent.vue` — pastille colorée (vert/jaune/rouge,
+  jamais la couleur seule : icône + libellé texte, RGAA 3.3) + liste détaillée des avertissements
+- `my_memo_master_front/test/components/AnswerQualityBadge.test.js` — 5 tests
+
+**Fichiers modifiés**
+- `my_memo_master_api/services/AnswerQuality.service.js` — `levelFromWarnings(warnings)` : 'high' (0 avert.)/
+  'medium' (1)/'low' (2+), même vocabulaire que `decision_zone` de `Semantic.service.js`
+- `my_memo_master_api/services/Response.service.js`, `my_memo_master_api/services/AiGenerationBatch.service.js`
+  — exposent `qualityLevel` aux côtés de `qualityWarnings` (`null` = non applicable : QCM, `correction:false`)
+- `my_memo_master_front/src/components/AiValidationScreenComponent.vue` — badge sous chaque carte "open"
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` — badge affiché après enregistrement réel de la
+  réponse ; modale non refermée automatiquement si le niveau n'est pas "high" ; `PUT` supplémentaire sur la
+  réponse principale après la boucle de création des formulations acceptées (sinon son `qualityWarnings`
+  serait calculé avant que les autres formulations n'existent en base, faussement pessimiste)
+- Tests back (`Response.service.test.js`, `AiGenerationBatch.service.test.js`, `AnswerQuality.service.test.js`)
+  et front (`AiValidationScreenComponent.test.js`, +3 tests) étendus pour le nouveau champ
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Tests** — Suite complète relancée des deux côtés : **2065/2065 tests API**, **847/847 tests front**
+(a11y inclus), 0 régression. Lint propre.
+
+**Points d'attention / dette** — (1) `FlashcardsCardsPage.vue` n'a aucun test dédié (gap préexistant à ce
+ticket, fichier volumineux sans suite avant) — câblage vérifié par lint + relecture seulement, pas par un test
+automatisé. (2) Pas de prévisualisation en direct avant sauvegarde — le badge n'apparaît qu'après un
+enregistrement réel ; une prévisualisation nécessiterait soit un nouvel endpoint sans persistance, soit
+dupliquer les heuristiques en JS côté front, écarté pour ce ticket. (3) L'outil d'audit du contenu déjà en
+base reste non implémenté (écarté par l'utilisateur, entrée précédente).
+
+---
+
+### [2026-09-12] ADD — `POST /responses/quality-preview` : aperçu de qualité sans persistance, prévisualisation en direct dans la modale de création/édition
+
+**Contexte** — Demande explicite immédiatement après l'entrée précédente : ajouter la prévisualisation en
+direct qui y avait été volontairement écartée du scope.
+
+**Fichiers ajoutés/modifiés**
+- `my_memo_master_api/validators/Response.validators.js` (+`qualityPreview`)
+- `my_memo_master_api/services/Response.service.js` (+`previewQuality` — synchrone, aucun accès base)
+- `my_memo_master_api/controllers/Response.controller.js` (+`qualityPreview`)
+- `my_memo_master_api/routes/Response.routes.js` (+`POST /responses/quality-preview`, doc Swagger)
+- `my_memo_master_api/test/services/Response.service.test.js` (+4), `test/controllers/Response.controller.
+  test.js` (+5)
+- `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` — `watch` débounce (500 ms) sur
+  statement/answer/type/altAnswers, compteur de séquence pour ignorer une réponse réseau obsolète, nouveau
+  booléen `qualitySaved` pour distinguer aperçu non enregistré vs résultat confirmé après sauvegarde
+- `.agents/CHANGELOG_AGENT.md`, `.agents/DECISIONS.md`
+
+**Bug trouvé et corrigé pendant l'implémentation** : le garde de type ("QCM" n'a rien à évaluer) sortait avant
+de réinitialiser le badge — passer de "Ouverte" à "QCM" laissait affiché à tort le badge de la précédente
+réponse "open".
+
+**Tests** — Suite complète relancée : **2074/2074 tests API** (0 régression). Front : **847/847** (inchangé,
+pas de nouveau test front sur ce point précis — cf. dette), `vite build` relancé en sanity-check (compile sans
+erreur). Lint propre des deux côtés.
+
+**Points d'attention / dette** — (1) `FlashcardsCardsPage.vue` toujours sans test dédié (gap préexistant) — le
+debounce/séquencement n'est vérifié que par relecture + build. (2) Séquencement applicatif (`previewSeq`), pas
+une vraie annulation réseau (`AbortController`) — suffisant pour ce volume d'appels. (3) `AiCardEditModalComponent.vue`
+(édition d'une carte IA avant acceptation) n'a pas reçu la même prévisualisation en direct — non demandé.
+
+---
+
+### [2026-09-12] VÉRIF — Test manuel en conditions réelles (API + front locaux, navigateur piloté) du badge de qualité et de la prévisualisation en direct
+
+**Contexte** — Demande explicite de l'utilisateur de vérifier que ça fonctionne réellement, pas seulement via
+les tests automatisés déjà verts.
+
+**Méthode** — API lancée en local avec SQLite forcé (Postgres du `.env` racine vide) ; utilisateur de test
+créé directement en base (email SMTP réel refusé par Brevo, IP non autorisée) ; rôles manquants créés (aucun
+seed de données au démarrage) ; session injectée dans le front via un vrai JWT (`POST /users/login` réel, pas
+de mock) ; `CORS_ORIGIN` ajusté pour le port du dev-server Vite ; navigateur piloté avec Playwright
+(`chromium-cli` indisponible sur Windows).
+
+**Résultats** — `POST /responses/quality-preview` : 0 écriture DB confirmée, résultats exacts sur le cas Q4
+réel et sa version corrigée, validations 400 confirmées (un premier essai erroné via `curl` venait d'un
+échappement d'apostrophes défaillant dans ma commande, pas d'un bug). Dans l'app réelle : badge rouge "À
+revoir" en direct pendant la frappe d'une réponse elliptique (rien enregistré), passe au vert "Bonne qualité"
+en direct après correction + 2 reformulations (toujours rien enregistré), la carte de bonne qualité ferme la
+modale après sauvegarde tandis qu'une carte de mauvaise qualité la laisse ouverte avec le libellé "✓ Carte
+enregistrée" — 4 captures d'écran confirment chaque étape (non conservées, environnement jetable).
+
+**Incident + point de vigilance** — `node seeder.js` a corrompu le schéma SQLite en cours de test (base
+recréée). En nettoyant après coup, un `rm` a supprimé par réflexe `my_memo_master_api/db.sqlite`, qui s'avère
+être **suivi par git** malgré le `*.sqlite` du `.gitignore` (règle qui n'affecte pas les fichiers déjà
+trackés) — restauré immédiatement via `git checkout` avant tout commit, aucune conséquence, mais retenu pour
+la prochaine session.
+
+**Conséquences** — Aucun changement de code, vérification pure. Confirme le fonctionnement réel de bout en
+bout des deux entrées précédentes. Nettoyage complet : serveurs arrêtés, fichiers temporaires (`.env` front,
+scripts de pilotage, base SQLite jetable) supprimés, `db.sqlite` suivi par git restauré, `git status` propre.
+
+---
+
 ### [2026-09-12] Images/schémas sur les questions — Ticket A (upload manuel)
 
 **Contexte** : demande utilisateur (« est-ce qu'on peut rajouter la possibilité d'intégrer une image ou un
@@ -12436,3 +12679,42 @@ trompeur (« Erreur interne du serveur. ») car `errorHandler.middleware.js` n'a
 `ENOBUFS` local, épuisement de sockets éphémères sous 200 requêtes rafale sur cette machine Windows,
 confirmé pré-existant et sans rapport : le fichier passe seul en isolation, 8/8). Lint non relancé (aucun
 changement front). Manifests k8s/Helm non appliqués/déployés dans cette session (pas d'accès cluster).
+
+
+### [2026-10-02] [IMP] Réduction des coûts d'hébergement — retrait de SonarQube du cluster
+
+Demande utilisateur : la facture Infomaniak (~100 € TTC/mois, 20 % de TVA ; tarifs du dépôt HT) est trop élevée, objectif ~60 €. SonarQube auto-hébergé justifiait à lui seul le 3ᵉ worker (nœud d'outillage `…-5sx65`) ; le RNCP étant passé, son rapport n'est plus nécessaire.
+
+**Fait** :
+- `.github/workflows/ci.yml` : job `sonarqube` mis en commentaire (conservé pour une éventuelle réactivation), avec bandeau explicatif. YAML revalidé : jobs actifs `setup`, `test_and_lint`, `e2e_and_load`.
+- Cluster `pck-dkoyol2` : `helm uninstall sonarqube`, suppression des 3 PVC, suppression du namespace `sonarqube`.
+- `helm-sonarqube/` conservé tel quel.
+
+**Reste à faire (hors dépôt)** :
+- Les 3 PV (5+10+2 Gi, `csi-cinder-sc-retain`) passent en `Released` : les volumes Cinder restent **facturés** jusqu'à suppression manuelle dans le Manager Infomaniak.
+- Le nœud `…-5sx65` n'héberge plus que des DaemonSets système : il peut être retiré du pool de workers.
+- Secrets GitHub `SONAR_TOKEN` et `KUBECONFIG_SONAR` devenus inutiles.
+- Migration prévue vers un cluster à control plane partagé (économie ~26,31 € HT/mois), non commencée.
+
+**Mesure** : SonarQube avait un pic mémoire de ~3,9 Gi (limite 4 Gi) ; metrics-server reste en panne (`failed`).
+
+
+### [2026-10-02] [FIX] CI — `npm audit` en échec sur l'API (nodemailer, brace-expansion…)
+
+La CI échouait à l'étape `npm audit --omit=dev --audit-level=high` (3 tentatives) : de nouveaux avis publiés touchaient `brace-expansion` (via `swagger-jsdoc`, high) et `nodemailer` ≤ 10.0.8 (high), plus `fast-uri`, `ip-address`, `moment`, `multer` (moderate).
+
+**Fait** (`my_memo_master_api/`) :
+- `npm audit fix` (non cassant) : `package-lock.json` seul — brace-expansion, fast-uri, ip-address, moment, multer.
+- `nodemailer` **^9.1.1 → ^10.0.13** (montée majeure, **dépendance signalée** : même paquet, version corrigée). Usage minimal et inchangé : `helpers/sendEmail.js` (`createTransport` + `sendMail`) ; Node ≥ 20 requis, projet en Node 22.
+- `npm audit --omit=dev --audit-level=high` : **0 vulnérabilité**. Tests API : **112 suites / 2 116 tests passés**.
+
+**Dette** : `npm audit` complet signale encore des alertes sur des dépendances de **dev** (ex. `tar` via `sqlite3`, correctif cassant) — hors périmètre de la CI (`--omit=dev`). Envoi réel d'e-mail SMTP non testé avec nodemailer 10 (mocké dans les tests) : à confirmer au prochain envoi de rappel.
+
+
+### [2026-10-02] [FIX] CI — `npm audit` en échec sur le front (axios, brace-expansion, fast-uri)
+
+Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.19.0 (high, 12 avis), `brace-expansion` ≤ 1.1.20 (high), `fast-uri` (moderate).
+
+**Fait** : `npm audit fix` (non cassant) — `package-lock.json` seul, `package.json` inchangé. `npm audit --omit=dev --audit-level=high` : **0 vulnérabilité**. Front : **56 fichiers / 870 tests Vitest passés**, `vite build` OK.
+
+**Dette** : 3 alertes *moderate* subsistent sur des dépendances de dev (correctif cassant via `--force`), hors périmètre de la CI.

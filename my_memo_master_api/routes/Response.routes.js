@@ -161,6 +161,57 @@ router.get('/:id', ResponseController.findOne)
  *       500:
  *         description: Erreur interne du serveur
  */
+/**
+ * @swagger
+ * /responses/quality-preview:
+ *   post:
+ *     summary: Aperçu de qualité d'une réponse de référence (AnswerQuality.service.js), sans aucune persistance
+ *     description: >
+ *       Calcule qualityWarnings/qualityLevel pour un couple énoncé/réponse(s) fourni directement par
+ *       l'appelant — ni la question ni la réponse n'ont besoin d'exister en base (utile pendant la
+ *       saisie, avant tout enregistrement). Contrairement à POST /responses et PUT /responses/edit/{id},
+ *       ne tient compte d'aucune reformulation déjà enregistrée en base : la liste doit être complète
+ *       dans `acceptedAnswers`.
+ *     tags:
+ *       - Responses
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [statement, answer]
+ *             properties:
+ *               statement:
+ *                 type: string
+ *                 example: "Qu'est-ce que l'énergie interne U d'un système ?"
+ *               answer:
+ *                 type: string
+ *                 example: "L'énergie interne U est une fonction d'état extensive."
+ *               acceptedAnswers:
+ *                 type: array
+ *                 items: { type: string }
+ *     responses:
+ *       200:
+ *         description: Aperçu calculé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 qualityWarnings:
+ *                   type: array
+ *                   items: { type: string }
+ *                 qualityLevel:
+ *                   type: string
+ *                   enum: [high, medium, low]
+ *       400:
+ *         description: Requête invalide
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.post('/quality-preview', responseValidators.qualityPreview, validate, ResponseController.qualityPreview)
+
 router.post('/', responseValidators.create, validate, ResponseController.create)
 
 /**

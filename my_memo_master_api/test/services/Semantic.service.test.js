@@ -426,10 +426,11 @@ describe('SemanticService', () => {
       ]
       for (const test of semanticCases) {
         const result = await SemanticService.gradeSemantic(test.correct, test.student)
-        // Seuil unique : correct <=> score >= HIGH_THRESHOLD (0,78), jamais un
-        // autre critère (mots-clés, longueur de réponse...) ne peut faire
-        // diverger le verdict du score affiché.
-        expect(result.is_correct).toBe(result.score >= 0.78)
+        // Seuil unique : correct <=> score >= HIGH_THRESHOLD (0,75 depuis le
+        // 2026-09-12, anciennement 0,78), jamais un autre critère (mots-clés,
+        // longueur de réponse...) ne peut faire diverger le verdict du score
+        // affiché.
+        expect(result.is_correct).toBe(result.score >= 0.75)
       }
     })
 

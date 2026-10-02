@@ -43,6 +43,11 @@
 
             <template v-if="card.type === 'open'">
               <p class="text-sm text-gray-500 mt-1 italic">→ <FormulaText :text="card.answer || ''" /></p>
+              <AnswerQualityBadge
+                class="mt-1"
+                :level="card.qualityLevel"
+                :warnings="card.qualityWarnings || []"
+              />
             </template>
             <template v-else>
               <p class="text-sm text-gray-500 mt-1">
@@ -117,6 +122,7 @@
 import { computed, reactive, ref } from 'vue'
 import FormulaText from '@/components/FormulaTextComponent.vue'
 import AiCardEditModal from '@/components/AiCardEditModalComponent.vue'
+import AnswerQualityBadge from '@/components/AnswerQualityBadgeComponent.vue'
 import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
 import { notif } from '@/helpers/notif'
 

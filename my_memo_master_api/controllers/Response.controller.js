@@ -82,6 +82,21 @@ exports.update = async (req, res) => {
   }
 }
 
+// Aperçu de qualité (AnswerQuality.service.js) sans persistance — pour un retour en temps réel
+// pendant la saisie, avant même la création de la Question/Response (DECISIONS.md 2026-09-12).
+exports.qualityPreview = (req, res) => {
+  try {
+    const { statement, answer, acceptedAnswers } = req.body
+    const preview = ResponseService.previewQuality(statement, answer, acceptedAnswers)
+    res.status(200).json(preview)
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({
+      message: "Une erreur s'est produite lors du calcul de l'aperçu de qualité."
+    })
+  }
+}
+
 // Supprimer une réponse par son ID
 exports.delete = async (req, res) => {
   try {
