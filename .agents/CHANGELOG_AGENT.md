@@ -12697,3 +12697,15 @@ Demande utilisateur : la facture Infomaniak (~100 € TTC/mois, 20 % de TVA ; ta
 - Migration prévue vers un cluster à control plane partagé (économie ~26,31 € HT/mois), non commencée.
 
 **Mesure** : SonarQube avait un pic mémoire de ~3,9 Gi (limite 4 Gi) ; metrics-server reste en panne (`failed`).
+
+
+### [2026-10-02] [FIX] CI — `npm audit` en échec sur l'API (nodemailer, brace-expansion…)
+
+La CI échouait à l'étape `npm audit --omit=dev --audit-level=high` (3 tentatives) : de nouveaux avis publiés touchaient `brace-expansion` (via `swagger-jsdoc`, high) et `nodemailer` ≤ 10.0.8 (high), plus `fast-uri`, `ip-address`, `moment`, `multer` (moderate).
+
+**Fait** (`my_memo_master_api/`) :
+- `npm audit fix` (non cassant) : `package-lock.json` seul — brace-expansion, fast-uri, ip-address, moment, multer.
+- `nodemailer` **^9.1.1 → ^10.0.13** (montée majeure, **dépendance signalée** : même paquet, version corrigée). Usage minimal et inchangé : `helpers/sendEmail.js` (`createTransport` + `sendMail`) ; Node ≥ 20 requis, projet en Node 22.
+- `npm audit --omit=dev --audit-level=high` : **0 vulnérabilité**. Tests API : **112 suites / 2 116 tests passés**.
+
+**Dette** : `npm audit` complet signale encore des alertes sur des dépendances de **dev** (ex. `tar` via `sqlite3`, correctif cassant) — hors périmètre de la CI (`--omit=dev`). Envoi réel d'e-mail SMTP non testé avec nodemailer 10 (mocké dans les tests) : à confirmer au prochain envoi de rappel.
