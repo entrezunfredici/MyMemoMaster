@@ -12709,3 +12709,12 @@ La CI échouait à l'étape `npm audit --omit=dev --audit-level=high` (3 tentati
 - `npm audit --omit=dev --audit-level=high` : **0 vulnérabilité**. Tests API : **112 suites / 2 116 tests passés**.
 
 **Dette** : `npm audit` complet signale encore des alertes sur des dépendances de **dev** (ex. `tar` via `sqlite3`, correctif cassant) — hors périmètre de la CI (`--omit=dev`). Envoi réel d'e-mail SMTP non testé avec nodemailer 10 (mocké dans les tests) : à confirmer au prochain envoi de rappel.
+
+
+### [2026-10-02] [FIX] CI — `npm audit` en échec sur le front (axios, brace-expansion, fast-uri)
+
+Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.19.0 (high, 12 avis), `brace-expansion` ≤ 1.1.20 (high), `fast-uri` (moderate).
+
+**Fait** : `npm audit fix` (non cassant) — `package-lock.json` seul, `package.json` inchangé. `npm audit --omit=dev --audit-level=high` : **0 vulnérabilité**. Front : **56 fichiers / 870 tests Vitest passés**, `vite build` OK.
+
+**Dette** : 3 alertes *moderate* subsistent sur des dépendances de dev (correctif cassant via `--force`), hors périmètre de la CI.
