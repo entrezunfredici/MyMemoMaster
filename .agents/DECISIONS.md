@@ -4789,3 +4789,12 @@ existent sur un environnement de test) ne sont pas réparées rétroactivement �
 Tickets A/B/C n'étant sur aucune branche mergée/déployée à ce jour. Non vérifié avec un appel S3 réel dans
 cette session (pas d'accès réseau sortant) : la correction est déduite de la configuration `.env` et du
 comportement documenté du path-style S3, à confirmer par l'utilisateur au prochain test réel.
+
+
+---
+
+### [2026-10-02] Abandon de SonarQube auto-hébergé pour réduire les coûts d'hébergement
+**Contexte** : L'hébergement Infomaniak coûte ~100 € TTC/mois (tarifs du dépôt HT : control plane dédié 26,31 €, worker 12,15 €, volumes 0,08 €/Go ; TVA 20 %). SonarQube Community consommait ~3,9 Gi au pic (limite 4 Gi, doc officielle : 4 Go pour une petite instance) et avait imposé un 3ᵉ worker dédié (décision du 2026-08-28). Son rapport servait au dossier RNCP, terminé.
+**Décision** : Désinstaller SonarQube du cluster et mettre le job CI en commentaire (réactivable). Le chart `helm-sonarqube/` est conservé.
+**Alternative écartée** : SonarCloud (gratuit en dépôt public) — non retenu pour l'instant, l'analyse n'étant plus nécessaire ; reste l'option de repli la moins chère (si le dépôt devient privé : ~34 $/mois au-delà de 50 k lignes). CodeQL + Dependabot (gratuits) envisagés comme remplacement sécurité, non mis en place. Garder SonarQube sur un nœud partagé avec la prod — écarté : pic de 3,9 Gi trop proche de l'allouable (5,6 Gi).
+**Conséquences** : Plus d'analyse statique continue ni de quality gate. Volumes retain à supprimer à la main. Prochaines étapes d'économie : retirer le worker d'outillage, migrer vers un control plane partagé (cluster à recréer), 2 workers.
