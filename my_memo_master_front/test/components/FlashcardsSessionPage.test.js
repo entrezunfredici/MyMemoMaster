@@ -152,6 +152,43 @@ describe('FlashcardsSessionPage', () => {
     expect(wrapper.text()).toContain('95%')
   })
 
+  it("correction dégradée — affiche l'avertissement de risque d'erreur", async () => {
+    const wrapper = mountSession()
+    await flushPromises()
+
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = {
+        success: false, score: 0.67, correction: 'Paris', explanation: 'Incorrect.', decision_zone: 'low',
+        degraded: true, degraded_message: "Correction automatique limitée : risque d'erreur plus élevé."
+      }
+      return true
+    })
+
+    await wrapper.find('textarea').setValue('Paris')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="degraded-notice"]').text()).toContain("risque d'erreur plus élevé")
+  })
+
+  it("correction normale — n'affiche aucun avertissement de correction dégradée", async () => {
+    const wrapper = mountSession()
+    await flushPromises()
+
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = { success: true, score: 0.95, correction: 'Paris', explanation: 'Correct.', decision_zone: 'high' }
+      return true
+    })
+
+    await wrapper.find('textarea').setValue('Paris')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="degraded-notice"]').exists()).toBe(false)
+  })
+
   // ── Soumission mauvaise réponse ───────────────────────────────────────────
 
   it('mauvaise réponse — affiche le feedback rouge avec la correction attendue', async () => {

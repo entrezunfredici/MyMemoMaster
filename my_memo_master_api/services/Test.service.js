@@ -148,14 +148,15 @@ class TestService {
     const questions = test.question ?? []
     const results = await Promise.all(questions.map(async q => {
       const submission = answers.find(a => a.questionId === q.idQuestion)
-      const { correct, explanation, semanticScore, points } = await this._checkAnswer(q, submission?.answer ?? null)
+      const { correct, explanation, semanticScore, points, degraded, degradedMessage } = await this._checkAnswer(q, submission?.answer ?? null, userId)
       return {
         questionId: q.idQuestion,
         correct,
         correctAnswer: this._formatCorrectAnswer(q),
         explanation,
         semanticScore,
-        points
+        points,
+        ...(degraded ? { degraded: true, degradedMessage } : {})
       }
     }))
 
@@ -171,7 +172,7 @@ class TestService {
     return { score, total: questions.length, results, resultId: testResult.resultId }
   }
 
-  async _checkAnswer(question, answer) {
+  async _checkAnswer(question, answer, userId = null) {
     const content = question.content ?? {}
     switch (question.type) {
       case 'open': {
@@ -186,8 +187,15 @@ class TestService {
           .map((s) => (s ?? '').trim())
           .filter(Boolean)
         if (accepted.length === 0) return { correct: false, explanation: null, semanticScore: null, points: 0 }
-        const result = await mistralGradingService.grade(accepted, user, question.statement)
-        return { correct: result.is_correct, explanation: result.explanation, semanticScore: result.score, points: result.score }
+        const result = await mistralGradingService.grade(accepted, user, question.statement, { userId })
+        return {
+          correct: result.is_correct,
+          explanation: result.explanation,
+          semanticScore: result.score,
+          points: result.score,
+          degraded: result.degraded === true,
+          degradedMessage: result.degraded_message ?? null
+        }
       }
       case 'mcq': {
         if (answer === null || answer === undefined) return { correct: false, explanation: null, semanticScore: null, points: 0 }

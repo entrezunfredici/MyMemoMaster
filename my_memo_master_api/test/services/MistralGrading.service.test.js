@@ -1,7 +1,12 @@
 const mistralGradingService = require('../../services/MistralGrading.service')
 const semanticService = require('../../services/Semantic.service')
 const gradingCache = require('../../helpers/mistralGradingCache')
+const aiQuotaService = require('../../services/AiQuota.service')
 
+jest.mock('../../services/AiQuota.service', () => ({
+  hasGradingCapacity: jest.fn(),
+  recordGradingUsage: jest.fn()
+}))
 jest.mock('../../helpers/mistralGradingCache', () => ({
   getCachedVerdict: jest.fn(),
   setCachedVerdict: jest.fn()
@@ -31,6 +36,8 @@ describe('MistralGradingService', () => {
     jest.restoreAllMocks()
     gradingCache.getCachedVerdict.mockReset().mockResolvedValue(null)
     gradingCache.setCachedVerdict.mockReset().mockResolvedValue(undefined)
+    aiQuotaService.hasGradingCapacity.mockReset().mockResolvedValue(true)
+    aiQuotaService.recordGradingUsage.mockReset().mockResolvedValue(undefined)
     process.env.MISTRAL_API_KEY = 'test-key'
   })
   afterAll(() => {
@@ -92,7 +99,8 @@ describe('MistralGradingService', () => {
       const semantic = semanticResult(0.67)
       jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semantic)
       const result = await mistralGradingService.grade('ref', 'rep')
-      expect(result).toEqual(semantic)
+      expect(result).toMatchObject({ ...semantic, degraded: true, degraded_reason: 'unavailable' })
+      expect(result.degraded_message).toMatch(/risque d'erreur/)
     })
 
     it('grade - Mistral en erreur HTTP - repli sur le verdict sémantique', async () => {
@@ -100,7 +108,8 @@ describe('MistralGradingService', () => {
       jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semantic)
       jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503 })
       const result = await mistralGradingService.grade('ref', 'rep')
-      expect(result).toEqual(semantic)
+      expect(result).toMatchObject({ ...semantic, degraded: true, degraded_reason: 'unavailable' })
+      expect(result.degraded_message).toMatch(/risque d'erreur/)
     })
 
     it('grade - réponse Mistral sans verdict booléen - repli sur le verdict sémantique', async () => {
@@ -108,7 +117,8 @@ describe('MistralGradingService', () => {
       jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semantic)
       mockFetchVerdict({ correct: 'oui' })
       const result = await mistralGradingService.grade('ref', 'rep')
-      expect(result).toEqual(semantic)
+      expect(result).toMatchObject({ ...semantic, degraded: true, degraded_reason: 'unavailable' })
+      expect(result.degraded_message).toMatch(/risque d'erreur/)
     })
   })
 
@@ -118,6 +128,64 @@ describe('MistralGradingService', () => {
       mockFetchVerdict({ correct: false, reason: 'Entropie extensive, pas intensive.' })
       const result = await mistralGradingService.grade('ref', "L'entropie est intensive", 'Q ?')
       expect(result.is_correct).toBe(false)
+      expect(result.strategy).toBe('mistral')
+    })
+  })
+
+  describe('mode dégradé et plafond', () => {
+    it('grade - plafond atteint - verdict sémantique dégradé (reason quota), Mistral non appelé', async () => {
+      const semantic = semanticResult(0.67)
+      jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semantic)
+      aiQuotaService.hasGradingCapacity.mockResolvedValue(false)
+      const fetchSpy = jest.spyOn(global, 'fetch')
+      const result = await mistralGradingService.grade('ref', 'rep', 'Q ?', { userId: 7 })
+      expect(result).toMatchObject({ ...semantic, degraded: true, degraded_reason: 'quota' })
+      expect(aiQuotaService.hasGradingCapacity).toHaveBeenCalledWith(7)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('grade - plafond atteint mais verdict en cache - sert le cache, non dégradé', async () => {
+      jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semanticResult(0.67))
+      gradingCache.getCachedVerdict.mockResolvedValue({ correct: true, reason: 'En cache.' })
+      aiQuotaService.hasGradingCapacity.mockResolvedValue(false)
+      const result = await mistralGradingService.grade('ref', 'rep', 'Q ?', { userId: 7 })
+      expect(result.degraded).toBeUndefined()
+      expect(result.is_correct).toBe(true)
+    })
+
+    it('grade - hors zone Mistral - jamais dégradé et plafond non consulté', async () => {
+      jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semanticResult(0.95))
+      const result = await mistralGradingService.grade('ref', 'rep')
+      expect(result.degraded).toBeUndefined()
+      expect(aiQuotaService.hasGradingCapacity).not.toHaveBeenCalled()
+    })
+
+    it('grade - appel Mistral réussi - usage journalisé pour cet utilisateur', async () => {
+      jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semanticResult(0.67))
+      mockFetchVerdict({ correct: true, reason: 'OK.' })
+      const result = await mistralGradingService.grade('ref', 'rep', 'Q ?', { userId: 7 })
+      expect(result.degraded).toBeUndefined()
+      expect(aiQuotaService.recordGradingUsage).toHaveBeenCalledWith({
+        userId: 7,
+        model: 'mistral-small-latest',
+        promptTokens: 120,
+        completionTokens: 20
+      })
+    })
+
+    it('grade - journalisation en échec - le verdict est quand même renvoyé', async () => {
+      jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semanticResult(0.67))
+      mockFetchVerdict({ correct: true, reason: 'OK.' })
+      aiQuotaService.recordGradingUsage.mockRejectedValue(new Error('db'))
+      const result = await mistralGradingService.grade('ref', 'rep')
+      expect(result).toMatchObject({ is_correct: true, strategy: 'mistral' })
+    })
+
+    it('grade - lecture du quota en échec - correction autorisée (fail-open)', async () => {
+      jest.spyOn(semanticService, 'gradeSemantic').mockResolvedValue(semanticResult(0.67))
+      mockFetchVerdict({ correct: false, reason: 'Non.' })
+      aiQuotaService.hasGradingCapacity.mockRejectedValue(new Error('db'))
+      const result = await mistralGradingService.grade('ref', 'rep')
       expect(result.strategy).toBe('mistral')
     })
   })

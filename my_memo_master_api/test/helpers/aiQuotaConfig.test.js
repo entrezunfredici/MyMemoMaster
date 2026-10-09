@@ -1,7 +1,7 @@
 const getAiQuotaConfig = require('../../helpers/aiQuotaConfig')
 
 describe('getAiQuotaConfig', () => {
-  const ENV_KEYS = ['AI_QUOTA_MAX_GENERATIONS_PER_DAY', 'AI_BUDGET_MAX_USD_PER_MONTH']
+  const ENV_KEYS = ['AI_QUOTA_MAX_GENERATIONS_PER_DAY', 'AI_BUDGET_MAX_USD_PER_MONTH', 'AI_GRADING_MAX_PER_DAY', 'AI_GRADING_BUDGET_MAX_USD_PER_MONTH']
   let savedEnv
 
   beforeEach(() => {
@@ -17,12 +17,24 @@ describe('getAiQuotaConfig', () => {
   })
 
   it('getAiQuotaConfig - aucune variable d\'environnement - retourne les valeurs par défaut', () => {
-    expect(getAiQuotaConfig()).toEqual({ maxGenerationsPerDay: 10, maxBudgetUsdPerMonth: 20 })
+    expect(getAiQuotaConfig()).toEqual({
+      maxGenerationsPerDay: 10,
+      maxBudgetUsdPerMonth: 20,
+      maxGradingsPerDay: 300,
+      maxGradingBudgetUsdPerMonth: 5
+    })
   })
 
   it('getAiQuotaConfig - variables renseignées - les reprend telles quelles', () => {
     process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = '5'
     process.env.AI_BUDGET_MAX_USD_PER_MONTH = '2.5'
-    expect(getAiQuotaConfig()).toEqual({ maxGenerationsPerDay: 5, maxBudgetUsdPerMonth: 2.5 })
+    process.env.AI_GRADING_MAX_PER_DAY = '50'
+    process.env.AI_GRADING_BUDGET_MAX_USD_PER_MONTH = '1.5'
+    expect(getAiQuotaConfig()).toEqual({
+      maxGenerationsPerDay: 5,
+      maxBudgetUsdPerMonth: 2.5,
+      maxGradingsPerDay: 50,
+      maxGradingBudgetUsdPerMonth: 1.5
+    })
   })
 })

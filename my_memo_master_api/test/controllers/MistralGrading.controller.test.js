@@ -25,7 +25,7 @@ describe('POST /grading/mistral', () => {
       .send({ question: 'Q ?', correct_answers: ['ref'], student_answer: 'rep' })
     expect(res.status).toBe(200)
     expect(res.body.strategy).toBe('mistral')
-    expect(mistralGradingService.grade).toHaveBeenCalledWith(['ref'], 'rep', 'Q ?')
+    expect(mistralGradingService.grade).toHaveBeenCalledWith(['ref'], 'rep', 'Q ?', { userId: null })
   })
 
   it('POST /grading/mistral - sans token - 401', async () => {

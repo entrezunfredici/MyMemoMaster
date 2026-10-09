@@ -190,7 +190,7 @@ describe('TestService', () => {
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: ' PARIS ' }])
       expect(result.results[0].correct).toBe(true)
       expect(result.results[0].explanation).toBe('Correct (similarity=0.99).')
-      expect(mistralGradingService.grade).toHaveBeenCalledWith(['Paris'], 'PARIS', undefined)
+      expect(mistralGradingService.grade).toHaveBeenCalledWith(['Paris'], 'PARIS', undefined, { userId: 1 })
     })
 
     it('open — formulations alternatives (accepted_answers) transmises à la correction', async () => {
@@ -212,7 +212,8 @@ describe('TestService', () => {
       expect(mistralGradingService.grade).toHaveBeenCalledWith(
         ['U = R × I', "la tension est égale à la résistance multipliée par l'intensité"],
         'u=r*i',
-        undefined
+        undefined,
+        { userId: 1 }
       )
     })
 

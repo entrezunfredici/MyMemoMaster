@@ -240,6 +240,27 @@ describe('ExerciseDetailPage', () => {
     expect(wrapper.text()).toContain('Incorrect')
   })
 
+  it("écran résultats — correction dégradée : affiche l'avertissement sur la question concernée", async () => {
+    const { wrapper, testResultStore } = mountPage()
+    await flushPromises()
+
+    testResultStore.submitTest.mockResolvedValue({
+      ...SUBMIT_RESULT,
+      results: [
+        { questionId: 1, correct: false, correctAnswer: 'Paris', explanation: 'Incorrect.', degraded: true, degradedMessage: 'Correction automatique limitée.' },
+        SUBMIT_RESULT.results[1]
+      ]
+    })
+
+    const btn = wrapper.findAll('button').find(b => b.text().includes('Vérifier'))
+    await btn.trigger('click')
+    await flushPromises()
+
+    const notices = wrapper.findAll('[data-testid="degraded-notice"]')
+    expect(notices).toHaveLength(1)
+    expect(notices[0].text()).toContain('Correction automatique limitée.')
+  })
+
   // ── Recommencer ───────────────────────────────────────────────────────────────
 
   it('bouton "Recommencer" — retour au mode quiz', async () => {

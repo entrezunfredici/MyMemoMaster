@@ -2,6 +2,7 @@ const logger = require('../helpers/logger')
 const getMistralConfig = require('../helpers/mistralConfig')
 const semanticService = require('./Semantic.service')
 const gradingCache = require('../helpers/mistralGradingCache')
+const aiQuotaService = require('./AiQuota.service')
 
 // Bornes de la zone où Mistral arbitre : au-dessus de ACCEPT_SCORE la réponse est quasi une
 // copie de la référence, en dessous de REJECT_SCORE elle est sans rapport — aucun appel LLM
@@ -16,6 +17,9 @@ const ACCEPT_SCORE = 0.9
 const REJECT_SCORE = 0.35
 
 const MAX_TEXT_LENGTH = 2000
+
+const DEGRADED_MESSAGE =
+  "Correction automatique limitée : le risque d'erreur est plus élevé que d'habitude. En cas de doute, fiez-vous à la réponse attendue."
 
 const SYSTEM_PROMPT = [
   "Tu es un correcteur strict mais juste pour une application de révision (cartes mémoire).",
@@ -112,10 +116,12 @@ class MistralGradingService {
    * @param {string|string[]} correctAnswers
    * @param {string} studentAnswer
    * @param {string} [question]
+   * @param {{ userId?: number|null }} [options] - `userId` active le plafond quotidien par utilisateur
    * @returns {Promise<object>} Même forme que Semantic.service#gradeSemantic ; `strategy` vaut
-   *   'mistral' quand le LLM a tranché, `decision_zone` 'llm'.
+   *   'mistral' quand le LLM a tranché, `decision_zone` 'llm'. En mode dégradé (plafond atteint ou
+   *   Mistral indisponible) : verdict sémantique + `degraded: true` et `degraded_message`.
    */
-  async grade(correctAnswers, studentAnswer, question = '') {
+  async grade(correctAnswers, studentAnswer, question = '', { userId = null } = {}) {
     const semantic = await semanticService.gradeSemantic(correctAnswers, studentAnswer)
 
     const inGreyArea =
@@ -131,18 +137,70 @@ class MistralGradingService {
     const cached = await gradingCache.getCachedVerdict(cacheParams)
     if (cached) return this.toResult(semantic, cached, null)
 
+    // CHOIX: le cache est lu AVANT le plafond — un verdict en cache ne coûte rien, il ne doit pas être
+    //        refusé parce que le budget est épuisé.
+    if (!(await this.hasCapacity(userId))) return this.degraded(semantic, 'quota')
+
     try {
       const verdict = await this.callJudge(question, correctList, studentAnswer)
       // CHOIX: seuls les verdicts réels de Mistral sont mis en cache — jamais le repli sémantique
       //        d'une panne, qui figerait un verdict dégradé pendant 7 jours.
       await gradingCache.setCachedVerdict(cacheParams, { correct: verdict.correct, reason: verdict.reason })
+      await this.recordUsageBestEffort(userId, verdict.usage)
       return this.toResult(semantic, verdict, verdict.usage)
     } catch (error) {
       // CHOIX: repli sur le verdict sémantique plutôt qu'une erreur — la correction doit rester
       //        disponible même si Mistral est en panne ou non configuré.
       logger.warn(`[MistralGrading] Repli sur le verdict sémantique : ${error?.message || error}`)
-      return semantic
+      return this.degraded(semantic, 'unavailable')
     }
+  }
+
+  /**
+   * Capacité restante (plafonds de AiQuota). En cas d'erreur de lecture du quota, on laisse passer : une
+   * panne du journal ne doit pas dégrader la correction (fail-open, borné par le plafond de Mistral).
+   *
+   * @param {number|null} userId
+   * @returns {Promise<boolean>}
+   */
+  async hasCapacity(userId) {
+    try {
+      return await aiQuotaService.hasGradingCapacity(userId)
+    } catch (error) {
+      logger.warn(`[MistralGrading] Lecture du quota impossible, correction autorisée : ${error?.message || error}`)
+      return true
+    }
+  }
+
+  /**
+   * Journalise le coût d'une correction. Best-effort : un échec d'écriture est logué, jamais propagé
+   * (le verdict est déjà obtenu et payé).
+   *
+   * @param {number|null} userId
+   * @param {{ promptTokens: number, completionTokens: number }} usage
+   */
+  async recordUsageBestEffort(userId, usage) {
+    try {
+      await aiQuotaService.recordGradingUsage({
+        userId,
+        model: getMistralConfig().model,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens
+      })
+    } catch (error) {
+      logger.warn(`[MistralGrading] Journalisation de l'usage impossible : ${error?.message || error}`)
+    }
+  }
+
+  /**
+   * Verdict sémantique marqué comme dégradé (voir DECISIONS.md 2026-10-09).
+   *
+   * @param {object} semantic
+   * @param {'quota'|'unavailable'} reason
+   * @returns {object}
+   */
+  degraded(semantic, reason) {
+    return { ...semantic, degraded: true, degraded_reason: reason, degraded_message: DEGRADED_MESSAGE }
   }
 
   /**

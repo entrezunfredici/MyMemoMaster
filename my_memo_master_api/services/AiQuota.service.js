@@ -33,6 +33,12 @@ const CHAT_PRICING_USD_PER_MILLION_TOKENS = {
 }
 const OCR_PRICE_USD_PER_1000_PAGES = 4
 
+// Opération journalisée pour une correction de réponse (MistralGrading.service). CHOIX: même table
+// AiUsageLog (pas de migration) mais comptée à part : checkQuota/getUsageSummary l'EXCLUENT, sinon
+// 10 réponses corrigées bloqueraient les générations de cartes du jour (quota « par génération »).
+const GRADING_OPERATION = 'grading'
+const NOT_GRADING = { [Op.ne]: GRADING_OPERATION }
+
 class AiQuotaService {
   /**
    * Estime le coût réel (en $) d'une génération à partir de sa consommation réelle rapportée par
@@ -79,7 +85,7 @@ class AiQuotaService {
 
     const startOfDay = dayjs().startOf('day').toDate()
     const generationsToday = await AiUsageLog.count({
-      where: { userId, createdAt: { [Op.gte]: startOfDay } }
+      where: { userId, operation: NOT_GRADING, createdAt: { [Op.gte]: startOfDay } }
     })
     if (generationsToday >= config.maxGenerationsPerDay) {
       const err = new Error(
@@ -91,7 +97,7 @@ class AiQuotaService {
 
     const startOfMonth = dayjs().startOf('month').toDate()
     const spentThisMonth =
-      (await AiUsageLog.sum('estimatedCostUsd', { where: { createdAt: { [Op.gte]: startOfMonth } } })) || 0
+      (await AiUsageLog.sum('estimatedCostUsd', { where: { operation: NOT_GRADING, createdAt: { [Op.gte]: startOfMonth } } })) || 0
     if (spentThisMonth >= config.maxBudgetUsdPerMonth) {
       const err = new Error(
         "Le budget mensuel de génération par IA est atteint pour l'ensemble des utilisateurs. Réessayez le mois prochain."
@@ -114,12 +120,13 @@ class AiQuotaService {
    * @param {number} [params.promptTokens]
    * @param {number} [params.completionTokens]
    * @param {number} [params.pagesProcessed]
+   * @param {string|null} [params.operation] - Force l'opération journalisée (ex. 'grading')
    * @returns {Promise<AiUsageLog>}
    */
-  async recordUsage({ userId = null, idBatch = null, model = null, promptTokens = 0, completionTokens = 0, pagesProcessed = 0 }) {
+  async recordUsage({ userId = null, idBatch = null, model = null, promptTokens = 0, completionTokens = 0, pagesProcessed = 0, operation: forcedOperation = null }) {
     const usedChat = promptTokens > 0 || completionTokens > 0
     const usedOcr = pagesProcessed > 0
-    const operation = usedChat && usedOcr ? 'chat_completion+ocr' : usedOcr ? 'ocr' : 'chat_completion'
+    const operation = forcedOperation || (usedChat && usedOcr ? 'chat_completion+ocr' : usedOcr ? 'ocr' : 'chat_completion')
 
     const estimatedCostUsd = this.estimateCostUsd({ model, promptTokens, completionTokens, pagesProcessed })
 
@@ -137,6 +144,43 @@ class AiQuotaService {
   }
 
   /**
+   * Reste-t-il de la capacité pour une correction par Mistral ? Ne lève jamais : le refus n'est pas une
+   * erreur pour l'appelant (MistralGrading.service retombe sur la correction dégradée). Deux plafonds :
+   * par utilisateur et par jour (si `userId` connu), et budget mensuel global des corrections.
+   *
+   * @param {number|null} [userId]
+   * @returns {Promise<boolean>}
+   */
+  async hasGradingCapacity(userId = null) {
+    const config = getAiQuotaConfig()
+    const startOfMonth = dayjs().startOf('month').toDate()
+
+    if (userId) {
+      const startOfDay = dayjs().startOf('day').toDate()
+      const gradingsToday = await AiUsageLog.count({
+        where: { userId, operation: GRADING_OPERATION, createdAt: { [Op.gte]: startOfDay } }
+      })
+      if (gradingsToday >= config.maxGradingsPerDay) return false
+    }
+
+    const spentThisMonth =
+      (await AiUsageLog.sum('estimatedCostUsd', {
+        where: { operation: GRADING_OPERATION, createdAt: { [Op.gte]: startOfMonth } }
+      })) || 0
+    return spentThisMonth < config.maxGradingBudgetUsdPerMonth
+  }
+
+  /**
+   * Journalise une correction réellement facturée (voir GRADING_OPERATION).
+   *
+   * @param {{ userId?: number|null, model: string|null, promptTokens?: number, completionTokens?: number }} params
+   * @returns {Promise<AiUsageLog>}
+   */
+  async recordGradingUsage({ userId = null, model, promptTokens = 0, completionTokens = 0 }) {
+    return this.recordUsage({ userId, model, promptTokens, completionTokens, operation: GRADING_OPERATION })
+  }
+
+  /**
    * Résumé de consommation pour l'utilisateur — pensé pour un futur affichage "Quota restant"
    * (déjà maquetté en generation_ia_ui.md, C-01.02) : pas encore consommé par aucune route/UI.
    *
@@ -149,10 +193,10 @@ class AiQuotaService {
     const startOfMonth = dayjs().startOf('month').toDate()
 
     const generationsToday = await AiUsageLog.count({
-      where: { userId, createdAt: { [Op.gte]: startOfDay } }
+      where: { userId, operation: NOT_GRADING, createdAt: { [Op.gte]: startOfDay } }
     })
     const spentThisMonth =
-      (await AiUsageLog.sum('estimatedCostUsd', { where: { createdAt: { [Op.gte]: startOfMonth } } })) || 0
+      (await AiUsageLog.sum('estimatedCostUsd', { where: { operation: NOT_GRADING, createdAt: { [Op.gte]: startOfMonth } } })) || 0
 
     return {
       generationsToday,

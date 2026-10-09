@@ -73,7 +73,7 @@ exports.updateCard = async (req, res) => {
 
 exports.correctResponse = async (req, res) => {
   try {
-    const result = await leitnerCardService.correctResponse(req.body.cardId, req.body.studentAnswer)
+    const result = await leitnerCardService.correctResponse(req.body.cardId, req.body.studentAnswer, req.user?.id ?? null)
     if (!result) return res.status(404).json({ message: 'Carte ou réponse introuvable.' })
     res.status(200).json(result)
   } catch (error) {

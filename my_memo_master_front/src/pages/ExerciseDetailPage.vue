@@ -179,6 +179,14 @@
           >
             {{ questionResults[idx].explanation }}
           </p>
+          <p
+            v-if="questionResults[idx]?.degraded"
+            class="mt-1 text-xs text-amber-700"
+            role="status"
+            data-testid="degraded-notice"
+          >
+            {{ questionResults[idx].degradedMessage }}
+          </p>
         </div>
 
         <button

@@ -97,6 +97,14 @@
               <p v-if="cardStore.lastCorrection?.explanation" class="text-sm mt-1 opacity-80">
                 {{ cardStore.lastCorrection?.explanation }}
               </p>
+              <p
+                v-if="cardStore.lastCorrection?.degraded"
+                class="text-sm mt-1 text-amber-700"
+                role="status"
+                data-testid="degraded-notice"
+              >
+                {{ cardStore.lastCorrection?.degraded_message }}
+              </p>
               <Button class="mt-4 w-full" :callback="nextStep">Continuer</Button>
             </div>
           </div>

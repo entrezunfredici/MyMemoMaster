@@ -12,7 +12,12 @@ const logger = require('../../helpers/logger')
 describe('AiQuotaService', () => {
   let userId
   let otherUserId
-  const ENV_KEYS = ['AI_QUOTA_MAX_GENERATIONS_PER_DAY', 'AI_BUDGET_MAX_USD_PER_MONTH']
+  const ENV_KEYS = [
+    'AI_QUOTA_MAX_GENERATIONS_PER_DAY',
+    'AI_BUDGET_MAX_USD_PER_MONTH',
+    'AI_GRADING_MAX_PER_DAY',
+    'AI_GRADING_BUDGET_MAX_USD_PER_MONTH'
+  ]
 
   beforeAll(async () => {
     await syncModels({ force: true })
@@ -92,6 +97,62 @@ describe('AiQuotaService', () => {
 
     it('estimateCostUsd - aucun paramètre - retourne 0', () => {
       expect(AiQuotaService.estimateCostUsd({ model: null })).toBe(0)
+    })
+  })
+
+  describe('corrections (operation grading)', () => {
+    it('checkQuota - corrections du jour nombreuses - ne consomment pas le quota de génération', async () => {
+      process.env.AI_QUOTA_MAX_GENERATIONS_PER_DAY = '1'
+      await AiUsageLog.create({ userId, operation: 'grading', estimatedCostUsd: 0.0001 })
+      await AiUsageLog.create({ userId, operation: 'grading', estimatedCostUsd: 0.0001 })
+
+      await expect(AiQuotaService.checkQuota(userId)).resolves.toBeUndefined()
+    })
+
+    it('checkQuota - dépense de corrections élevée - ne consomme pas le budget de génération', async () => {
+      process.env.AI_BUDGET_MAX_USD_PER_MONTH = '1'
+      await AiUsageLog.create({ userId: otherUserId, operation: 'grading', estimatedCostUsd: 50 })
+
+      await expect(AiQuotaService.checkQuota(userId)).resolves.toBeUndefined()
+    })
+
+    it('hasGradingCapacity - sous les plafonds - true', async () => {
+      await expect(AiQuotaService.hasGradingCapacity(userId)).resolves.toBe(true)
+    })
+
+    it('hasGradingCapacity - plafond quotidien atteint pour cet utilisateur - false, mais true pour un autre', async () => {
+      process.env.AI_GRADING_MAX_PER_DAY = '2'
+      await AiUsageLog.create({ userId, operation: 'grading', estimatedCostUsd: 0.0001 })
+      await AiUsageLog.create({ userId, operation: 'grading', estimatedCostUsd: 0.0001 })
+
+      await expect(AiQuotaService.hasGradingCapacity(userId)).resolves.toBe(false)
+      await expect(AiQuotaService.hasGradingCapacity(otherUserId)).resolves.toBe(true)
+    })
+
+    it('hasGradingCapacity - budget mensuel des corrections atteint - false pour tous', async () => {
+      process.env.AI_GRADING_BUDGET_MAX_USD_PER_MONTH = '1'
+      await AiUsageLog.create({ userId: otherUserId, operation: 'grading', estimatedCostUsd: 1.5 })
+
+      await expect(AiQuotaService.hasGradingCapacity(userId)).resolves.toBe(false)
+    })
+
+    it('hasGradingCapacity - générations facturées - ne comptent pas dans le plafond des corrections', async () => {
+      process.env.AI_GRADING_MAX_PER_DAY = '1'
+      process.env.AI_GRADING_BUDGET_MAX_USD_PER_MONTH = '1'
+      await AiUsageLog.create({ userId, operation: 'chat_completion', estimatedCostUsd: 5 })
+
+      await expect(AiQuotaService.hasGradingCapacity(userId)).resolves.toBe(true)
+    })
+
+    it('recordGradingUsage - journalise une ligne grading avec le coût estimé', async () => {
+      const row = await AiQuotaService.recordGradingUsage({
+        userId,
+        model: 'mistral-small-latest',
+        promptTokens: 1000,
+        completionTokens: 100
+      })
+      expect(row.operation).toBe('grading')
+      expect(row.estimatedCostUsd).toBeCloseTo(0.00021, 6)
     })
   })
 

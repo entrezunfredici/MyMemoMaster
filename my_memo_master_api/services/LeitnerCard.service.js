@@ -120,9 +120,10 @@ class LeitnerCardService {
    *
    * @param {number} cardId - ID de la carte
    * @param {string} studentAnswer - Réponse saisie par l'étudiant
-   * @returns {Promise<{ success: boolean, correction: string, score: number, explanation: string, decision_zone: string }|null>}
+   * @param {number|null} [userId] - Utilisateur (plafond quotidien de corrections par Mistral)
+   * @returns {Promise<{ success: boolean, correction: string, score: number, explanation: string, decision_zone: string, degraded?: boolean, degraded_message?: string }|null>}
    */
-  async correctResponse(cardId, studentAnswer) {
+  async correctResponse(cardId, studentAnswer, userId = null) {
     const card = await LeitnerCard.findByPk(cardId, {
       include: [
         { model: LeitnerBox, as: 'leitnerBox' },
@@ -157,7 +158,7 @@ class LeitnerCardService {
       if (correctResponses.length === 0) return null
 
       const correctAnswers = correctResponses.map((r) => r.content)
-      gradeResult = await mistralGradingService.grade(correctAnswers, studentAnswer, question?.statement)
+      gradeResult = await mistralGradingService.grade(correctAnswers, studentAnswer, question?.statement, { userId })
       gradeResult.correction = correctAnswers.join(' / ')
       isCorrect = gradeResult.is_correct
     }
@@ -193,6 +194,7 @@ class LeitnerCardService {
       score: gradeResult.score,
       explanation: gradeResult.explanation,
       decision_zone: gradeResult.decision_zone,
+      ...(gradeResult.degraded ? { degraded: true, degraded_message: gradeResult.degraded_message } : {}),
       newLevel: nextBox ? newLevel : currentLevel
     }
   }

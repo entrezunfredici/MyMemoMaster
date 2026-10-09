@@ -4,7 +4,7 @@ const logger = require('../helpers/logger')
 exports.gradeMistral = async (req, res) => {
   try {
     const { correct_answers, student_answer, question } = req.body
-    const result = await mistralGradingService.grade(correct_answers, student_answer, question)
+    const result = await mistralGradingService.grade(correct_answers, student_answer, question, { userId: req.user?.id ?? null })
     res.status(200).send(result)
   } catch (error) {
     logger.error(error?.message || error)

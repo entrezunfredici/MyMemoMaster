@@ -12756,3 +12756,12 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Fait** (`services/Semantic.service.js`) : règles d'ajout documentées en tête de liste (pas de mot polysémique, jamais deux contraires) ; formes conjuguées ajoutées aux 2 groupes d'origine ; groupes ajoutés : constance (constant/identique/inchangé/invariant), chauffe, refroidissement, liquéfaction/condensation, détente/expansion, maximum, minimum, nul/zéro, égal, proportionnel, rapport/quotient/ratio.
 **Écartés volontairement** : échange/transfert (« transfert d'électrons » ≠ « échange d'ions »), élève (nom), réduction (redox), produit, quantité, densité, stable/fixe ; tout couple de contraires.
 **Tests** : 14 paires unifiées + 7 paires de contraires jamais fusionnées (`Semantic.service.test.js`).
+
+
+### [2026-10-09] [ADD] Plafonds de correction Mistral + mode dégradé
+
+**Fichiers modifiés (API)** : `helpers/aiQuotaConfig.js` (2 plafonds), `services/AiQuota.service.js` (`hasGradingCapacity`, `recordGradingUsage`, option `operation` de `recordUsage`, exclusion de `grading` dans `checkQuota`/`getUsageSummary`), `services/MistralGrading.service.js` (plafond, journalisation, `degraded`), `services/Test.service.js` et `services/LeitnerCard.service.js` (+ `controllers/LeitnerCard.controller.js`, `controllers/MistralGrading.controller.js` : transmission de `userId`, champs `degraded*` en sortie), `docker-compose.yml`, `.env.example`, `helm/values.yaml` (nouvelles variables `AI_GRADING_MAX_PER_DAY`, `AI_GRADING_BUDGET_MAX_USD_PER_MONTH`).
+**Fichiers modifiés (front)** : `pages/FlashcardsSessionPage.vue`, `pages/ExerciseDetailPage.vue` (avertissement ambre `data-testid="degraded-notice"`).
+**Tests** : API 115 suites / 2174 tests ; front 56 fichiers / 873 tests ; lint API et front propres.
+**Utilisable** : au-delà des plafonds ou en panne Mistral, la correction continue (MiniLM) avec un avertissement visible. Interface publique étendue de façon rétro-compatible : `correctResponse(cardId, answer, userId?)`, réponses JSON avec champs optionnels `degraded*`.
+**Dette** : plafonds à calibrer sur l'usage réel (valeurs par défaut estimées, pas mesurées) ; pas de tableau de bord de consommation des corrections ; `getUsageSummary` n'expose pas encore l'usage des corrections ; manifests k8s (ConfigMaps) non modifiés — les variables ne sont passées que via compose/helm values, à reporter si l'on veut les surcharger en prod.
