@@ -133,7 +133,7 @@
       <div aria-live="polite">
         <div v-if="resultsShown" class="bg-gradient-to-r from-blue-500 to-blue-700 p-8 rounded-lg text-white text-center mb-8">
           <h2 class="text-3xl font-bold mb-2">Votre score</h2>
-          <p class="text-5xl font-bold">{{ correctCount }}/{{ questions.length }}</p>
+          <p class="text-5xl font-bold">{{ formatPoints(correctCount) }}/{{ questions.length }}</p>
           <p class="text-lg mt-2">{{ Math.round((correctCount / questions.length) * 100) }}%</p>
         </div>
       </div>
@@ -144,16 +144,25 @@
           v-for="(question, idx) in questions"
           :key="question.idQuestion"
           class="bg-gray-50 p-6 rounded-lg border-l-4"
-          :class="questionResults[idx]?.correct ? 'border-green-500' : 'border-red-500'"
+          :class="resultTone(idx).border"
         >
           <div class="flex items-start justify-between mb-3">
             <h3 class="text-lg font-semibold text-heading">Question {{ idx + 1 }}</h3>
-            <span
-              class="font-bold py-1 px-3 rounded text-white text-sm"
-              :class="questionResults[idx]?.correct ? 'bg-green-500' : 'bg-red-500'"
-            >
-              {{ questionResults[idx]?.correct ? 'Correct' : 'Incorrect' }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span
+                v-if="partialPoints(idx) !== null"
+                class="text-sm font-semibold text-gray-700"
+                data-testid="partial-points"
+              >
+                Note : {{ formatPoints(partialPoints(idx)) }} / 1
+              </span>
+              <span
+                class="font-bold py-1 px-3 rounded text-white text-sm"
+                :class="resultTone(idx).badge"
+              >
+                {{ resultTone(idx).label }}
+              </span>
+            </div>
           </div>
           <p class="text-base text-body mb-4"><FormulaText :text="question.statement || ''" /></p>
           <img
@@ -236,7 +245,7 @@
                 class="border-b border-gray-100 hover:bg-gray-50"
               >
                 <td class="px-4 py-3 text-gray-600">{{ formatDate(r.completedAt) }}</td>
-                <td class="px-4 py-3 font-semibold">{{ r.score }}/{{ r.total }}</td>
+                <td class="px-4 py-3 font-semibold">{{ formatPoints(r.score) }}/{{ r.total }}</td>
                 <td class="px-4 py-3">
                   <span
                     class="px-2 py-1 rounded-full text-xs font-bold"
@@ -408,6 +417,33 @@ async function submitAnswers() {
   correctCount.value = result.score
   resultsShown.value = true
   window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+/**
+ * Formate un nombre de points à la française, 2 décimales au plus (« 2,4 »).
+ */
+function formatPoints(value) {
+  return Number(value ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+}
+
+/**
+ * Crédit partiel d'une question (note strictement entre 0 et 1, ex. 0,6 pour une réponse ouverte
+ * incomplète), ou `null` pour un résultat binaire (0 ou 1, QCM, texte à trous…).
+ */
+function partialPoints(idx) {
+  const points = questionResults[idx]?.points
+  return typeof points === 'number' && points > 0 && points < 1 ? points : null
+}
+
+/**
+ * Aspect d'une question corrigée : correcte (vert), partielle (ambre : pas correcte mais crédit > 0),
+ * ou incorrecte (rouge).
+ */
+function resultTone(idx) {
+  const result = questionResults[idx]
+  if (result?.correct) return { label: 'Correct', badge: 'bg-green-500', border: 'border-green-500' }
+  if (partialPoints(idx) !== null) return { label: 'Partiel', badge: 'bg-amber-700', border: 'border-amber-500' }
+  return { label: 'Incorrect', badge: 'bg-red-500', border: 'border-red-500' }
 }
 
 function resetQuiz() {

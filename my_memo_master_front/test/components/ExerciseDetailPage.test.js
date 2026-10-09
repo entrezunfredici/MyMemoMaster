@@ -261,6 +261,64 @@ describe('ExerciseDetailPage', () => {
     expect(notices[0].text()).toContain('Correction automatique limitée.')
   })
 
+  it('écran résultats — crédit partiel : badge « Partiel » et note affichée (0,6 / 1)', async () => {
+    const { wrapper, testResultStore } = mountPage()
+    await flushPromises()
+
+    testResultStore.submitTest.mockResolvedValue({
+      ...SUBMIT_RESULT,
+      score: 1.6,
+      results: [
+        { questionId: 1, correct: false, correctAnswer: 'Paris', explanation: 'Incomplet.', points: 0.6 },
+        { questionId: 2, correct: true, correctAnswer: '4', explanation: null, points: 1 }
+      ]
+    })
+
+    const btn = wrapper.findAll('button').find(b => b.text().includes('Vérifier'))
+    await btn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Partiel')
+    const notes = wrapper.findAll('[data-testid="partial-points"]')
+    expect(notes).toHaveLength(1)
+    expect(notes[0].text()).toContain('0,6 / 1')
+    expect(wrapper.text()).toContain('1,6/2')
+  })
+
+  it('écran résultats — correct à 0,8 : badge « Correct » et note 0,8 / 1', async () => {
+    const { wrapper, testResultStore } = mountPage()
+    await flushPromises()
+
+    testResultStore.submitTest.mockResolvedValue({
+      ...SUBMIT_RESULT,
+      score: 1.8,
+      results: [
+        { questionId: 1, correct: true, correctAnswer: 'Paris', explanation: 'Ok.', points: 0.8 },
+        { questionId: 2, correct: true, correctAnswer: '4', explanation: null, points: 1 }
+      ]
+    })
+
+    const btn = wrapper.findAll('button').find(b => b.text().includes('Vérifier'))
+    await btn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Partiel')
+    expect(wrapper.find('[data-testid="partial-points"]').text()).toContain('0,8 / 1')
+  })
+
+  it('écran résultats — résultats binaires : aucune note partielle affichée', async () => {
+    const { wrapper, testResultStore } = mountPage()
+    await flushPromises()
+
+    testResultStore.submitTest.mockResolvedValue(SUBMIT_RESULT)
+
+    const btn = wrapper.findAll('button').find(b => b.text().includes('Vérifier'))
+    await btn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="partial-points"]').exists()).toBe(false)
+  })
+
   // ── Recommencer ───────────────────────────────────────────────────────────────
 
   it('bouton "Recommencer" — retour au mode quiz', async () => {

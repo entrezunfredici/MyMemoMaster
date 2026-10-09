@@ -78,7 +78,7 @@ describe('MistralGradingService', () => {
 
   describe('grade - verdict Mistral', () => {
     it('grade - Mistral dit correct - is_correct true, score 1, strategy mistral, MiniLM non appelé', async () => {
-      mockFetchVerdict({ correct: true, reason: 'Le volume constant est bien exprimé.' })
+      mockFetchVerdict({ score: 1, reason: 'Le volume constant est bien exprimé.' })
       const result = await mistralGradingService.grade(REFS, 'Le volume reste identique', 'Q ?')
       expect(result).toMatchObject({
         is_correct: true,
@@ -93,19 +93,19 @@ describe('MistralGradingService', () => {
     })
 
     it('grade - Mistral dit incorrect - is_correct false, score 0', async () => {
-      mockFetchVerdict({ correct: false, reason: 'Autre grandeur.' })
+      mockFetchVerdict({ score: 0, reason: 'Autre grandeur.' })
       const result = await mistralGradingService.grade(REFS, 'La pression reste constante', 'Q ?')
       expect(result).toMatchObject({ is_correct: false, score: 0, strategy: 'mistral' })
     })
 
     it('grade - raison absente - explication par défaut en français', async () => {
-      mockFetchVerdict({ correct: true })
+      mockFetchVerdict({ score: 1 })
       const result = await mistralGradingService.grade(REFS, 'volume identique')
       expect(result.explanation).toBe('Correct (jugé par Mistral).')
     })
 
     it('grade - réponse acceptée sous forme de chaîne - transmise comme liste', async () => {
-      const fetchSpy = mockFetchVerdict({ correct: true, reason: 'OK.' })
+      const fetchSpy = mockFetchVerdict({ score: 1, reason: 'OK.' })
       await mistralGradingService.grade('Une seule réponse', 'volume identique', 'Q ?')
       const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
       expect(body.messages[1].content).toContain('1. Une seule réponse')
@@ -113,7 +113,7 @@ describe('MistralGradingService', () => {
     })
 
     it('grade - appel Mistral réussi - usage journalisé pour cet utilisateur', async () => {
-      mockFetchVerdict({ correct: true, reason: 'OK.' })
+      mockFetchVerdict({ score: 1, reason: 'OK.' })
       await mistralGradingService.grade(REFS, 'volume identique', 'Q ?', { userId: 7 })
       expect(aiQuotaService.recordGradingUsage).toHaveBeenCalledWith({
         userId: 7,
@@ -124,17 +124,71 @@ describe('MistralGradingService', () => {
     })
 
     it('grade - journalisation en échec - le verdict est quand même renvoyé', async () => {
-      mockFetchVerdict({ correct: true, reason: 'OK.' })
+      mockFetchVerdict({ score: 1, reason: 'OK.' })
       aiQuotaService.recordGradingUsage.mockRejectedValue(new Error('db'))
       const result = await mistralGradingService.grade(REFS, 'volume identique')
       expect(result).toMatchObject({ is_correct: true, strategy: 'mistral' })
     })
 
     it('grade - lecture du quota en échec - correction autorisée (fail-open)', async () => {
-      mockFetchVerdict({ correct: false, reason: 'Non.' })
+      mockFetchVerdict({ score: 0, reason: 'Non.' })
       aiQuotaService.hasGradingCapacity.mockRejectedValue(new Error('db'))
       const result = await mistralGradingService.grade(REFS, 'rep')
       expect(result.strategy).toBe('mistral')
+    })
+  })
+
+  describe('grille de notes (0, 0.2, 0.4, 0.6, 0.8, 1)', () => {
+    it.each([
+      [1, true],
+      [0.8, true],
+      [0.6, false],
+      [0.4, false],
+      [0.2, false],
+      [0, false]
+    ])('grade - note %s - is_correct %s, la note est renvoyée telle quelle', async (score, expected) => {
+      mockFetchVerdict({ score, reason: 'Justification.' })
+      const result = await mistralGradingService.grade(REFS, 'réponse', 'Q ?')
+      expect(result).toMatchObject({ score, is_correct: expected, strategy: 'mistral' })
+    })
+
+    it('grade - note hors grille (0.75) - ramenée au palier le plus proche (0.8) donc correcte', async () => {
+      mockFetchVerdict({ score: 0.75, reason: 'ok' })
+      const result = await mistralGradingService.grade(REFS, 'réponse', 'Q ?')
+      expect(result).toMatchObject({ score: 0.8, is_correct: true })
+    })
+
+    it('grade - note donnée en chaîne avec virgule (« 0,6 ») - interprétée', async () => {
+      mockFetchVerdict({ score: '0,6', reason: 'ok' })
+      const result = await mistralGradingService.grade(REFS, 'réponse', 'Q ?')
+      expect(result).toMatchObject({ score: 0.6, is_correct: false })
+    })
+
+    it('grade - note servie par le cache - même note, même verdict', async () => {
+      gradingCache.getCachedVerdict.mockResolvedValue({ score: 0.6, reason: 'Incomplet.' })
+      const result = await mistralGradingService.grade(REFS, 'réponse', 'Q ?')
+      expect(result).toMatchObject({ score: 0.6, is_correct: false, explanation: 'Incomplet.' })
+    })
+
+    it('grade - le prompt décrit chaque palier de la grille', async () => {
+      const fetchSpy = mockFetchVerdict({ score: 1, reason: 'ok' })
+      await mistralGradingService.grade(REFS, 'réponse', 'Q ?')
+      const system = JSON.parse(fetchSpy.mock.calls[0][1].body).messages[0].content
+      ;['1 =', '0.8 =', '0.6 =', '0.4 =', '0.2 =', '0 ='].forEach((palier) => expect(system).toContain(palier))
+    })
+
+    it.each([[1.2], [-0.1], ['abc'], [null], [undefined], [Number.NaN]])(
+      'snapToGrid - valeur invalide %s - null (repli dégradé)',
+      (raw) => {
+        expect(mistralGradingService.snapToGrid(raw)).toBeNull()
+      }
+    )
+
+    it('grade - note invalide - repli dégradé et rien en cache', async () => {
+      mockFetchVerdict({ score: 7, reason: 'ok' })
+      const result = await mistralGradingService.grade(REFS, 'réponse', 'Q ?')
+      expect(result).toMatchObject({ degraded: true, degraded_reason: 'unavailable' })
+      expect(gradingCache.setCachedVerdict).not.toHaveBeenCalled()
     })
   })
 
@@ -151,7 +205,7 @@ describe('MistralGradingService', () => {
     })
 
     it('grade - plafond atteint mais verdict en cache - sert le cache, non dégradé, MiniLM non appelé', async () => {
-      gradingCache.getCachedVerdict.mockResolvedValue({ correct: true, reason: 'En cache.' })
+      gradingCache.getCachedVerdict.mockResolvedValue({ score: 1, reason: 'En cache.' })
       aiQuotaService.hasGradingCapacity.mockResolvedValue(false)
       const result = await mistralGradingService.grade(REFS, 'rep', 'Q ?', { userId: 7 })
       expect(result).toMatchObject({ is_correct: true, strategy: 'mistral', explanation: 'En cache.' })
@@ -174,7 +228,7 @@ describe('MistralGradingService', () => {
     })
 
     it('grade - réponse Mistral sans verdict booléen - repli dégradé', async () => {
-      mockFetchVerdict({ correct: 'oui' })
+      mockFetchVerdict({ score: 'oui' })
       const result = await mistralGradingService.grade(REFS, 'rep')
       expect(result).toMatchObject({ degraded: true, degraded_reason: 'unavailable' })
     })
@@ -198,7 +252,7 @@ describe('MistralGradingService', () => {
     })
 
     it('grade - nombre différent et Mistral disponible - Mistral tranche (approximation possible)', async () => {
-      mockFetchVerdict({ correct: true, reason: 'Arrondi acceptable.' })
+      mockFetchVerdict({ score: 1, reason: 'Arrondi acceptable.' })
       const result = await mistralGradingService.grade(['3,14'], '3,1416', 'Valeur de pi ?')
       expect(result).toMatchObject({ is_correct: true, strategy: 'mistral' })
     })
@@ -281,7 +335,7 @@ describe('MistralGradingService', () => {
 
   describe('cache', () => {
     it('grade - verdict déjà en cache - ne rappelle pas Mistral', async () => {
-      gradingCache.getCachedVerdict.mockResolvedValue({ correct: true, reason: 'En cache.' })
+      gradingCache.getCachedVerdict.mockResolvedValue({ score: 1, reason: 'En cache.' })
       const fetchSpy = jest.spyOn(global, 'fetch')
       const result = await mistralGradingService.grade(REFS, 'rep', 'Q ?')
       expect(result).toMatchObject({ is_correct: true, strategy: 'mistral', explanation: 'En cache.' })
@@ -289,11 +343,11 @@ describe('MistralGradingService', () => {
     })
 
     it('grade - verdict Mistral frais - mis en cache sans les tokens', async () => {
-      mockFetchVerdict({ correct: true, reason: 'OK.' })
+      mockFetchVerdict({ score: 1, reason: 'OK.' })
       await mistralGradingService.grade(REFS, 'rep', 'Q ?')
       expect(gradingCache.setCachedVerdict).toHaveBeenCalledWith(
         expect.objectContaining({ question: 'Q ?', studentAnswer: 'rep', correctList: REFS }),
-        { correct: true, reason: 'OK.' }
+        { score: 1, reason: 'OK.' }
       )
     })
   })

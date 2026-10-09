@@ -12807,3 +12807,19 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Résultat du banc de charge du mode dégradé après plafond de concurrence** : le plafond est effectif en direct (30 appels parallèles : 21 acceptés, 9 rejetés en 503) mais **sous charge HTTP le débit reste ~1 correction/s, p95 ~60 s** : la CPU du conteneur (0,5 CPU) est saturée par l'inférence, l'API ralentit globalement, les requêtes n'arrivent pas assez vite au plafond pour être rejetées. Limiter les threads ONNX n'améliore pas le temps d'inférence (~0,8-0,9 s à 0,5 CPU).
 **Mesure clé — repli lexical sans modèle** (recouvrement de mots-clés + synonymes, 96 cas) : **64/96 (67 %)** à seuil 0,3, contre **62/96 (65 %)** pour MiniLM. Équivalent, pour une CPU quasi nulle. **Piste recommandée (non faite)** : remplacer MiniLM par ce repli lexical dans `degraded()` puis retirer `@xenova/transformers`/ONNX/sharp (−0,5 à 0,8 Go de RAM par pod, démarrage plus court, surface d'audit réduite, mode dégradé sans saturation) — décision d'architecture à valider.
 **Docker Desktop** : cause racine des pannes répétées trouvée — `useResourceSaver: true` (pause auto après 300 s sans conteneur) ; mis à `false` dans `%APPDATA%\Docker\settings.json` (sauvegarde `settings.json.bak-claude`). La VM Docker n'a que 2 Go de mémoire (`memoryMiB: 2048`) : à relever pour un usage régulier.
+
+
+### [2026-10-09] [IMP] Note de correction Mistral sur grille de 6 paliers
+
+**Fichiers** : `services/MistralGrading.service.js` (prompt à grille, `snapToGrid`, `is_correct` dérivé de la note, `CORRECT_THRESHOLD`/`GRID` exportés), `helpers/mistralGradingCache.js` (clé `v2`), `routes/MistralGrading.routes.js` (doc), tests `MistralGrading.service.test.js` (+14), `mistralGradingCache.test.js`.
+**Mesures** : voir `DECISIONS.md` (96/96, stabilité ≥ 97 % à ≤ 0,2). **Tests** : API 116 suites / 2260+ tests, lint propre.
+**Utilisable** : `score` Mistral ∈ {0, 0.2, 0.4, 0.6, 0.8, 1} ; exercices avec crédit partiel ; le front affiche déjà le score en % (Leitner).
+**Dette** : calibration des paliers intermédiaires à valider sur de vraies réponses ; l'UI des exercices n'affiche pas encore le crédit partiel (badge Correct/Incorrect inchangé).
+
+
+### [2026-10-09] [IMP] Front — crédit partiel dans l'écran des résultats d'exercice
+
+**Fichiers** : `my_memo_master_front/src/pages/ExerciseDetailPage.vue` (helpers `formatPoints`, `partialPoints`, `resultTone`), `test/components/ExerciseDetailPage.test.js` (+3).
+**Comportement** : une réponse notée entre 0 et 1 (exclus) affiche « Note : 0,6 / 1 » ; le badge devient **« Partiel »** (ambre, `bg-amber-700` pour le contraste RGAA) quand elle n'est pas correcte (< 0,8) mais a du crédit, reste « Correct » à 0,8 (avec « Note : 0,8 / 1 ») ; QCM et résultats binaires inchangés. Score global et historique formatés à la française (« 1,6/2 »).
+**Tests** : front 56 fichiers / 876 tests, lint propre. Non vérifié visuellement dans un navigateur (pas de capture d'écran).
+**Dette** : la session Leitner affiche toujours succès/échec binaire (pas de crédit partiel : la règle Leitner reste « correct ou retour boîte 1 »).

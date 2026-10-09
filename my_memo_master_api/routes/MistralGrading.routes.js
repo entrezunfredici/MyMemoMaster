@@ -52,7 +52,7 @@ module.exports = function (app) {
    *                 score:
    *                   type: number
    *                   format: float
-   *                   description: 1 ou 0 pour un verdict Mistral (binaire) ; similarité 0-1 en mode dégradé
+   *                   description: Note de la grille Mistral (0, 0.2, 0.4, 0.6, 0.8, 1 ; is_correct si >= 0.8) ; similarité 0-1 en mode dégradé
    *                 strategy:
    *                   type: string
    *                   enum: [semantic, mistral]
