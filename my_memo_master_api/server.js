@@ -94,9 +94,18 @@ metricsServer.listen(METRICS_PORT, HOST, () => {
 // en tâche de fond — observé en local : le conteneur API (512 Mo) s'est fait
 // tuer par l'OOM killer pile à ce moment, avec le pré-chauffage qui se
 // terminait "avec succès" sans jamais avoir chargé quoi que ce soit.
-semanticService
-  .gradeSemantic('préchauffage du modèle', 'texte différent pour forcer un vrai calcul d\'embedding')
-  .then(() => logger.info('[SemanticService] Pre-warm inference done.'))
-  .catch((err) => {
-    logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)
-  })
+// CHOIX (2026-10-09): préchauffage désactivable (SEMANTIC_PREWARM=false), activé par défaut
+// RAISON: depuis que Mistral juge les réponses (MistralGrading.service), MiniLM ne sert plus qu'au
+// mode dégradé (plafond atteint / Mistral indisponible). Le préchauffer coûte ~450-800 Mo de RAM
+// par pod en permanence ; le désactiver libère cette mémoire, au prix d'un premier verdict dégradé
+// lent (~30 s) après chaque redémarrage — à choisir selon la fréquence attendue du mode dégradé.
+if (process.env.SEMANTIC_PREWARM !== 'false') {
+  semanticService
+    .gradeSemantic('préchauffage du modèle', 'texte différent pour forcer un vrai calcul d\'embedding')
+    .then(() => logger.info('[SemanticService] Pre-warm inference done.'))
+    .catch((err) => {
+      logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)
+    })
+} else {
+  logger.info('[SemanticService] Pre-warm désactivé (SEMANTIC_PREWARM=false) : modèle chargé à la demande.')
+}

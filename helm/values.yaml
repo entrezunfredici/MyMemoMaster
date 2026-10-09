@@ -103,6 +103,7 @@ config:
   AI_BUDGET_MAX_USD_PER_MONTH: ""
   AI_GRADING_MAX_PER_DAY: ""
   AI_GRADING_BUDGET_MAX_USD_PER_MONTH: ""
+  SEMANTIC_PREWARM: ""     # vide/true = MiniLM préchauffé au démarrage ; false = chargé à la demande (mode dégradé seul)
 
 # ── Domaines & Ingress ────────────────────────────────────────────────────────
 domain:

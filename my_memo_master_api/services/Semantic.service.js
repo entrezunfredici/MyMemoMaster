@@ -558,8 +558,17 @@ class SemanticService {
    * @param {string} studentAnswer
    * @returns {object} - { is_correct, score, strategy, explanation, decision_zone }
    */
-  async gradeSemantic(correctAnswers, studentAnswer) {
-    // Normalize input
+  /**
+   * Vérifications qui ne demandent AUCUN modèle d'embedding : réponse vide, aucune référence, ou
+   * correspondance exacte/symbolique (formule identique ou algébriquement équivalente).
+   * Extrait de `gradeSemantic` pour que MistralGrading.service puisse trancher ces cas sans payer
+   * l'inférence MiniLM (~0,4 s de CPU par correction, mesuré le 2026-10-09 : goulot de l'API).
+   *
+   * @param {string|string[]} correctAnswers
+   * @param {string} studentAnswer
+   * @returns {object|null} Résultat au format de gradeSemantic, ou `null` si seul l'embedding peut trancher
+   */
+  gradeWithoutModel(correctAnswers, studentAnswer) {
     const studentNorm = this.normalizeText(studentAnswer)
 
     // reponse vide
@@ -573,13 +582,7 @@ class SemanticService {
       }
     }
 
-    let correctList
-    if (Array.isArray(correctAnswers)) {
-      correctList = correctAnswers.map((a) => this.normalizeText(a)).filter((a) => a)
-    } else {
-      const normalized = this.normalizeText(correctAnswers)
-      correctList = normalized ? [normalized] : []
-    }
+    const correctList = this.normalizeCorrectList(correctAnswers)
 
     if (correctList.length === 0) {
       return {
@@ -610,6 +613,30 @@ class SemanticService {
         decision_zone: 'high'
       }
     }
+
+    return null
+  }
+
+  /**
+   * Normalise la ou les réponses attendues en une liste de textes non vides.
+   *
+   * @param {string|string[]} correctAnswers
+   * @returns {string[]}
+   */
+  normalizeCorrectList(correctAnswers) {
+    if (Array.isArray(correctAnswers)) {
+      return correctAnswers.map((a) => this.normalizeText(a)).filter((a) => a)
+    }
+    const normalized = this.normalizeText(correctAnswers)
+    return normalized ? [normalized] : []
+  }
+
+  async gradeSemantic(correctAnswers, studentAnswer) {
+    const early = this.gradeWithoutModel(correctAnswers, studentAnswer)
+    if (early) return early
+
+    const studentNorm = this.normalizeText(studentAnswer)
+    const correctList = this.normalizeCorrectList(correctAnswers)
 
     try {
       // Load model

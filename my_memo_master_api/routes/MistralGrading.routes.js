@@ -13,8 +13,9 @@ module.exports = function (app) {
    *   post:
    *     summary: Corriger une réponse par similarité sémantique, arbitrée par Mistral dans la zone intermédiaire
    *     description: >
-   *       Calcule d'abord le score d'embedding (comme /grading/semantic). Mistral n'est appelé que si le
-   *       score est entre 0,35 et 0,90 ; en cas d'indisponibilité, le verdict sémantique est renvoyé.
+   *       Mistral juge toute réponse qui n'est pas une correspondance exacte (réponse vide, formule
+   *       identique : aucun appel). Si le plafond de corrections est atteint ou si Mistral est
+   *       indisponible, le verdict sémantique (MiniLM) est renvoyé avec `degraded: true`.
    *     tags: [Grading]
    *     requestBody:
    *       required: true
@@ -51,6 +52,7 @@ module.exports = function (app) {
    *                 score:
    *                   type: number
    *                   format: float
+   *                   description: 1 ou 0 pour un verdict Mistral (binaire) ; similarité 0-1 en mode dégradé
    *                 strategy:
    *                   type: string
    *                   enum: [semantic, mistral]
@@ -59,6 +61,11 @@ module.exports = function (app) {
    *                 decision_zone:
    *                   type: string
    *                   enum: [high, low, inversion, llm]
+   *                 degraded:
+   *                   type: boolean
+   *                   description: Présent à true quand la correction est en mode dégradé
+   *                 degraded_message:
+   *                   type: string
    *       400:
    *         description: Champs manquants ou invalides
    *       401:

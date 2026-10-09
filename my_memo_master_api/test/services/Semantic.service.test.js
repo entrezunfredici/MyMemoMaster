@@ -247,6 +247,34 @@ describe('SemanticService', () => {
       expect(ref).toEqual(student)
     })
 
+    describe('gradeWithoutModel (sans embedding)', () => {
+      it('gradeWithoutModel - réponse vide - incorrect', () => {
+        expect(SemanticService.gradeWithoutModel('ref', '  ')).toMatchObject({ is_correct: false, decision_zone: 'low' })
+      })
+
+      it('gradeWithoutModel - aucune référence exploitable - incorrect', () => {
+        expect(SemanticService.gradeWithoutModel(['', '  '], 'rep')).toMatchObject({ is_correct: false })
+      })
+
+      it('gradeWithoutModel - formule équivalente - correct (exact)', () => {
+        expect(SemanticService.gradeWithoutModel(['U = R × I'], 'u=r*i')).toMatchObject({
+          is_correct: true,
+          strategy: 'exact'
+        })
+      })
+
+      it("gradeWithoutModel - texte libre non identique - null (seul l'embedding ou un juge peut trancher)", () => {
+        expect(SemanticService.gradeWithoutModel(['Le volume reste constant'], 'volume identique')).toBeNull()
+      })
+
+      it('gradeWithoutModel - ne charge jamais le modèle', () => {
+        const spy = jest.spyOn(SemanticService, 'getModel')
+        SemanticService.gradeWithoutModel(['Le volume reste constant'], 'volume identique')
+        expect(spy).not.toHaveBeenCalled()
+        spy.mockRestore()
+      })
+    })
+
     describe('groupes de synonymes (revue 2026-10-09)', () => {
       const keywordsOf = (mot) => SemanticService.extractKeywords(`la pression ${mot}`)
 

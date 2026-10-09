@@ -12765,3 +12765,29 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Tests** : API 115 suites / 2174 tests ; front 56 fichiers / 873 tests ; lint API et front propres.
 **Utilisable** : au-delà des plafonds ou en panne Mistral, la correction continue (MiniLM) avec un avertissement visible. Interface publique étendue de façon rétro-compatible : `correctResponse(cardId, answer, userId?)`, réponses JSON avec champs optionnels `degraded*`.
 **Dette** : plafonds à calibrer sur l'usage réel (valeurs par défaut estimées, pas mesurées) ; pas de tableau de bord de consommation des corrections ; `getUsageSummary` n'expose pas encore l'usage des corrections ; manifests k8s (ConfigMaps) non modifiés — les variables ne sont passées que via compose/helm values, à reporter si l'on veut les surcharger en prod.
+
+
+### [2026-10-09] [ADD] Test de charge k6 de la correction (`load-tests/grading-load.js`)
+
+**Fichier créé** : `load-tests/grading-load.js` (même contrat que `api-load.js` : login unique, `RATE_LIMIT_DISABLED=true` requis sur la cible). Deux scénarios : `embedding` (défaut, gratuit : copies exactes ≥ 0,90 et hors-sujet < 0,35, Mistral jamais appelé — mesure le coût CPU de MiniLM) et `mistral` (payant, exige `CONFIRM_PAID=yes` ; réponses figées → servies par le cache, ou `UNIQUE=true` pour contourner le cache et mesurer la vraie latence Mistral). Paliers de montée en charge jusqu'à `MAX_VUS`, sonde préalable (route existante, scénario cohérent), métriques `grading_duration`, `degraded_responses`, `mistral_verdicts`.
+**Vérifié** : syntaxe ; scores des jeux de réponses mesurés avec le vrai modèle (copies 1,00, hors-sujet ≤ 0,09, zone grise 0,47-0,86).
+**Non exécuté** : k6 absent et Docker Desktop en panne sur le poste — aucune mesure de charge réelle n'existe encore ; les chiffres de capacité de `DECISIONS.md` restent des estimations.
+**Prérequis avant exécution** : cible = preprod (jamais la prod), `RATE_LIMIT_DISABLED=true`, compte E2E seedé, idéalement metrics-server réparé pour lire CPU/RAM des pods.
+
+
+### [2026-10-09] [TEST] Première mesure de charge de la correction (k6, scénario `embedding`, stack Docker locale)
+
+**Conditions** : conteneur API bridé à **0,5 CPU / 1,5 Go** (limite du `docker-compose.yml`), `RATE_LIMIT_DISABLED=true`, compte E2E temporaire (mot de passe aléatoire non conservé ; comptes `load-student`/`load-teacher` créés dans la base Postgres locale), 40 VU, think time 1 s, 3 min 50. Mistral jamais appelé.
+**Résultats** : **2,4 corrections/s** soutenues ; latence moyenne 8,4 s, **p95 16,5 s**, max 60 s ; **4,6 % d'échecs** (timeouts k6) ; 0 réponse 429 ; mémoire API stable (~450 Mo). Seuils k6 franchis (p95, échecs).
+**Diagnostic** : coût unitaire mesuré dans le conteneur = **~770 ms par correction** (≈ 0,4 s de CPU), contre 42 ms mesurés sur le poste de dev (16 cœurs : l'inférence ONNX y est parallélisée — la mesure du 2026-10-09 matin était trompeuse). Chaque correction embeddise la réponse de l'étudiant **et toutes les réponses attendues** (2-4 textes), recalculées à chaque appel.
+**Conséquence sur les estimations de capacité** : à ~0,4 s CPU par correction, 1 CPU ≈ 2,5 corrections/s ; les 2 pods de prod (limite 1 CPU chacun, cœurs cloud plus lents) ≈ 4-5 corrections/s au mieux, soit **~40-50 étudiants actifs simultanés** à latence acceptable — pas 100-150 comme estimé plus tôt. Résultat NON transposable tel quel à K8s (limites et CPU différents), à confirmer sur le preprod.
+**Pistes (non faites)** : (1) mettre en cache les embeddings des réponses attendues (clé = texte, gain ~3-4× sans changer aucun verdict) ; (2) ne calculer l'embedding que pour le repli dégradé, et envoyer à Mistral tout ce qui n'est pas une copie exacte (CPU quasi nul, coût Mistral +10 %) ; (3) relever la limite CPU du pod API. Scénario `mistral` non exécuté.
+
+
+### [2026-10-09] [IMP] MiniLM réservé au mode dégradé (+ banc de charge refait)
+
+**Fichiers modifiés** : `services/Semantic.service.js` (`gradeWithoutModel`, `normalizeCorrectList`, extraits de `gradeSemantic`), `services/MistralGrading.service.js` (réécrit : exact → cache → plafond → Mistral → repli dégradé ; plus de seuils 0,35/0,90), `server.js` (+ `SEMANTIC_PREWARM`), `docker-compose.yml`, `.env.example`, `helm/values.yaml`, `routes/MistralGrading.routes.js` (doc Swagger), `load-tests/grading-load.js` (scénarios `cache` / `mistral` / recette « dégradé »), tests : `MistralGrading.service.test.js` (réécrit), `Semantic.service.test.js` (+5), `test/bdd/leitner.session.test.js` et `exercise.session.test.js` (mock rebasculé sur `MistralGrading.service`).
+**Tests** : API 115 suites / 2178 tests, lint propre. Précision 99 % (95/96) sur les 96 réponses simulées avec la vraie API.
+**Mesures k6 (API à 0,5 CPU)** : chemin normal (cache) 23,8 corr/s à 40 VU p95 22 ms ; saturation ~376 req/s, p95 1,3 s, 0 échec ; **dégradé ~0,9 corr/s, p95 60 s, 19,5 % d'échecs, API « unhealthy »**. Coût mesuré d'un verdict Mistral : 295 tokens entrée + 45 sortie ≈ **0,000071 $** (tarif mistral-small de la table d'`AiQuota`, à revérifier).
+**Dette** : (1) le mode dégradé sature le pod (MiniLM sans limite de concurrence) et peut faire échouer la sonde de santé → prévoir un plafond de concurrence sur `degraded()` ; (2) scénario k6 `mistral` non exécuté (payant) : la latence de Mistral sous charge et ses limites de débit côté compte restent inconnues ; (3) tests menés à 0,5 CPU en local, à refaire sur le preprod ; (4) `SEMANTIC_PREWARM` laissé à `true` : à passer à `false` seulement après décision (premier verdict dégradé ~30 s après redémarrage) ; (5) l'ancien score de similarité n'est plus affiché pour les verdicts Mistral (binaire).
+**Docker Desktop** : le moteur est retombé deux fois en erreur 500 (« no route to host 192.168.65.7:2375 », réseau interne de la VM) ; correctif = relancer Docker Desktop. Cause racine non identifiée.

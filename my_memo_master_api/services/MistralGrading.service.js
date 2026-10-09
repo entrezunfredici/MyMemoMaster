@@ -4,17 +4,13 @@ const semanticService = require('./Semantic.service')
 const gradingCache = require('../helpers/mistralGradingCache')
 const aiQuotaService = require('./AiQuota.service')
 
-// Bornes de la zone où Mistral arbitre : au-dessus de ACCEPT_SCORE la réponse est quasi une
-// copie de la référence, en dessous de REJECT_SCORE elle est sans rapport — aucun appel LLM
-// (coût/latence) dans ces deux cas.
-// CHOIX: zone très large [0,35 ; 0,90[ plutôt que la zone étroite initiale [0,45 ; 0,75[.
-// RAISON: mesuré le 2026-10-09 sur 96 réponses simulées (8 cartes du cours Thermodynamique, moitié
-//         justes / moitié fausses plausibles) — embedding seul 65 % de bonnes décisions ; zone étroite
-//         81 % (l'embedding acceptait des réponses fausses à 0,76-0,87 : « entropie = grandeur
-//         intensive », « enthalpie = dérivée de U »…) ; zone [0,35 ; 0,90[ 99 %, pour 86 appels sur 96.
-//         L'embedding ne sert donc plus qu'à court-circuiter les copies et les hors-sujet.
-const ACCEPT_SCORE = 0.9
-const REJECT_SCORE = 0.35
+// CHOIX: Mistral juge TOUTE réponse qui n'est pas une correspondance exacte ; MiniLM (embedding) ne
+//        sert plus que de REPLI dégradé (plafond atteint ou Mistral indisponible).
+// RAISON: mesuré le 2026-10-09 sur 96 réponses simulées (cours Thermodynamique) : embedding seul 65 %
+//         de bonnes décisions, embedding + Mistral en zone intermédiaire 99 %. Et l'inférence MiniLM
+//         est le goulot de l'API : ~0,4 s de CPU par correction (conteneur à 0,5 CPU : 2,4
+//         corrections/s, p95 16 s à 40 utilisateurs) — pour un tri qui n'évitait que ~10 % des appels
+//         Mistral. Sans embedding, le CPU de la correction est quasi nul (appel réseau asynchrone).
 
 const MAX_TEXT_LENGTH = 2000
 
@@ -22,20 +18,16 @@ const DEGRADED_MESSAGE =
   "Correction automatique limitée : le risque d'erreur est plus élevé que d'habitude. En cas de doute, fiez-vous à la réponse attendue."
 
 const SYSTEM_PROMPT = [
-  "Tu es un correcteur strict mais juste pour une application de révision (cartes mémoire).",
+  'Tu es un correcteur strict mais juste pour une application de révision (cartes mémoire).',
   "On te donne une question, une ou plusieurs réponses attendues (équivalentes entre elles) et la réponse d'un étudiant.",
   "Décide si la réponse de l'étudiant exprime la même idée qu'au moins une réponse attendue, même avec des mots différents,",
   "des synonymes, une formulation plus courte ou une faute d'orthographe sans conséquence sur le sens.",
-  "Elle est INCORRECTE si elle contredit la réponse attendue, désigne une autre notion (même proche), ou est incomplète sur un point essentiel.",
+  'Elle est INCORRECTE si elle contredit la réponse attendue, désigne une autre notion (même proche), est incomplète sur un point essentiel,',
+  "ou inverse les termes d'un rapport (« A divisé par B » n'est pas « B divisé par A »).",
   'Réponds uniquement en JSON : {"correct": true|false, "reason": "une phrase en français"}.'
 ].join(' ')
 
 class MistralGradingService {
-  constructor() {
-    this.acceptScore = ACCEPT_SCORE
-    this.rejectScore = REJECT_SCORE
-  }
-
   /**
    * Construit le message utilisateur envoyé au juge Mistral. Les textes étudiants sont encadrés
    * et tronqués : ils sont de la donnée, jamais des instructions.
@@ -110,36 +102,33 @@ class MistralGradingService {
   }
 
   /**
-   * Corrige une réponse : score d'embedding d'abord, Mistral uniquement dans la zone
-   * intermédiaire. Si Mistral est indisponible, le verdict sémantique est conservé.
+   * Corrige une réponse. Ordre : (1) réponse vide / correspondance exacte, sans aucun appel ;
+   * (2) verdict en cache ; (3) plafond de corrections ; (4) Mistral. Si le plafond est atteint ou si
+   * Mistral échoue, repli DÉGRADÉ sur l'embedding MiniLM (seul cas où le modèle est chargé).
    *
    * @param {string|string[]} correctAnswers
    * @param {string} studentAnswer
    * @param {string} [question]
    * @param {{ userId?: number|null }} [options] - `userId` active le plafond quotidien par utilisateur
-   * @returns {Promise<object>} Même forme que Semantic.service#gradeSemantic ; `strategy` vaut
-   *   'mistral' quand le LLM a tranché, `decision_zone` 'llm'. En mode dégradé (plafond atteint ou
-   *   Mistral indisponible) : verdict sémantique + `degraded: true` et `degraded_message`.
+   * @returns {Promise<object>} Même forme que Semantic.service#gradeSemantic. Verdict Mistral :
+   *   `strategy` 'mistral', `decision_zone` 'llm', `score` 1 ou 0 (verdict binaire, pas une similarité).
+   *   Repli : verdict sémantique + `degraded: true`, `degraded_reason`, `degraded_message`.
    */
   async grade(correctAnswers, studentAnswer, question = '', { userId = null } = {}) {
-    const semantic = await semanticService.gradeSemantic(correctAnswers, studentAnswer)
-
-    const inGreyArea =
-      semantic.strategy === 'semantic' &&
-      semantic.decision_zone !== 'inversion' &&
-      semantic.score >= this.rejectScore &&
-      semantic.score < this.acceptScore
-    if (!inGreyArea) return semantic
+    const early = semanticService.gradeWithoutModel(correctAnswers, studentAnswer)
+    if (early) return early
 
     const correctList = (Array.isArray(correctAnswers) ? correctAnswers : [correctAnswers]).filter(Boolean)
 
     const cacheParams = { model: getMistralConfig().model, question, correctList, studentAnswer }
     const cached = await gradingCache.getCachedVerdict(cacheParams)
-    if (cached) return this.toResult(semantic, cached, null)
+    if (cached) return this.toResult(cached, null)
 
     // CHOIX: le cache est lu AVANT le plafond — un verdict en cache ne coûte rien, il ne doit pas être
     //        refusé parce que le budget est épuisé.
-    if (!(await this.hasCapacity(userId))) return this.degraded(semantic, 'quota')
+    if (!(await this.hasCapacity(userId))) {
+      return this.degraded(correctAnswers, studentAnswer, 'quota')
+    }
 
     try {
       const verdict = await this.callJudge(question, correctList, studentAnswer)
@@ -147,13 +136,32 @@ class MistralGradingService {
       //        d'une panne, qui figerait un verdict dégradé pendant 7 jours.
       await gradingCache.setCachedVerdict(cacheParams, { correct: verdict.correct, reason: verdict.reason })
       await this.recordUsageBestEffort(userId, verdict.usage)
-      return this.toResult(semantic, verdict, verdict.usage)
+      return this.toResult(verdict, verdict.usage)
     } catch (error) {
       // CHOIX: repli sur le verdict sémantique plutôt qu'une erreur — la correction doit rester
       //        disponible même si Mistral est en panne ou non configuré.
       logger.warn(`[MistralGrading] Repli sur le verdict sémantique : ${error?.message || error}`)
-      return this.degraded(semantic, 'unavailable')
+      return this.degraded(correctAnswers, studentAnswer, 'unavailable')
     }
+  }
+
+  /**
+   * Met en forme un verdict Mistral (frais ou issu du cache) au format de Semantic.service.
+   *
+   * @param {{ correct: boolean, reason: string }} verdict
+   * @param {{ promptTokens: number, completionTokens: number }|null} usage - null si servi par le cache
+   * @returns {object}
+   */
+  toResult(verdict, usage) {
+    const result = {
+      is_correct: verdict.correct,
+      score: verdict.correct ? 1 : 0,
+      strategy: 'mistral',
+      explanation: verdict.reason || (verdict.correct ? 'Correct (jugé par Mistral).' : 'Incorrect (jugé par Mistral).'),
+      decision_zone: 'llm'
+    }
+    if (usage) result.usage = usage
+    return result
   }
 
   /**
@@ -193,37 +201,17 @@ class MistralGradingService {
   }
 
   /**
-   * Verdict sémantique marqué comme dégradé (voir DECISIONS.md 2026-10-09).
+   * Verdict dégradé : seul chemin qui charge/utilise MiniLM (voir DECISIONS.md 2026-10-09).
    *
-   * @param {object} semantic
+   * @param {string|string[]} correctAnswers
+   * @param {string} studentAnswer
    * @param {'quota'|'unavailable'} reason
-   * @returns {object}
+   * @returns {Promise<object>}
    */
-  degraded(semantic, reason) {
+  async degraded(correctAnswers, studentAnswer, reason) {
+    const semantic = await semanticService.gradeSemantic(correctAnswers, studentAnswer)
     return { ...semantic, degraded: true, degraded_reason: reason, degraded_message: DEGRADED_MESSAGE }
-  }
-
-  /**
-   * Met en forme un verdict Mistral (frais ou issu du cache) au format de Semantic.service.
-   *
-   * @param {object} semantic - Résultat sémantique (fournit le score)
-   * @param {{ correct: boolean, reason: string }} verdict
-   * @param {{ promptTokens: number, completionTokens: number }|null} usage - null si servi par le cache
-   * @returns {object}
-   */
-  toResult(semantic, verdict, usage) {
-    const result = {
-      is_correct: verdict.correct,
-      score: semantic.score,
-      strategy: 'mistral',
-      explanation: verdict.reason || (verdict.correct ? 'Correct (jugé par Mistral).' : 'Incorrect (jugé par Mistral).'),
-      decision_zone: 'llm'
-    }
-    if (usage) result.usage = usage
-    return result
   }
 }
 
 module.exports = new MistralGradingService()
-module.exports.ACCEPT_SCORE = ACCEPT_SCORE
-module.exports.REJECT_SCORE = REJECT_SCORE

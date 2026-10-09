@@ -1,5 +1,5 @@
 // Tests fonctionnels parcours complet exercices (M-06.12)
-// Base SQLite en mémoire — Semantic.service mocké (NLP ~30s).
+// Base SQLite en mémoire — MistralGrading.service mocké (NLP ~30s).
 // Les autres couches (controller → service → model → DB) sont réelles.
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -8,7 +8,7 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 // SQLite in-memory : DB isolée par fichier de test, aucune pollution entre runs
 process.env.DB_STORAGE = ':memory:'
 
-jest.mock('../../services/Semantic.service', () => ({ gradeSemantic: jest.fn() }))
+jest.mock('../../services/MistralGrading.service', () => ({ grade: jest.fn() }))
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
 jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
 jest.mock('../../jobs/reminder.queue', () => ({ getReminderQueue: jest.fn(), closeReminderQueue: jest.fn() }))
@@ -18,7 +18,7 @@ jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), wa
 const request = require('supertest')
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
-const semanticService = require('../../services/Semantic.service')
+const semanticService = require('../../services/MistralGrading.service')
 const app = require('../../app')
 const { syncModels, Test, Question, User, Role, Subject, TestResult } = require('../../models')
 
@@ -134,7 +134,7 @@ describe('Exercices — parcours complet (tests fonctionnels)', () => {
   // ── Parcours nominal — 4/4 correct ────────────────────────────────────────
 
   it('parcours nominal — 4/4 réponses correctes — score = 4, TestResult persisté en DB', async () => {
-    semanticService.gradeSemantic.mockResolvedValueOnce({
+    semanticService.grade.mockResolvedValueOnce({
       is_correct: true, score: 1.0, explanation: 'Correct.', decision_zone: 'high'
     })
 
@@ -169,7 +169,7 @@ describe('Exercices — parcours complet (tests fonctionnels)', () => {
   // ── Tout faux ─────────────────────────────────────────────────────────────
 
   it('0/4 correct — score = 0', async () => {
-    semanticService.gradeSemantic.mockResolvedValueOnce({
+    semanticService.grade.mockResolvedValueOnce({
       is_correct: false, score: 0, explanation: 'Incorrect.', decision_zone: 'low'
     })
 

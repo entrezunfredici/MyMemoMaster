@@ -1,5 +1,5 @@
 // Tests fonctionnels session complète Leitner (M-01.11)
-// Base SQLite en mémoire — seul Semantic.service est mocké (dépendance NLP externe ~30s).
+// Base SQLite en mémoire — seul MistralGrading.service est mocké (dépendance NLP externe ~30s).
 // Les autres couches (controller → service → model → DB) sont réelles.
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -8,7 +8,7 @@ process.env.VITE_FRONT_URL = 'http://localhost:5173'
 // SQLite in-memory : DB isolée par fichier de test, aucune pollution entre runs
 process.env.DB_STORAGE = ':memory:'
 
-jest.mock('../../services/Semantic.service', () => ({ gradeSemantic: jest.fn() }))
+jest.mock('../../services/MistralGrading.service', () => ({ grade: jest.fn() }))
 jest.mock('../../jobs/fifo.cron', () => ({ startFifoCron: jest.fn() }))
 jest.mock('../../jobs/reminder.worker', () => ({ startReminderWorker: jest.fn() }))
 jest.mock('../../jobs/reminder.queue', () => ({ getReminderQueue: jest.fn(), closeReminderQueue: jest.fn() }))
@@ -19,7 +19,7 @@ const request = require('supertest')
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
 const dayjs = require('dayjs')
-const semanticService = require('../../services/Semantic.service')
+const semanticService = require('../../services/MistralGrading.service')
 const app = require('../../app')
 const {
   syncModels,
@@ -124,7 +124,7 @@ describe('Leitner — session complète (tests fonctionnels)', () => {
   // ── Scénario 2 : Bonne réponse — avance en boîte 2 ──────────────────────
 
   it('POST /response — bonne réponse — carte avance en boîte 2, compteurs mis à jour', async () => {
-    semanticService.gradeSemantic.mockResolvedValueOnce({
+    semanticService.grade.mockResolvedValueOnce({
       is_correct: true,
       score: 0.95,
       explanation: 'Bonne réponse.',
@@ -186,7 +186,7 @@ describe('Leitner — session complète (tests fonctionnels)', () => {
   // ── Scénario 5 : Mauvaise réponse — retour boîte 1 ──────────────────────
 
   it('POST /response — mauvaise réponse — carte retourne en boîte 1, incorrect_count++', async () => {
-    semanticService.gradeSemantic.mockResolvedValueOnce({
+    semanticService.grade.mockResolvedValueOnce({
       is_correct: false,
       score: 0.1,
       explanation: 'Mauvaise réponse.',
@@ -215,7 +215,7 @@ describe('Leitner — session complète (tests fonctionnels)', () => {
     // Placer la carte directement en boîte 5
     await card.update({ idBox: boxes[5].idBox, next_review_at: null })
 
-    semanticService.gradeSemantic.mockResolvedValueOnce({
+    semanticService.grade.mockResolvedValueOnce({
       is_correct: true,
       score: 0.99,
       explanation: 'Excellent.',
@@ -285,7 +285,7 @@ describe('Leitner — session complète (tests fonctionnels)', () => {
   // ── Scénario 9 : Cas d'erreur — carte inexistante ───────────────────────
 
   it('POST /response — carte inexistante — 404', async () => {
-    semanticService.gradeSemantic.mockResolvedValueOnce({
+    semanticService.grade.mockResolvedValueOnce({
       is_correct: true,
       score: 1,
       explanation: '',
