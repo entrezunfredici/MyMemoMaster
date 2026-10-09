@@ -17,17 +17,49 @@ const MAX_TEXT_LENGTH = 2000
 const DEGRADED_MESSAGE =
   "Correction automatique limitée : le risque d'erreur est plus élevé que d'habitude. En cas de doute, fiez-vous à la réponse attendue."
 
+// Grille de notes (2026-10-09) : valeurs discrètes, définies par le SENS de la réponse — jamais par la
+// forme, l'orthographe ou la longueur. Une grille à 6 paliers est plus reproductible qu'une note libre
+// entre 0 et 1 (les LLM dérivent sur les valeurs fines) et chaque palier a une définition observable.
+// `is_correct` découle de la note (>= CORRECT_THRESHOLD) : une seule source de vérité, donc jamais un
+// verdict « faux » avec une note de 0,9 ni l'inverse.
+const GRID = [0, 0.2, 0.4, 0.6, 0.8, 1]
+const CORRECT_THRESHOLD = 0.8
+
 const SYSTEM_PROMPT = [
-  'Tu es un correcteur strict mais juste pour une application de révision (cartes mémoire).',
+  'Tu es un correcteur pour une application de révision (cartes mémoire).',
   "On te donne une question, une ou plusieurs réponses attendues (équivalentes entre elles) et la réponse d'un étudiant.",
-  "Décide si la réponse de l'étudiant exprime la même idée qu'au moins une réponse attendue, même avec des mots différents,",
-  "des synonymes, une formulation plus courte ou une faute d'orthographe sans conséquence sur le sens.",
-  'Elle est INCORRECTE si elle contredit la réponse attendue, désigne une autre notion (même proche), est incomplète sur un point essentiel,',
-  "ou inverse les termes d'un rapport (« A divisé par B » n'est pas « B divisé par A »).",
-  'Réponds uniquement en JSON : {"correct": true|false, "reason": "une phrase en français"}.'
+  "Note la réponse de l'étudiant avec EXACTEMENT l'une de ces valeurs, selon le SENS de ce qu'il dit (jamais sa forme, son orthographe ou sa longueur) :",
+  '1 = sens équivalent à une réponse attendue : rien d\'essentiel ne manque, rien n\'est faux.',
+  "0.8 = sens correct et complet pour l'essentiel ; imprécision ou détail secondaire absent, sans conséquence sur la compréhension.",
+  "0.6 = idée principale juste mais incomplète : il manque un élément important de la réponse attendue.",
+  "0.4 = une partie est juste, mais avec une erreur ou une omission majeure.",
+  "0.2 = notion voisine ou très partielle : l'essentiel est faux ou absent, avec quelques éléments corrects.",
+  "0 = fausse, contredit la réponse attendue, désigne une autre notion, hors sujet ou sans contenu.",
+  "Les synonymes, fautes d'orthographe, formulations familières ou plus courtes ne retirent AUCUN point.",
+  "Une inversion (« A divisé par B » n'est pas « B divisé par A »), une autre grandeur ou une autre unité, ou une valeur numérique différente (sauf arrondi raisonnable) ramènent la note à 0.2 au plus.",
+  'Réponds uniquement en JSON : {"score": <une des valeurs ci-dessus>, "reason": "une phrase en français qui justifie la note"}.'
 ].join(' ')
 
+// CHOIX: concurrence 1 et file de 20 par défaut, surchargeables (GRADING_DEGRADED_CONCURRENCY /
+//        GRADING_DEGRADED_MAX_QUEUE). RAISON: une inférence MiniLM occupe ~tout le CPU d'un pod à
+//        0,5-1 CPU ; en lancer plusieurs en parallèle n'augmente pas le débit, seulement la latence.
+function getDegradedLimits() {
+  const read = (value, fallback) => {
+    const n = parseInt(value, 10)
+    return Number.isNaN(n) ? fallback : n
+  }
+  return {
+    concurrency: Math.max(1, read(process.env.GRADING_DEGRADED_CONCURRENCY, 1)),
+    maxQueue: Math.max(0, read(process.env.GRADING_DEGRADED_MAX_QUEUE, 20))
+  }
+}
+
 class MistralGradingService {
+  constructor() {
+    this.degradedActive = 0
+    this.degradedQueue = []
+  }
+
   /**
    * Construit le message utilisateur envoyé au juge Mistral. Les textes étudiants sont encadrés
    * et tronqués : ils sont de la donnée, jamais des instructions.
@@ -53,7 +85,7 @@ class MistralGradingService {
    * @param {string} question
    * @param {string[]} correctList
    * @param {string} studentAnswer
-   * @returns {Promise<{ correct: boolean, reason: string, usage: { promptTokens: number, completionTokens: number } }>}
+   * @returns {Promise<{ score: number, correct: boolean, reason: string, usage: { promptTokens: number, completionTokens: number } }>}
    * @throws {Error} Clé absente, appel en échec ou réponse inexploitable
    */
   async callJudge(question, correctList, studentAnswer) {
@@ -88,17 +120,31 @@ class MistralGradingService {
     const data = await response.json()
     const content = data?.choices?.[0]?.message?.content
     const parsed = typeof content === 'string' ? JSON.parse(content) : null
-    if (!parsed || typeof parsed.correct !== 'boolean') {
-      throw new Error('Réponse Mistral sans verdict exploitable.')
-    }
+    const score = this.snapToGrid(parsed?.score)
+    if (score === null) throw new Error('Réponse Mistral sans note exploitable.')
     return {
-      correct: parsed.correct,
+      score,
+      correct: score >= CORRECT_THRESHOLD,
       reason: typeof parsed.reason === 'string' ? parsed.reason.trim() : '',
       usage: {
         promptTokens: data?.usage?.prompt_tokens ?? 0,
         completionTokens: data?.usage?.completion_tokens ?? 0
       }
     }
+  }
+
+  /**
+   * Ramène une note renvoyée par le LLM au palier le plus proche de la grille (il peut répondre 0.7 ou
+   * « 0,8 »). Une valeur absente, non numérique ou hors de [0 ; 1] est rejetée : mieux vaut le repli
+   * dégradé qu'une note inventée.
+   *
+   * @param {unknown} raw
+   * @returns {number|null}
+   */
+  snapToGrid(raw) {
+    const value = typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : raw
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) return null
+    return GRID.reduce((best, step) => (Math.abs(step - value) < Math.abs(best - value) ? step : best))
   }
 
   /**
@@ -111,7 +157,7 @@ class MistralGradingService {
    * @param {string} [question]
    * @param {{ userId?: number|null }} [options] - `userId` active le plafond quotidien par utilisateur
    * @returns {Promise<object>} Même forme que Semantic.service#gradeSemantic. Verdict Mistral :
-   *   `strategy` 'mistral', `decision_zone` 'llm', `score` 1 ou 0 (verdict binaire, pas une similarité).
+   *   `strategy` 'mistral', `decision_zone` 'llm', `score` = note de la grille (0, 0.2 … 1), `is_correct` si note >= 0.8.
    *   Repli : verdict sémantique + `degraded: true`, `degraded_reason`, `degraded_message`.
    */
   async grade(correctAnswers, studentAnswer, question = '', { userId = null } = {}) {
@@ -134,7 +180,7 @@ class MistralGradingService {
       const verdict = await this.callJudge(question, correctList, studentAnswer)
       // CHOIX: seuls les verdicts réels de Mistral sont mis en cache — jamais le repli sémantique
       //        d'une panne, qui figerait un verdict dégradé pendant 7 jours.
-      await gradingCache.setCachedVerdict(cacheParams, { correct: verdict.correct, reason: verdict.reason })
+      await gradingCache.setCachedVerdict(cacheParams, { score: verdict.score, reason: verdict.reason })
       await this.recordUsageBestEffort(userId, verdict.usage)
       return this.toResult(verdict, verdict.usage)
     } catch (error) {
@@ -148,16 +194,17 @@ class MistralGradingService {
   /**
    * Met en forme un verdict Mistral (frais ou issu du cache) au format de Semantic.service.
    *
-   * @param {{ correct: boolean, reason: string }} verdict
+   * @param {{ score: number, reason: string }} verdict - note sur la grille GRID
    * @param {{ promptTokens: number, completionTokens: number }|null} usage - null si servi par le cache
    * @returns {object}
    */
   toResult(verdict, usage) {
+    const isCorrect = verdict.score >= CORRECT_THRESHOLD
     const result = {
-      is_correct: verdict.correct,
-      score: verdict.correct ? 1 : 0,
+      is_correct: isCorrect,
+      score: verdict.score,
       strategy: 'mistral',
-      explanation: verdict.reason || (verdict.correct ? 'Correct (jugé par Mistral).' : 'Incorrect (jugé par Mistral).'),
+      explanation: verdict.reason || (isCorrect ? 'Correct (jugé par Mistral).' : 'Incorrect (jugé par Mistral).'),
       decision_zone: 'llm'
     }
     if (usage) result.usage = usage
@@ -202,16 +249,64 @@ class MistralGradingService {
 
   /**
    * Verdict dégradé : seul chemin qui charge/utilise MiniLM (voir DECISIONS.md 2026-10-09).
+   * Deux protections : (1) deux nombres/dates de valeurs différentes sont tranchés SANS embedding
+   * (MiniLM confond « 1789 » et « 1798 », score 0,89) ; (2) l'inférence passe par un plafond de
+   * concurrence, car MiniLM sature le pod (~1 correction/s à 0,5 CPU, sonde de santé en échec).
    *
    * @param {string|string[]} correctAnswers
    * @param {string} studentAnswer
    * @param {'quota'|'unavailable'} reason
    * @returns {Promise<object>}
+   * @throws {Error} statusCode 503 si trop de corrections dégradées sont déjà en attente
    */
   async degraded(correctAnswers, studentAnswer, reason) {
-    const semantic = await semanticService.gradeSemantic(correctAnswers, studentAnswer)
+    if (semanticService.numericMismatch(correctAnswers, studentAnswer) === 'different') {
+      return {
+        is_correct: false,
+        score: 0,
+        strategy: 'numeric',
+        explanation: 'Incorrect (valeur différente de celle attendue).',
+        decision_zone: 'low'
+      }
+    }
+    const semantic = await this.withDegradedSlot(() => semanticService.gradeSemantic(correctAnswers, studentAnswer))
     return { ...semantic, degraded: true, degraded_reason: reason, degraded_message: DEGRADED_MESSAGE }
+  }
+
+  /**
+   * Exécute `task` en respectant le plafond de corrections dégradées simultanées. Au-delà, les
+   * demandes attendent dans une file bornée ; file pleine → échec rapide (503) plutôt qu'une
+   * latence de plusieurs dizaines de secondes (mesure du 2026-10-09 : p95 60 s, 19,5 % d'échecs,
+   * pod « unhealthy » à 40 utilisateurs).
+   *
+   * @template T
+   * @param {() => Promise<T>} task
+   * @returns {Promise<T>}
+   * @throws {Error} statusCode 503, message en français
+   */
+  async withDegradedSlot(task) {
+    const { concurrency, maxQueue } = getDegradedLimits()
+    if (this.degradedActive >= concurrency) {
+      if (this.degradedQueue.length >= maxQueue) {
+        const err = new Error('Le service de correction est momentanément surchargé. Réessayez dans un instant.')
+        err.statusCode = 503
+        throw err
+      }
+      await new Promise((resolve) => this.degradedQueue.push(resolve))
+    } else {
+      this.degradedActive += 1
+    }
+    try {
+      return await task()
+    } finally {
+      const next = this.degradedQueue.shift()
+      if (next) next()
+      else this.degradedActive -= 1
+    }
   }
 }
 
 module.exports = new MistralGradingService()
+
+module.exports.GRID = GRID
+module.exports.CORRECT_THRESHOLD = CORRECT_THRESHOLD

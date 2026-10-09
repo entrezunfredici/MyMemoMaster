@@ -8,6 +8,7 @@ exports.gradeMistral = async (req, res) => {
     res.status(200).send(result)
   } catch (error) {
     logger.error(error?.message || error)
+    if (error?.statusCode === 503) return res.status(503).send({ message: error.message })
     res.status(500).send({ message: 'Erreur lors de la correction par Mistral.' })
   }
 }

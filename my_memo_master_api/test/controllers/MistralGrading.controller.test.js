@@ -47,6 +47,18 @@ describe('POST /grading/mistral', () => {
     expect(res.status).toBe(400)
   })
 
+  it('POST /grading/mistral - service surchargé (503) - relaie le 503 et son message', async () => {
+    const err = new Error('Le service de correction est momentanément surchargé. Réessayez dans un instant.')
+    err.statusCode = 503
+    mistralGradingService.grade.mockRejectedValue(err)
+    const res = await request(app)
+      .post('/grading/mistral')
+      .set('Authorization', 'Bearer x')
+      .send({ correct_answers: 'ref', student_answer: 'rep' })
+    expect(res.status).toBe(503)
+    expect(res.body.message).toContain('momentanément surchargé')
+  })
+
   it('POST /grading/mistral - erreur du service - 500 en français', async () => {
     mistralGradingService.grade.mockRejectedValue(new Error('boom'))
     const res = await request(app)

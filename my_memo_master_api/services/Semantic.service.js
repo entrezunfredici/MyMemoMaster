@@ -22,6 +22,7 @@ const GREEK_NAMES_PATTERN = new RegExp(
   'gi'
 )
 const { algebraicallyEqual: isAlgebraicallyEqual } = require('../helpers/algebraicEquivalence')
+const { numericVerdict } = require('../helpers/numericEquivalence')
 
 // Stopwords anglais + français : l'application est francophone, la liste anglaise
 // seule laissait « une », « dans », « les »… compter comme mots-clés dans la zone grise
@@ -614,7 +615,33 @@ class SemanticService {
       }
     }
 
+    // Même valeur écrite autrement (« 1789 » ≡ « mille sept cent quatre-vingt-neuf », date en chiffres
+    // ≡ date en lettres) : comparaison déterministe, sans embedding ni LLM.
+    if (this.numericMismatch(correctAnswers, studentAnswer) === 'equal') {
+      return {
+        is_correct: true,
+        score: 1.0,
+        strategy: 'numeric',
+        explanation: 'Correct (même valeur).',
+        decision_zone: 'high'
+      }
+    }
+
     return null
+  }
+
+  /**
+   * Verdict déterministe sur des valeurs « pures » (nombre ou date) — voir helpers/numericEquivalence.
+   *
+   * @param {string|string[]} correctAnswers
+   * @param {string} studentAnswer
+   * @returns {'equal'|'different'|null} `null` si ce n'est pas comparable (texte libre, unité…)
+   */
+  numericMismatch(correctAnswers, studentAnswer) {
+    const references = (Array.isArray(correctAnswers) ? correctAnswers : [correctAnswers]).filter(
+      (a) => typeof a === 'string' && a.trim()
+    )
+    return numericVerdict(references, typeof studentAnswer === 'string' ? studentAnswer : '')
   }
 
   /**

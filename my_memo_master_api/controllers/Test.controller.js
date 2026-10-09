@@ -67,6 +67,7 @@ exports.submit = async (req, res) => {
     res.status(200).json(result)
   } catch (error) {
     logger.error(error?.message || error)
+    if (error?.statusCode === 503) return res.status(503).json({ message: error.message })
     res.status(500).json({ message: "Erreur lors de la correction de l'exercice." })
   }
 }

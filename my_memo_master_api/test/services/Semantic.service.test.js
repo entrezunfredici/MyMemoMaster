@@ -263,6 +263,28 @@ describe('SemanticService', () => {
         })
       })
 
+      it('gradeWithoutModel - nombre en lettres égal au nombre attendu - correct (numeric), sans modèle', () => {
+        expect(SemanticService.gradeWithoutModel(['1789'], 'mille sept cent quatre-vingt-neuf')).toMatchObject({
+          is_correct: true,
+          strategy: 'numeric'
+        })
+      })
+
+      it('gradeWithoutModel - date en lettres égale à la date attendue - correct (numeric)', () => {
+        expect(
+          SemanticService.gradeWithoutModel(['18/09/2026'], 'dix-huit septembre deux mille vingt-six')
+        ).toMatchObject({ is_correct: true, strategy: 'numeric' })
+      })
+
+      it('gradeWithoutModel - nombre différent - null (Mistral peut accepter une approximation)', () => {
+        expect(SemanticService.gradeWithoutModel(['3,14'], '3,1416')).toBeNull()
+      })
+
+      it('numericMismatch - nombres différents - different ; texte libre - null', () => {
+        expect(SemanticService.numericMismatch(['1789'], '1798')).toBe('different')
+        expect(SemanticService.numericMismatch(['la pression'], 'le volume')).toBeNull()
+      })
+
       it("gradeWithoutModel - texte libre non identique - null (seul l'embedding ou un juge peut trancher)", () => {
         expect(SemanticService.gradeWithoutModel(['Le volume reste constant'], 'volume identique')).toBeNull()
       })

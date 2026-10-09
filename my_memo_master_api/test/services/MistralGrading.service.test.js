@@ -180,6 +180,105 @@ describe('MistralGradingService', () => {
     })
   })
 
+  describe('grade - nombres et dates', () => {
+    it('grade - nombre en lettres égal à la référence - correct sans appel Mistral ni MiniLM', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch')
+      const result = await mistralGradingService.grade(['1789'], 'mille sept cent quatre-vingt-neuf', 'En quelle année ?')
+      expect(result).toMatchObject({ is_correct: true, strategy: 'numeric' })
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(semanticSpy).not.toHaveBeenCalled()
+    })
+
+    it('grade - nombre différent et plafond atteint - incorrect déterministe, sans MiniLM ni dégradé', async () => {
+      aiQuotaService.hasGradingCapacity.mockResolvedValue(false)
+      const result = await mistralGradingService.grade(['1789'], '1798', 'En quelle année ?', { userId: 7 })
+      expect(result).toMatchObject({ is_correct: false, strategy: 'numeric' })
+      expect(result.degraded).toBeUndefined()
+      expect(semanticSpy).not.toHaveBeenCalled()
+    })
+
+    it('grade - nombre différent et Mistral disponible - Mistral tranche (approximation possible)', async () => {
+      mockFetchVerdict({ correct: true, reason: 'Arrondi acceptable.' })
+      const result = await mistralGradingService.grade(['3,14'], '3,1416', 'Valeur de pi ?')
+      expect(result).toMatchObject({ is_correct: true, strategy: 'mistral' })
+    })
+  })
+
+  describe('grade - plafond de concurrence du mode dégradé', () => {
+    const defer = () => {
+      let resolve
+      const promise = new Promise((r) => {
+        resolve = r
+      })
+      return { promise, resolve }
+    }
+
+    beforeEach(() => {
+      aiQuotaService.hasGradingCapacity.mockResolvedValue(false)
+      delete process.env.GRADING_DEGRADED_CONCURRENCY
+      delete process.env.GRADING_DEGRADED_MAX_QUEUE
+    })
+    afterEach(() => {
+      delete process.env.GRADING_DEGRADED_CONCURRENCY
+      delete process.env.GRADING_DEGRADED_MAX_QUEUE
+    })
+
+    it('grade - 3 corrections dégradées simultanées, concurrence 1 - exécutées une par une', async () => {
+      let running = 0
+      let maxRunning = 0
+      const gates = [defer(), defer(), defer()]
+      let call = 0
+      semanticSpy.mockImplementation(async () => {
+        const gate = gates[call++]
+        running += 1
+        maxRunning = Math.max(maxRunning, running)
+        await gate.promise
+        running -= 1
+        return semanticResult(0.5)
+      })
+
+      const all = [1, 2, 3].map((i) => mistralGradingService.grade(REFS, `réponse ${i}`, 'Q ?'))
+      await new Promise((r) => setImmediate(r))
+      await new Promise((r) => setImmediate(r))
+      expect(maxRunning).toBe(1)
+
+      gates.forEach((g) => g.resolve())
+      const results = await Promise.all(all)
+      expect(results).toHaveLength(3)
+      expect(results.every((r) => r.degraded === true)).toBe(true)
+      expect(maxRunning).toBe(1)
+    })
+
+    it('grade - file pleine - échec rapide 503 en français, le reste aboutit', async () => {
+      process.env.GRADING_DEGRADED_MAX_QUEUE = '1'
+      const gate = defer()
+      semanticSpy.mockImplementation(async () => {
+        await gate.promise
+        return semanticResult(0.5)
+      })
+
+      const first = mistralGradingService.grade(REFS, 'rep 1', 'Q ?')
+      const second = mistralGradingService.grade(REFS, 'rep 2', 'Q ?')
+      await new Promise((r) => setImmediate(r))
+      await new Promise((r) => setImmediate(r))
+      const third = mistralGradingService.grade(REFS, 'rep 3', 'Q ?')
+      await expect(third).rejects.toMatchObject({
+        statusCode: 503,
+        message: expect.stringContaining('momentanément surchargé')
+      })
+
+      gate.resolve()
+      await expect(first).resolves.toMatchObject({ degraded: true })
+      await expect(second).resolves.toMatchObject({ degraded: true })
+    })
+
+    it('grade - une correction dégradée en erreur - libère sa place pour la suivante', async () => {
+      semanticSpy.mockRejectedValueOnce(new Error('modèle indisponible')).mockResolvedValueOnce(semanticResult(0.5))
+      await expect(mistralGradingService.grade(REFS, 'rep 1', 'Q ?')).rejects.toThrow('modèle indisponible')
+      await expect(mistralGradingService.grade(REFS, 'rep 2', 'Q ?')).resolves.toMatchObject({ degraded: true })
+    })
+  })
+
   describe('cache', () => {
     it('grade - verdict déjà en cache - ne rappelle pas Mistral', async () => {
       gradingCache.getCachedVerdict.mockResolvedValue({ correct: true, reason: 'En cache.' })

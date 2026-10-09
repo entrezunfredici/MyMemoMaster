@@ -21,7 +21,7 @@ describe('mistralGradingCache', () => {
     const k = cache.cacheKey(params)
     expect(cache.cacheKey({ ...params, studentAnswer: 'autre' })).not.toBe(k)
     expect(cache.cacheKey({ ...params, model: 'm2' })).not.toBe(k)
-    expect(k).toMatch(/^grading:mistral:[0-9a-f]{64}$/)
+    expect(k).toMatch(/^grading:mistral:v2:[0-9a-f]{64}$/)
   })
 
   it('getCachedVerdict - entrée présente - retourne le verdict', async () => {
