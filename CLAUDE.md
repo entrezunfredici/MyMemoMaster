@@ -23,10 +23,12 @@ Ces fichiers sont la mémoire du projet. Les ignorer entraîne des incohérences
 Après chaque ticket ou tâche significative, tu **dois** mettre à jour :
 
 ### `.agents/CHANGELOG_AGENT.md`
+
 - Section "État global" : met à jour le statut du module concerné
 - Nouvelle entrée en bas avec : fichiers créés/modifiés, ce qui est utilisable, hypothèses posées, dette éventuelle
 
 ### `.agents/DECISIONS.md`
+
 - Ajoute une entrée pour chaque choix technique structurant (format de donnée, pattern d'auth, contournement d'une lib, etc.)
 - Format : Contexte / Décision / Alternative écartée / Conséquences
 

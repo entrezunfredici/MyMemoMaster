@@ -43,3 +43,15 @@ exports.gradeSemantic = [
     .isString()
     .withMessage('"student_answer" doit être une chaîne de caractères')
 ]
+
+/**
+ * Validation pour la correction par Mistral : mêmes champs que la correction sémantique,
+ * plus la question (optionnelle, donnée de contexte pour le juge).
+ */
+exports.gradeMistral = [
+  ...exports.gradeSemantic,
+  body('question')
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('"question" doit être une chaîne de caractères')
+]

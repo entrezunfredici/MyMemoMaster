@@ -12718,3 +12718,41 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Fait** : `npm audit fix` (non cassant) — `package-lock.json` seul, `package.json` inchangé. `npm audit --omit=dev --audit-level=high` : **0 vulnérabilité**. Front : **56 fichiers / 870 tests Vitest passés**, `vite build` OK.
 
 **Dette** : 3 alertes *moderate* subsistent sur des dépendances de dev (correctif cassant via `--force`), hors périmètre de la CI.
+
+
+### [2026-10-09] [FIX] docker-compose — warnings de variables non définies (`REDIS_PASS`, `$…` dans `.env`)
+
+`docker compose` affichait `The "YcNchXR2bb0PRem8" variable is not set` et `The "REDIS_PASS" variable is not set`.
+
+**Fait** :
+- `docker-compose.yml` (service redis, `command:`) : `${REDIS_PASS}` → `${REDIS_PASS:-}` (les deux occurrences), aligné sur les autres usages du fichier (lignes `environment:`). Comportement inchangé : Redis sans mot de passe si la variable est vide.
+- `.env` local (gitignoré) : `preprod_pass` mis entre apostrophes — la valeur contient un `$`, que compose interprétait comme une référence de variable (mot de passe tronqué silencieusement).
+
+**Non résolu côté dépôt** : `request returned Internal Server Error for API route…` = le moteur Docker Desktop (pipes `docker_engine` et `dockerDesktopLinuxEngine`) répond 500 alors que les distros WSL tournent ; nécessite un redémarrage de Docker Desktop, hors code.
+
+**Diagnostic sémantique (non corrigé)** : « Une transformation ou le volume reste identique » (réf. isochore) → 0,668 < seuil 0,75 ; la reformulation correcte « où le volume reste identique » → 0,65 ; réponses fausses (pression/température constante) → 0,56 / 0,49. Limite du modèle MiniLM (réponse courte vs référence longue), pas un bug de code ; aucun changement de seuil sans décision utilisateur (cf. DECISIONS.md 2026-09-12).
+
+
+### [2026-10-09] [ADD] Correction par Mistral des réponses ouvertes (MistralGrading)
+
+**Fichiers créés** : `services/MistralGrading.service.js`, `controllers/MistralGrading.controller.js`, `routes/MistralGrading.routes.js` (`POST /api/v1/grading/mistral`, authentifiée), tests `test/services/MistralGrading.service.test.js` et `test/controllers/MistralGrading.controller.test.js`.
+**Fichiers modifiés** : `validators/Grading.validators.js` (`gradeMistral`), `app.js`, `services/LeitnerCard.service.js` et `services/Test.service.js` (appellent désormais `mistralGradingService.grade(..., question.statement)` au lieu de `semanticService.gradeSemantic`), `services/Semantic.service.js` (groupe de synonymes « constance »), tests `LeitnerCard.service.test.js` / `Test.service.test.js` (mock rebasculé), `.agents/DECISIONS.md`.
+**Utilisable** : les cartes Leitner et les exercices ouverts sont corrigés avec arbitrage Mistral ; le cas « volume reste identique » est jugé correct, « pression/température constante » incorrect, avec explication en français.
+**Mesures** (96 réponses simulées, cours Thermodynamique) : embedding seul 65 % → hybride 99 %. Suite API : 96 suites / 1978 tests passés, lint propre.
+**Hypothèses** : bornes 0,35 / 0,90 calibrées sur des réponses générées par un LLM (mistral-medium), pas sur de vraies réponses d'étudiants ; juge et générateur de cas sont de la même famille (biais possible).
+**Dette** : (1) les appels de correction ne sont pas journalisés dans `AiUsageLog` ni plafonnés par `AiQuota` (ce quota compte des générations) — à traiter si le coût devient un sujet ; (2) ~~pas de cache~~ → fait le même jour, voir entrée suivante ; (3) `usage` (tokens) est renvoyé par `grade` mais non exploité ; (4) le front n'a pas été modifié (il affiche `explanation` tel quel) ; (5) QCM/dates/Test non concernés.
+
+
+### [2026-10-09] [ADD] Cache Redis des verdicts Mistral
+
+**Fichiers** : `helpers/mistralGradingCache.js` (nouveau, même pattern fail-open que `leitnerRightsCache`), `services/MistralGrading.service.js` (lecture avant l'appel, écriture après), tests `test/helpers/mistralGradingCache.test.js` et cas « cache » dans `MistralGrading.service.test.js`.
+**Fonctionnement** : clé = SHA-256 de (modèle, question, références triées, réponse) normalisés (casse/espaces) — jamais de texte en clair dans Redis ; TTL 7 jours (rien à invalider : une carte modifiée change ses références donc la clé ; un changement de `MISTRAL_MODEL` change la clé). Seuls les verdicts réels de Mistral sont mis en cache, jamais le repli sémantique d'une panne. Redis indisponible → on interroge Mistral (fail-open).
+**Tests** : suite API 115 suites / 2140 tests, lint propre.
+
+
+### [2026-10-09] [IMP] Revue des groupes de synonymes (`SYNONYM_GROUPS`)
+
+**Historique** : un seul commit (`bc7ef00`, 2026-09-08) a créé 2 groupes (augmentation / diminution) ; jamais modifiés ni retirés depuis. Les synonymes ne servent plus à la correction (verdict = seuil puis Mistral) mais restent utilisés par `AnswerQuality.service` (quasi-doublons, lien énoncé/réponse) et par la garde anti-inversion.
+**Fait** (`services/Semantic.service.js`) : règles d'ajout documentées en tête de liste (pas de mot polysémique, jamais deux contraires) ; formes conjuguées ajoutées aux 2 groupes d'origine ; groupes ajoutés : constance (constant/identique/inchangé/invariant), chauffe, refroidissement, liquéfaction/condensation, détente/expansion, maximum, minimum, nul/zéro, égal, proportionnel, rapport/quotient/ratio.
+**Écartés volontairement** : échange/transfert (« transfert d'électrons » ≠ « échange d'ions »), élève (nom), réduction (redox), produit, quantité, densité, stable/fixe ; tout couple de contraires.
+**Tests** : 14 paires unifiées + 7 paires de contraires jamais fusionnées (`Semantic.service.test.js`).

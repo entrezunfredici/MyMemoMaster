@@ -3,7 +3,7 @@ const { Test, Subject, Question, TestResult, Tag, ClassGroup, ClassGroupUsers, T
 
 const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
 const CLASS_GROUPS_INCLUDE = { model: ClassGroup, as: 'classGroups', attributes: ['id', 'name'], through: { attributes: [] }, required: false }
-const semanticService = require('./Semantic.service')
+const mistralGradingService = require('./MistralGrading.service')
 const revisionSessionService = require('./RevisionSession.service')
 
 class TestService {
@@ -186,7 +186,7 @@ class TestService {
           .map((s) => (s ?? '').trim())
           .filter(Boolean)
         if (accepted.length === 0) return { correct: false, explanation: null, semanticScore: null, points: 0 }
-        const result = await semanticService.gradeSemantic(accepted, user)
+        const result = await mistralGradingService.grade(accepted, user, question.statement)
         return { correct: result.is_correct, explanation: result.explanation, semanticScore: result.score, points: result.score }
       }
       case 'mcq': {

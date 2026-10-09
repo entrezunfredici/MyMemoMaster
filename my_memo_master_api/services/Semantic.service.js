@@ -233,9 +233,34 @@ const MATH_SEPARATORS = /[\s/\-−.,:=*+^()_#"·]+/
 // cf. calibration DECISIONS.md 2026-07-18 (« réponse fausse même domaine »
 // à 0,717 correctement rejetée par mots-clés : un thésaurus trop large
 // aurait pu la faire passer à tort).
+// RÈGLES D'AJOUT (revue 2026-10-09) : un groupe ne réunit que des mots de même sens dans tous
+// les contextes courants d'un cours (jamais un mot polysémique : « élève », « réduction » (redox),
+// « produit » (chimie), « quantité » (de matière), « densité »…), et JAMAIS deux contraires
+// (croissance/décroissance, chauffe/refroidissement, maximum/minimum, reçu/cédé) — le garde
+// anti-inversion et la détection de doublons s'appuient sur ces mots-clés. Les mots à plusieurs
+// termes (« ne varie pas », « transfert thermique ») ne sont pas représentables ici : un jeton à la fois.
+// Usages actuels (le verdict de correction ne les consulte plus depuis 2026-09-09, Mistral
+// arbitre) : détection de quasi-doublons et d'énoncé/réponse sans lien (AnswerQuality.service),
+// garde anti-inversion (detectInversion).
 const SYNONYM_GROUPS = [
-  ['augmente', 'augmenter', 'augmentation', 'croît', 'croit', 'croître', 'croitre', 'croissance', 'croissant', 'croissante', 'monte', 'monter', 'hausse'],
-  ['diminue', 'diminuer', 'diminution', 'décroît', 'décroit', 'décroître', 'decroitre', 'décroissance', 'décroissant', 'décroissante', 'baisse', 'baisser']
+  // Variation d'une grandeur (groupes d'origine, 2026-09-08 ; ajout des formes conjuguées)
+  ['augmente', 'augmentent', 'augmenté', 'augmentée', 'augmenter', 'augmentation', 'croît', 'croit', 'croissent', 'croître', 'croitre', 'croissance', 'croissant', 'croissante', 'accroît', 'accroissement', 'monte', 'monter', 'hausse'],
+  ['diminue', 'diminuent', 'diminué', 'diminuée', 'diminuer', 'diminution', 'décroît', 'décroit', 'décroissent', 'décroître', 'decroitre', 'décroissance', 'décroissant', 'décroissante', 'baisse', 'baisser'],
+  // Constance d'une grandeur (« volume constant » / « volume identique » — cas isochore, 2026-10-09).
+  // Volontairement sans « stable » ni « fixe » (sens plus larges : « point fixe », « équilibre stable »).
+  ['constant', 'constante', 'constants', 'constantes', 'identique', 'identiques', 'inchangé', 'inchangée', 'inchangés', 'inchangées', 'invariant', 'invariante', 'invariants', 'invariantes'],
+  // Chaleur / thermodynamique
+  ['chauffe', 'chauffer', 'chauffage', 'échauffe', 'échauffer', 'échauffement', 'réchauffe', 'réchauffer', 'réchauffement'],
+  ['refroidit', 'refroidir', 'refroidissement'],
+  ['liquéfaction', 'condensation'],
+  ['détente', 'expansion'],
+  // Extrema, nullité, égalité, proportionnalité, rapport (maths / sciences, accord en genre et nombre)
+  ['maximum', 'maximal', 'maximale', 'maximaux', 'maximales'],
+  ['minimum', 'minimal', 'minimale', 'minimaux', 'minimales'],
+  ['nul', 'nulle', 'nuls', 'nulles', 'zéro', 'zero'],
+  ['égal', 'égale', 'égaux', 'égales'],
+  ['proportionnel', 'proportionnelle', 'proportionnels', 'proportionnelles'],
+  ['rapport', 'quotient', 'ratio']
 ]
 const SYNONYM_CANONICAL = new Map(
   SYNONYM_GROUPS.flatMap((group) => group.map((word) => [word, group[0]]))

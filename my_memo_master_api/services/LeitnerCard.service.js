@@ -8,7 +8,7 @@ const {
   LeitnerSystem,
   LeitnerSystemsUsers
 } = require('../models')
-const semanticService = require('./Semantic.service')
+const mistralGradingService = require('./MistralGrading.service')
 const rightsCache = require('../helpers/leitnerRightsCache')
 
 class LeitnerCardService {
@@ -157,7 +157,7 @@ class LeitnerCardService {
       if (correctResponses.length === 0) return null
 
       const correctAnswers = correctResponses.map((r) => r.content)
-      gradeResult = await semanticService.gradeSemantic(correctAnswers, studentAnswer)
+      gradeResult = await mistralGradingService.grade(correctAnswers, studentAnswer, question?.statement)
       gradeResult.correction = correctAnswers.join(' / ')
       isCorrect = gradeResult.is_correct
     }

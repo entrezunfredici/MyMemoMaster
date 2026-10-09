@@ -30,8 +30,8 @@ jest.mock('../../models', () => ({
   }
 }))
 
-jest.mock('../../services/Semantic.service', () => ({
-  gradeSemantic: jest.fn()
+jest.mock('../../services/MistralGrading.service', () => ({
+  grade: jest.fn()
 }))
 
 jest.mock('../../helpers/leitnerRightsCache', () => ({
@@ -39,7 +39,7 @@ jest.mock('../../helpers/leitnerRightsCache', () => ({
   setCachedRights: jest.fn().mockResolvedValue(undefined)
 }))
 
-const semanticService = require('../../services/Semantic.service')
+const mistralGradingService = require('../../services/MistralGrading.service')
 const rightsCache = require('../../helpers/leitnerRightsCache')
 
 describe('LeitnerCardService', () => {
@@ -206,7 +206,7 @@ describe('LeitnerCardService', () => {
 
     LeitnerCard.findByPk.mockResolvedValue(mockCard)
     Response.findAll.mockResolvedValue([{ content: 'La bonne réponse' }])
-    semanticService.gradeSemantic.mockResolvedValue(mockGradeResult)
+    mistralGradingService.grade.mockResolvedValue(mockGradeResult)
     LeitnerBox.findOne.mockResolvedValue(mockBox)
 
     const result = await LeitnerCardService.correctResponse(1, 'ma réponse')
@@ -251,7 +251,7 @@ describe('LeitnerCardService', () => {
 
     LeitnerCard.findByPk.mockResolvedValue(mockCard)
     Response.findAll.mockResolvedValue([{ content: 'La bonne réponse' }])
-    semanticService.gradeSemantic.mockResolvedValue(mockGradeResult)
+    mistralGradingService.grade.mockResolvedValue(mockGradeResult)
     LeitnerBox.findOne.mockResolvedValue(mockBox)
 
     const result = await LeitnerCardService.correctResponse(1, 'mauvaise réponse')
@@ -294,7 +294,7 @@ describe('LeitnerCardService', () => {
 
     LeitnerCard.findByPk.mockResolvedValue(mockCard)
     Response.findAll.mockResolvedValue([{ content: 'Bonne réponse' }])
-    semanticService.gradeSemantic.mockResolvedValue(mockGradeResult)
+    mistralGradingService.grade.mockResolvedValue(mockGradeResult)
     LeitnerBox.findOne.mockResolvedValue(mockBox)
 
     const result = await LeitnerCardService.correctResponse(1, 'bonne réponse')
@@ -317,7 +317,7 @@ describe('LeitnerCardService', () => {
     const result = await LeitnerCardService.correctResponse(999, 'réponse')
 
     expect(result).toBeNull()
-    expect(semanticService.gradeSemantic).not.toHaveBeenCalled()
+    expect(mistralGradingService.grade).not.toHaveBeenCalled()
   })
 
   test('correctResponse - aucune réponse correcte en base - retourne null sans grading', async () => {
@@ -335,7 +335,7 @@ describe('LeitnerCardService', () => {
     const result = await LeitnerCardService.correctResponse(1, 'réponse')
 
     expect(result).toBeNull()
-    expect(semanticService.gradeSemantic).not.toHaveBeenCalled()
+    expect(mistralGradingService.grade).not.toHaveBeenCalled()
     expect(mockCard.update).not.toHaveBeenCalled()
   })
 
@@ -359,7 +359,7 @@ describe('LeitnerCardService', () => {
 
     LeitnerCard.findByPk.mockResolvedValue(mockCard)
     Response.findAll.mockResolvedValue([{ content: 'Bonne réponse' }])
-    semanticService.gradeSemantic.mockResolvedValue({
+    mistralGradingService.grade.mockResolvedValue({
       is_correct: true,
       score: 0.9,
       explanation: 'Correct.',

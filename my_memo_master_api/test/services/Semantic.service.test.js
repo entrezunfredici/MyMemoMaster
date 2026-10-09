@@ -247,6 +247,41 @@ describe('SemanticService', () => {
       expect(ref).toEqual(student)
     })
 
+    describe('groupes de synonymes (revue 2026-10-09)', () => {
+      const keywordsOf = (mot) => SemanticService.extractKeywords(`la pression ${mot}`)
+
+      it.each([
+        ['augmentent', 'croissent'],
+        ['diminuent', 'décroissent'],
+        ['reste constante', 'reste identique'],
+        ['reste inchangée', 'reste constante'],
+        ['est nulle', 'est zéro'],
+        ['est maximale', 'est maximum'],
+        ['est minimale', 'est minimum'],
+        ['est égale', 'est égal'],
+        ['est proportionnelle', 'est proportionnel'],
+        ['réchauffement', 'chauffage'],
+        ['refroidissement', 'refroidir'],
+        ['liquéfaction', 'condensation'],
+        ['détente', 'expansion'],
+        ['quotient', 'ratio']
+      ])('unifie « %s » et « %s »', (a, b) => {
+        expect(keywordsOf(a)).toEqual(keywordsOf(b))
+      })
+
+      it.each([
+        ['augmente', 'diminue'],
+        ['augmentent', 'diminuent'],
+        ['est maximale', 'est minimale'],
+        ['chauffage', 'refroidissement'],
+        ['réchauffement', 'refroidissement'],
+        ['est nulle', 'est constante'],
+        ['est égale', 'est proportionnelle']
+      ])('ne fusionne jamais « %s » et « %s »', (a, b) => {
+        expect(keywordsOf(a)).not.toEqual(keywordsOf(b))
+      })
+    })
+
     it('unifie un adverbe en -ment avec l\'adjectif dont il dérive (« exponentiellement » / « exponentielle »)', () => {
       const ref = SemanticService.extractKeywords('décroît exponentiellement')
       const student = SemanticService.extractKeywords('de façon exponentielle')

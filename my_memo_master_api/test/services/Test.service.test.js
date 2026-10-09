@@ -1,10 +1,10 @@
 const { Test, TestResult, ClassGroup, ClassGroupUsers, TestClassGroup } = require('../../models/index')
-const semanticService = require('../../services/Semantic.service')
+const mistralGradingService = require('../../services/MistralGrading.service')
 const revisionSessionService = require('../../services/RevisionSession.service')
 const TestService = require('../../services/Test.service')
 
-jest.mock('../../services/Semantic.service', () => ({
-  gradeSemantic: jest.fn()
+jest.mock('../../services/MistralGrading.service', () => ({
+  grade: jest.fn()
 }))
 
 jest.mock('../../services/RevisionSession.service', () => ({
@@ -130,7 +130,7 @@ describe('TestService', () => {
       ]
       Test.findByPk.mockResolvedValue({ testId: 1, userId: null, question: questions })
       TestResult.create.mockResolvedValue({ resultId: 42, score: 1.2, total: 2 })
-      semanticService.gradeSemantic
+      mistralGradingService.grade
         .mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: 'Correct (similarity=1.00).', decision_zone: 'correct' })
         .mockResolvedValueOnce({ is_correct: false, score: 0.2, explanation: 'Incorrect (similarity=0.20).', decision_zone: 'low' })
 
@@ -152,7 +152,7 @@ describe('TestService', () => {
       const questions = [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
       Test.findByPk.mockResolvedValue({ testId: 1, userId: null, question: questions })
       TestResult.create.mockResolvedValue({ resultId: 1, score: 1, total: 1 })
-      semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: '', decision_zone: 'correct' })
+      mistralGradingService.grade.mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: '', decision_zone: 'correct' })
 
       await TestService.submitAnswers(1, 5, [{ questionId: 1, answer: 'Paris' }], 87)
 
@@ -165,7 +165,7 @@ describe('TestService', () => {
       const questions = [makeQuestion(1, 'open', { correct_answer: 'Paris' })]
       Test.findByPk.mockResolvedValue({ testId: 1, userId: null, question: questions })
       TestResult.create.mockResolvedValue({ resultId: 1, score: 1, total: 1 })
-      semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: '', decision_zone: 'correct' })
+      mistralGradingService.grade.mockResolvedValueOnce({ is_correct: true, score: 1.0, explanation: '', decision_zone: 'correct' })
 
       await TestService.submitAnswers(1, 5, [{ questionId: 1, answer: 'Paris' }])
 
@@ -185,12 +185,12 @@ describe('TestService', () => {
         userId: null, question: [makeQuestion(1, 'open', { correct_answer: '  Paris  ' })]
       })
       TestResult.create.mockResolvedValue({ resultId: 1 })
-      semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 0.99, explanation: 'Correct (similarity=0.99).', decision_zone: 'correct' })
+      mistralGradingService.grade.mockResolvedValueOnce({ is_correct: true, score: 0.99, explanation: 'Correct (similarity=0.99).', decision_zone: 'correct' })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: ' PARIS ' }])
       expect(result.results[0].correct).toBe(true)
       expect(result.results[0].explanation).toBe('Correct (similarity=0.99).')
-      expect(semanticService.gradeSemantic).toHaveBeenCalledWith(['Paris'], 'PARIS')
+      expect(mistralGradingService.grade).toHaveBeenCalledWith(['Paris'], 'PARIS', undefined)
     })
 
     it('open — formulations alternatives (accepted_answers) transmises à la correction', async () => {
@@ -204,14 +204,15 @@ describe('TestService', () => {
         ]
       })
       TestResult.create.mockResolvedValue({ resultId: 1 })
-      semanticService.gradeSemantic.mockResolvedValueOnce({ is_correct: true, score: 1, explanation: 'Correct (correspondance exacte).', decision_zone: 'high' })
+      mistralGradingService.grade.mockResolvedValueOnce({ is_correct: true, score: 1, explanation: 'Correct (correspondance exacte).', decision_zone: 'high' })
 
       const result = await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: 'u=r*i' }])
       expect(result.results[0].correct).toBe(true)
       // Les vides sont filtrés, la principale et l'alternative sont transmises ensemble
-      expect(semanticService.gradeSemantic).toHaveBeenCalledWith(
+      expect(mistralGradingService.grade).toHaveBeenCalledWith(
         ['U = R × I', "la tension est égale à la résistance multipliée par l'intensité"],
-        'u=r*i'
+        'u=r*i',
+        undefined
       )
     })
 
