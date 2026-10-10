@@ -4839,3 +4839,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : monter `vue` et `katex` dans `package.json` ; forcer `compression` 1.8.2 par `overrides` (comme déjà fait côté API pour protobufjs, qs, etc.) ; laisser `npm audit fix` mettre à jour `source-map-js`.
 **Alternative écartée** : `npm audit fix --force` (breaking/rétrogradation de `serve`) ; ignorer les advisories dans la CI.
 **Conséquences** : `serve` 14 conserve son API ; override à retirer quand `serve` dépendra de `compression` ≥ 1.8.2. Le message CI « registre indisponible » reste trompeur quand le vrai motif est une vulnérabilité.
+
+
+### [2026-10-10] Prompt de correction : références = formulations alternatives, équivalences explicites, motif exigé précis
+
+**Contexte** : le correcteur pénalisait l'absence d'un élément mentionné dans une seule référence, rejetait des formules équivalentes (forme extensive `nR`, `ρVg`) et produisait des motifs inutiles (« hors sujet » pour une réponse du bon domaine).
+**Décision** : le prompt déclare que les réponses attendues sont des formulations alternatives (en satisfaire une suffit ; « A ou B » satisfait par A), liste des équivalences (synonymes de concept, réarrangement, forme extensive/molaire, expression développée), plafonne à 0,4 « évoquer qu'une relation existe » et à 0,2 « bon cadre sans répondre », place l'inversion à 0, et impose un motif qui nomme l'élément juste/manquant. Clé de cache passée à `v3`.
+**Alternative écartée** : corriger les références à la génération seulement (ne règle pas les fiches existantes ni les formulations hétérogènes) ; seuil `CORRECT_THRESHOLD` abaissé à 0,6 (ferait passer des réponses réellement incomplètes).
+**Conséquences** : prompt plus long (~+400 tokens d'entrée par correction, coût ≈ +0,00001 $ par appel non caché). Risque résiduel : le modèle suit imparfaitement la règle « ou » (« les frottements » seuls reste à 0,4-0,6) ; les cas limites dépendent du jugement du modèle.

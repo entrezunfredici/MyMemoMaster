@@ -177,6 +177,18 @@ describe('MistralGradingService', () => {
       ;['1 =', '0.8 =', '0.6 =', '0.4 =', '0.2 =', '0 ='].forEach((palier) => expect(system).toContain(palier))
     })
 
+    it('grade - le prompt traite les références comme alternatives, accepte les formes équivalentes et exige un motif précis', async () => {
+      const fetchSpy = mockFetchVerdict({ score: 1, reason: 'ok' })
+      await mistralGradingService.grade(REFS, 'réponse', 'Q ?')
+      const system = JSON.parse(fetchSpy.mock.calls[0][1].body).messages[0].content
+      expect(system).toContain('FORMULATIONS ALTERNATIVES')
+      expect(system).toContain('gradient de température')
+      expect(system).toContain('forme extensive ou molaire')
+      expect(system).toContain('0.4 au plus')
+      expect(system).toContain('pas « hors sujet »')
+      expect(system).toContain("n'écris « hors sujet » que pour une réponse sans rapport")
+    })
+
     it.each([[1.2], [-0.1], ['abc'], [null], [undefined], [Number.NaN]])(
       'snapToGrid - valeur invalide %s - null (repli dégradé)',
       (raw) => {
