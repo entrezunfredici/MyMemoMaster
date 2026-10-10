@@ -24,13 +24,13 @@
     "dotenv": "^16.4.5",
     "driver.js": "^1.7.0",
     "jsdom": "^25.0.1",
-    "katex": "^0.16.23",
+    "katex": "^0.19.0",
     "lodash": "^4.17.21",
     "mathlive": "^0.110.0",
     "pinia": "^2.3.1",
     "pinia-plugin-persistedstate": "^3.2.1",
     "serve": "^14.2.4",
-    "vue": "^3.4.21",
+    "vue": "^3.5.43",
     "vue-axios": "^3.5.2",
     "vue-chartjs": "^5.3.3",
     "vue-router": "^4.3.0",
@@ -55,5 +55,8 @@
     "vite": "^6.3.5",
     "vite-plugin-pwa": "^0.21.2",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "compression": "1.8.2"
   }
 }

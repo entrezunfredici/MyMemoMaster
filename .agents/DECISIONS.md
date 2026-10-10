@@ -4831,3 +4831,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Alternative écartée** : note libre 0-1 — les LLM dérivent sur les valeurs fines et rien ne définit 0,43 ; verdict `correct` séparé de la note — risque d'incohérence (note 0,9 mais « faux »).
 **Mesures** (vraie API, `mistral-small-latest`, température 0) : 96 réponses simulées justes/fausses : **96/96 de bonnes décisions aux deux passes** ; justes notées 1 (21) ou 0,8 (27), fausses 0 (39), 0,2 (4) ou 0,4 (5) — aucun chevauchement ; note identique entre 2 passes 93/96. 32 réponses volontairement partielles : « seul un détail manque » → 1 ou 0,8 (correct) ; « moitié juste / erreur majeure » → 0 (5), 0,4 (2), 0,8 (1) ; stabilité 28/32 identiques, **32/32 à ≤ 0,2 d'écart**.
 **Conséquences** : Crédit partiel automatique dans les exercices (`points` = note : 0,6 → 0,6 point alors que `correct` est faux, 0,8 → 0,8 point et `correct`). Les paliers intermédiaires (0,2-0,6) ne sont pas vérifiables contre une vérité terrain (mon jeu est binaire) : calibrés par jugement du prompt, à contrôler sur de vraies réponses d'étudiants. Une réponse notée 0,6 est « incorrecte » en Leitner (retour boîte 1). Le mode dégradé garde un score de similarité (autre sens).
+
+
+### [2026-10-10] Correctifs de sécurité front via montée directe et `overrides` (pas `npm audit fix --force`)
+
+**Contexte** : la CI échouait sur `npm audit --omit=dev --audit-level=high` (vue, compression, katex, source-map-js). `audit fix --force` aurait installé `serve@10.0.2` (rétrogradation) et rien n'indiquait une panne du registre.
+**Décision** : monter `vue` et `katex` dans `package.json` ; forcer `compression` 1.8.2 par `overrides` (comme déjà fait côté API pour protobufjs, qs, etc.) ; laisser `npm audit fix` mettre à jour `source-map-js`.
+**Alternative écartée** : `npm audit fix --force` (breaking/rétrogradation de `serve`) ; ignorer les advisories dans la CI.
+**Conséquences** : `serve` 14 conserve son API ; override à retirer quand `serve` dépendra de `compression` ≥ 1.8.2. Le message CI « registre indisponible » reste trompeur quand le vrai motif est une vulnérabilité.

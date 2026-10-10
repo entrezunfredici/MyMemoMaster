@@ -12823,3 +12823,11 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Comportement** : une réponse notée entre 0 et 1 (exclus) affiche « Note : 0,6 / 1 » ; le badge devient **« Partiel »** (ambre, `bg-amber-700` pour le contraste RGAA) quand elle n'est pas correcte (< 0,8) mais a du crédit, reste « Correct » à 0,8 (avec « Note : 0,8 / 1 ») ; QCM et résultats binaires inchangés. Score global et historique formatés à la française (« 1,6/2 »).
 **Tests** : front 56 fichiers / 876 tests, lint propre. Non vérifié visuellement dans un navigateur (pas de capture d'écran).
 **Dette** : la session Leitner affiche toujours succès/échec binaire (pas de crédit partiel : la règle Leitner reste « correct ou retour boîte 1 »).
+
+
+### [2026-10-10] [FIX] Front — `npm audit` en échec en CI (vue, compression, katex)
+
+**Fichiers** : `my_memo_master_front/package.json` (`vue ^3.5.43`, `katex ^0.19.0`, `overrides.compression = 1.8.2`), `package-lock.json` (`source-map-js` 1.2.2 via `npm audit fix`).
+**Cause** : advisories réelles (pas une panne du registre, malgré le message de retry de la CI) : `@vue/server-renderer`/`vue` ≤ 3.5.41 (XSS), `compression` < 1.8.2 (DoS, transitive de `serve`), `katex` ≤ 0.18.1 (pollution de prototype), `source-map-js` ≤ 1.2.1 (DoS).
+**Résultat** : `npm audit --omit=dev --audit-level=high` → 0 vulnérabilité. Build Vite OK, front 56 fichiers / 876 tests verts.
+**Hypothèses / dette** : `katex` 0.19 (saut mineur pré-1.0) vérifié par les tests uniquement, pas visuellement (formules dans FormulaTextComponent, interpreter, MindMapNode). Un `npm audit` complet (devDependencies) signale encore `tinypool`/vitest (critique) : hors périmètre de la CI (`--omit=dev`), exige vitest 5 (breaking). L'override `compression` est à retirer quand `serve` le remontera lui-même.
