@@ -70,28 +70,12 @@ describe('useMindMapBuilderStore', () => {
     expect(store.map.nodes[id].label).toBe('Nouveau titre')
   })
 
-  it('updateNode mastery "high" — secondaryColor passe à #27AE60', () => {
+  it('updateNode mastery — la couleur secondaire reste neutre (elle vient de la boîte liée)', () => {
     const store = useMindMapBuilderStore()
     store.new('Sujet')
     const id = store.map.subjectNodeId
     store.updateNode(id, { mastery: 'high' })
-    expect(store.map.nodes[id].style.secondaryColor).toBe('#27AE60')
-  })
-
-  it('updateNode mastery "low" — secondaryColor passe à #E74C3C', () => {
-    const store = useMindMapBuilderStore()
-    store.new('Sujet')
-    const id = store.map.subjectNodeId
-    store.updateNode(id, { mastery: 'low' })
-    expect(store.map.nodes[id].style.secondaryColor).toBe('#E74C3C')
-  })
-
-  it('updateNode mastery "medium" — secondaryColor passe à #F39C12', () => {
-    const store = useMindMapBuilderStore()
-    store.new('Sujet')
-    const id = store.map.subjectNodeId
-    store.updateNode(id, { mastery: 'medium' })
-    expect(store.map.nodes[id].style.secondaryColor).toBe('#F39C12')
+    expect(store.map.nodes[id].style.secondaryColor).toBe('#C0C5D2')
   })
 
   // ── updateNodeStyle ───────────────────────────────────────────────────────
@@ -288,5 +272,185 @@ describe('useMindMapBuilderStore', () => {
     const store = useMindMapBuilderStore()
     store.new('Sujet')
     expect(store.selectedNode).toBeNull()
+  })
+})
+
+describe('useMindMapBuilderStore — rôles des items', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue({ data: [] })
+  })
+
+  it('addNode — une grandeur reçoit un objet quantity vide', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Physique')
+    const id = store.addNode({ type: 'quantity' })
+    expect(store.map.nodes[id].quantity).toEqual({ symbol: '', value: null, unit: '' })
+  })
+
+  it('toggleNodeKind — une formule peut aussi être une grandeur', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Physique')
+    const id = store.addNode({ type: 'formula', content: 'E=mc^2' })
+    store.toggleNodeKind(id, 'quantity')
+    expect(store.map.nodes[id].type).toBe('formula')
+    expect(store.map.nodes[id].kinds).toEqual(['quantity'])
+    expect(store.map.nodes[id].quantity).toBeDefined()
+    store.toggleNodeKind(id, 'quantity')
+    expect(store.map.nodes[id].kinds).toEqual([])
+  })
+
+  it('toggleNodeKind — ignore le rôle principal et les rôles inconnus', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Physique')
+    const id = store.addNode({ type: 'formula' })
+    store.toggleNodeKind(id, 'formula')
+    store.toggleNodeKind(id, 'inconnu')
+    expect(store.map.nodes[id].kinds).toEqual([])
+  })
+
+  it('updateNode — changer le rôle principal retire ce rôle des rôles supplémentaires', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Physique')
+    const id = store.addNode({ type: 'formula' })
+    store.toggleNodeKind(id, 'quantity')
+    store.updateNode(id, { type: 'quantity' })
+    expect(store.map.nodes[id].type).toBe('quantity')
+    expect(store.map.nodes[id].kinds).toEqual([])
+  })
+
+  it('updateNodeQuantity — convertit la valeur en nombre, null si invalide', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Physique')
+    const id = store.addNode({ type: 'quantity' })
+    store.updateNodeQuantity(id, { symbol: 'v', value: '12.5', unit: 'm/s' })
+    expect(store.map.nodes[id].quantity).toEqual({ symbol: 'v', value: 12.5, unit: 'm/s' })
+    store.updateNodeQuantity(id, { value: 'abc' })
+    expect(store.map.nodes[id].quantity.value).toBeNull()
+  })
+
+  it('load — un ancien item sans kinds est normalisé', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Ancienne')
+    const payload = store.exportPayload()
+    const rootId = payload.subjectNodeId
+    delete payload.nodes[rootId].kinds
+    store.load(payload)
+    expect(store.map.nodes[rootId].kinds).toEqual([])
+  })
+})
+
+describe('useMindMapBuilderStore — branches', () => {
+  const setup = () => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue({ data: [] })
+    const store = useMindMapBuilderStore()
+    store.new('Carte')
+    return store
+  }
+
+  it('addNode — les branches sortantes reçoivent un ordre de lecture croissant', () => {
+    const store = setup()
+    const root = store.map.subjectNodeId
+    store.addNode({ parentId: root })
+    store.addNode({ parentId: root })
+    store.addNode({ parentId: root })
+    expect(store.map.links.map((l) => l.order)).toEqual([0, 1, 2])
+  })
+
+  it('moveLink — échange l\'ordre de lecture et ignore les bornes', () => {
+    const store = setup()
+    const root = store.map.subjectNodeId
+    store.addNode({ parentId: root })
+    store.addNode({ parentId: root })
+    const [first, second] = store.map.links
+    store.moveLink(second.id, -1)
+    expect(second.order).toBe(0)
+    expect(first.order).toBe(1)
+    store.moveLink(second.id, -1)
+    expect(second.order).toBe(0)
+  })
+
+  it('addBranchType — crée un type personnalisé, refuse les doublons', () => {
+    const store = setup()
+    expect(store.addBranchType('Équivalence')).toBe('equivalence')
+    expect(store.map.branchTypes.some((t) => t.id === 'equivalence')).toBe(true)
+    expect(store.addBranchType('equivalence')).toBeNull()
+    expect(store.addBranchType('')).toBeNull()
+  })
+
+  it('updateLink — fusionne le style et garde forme et sens cohérents', () => {
+    const store = setup()
+    store.addNode({})
+    const link = store.map.links[0]
+    store.updateLink(link.id, { direction: 'bidirectional', style: { shape: 'elbow', primaryColor: '#ff0000' } })
+    expect(link.direction).toBe('bidirectional')
+    expect(link.style).toMatchObject({ shape: 'elbow', primaryColor: '#ff0000', bezier: false })
+    expect(link.style.secondaryColor).toBeTruthy()
+  })
+
+  it('finalizePendingLink — utilise le type de lien choisi', () => {
+    const store = setup()
+    const a = store.addNode({})
+    const b = store.addNode({})
+    store.setLinkType('causalite')
+    store.setPendingLinkSource(a)
+    store.finalizePendingLink(b)
+    expect(store.map.links.find((l) => l.from === a && l.to === b).type).toBe('causalite')
+  })
+
+  it('selectedLink — renvoie la branche sélectionnée', () => {
+    const store = setup()
+    store.addNode({})
+    store.selectLink(store.map.links[0].id)
+    expect(store.selectedLink.id).toBe(store.map.links[0].id)
+  })
+
+  // ── Grandeurs générées depuis une formule ─────────────────────────────────
+
+  describe('createQuantitiesForFormula', () => {
+    const formulaStore = (content = 'E = 1/2 M V^2') => {
+      const store = setup()
+      const id = store.addNode({ label: 'Énergie', type: 'formula', content })
+      return { store, id }
+    }
+
+    it('crée une grandeur par variable, reliée par une branche « Calcul », symbole prérempli', () => {
+      const { store, id } = formulaStore()
+      const created = store.createQuantitiesForFormula(id, ['M', 'V'])
+      expect(created).toHaveLength(2)
+      const symbols = created.map((nid) => store.map.nodes[nid].quantity.symbol)
+      expect(symbols).toEqual(['M', 'V'])
+      created.forEach((nid) => {
+        expect(store.map.nodes[nid].type).toBe('quantity')
+        const branch = store.map.links.find((l) => l.from === id && l.to === nid)
+        expect(branch.type).toBe('calcul')
+      })
+    })
+
+    it('ne recrée pas une variable déjà reliée et ignore les symboles inconnus de la formule', () => {
+      const { store, id } = formulaStore()
+      store.createQuantitiesForFormula(id, ['M'])
+      const again = store.createQuantitiesForFormula(id, ['M', 'V', 'zzz'])
+      expect(again).toHaveLength(1)
+      expect(store.map.nodes[again[0]].quantity.symbol).toBe('V')
+    })
+
+    it('le résultat est ensuite calculable dès que les valeurs sont saisies', () => {
+      const { store, id } = formulaStore()
+      const [m, v] = store.createQuantitiesForFormula(id, ['M', 'V'])
+      store.updateNodeQuantity(m, { value: 2, unit: 'kg' })
+      store.updateNodeQuantity(v, { value: 5, unit: 'm/s' })
+      expect(store.calculations[id]).toMatchObject({ ok: true, value: 25, unit: 'J' })
+    })
+
+    it('garde la formule sélectionnée et ne touche pas une formule inexistante', () => {
+      const { store, id } = formulaStore()
+      store.createQuantitiesForFormula(id, ['M'])
+      expect(store.selectedNodeIds).toEqual([id])
+      expect(store.createQuantitiesForFormula('absent', ['M'])).toEqual([])
+    })
   })
 })

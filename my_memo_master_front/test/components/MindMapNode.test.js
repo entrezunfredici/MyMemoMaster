@@ -9,6 +9,7 @@ import { renderMathMultiline } from '@/components/interpreter/interpreter.js'
 
 vi.mock('@/components/interpreter/interpreter.js', () => ({
   renderMathMultiline: vi.fn((input) => `<span class="katex-mock">${input}</span>`),
+  toLatex: vi.fn((input) => String(input ?? '')),
 }))
 vi.mock('@/helpers/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }))
 vi.mock('@/config', () => ({ VITE_API_URL: 'http://localhost:3000' }))
@@ -173,6 +174,58 @@ describe('MindMapNode', () => {
   })
 
   // ── Drag & drop sur image ─────────────────────────────────────────────────
+
+  it("double-clic sur le symbole d'une grandeur ouvre les champs symbole et unité", async () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'quantity', content: '' }) })
+    await wrapper.find('.mindmap-node__quantity-label').trigger('dblclick')
+    expect(wrapper.find('.mindmap-node__quantity-editor').exists()).toBe(true)
+    expect(wrapper.findAll('.mindmap-node__quantity-input')).toHaveLength(2)
+  })
+
+  it("Entrée dans l'éditeur de grandeur enregistre symbole et unité via store.updateNodeQuantity", async () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'quantity', content: '' }) })
+    const store = useMindMapBuilderStore()
+    await wrapper.find('.mindmap-node__quantity-label').trigger('dblclick')
+    const [symbol, unit] = wrapper.findAll('.mindmap-node__quantity-input')
+    await symbol.setValue('m')
+    await unit.setValue('kg')
+    await unit.trigger('keydown.enter')
+    expect(store.updateNodeQuantity).toHaveBeenCalledWith('node-1', { symbol: 'm', unit: 'kg' })
+    expect(wrapper.find('.mindmap-node__quantity-editor').exists()).toBe(false)
+  })
+
+  it("Échap dans l'éditeur de grandeur annule sans enregistrer", async () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'quantity', content: '' }) })
+    const store = useMindMapBuilderStore()
+    await wrapper.find('.mindmap-node__quantity-label').trigger('dblclick')
+    await wrapper.find('.mindmap-node__quantity-input').trigger('keydown.escape')
+    expect(store.updateNodeQuantity).not.toHaveBeenCalled()
+    expect(wrapper.find('.mindmap-node__quantity-editor').exists()).toBe(false)
+  })
+
+  it("la valeur d'une grandeur s'édite directement, sans double-clic", async () => {
+    const wrapper = mountNode({
+      node: makeNode({ type: 'quantity', content: '', quantity: { symbol: 'M', value: null, unit: 'kg' } }),
+    })
+    const store = useMindMapBuilderStore()
+    const input = wrapper.find('.mindmap-node__quantity-value')
+    expect(input.exists()).toBe(true)
+    await input.setValue('2')
+    await input.trigger('change')
+    expect(store.updateNodeQuantity).toHaveBeenCalledWith('node-1', { value: '2' })
+  })
+
+  it("affiche le résultat calculé d'une formule reliée à des grandeurs", () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'formula', content: 'E = M' }) })
+    const store = useMindMapBuilderStore()
+    store.$patch({})
+    store.map.nodes['node-1'] = makeNode({ type: 'formula', content: 'E = M' })
+    store.map.nodes.q = { id: 'q', type: 'quantity', kinds: [], quantity: { symbol: 'M', value: 3, unit: 'kg' } }
+    store.map.links = [{ id: 'l', from: 'node-1', to: 'q' }]
+    return wrapper.vm.$nextTick().then(() => {
+      expect(wrapper.find('.mindmap-node__quantity--result').text()).toBe('E = 3 kg')
+    })
+  })
 
   it("dragover sur .mindmap-node__image active l'état de survol (isDragOver)", async () => {
     const wrapper = mountNode({ node: makeNode({ type: 'image', content: '' }) })

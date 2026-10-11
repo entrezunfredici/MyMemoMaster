@@ -12,6 +12,7 @@ vi.mock('@/helpers/api', () => ({ api: { get: mockGet, post: vi.fn() } }))
 vi.mock('@/config', () => ({ VITE_API_URL: 'http://localhost:3000' }))
 vi.mock('@/components/interpreter/interpreter.js', () => ({
   renderMathMultiline: vi.fn((v) => `<span class="katex-mock">${v}</span>`),
+  toLatex: vi.fn((v) => String(v ?? '')),
 }))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -120,7 +121,7 @@ describe('MindMapPalette', () => {
         stubs: { Interpreter: { template: '<div class="interpreter-stub" />' } },
       },
     })
-    expect(wrapper.text()).toContain('Sélectionnez un item pour modifier ses options.')
+    expect(wrapper.text()).toContain('Sélectionnez un item ou une branche pour modifier ses options.')
     expect(wrapper.find('.palette__section--selected').exists()).toBe(false)
   })
 
@@ -140,10 +141,66 @@ describe('MindMapPalette', () => {
     expect(typeSelect.element.value).toBe('formula')
   })
 
-  it('affiche le sélecteur de maîtrise avec la valeur courante', () => {
+  it("n'affiche pas de sélecteur de maîtrise (elle vient de la flashcard liée)", () => {
     const wrapper = mountPalette({ mastery: 'medium' })
-    const masterySelect = wrapper.find('.palette__section--selected select:not(.palette__select--inline)')
-    expect(masterySelect.element.value).toBe('medium')
+    expect(wrapper.find('select[aria-label="Niveau de maîtrise"]').exists()).toBe(false)
+  })
+
+  // ── Grandeurs proposées après saisie d'une formule ────────────────────────
+
+  describe('proposition de grandeurs après saisie d\'une formule', () => {
+    const mountWithInterpreter = () =>
+      mount(MindMapPalette, {
+        global: {
+          plugins: [
+            createTestingPinia({
+              createSpy: vi.fn,
+              stubActions: true,
+              initialState: makeStoreState({ type: 'formula', content: 'E = M V' }, { interpreterOpen: true }),
+            }),
+          ],
+          stubs: {
+            Interpreter: {
+              emits: ['apply'],
+              template: '<button class="interp-apply" @click="$emit(\'apply\', \'E = M V\')">ok</button>',
+            },
+          },
+        },
+        attachTo: document.body,
+      })
+
+    it('liste les variables sans grandeur et crée celles qui restent cochées', async () => {
+      const wrapper = mountWithInterpreter()
+      const store = useMindMapBuilderStore()
+      await document.body.querySelector('.interp-apply').click()
+      await wrapper.vm.$nextTick()
+
+      const items = [...document.body.querySelectorAll('.variable-prompt__item')]
+      expect(items.map((el) => el.textContent.trim())).toEqual(['M', 'V'])
+
+      items[1].querySelector('input').click() // décoche V
+      await wrapper.vm.$nextTick()
+      const create = [...document.body.querySelectorAll('.variable-prompt__actions button')][0]
+      create.click()
+      await wrapper.vm.$nextTick()
+
+      expect(store.createQuantitiesForFormula).toHaveBeenCalledWith('node-1', ['M'])
+      expect(document.body.querySelector('.variable-prompt__list')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('« Ignorer » ferme la fenêtre sans rien créer', async () => {
+      const wrapper = mountWithInterpreter()
+      const store = useMindMapBuilderStore()
+      await document.body.querySelector('.interp-apply').click()
+      await wrapper.vm.$nextTick()
+      const ignore = [...document.body.querySelectorAll('.variable-prompt__actions button')][1]
+      ignore.click()
+      await wrapper.vm.$nextTick()
+      expect(store.createQuantitiesForFormula).not.toHaveBeenCalled()
+      expect(document.body.querySelector('.variable-prompt__list')).toBeNull()
+      wrapper.unmount()
+    })
   })
 
   // ── Changement de type ────────────────────────────────────────────────────
@@ -155,17 +212,6 @@ describe('MindMapPalette', () => {
     typeSelect.element.value = 'formula'
     await typeSelect.trigger('change')
     expect(store.updateNode).toHaveBeenCalledWith('node-1', expect.objectContaining({ type: 'formula' }))
-  })
-
-  // ── Changement de maîtrise ────────────────────────────────────────────────
-
-  it('changer la maîtrise appelle store.updateNode avec le niveau', async () => {
-    const wrapper = mountPalette()
-    const store = useMindMapBuilderStore()
-    const masterySelect = wrapper.find('.palette__section--selected select:not(.palette__select--inline)')
-    masterySelect.element.value = 'high'
-    await masterySelect.trigger('change')
-    expect(store.updateNode).toHaveBeenCalledWith('node-1', { mastery: 'high' })
   })
 
   // ── Options texte ─────────────────────────────────────────────────────────

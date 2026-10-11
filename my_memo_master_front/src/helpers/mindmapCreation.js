@@ -1,4 +1,4 @@
-const creationTools = ['text', 'formula', 'image'];
+const creationTools = ['text', 'formula', 'function', 'quantity', 'image'];
 
 const creationLabels = {
   text: {
@@ -10,6 +10,16 @@ const creationLabels = {
     node: 'Nouvelle formule',
     subject: 'Ajouter une formule liée au sujet',
     child: 'Ajouter une formule enfant',
+  },
+  function: {
+    node: 'Nouvelle fonction',
+    subject: 'Ajouter une fonction liée au sujet',
+    child: 'Ajouter une fonction enfant',
+  },
+  quantity: {
+    node: 'Nouvelle grandeur',
+    subject: 'Ajouter une grandeur liée au sujet',
+    child: 'Ajouter une grandeur enfant',
   },
   image: {
     node: 'Nouvelle image',

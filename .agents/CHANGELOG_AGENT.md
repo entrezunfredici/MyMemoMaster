@@ -12840,3 +12840,65 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Mesure** (vraie API, `mistral-small-latest`, 114 appels = 57 cas × 2) : prompt précédent **91/114 (80 %)** ; après correction **114/114**. Défauts corrigés : références alternatives traitées comme cumulatives, formules équivalentes rejetées (`Cp − Cv = nR`, `ρVg`, `PV = RT`), « évoquer une relation » noté 0,8, motif « hors sujet » ou contradictoire.
 **Réserve** : après la 2e passe, j'ai assoupli 3 attentes jugées défendables dans les deux sens (« les frottements » seuls : 0,6-1 ; « la pression dépend de la profondeur, ρ et g » : 0,6-1 ; énoncé de Clausius pour le 2nd principe : 0-0,6). Le 100 % n'est donc pas comparable au 80 % initial sur ces 3 cas (le prompt seul a fait passer 91 → 105 avant tout assouplissement). Jeu écrit par l'agent, pas par un enseignant : à valider.
 **Dette** : le cache Redis est invalidé (clé v3) ; banc payant, hors CI, à rejouer à chaque changement de prompt (`node scripts/quality-check-grading.js --runs 2`) ; le jeu de 96 cas du 2026-10-09 n'étant pas versionné, la non-régression sur celui-ci n'a pas été rejouée.
+
+
+### [2026-10-11] [ADD] Front — items de carte mentale multi-rôles (formule + grandeur…)
+
+**Fichiers** : créé `src/helpers/mindmapItems.js` (rôles, `getNodeKinds`, `hasKind`, `normalizeNodeItem`, `createQuantity`, `formatQuantity`) ; modifiés `helpers/mindmap.js` (normalisation au chargement), `helpers/mindmapCreation.js`, `stores/mindmapBuilder.js` (`kinds` dans `addNode`, `toggleNodeKind`, `updateNodeQuantity`, `updateNode` re-normalise), `MindMapPalette.vue` (rôles « Aussi » + champs grandeur), `MindMapNode.vue` (rendu fonction, grandeur, pastille de grandeur) ; tests `test/helpers/mindmapItems.test.js` (+7), `mindmapBuilder.store.test.js` (+6).
+**Utilisable** : un item a un rôle principal `type` (text, formula, function, quantity, image) et des rôles supplémentaires `kinds`. Une grandeur porte `quantity: { symbol, value, unit }`. Une formule cochée « Grandeur » affiche sa valeur en pastille.
+**Hypothèses** : liste de rôles fixe (les rôles personnalisés viendront avec les liens) ; `function` se rend comme `formula` (KaTeX) ; anciennes cartes migrées à la volée au chargement (`kinds: []`), aucune migration BDD (le JSON est libre côté API).
+**Dette** : pas de calcul des formules ni de transmission de valeur (étape 3, dépend des branches) ; pas de vérification visuelle en navigateur ; `diagrams/mindmap_rules.md` à compléter avec `kinds`/`quantity`.
+
+
+### [2026-10-11] [ADD] Front — branches de carte mentale (types, sens, forme, ordre de lecture)
+
+**Fichiers** : créé `src/helpers/mindmapLinks.js` (normalisation, types personnalisés, ordre de lecture, géométrie) ; réécrit `MindMapLink.vue` (flèches par branche, type au-dessus, pastille secondaire au milieu, zone de clic élargie) ; modifiés `MindMapBoard.vue` (rangs de lecture, suppression des `<marker>` globaux), `MindMapPalette.vue` (section « Branche » + type des nouvelles branches en mode lien), `stores/mindmapBuilder.js` (`linkType`, `selectedLink`, `addBranchType`, `moveLink`, `updateLink` fusionne le style), `helpers/mindmap.js` (normalisation des liens, libellés accentués), `diagrams/mindmap_rules.md` ; tests `mindmapLinks.test.js` (+9), store (+6).
+**Utilisable** : sélection d'une branche → type (dont types créés par l'étudiant), sens un/deux, forme courbe/droite/coudée, couleur principale, couleur secondaire (milieu), ordre de lecture ↑↓, suppression.
+**Hypothèses** : les anciennes cartes sont normalisées au chargement (aucune migration BDD) ; les flèches suivent la couleur principale de la branche.
+**Dette** : `interactions` (transmettre une valeur, masquer/afficher) et calcul des formules restent à faire (étape 3) et n'ont volontairement pas d'UI ; pas de vérification visuelle en navigateur ; `bezier` conservé en miroir de `shape` pour compatibilité.
+
+
+### [2026-10-11] [IMP] Couleur choisie par boîte de Leitner + palette par défaut rouge → vert
+
+**Fichiers** : modifiés `my_memo_master_api/services/LeitnerSystem.service.js` (`DEFAULT_BOXES`), `validators/LeitnerBox.validators.js` (`color` entier 0–16777215), `seeds/LeitnerBox.seed.json` ; créé `migrations/20260913000001-update-leitnerbox-default-colors.js` ; front `helpers/mindmap.js` (`DEFAULT_BOX_PALETTE`, `defaultBoxColorHex`, `hexToBoxColor`, `boxColorToHex` borné, `ensureSecondaryColor` conserve la couleur de boîte des items liés), `pages/FlashcardsCardsPage.vue` (sélecteur de couleur dans la modale de boîte, pastille colorée) ; test `test/helpers/mindmapBoxColors.test.js` (+7).
+**Utilisable** : la couleur de chaque boîte se choisit à la création/modification (défaut selon le niveau). Les items de carte mentale liés à une flashcard prennent la couleur de la boîte où se trouve la carte (déjà branché sur lien + resynchronisation à l'ouverture ; elle n'est plus écrasée par la couleur de maîtrise au chargement).
+**Hypothèses** : `color` reste un BIGINT 0xRRGGBB (pas de changement de schéma) ; la migration ne remplace que les anciens placeholders exacts (123456, 654321, 111111, 222222, 333333) par niveau, les couleurs choisies sont préservées.
+**Dette** : pas de vérification visuelle en navigateur ; pas de test de validator côté API ; la palette est dupliquée API/front (constantes miroirs) ; les cartes mentales ne se mettent à jour qu'à l'ouverture (pas de temps réel après une réponse).
+
+
+### [2026-10-11] [IMP] Front — plus de sélecteur de maîtrise dans le formulaire d'un item
+
+**Fichiers** : `MindMapPalette.vue` (sélecteur « Maîtrise », `updateMastery`, `masteryLevels` retirés), `test/components/MindMapPalette.test.js` (2 tests de sélecteur remplacés par 1 test d'absence).
+**Utilisable** : la maîtrise d'un item vient uniquement de la flashcard liée (niveau de sa boîte, posé au lien et à la resynchronisation) ; un item non lié reste « non défini ».
+**Dette** : `store.updateNode({ mastery })` et `masteryList` restent exportés (utilisés par le lien/synchro et les tests) ; pas de vérification visuelle.
+
+
+### [2026-10-11] [IMP] Front — édition inline de la grandeur sur l'item de carte mentale
+
+**Fichiers** : `MindMapNode.vue` (double-clic sur la grandeur → trois champs symbole / valeur / unité, Entrée ou sortie du focus valide, Échap annule ; texte de la grandeur en couleur claire), `MindMapPalette.vue` (symbole et unité mis à jour à la frappe), `test/components/MindMapNode.test.js` (+3).
+**Utilisable** : la grandeur se saisit directement sur l'item (comme titre, texte et formule) ou dans la palette ; fonctionne aussi pour une formule marquée « Grandeur » (pastille).
+**Dette** : pas de vérification visuelle en navigateur ; la taille fixe de l'item (220×120) peut serrer les trois champs.
+
+
+### [2026-10-11] [REF] Front — couleurs des boîtes Leitner et des cartes mentales centralisées dans base.css
+
+**Fichiers** : `src/assets/base.css` (`--mastery-*`, `--mindmap-*` — pas de couleurs de boîtes Leitner : réglables, elles vivent côté API), créé `src/helpers/themeColors.js` (`themeColor`, `mindmapColors`, lecture des variables CSS avec repli), modifiés `helpers/mindmap.js`, `helpers/mindmapLinks.js`, `stores/mindmapBuilder.js`, `MindMapNode/Link/Zone/Palette.vue`, `MindMapNodePickerComponent.vue` ; test `mindmapBoxColors.test.js` (+2).
+**Utilisable** : changer une couleur par défaut (maîtrise, fond/texte des items, branches, zones) se fait dans `base.css`. Front 59 fichiers / 915 tests verts.
+**Hypothèses** : les valeurs de repli de `themeColors.js` (tests, hors navigateur) répliquent `base.css` ; les getters sont évalués à l'accès car la feuille peut se charger après l'import des modules.
+**Dette** : la modale de boîte pré-remplit la couleur avec celle de la dernière boîte du système (la palette par défaut n'existe que dans l'API, `DEFAULT_BOXES`) ; les ~39 fichiers avec hex en dur hors cartes mentales (`#1e3ba1`, `#dc2626`, gris Tailwind…) et le CSS scoped des composants mindmap (`#dbeafe`, `#0f172a`…) ne sont pas migrés (risque de contraste RGAA) ; pas de vérification visuelle.
+
+
+### [2026-10-11] [ADD] Front — calcul des formules de carte mentale + édition de grandeur + couleurs de maîtrise
+
+**Fichiers** : créés `src/helpers/quantityUnits.js` (unités → dimension SI + facteur, unité du résultat : J, N, W, Pa… sinon `kg·m/s`), `src/helpers/mindmapCalc.js` (lexer + évaluateur de formules LaTeX/raccourcis avec dimensions, `computeFormula`, `computeAllFormulas`) ; modifiés `stores/mindmapBuilder.js` (getter `calculations`), `MindMapNode.vue` (ligne de grandeur : valeur éditable directement, double-clic sur symbole/unité ; résultat calculé ou erreur sous la formule), `helpers/mindmap.js` + `base.css` + `themeColors.js` (`--mastery-*` et `masteryColors` supprimés : un item lié prend la couleur de sa boîte, sinon neutre) ; tests `quantityUnits.test.js` (+5), `mindmapCalc.test.js` (+11), `MindMapNode.test.js` (+5, 3 réécrits), store (3 tests de couleur de maîtrise → 1).
+**Utilisable** : relier une formule (`E = 1/2 M V^2`, LaTeX ou raccourcis) à des grandeurs par une branche (dans un sens ou dans l'autre) ; chaque variable de la formule est associée à la grandeur de même symbole ; le résultat s'affiche avec son unité et se met à jour à chaque changement de valeur. Les formules se chaînent (résultat d'une formule = entrée d'une autre). Conversion automatique vers le SI (g, km/h…).
+**Hypothèses** : la liaison variable ↔ grandeur se fait par le symbole (casse respectée) ; le résultat est exprimé en SI ; résultat calculé à la volée, jamais stocké (le JSON de la carte ne change pas).
+**Dette** : pas de fonctions (sin, ln…), pas de sommes/intégrales, pas de choix de l'unité de sortie ; pas de vérification visuelle en navigateur ; un symbole absent ou en double sur deux grandeurs reliées prend la première ; `interactions` des branches toujours sans UI.
+
+
+### [2026-10-11] [ADD] Front — génération des grandeurs d'une formule de carte mentale
+
+**Fichiers** : `helpers/mindmapCalc.js` (`collectSources` factorisé, `missingVariables`), `stores/mindmapBuilder.js` (`addNode({ linkType })`, action `createQuantitiesForFormula`), `MindMapPalette.vue` (fenêtre « Créer les grandeurs de la formule ? » après « Insérer dans l'item ») ; tests `mindmapCalc.test.js` (+4), store (+4), `MindMapPalette.test.js` (+2, mock `toLatex` ajouté).
+**Utilisable** : après saisie d'une formule dans l'interpréteur, les variables du membre de droite sans grandeur reliée sont listées (cases cochées par défaut) ; « Créer les grandeurs » ajoute un item grandeur par variable cochée, symbole prérempli, relié à la formule par une branche « Calcul », placé autour d'elle. Il ne reste qu'à saisir valeurs et unités ; le résultat s'affiche alors tout seul.
+**Hypothèses** : une variable déjà reliée (même symbole) n'est jamais recréée ni modifiée ; rien n'est supprimé quand la formule change ; sans indice, une suite de lettres (`Ec`) est lue comme des variables séparées (cases décochables).
+**Dette** : proposition seulement après l'interpréteur (pas à l'édition du texte brut) ; pas de renommage du symbole dans la fenêtre ; pas de vérification visuelle en navigateur.

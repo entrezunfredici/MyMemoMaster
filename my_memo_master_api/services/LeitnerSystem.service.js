@@ -11,12 +11,14 @@ const rightsCache = require('../helpers/leitnerRightsCache')
 // documentées dans diagrams/leitner_algo.md §5. Reste configurable par système,
 // sans restriction de droits (voir DECISIONS.md — décision explicite de l'utilisateur
 // de ne pas ajouter de vérification de propriété sur LeitnerBox).
+// `color` est un entier 0xRRGGBB (colonne BIGINT) : rouge → vert, du moins au mieux maîtrisé.
+// Palette miroir de DEFAULT_BOX_PALETTE (front, helpers/mindmap.js).
 const DEFAULT_BOXES = [
-  { level: 1, intervall: 86400, color: 123456 }, // 1 jour
-  { level: 2, intervall: 259200, color: 654321 }, // 3 jours
-  { level: 3, intervall: 604800, color: 111111 }, // 7 jours
-  { level: 4, intervall: 1209600, color: 222222 }, // 14 jours
-  { level: 5, intervall: 2592000, color: 333333 } // 30 jours
+  { level: 1, intervall: 86400, color: 0xe74c3c }, // 1 jour — rouge
+  { level: 2, intervall: 259200, color: 0xf39c12 }, // 3 jours — orange
+  { level: 3, intervall: 604800, color: 0xf1c40f }, // 7 jours — jaune
+  { level: 4, intervall: 1209600, color: 0x2ecc71 }, // 14 jours — vert clair
+  { level: 5, intervall: 2592000, color: 0x27ae60 } // 30 jours — vert
 ]
 
 const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }

@@ -65,6 +65,11 @@
             :key="box.idBox"
             class="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 text-sm"
           >
+            <span
+              class="inline-block w-3 h-3 rounded-full border border-black/10"
+              :style="{ backgroundColor: boxColorToHex(box.color) }"
+              aria-hidden="true"
+            ></span>
             <span class="font-semibold text-primary">B{{ box.level }}</span>
             <span class="text-gray-500">{{ box.intervall }}s</span>
             <button @click="openEditBoxModal(box)" class="text-gray-400 hover:text-primary" title="Modifier">✎</button>
@@ -312,7 +317,7 @@
               required
             />
           </div>
-          <div class="form-group--lg">
+          <div class="form-group">
             <label class="form-label">Intervalle (secondes)</label>
             <input aria-label="Intervalle en secondes"
               v-model="boxForm.intervall"
@@ -321,6 +326,14 @@
               placeholder="Ex : 10"
               class="form-input"
               required
+            />
+          </div>
+          <div class="form-group--lg">
+            <label class="form-label">Couleur</label>
+            <input aria-label="Couleur de la boîte"
+              v-model="boxForm.color"
+              type="color"
+              class="h-10 w-16 cursor-pointer rounded border border-gray-200 bg-white p-1"
             />
           </div>
           <p v-if="boxFormError" class="text-red-600 text-sm mb-4">{{ boxFormError }}</p>
@@ -369,6 +382,7 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
+import { boxColorToHex, hexToBoxColor } from '@/helpers/mindmap'
 import FormulaText from '@/components/FormulaTextComponent.vue'
 import FormulaHelper from '@/components/FormulaHelperComponent.vue'
 import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
@@ -460,7 +474,7 @@ const showBoxModal = ref(false)
 const submittingBox = ref(false)
 const boxFormError = ref('')
 const editingBox = ref(null)
-const boxForm = reactive({ level: '', intervall: '' })
+const boxForm = reactive({ level: '', intervall: '', color: boxColorToHex(null) })
 
 // --- génération par IA (C-01.08 / C-01.09) ---
 const aiCardGenerationStore = useAiCardGenerationStore()
@@ -780,8 +794,11 @@ const handleDelete = async (card) => {
 
 const openAddBoxModal = () => {
   editingBox.value = null
+  // Pré-remplit avec la couleur de la dernière boîte du système (réglable ensuite).
+  const lastBox = systemBoxes.value.reduce((last, b) => (!last || b.level > last.level ? b : last), null)
   boxForm.level = ''
   boxForm.intervall = ''
+  boxForm.color = boxColorToHex(lastBox?.color)
   boxFormError.value = ''
   showBoxModal.value = true
 }
@@ -790,6 +807,7 @@ const openEditBoxModal = (box) => {
   editingBox.value = box
   boxForm.level = box.level
   boxForm.intervall = box.intervall
+  boxForm.color = boxColorToHex(box.color)
   boxFormError.value = ''
   showBoxModal.value = true
 }
@@ -799,13 +817,14 @@ const closeBoxModal = () => {
   editingBox.value = null
   boxForm.level = ''
   boxForm.intervall = ''
+  boxForm.color = boxColorToHex(null)
   boxFormError.value = ''
 }
 
 const submitBoxForm = async () => {
   submittingBox.value = true
   boxFormError.value = ''
-  const data = { level: Number(boxForm.level), intervall: Number(boxForm.intervall), color: 123456, idSystem: systemId }
+  const data = { level: Number(boxForm.level), intervall: Number(boxForm.intervall), color: hexToBoxColor(boxForm.color), idSystem: systemId }
   const resp = editingBox.value
     ? await api.put(`leitnerboxes/${editingBox.value.idBox}`, data)
     : await api.post('leitnerboxes', data)

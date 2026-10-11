@@ -39,8 +39,8 @@
               :width="nodeWidth(node)"
               :height="nodeHeight(node)"
               :rx="nodeHeight(node) / 2"
-              :fill="node.id === modelValue ? '#1E3A8A' : '#ffffff'"
-              :stroke="node.id === modelValue ? '#1E3A8A' : node.style?.primaryColor || '#1E3A8A'"
+              :fill="node.id === modelValue ? mindmapColors.nodeBg : '#ffffff'"
+              :stroke="node.id === modelValue ? mindmapColors.nodeBg : node.style?.primaryColor || mindmapColors.nodeBg"
               :stroke-width="node.id === modelValue ? 8 : 4"
             />
             <text
@@ -67,6 +67,7 @@
 </template>
 
 <script setup>
+import { mindmapColors } from '@/helpers/themeColors';
 import { computed } from 'vue'
 import { normalizeMindMap, applyRadialLayout } from '@/helpers/mindmap'
 

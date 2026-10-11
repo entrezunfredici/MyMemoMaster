@@ -29,6 +29,16 @@
     --password-step-3: #dcd926;
     --password-step-4: #78dc26;
     --password-step-5: #29af00;
+
+    /* Cartes mentales : valeurs par défaut des items, branches et zones.
+       La couleur d'un item lié à une flashcard est celle de sa boîte de Leitner
+       (réglable par système, donc côté API : LeitnerBox.color) ; --mindmap-secondary
+       n'est que la couleur neutre d'un item non lié. */
+    --mindmap-node-bg: #1E3A8A;
+    --mindmap-node-text: #eef2ff;
+    --mindmap-secondary: #C0C5D2;
+    --mindmap-zone: #BFDBFE;
+    --mindmap-zone-border: #60A5FA;
 }
 
 /* Vue-toastification overrides */

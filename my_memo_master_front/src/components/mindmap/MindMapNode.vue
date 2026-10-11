@@ -61,6 +61,8 @@
           v-html="formulaHtml || '<span class=&quot;mindmap-node__placeholder&quot;>Double-clic pour saisir…</span>'"
           @dblclick.stop="store.openInterpreter()"
         />
+        <!-- Grandeur (rôle principal) : rendue par la ligne de grandeur ci-dessous -->
+        <template v-else-if="isQuantityNode" />
         <!-- Texte inline -->
         <template v-else>
           <textarea aria-label="Contenu du nœud"
@@ -81,6 +83,67 @@
             @dblclick.stop="startEditContent"
           />
         </template>
+        <!-- Grandeur (rôle principal ou supplémentaire) : valeur éditable directement,
+             double-clic sur le symbole ou l'unité pour les modifier -->
+        <div
+          v-if="hasQuantityKind && editingField !== 'quantity'"
+          class="mindmap-node__quantity"
+          :class="{ 'mindmap-node__quantity--badge': !isQuantityNode }"
+        >
+          <span class="mindmap-node__quantity-label" title="Double-clic pour modifier" @dblclick.stop="startEditQuantity">{{ quantitySymbol || 'symbole' }}</span>
+          <span class="mindmap-node__quantity-sep">=</span>
+          <span v-if="ownCalculation?.ok" class="mindmap-node__quantity-computed" :title="'Calculé : ' + ownCalculationText">{{ ownCalculation.value }}</span>
+          <input v-else aria-label="Valeur de la grandeur"
+            class="mindmap-node__inline-input mindmap-node__quantity-value"
+            type="number"
+            step="any"
+            placeholder="valeur"
+            :value="quantityValue"
+            @change="commitQuantityValue"
+            @keydown.enter.prevent="$event.target.blur()"
+            @click.stop
+            @pointerdown.stop
+            @dblclick.stop
+          />
+          <span class="mindmap-node__quantity-label" title="Double-clic pour modifier" @dblclick.stop="startEditQuantity">{{ ownCalculation?.ok ? ownCalculation.unit : quantityUnit || 'unité' }}</span>
+        </div>
+        <!-- Édition du symbole et de l'unité -->
+        <div
+          v-if="editingField === 'quantity'"
+          ref="quantityEditorRef"
+          class="mindmap-node__quantity-editor"
+          @focusout="onQuantityFocusOut"
+          @click.stop
+          @pointerdown.stop
+        >
+          <input aria-label="Symbole de la grandeur"
+            ref="quantitySymbolRef"
+            class="mindmap-node__inline-input mindmap-node__quantity-input"
+            v-model="localQuantity.symbol"
+            maxlength="12"
+            placeholder="m"
+            @keydown.enter.prevent="commitQuantity"
+            @keydown.escape.prevent="cancelEdit"
+          />
+          <input aria-label="Unité de la grandeur"
+            class="mindmap-node__inline-input mindmap-node__quantity-input"
+            v-model="localQuantity.unit"
+            maxlength="16"
+            placeholder="kg"
+            @keydown.enter.prevent="commitQuantity"
+            @keydown.escape.prevent="cancelEdit"
+          />
+        </div>
+        <!-- Résultat du calcul d'une formule reliée à des grandeurs -->
+        <div
+          v-if="calculation?.ok && !hasQuantityKind"
+          class="mindmap-node__quantity mindmap-node__quantity--badge mindmap-node__quantity--result"
+        >{{ calculationText }}</div>
+        <div
+          v-else-if="calculation && !calculation.ok"
+          class="mindmap-node__calc-error"
+          :title="calculation.error"
+        >⚠ {{ calculation.error }}</div>
       </div>
     </foreignObject>
 
@@ -121,9 +184,12 @@
 </template>
 
 <script setup>
+import { mindmapColors } from '@/helpers/themeColors';
 import { computed, ref, nextTick } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { getNodeLabel } from '@/helpers/mindmapCreation';
+import { createQuantity, hasKind, isMathNode } from '@/helpers/mindmapItems';
+import { formatCalculation } from '@/helpers/mindmapCalc';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
@@ -140,8 +206,8 @@ const store = useMindMapBuilderStore();
 
 const width = computed(() => props.node.style?.width || 220);
 const height = computed(() => props.node.style?.height || 120);
-const primaryColor = computed(() => props.node.style?.primaryColor || '#1E3A8A');
-const secondaryColor = computed(() => props.node.style?.secondaryColor || '#C0C5D2');
+const primaryColor = computed(() => props.node.style?.primaryColor || mindmapColors.nodeBg);
+const secondaryColor = computed(() => props.node.style?.secondaryColor || mindmapColors.secondary);
 const shape = computed(() => props.node.style?.shape || 'bubble');
 const borderRadius = computed(() => {
   if (shape.value === 'rect') return 12;
@@ -150,13 +216,25 @@ const borderRadius = computed(() => {
 });
 
 const isImageNode = computed(() => props.node.type === 'image');
-const isFormulaNode = computed(() => props.node.type === 'formula');
+const isFormulaNode = computed(() => isMathNode(props.node));
+const isQuantityNode = computed(() => props.node.type === 'quantity');
+const hasQuantityKind = computed(() => hasKind(props.node, 'quantity'));
+const quantity = computed(() => createQuantity(props.node.quantity));
+const quantitySymbol = computed(() => quantity.value.symbol);
+const quantityUnit = computed(() => quantity.value.unit);
+const quantityValue = computed(() => quantity.value.value ?? '');
+// Résultat de la formule portée par cet item (null si elle n'est reliée à aucune grandeur).
+const calculation = computed(() => store.calculations?.[props.node.id] || null);
+const calculationText = computed(() => formatCalculation(calculation.value));
+// Formule qui est aussi une grandeur : sa valeur et son unité viennent du calcul.
+const ownCalculation = computed(() => (hasQuantityKind.value && calculation.value?.ok ? calculation.value : null));
+const ownCalculationText = computed(() => formatCalculation(ownCalculation.value));
 const imageSrc = computed(() => (isImageNode.value ? props.node.content || '' : ''));
 const formulaHtml = computed(() =>
   isFormulaNode.value && props.node.content ? renderMathMultiline(props.node.content) : ''
 );
 const displayContent = computed(() => {
-  if (!props.node.content || isImageNode.value || isFormulaNode.value) return '';
+  if (!props.node.content || isImageNode.value || isFormulaNode.value || isQuantityNode.value) return '';
   return props.node.content;
 });
 const bodyStyle = computed(() => {
@@ -195,6 +273,36 @@ const startEditContent = () => {
     contentInputRef.value?.focus();
     contentInputRef.value?.select();
   });
+};
+
+const localQuantity = ref({ symbol: '', unit: '' });
+const quantityEditorRef = ref(null);
+const quantitySymbolRef = ref(null);
+
+const startEditQuantity = () => {
+  localQuantity.value = { symbol: quantity.value.symbol, unit: quantity.value.unit };
+  editingField.value = 'quantity';
+  nextTick(() => {
+    quantitySymbolRef.value?.focus();
+    quantitySymbolRef.value?.select();
+  });
+};
+
+const commitQuantity = () => {
+  if (editingField.value !== 'quantity') return;
+  store.updateNodeQuantity(props.node.id, { symbol: localQuantity.value.symbol, unit: localQuantity.value.unit });
+  editingField.value = null;
+};
+
+// La valeur s'édite directement sur l'item (sans double-clic).
+const commitQuantityValue = (event) => {
+  store.updateNodeQuantity(props.node.id, { value: event.target.value });
+};
+
+// Valide quand le focus quitte l'ensemble des trois champs (pas entre deux champs).
+const onQuantityFocusOut = (event) => {
+  if (quantityEditorRef.value?.contains(event.relatedTarget)) return;
+  commitQuantity();
 };
 
 const commitLabel = () => {
@@ -296,6 +404,60 @@ const createChildNode = () => {
 </script>
 
 <style scoped>
+.mindmap-node__quantity {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  color: #dbeafe;
+  cursor: text;
+}
+.mindmap-node__quantity-editor {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #dbeafe;
+}
+.mindmap-node__quantity-input {
+  min-width: 0;
+  flex: 1;
+  text-align: center;
+}
+.mindmap-node__quantity {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.mindmap-node__quantity-label {
+  cursor: text;
+  min-width: 1ch;
+}
+.mindmap-node__quantity-value {
+  width: 5.5em;
+  min-width: 0;
+  text-align: center;
+}
+.mindmap-node__quantity-computed {
+  font-variant-numeric: tabular-nums;
+}
+.mindmap-node__quantity--result {
+  font-weight: 700;
+}
+.mindmap-node__calc-error {
+  font-size: 11px;
+  color: #fecaca;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mindmap-node__quantity-sep {
+  font-weight: 700;
+}
+.mindmap-node__quantity--badge {
+  font-size: 12px;
+  opacity: 0.85;
+}
 .mindmap-node {
   cursor: pointer;
   filter: drop-shadow(0 3px 8px rgba(15, 23, 42, 0.28));

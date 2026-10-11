@@ -35,6 +35,12 @@
       <p v-if="store.tool === 'link'" class="palette__hint palette__hint--info">
         Mode lien actif — cliquez sur un nœud source, puis sur la cible.
       </p>
+      <div v-if="store.tool === 'link'" class="palette__field palette__field--row">
+        <label class="palette__label">Type</label>
+        <select aria-label="Type des nouvelles branches" class="palette__select palette__select--inline" :value="store.linkType" @change="store.setLinkType($event.target.value)">
+          <option v-for="bt in branchTypes" :key="bt.id" :value="bt.id">{{ bt.label }}</option>
+        </select>
+      </div>
     </section>
 
     <!-- ── Item sélectionné ───────────────────────────────────────────────── -->
@@ -52,18 +58,44 @@
         </select>
       </div>
 
-      <!-- Maîtrise -->
+      <!-- Rôles supplémentaires -->
       <div class="palette__field">
-        <label class="palette__label">Maîtrise</label>
-        <select aria-label="Niveau de maîtrise" class="palette__select" :value="selectedNode.mastery" @change="updateMastery($event.target.value)">
-          <option v-for="level in masteryLevels" :key="level.id" :value="level.id">{{ level.label }}</option>
-        </select>
+        <label class="palette__label">Aussi</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="kind in extraKindOptions"
+            :key="kind.id"
+            type="button"
+            :aria-pressed="hasKind(selectedNode, kind.id)"
+            :class="['palette__kind-btn', { 'palette__kind-btn--active': hasKind(selectedNode, kind.id) }]"
+            @click="toggleExtraKind(kind.id)"
+          >{{ kind.label }}</button>
+        </div>
       </div>
+
+      <!-- Grandeur -->
+      <template v-if="isQuantityNodeSelected">
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Symbole</label>
+          <input aria-label="Symbole de la grandeur" type="text" class="palette__number" maxlength="12"
+            :value="selectedNode.quantity?.symbol || ''" @input="updateQuantity('symbol', $event.target.value)" />
+        </div>
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Valeur</label>
+          <input aria-label="Valeur de la grandeur" type="number" step="any" class="palette__number"
+            :value="selectedNode.quantity?.value ?? ''" @change="updateQuantity('value', $event.target.value)" />
+        </div>
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Unité</label>
+          <input aria-label="Unité de la grandeur" type="text" class="palette__number" maxlength="16"
+            :value="selectedNode.quantity?.unit || ''" @input="updateQuantity('unit', $event.target.value)" />
+        </div>
+      </template>
 
       <!-- Couleur de fond + forme -->
       <div class="palette__field palette__field--row">
         <label class="palette__label">Fond</label>
-        <input aria-label="Couleur de fond" type="color" class="palette__color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
+        <input aria-label="Couleur de fond" type="color" class="palette__color" :value="selectedNode.style?.primaryColor || mindmapColors.nodeBg" @input="updateColor($event.target.value)" />
       </div>
 
       <div class="palette__field">
@@ -152,7 +184,7 @@
         <div v-if="selectedNode.idCard" class="palette__card-linked">
           <span
             class="palette__card-dot"
-            :style="{ background: linkedCardColor || '#C0C5D2' }"
+            :style="{ background: linkedCardColor || mindmapColors.secondary }"
           />
           <span class="palette__card-statement">{{ linkedCardStatement }}</span>
           <button class="palette__card-unlink" title="Délier" @click="unlinkCard">✕</button>
@@ -213,8 +245,71 @@
       </div>
     </section>
 
+    <!-- ── Branche sélectionnée ───────────────────────────────────────────── -->
+    <section class="palette__section palette__section--selected" v-else-if="selectedLink">
+      <h4 class="palette__section-title">Branche</h4>
+
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type</label>
+        <select aria-label="Type de la branche" class="palette__select palette__select--inline" :value="selectedLink.type" @change="store.updateLink(selectedLink.id, { type: $event.target.value })">
+          <option v-for="bt in branchTypes" :key="bt.id" :value="bt.id">{{ bt.label }}</option>
+        </select>
+      </div>
+      <div class="palette__field palette__field--row">
+        <input aria-label="Nom du nouveau type de branche" v-model="newBranchType" type="text" class="palette__number" maxlength="30" placeholder="Nouveau type…" @keydown.enter.prevent="createBranchType" />
+        <button class="palette__btn" type="button" @click="createBranchType">Créer</button>
+      </div>
+
+      <div class="palette__field">
+        <label class="palette__label">Sens</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="d in LINK_DIRECTIONS"
+            :key="d.id"
+            type="button"
+            :aria-pressed="selectedLink.direction === d.id"
+            :class="['palette__kind-btn', { 'palette__kind-btn--active': selectedLink.direction === d.id }]"
+            @click="store.updateLink(selectedLink.id, { direction: d.id })"
+          >{{ d.label }}</button>
+        </div>
+      </div>
+
+      <div class="palette__field">
+        <label class="palette__label">Forme</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="s in LINK_SHAPES"
+            :key="s.id"
+            type="button"
+            :aria-pressed="selectedLink.style?.shape === s.id"
+            :class="['palette__kind-btn', { 'palette__kind-btn--active': selectedLink.style?.shape === s.id }]"
+            @click="store.updateLink(selectedLink.id, { style: { shape: s.id } })"
+          >{{ s.label }}</button>
+        </div>
+      </div>
+
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Couleur</label>
+        <input aria-label="Couleur principale de la branche" type="color" class="palette__color" :value="selectedLink.style?.primaryColor" @input="store.updateLink(selectedLink.id, { style: { primaryColor: $event.target.value } })" />
+      </div>
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Milieu</label>
+        <input aria-label="Couleur secondaire de la branche" type="color" class="palette__color" :value="selectedLink.style?.secondaryColor" @input="store.updateLink(selectedLink.id, { style: { secondaryColor: $event.target.value } })" />
+      </div>
+
+      <div v-if="outgoingCount > 1" class="palette__field palette__field--row">
+        <label class="palette__label">Lecture {{ readingRank }}/{{ outgoingCount }}</label>
+        <button class="palette__btn" type="button" :disabled="readingRank <= 1" aria-label="Lire plus tôt" @click="store.moveLink(selectedLink.id, -1)">↑</button>
+        <button class="palette__btn" type="button" :disabled="readingRank >= outgoingCount" aria-label="Lire plus tard" @click="store.moveLink(selectedLink.id, 1)">↓</button>
+      </div>
+
+      <div class="palette__actions-row">
+        <button class="palette__btn palette__btn--danger" type="button" @click="store.removeLink(selectedLink.id)">Supprimer</button>
+      </div>
+    </section>
+
     <section class="palette__section palette__section--empty" v-else>
-      <p class="palette__hint">Sélectionnez un item pour modifier ses options.</p>
+      <p class="palette__hint">Sélectionnez un item ou une branche pour modifier ses options.</p>
     </section>
 
     <!-- ── Zones ──────────────────────────────────────────────────────────── -->
@@ -263,25 +358,51 @@
       </div>
     </div>
   </teleport>
+
+  <!-- ── Proposition : créer les grandeurs des variables de la formule ───── -->
+  <teleport to="body">
+    <div v-if="variablePrompt" class="interp-modal" role="dialog" aria-modal="true" aria-labelledby="variable-prompt-title">
+      <div class="interp-modal__backdrop" @click="dismissVariablePrompt" />
+      <div class="interp-modal__dialog interp-modal__dialog--narrow">
+        <div class="interp-modal__header">
+          <h3 id="variable-prompt-title">Créer les grandeurs de la formule ?</h3>
+          <button aria-label="Ignorer" type="button" class="interp-modal__close" @click="dismissVariablePrompt">&times;</button>
+        </div>
+        <p class="palette__hint">Ces variables n'ont pas encore de grandeur reliée. Cochez celles à créer : chacune sera reliée à la formule par une branche « Calcul ».</p>
+        <ul class="variable-prompt__list">
+          <li v-for="item in variablePrompt.items" :key="item.symbol">
+            <label class="variable-prompt__item">
+              <input type="checkbox" v-model="item.checked" :aria-label="'Créer la grandeur ' + item.symbol" />
+              <span>{{ item.symbol }}</span>
+            </label>
+          </li>
+        </ul>
+        <div class="variable-prompt__actions">
+          <button type="button" class="palette__btn" @click="confirmVariablePrompt">Créer les grandeurs</button>
+          <button type="button" class="palette__btn palette__btn--ghost" @click="dismissVariablePrompt">Ignorer</button>
+        </div>
+      </div>
+    </div>
+  </teleport>
 </template>
 
 <script setup>
+import { mindmapColors } from '@/helpers/themeColors';
 import { computed, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { masteryList, boxColorToHex, boxLevelToMastery } from '@/helpers/mindmap';
+import { boxColorToHex, boxLevelToMastery } from '@/helpers/mindmap';
+import { ITEM_KINDS, MATH_KINDS, hasKind, isMathNode } from '@/helpers/mindmapItems';
+import { LINK_DIRECTIONS, LINK_SHAPES, getOutgoingLinks } from '@/helpers/mindmapLinks';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
 import { notif } from '@/helpers/notif';
 import Interpreter from '@/components/interpreter/Interpreter.vue';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
+import { missingVariables } from '@/helpers/mindmapCalc';
 
 const store = useMindMapBuilderStore();
 
-const nodeTypes = [
-  { id: 'text', label: 'Texte', icon: 'T' },
-  { id: 'formula', label: 'Formule', icon: 'Fx' },
-  { id: 'image', label: 'Image', icon: '🖼' },
-];
+const nodeTypes = ITEM_KINDS;
 
 const shapes = [
   { id: 'bubble', label: 'Bulle' },
@@ -289,24 +410,44 @@ const shapes = [
   { id: 'pill', label: 'Pilule' },
 ];
 
-const masteryLevels = masteryList;
-
 const selectedNode = computed(() => store.selectedNode);
+const selectedLink = computed(() => store.selectedLink || null);
+const branchTypes = computed(() => store.map.branchTypes || []);
+const newBranchType = ref('');
+const outgoingLinks = computed(() =>
+  selectedLink.value ? getOutgoingLinks(store.map.links, selectedLink.value.from) : []
+);
+const outgoingCount = computed(() => outgoingLinks.value.length);
+const readingRank = computed(
+  () => outgoingLinks.value.findIndex((link) => link.id === selectedLink.value?.id) + 1
+);
+
+const createBranchType = () => {
+  const id = store.addBranchType(newBranchType.value);
+  if (!id || !selectedLink.value) return;
+  store.updateLink(selectedLink.value.id, { type: id });
+  newBranchType.value = '';
+};
+
 const selectedNodeZone = computed(() => selectedNode.value?.zoneId || null);
 const zones = computed(() => store.map.zones || []);
 
 const isImageNodeSelected = computed(() => selectedNode.value?.type === 'image');
-const isFormulaNodeSelected = computed(() => selectedNode.value?.type === 'formula');
+const isFormulaNodeSelected = computed(() => isMathNode(selectedNode.value));
+const isQuantityNodeSelected = computed(() => hasKind(selectedNode.value, 'quantity'));
+const extraKindOptions = computed(() =>
+  ITEM_KINDS.filter((kind) => kind.id !== selectedNode.value?.type)
+);
 const isTextNodeSelected = computed(() => selectedNode.value?.type === 'text');
 
 const editableContent = ref('');
 const zoneName = ref('Zone');
-const zoneColor = ref('#BFDBFE');
+const zoneColor = ref(mindmapColors.zone);
 const imageInputRef = ref(null);
 const isUploadingImage = ref(false);
 const imageUploadError = ref('');
 const interpreterValue = ref('');
-const textColor = ref('#eef2ff');
+const textColor = ref(mindmapColors.nodeText);
 const fontSize = ref(13);
 const isBold = ref(false);
 const isItalic = ref(false);
@@ -416,7 +557,7 @@ watch(
     editableContent.value = node?.content || '';
     imageUploadError.value = '';
     if (imageInputRef.value) imageInputRef.value.value = '';
-    textColor.value = node?.style?.textColor || '#eef2ff';
+    textColor.value = node?.style?.textColor || mindmapColors.nodeText;
     fontSize.value = Number.parseInt(node?.style?.fontSize, 10) || 13;
     isBold.value = (node?.style?.fontWeight || 'normal') !== 'normal';
     isItalic.value = (node?.style?.fontStyle || 'normal') !== 'normal';
@@ -428,17 +569,26 @@ watch(
   { immediate: true }
 );
 
+// Le contenu n'est conservé que si le nouveau rôle principal l'affiche de la même façon.
+const contentFamily = (type) => (MATH_KINDS.includes(type) ? 'math' : type);
+
 const updateNodeType = (type) => {
   if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, {
-    type,
-    content: type === 'text' ? (selectedNode.value.content || '') : '',
-  });
+  const payload = { type };
+  if (contentFamily(selectedNode.value.type) !== contentFamily(type)) {
+    payload.content = type === 'text' ? (selectedNode.value.content || '') : '';
+  }
+  store.updateNode(selectedNode.value.id, payload);
 };
 
-const updateMastery = (value) => {
+const toggleExtraKind = (kind) => {
   if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { mastery: value });
+  store.toggleNodeKind(selectedNode.value.id, kind);
+};
+
+const updateQuantity = (field, value) => {
+  if (!selectedNode.value) return;
+  store.updateNodeQuantity(selectedNode.value.id, { [field]: value });
 };
 
 const updateColor = (value) => {
@@ -498,7 +648,28 @@ const applyInterpreter = (value) => {
   editableContent.value = nextValue;
   store.updateNode(selectedNode.value.id, { content: nextValue });
   store.closeInterpreter();
+  proposeVariables(selectedNode.value.id);
 };
+
+// Après saisie d'une formule : propose de créer les grandeurs des variables qui n'en ont pas encore.
+const variablePrompt = ref(null);
+
+const proposeVariables = (nodeId) => {
+  const missing = missingVariables(store.map, nodeId);
+  variablePrompt.value = missing.length
+    ? { nodeId, items: missing.map((symbol) => ({ symbol, checked: true })) }
+    : null;
+};
+
+const confirmVariablePrompt = () => {
+  const prompt = variablePrompt.value;
+  variablePrompt.value = null;
+  if (!prompt) return;
+  const symbols = prompt.items.filter((item) => item.checked).map((item) => item.symbol);
+  if (symbols.length) store.createQuantitiesForFormula(prompt.nodeId, symbols);
+};
+
+const dismissVariablePrompt = () => { variablePrompt.value = null; };
 
 const clearFormulaContent = () => {
   if (!selectedNode.value) return;
@@ -572,7 +743,7 @@ const removeNode = () => {
 const createZone = () => {
   store.addZone({ name: zoneName.value.trim() || 'Zone', color: zoneColor.value });
   zoneName.value = 'Zone';
-  zoneColor.value = '#BFDBFE';
+  zoneColor.value = mindmapColors.zone;
 };
 
 const assignZone = (zoneId) => {
@@ -792,7 +963,8 @@ const assignZone = (zoneId) => {
   gap: 6px;
 }
 
-.palette__shape-btn {
+.palette__shape-btn,
+.palette__kind-btn {
   flex: 1;
   padding: 6px 4px;
   border-radius: 8px;
@@ -805,12 +977,14 @@ const assignZone = (zoneId) => {
   transition: all 0.15s ease;
 }
 
-.palette__shape-btn:hover {
+.palette__shape-btn:hover,
+.palette__kind-btn:hover {
   background: #eff6ff;
   border-color: #93c5fd;
 }
 
-.palette__shape-btn--active {
+.palette__shape-btn--active,
+.palette__kind-btn--active {
   background: #1e3a8a;
   border-color: #1e3a8a;
   color: #ffffff;
@@ -1052,6 +1226,14 @@ const assignZone = (zoneId) => {
   z-index: 1;
 }
 
+.interp-modal__dialog--narrow { width: min(440px, 100%); }
+.variable-prompt__list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.variable-prompt__item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #f8fafc; color: #0f172a; font-weight: 600; cursor: pointer;
+}
+.variable-prompt__actions { display: flex; gap: 8px; }
 .interp-modal__header {
   display: flex;
   justify-content: space-between;

@@ -4847,3 +4847,52 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : le prompt déclare que les réponses attendues sont des formulations alternatives (en satisfaire une suffit ; « A ou B » satisfait par A), liste des équivalences (synonymes de concept, réarrangement, forme extensive/molaire, expression développée), plafonne à 0,4 « évoquer qu'une relation existe » et à 0,2 « bon cadre sans répondre », place l'inversion à 0, et impose un motif qui nomme l'élément juste/manquant. Clé de cache passée à `v3`.
 **Alternative écartée** : corriger les références à la génération seulement (ne règle pas les fiches existantes ni les formulations hétérogènes) ; seuil `CORRECT_THRESHOLD` abaissé à 0,6 (ferait passer des réponses réellement incomplètes).
 **Conséquences** : prompt plus long (~+400 tokens d'entrée par correction, coût ≈ +0,00001 $ par appel non caché). Risque résiduel : le modèle suit imparfaitement la règle « ou » (« les frottements » seuls reste à 0,4-0,6) ; les cas limites dépendent du jugement du modèle.
+
+
+### [2026-10-11] Items multi-rôles : `type` principal conservé + `kinds[]` supplémentaires
+
+**Contexte** : un item doit pouvoir être plusieurs choses à la fois (formule et grandeur physique), alors que `type` était unique et pilote le rendu/contenu.
+**Décision** : garder `type` comme rôle principal (rétrocompatible avec les cartes et le rendu existants) et ajouter `kinds: string[]` pour les rôles supplémentaires ; les données propres à un rôle vivent dans un objet dédié (`quantity: { symbol, value, unit }`). Normalisation à chargement et dans `updateNode`.
+**Alternative écartée** : remplacer `type` par un tableau `kinds` unique — casse tous les consommateurs de `node.type` et les cartes sauvegardées, migration lourde pour un gain nul à ce stade.
+**Conséquences** : le contenu (`content`) reste unique, porté par le rôle principal ; `quantity.value` est numérique ou `null`, base du calcul futur via liens de composition.
+
+
+### [2026-10-11] Branches : forme `style.shape`, marqueurs de flèche par branche, extrémités au bord des items
+
+**Contexte** : la flèche était posée au centre de l'item cible donc masquée par celui-ci, un seul marqueur global bleu servait à toutes les branches, et `bezier` était un booléen.
+**Décision** : `style.shape` (`curve`/`straight`/`elbow`) remplace `bezier` (conservé en miroir) ; un `<marker>` par branche (id `arrow-<linkId>`) pour suivre la couleur ; tracé calculé aux bords des rectangles ; types de branche personnalisés stockés dans `map.branchTypes`.
+**Alternative écartée** : `context-stroke` pour les marqueurs (support navigateur inégal) ; type de branche libre non référencé (pas de liste ni de libellé stable).
+**Conséquences** : N marqueurs dans le DOM pour N branches (négligeable) ; l'id d'un type personnalisé est un slug, donc renommer un type changerait l'id — pas de renommage proposé pour l'instant.
+
+
+### [2026-10-11] Couleur de boîte Leitner : entier 0xRRGGBB conservé, palette rouge → vert
+
+**Contexte** : `LeitnerBox.color` (BIGINT) valait des placeholders (123456…) en dur dans le front, le seed et les boîtes par défaut ; lus en 0xRRGGBB ils donnaient des teintes sombres quasi identiques, et l'utilisateur ne pouvait pas choisir.
+**Décision** : garder l'entier 0xRRGGBB (aucun changement de schéma), valider `color` en entier 0–16777215, convertir via `boxColorToHex`/`hexToBoxColor` côté front avec un `<input type="color">`. Palette par défaut niveau 1→5 : `#E74C3C`, `#F39C12`, `#F1C40F`, `#2ECC71`, `#27AE60`. Migration ciblée des anciens placeholders uniquement.
+**Alternative écartée** : colonne `color` en chaîne `#rrggbb` — migration de type plus risquée et contrat API modifié pour un gain faible.
+**Conséquences** : la couleur secondaire d'un item de carte mentale lié à une carte provient de la boîte (`ensureSecondaryColor` ne l'écrase plus quand `idCard` est défini) ; la palette existe en deux exemplaires (API/front) à garder alignés.
+
+
+### [2026-10-11] Couleurs par défaut : variables CSS dans base.css, lues en JS via getters
+
+**Contexte** : les couleurs par défaut des cartes mentales et des boîtes Leitner étaient dupliquées en hex dans une dizaine de fichiers JS/Vue, alors que le thème vit déjà dans `base.css`.
+**Décision** : déclarer ces couleurs en variables CSS (`--mastery-*`, `--mindmap-*`) et les lire à l'exécution (`getComputedStyle`) via `helpers/themeColors.js`, avec un repli identique pour les tests. Lecture par getters et non constantes de module (ordre de chargement du CSS non garanti).
+**Alternative écartée** : module JS source unique injecté dans le CSS (le besoin exprimé est que `base.css` soit la source) ; migration en bloc des 39 fichiers à hex en dur (risque de régression de contraste RGAA, hors besoin).
+**Précision** : `base.css` ne contient que le stable côté front. Les couleurs des boîtes de Leitner sont réglables par système, donc définies uniquement côté API (`LeitnerBox.color`, défaut `DEFAULT_BOXES`) ; aucune copie front.
+**Conséquences** : les hex doivent rester hex (attributs SVG, `<input type="color">`, JSON sauvegardé) donc pas de format `rgb` triplet ; le repli est une duplication assumée .
+
+
+### [2026-10-11] Calcul des formules de carte mentale : évaluateur maison + algèbre d'unités SI, sans dépendance
+
+**Contexte** : relier une formule à des grandeurs doit en calculer le résultat et son unité (ex. masse + vitesse → énergie en J).
+**Décision** : évaluateur récursif écrit dans `helpers/mindmapCalc.js` (nombres, + − × ÷, puissances, `\frac`, `\sqrt`, multiplication implicite, symboles à indice/grecs) qui propage valeur et dimension SI ; `helpers/quantityUnits.js` convertit les unités saisies (préfixes, composées, casse tolérée) et nomme le résultat (J, N, W, Pa, V, C, Ω, Hz, sinon écriture composée). Variables associées aux grandeurs reliées par leur symbole. Résultat dérivé par un getter Pinia, non persisté.
+**Alternative écartée** : `mathjs` (dépendance non approuvée, lourde, et la gestion d'unités ne s'appuie pas sur nos symboles) ; stocker le résultat dans le JSON (désynchronisation à chaque modification de valeur).
+**Conséquences** : couverture limitée aux opérations listées (erreurs lisibles sinon) ; résultat toujours en SI ; la maîtrise n'a plus de couleur propre (couleur d'un item lié = couleur de la boîte, définie côté API).
+
+
+### [2026-10-11] Grandeurs d'une formule : proposition à valider, jamais de création silencieuse
+
+**Contexte** : relier à la main une grandeur à chaque variable d'une formule est fastidieux, mais la détection des variables est ambiguë (`MV`, constantes `g`/`π`, `d` d'une dérivée).
+**Décision** : après « Insérer dans l'item », une fenêtre liste les variables détectées sans grandeur reliée (cases cochées) ; seules les variables cochées sont créées, via `createQuantitiesForFormula`, qui revérifie les variables manquantes et ne touche à rien d'existant. Branche de type « Calcul », positionnement par le placement radial existant de `addNode`.
+**Alternative écartée** : création automatique à chaque modification (encombre la carte à la moindre faute de saisie, impose des suppressions) ; bouton séparé dans la palette (une étape de plus pour le cas courant).
+**Conséquences** : la détection réutilise le lexer du calcul (une seule définition d'une « variable ») ; l'action du store reste utilisable par d'autres entrées (bouton, IA).
