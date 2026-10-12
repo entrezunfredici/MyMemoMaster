@@ -164,3 +164,36 @@ Puis en HTTP : `https://preprod-api.my-memo-master.com/api/v1/health` (santé AP
 | Redis | éphémère (Deployment) | persistant (StatefulSet + PVC) |
 | PgAdmin | activé | désactivé |
 | Timeout Helm | 5 min | 8 min |
+
+---
+
+## Sauvegardes PostgreSQL (CronJob → S3)
+
+Le chart déploie un CronJob `{release}-backup` ([helm/templates/cronjob-backup.yaml](../helm/templates/cronjob-backup.yaml)), activé par `backup.enabled: true` dans `values-prod.yaml` et `values-preprod.yaml`.
+
+- **Quand** : tous les jours à 03:00 UTC (`backup.schedule`).
+- **Quoi** : `pg_dump -Fc` (format custom, vérifié par `pg_restore -l` avant envoi), déposé dans `s3://<S3_BUCKET>/backups/<ENVIRONMENT>/mmm-AAAAMMJJTHHMMSSZ.dump`. Mêmes identifiants S3 que l'API (Secret `{release}-secrets`).
+- **Rétention** : les 14 dumps les plus récents (`backup.keep`) ; les plus anciens sont supprimés après chaque envoi réussi.
+- **Images** : `postgres:17-alpine` (celle de la base) et `amazon/aws-cli:2.15.30` (épinglée : les versions récentes ajoutent des checksums que certains S3 compatibles refusent).
+
+Lancer une sauvegarde à la demande et lire son résultat :
+
+```sh
+kubectl create job mmm-prod-backup-manuel --from=cronjob/mmm-prod-backup -n mymemomaster
+kubectl logs -n mymemomaster job/mmm-prod-backup-manuel -c upload   # « Sauvegarde envoyée : backups/prod/... »
+```
+
+Restaurer un dump (exemple prod ; **arrêter l'API avant**, `--clean` remplace le contenu de la base) :
+
+```sh
+kubectl scale deploy/mmm-prod-api -n mymemomaster --replicas=0
+# récupérer le dump voulu (aws CLI configuré avec les clés S3 et --endpoint-url) :
+aws --endpoint-url https://s3.swiss-backup04.infomaniak.com s3 cp s3://default/backups/prod/<dump> prod.dump
+kubectl exec -i -n mymemomaster mmm-prod-postgres-0 -- sh -c \
+  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < prod.dump
+kubectl scale deploy/mmm-prod-api -n mymemomaster --replicas=2
+```
+
+Recette du 2026-10-12 : dump de la preprod envoyé sur S3, relu depuis S3 et restauré dans une base temporaire (2 utilisateurs, 79 migrations retrouvés), base temporaire supprimée.
+
+**Limites connues** : le bucket est partagé avec les uploads de l'API et avec la preprod (préfixes `backups/prod/` et `backups/preprod/` distincts) ; l'offre Swiss Backup expire le 2026-12-04 — sans renouvellement, les sauvegardes disparaissent avec elle. Aucune alerte n'est branchée sur l'échec d'un Job (`kubectl get jobs -n <ns>` pour vérifier).

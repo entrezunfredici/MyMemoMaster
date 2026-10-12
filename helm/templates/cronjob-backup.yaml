@@ -1,0 +1,145 @@
+# =============================================================================
+#  CronJob — sauvegarde quotidienne de PostgreSQL vers le stockage S3
+#
+#  Deux étapes dans un même Pod, sans dépendance applicative :
+#    1. initContainer `dump`  : pg_dump -Fc (même image que la base) → emptyDir
+#    2. container     `upload`: envoi sur s3://<bucket>/<keyPrefix>/ puis purge, en
+#       ne gardant que les `backup.keep` dumps les plus récents.
+#
+#  Les noms de dump embarquent l'horodatage UTC (mmm-AAAAMMJJTHHMMSSZ.dump) : le tri
+#  alphabétique est donc chronologique, ce qui évite de dépendre de la comparaison
+#  de dates côté JMESPath.
+#
+#  Restauration : voir docs/MANUEL_DEPLOIEMENT_KUBERNETES.md (section Sauvegardes).
+#
+#  ATTENTION : si resourceQuota.enabled, tout Pod du namespace doit déclarer
+#  requests ET limits (c'est le cas ici, pour les deux conteneurs).
+# =============================================================================
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 604800
+      template:
+        metadata:
+          labels:
+            app: {{ .Release.Name }}-backup
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          {{- if .Values.priorityClassName }}
+          priorityClassName: {{ .Values.priorityClassName }}
+          {{- end }}
+          volumes:
+            - name: backup
+              emptyDir: {}
+          initContainers:
+            - name: dump
+              image: {{ .Values.backup.images.postgres }}
+              env:
+                - name: PGHOST
+                  value: {{ .Release.Name }}-postgres
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "mmm.secretName" . }}
+                      key: PG_USER
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "mmm.secretName" . }}
+                      key: PG_PASS
+                - name: PGDATABASE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ include "mmm.configName" . }}
+                      key: PG_DB
+              command: ["sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  pg_dump -Fc -f /backup/db.dump
+                  # Un dump vide ou tronqué ne doit jamais partir sur S3.
+                  pg_restore -l /backup/db.dump > /dev/null
+                  ls -l /backup/db.dump
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+          containers:
+            - name: upload
+              image: {{ .Values.backup.images.awscli }}
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "mmm.secretName" . }}
+                      key: S3_ACCESS_KEY
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "mmm.secretName" . }}
+                      key: S3_SECRET_KEY
+                - name: AWS_DEFAULT_REGION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ include "mmm.configName" . }}
+                      key: S3_REGION
+                - name: S3_ENDPOINT
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ include "mmm.configName" . }}
+                      key: S3_ENDPOINT
+                - name: S3_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ include "mmm.configName" . }}
+                      key: S3_BUCKET
+                - name: KEY_PREFIX
+                  value: {{ printf "backups/%s" .Values.config.ENVIRONMENT | quote }}
+                - name: KEEP
+                  value: {{ .Values.backup.keep | quote }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  S3="aws --endpoint-url $S3_ENDPOINT"
+                  aws configure set default.s3.addressing_style path
+                  KEY="$KEY_PREFIX/mmm-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                  $S3 s3 cp /backup/db.dump "s3://$S3_BUCKET/$KEY" --no-progress
+                  # Contrôle : l'objet existe bien côté S3 avant toute purge.
+                  $S3 s3api head-object --bucket "$S3_BUCKET" --key "$KEY" > /dev/null
+                  echo "Sauvegarde envoyée : $KEY"
+                  # Rétention : on ne garde que les $KEEP dumps les plus récents.
+                  $S3 s3api list-objects-v2 --bucket "$S3_BUCKET" --prefix "$KEY_PREFIX/mmm-" \
+                    --query 'Contents[].Key' --output text | tr '\t' '\n' | grep '\.dump$' | sort > /tmp/keys || true
+                  TOTAL=$(wc -l < /tmp/keys)
+                  if [ "$TOTAL" -gt "$KEEP" ]; then
+                    head -n "$((TOTAL - KEEP))" /tmp/keys | while read -r OLD; do
+                      $S3 s3 rm "s3://$S3_BUCKET/$OLD" --only-show-errors
+                      echo "Purgé : $OLD"
+                    done
+                  fi
+                  echo "Dumps présents avant purge : $TOTAL (rétention : $KEEP)"
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                  readOnly: true
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+{{- end }}

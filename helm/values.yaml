@@ -156,6 +156,27 @@ postgres:
       cpu: 500m
       memory: 1Gi
 
+# ── Sauvegarde PostgreSQL (CronJob → S3) ─────────────────────────────────────
+# pg_dump -Fc quotidien envoyé sur s3://<S3_BUCKET>/backups/<ENVIRONMENT>/ (mêmes
+# identifiants S3 que l'API), puis purge : seuls les `keep` dumps les plus récents sont
+# conservés. Désactivé par défaut ; activé dans values-{env}.yaml. Images externes
+# (Docker Hub) : postgres:17-alpine = celle de la base ; amazon/aws-cli épinglée en 2.15.x
+# (les versions plus récentes ajoutent des checksums que certains S3 compatibles refusent).
+backup:
+  enabled: false
+  schedule: "0 3 * * *"     # 03:00 UTC
+  keep: 14
+  images:
+    postgres: postgres:17-alpine
+    awscli: amazon/aws-cli:2.15.30
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 # ── Redis ─────────────────────────────────────────────────────────────────────
 redis:
   # false = Deployment sans PVC (preprod, données éphémères)

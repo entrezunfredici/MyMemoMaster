@@ -133,3 +133,7 @@ monitoring:
     limits:
       cpu: 300m
       memory: 512Mi
+
+# Sauvegarde quotidienne de Postgres vers S3 (backups/preprod/, 14 derniers dumps)
+backup:
+  enabled: true

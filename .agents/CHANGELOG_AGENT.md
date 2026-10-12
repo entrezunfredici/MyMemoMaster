@@ -12865,3 +12865,9 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 ### [2026-10-12] [FIX] S3 configuré en prod
 **Fichiers** : `helm/values-prod.yaml` (S3_ENDPOINT, S3_BUCKET, S3_PUBLIC_URL). Déployé sur le nouveau cluster, vérifié (env des pods, plus d'avertissement). **À commiter.**
 **Dette** : séparer le bucket/préfixe prod de la preprod ; tester un téléversement réel et sa survie à un redéploiement ; sauvegardes automatiques Postgres (CronJob) toujours absentes.
+
+### [2026-10-12] [ADD] Sauvegarde PostgreSQL automatique (CronJob → S3)
+**Fichiers créés/modifiés** : `helm/templates/cronjob-backup.yaml` (nouveau), `helm/values.yaml` (+ bloc `backup`), `helm/values-prod.yaml` et `helm/values-preprod.yaml` (`backup.enabled: true`), `docs/MANUEL_DEPLOIEMENT_KUBERNETES.md` (section Sauvegardes). **À commiter.**
+**Utilisable** : sauvegarde quotidienne 03:00 UTC, 14 dumps conservés, `backups/prod/` et `backups/preprod/` ; restauration documentée et testée.
+**Hypothèses** : le bucket `default` reste partagé (un seul espace S3 payé).
+**Dette** : alerte sur échec de Job ; préfixe d'environnement des uploads (change le contrôle d'accès, à valider) ; renouvellement de l'offre S3 avant le 2026-12-04 ; test d'upload réel en prod.
