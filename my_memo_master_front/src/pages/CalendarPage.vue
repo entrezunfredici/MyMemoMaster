@@ -171,6 +171,16 @@
             </div>
 
             <div class="create-form__field">
+              <label for="create-session-system">Système de Leitner lié</label>
+              <select id="create-session-system" v-model="createForm.idSystem" @change="onSystemChange">
+                <option :value="null">Aucun</option>
+                <option v-for="sys in leitnerStore.systems" :key="sys.idSystem" :value="sys.idSystem">
+                  {{ sys.name }}
+                </option>
+              </select>
+            </div>
+
+            <div class="create-form__field">
               <label>Description</label>
               <textarea aria-label="Notes optionnelles" v-model="createForm.description" placeholder="Notes optionnelles…" rows="2" maxlength="1000" />
             </div>
@@ -207,6 +217,25 @@
             </div>
             <button class="detail-modal__close" @click="selectedEvent = null">
               <XMarkIcon class="size-5" />
+            </button>
+          </div>
+
+          <!-- Détail d'une séance de révision : horaires, système lié, lancement -->
+          <div v-if="selectedEvent.type === 'revision' && selectedEvent.session" class="detail-modal__body">
+            <p class="detail-modal__info">
+              {{ formatSessionDate(selectedEvent.session) }}
+            </p>
+            <p v-if="selectedEvent.session.leitnerSystem" class="detail-modal__info">
+              Système de Leitner lié : <strong>{{ selectedEvent.session.leitnerSystem.name }}</strong>
+            </p>
+            <p v-else class="detail-modal__info">Aucun système de Leitner lié.</p>
+            <button
+              v-if="selectedEvent.session.leitnerSystem"
+              type="button"
+              class="btn-submit"
+              @click="launchSession(selectedEvent.session.leitnerSystem.idSystem)"
+            >
+              Lancer la session
             </button>
           </div>
 
@@ -328,12 +357,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useRevisionSessionStore } from '@/stores/revisionSessions'
 import { useDeadlineStore } from '@/stores/deadlines'
 import { usePlanningStore } from '@/stores/planning'
 import { useGuidedTourStore } from '@/stores/guidedTour'
+import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import ReminderWidget from '@/components/ReminderWidget.vue'
 import TodoWidget from '@/components/TodoWidget.vue'
 
@@ -343,6 +374,8 @@ const revisionStore = useRevisionSessionStore()
 const deadlineStore = useDeadlineStore()
 const planningStore = usePlanningStore()
 const guidedTourStore = useGuidedTourStore()
+const leitnerStore = useLeitnerSystemStore()
+const router = useRouter()
 
 /* ── Constantes ── */
 const MONTHS = [
@@ -373,11 +406,20 @@ const selectedEvent = ref(null)
 /* ── Création séance ── */
 const showCreateModal = ref(false)
 const creating = ref(false)
-const createForm = ref({ name: '', date: '', startTime: '', endTime: '', description: '' })
+const createForm = ref({ name: '', date: '', startTime: '', endTime: '', description: '', idSystem: null })
+
+// Pré-remplit le nom de la séance avec celui du système choisi, tant que l'utilisateur n'a rien saisi
+function onSystemChange() {
+  const sys = leitnerStore.systems.find((s) => s.idSystem === createForm.value.idSystem)
+  if (sys && !createForm.value.name.trim()) createForm.value.name = sys.name
+}
 
 function openCreateModal(y, m, d) {
+  // Parcours guidé : le système de Leitner créé à l'étape 2 est pré-sélectionné
+  const tourSystem = guidedTourStore.active ? guidedTourStore.links.leitnerSystemId : null
   createForm.value = {
-    name: '',
+    idSystem: tourSystem,
+    name: leitnerStore.systems.find((s) => s.idSystem === tourSystem)?.name || '',
     date: y != null ? `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '',
     startTime: '',
     endTime: '',
@@ -394,10 +436,7 @@ async function submitCreate() {
     startTime: createForm.value.startTime,
     endTime: createForm.value.endTime,
     ...(createForm.value.description ? { description: createForm.value.description } : {}),
-    // Parcours guidé : lie la séance au système de Leitner créé pendant le parcours
-    ...(guidedTourStore.active && guidedTourStore.links.leitnerSystemId
-      ? { idSystem: guidedTourStore.links.leitnerSystemId }
-      : {}),
+    ...(createForm.value.idSystem ? { idSystem: createForm.value.idSystem } : {}),
   }
   const ok = await revisionStore.createSession(payload)
   creating.value = false
@@ -416,6 +455,7 @@ onMounted(async () => {
   await Promise.all([
     calendarStore.fetchEvents(),
     revisionStore.fetchSessions(),
+    leitnerStore.fetchSystems(),
     deadlineStore.fetchDeadlines(),
     planningStore.fetchPriorities(),
   ])
@@ -447,7 +487,7 @@ const allEvents = computed(() => {
   })
 
   revisionStore.sessions.forEach((rs) => {
-    add(parseDateToKey(rs.date), { label: rs.name, type: 'revision', id: rs.id })
+    add(parseDateToKey(rs.date), { label: rs.name, type: 'revision', id: rs.id, session: rs })
   })
 
   return dict
@@ -501,6 +541,17 @@ function getEvents(y, m, d) {
 /* ── Modale détail ── */
 function openDetail(ev) {
   selectedEvent.value = ev
+}
+
+function formatSessionDate(session) {
+  const [y, m, d] = session.date.split('-').map(Number)
+  const hours = [session.startTime, session.endTime].filter(Boolean).map((t) => t.slice(0, 5))
+  const when = `${d} ${MONTHS[m - 1]} ${y}`
+  return hours.length ? `${when} · ${hours.join(' – ')}` : when
+}
+
+function launchSession(idSystem) {
+  router.push({ name: 'flashcardssession', params: { systemId: idSystem } })
 }
 
 function typeLabel(type) {

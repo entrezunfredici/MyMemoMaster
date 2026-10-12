@@ -157,6 +157,8 @@ const formulaHtml = computed(() =>
 );
 const displayContent = computed(() => {
   if (!props.node.content || isImageNode.value || isFormulaNode.value) return '';
+  // Cartes existantes : le nœud racine dupliquait son titre dans son contenu
+  if (props.node.id === store.map.subjectNodeId && props.node.content === props.node.label) return '';
   return props.node.content;
 });
 const bodyStyle = computed(() => {

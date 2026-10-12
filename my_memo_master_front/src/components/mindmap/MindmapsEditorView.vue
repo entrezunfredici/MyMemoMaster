@@ -121,6 +121,12 @@ const scheduleAutoSave = () => {
   autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY)
 }
 
+// Parcours guidé : l'étape « carte mentale » exige un minimum de nœuds autour du nœud central
+const recordTourProgress = (payload) => {
+  const nodeCount = Object.keys(payload?.nodes || {}).length
+  guidedTourStore.recordLinks({ mindMapChildNodes: Math.max(0, nodeCount - 1) })
+}
+
 const ensureMeta = (payload) => ({
   subjectId: Number(currentDiagramMeta.value?.subjectId || 1),
   mmName: exportName.value || payload.title || 'Carte mentale',
@@ -146,6 +152,7 @@ const performAutoSave = async () => {
     if (currentDiagramId.value) {
       const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
       if (response) {
+        recordTourProgress(payload)
         currentDiagramMeta.value = { ...(currentDiagramMeta.value || {}), ...body, idMindMap: currentDiagramId.value }
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
         pendingPayload.value = null
@@ -160,6 +167,7 @@ const performAutoSave = async () => {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
         guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
+        recordTourProgress(payload)
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
         pendingPayload.value = null
         pendingCreate.value = false
@@ -242,6 +250,7 @@ const confirmExportModal = async () => {
     if (!pendingCreate.value && currentDiagramId.value) {
       const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
       if (response) {
+        recordTourProgress(pendingPayload.value)
         toast.success('Carte mise à jour.')
         if (currentDiagramMeta.value) {
           currentDiagramMeta.value.mmName = meta.mmName
@@ -256,6 +265,7 @@ const confirmExportModal = async () => {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
         guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
+        recordTourProgress(pendingPayload.value)
         toast.success('Carte créée.')
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
       }

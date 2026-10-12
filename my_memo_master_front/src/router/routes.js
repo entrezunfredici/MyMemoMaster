@@ -15,7 +15,7 @@ const routes = [
     name: 'exercises',
     component: () => import('../pages/ExercisesPage.vue'),
     meta: {
-      title: 'Exercises',
+      title: 'Exercices',
       private: true,
     },
   },
@@ -24,7 +24,7 @@ const routes = [
     name: 'exercise-detail',
     component: () => import('../pages/ExerciseDetailPage.vue'),
     meta: {
-      title: 'Exercise Detail',
+      title: 'Détail de l\'exercice',
       private: true,
     },
   },
@@ -96,7 +96,7 @@ const routes = [
     name: 'calendar',
     component: () => import('../pages/CalendarPage.vue'),
     meta: {
-      title: 'Calendar',
+      title: 'Calendrier',
       private: true
     }
   },
