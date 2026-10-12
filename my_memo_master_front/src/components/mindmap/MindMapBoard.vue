@@ -318,6 +318,8 @@ const onWheel = (event) => {
   border-radius: 16px;
   overflow: hidden;
   position: relative;
+  /* Maj+clic crée un nœud : sans ça, il sélectionne aussi le texte de la page */
+  user-select: none;
 }
 
 .mindmap-board__svg {

@@ -4871,3 +4871,14 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : ajouter les 3 variables dans `helm/values-prod.yaml` (endpoint `https://s3.swiss-backup04.infomaniak.com`, bucket `default`, comme la preprod). Déployé sur `pck-uuvuwp7` : les 2 pods API ont `S3_BUCKET=default`, plus d'avertissement.
 **Alternative écartée** : bucket dédié prod — non créé (création dans le manager Infomaniak, hors accès de l'agent).
 **Conséquences** : les clés d'objet sont `uploads/{userId}/{suffix}{ext}` **sans préfixe d'environnement** : prod et preprod partagent donc le même espace d'objets. Pas de collision (suffixe unique) mais un nettoyage de la preprod pourrait supprimer des fichiers de prod. À séparer (bucket dédié ou préfixe par `ENVIRONMENT`) avant les premiers vrais utilisateurs. Upload réel non testé (nécessite un compte connecté). Le changement doit être commité : le CD déploie `values-prod.yaml` du dépôt et retirerait S3 sinon.
+
+### [2026-10-12] Parcours guidé : validation par contenu minimal et récapitulatif de fin
+**Contexte** : la recette manuelle a montré qu'on pouvait finir le parcours sans rien de révisable (un nœud, un système Leitner vide) et que la fin ramenait à l'accueil sans retour.
+**Décision** : (1) l'étape carte mentale exige `MIN_MINDMAP_CHILD_NODES` (2) nœuds, comptés à chaque sauvegarde dans `links.mindMapChildNodes` ; (2) l'étape Leitner se valide sur `links.flashcardId` (une carte créée) ; (3) `finish()` met `completed = true` et garde les liens, le bandeau affiche le récapitulatif et propose de lancer la session du système créé, `dismissCompletion()` efface ensuite les liens. Le nœud racine d'une nouvelle carte a un contenu vide (le titre est déjà dans `label`).
+**Alternative écartée** : page dédiée de fin de parcours (plus de code et une route de plus pour un simple récapitulatif) ; modifier le schéma pour lier l'exercice au Leitner (hors périmètre, à valider).
+**Conséquences** : l'état `completed` est persisté en sessionStorage comme le reste ; le seuil de 2 nœuds est une constante facile à ajuster.
+### [2026-10-12] Réponse de référence d'une carte : lire /responses/correction plutôt que corriger /responses/question
+**Contexte** : la modale d'édition d'une carte Leitner s'ouvrait sans réponse, car `GET /responses/question/:id` filtre `correction: false`.
+**Décision** : `FlashcardsCardsPage.vue` appelle `GET /responses/correction/:id` pour les cartes ouvertes.
+**Alternative écartée** : retirer le filtre côté API — change le contrat d'un endpoint public (utilisé par `stores/responses.js`, couvert par des tests) ; interdit sans validation.
+**Conséquences** : seule la première correction est rechargée à l'édition.

@@ -2,6 +2,28 @@ export function isMobile() {
     return (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
 }
 
+/**
+ * Formate une durée en secondes de façon lisible (ex : 86400 → « 1 j », 90 → « 1 min 30 s »).
+ *
+ * @param {number|string} seconds - Durée en secondes
+ * @returns {string} Durée formatée, ou chaîne vide si la valeur n'est pas un nombre positif
+ */
+export function formatDuration(seconds) {
+    let remaining = Math.floor(Number(seconds));
+    if (!Number.isFinite(remaining) || remaining <= 0) return "";
+    const units = [["j", 86400], ["h", 3600], ["min", 60], ["s", 1]];
+    const parts = [];
+    for (const [label, size] of units) {
+        const count = Math.floor(remaining / size);
+        if (count > 0) {
+            parts.push(`${count} ${label}`);
+            remaining -= count * size;
+        }
+        if (parts.length === 2) break;
+    }
+    return parts.join(" ");
+}
+
 export function threeDotString(str, maxLen = 100) {
     if (!str) return "";
     if (str.length <= maxLen) return str;

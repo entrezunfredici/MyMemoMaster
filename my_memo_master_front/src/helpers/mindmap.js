@@ -67,7 +67,8 @@ const createBlankMindMap = (title = 'Nouvelle carte mentale') => {
         id: subjectId,
         label: title,
         type: 'text',
-        content: title,
+        // Vide : le titre est déjà affiché via `label` (sinon il apparaissait deux fois sur le nœud racine)
+        content: '',
         mastery: 'undefined',
         zoneId: null,
         style: {

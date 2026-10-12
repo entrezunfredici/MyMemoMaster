@@ -288,10 +288,12 @@ const goToSession = (systemId) => {
 // ── Modal système ─────────────────────────────────────────────────────────────
 const openCreateModal = () => {
   editingId.value = null
-  form.name = ''
-  // Parcours guidé : pré-sélectionne la matière et la carte mentale créées à l'étape précédente
+  // Parcours guidé : pré-sélectionne la matière et la carte mentale créées à l'étape précédente,
+  // et reprend le nom de la carte pour le système
   form.subjectId = guidedTourStore.active ? guidedTourStore.links.subjectId : null
   form.idMindMap = guidedTourStore.active ? guidedTourStore.links.mindMapId : null
+  form.name = (form.idMindMap
+    && (diagrammeStore.diagrammes || []).find((mm) => mm.idMindMap === form.idMindMap)?.mmName) || ''
   form.tagIds = []
   showModal.value = true
 }
