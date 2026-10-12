@@ -44,7 +44,9 @@ resourceQuota:
   enabled: false
 
 postgres:
-  storage: 20Gi
+  # Mesure du 2026-10-12 : base de 11 Mo, 65 Mo utilisés sur le volume de 20 Gi.
+  # Volume Cinder extensible (allowVolumeExpansion: true) : on repart à 5 Gi.
+  storage: 5Gi
   resources:
     requests:
       cpu: 250m

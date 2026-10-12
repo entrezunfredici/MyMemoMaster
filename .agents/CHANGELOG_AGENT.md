@@ -12840,3 +12840,16 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Mesure** (vraie API, `mistral-small-latest`, 114 appels = 57 cas × 2) : prompt précédent **91/114 (80 %)** ; après correction **114/114**. Défauts corrigés : références alternatives traitées comme cumulatives, formules équivalentes rejetées (`Cp − Cv = nR`, `ρVg`, `PV = RT`), « évoquer une relation » noté 0,8, motif « hors sujet » ou contradictoire.
 **Réserve** : après la 2e passe, j'ai assoupli 3 attentes jugées défendables dans les deux sens (« les frottements » seuls : 0,6-1 ; « la pression dépend de la profondeur, ρ et g » : 0,6-1 ; énoncé de Clausius pour le 2nd principe : 0-0,6). Le 100 % n'est donc pas comparable au 80 % initial sur ces 3 cas (le prompt seul a fait passer 91 → 105 avant tout assouplissement). Jeu écrit par l'agent, pas par un enseignant : à valider.
 **Dette** : le cache Redis est invalidé (clé v3) ; banc payant, hors CI, à rejouer à chaque changement de prompt (`node scripts/quality-check-grading.js --runs 2`) ; le jeu de 96 cas du 2026-10-09 n'étant pas versionné, la non-régression sur celui-ci n'a pas été rejouée.
+
+### [2026-10-12] [IMP] Préparation de la migration vers le control plane partagé (dimensionnement + nettoyage)
+**Fichiers modifiés** : `.gitignore` (+ `/backups-local/`). Aucun chart modifié.
+**Fait sur le cluster dédié** : sauvegarde locale des 3 volumes SonarQube (`backups-local/sonarqube/*.tar.gz`, non commité) puis suppression des PV ; namespace `sonarqube` supprimé ; metrics-server réparé (`--kubelet-insecure-tls`) → `kubectl top` de nouveau disponible.
+**Utilisable** : décision de dimensionnement 2 × A4-Ram8-Disk20-Perf1, zone az-3 (voir DECISIONS.md, 2026-10-12) ; mesures de consommation réelle au repos.
+**Hypothèses** : mesures prises au repos, sans trafic ; « 300 utilisateurs » non défini (comptes, actifs, simultanés).
+**Dette** : (1) volumes Cinder SonarQube (`Retain`) à supprimer dans le manager Infomaniak ; (2) recette de charge à rejouer sur le preprod du nouveau cluster avant de baisser les requests ; (3) runbook de migration (dump/restore Postgres, secrets, DNS, secrets GitHub `KUBECONFIG_*`) non rédigé ; (4) taille réelle de la base Postgres prod non mesurée ; (5) modification de `.gitignore` non commitée.
+
+### [2026-10-12] [IMP] Nouveau cluster : add-ons, secrets, dumps et runbook (déploiement non fait)
+**Fichiers** : `docs/RUNBOOK_MIGRATION_CLUSTER_PARTAGE.md` (nouveau), `helm/values-prod.yaml` (Postgres 20 → 5 Gi), `.gitignore`.
+**Fait sur `pck-uuvuwp7`** : cert-manager v1.21.1, ClusterIssuers Cloudflare, PriorityClasses, namespaces, Secrets applicatifs copiés depuis l'ancien cluster. Dumps prod/preprod faits en local. ingress-nginx installé puis **désinstallé** (incident IP, voir DECISIONS).
+**Non fait** : déploiement Helm prod/preprod (bloqué par les permissions), restauration des données, bascule. Prod en panne (523) tant que l'IP n'est pas reprise par un LoadBalancer fonctionnel.
+**Dette** : metrics-server du nouveau cluster en échec (SAN des kubelets) ; secrets GitHub `KUBECONFIG_*` à mettre à jour ; modifications non commitées ; tests de charge à rejouer sur le nouveau preprod.
