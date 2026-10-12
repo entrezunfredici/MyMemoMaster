@@ -31,6 +31,7 @@ config:
   # à séparer (bucket dédié) avant l'arrivée de vrais utilisateurs.
   S3_ENDPOINT: https://s3.swiss-backup04.infomaniak.com
   S3_BUCKET: default
+  S3_KEY_PREFIX: prod/
   S3_PUBLIC_URL: https://s3.swiss-backup04.infomaniak.com
 
 domain:

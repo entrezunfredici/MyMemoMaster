@@ -26,6 +26,7 @@ config:
   VITE_FRONT_URL: https://preprod.my-memo-master.com
   S3_ENDPOINT: https://s3.swiss-backup04.infomaniak.com
   S3_BUCKET: default
+  S3_KEY_PREFIX: preprod/
   S3_PUBLIC_URL: https://s3.swiss-backup04.infomaniak.com
 
 domain:

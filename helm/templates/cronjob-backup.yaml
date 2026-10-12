@@ -6,9 +6,11 @@
 #    2. container     `upload`: envoi sur s3://<bucket>/<keyPrefix>/ puis purge, en
 #       ne gardant que les `backup.keep` dumps les plus récents.
 #
-#  Les noms de dump embarquent l'horodatage UTC (mmm-AAAAMMJJTHHMMSSZ.dump) : le tri
-#  alphabétique est donc chronologique, ce qui évite de dépendre de la comparaison
-#  de dates côté JMESPath.
+#  Les noms de dump embarquent l'horodatage UTC puis un suffixe aléatoire
+#  (mmm-AAAAMMJJTHHMMSSZ-<24 hex>.dump) : le tri alphabétique reste chronologique (pas de
+#  comparaison de dates côté JMESPath) et le nom n'est pas devinable. Défense en profondeur :
+#  l'API ne sert plus de clé hors `mindmaps/` (voir helpers/storageKeys.js), mais un dump ne doit
+#  jamais dépendre d'une seule barrière.
 #
 #  Restauration : voir docs/MANUEL_DEPLOIEMENT_KUBERNETES.md (section Sauvegardes).
 #
@@ -120,7 +122,8 @@ spec:
                   set -eu
                   S3="aws --endpoint-url $S3_ENDPOINT"
                   aws configure set default.s3.addressing_style path
-                  KEY="$KEY_PREFIX/mmm-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                  RAND=$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')
+                  KEY="$KEY_PREFIX/mmm-$(date -u +%Y%m%dT%H%M%SZ)-$RAND.dump"
                   $S3 s3 cp /backup/db.dump "s3://$S3_BUCKET/$KEY" --no-progress
                   # Contrôle : l'objet existe bien côté S3 avant toute purge.
                   $S3 s3api head-object --bucket "$S3_BUCKET" --key "$KEY" > /dev/null

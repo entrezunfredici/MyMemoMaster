@@ -6,6 +6,7 @@ const pdfExtractionService = require('./PdfExtraction.service')
 const aiExerciseGenerationService = require('./AiExerciseGeneration.service')
 const imageCaptioningPipelineService = require('./ImageCaptioningPipeline.service')
 const { s3Client, bucket, buildPublicUrl } = require('../config/storage.config')
+const { buildUploadKey } = require('../helpers/storageKeys')
 
 // Périmètre : ajout de l'import PDF pour la génération de questions d'exercice par IA (`C-02`),
 // demandé explicitement par l'utilisateur après la livraison de C-02.07 — jusque-là, `C-02` n'avait
@@ -131,7 +132,7 @@ class AiExerciseGenerationPipelineService {
     const [, mimeType, base64Data] = match
     const buffer = Buffer.from(base64Data, 'base64')
     const extension = mimeType.split('/')[1] || 'jpg'
-    const key = `uploads/${userId || 'anon'}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${extension}`
+    const key = buildUploadKey(userId, `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${extension}`)
 
     try {
       await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: buffer, ContentType: mimeType }))

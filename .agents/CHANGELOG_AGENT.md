@@ -12885,3 +12885,8 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Non-bug** : `PUT /questions/:id` n'existe pas, la route d'édition d'une question est `PUT /questions/edit/:id` (déjà utilisée par le front).
 **Dette** : `getCorrectionByQuestion` ne renvoie que la première correction ; les reformulations acceptées supplémentaires ne sont pas rechargées à l'édition.
 >>>>>>> hotfixes
+
+### [2026-10-12] [FIX] Sécurité : route d'image publique restreinte + préfixe d'environnement S3
+**Fichiers** : `my_memo_master_api/helpers/storageKeys.js` (nouveau), `controllers/Diagramme.controller.js`, `controllers/Storage.controller.js`, `middlewares/upload.middleware.js`, `middlewares/mindmapImageUpload.js`, `services/AiExerciseGenerationPipeline.service.js`, `test/helpers/storageKeys.test.js` et `test/controllers/Diagramme.image.test.js` (nouveaux), `helm/values.yaml` + `values-prod.yaml` + `values-preprod.yaml` (`S3_KEY_PREFIX`), `helm/templates/cronjob-backup.yaml` (suffixe aléatoire), `docker-compose.yml` (S3_KEY_PREFIX optionnel), docs.
+**État** : 118 suites / 2 297 tests OK, lint OK. **Non déployé** (à commiter/pousser). CronJobs suspendus sur pck-uuvuwp7 en attendant ; dumps de test supprimés de S3.
+**Dette** : changer les mots de passe des comptes exposés ; reprendre les sauvegardes après déploiement du correctif (vérifier `kubectl get cronjob` : suspend=false) ; `getImage` toujours public ; alerte sur échec de sauvegarde.

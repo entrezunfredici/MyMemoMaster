@@ -185,6 +185,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      S3_KEY_PREFIX: ${S3_KEY_PREFIX:-}
       # Taille max des uploads (Mo) — stockage générique + PDF génération IA, voir .env.example
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}
       # IA (C-01, génération de cartes par IA) — jamais transmises au conteneur jusqu'ici : le
@@ -353,6 +354,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      S3_KEY_PREFIX: ${S3_KEY_PREFIX:-}
       # Taille max des uploads (Mo) — stockage générique + PDF génération IA, voir .env.example
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}
       # IA (C-01, génération de cartes par IA) — jamais transmises au conteneur jusqu'ici : le

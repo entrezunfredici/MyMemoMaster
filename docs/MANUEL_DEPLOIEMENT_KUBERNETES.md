@@ -172,7 +172,7 @@ Puis en HTTP : `https://preprod-api.my-memo-master.com/api/v1/health` (santé AP
 Le chart déploie un CronJob `{release}-backup` ([helm/templates/cronjob-backup.yaml](../helm/templates/cronjob-backup.yaml)), activé par `backup.enabled: true` dans `values-prod.yaml` et `values-preprod.yaml`.
 
 - **Quand** : tous les jours à 03:00 UTC (`backup.schedule`).
-- **Quoi** : `pg_dump -Fc` (format custom, vérifié par `pg_restore -l` avant envoi), déposé dans `s3://<S3_BUCKET>/backups/<ENVIRONMENT>/mmm-AAAAMMJJTHHMMSSZ.dump`. Mêmes identifiants S3 que l'API (Secret `{release}-secrets`).
+- **Quoi** : `pg_dump -Fc` (format custom, vérifié par `pg_restore -l` avant envoi), déposé dans `s3://<S3_BUCKET>/backups/<ENVIRONMENT>/mmm-AAAAMMJJTHHMMSSZ-<aléa>.dump` (suffixe aléatoire : nom non devinable). Mêmes identifiants S3 que l'API (Secret `{release}-secrets`).
 - **Rétention** : les 14 dumps les plus récents (`backup.keep`) ; les plus anciens sont supprimés après chaque envoi réussi.
 - **Images** : `postgres:17-alpine` (celle de la base) et `amazon/aws-cli:2.15.30` (épinglée : les versions récentes ajoutent des checksums que certains S3 compatibles refusent).
 

@@ -7,6 +7,7 @@ const { s3Client, bucket } = require('../config/storage.config')
 const { extensionMatchesMime, s3SniffContentType } = require('../helpers/fileSignature')
 const logger = require('../helpers/logger')
 const getUploadConfig = require('../helpers/uploadConfig')
+const { buildUploadKey } = require('../helpers/storageKeys')
 
 // Suffixe de nom de fichier tire d'un generateur CRYPTOGRAPHIQUE, pas de
 // Math.random() : les cles d'objets uploades ne doivent pas etre devinables.
@@ -62,7 +63,7 @@ const storage = bucket
         const userId = req.user?.id || 'anon'
         const suffix = uniqueSuffix()
         const ext = path.extname(file.originalname).toLowerCase()
-        cb(null, `uploads/${userId}/${suffix}${ext}`)
+        cb(null, buildUploadKey(userId, `${suffix}${ext}`))
       }
     })
   : multer.diskStorage({
