@@ -1,0 +1,8 @@
+{
+  "appId": "com.mymemomaster.app",
+  "appName": "MyMemoMaster",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

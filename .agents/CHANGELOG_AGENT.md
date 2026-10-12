@@ -114,6 +114,7 @@
 | Front — Stores Pinia Calendrier | Stable — 4 stores créés : calendarEvents, revisionSessions, deadlines, classGroups | 2026-06-12 |
 | Front — Stores Pinia Rappels | Stable — reminders.js : CRUD complet, pendingReminders, remindersByEntity | 2026-06-12 |
 | Front — Stores Pinia Leitner (systems, boxes, cards) | Stable — systemStats + loadSystemStats ajoutés à leitnerCards | 2026-06-08 |
+| Mobile — Android (Capacitor) | Socle créé, **non compilé ni testé** — voir dette (JDK/SDK, CORS `https://localhost`) | 2026-10-12 |
 | Front — VitePWA (service worker) | Stable — precaching désactivé (globPatterns: []), cache service worker réduit à zéro | 2026-06-06 |
 | Front — Couche API Axios (api.js, config.js) | Stable — [FIX] 2026-08-31 : `toResponse()` normalise `data.message` depuis `data.errors[0].msg` (forme express-validator) — corrige l'affichage du message d'erreur réel sur les 160 appelants qui lisaient `resp.data.message` | 2026-06-06 |
 | Tags (système de tags M2M) | Stable — S-05.01 : Tag model + 4 migrations + service/controller/validators/routes + TagSelector Vue + intégration MindmapsListView/FlashcardsPage/ExercisesPage + 39 tests controller | 2026-06-24 |
@@ -12865,3 +12866,15 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 ### [2026-10-12] [FIX] S3 configuré en prod
 **Fichiers** : `helm/values-prod.yaml` (S3_ENDPOINT, S3_BUCKET, S3_PUBLIC_URL). Déployé sur le nouveau cluster, vérifié (env des pods, plus d'avertissement). **À commiter.**
 **Dette** : séparer le bucket/préfixe prod de la preprod ; tester un téléversement réel et sa survie à un redéploiement ; sauvegardes automatiques Postgres (CronJob) toujours absentes.
+
+### [2026-10-12] [ADD] Socle d'application mobile Android (Capacitor)
+**Fichiers créés** : `my_memo_master_front/capacitor.config.json` (appId `com.mymemomaster.app`, `webDir: dist`, `androidScheme: https`), `my_memo_master_front/android/` (projet natif généré par `cap add android`).
+**Fichiers modifiés** : `my_memo_master_front/package.json` (+ `@capacitor/core`, `@capacitor/android`, `@capacitor/cli` en dev ; scripts `build:mobile` = `vite build && cap sync android`, `mobile:open`), `package-lock.json`.
+**Utilisable** : le front Vue est embarqué tel quel dans une WebView Android. **Aucun APK n'a été compilé ni testé** (voir dette).
+**Hypothèses** : (1) l'API de prod est joignable en HTTPS depuis le téléphone ; (2) le build mobile se fait avec `VITE_API_URL` absolue (le fallback `http://localhost/api/v1` pointerait sur le téléphone) ; (3) la WebView envoie `Origin: https://localhost`.
+**Dette** : (1) ajouter `https://localhost` à `CORS_ORIGIN` de l'API (dev/preprod/prod : valeurs Helm + `.env`) — non fait ; (2) compilation non validée : Java 8 seul sur le poste, Capacitor 8 demande un JDK récent (21 recommandé) et un SDK Android 36 (installés : 29/33/34) ; (3) icônes `android-chrome-*.png` référencées par le manifeste PWA absentes de `public/`, icône/splash natifs par défaut Capacitor ; (4) service worker VitePWA inutile dans la WebView (aucun cache, sans effet) ; (5) `npm audit` signale 12 vulnérabilités, non triées (non comparées au niveau d'avant l'ajout) ; (6) pas d'iOS (Mac + Xcode requis) ; (7) pas de signature de release ni de publication Play Store ; (8) liens profonds, notifications push natives, stockage sécurisé du token (aujourd'hui `localStorage` de la WebView) non traités.
+
+### [2026-10-12] [IMP] CORS : origine `https://localhost` pour l'app mobile Android
+**Fichiers modifiés** : `helm/values-prod.yaml`, `helm/values-preprod.yaml`, `k8s/prod/configmap.yml`, `k8s/preprod/configmap.yml`, `docker-compose.yml` (2 occurrences), `.env.example` — `https://localhost` ajouté en 2ᵉ position de `CORS_ORIGIN`. `app.js` inchangé (split sur virgule déjà géré).
+**Hypothèse** : la 1ʳᵉ origine reste le front web (`helpers/frontUrl.js` s'en sert comme repli).
+**Dette** : non déployé (le CD déploie à partir du dépôt, à commiter/pousser) ; `https://localhost` est une origine qui peut aussi être utilisée par n'importe quel site servi en local sur la machine d'un utilisateur — acceptable car l'auth reste par JWT, mais à noter.

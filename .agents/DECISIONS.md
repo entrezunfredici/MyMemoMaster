@@ -4871,3 +4871,15 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : ajouter les 3 variables dans `helm/values-prod.yaml` (endpoint `https://s3.swiss-backup04.infomaniak.com`, bucket `default`, comme la preprod). Déployé sur `pck-uuvuwp7` : les 2 pods API ont `S3_BUCKET=default`, plus d'avertissement.
 **Alternative écartée** : bucket dédié prod — non créé (création dans le manager Infomaniak, hors accès de l'agent).
 **Conséquences** : les clés d'objet sont `uploads/{userId}/{suffix}{ext}` **sans préfixe d'environnement** : prod et preprod partagent donc le même espace d'objets. Pas de collision (suffixe unique) mais un nettoyage de la preprod pourrait supprimer des fichiers de prod. À séparer (bucket dédié ou préfixe par `ENVIRONMENT`) avant les premiers vrais utilisateurs. Upload réel non testé (nécessite un compte connecté). Le changement doit être commité : le CD déploie `values-prod.yaml` du dépôt et retirerait S3 sinon.
+
+### [2026-10-12] Application mobile : Capacitor autour du front Vue, Android d'abord
+**Contexte** : demande d'une appli mobile. Le front Vue 3 est déjà responsive (header mobile) et installable (VitePWA). Aucune application native n'existait.
+**Décision** : embarquer le build Vite existant avec Capacitor 8 (`@capacitor/core`, `@capacitor/android`, `@capacitor/cli`), dans `my_memo_master_front/` (config + dossier `android/`) et non dans un nouveau dossier racine, car le projet natif dépend directement de `dist/`. Cible Android uniquement dans un premier temps. `androidScheme: https` pour que la WebView serve l'app en `https://localhost` (contexte sécurisé, pas de contenu mixte avec l'API HTTPS).
+**Alternative écartée** : (1) PWA seule — pas de présence sur les stores, notifications limitées sur iOS ; (2) React Native / Flutter — réécriture complète de l'UI, deuxième base de code et hors stack approuvée (JS/Vue, pas de TypeScript).
+**Conséquences** : nouvelles dépendances `@capacitor/*` à ajouter à la liste approuvée de `CONVENTIONS.md` (validées par l'utilisateur dans cette session). L'API doit autoriser l'origine `https://localhost` dans `CORS_ORIGIN` ; le build mobile exige une `VITE_API_URL` absolue. Aucune modification de contrat d'API. Le dossier `android/` est commité (son `.gitignore` interne exclut les artefacts de build).
+
+### [2026-10-12] CORS : autoriser `https://localhost` pour la WebView Capacitor
+**Contexte** : la WebView Android (`androidScheme: https`) envoie `Origin: https://localhost` ; sans autorisation, tout appel API est bloqué.
+**Décision** : ajouter `https://localhost` à `CORS_ORIGIN` dans tous les environnements, après l'origine du front web.
+**Alternative écartée** : réutiliser le cas `!origin` (non applicable, la WebView envoie bien un Origin) ; schéma custom non-https (`capacitor://`, contenu mixte et contexte non sécurisé sur Android).
+**Conséquences** : l'ordre compte (la 1ʳᵉ origine sert d'URL front de repli). Aucun cookie/credential de session côté serveur, donc pas d'élargissement de surface CSRF.

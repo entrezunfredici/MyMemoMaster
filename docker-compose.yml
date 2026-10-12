@@ -156,7 +156,7 @@ services:
       API_PUBLIC_URL: http://${API_DOMAIN}
       # Lien de vérification email envoyé aux utilisateurs — doit pointer sur le front (Traefik :80)
       APP_FRONT_URL: ${APP_FRONT_URL:-${VITE_FRONT_URL}}
-      CORS_ORIGIN: ${VITE_FRONT_URL}
+      CORS_ORIGIN: ${VITE_FRONT_URL},https://localhost
       EMAIL_FROM: ${EMAIL_FROM}
       SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -333,7 +333,7 @@ services:
       API_PUBLIC_URL: https://${API_DOMAIN}
       # Lien de vérification email envoyé aux utilisateurs — doit pointer sur le front public
       APP_FRONT_URL: ${APP_FRONT_URL:-https://${FRONT_DOMAIN}}
-      CORS_ORIGIN: https://${FRONT_DOMAIN}
+      CORS_ORIGIN: https://${FRONT_DOMAIN},https://localhost
       EMAIL_FROM: ${EMAIL_FROM}
       SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}
       SMTP_PORT: ${SMTP_PORT:-587}
