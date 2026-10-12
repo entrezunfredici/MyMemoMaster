@@ -10,7 +10,7 @@ OLD=~/.kube/config
 NEW=/c/Users/supoe/Downloads/pck-uuvuwp7-kubeconfig
 ```
 
-## ⚠️ Incident du 2026-10-12 : l'IP d'origine est partagée entre les deux clusters
+## ⚠️ Incident du 2026-10-12 : collision de nom de LoadBalancer entre les deux clusters (cause trouvée)
 
 L'installation d'`ingress-nginx` sur le nouveau cluster a obtenu **la même IP de LoadBalancer** (`83.228.249.190`) que l'ancien. L'IP a été prise à l'ancien LoadBalancer et la prod a répondu 525 puis 523 (Cloudflare). **Conséquence : dès que le nouveau cluster expose un LoadBalancer, il reçoit le trafic de la prod.** Ne créer le LoadBalancer du nouveau cluster qu'au moment de basculer, c'est-à-dire **après** l'étape 3. Le DNS Cloudflare n'est pas modifié tant que le LoadBalancer reprend cette IP.
 
@@ -89,3 +89,8 @@ Même procédure avec `values-preprod.yaml`, `-n mymemomaster-preprod`, release 
 ## Retour arrière
 
 Tant que l'ancien cluster n'est pas détruit : `helm uninstall ingress-nginx -n ingress-nginx --kubeconfig $NEW`, puis forcer la resynchronisation du LoadBalancer de l'ancien cluster (`kubectl --kubeconfig $OLD -n ingress-nginx annotate svc ingress-nginx-controller resync=$(date +%s) --overwrite`). Lors de l'incident du 2026-10-12, la désinstallation seule n'a **pas** suffi à rendre l'IP à l'ancien LoadBalancer (réponse 523 persistante) : prévoir de vérifier l'association de l'IP dans le manager Infomaniak.
+
+
+## Cause de l'incident et état au 2026-10-12 (soir)
+
+Les deux clusters sont nommés `kubernetes` et exposaient `ingress-nginx/ingress-nginx-controller` : même nom de LoadBalancer OpenStack. Le nouveau cluster a repris puis supprimé le LB de l'ancien (Octavia : `404 not found`). Réparation : retrait des annotations `loadbalancer.openstack.org/load-balancer-id` et `-address` sur le service de l'ancien cluster (LB recréé, IP `83.228.248.18`) ; sur le nouveau cluster, ingress-nginx est installé avec `fullnameOverride=ingress-nginx-v2` (IP `83.228.248.132`). La nouvelle prod est déployée, restaurée (46 tables identiques) et répond en direct ; **reste le changement DNS Cloudflare** des A `app`/`api` vers `83.228.248.132`.

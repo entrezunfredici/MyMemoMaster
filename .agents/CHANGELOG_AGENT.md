@@ -12853,3 +12853,11 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Fait sur `pck-uuvuwp7`** : cert-manager v1.21.1, ClusterIssuers Cloudflare, PriorityClasses, namespaces, Secrets applicatifs copiés depuis l'ancien cluster. Dumps prod/preprod faits en local. ingress-nginx installé puis **désinstallé** (incident IP, voir DECISIONS).
 **Non fait** : déploiement Helm prod/preprod (bloqué par les permissions), restauration des données, bascule. Prod en panne (523) tant que l'IP n'est pas reprise par un LoadBalancer fonctionnel.
 **Dette** : metrics-server du nouveau cluster en échec (SAN des kubelets) ; secrets GitHub `KUBECONFIG_*` à mettre à jour ; modifications non commitées ; tests de charge à rejouer sur le nouveau preprod.
+
+### [2026-10-12] [IMP] Nouvelle prod déployée et vérifiée sur pck-uuvuwp7 (bascule DNS restante)
+**Fait** : déploiement Helm prod (2 API, 2 front, Postgres 5 Gi, Redis, Prometheus) ; restauration depuis dump frais, 46 tables identiques ; `/health` 200 ; ingress-nginx-v2 + LB 83.228.248.132 ; certificats valides ; ancienne prod remise en service (LB recréé, IP 83.228.248.18, DNS mis à jour par l'utilisateur).
+**Reste** : DNS `app`/`api` → 83.228.248.132 ; mise à jour de `KUBECONFIG_PROD` après la bascule ; preprod à migrer (ou abandonner) ; metrics-server du nouveau cluster ; suppression des volumes Cinder `Retain` et de l'ancien cluster ; recette de charge sur le nouveau preprod.
+
+### [2026-10-12] [IMP] Preprod migrée sur pck-uuvuwp7
+**Fait** : déploiement Helm preprod (1 API, 1 front, Postgres, Redis, PgAdmin, Prometheus), restauration depuis dump frais (2 utilisateurs, 46 tables identiques), certificats `preprod`, `preprod-api`, `preprod-pgadmin` valides, réponses 200 en direct sur 83.228.248.132. La prod et la preprod comptent 2 utilisateurs chacune (admin + compte de test : aucune donnée client).
+**Reste** : DNS Cloudflare des 5 hôtes (`app`, `api`, `preprod`, `preprod-api`, `preprod-pgadmin`) → 83.228.248.132 ; `KUBECONFIG_PROD`/`KUBECONFIG_PREPROD` vers le nouveau cluster après le DNS ; suppression de l'ancien cluster et des volumes Cinder `Retain` après 48 h.
