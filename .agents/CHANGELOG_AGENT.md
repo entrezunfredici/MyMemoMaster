@@ -12861,3 +12861,7 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 ### [2026-10-12] [IMP] Preprod migrée sur pck-uuvuwp7
 **Fait** : déploiement Helm preprod (1 API, 1 front, Postgres, Redis, PgAdmin, Prometheus), restauration depuis dump frais (2 utilisateurs, 46 tables identiques), certificats `preprod`, `preprod-api`, `preprod-pgadmin` valides, réponses 200 en direct sur 83.228.248.132. La prod et la preprod comptent 2 utilisateurs chacune (admin + compte de test : aucune donnée client).
 **Reste** : DNS Cloudflare des 5 hôtes (`app`, `api`, `preprod`, `preprod-api`, `preprod-pgadmin`) → 83.228.248.132 ; `KUBECONFIG_PROD`/`KUBECONFIG_PREPROD` vers le nouveau cluster après le DNS ; suppression de l'ancien cluster et des volumes Cinder `Retain` après 48 h.
+
+### [2026-10-12] [FIX] S3 configuré en prod
+**Fichiers** : `helm/values-prod.yaml` (S3_ENDPOINT, S3_BUCKET, S3_PUBLIC_URL). Déployé sur le nouveau cluster, vérifié (env des pods, plus d'avertissement). **À commiter.**
+**Dette** : séparer le bucket/préfixe prod de la preprod ; tester un téléversement réel et sa survie à un redéploiement ; sauvegardes automatiques Postgres (CronJob) toujours absentes.
