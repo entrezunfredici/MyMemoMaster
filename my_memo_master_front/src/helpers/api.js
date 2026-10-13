@@ -11,6 +11,7 @@ import {
   VITE_API_GOOGLE_AUTH_HEADER,
 } from '@/config';
 import { useAuthStore } from '@/stores/auth'
+import { notif } from '@/helpers/notif'
 
 const SECURITY_MODES = {
   PUBLIC: 'public',
@@ -309,6 +310,34 @@ function toResponse(response) {
   return { data, status: response.status }
 }
 
+const NETWORK_ERROR_MESSAGE = 'Impossible de joindre le serveur. Vérifiez votre connexion.'
+const NETWORK_ERROR_COOLDOWN_MS = 5000
+const GATEWAY_ERROR_STATUSES = [502, 503, 504]
+let lastNetworkErrorNotifAt = 0
+
+// CHOIX: un seul toast « serveur injoignable » (délai anti-doublon) en plus du retour undefined
+// RAISON: contrat conservé — ~36 appelants testent `!resp`, ~89 lisent `resp.status` ; renvoyer une
+// réponse factice casserait les premiers (et une suppression hors-ligne passerait pour réussie dans
+// MindmapsListView). Sans ce message, une API coupée n'affichait que des TypeError empilés.
+/**
+ * Journalise une erreur d'appel API et, s'il s'agit d'une coupure réseau, prévient l'utilisateur une seule fois.
+ *
+ * @param {Error} error - Erreur interceptée (Axios ou autre)
+ * @param {string} [label] - Préfixe de log
+ * @returns {void}
+ */
+function reportApiError(error, label = 'Error during API call using api.js:') {
+  console.error(label, error?.stack)
+  if (error?.code === 'ERR_CANCELED') return
+  // Une vraie réponse applicative (4xx, 500…) n'est pas une coupure ; 502/503/504 = API injoignable derrière le proxy
+  const status = error?.response?.status
+  if (error?.response && !GATEWAY_ERROR_STATUSES.includes(status)) return
+  const now = Date.now()
+  if (now - lastNetworkErrorNotifAt < NETWORK_ERROR_COOLDOWN_MS) return
+  lastNetworkErrorNotifAt = now
+  notif.notify(NETWORK_ERROR_MESSAGE, 'error')
+}
+
 /**
  * Effectue une requête GET vers l'API.
  *
@@ -335,7 +364,7 @@ async function get(endpoint, params = {}) {
     // try/catch englobant, ou garde explicite `if (!resp) …`) ; retourner undefined
     // suffit, la redirection globale était un effet de bord disproportionné (bug
     // trouvé le 2026-09-01 sur la création de série d'exercices).
-    console.error('Error during API call using api.js:', error.stack)
+    reportApiError(error)
   }
 }
 
@@ -361,7 +390,7 @@ async function post(endpoint, data = {}, config = {}) {
     return toResponse(response)
   } catch (error) {
     // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
-    console.error('Error during API call using api.js:', error.stack)
+    reportApiError(error)
   }
 }
 
@@ -387,7 +416,7 @@ async function put(endpoint, data = {}, config = {}) {
     return toResponse(response)
   } catch (error) {
     // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
-    console.error('Error during API call using api.js:', error.stack)
+    reportApiError(error)
   }
 }
 
@@ -411,7 +440,7 @@ async function del(endpoint, data = {}) {
     return toResponse(response)
   } catch (error) {
     // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
-    console.error('Error during API call using api.js:', error.stack)
+    reportApiError(error)
   }
 }
 
@@ -432,7 +461,7 @@ async function patch(endpoint, data = {}) {
     return toResponse(response)
   } catch (error) {
     // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.
-    console.error('Error during API call using api.js:', error.stack)
+    reportApiError(error)
   }
 }
 
@@ -485,7 +514,7 @@ async function getBlob(endpoint) {
     if (handleSpecialStatus(response?.status)) return undefined
     return { data: response.data, status: response.status }
   } catch (error) {
-    console.error('Error during blob API call using api.js:', error.stack)
+    reportApiError(error, 'Error during blob API call using api.js:')
   }
 }
 

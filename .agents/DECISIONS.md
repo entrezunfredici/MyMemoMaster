@@ -4883,3 +4883,39 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : ajouter `https://localhost` à `CORS_ORIGIN` dans tous les environnements, après l'origine du front web.
 **Alternative écartée** : réutiliser le cas `!origin` (non applicable, la WebView envoie bien un Origin) ; schéma custom non-https (`capacitor://`, contenu mixte et contexte non sécurisé sur Android).
 **Conséquences** : l'ordre compte (la 1ʳᵉ origine sert d'URL front de repli). Aucun cookie/credential de session côté serveur, donc pas d'élargissement de surface CSRF.
+
+### [2026-10-13] Toolchain Android : JDK 21 via winget, pas de contournement TLS
+**Contexte** : le téléchargement direct du JDK (api.adoptium.net) échouait (`SEC_E_UNTRUSTED_ROOT`) ; Capacitor 8 exige JDK 21 + SDK 36.
+**Décision** : installer Microsoft OpenJDK 21 via winget (hash vérifié) et compiler avec `JAVA_HOME` positionné par session, sans toucher au `java` du PATH.
+**Alternative écartée** : `curl -k` / désactivation de la vérification TLS (téléchargement d'un binaire non vérifié) ; modification globale du PATH (casse les outils dépendant de Java 8).
+**Conséquences** : chaque build mobile doit exporter `JAVA_HOME` ; émulateur de test = AVD `mmm_test` (API 34).
+
+### [2026-10-13] Navigation mobile : barre 4 onglets + feuille « Plus »
+**Contexte** : la barre mobile alignait 10 icônes sur deux lignes (~25 % de la hauteur), sans libellé.
+**Décision** : composant dédié `MobileNavComponent.vue` — 4 onglets d'étude (Accueil, Cartes, Leitner, Exercices) avec libellé, le reste dans une feuille ouverte par « Plus », posée au-dessus de la barre.
+**Alternative écartée** : burger seul en haut avec tiroir latéral (plus d'espace vertical mais tout à 2 taps) ; arbitrage fait avec l'utilisateur.
+**Conséquences** : un nouvel écran principal s'ajoute dans `moreItems` (ou `primaryItems`) du composant ; la nav desktop (`App.vue`) reste séparée.
+
+### [2026-10-13] Éditeur de cartes : adaptation mobile par media query, pas par `isMobile()`
+**Contexte** : `isMobile()` lit le user-agent ; l'éditeur doit aussi bien se comporter dans une fenêtre étroite.
+**Décision** : `@media (max-width: 768px)` + deux booléens (`actionsOpen`, `toolsOpen`) dans `MindMapBuilder.vue`, DOM unique (pas de duplication palette/actions) ; éditeur `position: fixed` z-index 47 (au-dessus de la barre mobile 46, sous les modals 50).
+**Alternative écartée** : rendu conditionnel par `isMobile()` (deux arbres de composants, palette montée deux fois).
+**Conséquences** : le seuil 768px est dupliqué dans deux fichiers ; tout nouvel élément flottant de l'éditeur doit rester entre 41 et 49.
+
+### [2026-10-13] Clavier mobile du champ de formule : clavier virtuel MathLive affiché explicitement
+**Contexte** : MathLive force `inputmode=none` (pas de clavier système) ; la règle `auto` dépend de `(pointer: coarse)`.
+**Décision** : `bindVirtualKeyboard` appelle `mathVirtualKeyboard.show()/hide()` sur focus/clic/perte de focus du `<math-field>`, uniquement si `isMobile()` ; `--keyboard-zindex` relevé au-dessus des modales (2000).
+**Alternative écartée** : `mathVirtualKeyboardPolicy = 'auto'` (inopérant en émulateur, se déclencherait aussi sur portables tactiles) ; forcer `inputmode=text` sur la zone interne (fragile : MathLive la verrouille à `none` à cause des claviers prédictifs Android).
+**Conséquences** : toute nouvelle modale contenant un champ de formule doit rester sous z-index 2100.
+
+### [2026-10-13] Coupure réseau : notifier dans api.js sans changer le contrat de retour
+**Contexte** : sur erreur réseau, `api.*` renvoie `undefined` ; 36 appelants testent `!resp`, 89 lisent `resp.status`.
+**Décision** : `reportApiError` affiche un toast unique (anti-doublon 5 s) pour les erreurs sans réponse et les 502/503/504, et conserve le retour `undefined`.
+**Alternative écartée** : renvoyer `{ data: { message }, status: 0 }` — corrigerait les 89 lectures mais casserait les 36 gardes `!resp` et ferait passer certaines données d'erreur pour des données valides.
+**Conséquences** : la sécurisation des appelants reste à faire (ticket séparé) ; tout nouvel appelant doit gérer `undefined`.
+
+### [2026-10-13] Tests mobile contre Docker : `adb reverse` + `localhost:8081` plutôt que `10.0.2.2`
+**Contexte** : Traefik route l'API par `Host(API_DOMAIN)` ; `10.0.2.2` n'est pas un hôte routé (404 sans CORS).
+**Décision** : rediriger `tcp:8081` de l'émulateur vers le port 80 de la machine (`adb reverse tcp:8081 tcp:80`) et builder avec `VITE_API_URL=http://localhost:8081/api/v1`.
+**Alternative écartée** : ajouter `Host(10.0.2.2)` aux règles Traefik (modifie l'infra pour un besoin de test) ; `adb reverse tcp:80` (refusé par Android, port < 1024).
+**Conséquences** : procédure de test à rejouer après chaque redémarrage de l'émulateur.

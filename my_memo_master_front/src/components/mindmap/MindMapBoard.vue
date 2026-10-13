@@ -324,6 +324,8 @@ const onWheel = (event) => {
   width: 100%;
   height: 100%;
   cursor: grab;
+  /* CHOIX: touch-action none : le glisser au doigt déplace la carte (pointer events) au lieu de faire défiler la page */
+  touch-action: none;
 }
 
 .mindmap-board__svg:active {

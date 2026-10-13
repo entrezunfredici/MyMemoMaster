@@ -103,8 +103,9 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch, onMounted } from 'vue'
-import { renderMathMultiline, toLatex, addMatrixColumn, addMatrixRow } from './interpreter.js'
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
+import { renderMathMultiline, toLatex, addMatrixColumn, addMatrixRow, bindVirtualKeyboard } from './interpreter.js'
+import { isMobile } from '@/helpers/functions'
 import { checkUnitHomogeneity } from './units.js'
 import { PALETTE_TABS } from './palette.js'
 
@@ -141,6 +142,7 @@ const userInput = ref(props.modelValue || '')
 const textareaRef = ref(null)
 const mathfieldRef = ref(null)
 const mathliveReady = ref(false)
+let unbindKeyboard = null
 // Message temporaire affiché quand une commande de matrice (+1C…+3L) n'a pas
 // pu s'appliquer — voir insertItem pour la garde qui protège ces commandes.
 const matrixHint = ref('')
@@ -172,6 +174,10 @@ onMounted(async () => {
     MathfieldElement.fontsDirectory = null
     const mf = mathfieldRef.value
     if (!mf || typeof mf.getValue !== 'function') return
+    // Sur mobile le clavier système ne s'ouvre pas sur un <math-field> : on affiche celui de MathLive
+    if (isMobile() && window.mathVirtualKeyboard) {
+      unbindKeyboard = bindVirtualKeyboard(mf, window.mathVirtualKeyboard)
+    }
     mf.addEventListener('input', () => {
       // L'édition WYSIWYG fait foi : la zone brute suit en LaTeX (aller simple
       // documenté — on ne reconvertit pas vers les raccourcis historiques)
@@ -185,6 +191,10 @@ onMounted(async () => {
   } catch {
     mathliveReady.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  unbindKeyboard?.()
 })
 
 const syncMathfieldFromRaw = (value) => {
@@ -438,5 +448,13 @@ const apply = () => {
 .interpreter__actions button:hover {
   background: #1d4ed8;
   transform: translateY(-1px);
+}
+</style>
+
+<!-- Non scopé : le clavier virtuel MathLive est monté dans <body>, hors du composant -->
+<style>
+/* CHOIX: z-index du clavier > modales (.interp-modal = 2000) ; défaut MathLive 105 = clavier masqué derrière le voile */
+:root {
+  --keyboard-zindex: 2100;
 }
 </style>
