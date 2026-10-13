@@ -116,6 +116,7 @@ const handleQuit = () => {
       <p class="tour-banner__label">{{ step.label }}</p>
       <p class="tour-banner__hint">
         <template v-if="tourStore.currentStepDone">✅ C'est fait ! Vous pouvez passer à la suite.</template>
+        <template v-else-if="step.hintAfterLink && tourStore.links[step.hintAfterLink.key] !== null">{{ step.hintAfterLink.text }}</template>
         <template v-else>{{ step.hint }}</template>
       </p>
     </div>

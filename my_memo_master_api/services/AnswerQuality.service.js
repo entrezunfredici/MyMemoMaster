@@ -22,6 +22,8 @@ const semanticService = require('./Semantic.service')
 // l'exemple ci-dessus, ce qui aurait masqué le défaut à un recouvrement de mots-clés naïf — cette
 // liste existe pour que le recoupement porte sur le terme réellement distinctif ("énergie"), pas
 // sur le vocabulaire de contexte partagé par toutes les questions du domaine.
+const SOURCE_REFERENCE_HINT = /\b(selon|d'après|dans)\s+(le|ce|l['’])\s*(texte|extrait|document|passage|cours ci-dessus)|\bci-dessus\b/i
+
 const GENERIC_FILLER_KEYWORDS = new Set([
   'système', 'systeme',
   'grandeur',
@@ -90,8 +92,10 @@ class AnswerQualityService {
    * ne produit aucun mot-clé distinctif (rien de fiable à comparer — pas de faux positif).
    */
   sharesSubjectWithStatement(statement, answer) {
-    const statementKeywords = this.extractDistinctiveKeywords(statement)
-    const answerKeywords = this.extractDistinctiveKeywords(answer)
+    // Une réponse qui est (ou contient) une formule LaTeX n'a pas à répéter le sujet en mots :
+    // les segments $...$ sont écartés, et si rien d'autre ne reste, il n'y a rien de fiable à comparer.
+    const statementKeywords = this.extractDistinctiveKeywords(this.stripFormulaSegments(statement))
+    const answerKeywords = this.extractDistinctiveKeywords(this.stripFormulaSegments(answer))
     if (statementKeywords.size === 0 || answerKeywords.size === 0) return true
     return [...statementKeywords].some((k) => answerKeywords.has(k))
   }
@@ -131,6 +135,14 @@ class AnswerQualityService {
 
     const [primary, ...alternatives] = nonEmpty
     const primaryHasFormula = /\$[^$]+\$/.test(primary) || this.hasUnwrappedFormula(primary)
+
+    // Énoncé qui dépend de la source (« selon le texte… ») : incompréhensible à la révision
+    if (SOURCE_REFERENCE_HINT.test(statement)) {
+      warnings.push(
+        "L'énoncé fait référence au texte source (« selon le texte », « d'après l'extrait »…) — " +
+        'reformule-le pour qu\'il se comprenne seul.'
+      )
+    }
 
     // Règle 9 : autonomie de la réponse principale
     if (!this.sharesSubjectWithStatement(statement, primary)) {

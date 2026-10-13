@@ -719,7 +719,7 @@ const trailingDays = computed(() => {
 
 .year-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -748,7 +748,7 @@ const trailingDays = computed(() => {
 
 .mini-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
 }
 
@@ -796,7 +796,7 @@ const trailingDays = computed(() => {
 
 .month-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   border: 0.5px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
@@ -1304,7 +1304,7 @@ const trailingDays = computed(() => {
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .year-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .year-number {
     font-size: 32px;
@@ -1316,7 +1316,7 @@ const trailingDays = computed(() => {
 
 @media (max-width: 600px) {
   .year-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .cal-content {
     padding: 12px 12px;

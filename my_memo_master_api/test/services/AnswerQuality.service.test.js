@@ -138,4 +138,21 @@ describe('AnswerQualityService', () => {
       expect(AnswerQualityService.levelFromWarnings(null)).toBe('high')
     })
   })
+
+  describe('assess - énoncé dépendant de la source et formules LaTeX', () => {
+    it('signale un énoncé « selon le texte »', () => {
+      const w = AnswerQualityService.assess('Que vaut le déterminant selon le texte ?', ['Le déterminant vaut zéro quand la matrice est singulière.'])
+      expect(w.some((m) => m.includes('texte source'))).toBe(true)
+    })
+
+    it('ne signale pas un énoncé autonome', () => {
+      const w = AnswerQualityService.assess('Quand une matrice est-elle inversible ?', ['Une matrice est inversible quand son déterminant est non nul.'])
+      expect(w.some((m) => m.includes('texte source'))).toBe(false)
+    })
+
+    it('pas de fausse alerte « mot-clé distinctif » sur une réponse formule LaTeX', () => {
+      const w = AnswerQualityService.assess('Quelle est la formule du déterminant de $A = \begin{pmatrix}a&b\\c&d\end{pmatrix}$ ?', ['$ad - bc$'])
+      expect(w.some((m) => m.includes('mot-clé distinctif'))).toBe(false)
+    })
+  })
 })

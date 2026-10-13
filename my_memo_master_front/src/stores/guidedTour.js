@@ -42,6 +42,8 @@ export const GUIDED_TOUR_STEPS = [
     extraRoutes: ['flashcards.cards'],
     label: 'Créez votre système de Leitner et sa première flashcard',
     hint: 'Cliquez sur « + Nouveau système » (matière et carte mentale pré-sélectionnées), puis ajoutez au moins une carte.',
+    // Une fois le système créé, la consigne ne parle plus que de la carte à ajouter
+    hintAfterLink: { key: 'leitnerSystemId', text: 'Votre système est créé. Ajoutez maintenant au moins une carte.' },
     linkKey: 'flashcardId'
   },
   {

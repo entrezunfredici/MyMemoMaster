@@ -318,7 +318,10 @@ const createChildNode = () => {
   flex-direction: column;
   gap: 4px;
   height: 100%;
-  overflow: hidden;
+  /* Texte long : défilement dans le nœud plutôt que coupé net */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .mindmap-node__title {

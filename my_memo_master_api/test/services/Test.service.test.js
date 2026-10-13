@@ -193,6 +193,21 @@ describe('TestService', () => {
       expect(mistralGradingService.grade).toHaveBeenCalledWith(['Paris'], 'PARIS', undefined, { userId: 1 })
     })
 
+    it('open — l\'énoncé est chargé et transmis au correcteur (régression faux négatif)', async () => {
+      Test.findByPk.mockResolvedValue({
+        userId: null,
+        question: [{ ...makeQuestion(1, 'open', { correct_answer: '5' }), statement: 'Calculer det(A)' }]
+      })
+      TestResult.create.mockResolvedValue({ resultId: 1 })
+      mistralGradingService.grade.mockResolvedValueOnce({ is_correct: true, score: 1, explanation: '', decision_zone: 'high' })
+
+      await TestService.submitAnswers(1, 1, [{ questionId: 1, answer: '5' }])
+
+      const include = Test.findByPk.mock.calls.at(-1)[1].include
+      expect(include[0].attributes).toContain('statement')
+      expect(mistralGradingService.grade).toHaveBeenCalledWith(['5'], '5', 'Calculer det(A)', { userId: 1 })
+    })
+
     it('open — formulations alternatives (accepted_answers) transmises à la correction', async () => {
       Test.findByPk.mockResolvedValue({
         userId: null,

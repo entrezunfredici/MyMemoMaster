@@ -149,14 +149,18 @@
                   <!-- Énoncé -->
                   <div class="mb-3">
                     <label class="form-label--xs">Énoncé</label>
-                    <textarea aria-label="Entrez l'énoncé de la question" v-model="q.statement" placeholder="Entrez l'énoncé de la question" class="form-input form-input--sm" rows="2" required />
+                    <FormulaHelper v-model="q.statement">
+                      <textarea aria-label="Entrez l'énoncé de la question" v-model="q.statement" placeholder="Entrez l'énoncé de la question (formules entre $…$)" class="form-input form-input--sm" rows="2" required />
+                    </FormulaHelper>
                   </div>
 
                   <!-- open -->
                   <template v-if="q.type === 'open'">
                     <div>
                       <label class="form-label--xs">Réponse attendue</label>
-                      <textarea aria-label="Réponse correcte (utilisée pour la correction)" v-model="q.openAnswer" placeholder="Réponse correcte (utilisée pour la correction)" class="form-input form-input--sm" rows="2" required />
+                      <FormulaHelper v-model="q.openAnswer">
+                        <textarea aria-label="Réponse correcte (utilisée pour la correction)" v-model="q.openAnswer" placeholder="Réponse correcte (utilisée pour la correction)" class="form-input form-input--sm" rows="2" required />
+                      </FormulaHelper>
                     </div>
                     <div>
                       <label class="form-label--xs">Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span></label>
@@ -308,7 +312,9 @@ import { useTagStore } from '@/stores/tags'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useAuthStore } from '@/stores/auth'
 import { useGuidedTourStore } from '@/stores/guidedTour'
+import { useDiagrammeStore } from '@/stores/diagrammes'
 import { useRole } from '@/composables/useRole'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
@@ -326,6 +332,7 @@ const tagStore = useTagStore()
 const classGroupStore = useClassGroupStore()
 const authStore = useAuthStore()
 const guidedTourStore = useGuidedTourStore()
+const diagrammeStore = useDiagrammeStore()
 const aiExerciseGenerationStore = useAiExerciseGenerationStore()
 const { isEnseignant } = useRole()
 
@@ -535,7 +542,8 @@ function removeQuestion(idx) {
 
 // ── lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  await Promise.all([testStore.fetchTests(), subjectStore.fetchSubjects(), classGroupStore.fetchGroups()])
+  await Promise.all([testStore.fetchTests(), subjectStore.fetchSubjects(), classGroupStore.fetchGroups(),
+    guidedTourStore.active ? diagrammeStore.fetchDiagrammes() : null])
   loading.value = false
 })
 
@@ -545,9 +553,12 @@ function openCreateModal() {
   editTestId.value = null
   editingTestUserId.value = authStore.user?.userId ?? null
   questionsToDelete.value = []
-  form.name = ''
-  // Parcours guidé : pré-sélectionne la matière liée aux étapes précédentes
+  // Parcours guidé : pré-sélectionne la matière liée aux étapes précédentes et reprend le nom
+  // de la carte mentale pour le titre (comme pour le système de Leitner à l'étape 2)
   form.subjectId = guidedTourStore.active ? guidedTourStore.links.subjectId : null
+  const guidedMindMapId = guidedTourStore.active ? guidedTourStore.links.mindMapId : null
+  form.name = (guidedMindMapId
+    && (diagrammeStore.diagrammes || []).find((mm) => mm.idMindMap === guidedMindMapId)?.mmName) || ''
   form.tagIds = []
   form.groupIds = []
   form.questions = [defaultQuestion()]

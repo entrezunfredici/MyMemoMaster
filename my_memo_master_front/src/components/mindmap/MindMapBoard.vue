@@ -2,7 +2,7 @@
   <div
     class="mindmap-board"
     ref="containerRef"
-    @wheel.prevent="onWheel"
+    @wheel="onWheel"
     @contextmenu.prevent
   >
     <svg
@@ -144,6 +144,31 @@ const centerOnSubject = () => {
     y: rect.height / 2 - node.layout.y * zoom.value,
   };
 };
+
+// Recentre sur un nœud fraîchement créé s'il apparaît hors de la zone visible
+const revealNodeIfOffscreen = (node) => {
+  if (!node?.layout || !containerRef.value) return;
+  const rect = containerRef.value.getBoundingClientRect();
+  const margin = 60;
+  const screenX = node.layout.x * zoom.value + pan.value.x;
+  const screenY = node.layout.y * zoom.value + pan.value.y;
+  const offscreen = screenX < margin || screenY < margin
+    || screenX > rect.width - margin || screenY > rect.height - margin;
+  if (!offscreen) return;
+  pan.value = {
+    x: rect.width / 2 - node.layout.x * zoom.value,
+    y: rect.height / 2 - node.layout.y * zoom.value,
+  };
+};
+
+watch(
+  () => Object.keys(store.map.nodes || {}).length,
+  (count, previous) => {
+    if (!previous || count <= previous) return;
+    const ids = Object.keys(store.map.nodes);
+    revealNodeIfOffscreen(store.map.nodes[ids[ids.length - 1]]);
+  }
+);
 
 onMounted(() => {
   window.addEventListener('resize', centerOnSubject);
@@ -291,6 +316,10 @@ const onPointerUp = (event) => {
 };
 
 const onWheel = (event) => {
+  // Zoom uniquement avec Ctrl/⌘ (comme pinch-to-zoom) : sans modificateur, la molette fait défiler
+  // la page au lieu de piéger l'utilisateur dans le canevas.
+  if (!event.ctrlKey && !event.metaKey) return;
+  event.preventDefault();
   const rect = svgRef.value?.getBoundingClientRect();
   if (!rect) return;
   const wheelDelta = event.deltaY > 0 ? -0.1 : 0.1;

@@ -72,14 +72,29 @@ const pathD = computed(() => {
 
 const linkLabel = computed(() => props.link.type || '');
 
+// Distance entre le centre d'un nœud et le bord de son rectangle, dans la direction (ux, uy)
+const distanceToEdge = (node, ux, uy) => {
+  const halfW = (node.style?.width || 220) / 2;
+  const halfH = (node.style?.height || 120) / 2;
+  const tx = Math.abs(ux) > 1e-6 ? halfW / Math.abs(ux) : Infinity;
+  const ty = Math.abs(uy) > 1e-6 ? halfH / Math.abs(uy) : Infinity;
+  return Math.min(tx, ty);
+};
+
+// Étiquette au milieu du segment VISIBLE (entre les bords des deux nœuds) plutôt qu'entre leurs
+// centres : elle ne passe plus sous le nœud ni sous le bouton « + » qui déborde à sa droite.
 const labelTransform = computed(() => {
-  const midpointT = 0.5;
   const { source, target } = props;
   const dx = target.layout.x - source.layout.x;
   const dy = target.layout.y - source.layout.y;
-  const mx = source.layout.x + dx * midpointT;
-  const my = source.layout.y + dy * midpointT;
-  return `translate(${mx}, ${my})`;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1e-6) return `translate(${source.layout.x}, ${source.layout.y})`;
+  const ux = dx / dist;
+  const uy = dy / dist;
+  const exit = distanceToEdge(source, ux, uy);
+  const entry = dist - distanceToEdge(target, ux, uy);
+  const mid = entry > exit ? (exit + entry) / 2 : dist / 2;
+  return `translate(${source.layout.x + ux * mid}, ${source.layout.y + uy * mid})`;
 });
 
 const handlePointerDown = (event) => {

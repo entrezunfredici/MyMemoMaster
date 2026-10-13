@@ -128,8 +128,12 @@ RÈGLES STRICTES :
    fragments ne doivent jamais pouvoir être permutés sans changer le sens de la phrase reconstituée. Au
    moins 2 fragments distincts sont requis.
 9. Si "questionType" vaut "mixed", choisis le type le plus adapté à chaque question individuellement, en
-   fonction de la nature de la notion source — jamais une répartition forcée en proportions fixes entre
-   types.
+   fonction de la nature de la notion source, et VARIE les types : n'utilise "open" que pour une notion
+   qui exige une réponse rédigée (définition, calcul, démonstration). Une notion qui se reconnaît parmi
+   des alternatives (propriété vraie/fausse, choix d'une méthode, d'un résultat parmi des valeurs
+   plausibles) doit être un "mcq" ; un terme technique précis dans une phrase, un "fill_blank" ; une suite
+   d'étapes, un "reorder". Si tu produis au moins 4 questions, au moins deux types différents doivent
+   apparaître, dont "mcq" dès qu'une notion s'y prête. Pas de proportions fixes pour autant.
 10. Réponds UNIQUEMENT avec un objet JSON conforme au schéma fourni. Aucun texte avant ou après le JSON.
 11. Si le texte source ne contient pas assez de faits distincts pour atteindre le nombre de questions
     demandé SANS enfreindre la règle 2, génère MOINS de questions que demandé plutôt que de combler par
