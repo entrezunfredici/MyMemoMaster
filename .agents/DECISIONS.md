@@ -4919,3 +4919,9 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : rediriger `tcp:8081` de l'émulateur vers le port 80 de la machine (`adb reverse tcp:8081 tcp:80`) et builder avec `VITE_API_URL=http://localhost:8081/api/v1`.
 **Alternative écartée** : ajouter `Host(10.0.2.2)` aux règles Traefik (modifie l'infra pour un besoin de test) ; `adb reverse tcp:80` (refusé par Android, port < 1024).
 **Conséquences** : procédure de test à rejouer après chaque redémarrage de l'émulateur.
+
+### [2026-10-14] Champs texte : utilitaires de padding en `!` (important) plutôt que modifier `main.css`
+**Contexte** : `main.css` définit `input[type="text"], textarea { padding: .75rem; border: 2px … }`, de spécificité supérieure aux classes Tailwind ; tout `pl-*`/`pr-*`/`px-*` posé sur un `type="text"` est ignoré (la loupe de recherche recouvrait le texte).
+**Décision** : `!pl-10` / `!pr-11` ciblés sur les champs qui réservent de la place à une icône.
+**Alternative écartée** : réécrire la règle globale de `main.css` (change ~tous les champs du site, risque visuel hors périmètre mobile).
+**Conséquences** : tout nouveau champ texte avec icône interne doit utiliser le modificateur `!` ; dette : traiter la règle globale dans un ticket dédié.

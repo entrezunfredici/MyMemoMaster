@@ -743,9 +743,11 @@ const trailingDays = computed(() => {
   min-width: 120px;
 }
 
+/* CHOIX: minmax(0, 1fr) plutôt que 1fr — 1fr a un minimum = contenu (min-content), un libellé
+   d'événement en nowrap élargissait sa colonne et poussait les jours suivants hors écran */
 .month-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   border: 0.5px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
@@ -763,6 +765,7 @@ const trailingDays = computed(() => {
 }
 
 .month-day-cell {
+  min-width: 0;
   min-height: 90px;
   padding: 8px;
   background: #ffffff;
@@ -1266,6 +1269,32 @@ const trailingDays = computed(() => {
 @media (max-width: 600px) {
   .year-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  /* Vue mensuelle : 7 colonnes sur ~360 px → cellules compactes */
+  .month-day-cell {
+    min-height: 64px;
+    padding: 4px 2px;
+    gap: 2px;
+  }
+  .month-day-label {
+    padding: 6px 0;
+    font-size: 11px;
+  }
+  .day-num {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+  .event-pill {
+    font-size: 10px;
+    padding: 1px 3px;
+  }
+  .month-nav {
+    gap: 8px;
+  }
+  .month-nav h2 {
+    min-width: 0;
+    flex: 1;
   }
   .cal-content {
     padding: 12px 12px;

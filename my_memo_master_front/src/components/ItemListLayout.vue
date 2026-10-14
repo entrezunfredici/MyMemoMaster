@@ -2,20 +2,22 @@
   <div class="container mx-auto px-4 py-8">
 
     <!-- Barre de recherche + bouton créer -->
-    <div class="mb-6 flex gap-4 items-center">
-      <div class="relative flex-1 max-w-2xl">
+    <!-- CHOIX: recherche et bouton empilés sous sm, côte à côte au-delà ; pr-11 réserve la place de la loupe
+         RAISON: sur 360-412 px le bouton prenait la moitié de la ligne et la loupe recouvrait le placeholder -->
+    <div class="mb-6 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+      <div class="relative w-full sm:flex-1 max-w-2xl">
         <input aria-label="Rechercher"
           :value="search"
           @input="$emit('update:search', $event.target.value)"
           type="text"
           :placeholder="searchPlaceholder"
-          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          class="w-full min-w-0 !pl-4 !pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-ellipsis"
         />
-        <span class="absolute right-4 top-3.5 text-gray-400">🔍</span>
+        <span class="absolute right-4 top-3.5 text-gray-400 pointer-events-none" aria-hidden="true">🔍</span>
       </div>
       <button
         @click="$emit('create')"
-        class="bg-primary hover:bg-primary/90 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg whitespace-nowrap ml-auto"
+        class="bg-primary hover:bg-primary/90 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg whitespace-nowrap w-full sm:w-auto sm:ml-auto"
       >
         {{ createLabel }}
       </button>

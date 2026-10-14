@@ -13,7 +13,7 @@
         v-model="searchQuery"
         type="text"
         placeholder="Rechercher dans tous les contenus…"
-        class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+        class="w-full px-4 py-3 !pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
       />
       <span class="absolute left-3 top-3.5 text-gray-400">🔍</span>
       <button aria-label="Effacer la recherche"

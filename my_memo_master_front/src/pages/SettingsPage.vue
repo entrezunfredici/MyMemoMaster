@@ -362,4 +362,46 @@ function save(updates) {
   color: #1E3BA1;
   text-decoration: underline;
 }
+
+/* Mobile : menu au-dessus du panneau (colonne unique) au lieu de deux colonnes qui débordaient de l'écran */
+@media (max-width: 768px) {
+  .settings {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .settings__sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 12px 0 16px;
+  }
+
+  .settings__sidebar-link {
+    width: auto;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .settings__sidebar-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .settings__sidebar-label {
+    width: 100%;
+  }
+
+  .settings__panel {
+    padding: 20px 0;
+    max-width: none;
+    min-width: 0;
+  }
+}
 </style>

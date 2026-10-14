@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full max-w-4xl mx-auto p-6">
+  <div class="w-full max-w-4xl mx-auto p-3 sm:p-6">
 
     <!-- Écran de révision des cartes générées (C-01.09, Vue 3 de la maquette) — remplace
          temporairement le contenu de la page, pas une modal, conforme à diagrams/generation_ia_ui.md
@@ -14,21 +14,23 @@
 
     <template v-else>
 
-    <div class="flex items-center justify-between mb-6">
-      <button @click="router.push('/flashcards')" class="text-primary font-semibold hover:underline">
+    <!-- CHOIX: sous sm, « Retour » + titre sur la 1re ligne, les deux boutons d'action sur la 2e (pleine largeur)
+         RAISON: quatre éléments sur une ligne écrasaient le titre sous les boutons (360-412 px) -->
+    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-3 mb-6">
+      <button @click="router.push('/flashcards')" class="text-primary font-semibold hover:underline whitespace-nowrap shrink-0">
         ← Retour
       </button>
-      <h2 class="text-2xl font-bold text-heading">{{ systemName }}</h2>
-      <div class="flex gap-2">
+      <h2 class="flex-1 sm:flex-none min-w-0 break-words text-xl sm:text-2xl font-bold text-heading">{{ systemName }}</h2>
+      <div class="flex gap-2 basis-full sm:basis-auto">
         <button
           @click="openAiFlow"
-          class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           ✨ Générer par IA
         </button>
         <button
           @click="openAddModal"
-          class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           + Ajouter une carte
         </button>
