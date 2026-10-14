@@ -8,6 +8,20 @@ import { defineStore } from 'pinia'
 // par auth.logout) — un parcours ressuscité des jours plus tard référencerait des entités
 // potentiellement supprimées.
 
+/** Nœuds minimum à ajouter autour du nœud central pour valider l'étape « carte mentale ». */
+export const MIN_MINDMAP_CHILD_NODES = 2
+
+/** Valeurs initiales des liens (un nouvel objet à chaque appel — jamais partagé entre états). */
+const emptyLinks = () => ({
+  subjectId: null,
+  mindMapId: null,
+  mindMapChildNodes: 0,
+  leitnerSystemId: null,
+  flashcardId: null,
+  testId: null,
+  revisionSessionId: null
+})
+
 /**
  * Définition ordonnée des étapes du parcours guidé.
  * Chaque étape référence la route réelle où l'utilisateur réalise l'action,
@@ -18,15 +32,19 @@ export const GUIDED_TOUR_STEPS = [
     key: 'mindmap',
     route: 'mindmaps',
     label: 'Créez votre carte mentale',
-    hint: 'Cliquez sur « + Nouvelle carte », choisissez une matière (ou créez-la), puis construisez votre carte.',
+    hint: `Cliquez sur « + Nouvelle carte », choisissez une matière (ou créez-la), puis ajoutez au moins ${MIN_MINDMAP_CHILD_NODES} nœuds autour du nœud central.`,
     linkKey: 'mindMapId'
   },
   {
     key: 'leitner',
     route: 'flashcards',
-    label: 'Créez le système de Leitner lié',
-    hint: 'Cliquez sur « + Nouveau système » — la matière de votre carte mentale est déjà pré-sélectionnée.',
-    linkKey: 'leitnerSystemId'
+    // La page « cartes » du système fait partie de l'étape : on y atterrit juste après la création.
+    extraRoutes: ['flashcards.cards'],
+    label: 'Créez votre système de Leitner et sa première flashcard',
+    hint: 'Cliquez sur « + Nouveau système » (matière et carte mentale pré-sélectionnées), puis ajoutez au moins une carte.',
+    // Une fois le système créé, la consigne ne parle plus que de la carte à ajouter
+    hintAfterLink: { key: 'leitnerSystemId', text: 'Votre système est créé. Ajoutez maintenant au moins une carte.' },
+    linkKey: 'flashcardId'
   },
   {
     key: 'exercise',
@@ -39,7 +57,7 @@ export const GUIDED_TOUR_STEPS = [
     key: 'planning',
     route: 'calendar',
     label: 'Planifiez vos révisions',
-    hint: 'Cliquez sur un jour du calendrier pour planifier une séance — elle sera liée à votre système de Leitner.',
+    hint: 'Cliquez sur « + » ou sur un jour du calendrier : votre système de Leitner est pré-sélectionné pour lier la séance.',
     linkKey: 'revisionSessionId'
   }
 ]
@@ -57,14 +75,10 @@ export const useGuidedTourStore = defineStore('guidedTour', {
   state: () => ({
     active: false,
     stepIndex: 0,
+    // true une fois la dernière étape validée : le bandeau affiche alors le récapitulatif de fin
+    completed: false,
     // IDs des éléments créés pendant le parcours — servent à lier les entités entre elles.
-    links: {
-      subjectId: null,
-      mindMapId: null,
-      leitnerSystemId: null,
-      testId: null,
-      revisionSessionId: null
-    }
+    links: emptyLinks()
   }),
 
   getters: {
@@ -78,10 +92,13 @@ export const useGuidedTourStore = defineStore('guidedTour', {
       return state.stepIndex === GUIDED_TOUR_STEPS.length - 1
     },
 
-    /** L'élément attendu à l'étape courante a-t-il été créé ? */
+    /** L'élément attendu à l'étape courante a-t-il été créé (avec un contenu minimal) ? */
     currentStepDone(state) {
       const step = GUIDED_TOUR_STEPS[state.stepIndex]
-      return step ? state.links[step.linkKey] !== null : false
+      if (!step) return false
+      // La carte mentale doit contenir un minimum de nœuds, pas seulement exister
+      if (step.key === 'mindmap' && state.links.mindMapChildNodes < MIN_MINDMAP_CHILD_NODES) return false
+      return state.links[step.linkKey] !== null
     }
   },
 
@@ -91,14 +108,9 @@ export const useGuidedTourStore = defineStore('guidedTour', {
      */
     start() {
       this.active = true
+      this.completed = false
       this.stepIndex = 0
-      this.links = {
-        subjectId: null,
-        mindMapId: null,
-        leitnerSystemId: null,
-        testId: null,
-        revisionSessionId: null
-      }
+      this.links = emptyLinks()
     },
 
     /**
@@ -131,15 +143,26 @@ export const useGuidedTourStore = defineStore('guidedTour', {
       return this.currentStep.route
     },
 
-    /** Termine le parcours (dernière étape validée). */
+    /**
+     * Termine le parcours (dernière étape validée).
+     * Les liens sont conservés : le récapitulatif de fin s'en sert (ex : lancer la session du système créé).
+     */
     finish() {
       this.active = false
+      this.completed = true
       this.stepIndex = 0
+    },
+
+    /** Ferme le récapitulatif de fin et efface les liens du parcours terminé. */
+    dismissCompletion() {
+      this.completed = false
+      this.links = emptyLinks()
     },
 
     /** Quitte le parcours sans le terminer. */
     quit() {
       this.active = false
+      this.completed = false
       this.stepIndex = 0
     },
 
@@ -149,14 +172,9 @@ export const useGuidedTourStore = defineStore('guidedTour', {
      */
     reset() {
       this.active = false
+      this.completed = false
       this.stepIndex = 0
-      this.links = {
-        subjectId: null,
-        mindMapId: null,
-        leitnerSystemId: null,
-        testId: null,
-        revisionSessionId: null
-      }
+      this.links = emptyLinks()
     }
   }
 })

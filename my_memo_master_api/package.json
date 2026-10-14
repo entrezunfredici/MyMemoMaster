@@ -60,7 +60,7 @@
     "nodemon": "^3.1.7",
     "prettier": "^3.8.4",
     "sequelize-cli": "^6.6.2",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "supertest": "^7.0.0"
   },
   "overrides": {

@@ -1,5 +1,5 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
+  <div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
     <router-link
       to="/exercises"
       class="mb-6 inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 border-2 border-blue-800 shadow-lg"
@@ -11,8 +11,8 @@
 
     <div v-else-if="!test" class="text-center text-gray-400 py-16">Exercice introuvable.</div>
 
-    <div v-else class="bg-white rounded-lg shadow-lg p-8">
-      <h1 class="text-4xl font-bold mb-2 text-heading">{{ test.name }}</h1>
+    <div v-else class="bg-white rounded-lg shadow-lg p-4 sm:p-8">
+      <h1 class="text-2xl sm:text-4xl font-bold mb-2 text-heading break-words">{{ test.name }}</h1>
       <p class="text-sm text-gray-400 mb-8">{{ test.subject?.name }}</p>
 
       <!-- Mode quiz -->
@@ -20,7 +20,7 @@
         <div
           v-for="(question, idx) in questions"
           :key="question.idQuestion"
-          class="bg-gray-50 p-6 rounded-lg border border-gray-200"
+          class="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200"
         >
           <h3 class="text-lg font-semibold text-heading mb-4">Question {{ idx + 1 }}</h3>
           <p :id="`question-statement-${idx}`" class="text-base text-body mb-5"><FormulaText :text="question.statement || ''" /></p>
@@ -51,7 +51,7 @@
                  question (id="question-statement-N" ci-dessus) sert de légende programmatique. -->
             <div class="space-y-2" role="radiogroup" :aria-labelledby="`question-statement-${idx}`">
               <label
-                v-for="(opt, oi) in question.content?.options"
+                v-for="oi in mcqDisplayOrder[idx]"
                 :key="oi"
                 class="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition"
                 :class="userAnswers[idx] === oi ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'"
@@ -63,7 +63,7 @@
                   @change="userAnswers[idx] = oi"
                   class="accent-blue-600"
                 />
-                <span><FormulaText :text="opt.text || ''" /></span>
+                <span><FormulaText :text="question.content.options[oi]?.text || ''" /></span>
               </label>
             </div>
           </template>
@@ -289,6 +289,9 @@ const resultHistory = computed(() => testResultStore.results)
 const userAnswers = reactive([])
 const selectedFragments = reactive([])
 const shuffledFragments = reactive([])
+// Ordre d'affichage des options de QCM (indices d'origine mélangés) : sans cela la bonne réponse
+// apparaîtrait toujours dans l'ordre de saisie, souvent en premier.
+const mcqDisplayOrder = reactive([])
 const questionResults = reactive([])
 const correctCount = ref(0)
 
@@ -320,8 +323,12 @@ function initAnswers() {
   userAnswers.splice(0)
   selectedFragments.splice(0)
   shuffledFragments.splice(0)
+  mcqDisplayOrder.splice(0)
 
   questions.value.forEach((q) => {
+    const order = (q.content?.options ?? []).map((_, i) => i)
+    if (q.type === 'mcq') shuffled(order)
+    mcqDisplayOrder.push(order)
     if (q.type === 'open') {
       userAnswers.push('')
     } else if (q.type === 'mcq') {

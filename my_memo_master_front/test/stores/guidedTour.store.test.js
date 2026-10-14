@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useGuidedTourStore, GUIDED_TOUR_STEPS } from '@/stores/guidedTour'
+import { useGuidedTourStore, GUIDED_TOUR_STEPS, MIN_MINDMAP_CHILD_NODES } from '@/stores/guidedTour'
 
 describe('useGuidedTourStore', () => {
   beforeEach(() => {
@@ -75,11 +75,40 @@ describe('useGuidedTourStore', () => {
     expect(store.currentStepDone).toBe(false)
   })
 
-  it("currentStepDone - élément de l'étape créé - retourne true", () => {
+  it('currentStepDone - carte mentale sans assez de nœuds - retourne false', () => {
     const store = useGuidedTourStore()
     store.start()
 
-    store.recordLinks({ mindMapId: 3 })
+    store.recordLinks({ mindMapId: 3, mindMapChildNodes: MIN_MINDMAP_CHILD_NODES - 1 })
+
+    expect(store.currentStepDone).toBe(false)
+  })
+
+  it("currentStepDone - carte mentale avec assez de nœuds - retourne true", () => {
+    const store = useGuidedTourStore()
+    store.start()
+
+    store.recordLinks({ mindMapId: 3, mindMapChildNodes: MIN_MINDMAP_CHILD_NODES })
+
+    expect(store.currentStepDone).toBe(true)
+  })
+
+  it('currentStepDone - système Leitner sans flashcard - retourne false', () => {
+    const store = useGuidedTourStore()
+    store.start()
+    store.stepIndex = 1
+
+    store.recordLinks({ leitnerSystemId: 2 })
+
+    expect(store.currentStepDone).toBe(false)
+  })
+
+  it('currentStepDone - système Leitner avec une flashcard - retourne true', () => {
+    const store = useGuidedTourStore()
+    store.start()
+    store.stepIndex = 1
+
+    store.recordLinks({ leitnerSystemId: 2, flashcardId: 9 })
 
     expect(store.currentStepDone).toBe(true)
   })
@@ -106,7 +135,21 @@ describe('useGuidedTourStore', () => {
 
     expect(route).toBeNull()
     expect(store.active).toBe(false)
+    expect(store.completed).toBe(true)
     expect(store.stepIndex).toBe(0)
+  })
+
+  it('dismissCompletion - parcours terminé - ferme le récapitulatif et efface les liens', () => {
+    const store = useGuidedTourStore()
+    store.start()
+    store.recordLinks({ leitnerSystemId: 2 })
+    store.finish()
+    expect(store.links.leitnerSystemId).toBe(2)
+
+    store.dismissCompletion()
+
+    expect(store.completed).toBe(false)
+    expect(store.links.leitnerSystemId).toBeNull()
   })
 
   it('advance - parcours inactif - ne fait rien et retourne null', () => {
@@ -155,10 +198,10 @@ describe('useGuidedTourStore', () => {
     store.start()
 
     expect(store.currentStep.route).toBe('mindmaps')
-    store.recordLinks({ mindMapId: 1, subjectId: 1 })
+    store.recordLinks({ mindMapId: 1, subjectId: 1, mindMapChildNodes: MIN_MINDMAP_CHILD_NODES })
     expect(store.advance()).toBe('flashcards')
 
-    store.recordLinks({ leitnerSystemId: 2 })
+    store.recordLinks({ leitnerSystemId: 2, flashcardId: 5 })
     expect(store.advance()).toBe('exercises')
 
     store.recordLinks({ testId: 3 })

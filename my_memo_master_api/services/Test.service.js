@@ -129,7 +129,7 @@ class TestService {
         {
           model: Question,
           as: 'question',
-          attributes: ['idQuestion', 'type', 'content', 'questionPosition']
+          attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition']
         },
         CLASS_GROUPS_INCLUDE
       ],

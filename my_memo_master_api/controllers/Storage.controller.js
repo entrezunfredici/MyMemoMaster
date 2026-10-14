@@ -2,6 +2,7 @@ const { DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 const { s3Client, bucket, publicUrl } = require('../config/storage.config')
 const logger = require('../helpers/logger')
+const { isUploadKey, isUserUploadKey } = require('../helpers/storageKeys')
 
 exports.upload = async (req, res) => {
   try {
@@ -47,7 +48,7 @@ exports.uploadMultiple = async (req, res) => {
 exports.presignFile = async (req, res) => {
   const key = decodeURIComponent(req.query.key || '')
   const disposition = req.query.disposition === 'attachment' ? 'attachment' : 'inline'
-  if (!key || !key.startsWith('uploads/')) {
+  if (!isUploadKey(key)) {
     return res.status(400).send({ message: 'Clé de fichier invalide.' })
   }
   try {
@@ -72,8 +73,7 @@ exports.delete = async (req, res) => {
       return res.status(400).send({ message: "Paramètre 'key' manquant." })
     }
     const decodedKey = decodeURIComponent(key)
-    const expectedPrefix = `uploads/${req.user.id}/`
-    if (!decodedKey.startsWith(expectedPrefix)) {
+    if (!isUserUploadKey(decodedKey, req.user.id)) {
       return res.status(403).send({ message: 'Accès refusé.' })
     }
     await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: decodedKey }))

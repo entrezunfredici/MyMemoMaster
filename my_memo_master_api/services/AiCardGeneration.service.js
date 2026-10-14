@@ -113,7 +113,19 @@ RÈGLES STRICTES :
     réponse de l'étudiant à CHACUNE de ces formulations : plus il y a de variantes plausibles
     couvertes, moins un étudiant risque d'être compté faux pour une reformulation correcte mais
     différemment exprimée. Un tableau vide reste acceptable uniquement pour une réponse strictement
-    factuelle (valeur, nom, date) où la paraphrase n'apporte rien.`
+    factuelle (valeur, nom, date) où la paraphrase n'apporte rien.
+11. Chaque "statement" doit se comprendre SANS le texte source : n'écris jamais « selon le texte »,
+    « d'après l'extrait », « dans ce document », « ci-dessus » ni aucune référence à la source ; nomme
+    explicitement la notion et son cadre (ex. « Dans un espace vectoriel, … »).
+12. Ne crée de carte que pour une notion du COURS : définition, propriété, théorème, formule, méthode.
+    N'en crée JAMAIS pour un exemple illustratif, une anecdote, une application numérique isolée ou un
+    objet du quotidien servant seulement d'illustration (ex. une chaise, une voiture, un personnage).
+    Si le passage ne contient que de tels éléments, ne génère aucune carte pour lui.
+13. Respecte le statut que le texte donne à une notion : ne présente pas comme « définition » ce que le
+    cours énonce comme propriété, théorème ou résultat admis (et inversement). Formule la question en
+    conséquence (« Quelle propriété… », « Que dit le théorème… »).
+14. Avant de répondre, relis ta liste : si deux cartes portent sur la même notion (ex. deux cartes sur
+    la « famille libre »), n'en garde qu'une, la plus précise.`
   }
 
   /**

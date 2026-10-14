@@ -1,5 +1,5 @@
 <template>
-  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
+  <div class="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
     <section class="order-2 lg:order-1 p-5 bg-light rounded-[7px]">
       <div class="w-full">
         <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4">

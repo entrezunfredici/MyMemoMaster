@@ -12,7 +12,21 @@ const stepNumber = computed(() => tourStore.stepIndex + 1)
 const totalSteps = computed(() => tourStore.steps.length)
 
 // L'utilisateur est-il sur la page de l'étape courante ?
-const onStepPage = computed(() => route.name === step.value?.route)
+const onStepPage = computed(
+  () => route.name === step.value?.route || !!step.value?.extraRoutes?.includes(route.name)
+)
+
+// Récapitulatif de fin : une ligne par étape validée
+const RECAP_ITEMS = [
+  { key: 'mindMapId', label: 'Carte mentale' },
+  { key: 'flashcardId', label: 'Système de Leitner avec sa première flashcard' },
+  { key: 'testId', label: 'Série d’exercices' },
+  { key: 'revisionSessionId', label: 'Séance de révision planifiée' }
+]
+const recapItems = computed(() =>
+  RECAP_ITEMS.map((item) => ({ ...item, done: tourStore.links[item.key] !== null }))
+)
+const canLaunchSession = computed(() => tourStore.links.leitnerSystemId !== null)
 
 const nextLabel = computed(() =>
   tourStore.isLastStep ? 'Terminer le parcours 🎉' : 'Étape suivante →'
@@ -22,10 +36,21 @@ const goToStepPage = () => {
   if (step.value) router.push({ name: step.value.route })
 }
 
+// Dernière étape : advance() renvoie null et le récapitulatif de fin s'affiche (pas de redirection)
 const handleNext = () => {
   const nextRoute = tourStore.advance()
   if (nextRoute) router.push({ name: nextRoute })
-  else router.push({ name: 'home' })
+}
+
+const launchFirstSession = () => {
+  const systemId = tourStore.links.leitnerSystemId
+  tourStore.dismissCompletion()
+  router.push({ name: 'flashcardssession', params: { systemId } })
+}
+
+const closeRecap = () => {
+  tourStore.dismissCompletion()
+  router.push({ name: 'home' })
 }
 
 const handleQuit = () => {
@@ -36,7 +61,38 @@ const handleQuit = () => {
 
 <template>
   <div
-    v-if="tourStore.active && step"
+    v-if="tourStore.completed"
+    class="tour-banner tour-banner--recap"
+    role="region"
+    aria-label="Parcours guidé terminé"
+  >
+    <div class="tour-banner__info">
+      <p class="tour-banner__title">🎉 Bravo, parcours terminé !</p>
+      <p class="tour-banner__label">Voici ce que vous avez créé :</p>
+      <ul class="tour-banner__recap">
+        <li v-for="item in recapItems" :key="item.key">
+          <span aria-hidden="true">{{ item.done ? '✅' : '⬜' }}</span>
+          {{ item.label }}
+        </li>
+      </ul>
+    </div>
+    <div class="tour-banner__actions">
+      <button
+        v-if="canLaunchSession"
+        type="button"
+        class="tour-banner__btn tour-banner__btn--primary"
+        @click="launchFirstSession"
+      >
+        Lancer ma première session
+      </button>
+      <button type="button" class="tour-banner__btn tour-banner__btn--secondary" @click="closeRecap">
+        Retour à l'accueil
+      </button>
+    </div>
+  </div>
+
+  <div
+    v-else-if="tourStore.active && step"
     class="tour-banner"
     role="region"
     aria-label="Parcours guidé"
@@ -60,6 +116,7 @@ const handleQuit = () => {
       <p class="tour-banner__label">{{ step.label }}</p>
       <p class="tour-banner__hint">
         <template v-if="tourStore.currentStepDone">✅ C'est fait ! Vous pouvez passer à la suite.</template>
+        <template v-else-if="step.hintAfterLink && tourStore.links[step.hintAfterLink.key] !== null">{{ step.hintAfterLink.text }}</template>
         <template v-else>{{ step.hint }}</template>
       </p>
     </div>
@@ -71,7 +128,7 @@ const handleQuit = () => {
         class="tour-banner__btn tour-banner__btn--secondary"
         @click="goToStepPage"
       >
-        Reprendre l'étape →
+        Aller à la page de l'étape →
       </button>
       <button
         type="button"
@@ -211,6 +268,16 @@ const handleQuit = () => {
 
 .tour-banner__btn--secondary:hover {
   background: #eef2ff;
+}
+
+.tour-banner__recap {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 14px;
+  color: #1f2937;
+  display: grid;
+  gap: 2px;
 }
 
 .tour-banner__close {

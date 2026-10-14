@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full max-w-4xl mx-auto p-6">
+  <div class="w-full max-w-4xl mx-auto p-3 sm:p-6">
 
     <!-- Écran de révision des cartes générées (C-01.09, Vue 3 de la maquette) — remplace
          temporairement le contenu de la page, pas une modal, conforme à diagrams/generation_ia_ui.md
@@ -14,21 +14,23 @@
 
     <template v-else>
 
-    <div class="flex items-center justify-between mb-6">
-      <button @click="router.push('/flashcards')" class="text-primary font-semibold hover:underline">
+    <!-- CHOIX: sous sm, « Retour » + titre sur la 1re ligne, les deux boutons d'action sur la 2e (pleine largeur)
+         RAISON: quatre éléments sur une ligne écrasaient le titre sous les boutons (360-412 px) -->
+    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-3 mb-6">
+      <button @click="router.push('/flashcards')" class="text-primary font-semibold hover:underline whitespace-nowrap shrink-0">
         ← Retour
       </button>
-      <h2 class="text-2xl font-bold text-heading">{{ systemName }}</h2>
-      <div class="flex gap-2">
+      <h2 class="flex-1 sm:flex-none min-w-0 break-words text-xl sm:text-2xl font-bold text-heading">{{ systemName }}</h2>
+      <div class="flex gap-2 basis-full sm:basis-auto">
         <button
           @click="openAiFlow"
-          class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           ✨ Générer par IA
         </button>
         <button
           @click="openAddModal"
-          class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           + Ajouter une carte
         </button>
@@ -71,7 +73,7 @@
               aria-hidden="true"
             ></span>
             <span class="font-semibold text-primary">B{{ box.level }}</span>
-            <span class="text-gray-500">{{ box.intervall }}s</span>
+            <span class="text-gray-500" :title="`${box.intervall} s`">{{ formatDuration(box.intervall) || `${box.intervall} s` }}</span>
             <button @click="openEditBoxModal(box)" class="text-gray-400 hover:text-primary" title="Modifier">✎</button>
             <button @click="handleDeleteBox(box)" class="text-gray-400 hover:text-red-500" title="Supprimer">✕</button>
           </div>
@@ -215,10 +217,18 @@
                pendant la saisie (rien n'est encore enregistré), remplacé par le résultat réel une
                fois la sauvegarde effectuée ; la modale reste alors ouverte tant qu'il y a un point
                à vérifier plutôt que de se refermer immédiatement (DECISIONS.md 2026-09-12). -->
-          <div v-if="lastQuality.level" class="form-group--lg">
-            <p class="text-sm mb-1" :class="qualitySaved ? 'text-green-700' : 'text-gray-500'">
-              {{ qualitySaved ? `✓ Carte enregistrée — ${editingCard ? 'réponse mise à jour' : 'réponse créée'}.` : 'Aperçu (non enregistré) :' }}
-            </p>
+          <!-- Zone à hauteur réservée (cartes ouvertes) : l'aperçu apparaît après un délai de saisie ;
+               sans place réservée, il décalait le reste de la modale et un clic pouvait tomber
+               sur un autre élément (nœud de la mini-carte, bouton « Ajouter »). -->
+          <div v-if="form.type === 'open'" class="form-group--lg min-h-[7rem]">
+            <template v-if="lastQuality.level">
+              <p class="text-sm mb-1" :class="qualitySaved ? 'text-green-700' : 'text-gray-500'">
+                {{ qualitySaved ? `✓ Carte enregistrée — ${editingCard ? 'réponse mise à jour' : 'réponse créée'}.` : 'Aperçu (non enregistré) :' }}
+              </p>
+              <AnswerQualityBadge :level="lastQuality.level" :warnings="lastQuality.warnings" />
+            </template>
+          </div>
+          <div v-else-if="lastQuality.level" class="form-group--lg">
             <AnswerQualityBadge :level="lastQuality.level" :warnings="lastQuality.warnings" />
           </div>
 
@@ -276,6 +286,7 @@
 
           <div class="btn-row">
             <button
+              v-if="!justCreated"
               type="submit"
               :disabled="submitting"
               class="btn-modal-submit"
@@ -283,11 +294,19 @@
               {{ submitting ? 'Enregistrement...' : editingCard ? 'Modifier' : 'Ajouter' }}
             </button>
             <button
+              v-else
+              type="button"
+              class="btn-modal-submit"
+              @click="openAddModal"
+            >
+              Ajouter une autre carte
+            </button>
+            <button
               type="button"
               @click="closeModal"
               class="btn-modal-cancel"
             >
-              Annuler
+              {{ justCreated ? 'Fermer' : 'Annuler' }}
             </button>
           </div>
         </form>
@@ -391,10 +410,13 @@ import AiGenerationProgressModal from '@/components/AiGenerationProgressModalCom
 import AiValidationScreen from '@/components/AiValidationScreenComponent.vue'
 import AnswerQualityBadge from '@/components/AnswerQualityBadgeComponent.vue'
 import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
+import { useGuidedTourStore } from '@/stores/guidedTour'
+import { formatDuration } from '@/helpers/functions'
 import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 
 const router = useRouter()
 const route = useRoute()
+const guidedTourStore = useGuidedTourStore()
 const systemId = Number(route.params.systemId)
 
 const loading = ref(true)
@@ -432,6 +454,9 @@ const lastQuality = reactive({ level: null, warnings: [] })
 // PUT /responses/edit/:id) ; false pendant l'aperçu en direct (rien n'est encore sauvegardé) —
 // distingue les deux dans le libellé affiché sous le badge (cf. template).
 const qualitySaved = ref(false)
+// true quand la carte vient d'être créée et que la modale reste ouverte pour afficher la qualité :
+// le bouton « Ajouter » est alors remplacé, pour ne pas créer un doublon en recliquant.
+const justCreated = ref(false)
 
 // Aperçu de qualité EN DIRECT pendant la saisie, avant tout enregistrement — débounce (500 ms)
 // pour ne pas interroger l'API à chaque frappe ; `seq` ignore la réponse d'un appel devenu obsolète
@@ -531,12 +556,15 @@ const loadCards = async () => {
 
   // Charger la réponse correcte pour chaque carte
   await Promise.all(cards.map(async (card) => {
-    const resp = await api.get(`responses/question/${card.idQuestion}`)
-    if (resp?.status === 200) {
-      const correct = resp.data.find(r => r.correction === true)
-      card.correctAnswer = correct?.content || ''
-      card.idResponse = correct?.idResponse || null
-    }
+    // CHOIX: /responses/correction/:id plutôt que /responses/question/:id
+    // RAISON: ce dernier ne renvoie que les réponses `correction: false` — la réponse de référence
+    // n'y figurait jamais, d'où une modale « Modifier la carte » ouverte avec une réponse vide.
+    // 404 attendu pour une carte QCM (correction portée par `content`) : réponse laissée vide.
+    const resp = card.question?.type === 'mcq'
+      ? undefined
+      : await api.get(`responses/correction/${card.idQuestion}`)
+    card.correctAnswer = resp?.status === 200 ? resp.data?.content || '' : ''
+    card.idResponse = resp?.status === 200 ? resp.data?.idResponse || null : null
   }))
 
   allCards.value = cards
@@ -584,6 +612,7 @@ const openAddModal = () => {
   lastQuality.level = null
   lastQuality.warnings = []
   qualitySaved.value = false
+  justCreated.value = false
   showModal.value = true
 }
 
@@ -608,6 +637,7 @@ const openEditModal = async (card) => {
   lastQuality.level = null
   lastQuality.warnings = []
   qualitySaved.value = false
+  justCreated.value = false
   showModal.value = true
 }
 
@@ -624,6 +654,7 @@ const closeModal = () => {
   lastQuality.level = null
   lastQuality.warnings = []
   qualitySaved.value = false
+  justCreated.value = false
 }
 
 const submitForm = async () => {
@@ -718,11 +749,15 @@ const handleCreate = async () => {
     return
   }
 
+  // Parcours guidé : une première flashcard valide l'étape « système de Leitner »
+  guidedTourStore.recordLinks({ flashcardId: cResp.data?.idCard ?? -1 })
+
   notif.notify('Carte ajoutée avec succès.', 'success')
   loading.value = true
   await loadCards()
   loading.value = false
   if (!lastQuality.level || lastQuality.level === 'high') closeModal()
+  else justCreated.value = true
 }
 
 const handleUpdate = async () => {

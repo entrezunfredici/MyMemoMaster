@@ -1,20 +1,23 @@
 <template>
-  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-grey rounded-[2px] p-1.5">
+  <div class="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-grey rounded-[2px] p-1.5">
 
-    <section class="mx-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
+    <section class="mx-0 md:mx-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-3 md:p-5 bg-light rounded-[7px] flex flex-col h-full">
       <div class="w-full flex-grow">
 
-        <div class="flex justify-between items-center pb-4">
+        <!-- CHOIX: sur mobile « Retour » et le compteur sont sur une ligne, le titre passe dessous (order-last)
+             RAISON: le titre d'un système peut être long (« Cours 9 - Statique des fluides ») ; sur une seule
+             ligne à trois colonnes il écrasait le bouton et le compteur -->
+        <div class="flex flex-wrap md:flex-nowrap justify-between items-center gap-x-3 gap-y-2 pb-4">
           <button
             @click="confirmExit"
-            class="text-primary font-semibold hover:underline"
+            class="text-primary font-semibold hover:underline whitespace-nowrap shrink-0"
           >
             ← Retour
           </button>
-          <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold">
+          <h4 class="order-last md:order-none basis-full md:basis-auto text-primary text-lg md:text-2xl neue-haas-grotesk-r font-semibold">
             Session : {{ systemStore.system.name || '...' }}
           </h4>
-          <span class="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
+          <span class="shrink-0 whitespace-nowrap text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
             {{ currentIndex + 1 }} / {{ cardStore.dueCards.length }}
           </span>
         </div>
@@ -129,7 +132,7 @@
       </div>
     </section>
 
-    <section class="mx-16 mt-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
+    <section class="mx-0 md:mx-16 mt-4 md:mt-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-3 md:p-5 bg-light rounded-[7px] flex flex-col h-full">
       <div v-if="!isFinished && errors.length > 0" class="mb-4">
         <h4 class="text-primary text-lg font-semibold pb-2">Dernières erreurs</h4>
         <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">

@@ -6,6 +6,7 @@ const multerS3 = require('multer-s3')
 const { s3Client, bucket } = require('../config/storage.config')
 const { extensionMatchesMime, s3SniffContentType } = require('../helpers/fileSignature')
 const logger = require('../helpers/logger')
+const { buildMindmapKey } = require('../helpers/storageKeys')
 
 // Suffixe de nom de fichier tire d'un generateur CRYPTOGRAPHIQUE, pas de
 // Math.random() : les cles d'objets uploades ne doivent pas etre devinables.
@@ -42,7 +43,7 @@ const buildStorage = () => {
       key: (_req, file, cb) => {
         const suffix = uniqueSuffix()
         const ext = path.extname(file.originalname).toLowerCase()
-        cb(null, `mindmaps/${suffix}${ext}`)
+        cb(null, buildMindmapKey(`${suffix}${ext}`))
       }
     })
   }

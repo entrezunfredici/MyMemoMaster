@@ -4,6 +4,7 @@ const { GetObjectCommand } = require('@aws-sdk/client-s3')
 const DiagrammeService = require('../services/Diagramme.service.js')
 const logger = require('../helpers/logger')
 const { s3Client, bucket: s3Bucket } = require('../config/storage.config')
+const { isMindmapKey } = require('../helpers/storageKeys')
 
 exports.findAll = async (req, res) => {
   try {
@@ -134,6 +135,10 @@ exports.getImage = async (req, res) => {
   try {
     const key = req.params[0]
     if (!key) return res.status(400).json({ message: 'Clé image manquante.' })
+    // SÉCURITÉ : cette route est publique (balise <img>, pas d'en-tête Authorization) et le
+    // bucket contient aussi des fichiers privés et les sauvegardes de la base : on ne sert
+    // QUE les images de cartes mentales, jamais une clé arbitraire fournie par le client.
+    if (!isMindmapKey(key)) return res.status(400).json({ message: 'Clé image invalide.' })
 
     const command = new GetObjectCommand({ Bucket: s3Bucket, Key: key })
     const s3Response = await s3Client.send(command)

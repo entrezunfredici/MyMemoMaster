@@ -192,3 +192,40 @@ export function renderInlineMath(input) {
     )
     .join('')
 }
+
+/**
+ * Branche l'affichage du clavier virtuel MathLive sur le focus d'un <math-field>.
+ *
+ * CHOIX: affichage explicite (show/hide) plutôt que mathVirtualKeyboardPolicy = 'auto'
+ * RAISON: MathLive impose inputmode=none à sa zone de saisie, donc le clavier système ne s'ouvre
+ * jamais sur un <math-field> ; et sa règle 'auto' ne se déclenche que si matchMedia('(pointer: coarse)')
+ * est vrai — faux dans l'émulateur Android (pointeur « fin »), donc rien ne s'affichait. Le clic est
+ * aussi écouté : si le champ a déjà le focus (ouverture de la modale), aucun focusin ne se produit.
+ *
+ * @param {HTMLElement} field - Le <math-field>
+ * @param {{show: Function, hide: Function}} keyboard - window.mathVirtualKeyboard
+ * @param {{delay?: number, isFocused?: Function}} [options] - délai avant masquage (ms) et test du focus
+ * @returns {Function} Fonction de débranchement (retire les écouteurs et masque le clavier)
+ */
+export function bindVirtualKeyboard(field, keyboard, { delay = 300, isFocused } = {}) {
+  const stillFocused = isFocused || (() => document.activeElement === field)
+  let timer = null
+  const show = () => {
+    clearTimeout(timer)
+    keyboard.show({ animate: true })
+  }
+  const hide = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => { if (!stillFocused()) keyboard.hide() }, delay)
+  }
+  field.addEventListener('focusin', show)
+  field.addEventListener('click', show)
+  field.addEventListener('focusout', hide)
+  return () => {
+    clearTimeout(timer)
+    field.removeEventListener('focusin', show)
+    field.removeEventListener('click', show)
+    field.removeEventListener('focusout', hide)
+    keyboard.hide()
+  }
+}

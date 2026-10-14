@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // vi.hoisted garantit que ces mocks sont disponibles avant que vi.mock() ne soit évalué
-const { mockGet, mockPost, mockPut, mockDelete, mockLogout, mockUseAuthStore } = vi.hoisted(() => ({
+const { mockGet, mockPost, mockPut, mockDelete, mockLogout, mockUseAuthStore, mockNotify } = vi.hoisted(() => ({
+  mockNotify: vi.fn(),
   mockGet: vi.fn(),
   mockPost: vi.fn(),
   mockPut: vi.fn(),
@@ -28,6 +29,10 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: mockUseAuthStore,
 }))
 
+vi.mock('@/helpers/notif', () => ({
+  notif: { notify: mockNotify },
+}))
+
 vi.mock('axios', () => ({
   default: {
     create: () => ({
@@ -50,6 +55,66 @@ describe('api.js — couche API front', () => {
     vi.clearAllMocks()
     vi.spyOn(console, 'error').mockImplementation(() => {})
     mockUseAuthStore.mockReturnValue({ authenticated: false, token: null, user: {}, logout: mockLogout })
+  })
+
+  // ==================== Erreur réseau : message unique ====================
+  describe('api — coupure réseau', () => {
+    let clock = 0
+    beforeEach(() => {
+      // le délai anti-doublon est un état de module : chaque test repart 1 min plus tard
+      vi.useFakeTimers()
+      clock += 60_000
+      vi.setSystemTime(new Date(2026, 9, 13, 12, 0, 0).getTime() + clock)
+    })
+    afterEach(() => vi.useRealTimers())
+
+    it('get - erreur réseau - affiche un message « serveur injoignable » et retourne undefined', async () => {
+      mockGet.mockRejectedValue(new Error('Network Error'))
+      const result = await api.get('users/1')
+      expect(result).toBeUndefined()
+      expect(mockNotify).toHaveBeenCalledOnce()
+      expect(mockNotify).toHaveBeenCalledWith('Impossible de joindre le serveur. Vérifiez votre connexion.', 'error')
+    })
+
+    it('get - plusieurs erreurs réseau rapprochées - un seul message', async () => {
+      mockGet.mockRejectedValue(new Error('Network Error'))
+      await Promise.all([api.get('a'), api.get('b'), api.get('c')])
+      expect(mockNotify).toHaveBeenCalledOnce()
+    })
+
+    it('get - nouvelle erreur réseau après le délai - prévient à nouveau', async () => {
+      mockGet.mockRejectedValue(new Error('Network Error'))
+      await api.get('a')
+      vi.advanceTimersByTime(6000)
+      await api.get('b')
+      expect(mockNotify).toHaveBeenCalledTimes(2)
+    })
+
+    it('post - erreur réseau - même message', async () => {
+      mockPost.mockRejectedValue(new Error('Network Error'))
+      const result = await api.post('users/login', { email: 'a' })
+      expect(result).toBeUndefined()
+      expect(mockNotify).toHaveBeenCalledOnce()
+    })
+
+    it('get - réponse serveur en erreur (error.response) - pas de message réseau', async () => {
+      mockGet.mockRejectedValue(Object.assign(new Error('Request failed'), { response: { status: 500 } }))
+      const result = await api.get('users/1')
+      expect(result).toBeUndefined()
+      expect(mockNotify).not.toHaveBeenCalled()
+    })
+
+    it('get - API injoignable derrière le proxy (503) - affiche le message', async () => {
+      mockGet.mockRejectedValue(Object.assign(new Error('Service Unavailable'), { response: { status: 503 } }))
+      await api.get('users/1')
+      expect(mockNotify).toHaveBeenCalledOnce()
+    })
+
+    it('get - requête annulée - pas de message réseau', async () => {
+      mockGet.mockRejectedValue(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' }))
+      await api.get('users/1')
+      expect(mockNotify).not.toHaveBeenCalled()
+    })
   })
 
   // ==================== api.get ====================

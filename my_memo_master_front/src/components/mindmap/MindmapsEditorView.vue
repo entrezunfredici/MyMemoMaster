@@ -121,6 +121,12 @@ const scheduleAutoSave = () => {
   autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY)
 }
 
+// Parcours guidé : l'étape « carte mentale » exige un minimum de nœuds autour du nœud central
+const recordTourProgress = (payload) => {
+  const nodeCount = Object.keys(payload?.nodes || {}).length
+  guidedTourStore.recordLinks({ mindMapChildNodes: Math.max(0, nodeCount - 1) })
+}
+
 const ensureMeta = (payload) => ({
   subjectId: Number(currentDiagramMeta.value?.subjectId || 1),
   mmName: exportName.value || payload.title || 'Carte mentale',
@@ -146,6 +152,7 @@ const performAutoSave = async () => {
     if (currentDiagramId.value) {
       const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
       if (response) {
+        recordTourProgress(payload)
         currentDiagramMeta.value = { ...(currentDiagramMeta.value || {}), ...body, idMindMap: currentDiagramId.value }
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
         pendingPayload.value = null
@@ -160,6 +167,7 @@ const performAutoSave = async () => {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
         guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
+        recordTourProgress(payload)
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
         pendingPayload.value = null
         pendingCreate.value = false
@@ -242,6 +250,7 @@ const confirmExportModal = async () => {
     if (!pendingCreate.value && currentDiagramId.value) {
       const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
       if (response) {
+        recordTourProgress(pendingPayload.value)
         toast.success('Carte mise à jour.')
         if (currentDiagramMeta.value) {
           currentDiagramMeta.value.mmName = meta.mmName
@@ -256,6 +265,7 @@ const confirmExportModal = async () => {
         currentDiagramId.value = newId
         currentDiagramMeta.value = { ...body, idMindMap: newId }
         guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
+        recordTourProgress(pendingPayload.value)
         toast.success('Carte créée.')
         if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
       }
@@ -326,7 +336,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="editor-view">
     <div class="editor-topbar">
-      <button class="editor-back-btn" @click="emit('back')">← Mes cartes mentales</button>
+      <button class="editor-back-btn" aria-label="Retour à mes cartes mentales" @click="emit('back')">←<span class="editor-back-label"> Mes cartes mentales</span></button>
       <span class="editor-map-name">{{ currentDiagramMeta?.mmName || 'Nouvelle carte' }}</span>
       <span v-if="isSaving" class="editor-save-status">Sauvegarde…</span>
       <span v-else-if="saveHasFailed" class="editor-save-status editor-save-status--error">
@@ -439,5 +449,43 @@ onBeforeUnmount(() => {
 .editor-canvas {
   flex: 1;
   min-height: 0;
+}
+
+/* Mobile : l'éditeur occupe tout l'écran (par-dessus en-tête, bandeaux et barre de navigation) */
+@media (max-width: 768px) {
+  .editor-view {
+    position: fixed;
+    inset: 0;
+    /* au-dessus de la barre de navigation mobile (46), sous les modals (50) */
+    z-index: 47;
+    height: 100dvh;
+  }
+
+  .editor-topbar {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .editor-back-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 12px;
+  }
+
+  .editor-back-label {
+    display: none;
+  }
+
+  .editor-map-name {
+    font-size: 14px;
+  }
+
+  .editor-save-status {
+    font-size: 11px;
+  }
+
+  .editor-canvas {
+    padding: 0 8px 8px;
+  }
 }
 </style>

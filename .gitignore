@@ -25,3 +25,6 @@ helm-sonarqube/KUBECONFIG_SONAR.b64
 # Cours PDF fournis par l'utilisateur pour tester la génération IA (droits d'auteur tiers) —
 # usage local ponctuel, ne doit pas entrer dans l'historique git (2026-09-12)
 cours_exemples/
+
+# Sauvegardes locales (jamais committées)
+/backups-local/
