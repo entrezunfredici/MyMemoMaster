@@ -27,7 +27,7 @@ function cacheKey({ model, question, correctList, studentAnswer }) {
     .createHash('sha256')
     .update(JSON.stringify([model, norm(question), correctList.map(norm).sort(), norm(studentAnswer)]))
     .digest('hex')
-  return `grading:mistral:v3:${digest}`
+  return `grading:mistral:v4:${digest}`
 }
 
 /**

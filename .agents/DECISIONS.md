@@ -4908,3 +4908,10 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : zoom uniquement avec Ctrl/⌘ ; sans modificateur, la molette défile la page.
 **Alternative écartée** : garder le zoom permanent (les utilisateurs habitués au zoom direct le perdent) ; ajouter des boutons +/− (hors périmètre).
 **Conséquences** : le zoom est moins découvrable ; à signaler dans l'aide si besoin.
+
+## 2026-10-14 — Correcteur : l'explication ne fait que comparer, et précède la note
+**Contexte** : test réel : explication physiquement fausse avec note 100 % (« isentropique » = « isotherme avec ΔS = 0 »), conditions exactes pénalisées, explications contradictoires, affirmation fausse non relevée.
+**Décision** : le prompt interdit au juge d'introduire ses propres faits dans l'explication, impose la cohérence avec la note, protège les conditions exactes et plafonne à 0.6 une réponse contenant une affirmation fausse ; `reason` est demandé avant `score` dans le JSON ; version de clé de cache `v4`.
+**Alternative écartée** : supprimer l'explication LLM pour afficher seulement la réponse attendue (perd le retour pédagogique) ; second appel de vérification (coût ×2).
+**Conséquences** : effet à confirmer sur modèle réel ; toute modification future du prompt devrait aussi incrémenter la version de clé de cache.
+**Limite acceptée (2026-10-14)** : un juge LLM sans contexte ne peut pas invalider une affirmation fausse qui ne figure pas dans la réponse attendue (cas « monotherme, température initiale = T_ext »). Non traité ; voir CHANGELOG_AGENT.md.
