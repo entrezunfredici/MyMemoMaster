@@ -1,9 +1,10 @@
 <template>
   <div>
     <!-- ACTIONS -->
-    <section class="flex items-center justify-between">
+    <!-- CHOIX: filtre au-dessus de la case « Tips » sous sm (colonne), côte à côte au-delà -->
+    <section class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <SubjectFilter />
-      <div class="flex items-center gap-4 mx-4">
+      <div class="flex items-center gap-4 mx-0 sm:mx-4">
         <label for="tips" class="text-lg">Tips de révision</label>
         <input type="checkbox" id="tips" name="tips" @click="toggleTips($event.target.checked)" />
       </div>

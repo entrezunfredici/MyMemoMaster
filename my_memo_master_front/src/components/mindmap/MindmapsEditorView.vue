@@ -336,7 +336,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="editor-view">
     <div class="editor-topbar">
-      <button class="editor-back-btn" @click="emit('back')">← Mes cartes mentales</button>
+      <button class="editor-back-btn" aria-label="Retour à mes cartes mentales" @click="emit('back')">←<span class="editor-back-label"> Mes cartes mentales</span></button>
       <span class="editor-map-name">{{ currentDiagramMeta?.mmName || 'Nouvelle carte' }}</span>
       <span v-if="isSaving" class="editor-save-status">Sauvegarde…</span>
       <span v-else-if="saveHasFailed" class="editor-save-status editor-save-status--error">
@@ -449,5 +449,43 @@ onBeforeUnmount(() => {
 .editor-canvas {
   flex: 1;
   min-height: 0;
+}
+
+/* Mobile : l'éditeur occupe tout l'écran (par-dessus en-tête, bandeaux et barre de navigation) */
+@media (max-width: 768px) {
+  .editor-view {
+    position: fixed;
+    inset: 0;
+    /* au-dessus de la barre de navigation mobile (46), sous les modals (50) */
+    z-index: 47;
+    height: 100dvh;
+  }
+
+  .editor-topbar {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .editor-back-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 12px;
+  }
+
+  .editor-back-label {
+    display: none;
+  }
+
+  .editor-map-name {
+    font-size: 14px;
+  }
+
+  .editor-save-status {
+    font-size: 11px;
+  }
+
+  .editor-canvas {
+    padding: 0 8px 8px;
+  }
 }
 </style>

@@ -10,6 +10,10 @@ on:
       - '*devops*'
       - 'dev_back_*'
       - 'dev_front_*'
+      # Application mobile Android (Capacitor) : même code front, embarqué dans une WebView.
+      # CHOIX: branche traitée comme une branche front (voir `setup`) ; cd.yml reste filtré sur
+      # main/staging/dev, donc ces branches ne déploient rien.
+      - 'android_*'
 
 permissions:
   contents: read
@@ -23,7 +27,8 @@ jobs:
       - id: set-matrix
         run: |
           BRANCH="${GITHUB_REF##*/}"
-          if [[ "$BRANCH" == dev_front_* ]]; then
+          # android_* : l'app mobile n'embarque que le front (Vue) — l'API n'est ni modifiée ni testée ici
+          if [[ "$BRANCH" == dev_front_* || "$BRANCH" == android_* ]]; then
             echo 'matrix={"include":[{"service":"front","path":"my_memo_master_front"}]}' >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == dev_back_* ]]; then
             echo 'matrix={"include":[{"service":"api","path":"my_memo_master_api"}]}' >> $GITHUB_OUTPUT

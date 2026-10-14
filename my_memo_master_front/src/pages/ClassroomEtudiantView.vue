@@ -26,7 +26,7 @@
           v-model="search"
           type="text"
           placeholder="Rechercher une section, un rendu, une ressource..."
-          class="w-full rounded-xl border-2 border-gray px-4 py-3 pr-10 text-sm focus:border-primary focus:outline-none transition" />
+          class="w-full rounded-xl border-2 border-gray px-4 py-3 !pr-10 text-sm focus:border-primary focus:outline-none transition" />
         <button aria-label="Effacer la recherche" v-if="search" @click="search = ''"
           class="absolute right-3 top-1/2 -translate-y-1/2 text-dark/40 hover:text-dark">✕</button>
       </div>

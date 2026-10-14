@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { toLatex, renderMath, renderInlineMath, addMatrixColumn, addMatrixRow } from '@/components/interpreter/interpreter.js'
+import { describe, it, expect, vi } from 'vitest'
+import { toLatex, renderMath, renderInlineMath, addMatrixColumn, addMatrixRow, bindVirtualKeyboard } from '@/components/interpreter/interpreter.js'
 
 // Exposants : sans accolades, LaTeX ne met en exposant que le premier caractère
 // (s^-2 affichait le 2 en taille normale) — toLatex doit toujours les poser.
@@ -152,5 +152,48 @@ describe('addMatrixColumn / addMatrixRow', () => {
     latex = addMatrixColumn(latex)
     latex = addMatrixRow(latex)
     expect(latex).toBe('\\begin{pmatrix}\\placeholder{} & \\placeholder{} \\\\ \\placeholder{} & \\placeholder{}\\end{pmatrix}')
+  })
+})
+
+describe('bindVirtualKeyboard', () => {
+  const setup = (opts = {}) => {
+    const field = document.createElement('div')
+    const keyboard = { show: vi.fn(), hide: vi.fn() }
+    const unbind = bindVirtualKeyboard(field, keyboard, { delay: 0, isFocused: () => false, ...opts })
+    return { field, keyboard, unbind }
+  }
+
+  it('bindVirtualKeyboard - focus du champ - affiche le clavier', () => {
+    const { field, keyboard } = setup()
+    field.dispatchEvent(new Event('focusin'))
+    expect(keyboard.show).toHaveBeenCalledTimes(1)
+  })
+
+  it('bindVirtualKeyboard - clic sur un champ déjà focalisé - affiche le clavier', () => {
+    const { field, keyboard } = setup()
+    field.dispatchEvent(new Event('click'))
+    expect(keyboard.show).toHaveBeenCalledTimes(1)
+  })
+
+  it('bindVirtualKeyboard - perte du focus - masque le clavier après le délai', async () => {
+    const { field, keyboard } = setup()
+    field.dispatchEvent(new Event('focusout'))
+    await new Promise((r) => setTimeout(r, 5))
+    expect(keyboard.hide).toHaveBeenCalledTimes(1)
+  })
+
+  it('bindVirtualKeyboard - focus récupéré pendant le délai (bouton de palette) - ne masque pas', async () => {
+    const { field, keyboard } = setup({ isFocused: () => true })
+    field.dispatchEvent(new Event('focusout'))
+    await new Promise((r) => setTimeout(r, 5))
+    expect(keyboard.hide).not.toHaveBeenCalled()
+  })
+
+  it('bindVirtualKeyboard - débranchement - masque et retire les écouteurs', () => {
+    const { field, keyboard, unbind } = setup()
+    unbind()
+    expect(keyboard.hide).toHaveBeenCalledTimes(1)
+    field.dispatchEvent(new Event('focusin'))
+    expect(keyboard.show).not.toHaveBeenCalled()
   })
 })

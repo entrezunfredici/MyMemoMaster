@@ -4872,13 +4872,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Alternative écartée** : bucket dédié prod — non créé (création dans le manager Infomaniak, hors accès de l'agent).
 **Conséquences** : les clés d'objet sont `uploads/{userId}/{suffix}{ext}` **sans préfixe d'environnement** : prod et preprod partagent donc le même espace d'objets. Pas de collision (suffixe unique) mais un nettoyage de la preprod pourrait supprimer des fichiers de prod. À séparer (bucket dédié ou préfixe par `ENVIRONMENT`) avant les premiers vrais utilisateurs. Upload réel non testé (nécessite un compte connecté). Le changement doit être commité : le CD déploie `values-prod.yaml` du dépôt et retirerait S3 sinon.
 
-<<<<<<< HEAD
 ### [2026-10-12] Sauvegarde PostgreSQL : CronJob Helm `pg_dump` → S3, rétention par nombre de dumps
 **Contexte** : aucune sauvegarde automatique de la base sur Kubernetes (la storage class `Retain` ne protège que de la suppression du volume). Un seul espace S3 est payé (offre Swiss Backup 200 Go, expire le 2026-12-04) ; un second coûterait ≈ 2 €/mois.
 **Décision** : `helm/templates/cronjob-backup.yaml` (`backup.enabled`) : initContainer `postgres:17-alpine` (`pg_dump -Fc` + `pg_restore -l` de contrôle) puis conteneur `amazon/aws-cli:2.15.30` (envoi sur `s3://<bucket>/backups/<ENVIRONMENT>/`, `head-object`, purge au-delà des `keep`=14 plus récents). Noms horodatés UTC : tri alphabétique = chronologique, ce qui évite la comparaison de dates en JMESPath. Planifié à 03:00 UTC, `concurrencyPolicy: Forbid`. Activé en prod et en preprod sur `pck-uuvuwp7`. **Dépendance externe signalée** : image Docker Hub `amazon/aws-cli` (épinglée en 2.15.x, les versions récentes ajoutent des checksums refusés par certains S3 compatibles).
 **Alternative écartée** : préfixe d'environnement sur les clés d'upload (`S3_KEY_PREFIX`) — la structure `uploads/{userId}/…` est vérifiée dans `Storage.controller.js` (`startsWith('uploads/')`, `uploads/{userId}/`), reconstruite par `AiExerciseGenerationPipeline.service.js` et supposée par `scripts/cleanup-s3-legacy-keys.js` : changement sensible côté contrôle d'accès, non fait sans validation. Rétention par date (JMESPath `LastModified<`) — moins robuste que le tri par nom.
 **Conséquences** : recette faite : job prod et preprod OK (dump de 169 Ko), dernier dump relu depuis S3 et restauré dans une base temporaire (2 utilisateurs, 79 migrations). Le bucket reste partagé (uploads + sauvegardes + preprod), l'expiration de l'offre au 2026-12-04 est un point de défaillance unique, et aucune alerte n'est branchée sur l'échec d'un Job.
-=======
 ### [2026-10-12] Parcours guidé : validation par contenu minimal et récapitulatif de fin
 **Contexte** : la recette manuelle a montré qu'on pouvait finir le parcours sans rien de révisable (un nœud, un système Leitner vide) et que la fin ramenait à l'accueil sans retour.
 **Décision** : (1) l'étape carte mentale exige `MIN_MINDMAP_CHILD_NODES` (2) nœuds, comptés à chaque sauvegarde dans `links.mindMapChildNodes` ; (2) l'étape Leitner se valide sur `links.flashcardId` (une carte créée) ; (3) `finish()` met `completed = true` et garde les liens, le bandeau affiche le récapitulatif et propose de lancer la session du système créé, `dismissCompletion()` efface ensuite les liens. Le nœud racine d'une nouvelle carte a un contenu vide (le titre est déjà dans `label`).
@@ -4889,7 +4887,6 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `FlashcardsCardsPage.vue` appelle `GET /responses/correction/:id` pour les cartes ouvertes.
 **Alternative écartée** : retirer le filtre côté API — change le contrat d'un endpoint public (utilisé par `stores/responses.js`, couvert par des tests) ; interdit sans validation.
 **Conséquences** : seule la première correction est rechargée à l'édition.
->>>>>>> hotfixes
 
 ### [2026-10-12] Faille : la route publique `GET /diagrammes/image/*` servait n'importe quelle clé du bucket — restreinte aux images de cartes mentales ; préfixe d'environnement `S3_KEY_PREFIX`
 **Contexte** : en placant les sauvegardes Postgres dans le bucket partagé (`backups/<env>/`), un test a montré que `https://api.../api/v1/diagrammes/image/backups/prod/<dump>` renvoyait **200 et le dump complet, sans authentification** (la route n'a pas d'`authMiddleware` — elle sert des balises `<img>` — et `Diagramme.controller#getImage` passait `req.params[0]` tel quel à `GetObjectCommand`). La faille préexistait pour tout objet du bucket (`uploads/<userId>/...`, fichiers privés) ; l'ajout des sauvegardes la rendait grave (hashes de mots de passe, e-mails, refresh tokens). Exposition mesurée : dumps de test (prod et preprod, 2 comptes chacun) accessibles du 2026-10-12 ≈ 16:30 à 18:05 UTC ; les logs d'ingress du nouveau cluster n'enregistrent que les 4 requêtes de l'agent (2 avant, 2 après suppression), logs limités à ce cluster et à la période depuis l'installation de l'ingress.
@@ -4915,3 +4912,67 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Alternative écartée** : supprimer l'explication LLM pour afficher seulement la réponse attendue (perd le retour pédagogique) ; second appel de vérification (coût ×2).
 **Conséquences** : effet à confirmer sur modèle réel ; toute modification future du prompt devrait aussi incrémenter la version de clé de cache.
 **Limite acceptée (2026-10-14)** : un juge LLM sans contexte ne peut pas invalider une affirmation fausse qui ne figure pas dans la réponse attendue (cas « monotherme, température initiale = T_ext »). Non traité ; voir CHANGELOG_AGENT.md.
+### [2026-10-12] Application mobile : Capacitor autour du front Vue, Android d'abord
+**Contexte** : demande d'une appli mobile. Le front Vue 3 est déjà responsive (header mobile) et installable (VitePWA). Aucune application native n'existait.
+**Décision** : embarquer le build Vite existant avec Capacitor 8 (`@capacitor/core`, `@capacitor/android`, `@capacitor/cli`), dans `my_memo_master_front/` (config + dossier `android/`) et non dans un nouveau dossier racine, car le projet natif dépend directement de `dist/`. Cible Android uniquement dans un premier temps. `androidScheme: https` pour que la WebView serve l'app en `https://localhost` (contexte sécurisé, pas de contenu mixte avec l'API HTTPS).
+**Alternative écartée** : (1) PWA seule — pas de présence sur les stores, notifications limitées sur iOS ; (2) React Native / Flutter — réécriture complète de l'UI, deuxième base de code et hors stack approuvée (JS/Vue, pas de TypeScript).
+**Conséquences** : nouvelles dépendances `@capacitor/*` à ajouter à la liste approuvée de `CONVENTIONS.md` (validées par l'utilisateur dans cette session). L'API doit autoriser l'origine `https://localhost` dans `CORS_ORIGIN` ; le build mobile exige une `VITE_API_URL` absolue. Aucune modification de contrat d'API. Le dossier `android/` est commité (son `.gitignore` interne exclut les artefacts de build).
+
+### [2026-10-12] CORS : autoriser `https://localhost` pour la WebView Capacitor
+**Contexte** : la WebView Android (`androidScheme: https`) envoie `Origin: https://localhost` ; sans autorisation, tout appel API est bloqué.
+**Décision** : ajouter `https://localhost` à `CORS_ORIGIN` dans tous les environnements, après l'origine du front web.
+**Alternative écartée** : réutiliser le cas `!origin` (non applicable, la WebView envoie bien un Origin) ; schéma custom non-https (`capacitor://`, contenu mixte et contexte non sécurisé sur Android).
+**Conséquences** : l'ordre compte (la 1ʳᵉ origine sert d'URL front de repli). Aucun cookie/credential de session côté serveur, donc pas d'élargissement de surface CSRF.
+
+### [2026-10-13] Toolchain Android : JDK 21 via winget, pas de contournement TLS
+**Contexte** : le téléchargement direct du JDK (api.adoptium.net) échouait (`SEC_E_UNTRUSTED_ROOT`) ; Capacitor 8 exige JDK 21 + SDK 36.
+**Décision** : installer Microsoft OpenJDK 21 via winget (hash vérifié) et compiler avec `JAVA_HOME` positionné par session, sans toucher au `java` du PATH.
+**Alternative écartée** : `curl -k` / désactivation de la vérification TLS (téléchargement d'un binaire non vérifié) ; modification globale du PATH (casse les outils dépendant de Java 8).
+**Conséquences** : chaque build mobile doit exporter `JAVA_HOME` ; émulateur de test = AVD `mmm_test` (API 34).
+
+### [2026-10-13] Navigation mobile : barre 4 onglets + feuille « Plus »
+**Contexte** : la barre mobile alignait 10 icônes sur deux lignes (~25 % de la hauteur), sans libellé.
+**Décision** : composant dédié `MobileNavComponent.vue` — 4 onglets d'étude (Accueil, Cartes, Leitner, Exercices) avec libellé, le reste dans une feuille ouverte par « Plus », posée au-dessus de la barre.
+**Alternative écartée** : burger seul en haut avec tiroir latéral (plus d'espace vertical mais tout à 2 taps) ; arbitrage fait avec l'utilisateur.
+**Conséquences** : un nouvel écran principal s'ajoute dans `moreItems` (ou `primaryItems`) du composant ; la nav desktop (`App.vue`) reste séparée.
+
+### [2026-10-13] Éditeur de cartes : adaptation mobile par media query, pas par `isMobile()`
+**Contexte** : `isMobile()` lit le user-agent ; l'éditeur doit aussi bien se comporter dans une fenêtre étroite.
+**Décision** : `@media (max-width: 768px)` + deux booléens (`actionsOpen`, `toolsOpen`) dans `MindMapBuilder.vue`, DOM unique (pas de duplication palette/actions) ; éditeur `position: fixed` z-index 47 (au-dessus de la barre mobile 46, sous les modals 50).
+**Alternative écartée** : rendu conditionnel par `isMobile()` (deux arbres de composants, palette montée deux fois).
+**Conséquences** : le seuil 768px est dupliqué dans deux fichiers ; tout nouvel élément flottant de l'éditeur doit rester entre 41 et 49.
+
+### [2026-10-13] Clavier mobile du champ de formule : clavier virtuel MathLive affiché explicitement
+**Contexte** : MathLive force `inputmode=none` (pas de clavier système) ; la règle `auto` dépend de `(pointer: coarse)`.
+**Décision** : `bindVirtualKeyboard` appelle `mathVirtualKeyboard.show()/hide()` sur focus/clic/perte de focus du `<math-field>`, uniquement si `isMobile()` ; `--keyboard-zindex` relevé au-dessus des modales (2000).
+**Alternative écartée** : `mathVirtualKeyboardPolicy = 'auto'` (inopérant en émulateur, se déclencherait aussi sur portables tactiles) ; forcer `inputmode=text` sur la zone interne (fragile : MathLive la verrouille à `none` à cause des claviers prédictifs Android).
+**Conséquences** : toute nouvelle modale contenant un champ de formule doit rester sous z-index 2100.
+
+### [2026-10-13] Coupure réseau : notifier dans api.js sans changer le contrat de retour
+**Contexte** : sur erreur réseau, `api.*` renvoie `undefined` ; 36 appelants testent `!resp`, 89 lisent `resp.status`.
+**Décision** : `reportApiError` affiche un toast unique (anti-doublon 5 s) pour les erreurs sans réponse et les 502/503/504, et conserve le retour `undefined`.
+**Alternative écartée** : renvoyer `{ data: { message }, status: 0 }` — corrigerait les 89 lectures mais casserait les 36 gardes `!resp` et ferait passer certaines données d'erreur pour des données valides.
+**Conséquences** : la sécurisation des appelants reste à faire (ticket séparé) ; tout nouvel appelant doit gérer `undefined`.
+
+### [2026-10-13] Tests mobile contre Docker : `adb reverse` + `localhost:8081` plutôt que `10.0.2.2`
+**Contexte** : Traefik route l'API par `Host(API_DOMAIN)` ; `10.0.2.2` n'est pas un hôte routé (404 sans CORS).
+**Décision** : rediriger `tcp:8081` de l'émulateur vers le port 80 de la machine (`adb reverse tcp:8081 tcp:80`) et builder avec `VITE_API_URL=http://localhost:8081/api/v1`.
+**Alternative écartée** : ajouter `Host(10.0.2.2)` aux règles Traefik (modifie l'infra pour un besoin de test) ; `adb reverse tcp:80` (refusé par Android, port < 1024).
+**Conséquences** : procédure de test à rejouer après chaque redémarrage de l'émulateur.
+
+### [2026-10-14] Champs texte : utilitaires de padding en `!` (important) plutôt que modifier `main.css`
+**Contexte** : `main.css` définit `input[type="text"], textarea { padding: .75rem; border: 2px … }`, de spécificité supérieure aux classes Tailwind ; tout `pl-*`/`pr-*`/`px-*` posé sur un `type="text"` est ignoré (la loupe de recherche recouvrait le texte).
+**Décision** : `!pl-10` / `!pr-11` ciblés sur les champs qui réservent de la place à une icône.
+**Alternative écartée** : réécrire la règle globale de `main.css` (change ~tous les champs du site, risque visuel hors périmètre mobile).
+**Conséquences** : tout nouveau champ texte avec icône interne doit utiliser le modificateur `!` ; dette : traiter la règle globale dans un ticket dédié.
+
+### [2026-10-14] CI : les branches `android_*` suivent le pipeline front, sans CD ni build Gradle
+**Contexte** : `android_app` n'était dans aucun déclencheur de `ci.yml` ; l'app mobile est le front embarqué dans une WebView.
+**Décision** : ajouter `android_*` aux branches de `ci.yml` et à la branche « front seul » de la matrice (comme `dev_front_*`) : tests Vitest avec couverture, lint, audit des dépendances, build, audit de contraste. `cd.yml` reste limité à `main`/`staging`/`dev`.
+**Alternative écartée** : job dédié « tests mobiles seulement » (duplique `npm ci` et réduit le contrôle : les tests mobiles font partie de la suite front) ; build Gradle en CI (JDK 21 + SDK 36, plusieurs minutes, aucune signature disponible).
+**Conséquences** : toute branche `android_*` coûte un passage de CI front ; le build Android reste à lancer en local (`docs/MOBILE_ANDROID.md`).
+
+### [2026-10-14] Signature Android : `keystore.properties` hors dépôt, artefact non signé sans clé
+**Décision** : `android/app/build.gradle` lit `android/keystore.properties` (ignoré par git) ; sans lui, `bundleRelease` produit un `.aab` **non signé** plutôt que d'échouer ou de signer avec la clé de debug.
+**Alternative écartée** : secrets de signature dans `gradle.properties` du dépôt ou signature par la clé de debug (publiable par erreur, non remplaçable).
+**Conséquences** : la clé de signature doit être sauvegardée par son propriétaire ; Play App Signing recommandé.
