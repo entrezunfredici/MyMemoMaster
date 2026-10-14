@@ -151,7 +151,7 @@ describe('AnswerQualityService', () => {
     })
 
     it('pas de fausse alerte « mot-clé distinctif » sur une réponse formule LaTeX', () => {
-      const w = AnswerQualityService.assess('Quelle est la formule du déterminant de $A = \begin{pmatrix}a&b\\c&d\end{pmatrix}$ ?', ['$ad - bc$'])
+      const w = AnswerQualityService.assess(String.raw`Quelle est la formule du déterminant de $A = \begin{pmatrix}a&b\\c&d\end{pmatrix}$ ?`,['$ad - bc$'])
       expect(w.some((m) => m.includes('mot-clé distinctif'))).toBe(false)
     })
   })
