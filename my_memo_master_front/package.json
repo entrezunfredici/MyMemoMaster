@@ -15,7 +15,9 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config=playwright.e2e.config.js",
     "build:mobile": "vite build && cap sync android",
-    "mobile:open": "cap open android"
+    "build:mobile:prod": "vite build --mode mobile && cap sync android",
+    "mobile:open": "cap open android",
+    "android:assets": "node scripts/generate-android-assets.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

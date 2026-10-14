@@ -4925,3 +4925,14 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `!pl-10` / `!pr-11` ciblés sur les champs qui réservent de la place à une icône.
 **Alternative écartée** : réécrire la règle globale de `main.css` (change ~tous les champs du site, risque visuel hors périmètre mobile).
 **Conséquences** : tout nouveau champ texte avec icône interne doit utiliser le modificateur `!` ; dette : traiter la règle globale dans un ticket dédié.
+
+### [2026-10-14] CI : les branches `android_*` suivent le pipeline front, sans CD ni build Gradle
+**Contexte** : `android_app` n'était dans aucun déclencheur de `ci.yml` ; l'app mobile est le front embarqué dans une WebView.
+**Décision** : ajouter `android_*` aux branches de `ci.yml` et à la branche « front seul » de la matrice (comme `dev_front_*`) : tests Vitest avec couverture, lint, audit des dépendances, build, audit de contraste. `cd.yml` reste limité à `main`/`staging`/`dev`.
+**Alternative écartée** : job dédié « tests mobiles seulement » (duplique `npm ci` et réduit le contrôle : les tests mobiles font partie de la suite front) ; build Gradle en CI (JDK 21 + SDK 36, plusieurs minutes, aucune signature disponible).
+**Conséquences** : toute branche `android_*` coûte un passage de CI front ; le build Android reste à lancer en local (`docs/MOBILE_ANDROID.md`).
+
+### [2026-10-14] Signature Android : `keystore.properties` hors dépôt, artefact non signé sans clé
+**Décision** : `android/app/build.gradle` lit `android/keystore.properties` (ignoré par git) ; sans lui, `bundleRelease` produit un `.aab` **non signé** plutôt que d'échouer ou de signer avec la clé de debug.
+**Alternative écartée** : secrets de signature dans `gradle.properties` du dépôt ou signature par la clé de debug (publiable par erreur, non remplaçable).
+**Conséquences** : la clé de signature doit être sauvegardée par son propriétaire ; Play App Signing recommandé.
