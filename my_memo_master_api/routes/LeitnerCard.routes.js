@@ -130,6 +130,10 @@ router.post(
  *               idBox:
  *                 type: integer
  *                 example: 3
+ *               mindMapNodeId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Nœud de carte mentale lié (null pour retirer le lien, absent pour ne pas le modifier)
  *     responses:
  *       200:
  *         description: Carte mise à jour avec succès.

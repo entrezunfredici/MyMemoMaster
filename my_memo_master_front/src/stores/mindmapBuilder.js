@@ -28,6 +28,8 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     pendingLinkSource: null,
     isDirty: false,
     interpreterOpen: false,
+    // id (base) de la carte mentale éditée : sert à retrouver les cartes liées depuis le côté flashcard
+    idMindMap: null,
   }),
   getters: {
     nodesArray: (state) => Object.values(state.map.nodes),
@@ -45,7 +47,8 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     },
   },
   actions: {
-    load(raw) {
+    load(raw, idMindMap = null) {
+      this.idMindMap = idMindMap;
       const normalized = normalizeMindMap(raw);
       const nonSubjectNodes = Object.values(normalized.nodes).filter(
         (n) => n.id !== normalized.subjectNodeId
@@ -60,6 +63,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     },
     new(title) {
       this.map = createBlankMindMap(title);
+      this.idMindMap = null;
       this.resetSelection();
       this.isDirty = false;
     },
@@ -420,6 +424,11 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     },
     async syncCardMasteries() {
       const nodes = Object.values(this.map.nodes);
+      const applyBox = (node, card) => {
+        if (!card?.leitnerBox) return;
+        node.mastery = boxLevelToMastery(card.leitnerBox.level);
+        node.style.secondaryColor = boxColorToHex(card.leitnerBox.color);
+      };
       const systemGroups = {};
       for (const node of nodes) {
         if (node.idCard && node.idSystem) {
@@ -427,14 +436,31 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
           systemGroups[node.idSystem].push(node);
         }
       }
-      for (const systemId of Object.keys(systemGroups)) {
+      // Lien posé depuis la flashcard (LeitnerCard.mindMapNodeId) : le nœud ne porte pas d'idCard,
+      // on retrouve les cartes via les systèmes rattachés à cette carte mentale.
+      const mindMapSystemIds = [];
+      if (this.idMindMap) {
+        try {
+          const sysRes = await api.get('leitnersystems/');
+          for (const s of sysRes?.data || []) {
+            if (Number(s.idMindMap) === Number(this.idMindMap)) mindMapSystemIds.push(String(s.idSystem));
+          }
+        } catch {
+          // couleurs de boîte non essentielles : l'éditeur reste utilisable sans
+        }
+      }
+      const systemIds = new Set([...Object.keys(systemGroups), ...mindMapSystemIds]);
+      for (const systemId of systemIds) {
         const res = await api.get(`leitnercards/system/${systemId}`);
         if (!res?.data) continue;
-        for (const node of systemGroups[systemId]) {
-          const card = res.data.find((c) => c.idCard === node.idCard);
-          if (!card?.leitnerBox) continue;
-          node.mastery = boxLevelToMastery(card.leitnerBox.level);
-          node.style.secondaryColor = boxColorToHex(card.leitnerBox.color);
+        for (const node of systemGroups[systemId] || []) {
+          applyBox(node, res.data.find((c) => c.idCard === node.idCard));
+        }
+        if (mindMapSystemIds.includes(systemId)) {
+          for (const card of res.data) {
+            const node = card.mindMapNodeId && this.map.nodes[card.mindMapNodeId];
+            if (node && !node.idCard) applyBox(node, card);
+          }
         }
       }
     },

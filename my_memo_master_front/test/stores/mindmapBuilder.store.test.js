@@ -230,6 +230,22 @@ describe('useMindMapBuilderStore', () => {
     expect(store.map.nodes[id].style.secondaryColor).toBe('#ff0000')
   })
 
+  it('syncCardMasteries — nœud lié depuis la flashcard (mindMapNodeId) : prend la couleur de la boîte', async () => {
+    const store = useMindMapBuilderStore()
+    store.new('Sujet')
+    store.idMindMap = 7
+    const id = store.map.subjectNodeId
+    mockGet.mockImplementation(async (url) => {
+      if (url === 'leitnersystems/') return { data: [{ idSystem: 3, idMindMap: 7 }, { idSystem: 4, idMindMap: 8 }] }
+      return { data: [{ idCard: 5, mindMapNodeId: id, leitnerBox: { level: 2, color: 255 } }] }
+    })
+    await store.syncCardMasteries()
+    expect(mockGet).toHaveBeenCalledWith('leitnercards/system/3')
+    expect(mockGet).not.toHaveBeenCalledWith('leitnercards/system/4')
+    expect(store.map.nodes[id].mastery).toBe('medium')
+    expect(store.map.nodes[id].style.secondaryColor).toBe('#0000ff')
+  })
+
   it("syncCardMasteries — n'appelle pas l'API si aucun nœud n'est lié", async () => {
     const store = useMindMapBuilderStore()
     store.new('Sujet')

@@ -231,9 +231,10 @@
           <div v-else-if="lastQuality.level" class="form-group--lg">
             <AnswerQualityBadge :level="lastQuality.level" :warnings="lastQuality.warnings" />
           </div>
+          <p v-if="justCreated && form.type !== 'open'" class="text-sm text-green-700 mb-4">✓ Carte enregistrée.</p>
 
-          <!-- Nœud de la carte mentale liée (création uniquement) -->
-          <div v-if="!editingCard && mindMapJson" class="form-group--lg">
+          <!-- Nœud de la carte mentale liée (création et modification) -->
+          <div v-if="mindMapJson" class="form-group--lg">
             <label class="form-label">
               Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
             </label>
@@ -628,6 +629,7 @@ const openEditModal = async (card) => {
   form.statement = card.question?.statement || ''
   form.answer = card.correctAnswer || ''
   form.type = card.question?.type || 'open'
+  form.mindMapNodeId = card.mindMapNodeId || null
   if (form.type === 'mcq' && Array.isArray(card.question?.content?.options)) {
     form.mcqOptions = card.question.content.options.map(o => ({ text: o.text, correct: !!o.correct }))
   } else {
@@ -756,8 +758,9 @@ const handleCreate = async () => {
   loading.value = true
   await loadCards()
   loading.value = false
-  if (!lastQuality.level || lastQuality.level === 'high') closeModal()
-  else justCreated.value = true
+  // CHOIX: toujours rester sur l'écran de confirmation après une création, quelle que soit la qualité
+  // RAISON: la modale se fermait seulement pour « Bonne qualité », ce qui déroutait à l'ajout en série.
+  justCreated.value = true
 }
 
 const handleUpdate = async () => {
@@ -778,6 +781,18 @@ const handleUpdate = async () => {
   if (!qResp || qResp.status !== 200) {
     formError.value = qResp?.data?.message || 'Erreur lors de la mise à jour de la question.'
     return
+  }
+
+  // Lien au nœud de la carte mentale (null = retirer) — uniquement si une carte mentale est liée au système
+  if (mindMapJson.value) {
+    const cardResp = await api.put(`leitnercards/${card.idCard}`, {
+      idQuestion: card.idQuestion,
+      mindMapNodeId: form.mindMapNodeId || null,
+    })
+    if (!cardResp || cardResp.status !== 200) {
+      formError.value = cardResp?.data?.message || 'Erreur lors de la mise à jour du lien avec la carte mentale.'
+      return
+    }
   }
 
   // Réponse uniquement pour les cartes ouvertes

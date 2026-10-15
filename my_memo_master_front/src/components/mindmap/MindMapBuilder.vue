@@ -72,6 +72,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  idMindMap: {
+    type: [Number, String, null],
+    default: null,
+  },
 });
 
 const emit = defineEmits(['save', 'export', 'new-map']);
@@ -86,7 +90,7 @@ watch(
   () => props.mapPayload,
   (payload) => {
     if (payload) {
-      store.load(payload);
+      store.load(payload, props.idMindMap);
     }
   },
   { immediate: true }
@@ -131,7 +135,7 @@ const onTitleInput = (value) => {
 const getSerializedMap = () => store.exportPayload();
 
 const loadMap = (payload) => {
-  store.load(payload);
+  store.load(payload, props.idMindMap);
 };
 
 defineExpose({

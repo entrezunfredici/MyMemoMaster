@@ -321,6 +321,12 @@ onMounted(() => {
   // immédiatement, sans action supplémentaire de l'utilisateur.
   if (!currentDiagramId.value) {
     mindmapStore.touch()
+  } else if (props.diagramMeta?.mindMapJson) {
+    // CHOIX: valider l'étape « carte mentale » dès l'ouverture d'une carte déjà enregistrée
+    // et suffisamment remplie, plutôt que d'exiger une modification dans l'éditeur.
+    // RAISON: une carte arrivée du serveur déjà complète laissait « Étape suivante » inactif.
+    guidedTourStore.recordLinks({ mindMapId: currentDiagramId.value, subjectId: props.diagramMeta.subjectId })
+    recordTourProgress(props.diagramMeta.mindMapJson)
   }
 })
 
@@ -350,6 +356,7 @@ onBeforeUnmount(() => {
     <div class="editor-canvas">
       <MindMapBuilder
         :map-payload="props.mapPayload"
+        :id-mind-map="currentDiagramId"
         :loading="isSaving || isExporting"
         @save="handleSave"
         @export="handleExport"

@@ -13061,3 +13061,27 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Constat bloquant côté serveur** : la prod répond à `Origin: https://app.my-memo-master.com` mais **pas** à `https://localhost` — la config CORS du dépôt (`helm/values-prod.yaml`) n'est pas encore déployée ; sans elle l'app mobile ne peut pas se connecter à la prod.
 **Hypothèses** : (1) `support@my-memo-master.com` (adresse d'expédition de l'API) sert de contact ; (2) app gratuite, sans publicité ; (3) public non limité aux mineurs (à décider).
 **Dette / reste à faire** : (1) captures Play Store non prises (session ouverte avec un compte riche en données requise) ; (2) politique de confidentialité à compléter, valider et publier à une URL publique (inexistante dans le front) ; (3) adresse web de demande de suppression de compte exigée par Google ; (4) création de la clé de signature et du compte Play (côté utilisateur) ; (5) le build Gradle n'est pas exécuté en CI ; (6) la couche adaptative n'a pas d'icône monochrome (thèmes Android 13+).
+
+### [2026-10-15] [FIX] Retours de test du parcours guidé (qualité des cartes, modale d'ajout, étape 1)
+**Fichiers modifiés** : `my_memo_master_api/services/AnswerQuality.service.js` (règle 9 non appliquée à une formule isolée), `test/services/AnswerQuality.service.test.js` (+2 tests), `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` (modale d'ajout : confirmation systématique après création, message pour les QCM), `src/components/mindmap/MindmapsEditorView.vue` (au montage d'une carte existante, enregistre `mindMapId` et le nombre de nœuds dans le parcours guidé).
+**Vérifié** : tests AnswerQuality (24) et stores/éditeur front (37) verts. Aucun test dédié à `FlashcardsCardsPage` n'a été lancé (aucun fichier correspondant) ; comportement des deux correctifs front non vérifié dans le navigateur.
+**Non traité** : relation de Mayer et « COP > 1 » (contenu du cours testé, pas l'app) ; chevauchement des nœuds posés par calcul via l'API (sans lien avec l'app).
+
+### [2026-10-15] [IMP] Lien carte Leitner ↔ nœud de carte mentale modifiable
+**Fichiers modifiés** : `my_memo_master_api/validators/LeitnerCard.validators.js` (`updateCard` accepte `mindMapNodeId` chaîne 1-64 ou null), `services/LeitnerCard.service.js` (`updateCard` ne touche au lien que si la clé est fournie ; null = retirer), `routes/LeitnerCard.routes.js` (Swagger), tests service (+2) et contrôleur (+2) ; `my_memo_master_front/src/pages/FlashcardsCardsPage.vue` (sélecteur de nœud affiché aussi en modification, prérempli, envoyé par `PUT leitnercards/:id`).
+**Interface publique modifiée** : `PUT /leitnercards/:id` accepte `mindMapNodeId` optionnel (rétrocompatible : absent = lien inchangé), validé par l'utilisateur.
+**Vérifié** : tests API Leitner (60) verts, lint API. Comportement front non vérifié dans le navigateur.
+
+### [2026-10-15] [IMP] Retours de test de la session Leitner (correcteur IA, feedback, écran de fin)
+**Fichiers modifiés** : `my_memo_master_api/services/MistralGrading.service.js` (prompt : explication au tutoiement, sans mention de la consigne/du rôle, formules en `$…$`) ; `my_memo_master_front/src/pages/FlashcardsSessionPage.vue` (explication rendue via `FormulaText`/KaTeX ; seuil de réussite 80 % affiché ; titre « ✅ Correct » si réussite < 100 % et « ✅ Excellent ! » seulement à 100 % ; écran de fin : score moyen des questions ouvertes, réussies/à revoir, liste « Dernières erreurs » conservée) ; `test/components/FlashcardsSessionPage.test.js` (1 test adapté, 2 ajoutés).
+**Vérifié** : tests session (21) et MistralGrading (54) verts, lint front. Effet du nouveau prompt non vérifié sur de vrais appels Mistral.
+**Hypothèse / dette** : seuil 80 % dupliqué dans le front (l'API ne le renvoie pas) ; les corrections déjà en cache gardent l'ancienne formulation ; l'erreur factuelle du commentaire (« borne non mentionnée » alors que la réponse la mentionnait) n'est pas corrigée — limite du juge LLM, un seul cas observé.
+
+---
+
+## [2026-10-15] [FIX] Carte mentale : couleur secondaire des items liés depuis une flashcard
+
+**Problème** : un item lié à une flashcard *depuis la carte* (`node.idCard`) prenait la couleur de la boîte Leitner, mais un item lié *depuis la flashcard* (`LeitnerCard.mindMapNodeId`) restait à la couleur neutre.
+**Fichiers modifiés** : `my_memo_master_api/services/LeitnerCard.service.js` (`getCardsBySystemId` renvoie aussi `mindMapNodeId`) ; `my_memo_master_front/src/stores/mindmapBuilder.js` (état `idMindMap`, `load(raw, idMindMap)`, `syncCardMasteries` couvre aussi les cartes des systèmes rattachés à la carte mentale) ; `components/mindmap/MindMapBuilder.vue` (prop `idMindMap`) ; `MindmapsEditorView.vue` (transmet `currentDiagramId`) ; test store (+1).
+**Hypothèses** : le nœud n'est pas muté avec `idCard`/`idSystem` (le lien reste porté par la carte) ; échec de `GET leitnersystems/` toléré (couleurs non essentielles).
+**Dette** : pas de resynchronisation si la carte mentale reçoit son id après une première sauvegarde (rechargement nécessaire) ; le sélecteur de nœud (`MindMapNodePickerComponent`) n'affiche pas ces couleurs.

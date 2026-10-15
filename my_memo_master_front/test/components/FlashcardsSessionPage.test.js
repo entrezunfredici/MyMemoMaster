@@ -148,7 +148,9 @@ describe('FlashcardsSessionPage', () => {
     await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Excellent')
+    expect(wrapper.text()).toContain('Correct')
+    expect(wrapper.text()).not.toContain('Excellent')
+    expect(wrapper.text()).toContain('réussite à partir de 80%')
     expect(wrapper.text()).toContain('95%')
   })
 
@@ -254,6 +256,44 @@ describe('FlashcardsSessionPage', () => {
 
     expect(wrapper.text()).toContain('Session terminée')
     expect(wrapper.text()).toContain('1 cartes')
+  })
+
+  it('score de 100 % — affiche "Excellent"', async () => {
+    const wrapper = mountSession()
+    await flushPromises()
+
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = { success: true, score: 1, correction: 'Paris', explanation: '', decision_zone: 'llm' }
+      return true
+    })
+
+    await wrapper.find('textarea').setValue('Paris')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Excellent')
+  })
+
+  it('fin de session — affiche le score moyen et conserve les dernières erreurs', async () => {
+    const wrapper = mountSession([mockCard])
+    await flushPromises()
+
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = { success: false, score: 0.4, correction: 'Paris', explanation: '', decision_zone: 'llm' }
+      return true
+    })
+
+    await wrapper.find('textarea').setValue('Lyon')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'Continuer')?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Session terminée')
+    expect(wrapper.find('[data-testid="average-score"]').text()).toContain('40%')
+    expect(wrapper.text()).toContain('Dernières erreurs')
   })
 
   it('fin de session — journalise la session (système, nb de cartes, durée >= 0)', async () => {

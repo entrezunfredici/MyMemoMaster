@@ -5024,3 +5024,22 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `android/app/build.gradle` lit `android/keystore.properties` (ignoré par git) ; sans lui, `bundleRelease` produit un `.aab` **non signé** plutôt que d'échouer ou de signer avec la clé de debug.
 **Alternative écartée** : secrets de signature dans `gradle.properties` du dépôt ou signature par la clé de debug (publiable par erreur, non remplaçable).
 **Conséquences** : la clé de signature doit être sauvegardée par son propriétaire ; Play App Signing recommandé.
+
+### [2026-10-15] Qualité des réponses : une formule isolée est dispensée du recoupement lexical avec l'énoncé
+**Contexte** : retour de test du parcours guidé — « ΔS = Sech + Scréée… » (correcte) était classée « À revoir » faute de mot commun avec la question, alors que répéter les mots de l'énoncé suffit à obtenir « Bonne qualité ».
+**Décision** : `AnswerQuality.assess` n'applique plus la règle 9 (mot-clé distinctif commun) à une réponse contenant une formule et ayant moins de 5 mots rédigés (≥ 3 lettres). L'avertissement « formule non balisée » (règle 8) reste actif.
+**Alternative écartée** : supprimer la règle 9 (elle détecte encore les réponses elliptiques en phrases) ; vérification sémantique de la justesse (hors périmètre : le service reste consultatif et lexical).
+**Conséquences** : le critère reste lexical — il ne juge pas l'exactitude ; une phrase qui répète la question garde « Bonne qualité ».
+
+### [2026-10-15] Modale d'ajout de carte : toujours rester sur l'écran de confirmation après création
+**Contexte** : la modale se fermait pour « Bonne qualité » mais restait ouverte (« Ajouter une autre carte ») sinon, ce qui déroutait lors d'ajouts en série.
+**Décision** : après une création, `justCreated` est toujours activé (confirmation + « Ajouter une autre carte » / « Fermer »). L'édition d'une carte se ferme toujours si la qualité est bonne (inchangé).
+**Alternative écartée** : toujours fermer (masquerait les avertissements de qualité).
+**Conséquences** : un clic de plus (« Fermer ») pour une carte unique.
+
+### [2026-10-15] Couleur de boîte des nœuds liés côté flashcard : résolue à la synchronisation, sans écrire `idCard` dans le nœud
+
+**Contexte** : deux sens de liaison coexistent (`node.idCard` dans le JSON de la carte mentale ; `LeitnerCard.mindMapNodeId` en base). Seul le premier alimentait la couleur secondaire.
+**Décision** : `syncCardMasteries` récupère aussi les systèmes dont `idMindMap` = carte éditée, charge leurs cartes (qui exposent désormais `mindMapNodeId`) et applique niveau/couleur de la boîte au nœud correspondant.
+**Alternative écartée** : copier `idCard`/`idSystem` dans le nœud (duplique la source de vérité, devient obsolète si la carte est déliée/supprimée).
+**Conséquences** : un appel `GET leitnersystems/` supplémentaire à l'ouverture d'une carte mentale enregistrée ; `GET leitnercards/system/:id` expose `mindMapNodeId`.
