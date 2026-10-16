@@ -3,7 +3,7 @@
     <LoaderComponent />
   </div>
 
-  <div v-else-if="!store.kpis" class="text-center py-20 text-gray-400">
+  <div v-else-if="!store.kpis" class="text-center py-20 text-gray-500">
     <p>Aucune donnée disponible pour le moment.</p>
     <p class="text-sm mt-1">Commence à réviser pour voir tes indicateurs !</p>
   </div>
@@ -21,7 +21,7 @@
             'flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-medium',
             badge.unlocked
               ? 'border-primary bg-primary text-on-primary'
-              : 'border-gray-200 bg-white text-gray-400'
+              : 'border-gray-200 bg-white text-gray-500'
           ]"
           :title="badge.description"
         >
@@ -34,13 +34,13 @@
     <!-- RÉVISION & RÉGULARITÉ -->
     <section>
       <h2 class="text-xl font-bold text-primary mb-1">Révision & Régularité</h2>
-      <p class="text-sm text-gray-400 mb-3">
+      <p class="text-sm text-gray-500 mb-3">
         Deux temps : ce que tu <strong>prévois</strong> dans le calendrier, et ce que tu <strong>fais</strong>
         réellement (exercices, révisions Leitner, cartes mentales). Une séance planifiée se valide
         automatiquement dès qu'une pratique réelle correspondante a lieu le jour même — sinon, coche-la à la main.
       </p>
 
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prévu</p>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prévu</p>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <StatCard label="Sessions planifiées" :value="store.kpis.revision.totalPlanned" hint="créneaux calendrier" />
         <StatCard label="Taux de complétion" :value="store.kpis.revision.completionRate + ' %'" hint="créneaux planifiés tenus" />
@@ -48,7 +48,7 @@
         <StatCard label="30 derniers jours" :value="store.kpis.revision.sessionsLast30Days + ' sessions'" hint="créneaux calendrier" />
       </div>
 
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fait</p>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Fait</p>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         <StatCard label="Sessions complétées" :value="store.kpis.revision.totalCompleted" hint="cochées ou validées par la pratique" />
         <StatCard label="Complétées / 30 j" :value="store.kpis.revision.completedLast30Days + ' sessions'" hint="cochées ou validées par la pratique" />
@@ -107,13 +107,13 @@
           <Line :data="scoreChartData" :options="lineOptions" />
         </div>
       </div>
-      <p v-else class="text-sm text-gray-400">Aucun exercice complété pour le moment.</p>
+      <p v-else class="text-sm text-gray-500">Aucun exercice complété pour le moment.</p>
     </section>
 
     <!-- EXERCICES DE CLASSE (KPI pédagogiques) -->
     <section v-if="store.kpis.pedagogical?.totalTests > 0">
       <h2 class="text-xl font-bold text-primary mb-1">Exercices de classe</h2>
-      <p class="text-sm text-gray-400 mb-3">Exercices assignés par tes enseignants — ces scores ne comptent pas dans tes KPI personnels.</p>
+      <p class="text-sm text-gray-500 mb-3">Exercices assignés par tes enseignants — ces scores ne comptent pas dans tes KPI personnels.</p>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         <StatCard label="Exercices passés" :value="store.kpis.pedagogical.totalTests" />
         <StatCard label="Score moyen" :value="store.kpis.pedagogical.avgScore + ' %'" />
@@ -145,12 +145,12 @@
           >
             <div>
               <span class="font-medium text-heading">{{ entry.testName }}</span>
-              <span class="text-xs text-gray-400 ml-2">{{ entry.groups.join(', ') }}</span>
+              <span class="text-xs text-gray-500 ml-2">{{ entry.groups.join(', ') }}</span>
             </div>
             <span
               :class="[
                 'font-bold',
-                entry.percentage >= 80 ? 'text-green-600' : entry.percentage >= 50 ? 'text-orange-500' : 'text-red-500'
+                entry.percentage >= 80 ? 'text-green-700' : entry.percentage >= 50 ? 'text-orange-700' : 'text-red-600'
               ]"
             >{{ entry.percentage }} %</span>
           </div>
@@ -174,7 +174,7 @@
           <Bar :data="leitnerChartData" :options="leitnerBarOptions" />
         </div>
       </div>
-      <p v-else class="text-sm text-gray-400">Aucune carte Leitner créée pour le moment.</p>
+      <p v-else class="text-sm text-gray-500">Aucune carte Leitner créée pour le moment.</p>
     </section>
 
     <!-- DIVERSITÉ DES SUJETS -->
@@ -190,14 +190,14 @@
           class="bg-white border-2 border-primary/20 rounded-lg px-3 py-2 text-sm"
         >
           <span class="font-medium text-primary">{{ sub.name }}</span>
-          <div class="text-xs text-gray-400 mt-0.5">
+          <div class="text-xs text-gray-500 mt-0.5">
             <span v-if="sub.tests > 0">{{ sub.tests }} exercice{{ sub.tests > 1 ? 's' : '' }}</span>
             <span v-if="sub.tests > 0 && sub.systems > 0"> · </span>
             <span v-if="sub.systems > 0">{{ sub.systems }} système{{ sub.systems > 1 ? 's' : '' }} Leitner</span>
           </div>
         </div>
       </div>
-      <p v-else class="text-sm text-gray-400">Aucune matière enregistrée pour le moment.</p>
+      <p v-else class="text-sm text-gray-500">Aucune matière enregistrée pour le moment.</p>
     </section>
 
   </div>
@@ -240,9 +240,9 @@ const StatCard = defineComponent({
   props: { label: String, value: [String, Number], highlight: Boolean, hint: String },
   setup(props) {
     return () => h('div', { class: 'bg-white border-2 border-gray-100 rounded-xl p-4' }, [
-      h('p', { class: 'text-xs text-gray-400 mb-1' }, props.label),
+      h('p', { class: 'text-xs text-gray-500 mb-1' }, props.label),
       h('p', { class: `text-2xl font-bold ${props.highlight ? 'text-primary' : 'text-gray-800'}` }, String(props.value ?? '—')),
-      props.hint ? h('p', { class: 'text-[11px] text-gray-400 mt-1 italic' }, props.hint) : null
+      props.hint ? h('p', { class: 'text-[11px] text-gray-500 mt-1 italic' }, props.hint) : null
     ])
   }
 })

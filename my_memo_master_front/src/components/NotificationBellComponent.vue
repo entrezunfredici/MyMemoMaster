@@ -10,7 +10,7 @@
       <BellIcon class="size-7" />
       <span
         v-if="pendingCount > 0"
-        class="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full leading-none"
+        class="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-600 rounded-full leading-none"
       >
         {{ pendingCount > 9 ? '9+' : pendingCount }}
       </span>
@@ -46,10 +46,10 @@
         <!-- Liste -->
         <div class="max-h-80 overflow-y-auto" style="background-color: rgb(var(--white))">
           <div v-if="loading && reminders.length === 0" class="flex justify-center py-8">
-            <ArrowPathIcon class="size-5 animate-spin text-gray-400" />
+            <ArrowPathIcon class="size-5 animate-spin text-gray-500" />
           </div>
 
-          <div v-else-if="reminders.length === 0" class="flex flex-col items-center py-8 text-gray-400">
+          <div v-else-if="reminders.length === 0" class="flex flex-col items-center py-8 text-gray-500">
             <BellSlashIcon class="size-8 mb-2" />
             <p class="text-sm">Aucun rappel en attente</p>
           </div>
@@ -104,7 +104,7 @@
               <!-- Supprimer -->
               <button
                 @click.stop="deleteReminder(reminder.id)"
-                class="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors p-1 rounded"
+                class="flex-shrink-0 text-gray-500 hover:text-red-600 transition-colors p-1 rounded"
                 title="Supprimer ce rappel"
               >
                 <XMarkIcon class="size-4" />
@@ -114,7 +114,7 @@
         </div>
 
         <!-- Pied panneau -->
-        <div v-if="sentCount > 0" class="px-4 py-2 border-t border-gray-100 text-xs text-gray-400 text-center">
+        <div v-if="sentCount > 0" class="px-4 py-2 border-t border-gray-100 text-xs text-gray-500 text-center">
           {{ sentCount }} rappel{{ sentCount > 1 ? 's' : '' }} déjà envoyé{{ sentCount > 1 ? 's' : '' }}
         </div>
       </div>

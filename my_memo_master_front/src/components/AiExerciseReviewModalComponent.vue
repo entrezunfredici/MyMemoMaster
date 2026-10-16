@@ -71,7 +71,7 @@
                   />
                 </div>
                 <div>
-                  <label class="form-label--xs">Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span></label>
+                  <label class="form-label--xs">Autres formulations acceptées <span class="text-gray-500 font-normal">(optionnel)</span></label>
                   <div v-for="(alt, ai) in item.openAltAnswers" :key="ai" class="flex items-center gap-2 mb-2">
                     <input
                       :aria-label="`Formulation acceptée ${ai + 1}`"
@@ -83,7 +83,7 @@
                       type="button"
                       :aria-label="`Supprimer la formulation acceptée ${ai + 1}`"
                       @click="item.openAltAnswers.splice(ai, 1)"
-                      class="text-gray-400 hover:text-red-500 text-lg leading-none"
+                      class="text-gray-500 hover:text-red-600 text-lg leading-none"
                     >✕</button>
                   </div>
                   <button type="button" @click="item.openAltAnswers.push('')" class="text-sm text-primary hover:underline font-medium">
@@ -111,9 +111,9 @@
                       :value="opt.text"
                       @input="setOptionText(item, oi, $event.target.value)"
                       type="text"
-                      class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      class="flex-1 px-3 py-1.5 border border-gray-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
-                    <button v-if="item.mcqOptions.length > 2" type="button" @click="removeOption(item, oi)" class="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
+                    <button v-if="item.mcqOptions.length > 2" type="button" @click="removeOption(item, oi)" class="text-red-600 hover:text-red-600 text-lg leading-none">✕</button>
                   </div>
                 </div>
                 <button type="button" @click="addOption(item)" class="mt-2 text-sm text-primary hover:underline font-medium">+ Ajouter une option</button>
@@ -133,12 +133,12 @@
                 <div v-if="item.fillBlanks.length" class="space-y-2">
                   <label class="form-label--xs">Réponses attendues</label>
                   <div v-for="(blank, bi) in item.fillBlanks" :key="bi" class="flex items-center gap-2">
-                    <span class="text-xs text-gray-400 w-14 shrink-0">Trou {{ bi }}</span>
+                    <span class="text-xs text-gray-500 w-14 shrink-0">Trou {{ bi }}</span>
                     <input
                       :aria-label="`Réponse du trou ${bi}`"
                       v-model="item.fillBlanks[bi]"
                       type="text"
-                      class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      class="flex-1 px-3 py-1.5 border border-gray-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -148,14 +148,14 @@
                 <label class="block text-xs font-semibold text-gray-500 mb-2">Fragments dans le bon ordre</label>
                 <div class="space-y-2">
                   <div v-for="(frag, fi) in item.reorderFragments" :key="fi" class="flex items-center gap-2">
-                    <span class="text-xs text-gray-400 w-5 shrink-0">{{ fi + 1 }}.</span>
+                    <span class="text-xs text-gray-500 w-5 shrink-0">{{ fi + 1 }}.</span>
                     <input
                       :aria-label="`Fragment ${fi + 1}`"
                       v-model="item.reorderFragments[fi]"
                       type="text"
-                      class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      class="flex-1 px-3 py-1.5 border border-gray-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
-                    <button v-if="item.reorderFragments.length > 2" type="button" @click="item.reorderFragments.splice(fi, 1)" class="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
+                    <button v-if="item.reorderFragments.length > 2" type="button" @click="item.reorderFragments.splice(fi, 1)" class="text-red-600 hover:text-red-600 text-lg leading-none">✕</button>
                   </div>
                 </div>
                 <button type="button" @click="item.reorderFragments.push('')" class="mt-2 text-sm text-primary hover:underline font-medium">+ Ajouter un fragment</button>
@@ -180,7 +180,7 @@
                 <template v-else-if="item.type === 'reorder'"> · {{ item.reorderFragments.length }} fragments</template>
               </p>
 
-              <button type="button" class="text-xs text-gray-400 hover:text-gray-600 mt-2" @click="item.sourceOpen = !item.sourceOpen">
+              <button type="button" class="text-xs text-gray-500 hover:text-gray-600 mt-2" @click="item.sourceOpen = !item.sourceOpen">
                 {{ item.sourceOpen ? '▾' : '▸' }} Source
               </button>
               <p v-if="item.sourceOpen" class="text-xs text-gray-500 mt-1 italic border-l-2 border-gray-200 pl-2">
@@ -203,7 +203,7 @@
               <button
                 type="button"
                 :aria-label="`Retirer l'image de la question générée ${idx + 1}`"
-                class="text-xs text-gray-400 hover:text-red-500 underline"
+                class="text-xs text-gray-500 hover:text-red-600 underline"
                 @click="removeImage(item)"
               >Retirer l'image</button>
             </div>

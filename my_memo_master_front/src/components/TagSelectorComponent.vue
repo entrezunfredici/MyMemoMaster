@@ -53,7 +53,7 @@
       <!-- Flèche (cliquable, tourne quand ouvert) -->
       <button
         type="button"
-        class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 transition-transform focus:outline-none"
+        class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-gray-500 hover:text-gray-600 transition-transform focus:outline-none"
         :class="anyOpen ? 'rotate-180' : ''"
         :aria-label="anyOpen ? 'Fermer la liste des tags' : 'Ouvrir la liste des tags'"
         tabindex="-1"
@@ -85,7 +85,7 @@
             :style="{ backgroundColor: tag.color || DEFAULT_COLOR }"
           />
           <span class="flex-1 text-gray-800">{{ tag.name }}</span>
-          <span v-if="modelValue.includes(tag.tagId)" class="text-purple-500 text-xs font-bold">✓</span>
+          <span v-if="modelValue.includes(tag.tagId)" class="text-purple-600 text-xs font-bold">✓</span>
         </button>
 
         <div v-if="filteredTags.length && canCreate" class="border-t border-gray-100 my-0.5" />
@@ -116,7 +116,7 @@
         class="absolute z-50 left-0 mt-1 border border-gray-200 rounded-xl shadow-xl p-3"
         style="background-color: white !important"
       >
-        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
           Couleur — {{ colorPickerTag.name }}
         </p>
         <div class="grid grid-cols-5 gap-1.5">
