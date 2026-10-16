@@ -7,7 +7,7 @@
         <li>⏳ Génération des cartes...</li>
         <li>○ Préparation de la validation</li>
       </ul>
-      <p class="text-xs text-gray-400 mb-4">Cela peut prendre jusqu'à une minute selon la taille du contenu.</p>
+      <p class="text-xs text-gray-500 mb-4">Cela peut prendre jusqu'à une minute selon la taille du contenu.</p>
     </div>
 
     <div v-else class="text-center py-4">

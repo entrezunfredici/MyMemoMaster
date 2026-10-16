@@ -21,7 +21,7 @@
           class="form-input"
           rows="6"
         />
-        <p class="text-xs text-gray-400 mt-1 text-right">{{ sourceText.length }} caractère{{ sourceText.length > 1 ? 's' : '' }}</p>
+        <p class="text-xs text-gray-500 mt-1 text-right">{{ sourceText.length }} caractère{{ sourceText.length > 1 ? 's' : '' }}</p>
       </template>
 
       <template v-else>
@@ -42,7 +42,7 @@
           </template>
           <div v-else class="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2">
             <span class="truncate">{{ pdfFile.name }} ({{ formatFileSize(pdfFile.size) }})</span>
-            <button type="button" aria-label="Retirer le fichier" class="text-gray-400 hover:text-red-500 ml-2" @click="pdfFile = null">
+            <button type="button" aria-label="Retirer le fichier" class="text-gray-500 hover:text-red-600 ml-2" @click="pdfFile = null">
               ✕
             </button>
           </div>
@@ -60,7 +60,7 @@
     </div>
 
     <div class="form-group--lg">
-      <label class="form-label">Matière <span class="text-gray-400 font-normal">(optionnel — contexte pour l'IA)</span></label>
+      <label class="form-label">Matière <span class="text-gray-500 font-normal">(optionnel — contexte pour l'IA)</span></label>
       <input
         aria-label="Matière"
         v-model="subjectContext"

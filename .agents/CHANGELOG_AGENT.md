@@ -13168,3 +13168,11 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Fichiers modifiés** : `my_memo_master_api/services/LeitnerSystem.service.js` (`DEFAULT_BOXES` : rouge, orange, vert, turquoise, bleu), `seeds/LeitnerBox.seed.json` (mêmes couleurs, en décimal), `test/services/LeitnerSystem.service.test.js` (+1 : couleurs distinctes attendues) ; `my_memo_master_front/src/components/mindmap/MindMapNode.vue` (symbole +/− du bouton de repliage lisible sur toute couleur de boîte).
 **Hypothèse** : les 5 couleurs sont celles de la capture fournie (valeurs lues sur l'image : `#e40101`, `#fb9609`, `#01b207`, `#0affce`, `#001eff`). Seuls les NOUVEAUX systèmes sont concernés ; les existants ne sont pas migrés (voir DECISIONS).
 **Vérifié** : tests du service Leitner (15) et du nœud (32) verts ; non vérifié visuellement dans l'app.
+
+## [2026-10-16] [REF] Classes Tailwind de palette activées (branche `dev_front_tailwind`)
+
+**Problème** : 455 classes de couleur (`bg-gray-100`, `text-red-600`, `hover:bg-blue-700`…) + `bg-white`/`text-white` ne produisaient aucun style (config Tailwind sans échelles de teintes) : boutons sans fond à texte noir, textes secondaires noirs, cartes sans fond.
+**Fait** : `tailwind.config.js` (échelles gray/red/blue/green/amber/yellow/purple/orange via `var(--…)`, `white`, `black`, `transparent`, `current` ; `borderColor.DEFAULT: currentColor` pour ne pas éclaircir les champs), `assets/base.css` (+45 teintes), 23 fichiers `.vue` (113 ajustements de contraste, 12 bordures de champs en `border-gray-500`), `scripts/audit-tailwind.mjs` + `npm run audit:tailwind` + étape de CI, `test/components/NotificationBellComponent.test.js` (classe `bg-red-600`).
+**Mesure** : relevé des styles calculés sur 16 pages avant/après (bordures de largeur nulle ignorées) : 47 éléments / 1456 modifiés, tous attendus ; captures revues (bouton « Retour aux exercices » bleu à texte blanc, cartes, textes gris).
+**Vérifié** : suite front 73 fichiers / 1117 tests, ESLint, audits RGAA / couleurs / Tailwind à 0, 35 tests Playwright (axe WCAG 2.1 AA sur 26 pages).
+**Limites** : états de données non rendus par l'audit (résultats d'un exercice, listes remplies, modales IA) vérifiés seulement par analyse statique des paires texte/fond ; les 12 champs à `border-gray` du thème (≈ 1,4:1) restent sous le 3:1 de RGAA 3.3.
