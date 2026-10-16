@@ -45,7 +45,7 @@
 </template>
 
 <script setup>
-import { MONTHS, DAYS_SHORT, getDaysInMonth, getFirstDay } from '../stores/calendar.js'
+import { MONTHS, DAYS_SHORT, getDaysInMonth, getFirstDay } from '@/helpers/calendar'
 
 defineProps({
   year: { type: Number, required: true },

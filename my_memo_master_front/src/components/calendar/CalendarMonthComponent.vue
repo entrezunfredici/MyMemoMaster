@@ -32,7 +32,7 @@
         }"
         role="button"
         tabindex="0"
-        :aria-label="`${day} ${MONTHS[month]} ${year}`"
+        :aria-label="dayLabel(day)"
         :aria-pressed="isSelected(year, month, day)"
         @click="$emit('select-day', year, month, day)"
         @keydown.enter.prevent="$emit('select-day', year, month, day)"
@@ -45,7 +45,7 @@
           class="event-pill"
           :class="`pill-${ev.color}`"
         >
-          {{ ev.title }}
+          {{ ev.label }}
         </div>
         <div v-if="getEvents(year, month, day).length > 2" class="more-badge">
           +{{ getEvents(year, month, day).length - 2 }} autres
@@ -61,9 +61,9 @@
 </template>
 
 <script setup>
-import { MONTHS, DAYS_SHORT, getDaysInMonth, getFirstDay } from '../stores/calendar.js'
+import { MONTHS, DAYS_SHORT, getDaysInMonth, getFirstDay } from '@/helpers/calendar'
 
-defineProps({
+const props = defineProps({
   year: { type: Number, required: true },
   month: { type: Number, required: true },
   trailingDays: { type: Number, required: true },
@@ -74,6 +74,13 @@ defineProps({
 })
 
 defineEmits(['prev-month', 'next-month', 'select-day'])
+
+// « 9 Juin 2026, 3 événements » : le jour est un bouton, son nom annonce ce qu'il contient.
+const dayLabel = (day) => {
+  const count = props.getEvents(props.year, props.month, day).length
+  const base = `${day} ${MONTHS[props.month]} ${props.year}`
+  return count ? `${base}, ${count} événement${count > 1 ? 's' : ''}` : base
+}
 </script>
 
 <style scoped>
@@ -198,7 +205,8 @@ defineEmits(['prev-month', 'next-month', 'select-day'])
 
 .more-badge {
   font-size: 10px;
-  color: var(--slate-500);
+  /* slate-600 : le jour survolé ou sélectionné a un fond teinté (4,2:1 seulement en slate-500) */
+  color: var(--slate-600);
   padding: 0 2px;
 }
 

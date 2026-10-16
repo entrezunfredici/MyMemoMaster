@@ -2,10 +2,17 @@
   <div class="calendar-page">
     <main class="cal-main">
       <header class="cal-header">
-        <div class="view-toggle">
-          <button :class="{ active: view === 'year' }" @click="view = 'year'">Année</button>
-          <button :class="{ active: view === 'month' }" @click="view = 'month'">Mois</button>
+        <div class="view-toggle" role="group" aria-label="Affichage du calendrier">
+          <button type="button" :class="{ active: view === 'year' }" :aria-pressed="view === 'year'" @click="view = 'year'">Année</button>
+          <button type="button" :class="{ active: view === 'month' }" :aria-pressed="view === 'month'" @click="view = 'month'">Mois</button>
         </div>
+        <button
+          type="button"
+          class="add-btn"
+          aria-label="Nouvelle séance de révision"
+          title="Nouvelle séance de révision"
+          @click="openCreate()"
+        >+</button>
       </header>
 
       <div class="cal-body">
@@ -34,24 +41,45 @@
           />
         </div>
 
-        <CalendarDetailPanel :day="selectedDay" :get-events="getEvents" @close="closePanel" />
+        <CalendarDetailPanel
+          :day="selectedDay"
+          :get-events="getEvents"
+          @close="closePanel"
+          @open-event="selectedEvent = $event"
+          @create="openCreate"
+        />
       </div>
     </main>
+
+    <CalendarAgenda :loading="loading" />
+
+    <CalendarCreateModal :open="showCreate" :day="createDay" @close="showCreate = false" @created="refreshSessions" />
+    <CalendarEventModal :event="selectedEvent" @close="selectedEvent = null" />
   </div>
 </template>
 
 <script setup>
-import { useCalendar } from '../stores/calendar.js'
-import CalendarYearView from '../components/CalendarYearComponent.vue'
-import CalendarMonthView from '../components/CalendarMonthComponent.vue'
-import CalendarDetailPanel from '../components/CalendarDetailPanelComponent.vue'
+// Page Calendrier : vues année / mois, panneau du jour sélectionné, agenda latéral et fenêtres de
+// création de séance et de détail d'un événement. L'état et les données sont dans useCalendar.
+import { ref, onMounted } from 'vue'
+import { useCalendar } from '@/composables/useCalendar'
+import CalendarYearView from '@/components/calendar/CalendarYearComponent.vue'
+import CalendarMonthView from '@/components/calendar/CalendarMonthComponent.vue'
+import CalendarDetailPanel from '@/components/calendar/CalendarDetailPanelComponent.vue'
+import CalendarAgenda from '@/components/calendar/CalendarAgendaComponent.vue'
+import CalendarCreateModal from '@/components/calendar/CalendarCreateModalComponent.vue'
+import CalendarEventModal from '@/components/calendar/CalendarEventModalComponent.vue'
+import '@/components/calendar/calendar.css'
 
 const {
   view,
   currentYear,
   currentMonth,
   selectedDay,
+  loading,
   trailingDays,
+  load,
+  refreshSessions,
   isToday,
   isWeekend,
   isSelected,
@@ -61,8 +89,20 @@ const {
   closePanel,
   prevMonth,
   nextMonth,
-  goToMonth
+  goToMonth,
 } = useCalendar()
+
+const selectedEvent = ref(null) // événement dont la fiche est ouverte
+const showCreate = ref(false)
+const createDay = ref(null) // jour proposé pour la nouvelle séance ({ y, m, d }) ou null
+
+// Depuis le bouton « + » (aucun jour) ou depuis le panneau d'un jour.
+function openCreate(day = null) {
+  createDay.value = day
+  showCreate.value = true
+}
+
+onMounted(load)
 </script>
 
 <style scoped>

@@ -94,6 +94,7 @@ Suite à la demande de « s'occuper des 106 critères RGAA » sur `docs/COMPTE_R
 **2. Nouveaux audits navigateur** (Chromium sur la version buildée, API simulée) :
 - `e2e-a11y/pages.spec.js` — **26 pages**, publiques et privées (session injectée, toute requête API répond `[]`), toutes les règles WCAG 2.1 A/AA d'axe-core ; la visite guidée (driver.js) y est ouverte, donc auditée ;
 - `e2e-a11y/mindmap-editor.spec.js` — liste puis éditeur de carte mentale, état par état (un item de chaque type sélectionné : texte, formule, grandeur, graphique, image), plus une **mesure directe du contraste des textes** (`helpers/contrast.js`) : axe répond « à vérifier » pour les 36 textes posés dans des `<foreignObject>` sur une forme SVG, faute de pouvoir résoudre leur fond ;
+- `e2e-a11y/calendar.spec.js` — le calendrier AVEC données (mois avec événements et « +N autres », panneau du jour, fiche d'une séance, création, onglet To-do, vue année) : les états vides de `pages.spec.js` ne montraient pas les pastilles ni les fenêtres ;
 - `e2e-a11y/live-public.spec.js` + `contrast.spec.js` sur un site déployé (`A11Y_BASE_URL`), via `.github/workflows/a11y-live.yml`.
 
 **3. Non-conformités réelles trouvées et corrigées** (elles existaient avant la campagne, indépendamment de la migration) :
