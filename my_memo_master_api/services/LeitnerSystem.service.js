@@ -11,12 +11,16 @@ const rightsCache = require('../helpers/leitnerRightsCache')
 // documentées dans diagrams/leitner_algo.md §5. Reste configurable par système,
 // sans restriction de droits (voir DECISIONS.md — décision explicite de l'utilisateur
 // de ne pas ajouter de vérification de propriété sur LeitnerBox).
+// `color` est un entier 0xRRGGBB (colonne BIGINT) : une teinte distincte par boîte, du moins au mieux
+// maîtrisé (rouge, orange, vert, turquoise, bleu), modifiable ensuite par l'étudiant. La couleur
+// de la boîte est aussi celle de la bordure des items de carte mentale liés à une carte (voir
+// DECISIONS 2026-10-16). Le front n'en garde aucune copie : il lit LeitnerBox.color.
 const DEFAULT_BOXES = [
-  { level: 1, intervall: 86400, color: 123456 }, // 1 jour
-  { level: 2, intervall: 259200, color: 654321 }, // 3 jours
-  { level: 3, intervall: 604800, color: 111111 }, // 7 jours
-  { level: 4, intervall: 1209600, color: 222222 }, // 14 jours
-  { level: 5, intervall: 2592000, color: 333333 } // 30 jours
+  { level: 1, intervall: 86400, color: 0xe40101 }, // 1 jour — rouge
+  { level: 2, intervall: 259200, color: 0xfb9609 }, // 3 jours — orange
+  { level: 3, intervall: 604800, color: 0x01b207 }, // 7 jours — vert
+  { level: 4, intervall: 1209600, color: 0x0affce }, // 14 jours — turquoise
+  { level: 5, intervall: 2592000, color: 0x001eff } // 30 jours — bleu
 ]
 
 const SUBJECT_INCLUDE = { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }

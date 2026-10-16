@@ -20,7 +20,7 @@
           :class="[
             'flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-medium',
             badge.unlocked
-              ? 'border-primary bg-primary text-white'
+              ? 'border-primary bg-primary text-on-primary'
               : 'border-gray-200 bg-white text-gray-400'
           ]"
           :title="badge.description"
@@ -219,6 +219,7 @@ import {
   Filler
 } from 'chart.js'
 import { useKpiStore } from '@/stores/kpi'
+import { themeHex, themeRgba } from '@/helpers/themeColors'
 import LoaderComponent from '@/components/LoaderComponent.vue'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
@@ -247,14 +248,17 @@ const StatCard = defineComponent({
 })
 
 // ---- Couleurs ----
-const PRIMARY = 'rgb(30, 59, 161)'
-const PRIMARY_LIGHT = 'rgba(30, 59, 161, 0.15)'
+// Couleurs lues dans base.css (canvas Chart.js : valeurs concrètes, pas de var(--…)).
+const PRIMARY = themeRgba('--primary', 1)
+const PRIMARY_LIGHT = themeRgba('--primary', 0.15)
+const CHART_TICK = themeHex('--gray-400')
+const CHART_GRID = themeHex('--gray-100')
 const LEITNER_COLORS = [
-  'rgba(239,68,68,0.85)',   // B1 rouge
-  'rgba(249,115,22,0.85)',  // B2 orange
-  'rgba(234,179,8,0.85)',   // B3 jaune
-  'rgba(59,130,246,0.85)',  // B4 bleu
-  'rgba(34,197,94,0.85)'   // B5 vert
+  themeRgba('--red-500', 0.85),    // B1 rouge
+  themeRgba('--orange-500', 0.85), // B2 orange
+  themeRgba('--yellow-500', 0.85), // B3 jaune
+  themeRgba('--blue-500', 0.85),   // B4 bleu
+  themeRgba('--green-500', 0.85)   // B5 vert
 ]
 
 // ---- Données des graphiques ----
@@ -316,8 +320,8 @@ const barOptions = {
     }
   },
   scales: {
-    y: { beginAtZero: true, ticks: { stepSize: 1, color: '#9ca3af' }, grid: { color: '#f3f4f6' } },
-    x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
+    y: { beginAtZero: true, ticks: { stepSize: 1, color: CHART_TICK }, grid: { color: CHART_GRID } },
+    x: { ticks: { color: CHART_TICK }, grid: { display: false } }
   }
 }
 
@@ -336,12 +340,12 @@ const lineOptions = {
     y: {
       beginAtZero: true,
       max: 100,
-      ticks: { callback: (v) => v + ' %', color: '#9ca3af' },
-      grid: { color: '#f3f4f6' }
+      ticks: { callback: (v) => v + ' %', color: CHART_TICK },
+      grid: { color: CHART_GRID }
     },
     x: {
       ticks: {
-        color: '#9ca3af',
+        color: CHART_TICK,
         maxTicksLimit: 5,
         callback: function(val) {
           const label = this.getLabelForValue(val)
@@ -365,8 +369,8 @@ const leitnerBarOptions = {
     }
   },
   scales: {
-    y: { beginAtZero: true, ticks: { stepSize: 1, color: '#9ca3af' }, grid: { color: '#f3f4f6' } },
-    x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
+    y: { beginAtZero: true, ticks: { stepSize: 1, color: CHART_TICK }, grid: { color: CHART_GRID } },
+    x: { ticks: { color: CHART_TICK }, grid: { display: false } }
   }
 }
 

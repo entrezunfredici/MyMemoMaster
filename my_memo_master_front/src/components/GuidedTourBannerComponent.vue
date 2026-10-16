@@ -160,12 +160,12 @@ const handleQuit = () => {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  background: #ffffff;
-  border: 2px solid #6366f1;
+  background: rgb(var(--white));
+  border: 2px solid var(--indigo-500);
   border-radius: 12px;
   padding: 12px 16px;
   margin: 0 16px 16px 0;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 4px 12px rgb(var(--indigo-500-rgb) / 0.15);
 }
 
 .tour-banner__info {
@@ -182,15 +182,15 @@ const handleQuit = () => {
 
 .tour-banner__title {
   font-weight: 700;
-  color: #4338ca;
+  color: var(--indigo-700);
   font-size: 14px;
 }
 
 .tour-banner__counter {
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
-  background: #eef2ff;
+  color: var(--gray-600);
+  background: var(--indigo-50);
   border-radius: 9999px;
   padding: 2px 8px;
 }
@@ -204,27 +204,27 @@ const handleQuit = () => {
   width: 8px;
   height: 8px;
   border-radius: 9999px;
-  background: #e5e7eb;
+  background: var(--gray-200);
 }
 
 .tour-banner__dot--done {
-  background: #22c55e;
+  background: var(--green-500);
 }
 
 .tour-banner__dot--current {
-  background: #6366f1;
+  background: var(--indigo-500);
 }
 
 .tour-banner__label {
   font-weight: 600;
-  color: #1f2937;
+  color: var(--gray-800);
   font-size: 15px;
   margin-top: 2px;
 }
 
 .tour-banner__hint {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--gray-500);
   margin-top: 1px;
 }
 
@@ -246,13 +246,13 @@ const handleQuit = () => {
 }
 
 .tour-banner__btn--primary {
-  background: #6366f1;
-  color: #ffffff;
-  border: 1px solid #4f46e5;
+  background: var(--indigo-600);
+  color: rgb(var(--white));
+  border: 1px solid var(--indigo-700);
 }
 
 .tour-banner__btn--primary:hover:not(:disabled) {
-  background: #4f46e5;
+  background: var(--indigo-700);
 }
 
 .tour-banner__btn--primary:disabled {
@@ -261,13 +261,13 @@ const handleQuit = () => {
 }
 
 .tour-banner__btn--secondary {
-  background: #ffffff;
-  color: #4338ca;
-  border: 1px solid #c7d2fe;
+  background: rgb(var(--white));
+  color: var(--indigo-700);
+  border: 1px solid var(--indigo-200);
 }
 
 .tour-banner__btn--secondary:hover {
-  background: #eef2ff;
+  background: var(--indigo-50);
 }
 
 .tour-banner__recap {
@@ -275,7 +275,7 @@ const handleQuit = () => {
   margin: 6px 0 0;
   padding: 0;
   font-size: 14px;
-  color: #1f2937;
+  color: var(--gray-800);
   display: grid;
   gap: 2px;
 }
@@ -283,7 +283,7 @@ const handleQuit = () => {
 .tour-banner__close {
   background: none;
   border: none;
-  color: #9ca3af;
+  color: var(--gray-500);
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
@@ -291,6 +291,6 @@ const handleQuit = () => {
 }
 
 .tour-banner__close:hover {
-  color: #4b5563;
+  color: var(--gray-600);
 }
 </style>

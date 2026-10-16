@@ -36,6 +36,23 @@ describe('AnswerQualityService', () => {
       const warnings = AnswerQualityService.assess('?', ['42'])
       expect(warnings.some((w) => w.includes('mot-clé distinctif'))).toBe(false)
     })
+
+    it('assess - formule isolée balisée sans mot commun avec l\'énoncé - aucun avertissement de mot-clé', () => {
+      const warnings = AnswerQualityService.assess(
+        'Quel est le bilan d\'entropie du second principe ?',
+        ['$\\Delta S = S_{ech} + S_{cr}$']
+      )
+      expect(warnings.some((w) => w.includes('mot-clé distinctif'))).toBe(false)
+    })
+
+    it('assess - formule isolée en texte brut - signale la formule non balisée mais pas l\'absence de mot-clé', () => {
+      const warnings = AnswerQualityService.assess(
+        'Quel est le bilan d\'entropie du second principe ?',
+        ['ΔS = Sech + Scréée']
+      )
+      expect(warnings.some((w) => w.includes('mot-clé distinctif'))).toBe(false)
+      expect(warnings.some((w) => w.includes('formule non balisée'))).toBe(true)
+    })
   })
 
   describe('assess - réponse courte (hors formule)', () => {

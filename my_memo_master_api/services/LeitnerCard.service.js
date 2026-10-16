@@ -98,7 +98,7 @@ class LeitnerCardService {
    * Met à jour les données d'une carte.
    *
    * @param {number} id - ID de la carte
-   * @param {object} data - Nouvelles données
+   * @param {object} data - Nouvelles données (idQuestion, mindMapNodeId optionnel : chaîne ou null pour retirer le lien)
    * @param {{ canEdit: boolean }} userRights - Droits de l'utilisateur
    * @returns {Promise<LeitnerCard|null>}
    */
@@ -106,7 +106,11 @@ class LeitnerCardService {
     const card = await LeitnerCard.findByPk(id)
     if (!card || !userRights.canEdit) return null
     const { idQuestion } = data
-    await card.update({ idQuestion })
+    const changes = { idQuestion }
+    // CHOIX: le lien au nœud de carte mentale n'est modifié que si la clé est fournie (null = retirer)
+    // RAISON: un PUT existant sans mindMapNodeId ne doit pas effacer le lien déjà posé.
+    if (Object.prototype.hasOwnProperty.call(data, 'mindMapNodeId')) changes.mindMapNodeId = data.mindMapNodeId
+    await card.update(changes)
     return card
   }
 
@@ -263,7 +267,7 @@ class LeitnerCardService {
    */
   async getCardsBySystemId(systemId) {
     return await LeitnerCard.findAll({
-      attributes: ['idCard', 'idBox', 'idQuestion'],
+      attributes: ['idCard', 'idBox', 'idQuestion', 'mindMapNodeId'],
       include: [
         {
           model: LeitnerBox,

@@ -35,11 +35,11 @@
 .subject-inline-input {
   flex: 1;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #D1D5DB;
+  border: 1px solid var(--gray-300);
   border-radius: 0.5rem;
   font-size: 0.875rem;
   outline: none;
-  background: white;
+  background: rgb(var(--white));
 }
 .subject-inline-input:focus {
   border-color: rgb(var(--primary));
@@ -49,7 +49,7 @@
 /* Bouton confirmer la création */
 .subject-inline-btn {
   background-color: rgb(var(--primary));
-  color: white;
+  color: rgb(var(--white));
   font-size: 0.875rem;
   font-weight: 700;
   padding: 0.5rem 1rem;
@@ -65,10 +65,10 @@
 /* Bouton annuler */
 .subject-inline-cancel {
   font-size: 0.875rem;
-  color: #6B7280;
+  color: var(--gray-500);
   background: none;
   border: none;
   cursor: pointer;
   padding: 0 0.5rem;
 }
-.subject-inline-cancel:hover { color: #374151; }
+.subject-inline-cancel:hover { color: var(--gray-700); }

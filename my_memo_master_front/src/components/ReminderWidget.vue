@@ -183,7 +183,7 @@ onMounted(() => {
 
 .reminder-empty {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--slate-500);
   margin: 0;
 }
 
@@ -194,8 +194,8 @@ onMounted(() => {
   gap: 8px;
   padding: 7px 10px;
   border-radius: 8px;
-  background: #f8fafc;
-  border: 0.5px solid #e2e8f0;
+  background: var(--slate-50);
+  border: 0.5px solid var(--slate-200);
 }
 
 .reminder-item--sent {
@@ -203,8 +203,8 @@ onMounted(() => {
 }
 
 .reminder-item--failed {
-  border-color: #fca5a5;
-  background: #fff5f5;
+  border-color: var(--red-300);
+  background: var(--danger-surface);
 }
 
 .reminder-item__info {
@@ -218,13 +218,13 @@ onMounted(() => {
 .reminder-item__delay {
   font-size: 12px;
   font-weight: 600;
-  color: #1a1aff;
+  color: rgb(var(--accent));
   white-space: nowrap;
 }
 
 .reminder-item__msg {
   font-size: 12px;
-  color: #475569;
+  color: var(--slate-600);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -232,13 +232,13 @@ onMounted(() => {
 
 .reminder-item__status {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--slate-500);
   white-space: nowrap;
 }
 
 .reminder-item__del {
   flex-shrink: 0;
-  color: #cbd5e1;
+  color: var(--slate-500);
   background: none;
   border: none;
   cursor: pointer;
@@ -250,7 +250,7 @@ onMounted(() => {
 }
 
 .reminder-item__del:hover {
-  color: #ef4444;
+  color: var(--red-700);
 }
 
 /* ── Formulaire ── */
@@ -259,7 +259,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
   padding-top: 10px;
-  border-top: 0.5px solid #f1f5f9;
+  border-top: 0.5px solid var(--slate-100);
 }
 
 .reminder-form__row {
@@ -271,7 +271,7 @@ onMounted(() => {
 .reminder-form__label {
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--slate-500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -280,7 +280,7 @@ onMounted(() => {
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: #94a3b8;
+  color: var(--slate-500);
 }
 
 .reminder-presets {
@@ -293,23 +293,23 @@ onMounted(() => {
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 500;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 6px;
-  background: #ffffff;
-  color: #64748b;
+  background: rgb(var(--white));
+  color: var(--slate-500);
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .preset-btn:hover {
-  border-color: #1a1aff;
-  color: #1a1aff;
+  border-color: rgb(var(--accent));
+  color: rgb(var(--accent));
 }
 
 .preset-btn.active {
-  background: #1a1aff;
-  color: #ffffff;
-  border-color: #1a1aff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
+  border-color: rgb(var(--accent));
 }
 
 .custom-delay {
@@ -322,12 +322,12 @@ onMounted(() => {
   width: 100%;
   padding: 7px 10px;
   font-size: 13px;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 8px;
   outline: none;
   transition: border-color 0.15s;
-  color: #0f172a;
-  background: #ffffff;
+  color: var(--slate-900);
+  background: rgb(var(--white));
   box-sizing: border-box;
 }
 
@@ -336,17 +336,17 @@ onMounted(() => {
 }
 
 .reminder-input:focus {
-  border-color: #1a1aff;
+  border-color: rgb(var(--accent));
 }
 
 .reminder-select {
   padding: 7px 8px;
   font-size: 13px;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 8px;
   outline: none;
-  color: #0f172a;
-  background: #ffffff;
+  color: var(--slate-900);
+  background: rgb(var(--white));
   cursor: pointer;
 }
 
@@ -354,8 +354,8 @@ onMounted(() => {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
-  background: #1a1aff;
-  color: #ffffff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
   border: none;
   border-radius: 8px;
   cursor: pointer;

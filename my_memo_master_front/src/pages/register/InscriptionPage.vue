@@ -66,7 +66,7 @@
         <button
           type="submit"
           :disabled="submitting || !canSubmit"
-          class="w-[116px] bg-[#1E3BA1] text-white hover:bg-[#162c7a] focus:outline-none py-2 px-4 rounded valider disabled:opacity-60 disabled:cursor-not-allowed"
+          class="w-[116px] bg-primary text-white hover:bg-primary-dark focus:outline-none py-2 px-4 rounded valider disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {{ submitting ? 'Création...' : 'Valider' }}
         </button>

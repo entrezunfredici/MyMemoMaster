@@ -165,6 +165,24 @@ describe('LeitnerCardService', () => {
     expect(result).toEqual(mockCard)
   })
 
+  test('updateCard - mindMapNodeId fourni - modifie le lien au nœud', async () => {
+    const mockCard = { idCard: 1, update: jest.fn().mockResolvedValue(true) }
+    LeitnerCard.findByPk.mockResolvedValue(mockCard)
+
+    await LeitnerCardService.updateCard(1, { idQuestion: 42, mindMapNodeId: 'node-7' }, { canEdit: true })
+
+    expect(mockCard.update).toHaveBeenCalledWith({ idQuestion: 42, mindMapNodeId: 'node-7' })
+  })
+
+  test('updateCard - mindMapNodeId null - retire le lien au nœud', async () => {
+    const mockCard = { idCard: 1, update: jest.fn().mockResolvedValue(true) }
+    LeitnerCard.findByPk.mockResolvedValue(mockCard)
+
+    await LeitnerCardService.updateCard(1, { idQuestion: 42, mindMapNodeId: null }, { canEdit: true })
+
+    expect(mockCard.update).toHaveBeenCalledWith({ idQuestion: 42, mindMapNodeId: null })
+  })
+
   test('updateCard - droits insuffisants - retourne null sans modifier', async () => {
     const mockCard = { idCard: 1, idQuestion: 10, update: jest.fn() }
     LeitnerCard.findByPk.mockResolvedValue(mockCard)

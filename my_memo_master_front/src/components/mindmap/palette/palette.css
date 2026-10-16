@@ -1,0 +1,448 @@
+/* Styles de la palette d'options des cartes mentales (MindMapPalette.vue et ses sections).
+   Feuille globale, mais chaque sélecteur est préfixé par `.palette` : même spécificité que
+   l'ancien <style scoped>, et utilisable par les sous-composants rendus dans `.palette`.
+   Les couleurs viennent de base.css (var(--…)). La modale de l'interpréteur, teleportée dans
+   <body>, garde son style dans MindMapPalette.vue. */
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgb(var(--white));
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--slate-200);
+  box-shadow: 0 8px 24px rgb(var(--slate-900-rgb) / 0.07);
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--slate-200) transparent;
+}
+
+.palette .palette__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.palette .palette__section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.palette .palette__section--selected {
+  background: var(--slate-50);
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid var(--slate-200);
+}
+
+.palette .palette__section--empty {
+  border-bottom: none;
+}
+
+.palette .palette__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--slate-500);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.palette .palette__node-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue-900);
+  background: var(--blue-100);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette .palette__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--slate-500);
+}
+
+.palette .palette__hint {
+  font-size: 11px;
+  color: var(--slate-500);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.palette .palette__hint kbd {
+  font-family: monospace;
+  background: var(--slate-100);
+  border: 1px solid var(--slate-300);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 11px;
+  color: var(--slate-900);
+}
+
+.palette .palette__hint--info {
+  color: var(--blue-600);
+  background: var(--blue-50);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--blue-200);
+}
+
+.palette /* Mode buttons */
+.palette__mode-row {
+  display: flex;
+  gap: 8px;
+}
+
+.palette .palette__mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 1.5px solid var(--slate-200);
+  background: var(--slate-50);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-600);
+  transition: all 0.15s ease;
+}
+
+.palette .palette__mode-btn:hover {
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+}
+
+.palette .palette__mode-btn--active {
+  background: var(--slate-900);
+  border-color: var(--slate-900);
+  color: var(--slate-100);
+}
+
+.palette /* Fields */
+.palette__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.palette .palette__field--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.palette .palette__select--inline {
+  width: auto;
+  min-width: 100px;
+}
+
+.palette .palette__input,
+.palette .palette__select {
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  font-size: 13px;
+  color: var(--slate-900);
+  background: rgb(var(--white));
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.palette .palette__textarea {
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  font-size: 12px;
+  color: var(--slate-900);
+  background: rgb(var(--white));
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: 'Fira Code', monospace;
+}
+
+.palette .palette__input:focus,
+.palette .palette__select:focus,
+.palette .palette__textarea:focus {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgb(var(--blue-500-rgb) / 0.12);
+}
+
+.palette .palette__number {
+  width: 68px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  font-size: 13px;
+  text-align: center;
+  background: rgb(var(--white));
+}
+
+.palette .palette__color {
+  width: 34px;
+  height: 26px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 7px;
+  cursor: pointer;
+  padding: 2px;
+  background: transparent;
+}
+
+.palette /* Shape */
+.palette__shape-row {
+  display: flex;
+  gap: 6px;
+}
+
+.palette .palette__shape-btn,
+.palette .palette__kind-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1.5px solid var(--slate-200);
+  background: var(--slate-50);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--slate-600);
+  transition: all 0.15s ease;
+}
+
+.palette .palette__shape-btn:hover,
+.palette .palette__kind-btn:hover {
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+}
+
+.palette .palette__shape-btn--active,
+.palette .palette__kind-btn--active {
+  background: var(--blue-900);
+  border-color: var(--blue-900);
+  color: rgb(var(--white));
+}
+
+.palette /* Toolbar text style */
+.palette__toolbar {
+  display: flex;
+  gap: 6px;
+}
+
+.palette .palette__toolbar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1.5px solid var(--slate-200);
+  background: var(--slate-50);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--slate-600);
+  transition: all 0.15s ease;
+}
+
+.palette .palette__toolbar-btn:hover {
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+}
+
+.palette .palette__toolbar-btn.active {
+  background: var(--blue-700);
+  border-color: var(--blue-700);
+  color: rgb(var(--white));
+}
+
+.palette /* Buttons */
+.palette__actions-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.palette .palette__btn {
+  flex: 1;
+  padding: 7px 8px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--blue-700);
+  color: rgb(var(--white));
+  transition: background 0.15s ease;
+}
+
+.palette .palette__btn:hover { background: var(--blue-800); }
+
+.palette .palette__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.palette .palette__btn--ghost {
+  background: var(--slate-100);
+  color: var(--slate-600);
+  border: 1px solid var(--slate-200);
+}
+
+.palette .palette__btn--ghost:hover { background: var(--slate-200); }
+
+.palette .palette__btn--danger {
+  background: rgb(var(--danger));
+  color: rgb(var(--white));
+}
+
+.palette .palette__btn--danger:hover { background: var(--red-700); }
+
+.palette .palette__node-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.palette /* Formula */
+.palette__formula-preview {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  background: rgb(var(--white));
+  max-height: 140px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.palette /* Image */
+.palette__error {
+  font-size: 11px;
+  color: var(--red-700);
+  margin: 4px 0 0;
+}
+
+.palette .palette__file-hidden { display: none; }
+
+.palette .palette__image-preview {
+  margin-top: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--slate-200);
+}
+
+.palette .palette__image-preview img {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+
+.palette /* Zones */
+.palette__zone-assign {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.palette .palette__zone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.palette .palette__zone-chip {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--slate-200);
+  background: var(--slate-50);
+  color: var(--slate-600);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.palette .palette__zone-chip:hover {
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+}
+
+.palette .palette__zone-chip.active {
+  background: var(--blue-900);
+  border-color: var(--blue-900);
+  color: rgb(var(--white));
+}
+
+.palette /* Flashcard liée */
+.palette__card-linked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--green-50);
+  border: 1px solid var(--green-300);
+}
+
+.palette .palette__card-dot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(var(--black) / 0.12);
+}
+
+.palette .palette__card-statement {
+  flex: 1;
+  font-size: 12px;
+  color: var(--green-800);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette .palette__card-unlink {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--green-800);
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.palette .palette__card-unlink:hover { opacity: 1; }
+
+.palette .palette__btn--sm {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.palette .palette__card-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+}

@@ -1,0 +1,127 @@
+name: A11y Live
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  Audit d'accessibilité (RGAA) du site DÉPLOYÉ
+#
+#  La CI audite la version buildée avec une API simulée (jeux de données vides ou
+#  fixes). Ce workflow contrôle ce qui est réellement en ligne, avec la vraie API et
+#  la vraie configuration serveur : il détecte une violation introduite par un contenu
+#  dynamique, un déploiement partiel ou un changement d'infrastructure.
+#
+#  Déclenchement :
+#    - à la fin de chaque CD réussi (main / staging / dev) ;
+#    - chaque lundi à 06:00 UTC (dérive hors déploiement : contenu, dépendances) ;
+#    - à la demande (workflow_dispatch).
+#
+#  Configuration (même principe que uptime.yml) :
+#    - Variable de dépôt A11Y_BASE_URLS (Settings → Secrets and variables →
+#      Actions → Variables) : URLs du FRONT séparées par des espaces, ex :
+#        https://app.example.com https://test.example.com
+#      Si absente, le job sort en succès sans rien auditer (environnements éteints).
+#    - Secret DISCORD_LOG : webhook déjà utilisé par notify_ci.yml, cd.yml et uptime.yml.
+#
+#  Périmètre : pages PUBLIQUES (aucune session) — contrast.spec.js (contraste RGAA 3.2)
+#  et live-public.spec.js (WCAG 2.1 A/AA, toutes règles axe-core). Les pages privées sont
+#  auditées par la CI (session simulée) ; auditer l'application connectée en production
+#  exigerait un compte de test dédié.
+#
+#  Limites connues :
+#    - Le cron GitHub Actions ne s'exécute que sur la branche par défaut (main).
+#    - Un échec sur un site fraîchement déployé peut venir d'un cache CDN pas encore
+#      purgé : relancer avant de conclure à une régression.
+# ═════════════════════════════════════════════════════════════════════════════
+
+on:
+  workflow_run:
+    workflows:
+      - CD
+    types:
+      - completed
+    branches:
+      - main
+      - staging
+      - dev
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit RGAA du site déployé
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Vérifier la configuration
+        id: config
+        env:
+          A11Y_BASE_URLS: ${{ vars.A11Y_BASE_URLS }}
+        run: |
+          if [ -z "$A11Y_BASE_URLS" ]; then
+            echo "A11Y_BASE_URLS non définie — aucun site à auditer, sortie en succès."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout Code
+        if: steps.config.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Node.js
+        if: steps.config.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: my_memo_master_front/package-lock.json
+
+      - name: Install Dependencies
+        if: steps.config.outputs.enabled == 'true'
+        working-directory: my_memo_master_front
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        if: steps.config.outputs.enabled == 'true'
+        working-directory: my_memo_master_front
+        run: npx playwright install --with-deps chromium
+
+      - name: Audit des sites déployés
+        if: steps.config.outputs.enabled == 'true'
+        working-directory: my_memo_master_front
+        env:
+          A11Y_BASE_URLS: ${{ vars.A11Y_BASE_URLS }}
+          DISCORD_LOG: ${{ secrets.DISCORD_LOG }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          FAILED=""
+          for url in $A11Y_BASE_URLS; do
+            echo "::group::Audit RGAA — $url"
+            if A11Y_BASE_URL="$url" npx playwright test --reporter=line; then
+              echo "OK : $url"
+            else
+              echo "ÉCHEC : $url"
+              FAILED="$FAILED\n- \`$url\`"
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ -n "$FAILED" ]; then
+            curl -s -X POST -H "Content-Type: application/json" \
+              -d "{\"content\": \"♿ **Audit RGAA du site déployé** — non-conformité(s) détectée(s) :${FAILED}\n$RUN_URL\"}" \
+              "$DISCORD_LOG" || true
+            exit 1
+          fi
+
+      - name: Upload Accessibility Audit Traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-live-test-results
+          path: my_memo_master_front/test-results
+          if-no-files-found: ignore
+          retention-days: 7

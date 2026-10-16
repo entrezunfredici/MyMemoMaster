@@ -1,10 +1,8 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { api } from '@/helpers/api'
-import { useToast } from 'vue-toastification'
+import { onMounted, onBeforeUnmount } from 'vue'
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
-import { useGuidedTourStore } from '@/stores/guidedTour'
 import { useMindMapViewSessionStore } from '@/stores/mindmapViewSessions'
+import { useMindmapPersistence } from '@/composables/useMindmapPersistence'
 import MindMapBuilder from '@/components/mindmap/MindMapBuilder.vue'
 
 const props = defineProps({
@@ -14,9 +12,7 @@ const props = defineProps({
   subjects: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['back'])
-const toast = useToast()
 const mindmapStore = useMindMapBuilderStore()
-const guidedTourStore = useGuidedTourStore()
 const mindMapViewSessionStore = useMindMapViewSessionStore()
 
 // ── Chronométrage de la consultation ───────────────────────────────────────────
@@ -92,204 +88,27 @@ const handleVisibilityChange = () => {
   }
 }
 
-// ── État interne ──────────────────────────────────────────────────────────────
-const currentDiagramId = ref(props.diagramId)
-const currentDiagramMeta = ref(props.diagramMeta ? { ...props.diagramMeta } : null)
-const isSaving = ref(false)
-const isExporting = ref(false)
-const saveHasFailed = ref(false)
-const showExportModal = ref(false)
-const exportName = ref(props.diagramMeta?.mmName || '')
-const pendingPayload = ref(null)
-const pendingCreate = ref(false)
-
-// ── Auto-save ─────────────────────────────────────────────────────────────────
-const AUTO_SAVE_DELAY = 1500
-const AUTO_SAVE_RETRY_DELAY = 5000
-const AUTO_SAVE_MAX_RETRY = 3
-let autoSaveTimer = null
-let autoSaveRetryCount = 0
-
-const clearAutoSaveTimer = () => {
-  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null }
-}
-
-const scheduleAutoSave = () => {
-  clearAutoSaveTimer()
-  autoSaveRetryCount = 0
-  saveHasFailed.value = false
-  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY)
-}
-
-// Parcours guidé : l'étape « carte mentale » exige un minimum de nœuds autour du nœud central
-const recordTourProgress = (payload) => {
-  const nodeCount = Object.keys(payload?.nodes || {}).length
-  guidedTourStore.recordLinks({ mindMapChildNodes: Math.max(0, nodeCount - 1) })
-}
-
-const ensureMeta = (payload) => ({
-  subjectId: Number(currentDiagramMeta.value?.subjectId || 1),
-  mmName: exportName.value || payload.title || 'Carte mentale',
-})
-
-const performAutoSave = async () => {
-  autoSaveTimer = null
-  if (!mindmapStore.isDirty) return
-  if (isSaving.value || isExporting.value || showExportModal.value) {
-    scheduleAutoSave()
-    return
-  }
-
-  const payload = mindmapStore.exportPayload()
-  if (!payload) return
-  const saveVersion = payload?.updatedAt
-  exportName.value = payload.title || exportName.value || 'Carte mentale'
-  const meta = ensureMeta(payload)
-  const body = { mmName: meta.mmName, mindMapJson: payload, subjectId: meta.subjectId }
-
-  try {
-    isSaving.value = true
-    if (currentDiagramId.value) {
-      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
-      if (response) {
-        recordTourProgress(payload)
-        currentDiagramMeta.value = { ...(currentDiagramMeta.value || {}), ...body, idMindMap: currentDiagramId.value }
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
-        pendingPayload.value = null
-        pendingCreate.value = false
-        autoSaveRetryCount = 0
-        saveHasFailed.value = false
-      }
-    } else {
-      const response = await api.post('diagrammes', body)
-      const newId = response?.data?.id || response?.data?.idMindMap
-      if (newId) {
-        currentDiagramId.value = newId
-        currentDiagramMeta.value = { ...body, idMindMap: newId }
-        guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
-        recordTourProgress(payload)
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
-        pendingPayload.value = null
-        pendingCreate.value = false
-        autoSaveRetryCount = 0
-        saveHasFailed.value = false
-      }
-    }
-  } catch {
-    autoSaveRetryCount++
-    saveHasFailed.value = true
-    if (autoSaveRetryCount === 1) toast.warning('Sauvegarde impossible, nouvelle tentative dans 5 s…')
-    if (autoSaveRetryCount <= AUTO_SAVE_MAX_RETRY) {
-      autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_RETRY_DELAY)
-    } else {
-      autoSaveRetryCount = 0
-      toast.error('Sauvegarde automatique échouée. Vérifiez votre connexion.')
-    }
-  } finally {
-    isSaving.value = false
-  }
-}
-
-// ── Sauvegarde manuelle ───────────────────────────────────────────────────────
-const handleSave = async (payload) => {
-  const saveVersion = payload?.updatedAt
-  exportName.value = payload.title || exportName.value || 'Carte mentale'
-  if (!currentDiagramId.value) {
-    pendingCreate.value = true
-    pendingPayload.value = payload
-    showExportModal.value = true
-    return
-  }
-  try {
-    isSaving.value = true
-    const meta = ensureMeta(payload)
-    const response = await api.put(`/diagrammes/${currentDiagramId.value}`, {
-      mmName: meta.mmName,
-      mindMapJson: payload,
-      subjectId: meta.subjectId,
-    })
-    if (response) {
-      toast.success('Carte sauvegardée.')
-      if (currentDiagramMeta.value) {
-        currentDiagramMeta.value.mmName = meta.mmName
-        currentDiagramMeta.value.mindMapJson = payload
-      }
-      if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
-    }
-  } catch {
-    toast.error('Erreur lors de la sauvegarde.')
-  } finally {
-    isSaving.value = false
-  }
-}
-
-const handleExport = (payload) => {
-  exportName.value = payload.title || exportName.value || 'Carte mentale'
-  pendingCreate.value = !currentDiagramId.value
-  pendingPayload.value = payload
-  showExportModal.value = true
-}
+// ── Enregistrement de la carte (auto-sauvegarde, sauvegarde manuelle, modale) ──────
+const {
+  currentDiagramId,
+  currentDiagramMeta,
+  isSaving,
+  isExporting,
+  saveHasFailed,
+  showExportModal,
+  exportName,
+  handleSave,
+  handleExport,
+  confirmExportModal,
+  startNewMap,
+} = useMindmapPersistence(props)
 
 const handleNewMap = (payload) => {
   // La consultation de la carte ouverte à l'origine (le cas échéant) s'arrête ici :
   // le temps passé ensuite sert à créer une carte neuve, pas à consulter viewedMindMapId.
   stopTracking()
-  currentDiagramId.value = null
-  currentDiagramMeta.value = { mmName: payload.title, subjectId: currentDiagramMeta.value?.subjectId || 1 }
-  exportName.value = payload.title
-  toast.success('Nouvelle carte mentale.')
+  startNewMap(payload)
 }
-
-const confirmExportModal = async () => {
-  if (!pendingPayload.value) return
-  const saveVersion = pendingPayload.value?.updatedAt
-  try {
-    isExporting.value = true
-    const meta = ensureMeta(pendingPayload.value)
-    const body = { mmName: meta.mmName, mindMapJson: pendingPayload.value, subjectId: meta.subjectId }
-    if (!pendingCreate.value && currentDiagramId.value) {
-      const response = await api.put(`/diagrammes/${currentDiagramId.value}`, body)
-      if (response) {
-        recordTourProgress(pendingPayload.value)
-        toast.success('Carte mise à jour.')
-        if (currentDiagramMeta.value) {
-          currentDiagramMeta.value.mmName = meta.mmName
-          currentDiagramMeta.value.mindMapJson = pendingPayload.value
-        }
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
-      }
-    } else {
-      const response = await api.post('diagrammes', body)
-      const newId = response?.data?.id || response?.data?.idMindMap
-      if (newId) {
-        currentDiagramId.value = newId
-        currentDiagramMeta.value = { ...body, idMindMap: newId }
-        guidedTourStore.recordLinks({ mindMapId: newId, subjectId: meta.subjectId })
-        recordTourProgress(pendingPayload.value)
-        toast.success('Carte créée.')
-        if (saveVersion && mindmapStore.map.updatedAt === saveVersion) mindmapStore.markSaved()
-      }
-    }
-  } catch {
-    toast.error('Erreur lors de la sauvegarde.')
-  } finally {
-    isExporting.value = false
-    showExportModal.value = false
-    pendingPayload.value = null
-    pendingCreate.value = false
-  }
-}
-
-// ── Watchers ──────────────────────────────────────────────────────────────────
-watch(
-  () => mindmapStore.map.updatedAt,
-  () => { if (mindmapStore.isDirty) scheduleAutoSave() }
-)
-
-watch(
-  () => showExportModal.value,
-  (isOpen) => { if (!isOpen && mindmapStore.isDirty) scheduleAutoSave() }
-)
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 const handleBeforeUnload = (event) => {
@@ -314,21 +133,12 @@ onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
   window.addEventListener('pagehide', handlePageHide)
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  // CHOIX: déclencher la sauvegarde automatique dès l'ouverture d'une carte
-  // fraîchement créée (pas d'id existant), plutôt que d'attendre une
-  // première modification ou un clic manuel sur "Sauvegarder".
-  // RAISON: le nom saisi dans la modale de création doit être persisté
-  // immédiatement, sans action supplémentaire de l'utilisateur.
-  if (!currentDiagramId.value) {
-    mindmapStore.touch()
-  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
   window.removeEventListener('pagehide', handlePageHide)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  clearAutoSaveTimer()
   stopTracking()
 })
 </script>
@@ -350,6 +160,7 @@ onBeforeUnmount(() => {
     <div class="editor-canvas">
       <MindMapBuilder
         :map-payload="props.mapPayload"
+        :id-mind-map="currentDiagramId"
         :loading="isSaving || isExporting"
         @save="handleSave"
         @export="handleExport"
@@ -397,7 +208,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #f1f5f9;
+  background: var(--slate-100);
 }
 
 .editor-topbar {
@@ -405,33 +216,33 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 16px;
   padding: 12px 20px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  background: rgb(var(--white));
+  border-bottom: 1px solid var(--slate-200);
+  box-shadow: 0 2px 8px rgb(var(--slate-900-rgb) / 0.06);
   flex-shrink: 0;
 }
 
 .editor-back-btn {
   background: none;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--slate-300);
   border-radius: 8px;
   padding: 6px 14px;
   font-size: 14px;
   font-weight: 600;
-  color: #475569;
+  color: var(--slate-600);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
 }
 .editor-back-btn:hover {
-  background: #f1f5f9;
-  color: #1e293b;
+  background: var(--slate-100);
+  color: var(--slate-800);
 }
 
 .editor-map-name {
   font-size: 16px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--gray-800);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -440,11 +251,11 @@ onBeforeUnmount(() => {
 
 .editor-save-status {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--slate-500);
   white-space: nowrap;
 }
-.editor-save-status--saved { color: #22c55e; }
-.editor-save-status--error { color: #ef4444; font-weight: 600; }
+.editor-save-status--saved { color: var(--green-800); }
+.editor-save-status--error { color: var(--red-700); font-weight: 600; }
 
 .editor-canvas {
   flex: 1;

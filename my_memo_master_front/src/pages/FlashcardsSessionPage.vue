@@ -89,16 +89,17 @@
                le texte ✅/❌ double l'information portée par la couleur (RGAA 3.x) -->
           <div aria-live="polite">
             <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="cardStore.lastCorrection?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-              <p class="font-bold mb-1">{{ cardStore.lastCorrection?.success ? '✅ Excellent !' : '❌ À revoir' }}</p>
+              <p class="font-bold mb-1">{{ feedbackTitle }}</p>
               <!-- Score IA uniquement pour les questions ouvertes -->
               <p v-if="currentCard.question?.type !== 'mcq'" class="text-sm">
                 Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%
+                <span class="opacity-80">(réussite à partir de {{ PASS_THRESHOLD_PERCENT }}%)</span>
               </p>
               <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
                 Réponse attendue : <FormulaText :text="cardStore.lastCorrection?.correction || ''" />
               </p>
               <p v-if="cardStore.lastCorrection?.explanation" class="text-sm mt-1 opacity-80">
-                {{ cardStore.lastCorrection?.explanation }}
+                <FormulaText :text="cardStore.lastCorrection?.explanation" />
               </p>
               <p
                 v-if="cardStore.lastCorrection?.degraded"
@@ -125,7 +126,11 @@
 
         <div v-else class="text-center py-10">
           <h3 class="text-2xl font-bold text-primary mb-4">Session terminée !</h3>
-          <p class="mb-6">Vous avez révisé {{ cardStore.dueCards.length }} cartes.</p>
+          <p class="mb-2">Vous avez révisé {{ cardStore.dueCards.length }} cartes.</p>
+          <p v-if="averageScorePercent !== null" class="mb-6" data-testid="average-score">
+            Score moyen : <strong>{{ averageScorePercent }}%</strong> ·
+            {{ cardStore.dueCards.length - errors.length }} réussie(s), {{ errors.length }} à revoir
+          </p>
           <Button :callback="() => router.push('/flashcards')">Retour aux systèmes</Button>
         </div>
 
@@ -133,7 +138,7 @@
     </section>
 
     <section class="mx-0 md:mx-16 mt-4 md:mt-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-3 md:p-5 bg-light rounded-[7px] flex flex-col h-full">
-      <div v-if="!isFinished && errors.length > 0" class="mb-4">
+      <div v-if="errors.length > 0" class="mb-4">
         <h4 class="text-primary text-lg font-semibold pb-2">Dernières erreurs</h4>
         <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
           <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-primary/10 rounded-lg px-3 py-2 text-sm">
@@ -190,6 +195,25 @@ const showFeedback = ref(false)
 const submitting = ref(false)
 const isFinished = ref(false)
 const errors = ref([])
+// Scores (0-1) des questions ouvertes corrigées — alimente le score moyen de l'écran de fin
+const openScores = ref([])
+
+// CHOIX: seuil recopié du back (MistralGrading.service.js, CORRECT_THRESHOLD = 0.8) pour l'afficher
+// RAISON: l'API ne le renvoie pas ; garder les deux valeurs alignées.
+const PASS_THRESHOLD_PERCENT = 80
+
+const feedbackTitle = computed(() => {
+  const c = cardStore.lastCorrection
+  if (!c?.success) return '❌ À revoir'
+  // Réussite avec un manque signalé (score < 100 %) : ne pas annoncer « Excellent » en contradiction
+  return c.score !== undefined && c.score < 1 && currentCard.value?.question?.type !== 'mcq' ? '✅ Correct' : '✅ Excellent !'
+})
+
+const averageScorePercent = computed(() =>
+  openScores.value.length
+    ? Math.round((openScores.value.reduce((a, b) => a + b, 0) / openScores.value.length) * 100)
+    : null
+)
 
 // Chronométrage du temps réellement passé sur la session (alimente le KPI
 // "Temps total de révision") — démarré une fois les cartes chargées, pas
@@ -244,6 +268,7 @@ const handleValidation = async () => {
   // l'utilisateur quitte avant d'avoir cliqué ce bouton.
   reviewedCount.value++
 
+  if (currentCard.value.question?.type !== 'mcq') openScores.value.push(cardStore.lastCorrection?.score || 0)
   if (!cardStore.lastCorrection?.success) {
     errors.value.push(currentCard.value)
   }

@@ -36,6 +36,10 @@ const PUBLIC_PAGES = [
 for (const { path, label } of PUBLIC_PAGES) {
   test(`${label} (${path}) - contraste - aucune violation color-contrast`, async ({ page }) => {
     await page.goto(path)
+    // Le toast d'erreur n'apparaît qu'APRÈS l'échec de l'appel API : on attend la fin des requêtes
+    // puis un court délai avant de chercher le toast, sinon on le manque (non-déterminisme sous charge).
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(600)
 
     // Le serveur de preview n'a pas d'API : les composants qui appellent
     // l'API au montage font apparaitre un toast d'erreur. Il se ferme seul

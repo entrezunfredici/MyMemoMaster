@@ -28,7 +28,7 @@
       <div
         v-if="open"
         class="absolute right-0 mt-2 w-80 border-2 border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden"
-        style="background-color: #ffffff"
+        style="background-color: rgb(var(--white))"
       >
         <!-- En-tête panneau -->
         <div class="flex items-center justify-between px-4 py-3 bg-primary border-b border-blue-700">
@@ -44,7 +44,7 @@
         </div>
 
         <!-- Liste -->
-        <div class="max-h-80 overflow-y-auto" style="background-color: #ffffff">
+        <div class="max-h-80 overflow-y-auto" style="background-color: rgb(var(--white))">
           <div v-if="loading && reminders.length === 0" class="flex justify-center py-8">
             <ArrowPathIcon class="size-5 animate-spin text-gray-400" />
           </div>

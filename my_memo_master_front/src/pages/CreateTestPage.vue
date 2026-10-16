@@ -54,7 +54,7 @@
           <button
             v-else
             type="button"
-            class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-[#F5F5F5] disabled:opacity-50"
+            class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-[color:var(--neutral-100)] disabled:opacity-50"
             :disabled="questionStore.uploading"
             @click="imageInput.click()"
           >
@@ -72,7 +72,7 @@
           </h4>
           <div class="flex flex-col gap-4">
             <div v-for="(q) in questions" :key="q.idQuestion"
-              class="flex justify-between items-center border-2 bg-[#FFF] border-gray rounded-lg px-4 py-2">
+              class="flex justify-between items-center border-2 bg-[color:rgb(var(--white))] border-gray rounded-lg px-4 py-2">
               <div class="flex items-center gap-2">
                 <img v-if="q.imageUrl" :src="q.imageUrl" :alt="q.imageOriginalName || ''" class="h-10 w-10 object-cover rounded" />
                 <span class="text-lg text-dark"><FormulaText :text="q.statement || ''" /></span>

@@ -8,21 +8,39 @@ import {
   ensureSecondaryColor,
   boxColorToHex,
   boxLevelToMastery,
-} from '@/helpers/mindmap';
+} from '@/helpers/mindmap/mindmap';
+import { createBranchType, getOutgoingLinks, normalizeLink } from '@/helpers/mindmap/mindmapLinks';
+import { createQuantity, normalizeNodeItem, sanitizeExtraKinds } from '@/helpers/mindmap/mindmapItems';
+import { createGraph } from '@/helpers/mindmap/mindmapGraph';
+import { computeAllFormulas, missingVariables } from '@/helpers/mindmap/mindmapCalc';
 import { api } from '@/helpers/api';
+import { mindmapColors } from '@/helpers/themeColors';
 
 const defaultTool = 'select';
+
+// Un nœud graphique a besoin de place pour le repère et les curseurs.
+const GRAPH_NODE_SIZE = { width: 340, height: 300 };
+const ensureGraphNodeSize = (node) => {
+  node.style = {
+    ...node.style,
+    width: Math.max(node.style?.width || 0, GRAPH_NODE_SIZE.width),
+    height: Math.max(node.style?.height || 0, GRAPH_NODE_SIZE.height),
+  };
+};
 
 export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
   state: () => ({
     map: createBlankMindMap(),
     tool: defaultTool,
-    nodeType: 'text', // 'text' | 'formula' | 'image'
+    nodeType: 'text', // un des types de ITEM_KINDS (helpers/mindmapItems.js)
     selectedNodeIds: [],
     selectedLinkId: null,
+    linkType: 'appartenance', // type appliqué aux nouvelles branches créées à la main
     pendingLinkSource: null,
     isDirty: false,
     interpreterOpen: false,
+    // id (base) de la carte mentale éditée : sert à retrouver les cartes liées depuis le côté flashcard
+    idMindMap: null,
   }),
   getters: {
     nodesArray: (state) => Object.values(state.map.nodes),
@@ -32,12 +50,16 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       }
       return null;
     },
+    selectedLink: (state) => state.map.links.find((link) => link.id === state.selectedLinkId) || null,
+    // Résultats des formules reliées à des grandeurs : { [nodeId]: { ok, symbol, value, unit } | { ok: false, error } }
+    calculations: (state) => computeAllFormulas(state.map),
     selectedNodes(state) {
       return state.selectedNodeIds.map((id) => state.map.nodes[id]).filter(Boolean);
     },
   },
   actions: {
-    load(raw) {
+    load(raw, idMindMap = null) {
+      this.idMindMap = idMindMap;
       const normalized = normalizeMindMap(raw);
       const nonSubjectNodes = Object.values(normalized.nodes).filter(
         (n) => n.id !== normalized.subjectNodeId
@@ -52,6 +74,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     },
     new(title) {
       this.map = createBlankMindMap(title);
+      this.idMindMap = null;
       this.resetSelection();
       this.isDirty = false;
     },
@@ -102,9 +125,11 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     addNode({
       label = 'Nouvel item',
       type = 'text',
+      kinds = [],
       content = undefined,
       parentId = null,
       position = null,
+      linkType = 'appartenance',
     }) {
       const id = createId();
       const subject = this.map.nodes[this.map.subjectNodeId];
@@ -131,18 +156,19 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
         id,
         label,
         type,
+        kinds: sanitizeExtraKinds(type, kinds),
         content: nodeContent,
         mastery: 'undefined',
         idCard: null,
         idSystem: null,
         zoneId: null,
         style: {
-          primaryColor: parent?.style?.primaryColor || '#1E3A8A',
+          primaryColor: parent?.style?.primaryColor || mindmapColors.nodeBg,
           secondaryColor: undefined,
           shape: 'bubble',
           width: 220,
           height: 120,
-          textColor: parent?.style?.textColor || '#eef2ff',
+          textColor: parent?.style?.textColor || mindmapColors.nodeText,
           fontSize: Number.parseInt(parent?.style?.fontSize, 10) || 14,
           fontWeight: parent?.style?.fontWeight || 'normal',
           fontStyle: parent?.style?.fontStyle || 'normal',
@@ -155,6 +181,14 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
           parentId: resolvedParentId || null,
         },
       });
+      if (type === 'quantity' || newNode.kinds.includes('quantity')) {
+        newNode.quantity = createQuantity();
+      }
+      if (type === 'graph') {
+        newNode.graph = createGraph();
+        newNode.style.width = GRAPH_NODE_SIZE.width;
+        newNode.style.height = GRAPH_NODE_SIZE.height;
+      }
       if (position && typeof position.x === 'number' && typeof position.y === 'number') {
         newNode.layout.x = position.x;
         newNode.layout.y = position.y;
@@ -170,15 +204,38 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       }
       this.map.nodes[id] = newNode;
       if (resolvedParentId) {
-        this.addLink({ from: resolvedParentId, to: id, type: 'appartenance' });
+        this.addLink({ from: resolvedParentId, to: id, type: linkType });
       } else if (this.map.subjectNodeId) {
-        this.addLink({ from: this.map.subjectNodeId, to: id, type: 'appartenance' });
+        this.addLink({ from: this.map.subjectNodeId, to: id, type: linkType });
       }
       this.selectNode(id);
       this.touch();
       return id;
     },
-    addZone({ name = 'Zone', color = '#BFDBFE', x = 200, y = 200, width = 360, height = 240 }) {
+    // Crée une grandeur (symbole prérempli) reliée par une branche « Calcul » à la formule, pour chaque
+    // variable demandée qui n'a pas déjà de grandeur reliée. Ne supprime ni ne modifie rien d'existant.
+    createQuantitiesForFormula(formulaId, symbols = []) {
+      if (!this.map.nodes[formulaId]) return [];
+      const missing = new Set(missingVariables(this.map, formulaId));
+      const created = [];
+      for (const symbol of symbols) {
+        if (!missing.has(symbol)) continue;
+        missing.delete(symbol);
+        const id = this.addNode({
+          label: symbol,
+          type: 'quantity',
+          content: '',
+          parentId: formulaId,
+          linkType: 'calcul',
+        });
+        this.map.nodes[id].quantity = createQuantity({ symbol });
+        created.push(id);
+      }
+      this.selectNode(formulaId);
+      this.touch();
+      return created;
+    },
+    addZone({ name = 'Zone', color = mindmapColors.zone, x = 200, y = 200, width = 360, height = 240 }) {
       const id = createId();
       this.map.zones = Array.isArray(this.map.zones) ? this.map.zones : [];
       this.map.zones.push({
@@ -225,23 +282,21 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       const exists = this.map.links.find((link) => link.from === from && link.to === to);
       if (exists) return exists.id;
       const id = createId();
-      this.map.links.push({
-        id,
-        from,
-        to,
-        type,
-        direction,
-        order: this.map.links.length,
-        style: {
-          primaryColor: this.map.nodes[from]?.style?.primaryColor || '#1E3A8A',
-          secondaryColor: this.map.nodes[from]?.style?.secondaryColor || '#C0C5D2',
-          bezier: true,
-        },
-        interactions: {
-          transfersValue: false,
-          togglesVisibility: false,
-        },
-      });
+      this.map.links.push(
+        normalizeLink({
+          id,
+          from,
+          to,
+          type,
+          direction,
+          // Dernier rang de lecture parmi les branches sortantes de `from`.
+          order: this.map.links.filter((link) => link.from === from).length,
+          style: {
+            primaryColor: this.map.nodes[from]?.style?.primaryColor || mindmapColors.nodeBg,
+            secondaryColor: this.map.nodes[from]?.style?.secondaryColor || mindmapColors.secondary,
+          },
+        })
+      );
       this.touch();
       return id;
     },
@@ -262,9 +317,44 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       const node = this.map.nodes[id];
       if (!node) return;
       Object.assign(node, payload);
+      if (payload.type !== undefined || payload.kinds !== undefined) {
+        // Garde les rôles supplémentaires cohérents avec le nouveau rôle principal.
+        Object.assign(node, normalizeNodeItem(node));
+      }
+      if (payload.type === 'graph') ensureGraphNodeSize(node);
       if (payload.mastery) {
         ensureSecondaryColor(node);
       }
+      this.touch();
+    },
+    // Ajoute ou retire un rôle supplémentaire (le rôle principal `type` reste inchangé).
+    toggleNodeKind(id, kind) {
+      const node = this.map.nodes[id];
+      if (!node || kind === node.type) return;
+      const current = sanitizeExtraKinds(node.type, node.kinds);
+      const next = current.includes(kind) ? current.filter((k) => k !== kind) : [...current, kind];
+      node.kinds = sanitizeExtraKinds(node.type, next);
+      if (node.kinds.includes('quantity') && !node.quantity) {
+        node.quantity = createQuantity();
+      }
+      this.touch();
+    },
+    updateNodeQuantity(id, payload = {}) {
+      const node = this.map.nodes[id];
+      if (!node) return;
+      node.quantity = createQuantity({ ...node.quantity, ...payload });
+      this.touch();
+    },
+    // Fenêtre de vue, valeurs des paramètres et mode d'affichage d'un nœud graphique.
+    updateNodeGraph(id, payload = {}) {
+      const node = this.map.nodes[id];
+      if (!node || node.type !== 'graph') return;
+      const current = createGraph(node.graph);
+      node.graph = createGraph({
+        ...current,
+        ...payload,
+        params: payload.params ? { ...current.params, ...payload.params } : current.params,
+      });
       this.touch();
     },
     updateNodeStyle(id, style = {}) {
@@ -276,7 +366,36 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     updateLink(id, payload = {}) {
       const link = this.map.links.find((item) => item.id === id);
       if (!link) return;
-      Object.assign(link, payload);
+      const { style, ...rest } = payload;
+      Object.assign(link, rest);
+      if (style) link.style = { ...link.style, ...style };
+      Object.assign(link, normalizeLink(link));
+      this.touch();
+    },
+    // Ajoute un type de branche personnalisé ; renvoie son id (ou null si vide / déjà existant).
+    addBranchType(label) {
+      const created = createBranchType(this.map.branchTypes, label);
+      if (!created) return null;
+      this.map.branchTypes = [...(this.map.branchTypes || []), created];
+      this.touch();
+      return created.id;
+    },
+    setLinkType(type) {
+      this.linkType = type;
+    },
+    // Décale une branche dans l'ordre de lecture des branches sortantes de son item source.
+    moveLink(id, delta) {
+      const link = this.map.links.find((item) => item.id === id);
+      if (!link) return;
+      const siblings = getOutgoingLinks(this.map.links, link.from);
+      const index = siblings.findIndex((item) => item.id === id);
+      const target = index + delta;
+      if (target < 0 || target >= siblings.length) return;
+      siblings.splice(index, 1);
+      siblings.splice(target, 0, link);
+      siblings.forEach((item, rank) => {
+        item.order = rank;
+      });
       this.touch();
     },
     removeNode(id) {
@@ -305,7 +424,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     setPendingLinkSource(nodeId) {
       this.pendingLinkSource = nodeId;
     },
-    finalizePendingLink(targetId, type = 'appartenance') {
+    finalizePendingLink(targetId, type = this.linkType) {
       if (!this.pendingLinkSource || !targetId || this.pendingLinkSource === targetId) return;
       this.addLink({ from: this.pendingLinkSource, to: targetId, type });
       this.pendingLinkSource = null;
@@ -334,6 +453,11 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     },
     async syncCardMasteries() {
       const nodes = Object.values(this.map.nodes);
+      const applyBox = (node, card) => {
+        if (!card?.leitnerBox) return;
+        node.mastery = boxLevelToMastery(card.leitnerBox.level);
+        node.style.secondaryColor = boxColorToHex(card.leitnerBox.color);
+      };
       const systemGroups = {};
       for (const node of nodes) {
         if (node.idCard && node.idSystem) {
@@ -341,14 +465,31 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
           systemGroups[node.idSystem].push(node);
         }
       }
-      for (const systemId of Object.keys(systemGroups)) {
+      // Lien posé depuis la flashcard (LeitnerCard.mindMapNodeId) : le nœud ne porte pas d'idCard,
+      // on retrouve les cartes via les systèmes rattachés à cette carte mentale.
+      const mindMapSystemIds = [];
+      if (this.idMindMap) {
+        try {
+          const sysRes = await api.get('leitnersystems/');
+          for (const s of sysRes?.data || []) {
+            if (Number(s.idMindMap) === Number(this.idMindMap)) mindMapSystemIds.push(String(s.idSystem));
+          }
+        } catch {
+          // couleurs de boîte non essentielles : l'éditeur reste utilisable sans
+        }
+      }
+      const systemIds = new Set([...Object.keys(systemGroups), ...mindMapSystemIds]);
+      for (const systemId of systemIds) {
         const res = await api.get(`leitnercards/system/${systemId}`);
         if (!res?.data) continue;
-        for (const node of systemGroups[systemId]) {
-          const card = res.data.find((c) => c.idCard === node.idCard);
-          if (!card?.leitnerBox) continue;
-          node.mastery = boxLevelToMastery(card.leitnerBox.level);
-          node.style.secondaryColor = boxColorToHex(card.leitnerBox.color);
+        for (const node of systemGroups[systemId] || []) {
+          applyBox(node, res.data.find((c) => c.idCard === node.idCard));
+        }
+        if (mindMapSystemIds.includes(systemId)) {
+          for (const card of res.data) {
+            const node = card.mindMapNodeId && this.map.nodes[card.mindMapNodeId];
+            if (node && !node.idCard) applyBox(node, card);
+          }
         }
       }
     },
