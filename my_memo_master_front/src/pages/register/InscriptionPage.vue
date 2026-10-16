@@ -15,7 +15,7 @@
           required
           :class="['w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
         >
-        <p v-if="fieldErrors.name" class="text-red-500 text-xs mt-1">{{ fieldErrors.name }}</p>
+        <p v-if="fieldErrors.name" class="text-red-600 text-xs mt-1">{{ fieldErrors.name }}</p>
       </div>
 
       <div class="mb-4">
@@ -29,7 +29,7 @@
           required
           :class="['w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.email ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
         >
-        <p v-if="fieldErrors.email" class="text-red-500 text-xs mt-1">{{ fieldErrors.email }}</p>
+        <p v-if="fieldErrors.email" class="text-red-600 text-xs mt-1">{{ fieldErrors.email }}</p>
       </div>
 
       <div class="mb-4">
@@ -44,7 +44,7 @@
           required
           :class="['w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.password ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
         >
-        <p v-if="fieldErrors.password" class="text-red-500 text-xs mt-1">{{ fieldErrors.password }}</p>
+        <p v-if="fieldErrors.password" class="text-red-600 text-xs mt-1">{{ fieldErrors.password }}</p>
       </div>
 
       <div class="mb-4">
@@ -59,7 +59,7 @@
           required
           :class="['w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:outline-none', fieldErrors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500']"
         >
-        <p v-if="fieldErrors.confirmPassword" class="text-red-500 text-xs mt-1">{{ fieldErrors.confirmPassword }}</p>
+        <p v-if="fieldErrors.confirmPassword" class="text-red-600 text-xs mt-1">{{ fieldErrors.confirmPassword }}</p>
       </div>
 
       <div class="flex flex-col items-center m-2">
@@ -75,7 +75,7 @@
           Vous avez déjà un compte ? Connectez-vous !
         </router-link>
 
-        <p v-if="errorMessage" class="text-red-500 text-sm text-center mt-2">
+        <p v-if="errorMessage" class="text-red-600 text-sm text-center mt-2">
           {{ errorMessage }}
         </p>
       </div>

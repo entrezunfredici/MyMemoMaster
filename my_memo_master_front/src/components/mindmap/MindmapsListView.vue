@@ -215,7 +215,7 @@ onMounted(fetchDiagrams)
               </select>
             </div>
             <div class="mb-4">
-              <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <label class="form-label">Tags <span class="text-gray-500 font-normal">(optionnel)</span></label>
               <TagSelectorComponent v-model="editedTagIds" />
             </div>
             <div class="btn-row">

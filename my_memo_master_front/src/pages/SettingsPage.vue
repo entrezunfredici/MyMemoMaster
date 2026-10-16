@@ -50,7 +50,7 @@
 
         <!-- Alertes KPI -->
         <template v-if="alertStore.loading">
-          <p class="text-sm text-gray-400">Chargement des préférences…</p>
+          <p class="text-sm text-gray-500">Chargement des préférences…</p>
         </template>
 
         <template v-else-if="alertStore.settings">

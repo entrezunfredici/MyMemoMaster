@@ -16,7 +16,7 @@
       </button>
     </div>
 
-    <p v-if="showPreview" class="text-xs text-gray-400 mt-1">
+    <p v-if="showPreview" class="text-xs text-gray-500 mt-1">
       Aperçu : <FormulaText :text="modelValue" class="text-dark text-sm" />
     </p>
 

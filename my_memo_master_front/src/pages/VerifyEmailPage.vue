@@ -8,7 +8,7 @@
     </div>
 
     <div v-else-if="verified" class="text-center py-8">
-      <p class="text-green-600 font-semibold mb-4">Votre email a été vérifié avec succès !</p>
+      <p class="text-green-700 font-semibold mb-4">Votre email a été vérifié avec succès !</p>
       <router-link to="/auth" class="text-primary underline">Se connecter</router-link>
     </div>
 

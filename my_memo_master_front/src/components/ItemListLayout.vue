@@ -11,9 +11,9 @@
           @input="$emit('update:search', $event.target.value)"
           type="text"
           :placeholder="searchPlaceholder"
-          class="w-full min-w-0 !pl-4 !pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-ellipsis"
+          class="w-full min-w-0 !pl-4 !pr-11 py-3 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-ellipsis"
         />
-        <span class="absolute right-4 top-3.5 text-gray-400 pointer-events-none" aria-hidden="true">🔍</span>
+        <span class="absolute right-4 top-3.5 text-gray-500 pointer-events-none" aria-hidden="true">🔍</span>
       </div>
       <button
         @click="$emit('create')"
@@ -66,7 +66,7 @@
     </div>
 
     <!-- État vide -->
-    <p v-if="!loading && filteredCount === 0" class="text-center text-gray-400 py-12">
+    <p v-if="!loading && filteredCount === 0" class="text-center text-gray-500 py-12">
       {{ emptyMessage }}
     </p>
 

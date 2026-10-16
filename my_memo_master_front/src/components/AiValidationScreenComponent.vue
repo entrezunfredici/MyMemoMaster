@@ -58,7 +58,7 @@
 
             <button
               type="button"
-              class="text-xs text-gray-400 hover:text-gray-600 mt-2"
+              class="text-xs text-gray-500 hover:text-gray-600 mt-2"
               @click="card.sourceOpen = !card.sourceOpen"
             >
               {{ card.sourceOpen ? '▾' : '▸' }} Source

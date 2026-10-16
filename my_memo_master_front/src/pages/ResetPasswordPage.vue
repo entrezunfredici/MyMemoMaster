@@ -18,7 +18,7 @@
           placeholder="123456"
           class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-lg tracking-[0.5em] text-center"
         >
-        <p class="text-xs text-gray-400 mt-1">Code valable 15 minutes</p>
+        <p class="text-xs text-gray-500 mt-1">Code valable 15 minutes</p>
       </div>
 
       <div class="mb-4">
@@ -30,7 +30,7 @@
           required
           class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
-        <p class="text-xs text-gray-400 mt-1">Min. 10 caractères, 1 majuscule, 1 chiffre</p>
+        <p class="text-xs text-gray-500 mt-1">Min. 10 caractères, 1 majuscule, 1 chiffre</p>
       </div>
 
       <p v-if="errorMessage" class="text-red-600 text-sm mb-3">{{ errorMessage }}</p>
