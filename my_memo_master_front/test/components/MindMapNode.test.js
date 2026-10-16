@@ -234,3 +234,71 @@ describe('MindMapNode', () => {
     expect(wrapper.find('.mindmap-node__image-placeholder').text()).toContain('Déposer ici')
   })
 })
+
+describe('MindMapNode — nœud graphique', () => {
+  const graphNode = (overrides = {}) =>
+    makeNode({
+      type: 'graph',
+      content: 'y=ax^{2}',
+      graph: { xMin: -10, xMax: 10, yMin: -6, yMax: 6, params: { a: 2 }, mode: 'plot' },
+      style: { ...makeNode().style, width: 340, height: 300 },
+      ...overrides,
+    })
+
+  it("affiche le repère, la courbe et un curseur par paramètre pour un nœud de type 'graph'", () => {
+    const wrapper = mountNode({ node: graphNode() })
+    expect(wrapper.find('.mmgraph__plot').exists()).toBe(true)
+    expect(wrapper.find('.mmgraph__curve').attributes('d')).toMatch(/^M/)
+    expect(wrapper.findAll('input[type="range"]')).toHaveLength(1)
+    expect(wrapper.find('.mindmap-node__body').exists()).toBe(false)
+  })
+
+  it('mode « formule » : affiche la formule avec la valeur du paramètre, sans tracé', () => {
+    const wrapper = mountNode({ node: graphNode({ graph: { ...graphNode().graph, mode: 'formula' } }) })
+    expect(wrapper.find('.mmgraph__plot').exists()).toBe(false)
+    expect(renderMathMultiline).toHaveBeenCalledWith('y=2x^{2}')
+  })
+
+  it('formule vide : invite à saisir, sans tracé ni curseur', () => {
+    const wrapper = mountNode({ node: graphNode({ content: '' }) })
+    expect(wrapper.find('.mmgraph__empty').text()).toContain('Double-clic')
+    expect(wrapper.find('.mmgraph__plot').exists()).toBe(false)
+  })
+
+  it('formule non traçable : affiche l’erreur', () => {
+    const wrapper = mountNode({ node: graphNode({ content: 'y=(x+1' }) })
+    expect(wrapper.find('.mmgraph__error').exists()).toBe(true)
+  })
+
+  it('les boutons du nœud appellent le store (mode, zoom, réinitialisation)', async () => {
+    const wrapper = mountNode({ node: graphNode() })
+    const store = useMindMapBuilderStore()
+    const buttons = wrapper.findAll('.mmgraph__btn')
+    await buttons.find((b) => b.text() === 'Formule').trigger('click')
+    expect(store.updateNodeGraph).toHaveBeenCalledWith('node-1', { mode: 'formula' })
+    await wrapper.find('[aria-label="Zoom avant"]').trigger('click')
+    expect(store.updateNodeGraph).toHaveBeenLastCalledWith('node-1', expect.objectContaining({ xMin: -7, xMax: 7 }))
+    await wrapper.find('[aria-label="Réinitialiser la vue"]').trigger('click')
+    expect(store.updateNodeGraph).toHaveBeenLastCalledWith('node-1', { xMin: -10, xMax: 10, yMin: -6, yMax: 6 })
+  })
+
+  it('le curseur valide la valeur du paramètre au relâchement', async () => {
+    const wrapper = mountNode({ node: graphNode() })
+    const store = useMindMapBuilderStore()
+    const slider = wrapper.find('input[type="range"]')
+    slider.element.value = '3'
+    await slider.trigger('input')
+    expect(store.updateNodeGraph).not.toHaveBeenCalled()
+    await slider.trigger('change')
+    expect(store.updateNodeGraph).toHaveBeenCalledWith('node-1', { params: { a: 3 } })
+  })
+})
+
+describe('MindMapNode — texte avec rôle « Formule » / « Fonction »', () => {
+  it('rend le contenu comme formule (KaTeX) au lieu du texte brut', () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'text', kinds: ['function'], content: 'y=x^2' }) })
+    expect(wrapper.find('.mindmap-node__formula').exists()).toBe(true)
+    expect(wrapper.find('.mindmap-node__body').exists()).toBe(false)
+    expect(renderMathMultiline).toHaveBeenCalledWith('y=x^2')
+  })
+})

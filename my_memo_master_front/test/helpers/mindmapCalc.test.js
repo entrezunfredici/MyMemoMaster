@@ -28,6 +28,12 @@ describe('mindmapCalc — calcul des formules', () => {
     expect(computeFormula(energyMap('E = 1/2 M V^2'), 'f').value).toBe(25)
   })
 
+  it('accepte les raccourcis MathLive sans accolades (\\frac12, \\sqrt2)', () => {
+    expect(computeFormula(energyMap(String.raw`E=\frac12MV^2`), 'f')).toMatchObject({ ok: true, value: 25, unit: 'J' })
+    expect(computeFormula(energyMap(String.raw`E=\frac{1}2MV^2`), 'f').value).toBe(25)
+    expect(computeFormula(energyMap(String.raw`E=\sqrt4MV`), 'f').value).toBe(20)
+  })
+
   it('fonctionne quand la branche part de la grandeur vers la formule', () => {
     const map = energyMap()
     map.links = [link('m', 'f'), link('v', 'f')]
@@ -114,6 +120,62 @@ describe('mindmapCalc — calcul des formules', () => {
     map.nodes.alone = formulaNode('alone', 'a = b')
     const all = computeAllFormulas(map)
     expect(Object.keys(all)).toEqual(['f'])
+  })
+})
+
+describe('mindmapCalc — grandeur qui reçoit le résultat d’une formule', () => {
+  // V = D / T, avec D et T reliées à la formule, et une grandeur « v » reliée au résultat.
+  const speedMap = (resultSymbol = 'v') => ({
+    nodes: {
+      f: formulaNode('f', 'V = D / T'),
+      d: quantityNode('d', 'D', 70, 'm'),
+      t: quantityNode('t', 'T', 14, 's'),
+      v: quantityNode('v', resultSymbol, 15, 'm/s'),
+    },
+    links: [link('f', 'd'), link('f', 't'), link('v', 'f')],
+  })
+
+  it('la grandeur de même symbole (casse ignorée) prend la valeur calculée', () => {
+    const all = computeAllFormulas(speedMap('v'))
+    expect(all.f).toMatchObject({ ok: true, value: 5, unit: 'm/s' })
+    expect(all.v).toBe(all.f)
+  })
+
+  it('une grandeur de symbole différent n’est pas touchée', () => {
+    expect(computeAllFormulas(speedMap('w')).v).toBeUndefined()
+  })
+
+  it('une grandeur non reliée à la formule n’est pas touchée', () => {
+    const map = speedMap('v')
+    map.links = map.links.filter((l) => l.from !== 'v')
+    expect(computeAllFormulas(map).v).toBeUndefined()
+  })
+
+  it('si la formule échoue, la valeur saisie reste utilisée', () => {
+    const map = speedMap('v')
+    map.nodes.t.quantity.value = null
+    const all = computeAllFormulas(map)
+    expect(all.f.ok).toBe(false)
+    expect(all.v).toBeUndefined()
+  })
+
+  it('une autre formule utilise le résultat calculé, pas la valeur saisie (15)', () => {
+    const map = speedMap('v')
+    map.nodes.e = formulaNode('e', 'W = v * U')
+    map.nodes.u = quantityNode('u', 'U', 2, 's')
+    map.links.push(link('e', 'v'), link('e', 'u'))
+    // v = 70 / 14 = 5 m/s (et non 15) → W = 5 × 2 = 10 m
+    expect(computeFormula(map, 'e')).toMatchObject({ ok: true, value: 10, unit: 'm' })
+  })
+
+  it('une grandeur qui porte sa propre formule garde son calcul', () => {
+    const map = speedMap('v')
+    map.nodes.v.kinds = ['formula']
+    map.nodes.v.content = 'v = D'
+    map.links.push(link('v', 'd'))
+    const all = computeAllFormulas(map)
+    expect(all.v).toMatchObject({ ok: true, value: 70 })
+    expect(all.v).not.toBe(all.f)
   })
 })
 

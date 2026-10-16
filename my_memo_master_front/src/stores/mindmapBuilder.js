@@ -11,17 +11,28 @@ import {
 } from '@/helpers/mindmap';
 import { createBranchType, getOutgoingLinks, normalizeLink } from '@/helpers/mindmapLinks';
 import { createQuantity, normalizeNodeItem, sanitizeExtraKinds } from '@/helpers/mindmapItems';
+import { createGraph } from '@/helpers/mindmapGraph';
 import { computeAllFormulas, missingVariables } from '@/helpers/mindmapCalc';
 import { api } from '@/helpers/api';
 import { mindmapColors } from '@/helpers/themeColors';
 
 const defaultTool = 'select';
 
+// Un nœud graphique a besoin de place pour le repère et les curseurs.
+const GRAPH_NODE_SIZE = { width: 340, height: 300 };
+const ensureGraphNodeSize = (node) => {
+  node.style = {
+    ...node.style,
+    width: Math.max(node.style?.width || 0, GRAPH_NODE_SIZE.width),
+    height: Math.max(node.style?.height || 0, GRAPH_NODE_SIZE.height),
+  };
+};
+
 export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
   state: () => ({
     map: createBlankMindMap(),
     tool: defaultTool,
-    nodeType: 'text', // 'text' | 'formula' | 'function' | 'quantity' | 'image'
+    nodeType: 'text', // 'text' | 'formula' | 'function' | 'graph' | 'quantity' | 'image'
     selectedNodeIds: [],
     selectedLinkId: null,
     linkType: 'appartenance', // type appliqué aux nouvelles branches créées à la main
@@ -173,6 +184,11 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       if (type === 'quantity' || newNode.kinds.includes('quantity')) {
         newNode.quantity = createQuantity();
       }
+      if (type === 'graph') {
+        newNode.graph = createGraph();
+        newNode.style.width = GRAPH_NODE_SIZE.width;
+        newNode.style.height = GRAPH_NODE_SIZE.height;
+      }
       if (position && typeof position.x === 'number' && typeof position.y === 'number') {
         newNode.layout.x = position.x;
         newNode.layout.y = position.y;
@@ -305,6 +321,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
         // Garde les rôles supplémentaires cohérents avec le nouveau rôle principal.
         Object.assign(node, normalizeNodeItem(node));
       }
+      if (payload.type === 'graph') ensureGraphNodeSize(node);
       if (payload.mastery) {
         ensureSecondaryColor(node);
       }
@@ -326,6 +343,18 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       const node = this.map.nodes[id];
       if (!node) return;
       node.quantity = createQuantity({ ...node.quantity, ...payload });
+      this.touch();
+    },
+    // Fenêtre de vue, valeurs des paramètres et mode d'affichage d'un nœud graphique.
+    updateNodeGraph(id, payload = {}) {
+      const node = this.map.nodes[id];
+      if (!node || node.type !== 'graph') return;
+      const current = createGraph(node.graph);
+      node.graph = createGraph({
+        ...current,
+        ...payload,
+        params: payload.params ? { ...current.params, ...payload.params } : current.params,
+      });
       this.touch();
     },
     updateNodeStyle(id, style = {}) {

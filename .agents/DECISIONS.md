@@ -5043,3 +5043,15 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `syncCardMasteries` récupère aussi les systèmes dont `idMindMap` = carte éditée, charge leurs cartes (qui exposent désormais `mindMapNodeId`) et applique niveau/couleur de la boîte au nœud correspondant.
 **Alternative écartée** : copier `idCard`/`idSystem` dans le nœud (duplique la source de vérité, devient obsolète si la carte est déliée/supprimée).
 **Conséquences** : un appel `GET leitnersystems/` supplémentaire à l'ouverture d'une carte mentale enregistrée ; `GET leitnercards/system/:id` expose `mindMapNodeId`.
+
+### [2026-10-16] Item « Graphique » de carte mentale : tracé maison sans dépendance, formule source de vérité
+**Contexte** : demande d'un « GeoGebra dans un nœud » : une formule qui se transforme en graphique puis de nouveau en formule. MathLive/KaTeX gèrent déjà la saisie et le rendu des formules.
+**Décision** : nouveau rôle principal `graph` ; contenu = formule LaTeX `y = f(x)` (même saisie que les formules) ; état de vue, valeurs des paramètres et mode d'affichage dans `node.graph`. Analyse LaTeX → fonction JS (`helpers/mindmapGraph.js`) et tracé en SVG écrits dans le projet : **aucune dépendance ajoutée**. « Graphique → formule » = bascule d'affichage vers la formule avec les valeurs des paramètres substituées (les curseurs modifient la courbe et la formule).
+**Alternative écartée** : `function-plot` (tire d3, ~300 Ko) ou JSXGraph/GeoGebra (riche mais lourd, gestes tactiles en conflit avec le canevas, licence GeoGebra non commerciale) ; `mathjs`/`compute-engine` pour l'évaluation (un analyseur de ~150 lignes suffit pour y = f(x), et celui de `mindmapCalc.js` est lié aux unités et ne gère pas les fonctions). Non stocké : l'image du graphique (se régénère).
+**Conséquences** : périmètre limité à y = f(x) ; ajouter courbes paramétriques/implicites, points déplaçables ou régression demandera soit d'étendre cet analyseur soit de réévaluer JSXGraph (chargé en lazy).
+
+### [2026-10-16] Grandeur ↔ résultat de formule : liaison par symbole (casse ignorée), sans stocker la valeur
+**Contexte** : une formule `V = D/T` calculait `V` mais la grandeur `v` reliée gardait sa valeur saisie, incohérente avec le calcul.
+**Décision** : la grandeur reliée à une formule et de même symbole que son résultat (comparaison sans casse, pour ce lien seulement) prend le résultat calculé à l'affichage et dans les formules en aval ; la valeur n'est jamais écrite dans `node.quantity` (le calcul reste « à la volée »).
+**Alternative écartée** : copier la valeur dans la grandeur (source de vérité dupliquée, obsolète dès qu'une entrée change) ; correspondance exacte seulement (`V` ≠ `v`, cas réel rencontré) ; imposer la grandeur-formule (« Aussi → Formule »), qui reste possible.
+**Conséquences** : une valeur saisie sur une grandeur ainsi alimentée n'est qu'un repli ; deux grandeurs `v`/`V` reliées à la même formule recevraient toutes deux le résultat.

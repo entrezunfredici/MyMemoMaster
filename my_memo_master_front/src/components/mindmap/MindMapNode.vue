@@ -53,6 +53,13 @@
             {{ isDragOver ? 'Déposer ici' : 'Glissez une image ici' }}
           </span>
         </div>
+        <!-- Graphique : formule y = f(x) tracée dans un repère, convertible en formule -->
+        <MindMapGraph
+          v-else-if="isGraphNode"
+          :node="node"
+          :width="width - 24"
+          :height="height - 20 - GRAPH_TITLE_HEIGHT"
+        />
         <!-- Formule -->
         <div
           v-else-if="isFormulaNode"
@@ -188,7 +195,8 @@ import { mindmapColors } from '@/helpers/themeColors';
 import { computed, ref, nextTick } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { getNodeLabel } from '@/helpers/mindmapCreation';
-import { createQuantity, hasKind, isMathNode } from '@/helpers/mindmapItems';
+import { createQuantity, hasKind, hasFormulaContent, isGraphNode as isGraphItem } from '@/helpers/mindmapItems';
+import MindMapGraph from './MindMapGraph.vue';
 import { formatCalculation } from '@/helpers/mindmapCalc';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
 import { api } from '@/helpers/api';
@@ -210,13 +218,18 @@ const primaryColor = computed(() => props.node.style?.primaryColor || mindmapCol
 const secondaryColor = computed(() => props.node.style?.secondaryColor || mindmapColors.secondary);
 const shape = computed(() => props.node.style?.shape || 'bubble');
 const borderRadius = computed(() => {
+  // Un graphique est un bloc rectangulaire : un grand arrondi rognerait le repère et les boutons.
+  if (props.node.type === 'graph' && shape.value !== 'pill') return 16;
   if (shape.value === 'rect') return 12;
   if (shape.value === 'pill') return height.value / 2;
   return Math.min(width.value, height.value) / 4;
 });
 
 const isImageNode = computed(() => props.node.type === 'image');
-const isFormulaNode = computed(() => isMathNode(props.node));
+const isFormulaNode = computed(() => hasFormulaContent(props.node));
+const isGraphNode = computed(() => isGraphItem(props.node));
+// Hauteur réservée au titre au-dessus du graphique (ligne + espacement).
+const GRAPH_TITLE_HEIGHT = 28;
 const isQuantityNode = computed(() => props.node.type === 'quantity');
 const hasQuantityKind = computed(() => hasKind(props.node, 'quantity'));
 const quantity = computed(() => createQuantity(props.node.quantity));
@@ -234,7 +247,7 @@ const formulaHtml = computed(() =>
   isFormulaNode.value && props.node.content ? renderMathMultiline(props.node.content) : ''
 );
 const displayContent = computed(() => {
-  if (!props.node.content || isImageNode.value || isFormulaNode.value || isQuantityNode.value) return '';
+  if (!props.node.content || isImageNode.value || isFormulaNode.value || isGraphNode.value || isQuantityNode.value) return '';
   // Cartes existantes : le nœud racine dupliquait son titre dans son contenu
   if (props.node.id === store.map.subjectNodeId && props.node.content === props.node.label) return '';
   return props.node.content;
@@ -268,7 +281,7 @@ const startEditLabel = () => {
 };
 
 const startEditContent = () => {
-  if (isImageNode.value || isFormulaNode.value) return;
+  if (isImageNode.value || isFormulaNode.value || isGraphNode.value) return;
   localContent.value = props.node.content || '';
   editingField.value = 'content';
   nextTick(() => {

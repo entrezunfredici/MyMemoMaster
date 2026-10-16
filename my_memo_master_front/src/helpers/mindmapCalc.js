@@ -3,6 +3,7 @@
 // déduite de la formule (ex. kg × (m/s)² → J). Le résultat est calculé à la volée, jamais stocké.
 
 import { toLatex } from '@/components/interpreter/interpreter.js';
+import { normalizeLatexShorthand } from './latexShorthand';
 import { createQuantity, getNodeKinds, hasKind } from './mindmapItems';
 import { parseUnit, formatDim, addDim, scaleDim, sameDim, isDimensionless, ZERO } from './quantityUnits';
 
@@ -241,6 +242,30 @@ const collectSources = (map, id) => {
   return sources;
 };
 
+// Symbole du résultat d'une formule (« V » dans « V = D / T »), insensible à la casse : sert à relier
+// une formule à la grandeur qui reçoit son résultat (« v »).
+const resultKey = (formulaNode) => {
+  try {
+    return normalizeSymbol(splitEquation(normalizeLatexShorthand(toLatex(formulaNode.content || ''))).symbol).toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
+// Formule reliée à la grandeur `quantityNode` dont le symbole de résultat est celui de la grandeur
+// (à la casse près) : la grandeur prend alors la valeur calculée. Une grandeur qui porte elle-même
+// une formule calcule sa propre valeur et n'a pas de producteur.
+const findProducer = (map, quantityNode, excludeId = null) => {
+  if (!hasKind(quantityNode, 'quantity') || isFormulaNode(quantityNode)) return null;
+  const key = normalizeSymbol(quantityNode.quantity?.symbol).toLowerCase();
+  if (!key) return null;
+  return (
+    neighborIds(map, quantityNode.id)
+      .map((nid) => map.nodes[nid])
+      .find((node) => node.id !== excludeId && isFormulaNode(node) && node.content && resultKey(node) === key) || null
+  );
+};
+
 // Calcule la formule `id`. Retourne { ok, symbol, value, unit } ou { ok: false, error }.
 const computeFormula = (map, id, visiting = new Set(), cache = new Map()) => {
   if (cache.has(id)) return cache.get(id);
@@ -251,7 +276,7 @@ const computeFormula = (map, id, visiting = new Set(), cache = new Map()) => {
 
   let result;
   try {
-    const latex = toLatex(node.content || '');
+    const latex = normalizeLatexShorthand(toLatex(node.content || ''));
     if (!latex) throw new CalcError('Formule vide');
     const { symbol, body } = splitEquation(latex);
 
@@ -264,6 +289,12 @@ const computeFormula = (map, id, visiting = new Set(), cache = new Map()) => {
         const inner = computeFormula(map, source.id, visiting, cache);
         if (inner.ok) return { v: inner.si, d: inner.dim };
         if (!hasKind(source, 'quantity')) throw new CalcError(`« ${name} » : ${inner.error}`);
+      }
+      // Grandeur alimentée par une autre formule : on utilise le résultat calculé (valeur saisie en repli).
+      const producer = isFormulaNode(source) ? null : findProducer(map, source, id);
+      if (producer) {
+        const inner = computeFormula(map, producer.id, visiting, cache);
+        if (inner.ok) return { v: inner.si, d: inner.dim };
       }
       const quantity = createQuantity(source.quantity);
       if (quantity.value === null) throw new CalcError(`Valeur de « ${name} » à renseigner`);
@@ -295,6 +326,12 @@ const computeAllFormulas = (map) => {
     if (!linked) continue;
     out[node.id] = computeFormula(map, node.id, new Set(), cache);
   }
+  // Grandeurs qui reçoivent le résultat d'une formule reliée (même symbole, casse ignorée).
+  for (const node of Object.values(map?.nodes || {})) {
+    const producer = findProducer(map, node);
+    const result = producer && out[producer.id];
+    if (result?.ok) out[node.id] = result;
+  }
   return out;
 };
 
@@ -304,7 +341,7 @@ const missingVariables = (map, id) => {
   const node = map?.nodes?.[id];
   if (!node || !isFormulaNode(node) || !node.content) return [];
   try {
-    const { body } = splitEquation(toLatex(node.content));
+    const { body } = splitEquation(normalizeLatexShorthand(toLatex(node.content)));
     const known = collectSources(map, id);
     const names = tokenize(body, new Set(known.keys())).filter((token) => token.t === 'id').map((token) => token.v);
     return [...new Set(names)].filter((name) => !known.has(name));

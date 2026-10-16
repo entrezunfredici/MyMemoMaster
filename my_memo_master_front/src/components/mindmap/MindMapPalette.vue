@@ -80,7 +80,20 @@
           <input aria-label="Symbole de la grandeur" type="text" class="palette__number" maxlength="12"
             :value="selectedNode.quantity?.symbol || ''" @input="updateQuantity('symbol', $event.target.value)" />
         </div>
-        <div class="palette__field palette__field--row">
+        <!-- Grandeur numérique (valeur saisie) ou grandeur formule (valeur calculée) -->
+        <div v-if="canChooseQuantityMode" class="palette__field">
+          <label class="palette__label">Type de grandeur</label>
+          <div class="palette__shape-row" role="group" aria-label="Type de grandeur">
+            <button type="button" :aria-pressed="!quantityIsFormula"
+              :class="['palette__kind-btn', { 'palette__kind-btn--active': !quantityIsFormula }]"
+              @click="setQuantityMode('number')">Numérique</button>
+            <button type="button" :aria-pressed="quantityIsFormula"
+              :class="['palette__kind-btn', { 'palette__kind-btn--active': quantityIsFormula }]"
+              @click="setQuantityMode('formula')">Formule</button>
+          </div>
+        </div>
+        <p v-if="quantityIsFormula" class="palette__hint">Valeur calculée par la formule à partir des grandeurs reliées.</p>
+        <div v-else class="palette__field palette__field--row">
           <label class="palette__label">Valeur</label>
           <input aria-label="Valeur de la grandeur" type="number" step="any" class="palette__number"
             :value="selectedNode.quantity?.value ?? ''" @change="updateQuantity('value', $event.target.value)" />
@@ -140,13 +153,13 @@
       </template>
 
       <!-- Formule -->
-      <template v-if="isFormulaNodeSelected">
+      <template v-if="isFormulaNodeSelected || isGraphNodeSelected">
         <div class="palette__field palette__field--row">
           <label class="palette__label">Couleur texte</label>
           <input aria-label="Couleur du texte" type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
         </div>
         <div class="palette__field">
-          <label class="palette__label">Formule</label>
+          <label class="palette__label">{{ isGraphNodeSelected ? 'Fonction à tracer (y = f(x))' : 'Formule' }}</label>
           <div v-if="editableContent" class="palette__formula-preview" v-html="formulaPreviewHtml" />
           <p v-else class="palette__hint">Aucune formule — ouvrez l'interpréteur pour en saisir une.</p>
           <div class="palette__actions-row">
@@ -391,7 +404,7 @@ import { mindmapColors } from '@/helpers/themeColors';
 import { computed, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { boxColorToHex, boxLevelToMastery } from '@/helpers/mindmap';
-import { ITEM_KINDS, MATH_KINDS, hasKind, isMathNode } from '@/helpers/mindmapItems';
+import { ITEM_KINDS, MATH_KINDS, PRIMARY_ONLY_KINDS, hasKind, hasFormulaContent, isGraphNode } from '@/helpers/mindmapItems';
 import { LINK_DIRECTIONS, LINK_SHAPES, getOutgoingLinks } from '@/helpers/mindmapLinks';
 import { api } from '@/helpers/api';
 import { VITE_API_URL } from '@/config';
@@ -433,11 +446,15 @@ const selectedNodeZone = computed(() => selectedNode.value?.zoneId || null);
 const zones = computed(() => store.map.zones || []);
 
 const isImageNodeSelected = computed(() => selectedNode.value?.type === 'image');
-const isFormulaNodeSelected = computed(() => isMathNode(selectedNode.value));
+const isFormulaNodeSelected = computed(() => hasFormulaContent(selectedNode.value));
+const isGraphNodeSelected = computed(() => isGraphNode(selectedNode.value));
 const isQuantityNodeSelected = computed(() => hasKind(selectedNode.value, 'quantity'));
 const extraKindOptions = computed(() =>
-  ITEM_KINDS.filter((kind) => kind.id !== selectedNode.value?.type)
+  ITEM_KINDS.filter((kind) => kind.id !== selectedNode.value?.type && !PRIMARY_ONLY_KINDS.includes(kind.id))
 );
+// Une grandeur (principale ou ajoutée à un texte) est soit numérique, soit calculée par une formule.
+const canChooseQuantityMode = computed(() => ['quantity', 'text'].includes(selectedNode.value?.type));
+const quantityIsFormula = computed(() => MATH_KINDS.some((kind) => hasKind(selectedNode.value, kind)));
 const isTextNodeSelected = computed(() => selectedNode.value?.type === 'text');
 
 const editableContent = ref('');
@@ -529,7 +546,7 @@ const unlinkCard = () => {
 };
 
 watch(() => store.interpreterOpen, (open) => {
-  if (open && isFormulaNodeSelected.value) {
+  if (open && (isFormulaNodeSelected.value || isGraphNodeSelected.value)) {
     interpreterValue.value = editableContent.value || selectedNode.value?.content || '';
   }
 });
@@ -546,7 +563,7 @@ watch(selectedNode, () => {
 });
 
 const formulaPreviewHtml = computed(() =>
-  isFormulaNodeSelected.value && editableContent.value
+  (isFormulaNodeSelected.value || isGraphNodeSelected.value) && editableContent.value
     ? renderMathMultiline(editableContent.value)
     : ''
 );
@@ -562,7 +579,7 @@ watch(
     isBold.value = (node?.style?.fontWeight || 'normal') !== 'normal';
     isItalic.value = (node?.style?.fontStyle || 'normal') !== 'normal';
     isUnderline.value = (node?.style?.textDecoration || 'none').includes('underline');
-    if (isFormulaNodeSelected.value) interpreterValue.value = node?.content || '';
+    if (isFormulaNodeSelected.value || isGraphNodeSelected.value) interpreterValue.value = node?.content || '';
     else interpreterValue.value = '';
     store.closeInterpreter();
   },
@@ -570,7 +587,7 @@ watch(
 );
 
 // Le contenu n'est conservé que si le nouveau rôle principal l'affiche de la même façon.
-const contentFamily = (type) => (MATH_KINDS.includes(type) ? 'math' : type);
+const contentFamily = (type) => (MATH_KINDS.includes(type) || type === 'graph' ? 'math' : type);
 
 const updateNodeType = (type) => {
   if (!selectedNode.value) return;
@@ -583,7 +600,31 @@ const updateNodeType = (type) => {
 
 const toggleExtraKind = (kind) => {
   if (!selectedNode.value) return;
-  store.toggleNodeKind(selectedNode.value.id, kind);
+  const node = selectedNode.value;
+  const enabling = !hasKind(node, kind);
+  store.toggleNodeKind(node.id, kind);
+  // Activer « Formule » / « Fonction » sur un texte ou une grandeur propose directement l'éditeur de formule.
+  if (enabling && MATH_KINDS.includes(kind) && ['text', 'quantity'].includes(node.type)) {
+    // Le texte par défaut (titre recopié) n'a pas de sens comme formule : on part d'une saisie vide.
+    if (node.content === node.label) {
+      editableContent.value = '';
+      store.updateNode(node.id, { content: '' });
+    }
+    interpreterValue.value = editableContent.value || node.content || '';
+    store.openInterpreter();
+  }
+};
+
+// Passe d'une grandeur numérique à une grandeur formule et inversement. Repasser en numérique garde
+// la formule en mémoire (elle est simplement ignorée) : la rebasculer la retrouve.
+const setQuantityMode = (mode) => {
+  if (!selectedNode.value) return;
+  const node = selectedNode.value;
+  if (mode === 'formula') {
+    if (!quantityIsFormula.value) toggleExtraKind('formula');
+    return;
+  }
+  MATH_KINDS.filter((kind) => hasKind(node, kind)).forEach((kind) => store.toggleNodeKind(node.id, kind));
 };
 
 const updateQuantity = (field, value) => {
@@ -648,7 +689,7 @@ const applyInterpreter = (value) => {
   editableContent.value = nextValue;
   store.updateNode(selectedNode.value.id, { content: nextValue });
   store.closeInterpreter();
-  proposeVariables(selectedNode.value.id);
+  if (!isGraphNodeSelected.value) proposeVariables(selectedNode.value.id);
 };
 
 // Après saisie d'une formule : propose de créer les grandeurs des variables qui n'en ont pas encore.

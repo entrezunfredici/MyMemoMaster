@@ -3,6 +3,7 @@ import {
   getNodeKinds,
   hasKind,
   isMathNode,
+  hasFormulaContent,
   normalizeNodeItem,
   formatQuantity,
   createQuantity,
@@ -46,5 +47,30 @@ describe('mindmapItems', () => {
     expect(formatQuantity({ symbol: 'v' })).toBe('v')
     expect(formatQuantity({ value: 3, unit: 'kg' })).toBe('3 kg')
     expect(formatQuantity(null)).toBe('')
+  })
+})
+
+describe('mindmapItems — graphique', () => {
+  it('normalizeNodeItem — un item graph reçoit un état de graphique par défaut', () => {
+    const node = normalizeNodeItem({ id: 'g', type: 'graph', content: 'y=x' })
+    expect(node.graph).toMatchObject({ xMin: -10, xMax: 10, yMin: -6, yMax: 6, mode: 'plot', params: {} })
+  })
+
+  it('normalizeNodeItem — le graphique n’est jamais un rôle supplémentaire', () => {
+    expect(normalizeNodeItem({ id: 'a', type: 'text', kinds: ['graph', 'quantity'] }).kinds).toEqual(['quantity'])
+  })
+})
+
+describe('mindmapItems — hasFormulaContent', () => {
+  it('formule/fonction en rôle principal, ou texte/grandeur avec ce rôle ajouté', () => {
+    expect(hasFormulaContent({ type: 'formula' })).toBe(true)
+    expect(hasFormulaContent({ type: 'text', kinds: ['function'] })).toBe(true)
+    expect(hasFormulaContent({ type: 'quantity', kinds: ['formula'] })).toBe(true)
+  })
+
+  it('faux pour un texte simple, une image ou un graphique', () => {
+    expect(hasFormulaContent({ type: 'text', kinds: ['quantity'] })).toBe(false)
+    expect(hasFormulaContent({ type: 'image', kinds: ['formula'] })).toBe(false)
+    expect(hasFormulaContent({ type: 'graph' })).toBe(false)
   })
 })

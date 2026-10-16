@@ -470,3 +470,53 @@ describe('useMindMapBuilderStore — branches', () => {
     })
   })
 })
+
+describe('useMindMapBuilderStore — nœud graphique', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue({ data: [] })
+  })
+
+  it('addNode(graph) — crée l’état du graphique et agrandit le nœud', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Carte')
+    const id = store.addNode({ label: 'G', type: 'graph', content: '', parentId: store.map.subjectNodeId })
+    const node = store.map.nodes[id]
+    expect(node.graph).toMatchObject({ xMin: -10, xMax: 10, mode: 'plot', params: {} })
+    expect(node.style.width).toBeGreaterThanOrEqual(340)
+    expect(node.style.height).toBeGreaterThanOrEqual(300)
+  })
+
+  it('updateNode({ type: graph }) — convertit un nœud formule en graphique en gardant la formule', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Carte')
+    const id = store.addNode({ label: 'F', type: 'formula', content: 'y=x^{2}', parentId: store.map.subjectNodeId })
+    store.updateNode(id, { type: 'graph' })
+    const node = store.map.nodes[id]
+    expect(node.type).toBe('graph')
+    expect(node.content).toBe('y=x^{2}')
+    expect(node.graph.mode).toBe('plot')
+    expect(node.style.width).toBeGreaterThanOrEqual(340)
+  })
+
+  it('updateNodeGraph — fusionne la vue et les paramètres, ignore les autres types', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Carte')
+    const id = store.addNode({ label: 'G', type: 'graph', content: 'y=ax', parentId: store.map.subjectNodeId })
+    store.updateNodeGraph(id, { params: { a: 2 } })
+    store.updateNodeGraph(id, { params: { b: 3 }, xMin: -2, xMax: 2 })
+    expect(store.map.nodes[id].graph).toMatchObject({ xMin: -2, xMax: 2, params: { a: 2, b: 3 } })
+    const textId = store.addNode({ label: 'T', type: 'text', parentId: store.map.subjectNodeId })
+    store.updateNodeGraph(textId, { mode: 'formula' })
+    expect(store.map.nodes[textId].graph).toBeUndefined()
+  })
+
+  it('toggleNodeKind — le graphique n’est pas un rôle supplémentaire', () => {
+    const store = useMindMapBuilderStore()
+    store.new('Carte')
+    const id = store.addNode({ label: 'T', type: 'text', parentId: store.map.subjectNodeId })
+    store.toggleNodeKind(id, 'graph')
+    expect(store.map.nodes[id].kinds).not.toContain('graph')
+  })
+})

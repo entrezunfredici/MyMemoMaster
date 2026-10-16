@@ -307,3 +307,94 @@ describe('MindMapPalette', () => {
     expect(wrapper.find('.palette__card-picker').exists()).toBe(true)
   })
 })
+
+describe('MindMapPalette — rôles supplémentaires « Formule » / « Fonction »', () => {
+  const clickKind = async (wrapper, label) => {
+    await wrapper.findAll('.palette__kind-btn').find((b) => b.text() === label).trigger('click')
+  }
+
+  it('activer « Fonction » sur un texte ouvre l’éditeur de formule', async () => {
+    const wrapper = mountPalette({ type: 'text', content: 'Contenu' })
+    const store = useMindMapBuilderStore()
+    await clickKind(wrapper, 'Fonction')
+    expect(store.toggleNodeKind).toHaveBeenCalledWith('node-1', 'function')
+    expect(store.openInterpreter).toHaveBeenCalled()
+  })
+
+  it('le texte par défaut (identique au titre) est vidé pour partir d’une saisie vide', async () => {
+    const wrapper = mountPalette({ type: 'text', label: 'Nouvel item', content: 'Nouvel item' })
+    const store = useMindMapBuilderStore()
+    await clickKind(wrapper, 'Formule')
+    expect(store.updateNode).toHaveBeenCalledWith('node-1', { content: '' })
+    expect(store.openInterpreter).toHaveBeenCalled()
+  })
+
+  it('un texte déjà rédigé est conservé comme point de départ', async () => {
+    const wrapper = mountPalette({ type: 'text', label: 'Titre', content: 'E=mc^2' })
+    const store = useMindMapBuilderStore()
+    await clickKind(wrapper, 'Formule')
+    expect(store.updateNode).not.toHaveBeenCalled()
+    expect(store.openInterpreter).toHaveBeenCalled()
+  })
+
+  it('désactiver le rôle (déjà actif) n’ouvre pas l’éditeur', async () => {
+    const wrapper = mountPalette({ type: 'text', kinds: ['function'], content: 'f(x)=x' })
+    const store = useMindMapBuilderStore()
+    await clickKind(wrapper, 'Fonction')
+    expect(store.toggleNodeKind).toHaveBeenCalledWith('node-1', 'function')
+    expect(store.openInterpreter).not.toHaveBeenCalled()
+  })
+
+  it('« Grandeur » n’ouvre pas l’éditeur', async () => {
+    const wrapper = mountPalette({ type: 'text' })
+    const store = useMindMapBuilderStore()
+    await clickKind(wrapper, 'Grandeur')
+    expect(store.openInterpreter).not.toHaveBeenCalled()
+  })
+
+  it('un texte avec le rôle « Fonction » affiche la section formule (aperçu + éditeur)', () => {
+    const wrapper = mountPalette({ type: 'text', kinds: ['function'], content: 'y=x' })
+    expect(wrapper.text()).toContain('Saisir avec l\'interpréteur')
+  })
+})
+
+describe('MindMapPalette — grandeur numérique ou formule', () => {
+  const quantity = { symbol: 'v', value: 15, unit: 'm/s' }
+  const modeBtn = (wrapper, label) =>
+    wrapper.find('[aria-label="Type de grandeur"]').findAll('button').find((b) => b.text() === label)
+
+  it('grandeur numérique : champ Valeur affiché, mode Numérique actif', () => {
+    const wrapper = mountPalette({ type: 'quantity', quantity })
+    expect(wrapper.find('[aria-label="Valeur de la grandeur"]').exists()).toBe(true)
+    expect(modeBtn(wrapper, 'Numérique').attributes('aria-pressed')).toBe('true')
+    expect(modeBtn(wrapper, 'Formule').attributes('aria-pressed')).toBe('false')
+  })
+
+  it('choisir « Formule » ajoute le rôle formule et ouvre l’éditeur', async () => {
+    const wrapper = mountPalette({ type: 'quantity', label: 'v', content: '', quantity })
+    const store = useMindMapBuilderStore()
+    await modeBtn(wrapper, 'Formule').trigger('click')
+    expect(store.toggleNodeKind).toHaveBeenCalledWith('node-1', 'formula')
+    expect(store.openInterpreter).toHaveBeenCalled()
+  })
+
+  it('grandeur formule : champ Valeur remplacé par une explication, mode Formule actif', () => {
+    const wrapper = mountPalette({ type: 'quantity', kinds: ['formula'], content: 'v=D/T', quantity })
+    expect(wrapper.find('[aria-label="Valeur de la grandeur"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Valeur calculée par la formule')
+    expect(modeBtn(wrapper, 'Formule').attributes('aria-pressed')).toBe('true')
+  })
+
+  it('choisir « Numérique » retire le rôle formule sans effacer la formule', async () => {
+    const wrapper = mountPalette({ type: 'quantity', kinds: ['formula'], content: 'v=D/T', quantity })
+    const store = useMindMapBuilderStore()
+    await modeBtn(wrapper, 'Numérique').trigger('click')
+    expect(store.toggleNodeKind).toHaveBeenCalledWith('node-1', 'formula')
+    expect(store.updateNode).not.toHaveBeenCalled()
+  })
+
+  it('pas de choix de mode pour un item de type formule', () => {
+    const wrapper = mountPalette({ type: 'formula', kinds: ['quantity'], content: 'v=D/T', quantity })
+    expect(wrapper.find('[aria-label="Type de grandeur"]').exists()).toBe(false)
+  })
+})

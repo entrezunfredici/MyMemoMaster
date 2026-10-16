@@ -2,15 +2,20 @@
 // rendu et le contenu) et peut porter des rôles supplémentaires (`kinds`),
 // par ex. une formule qui est aussi une grandeur physique.
 
+import { createGraph } from './mindmapGraph';
+
 const ITEM_KINDS = [
   { id: 'text', label: 'Texte', icon: 'T' },
   { id: 'formula', label: 'Formule', icon: 'Fx' },
   { id: 'function', label: 'Fonction', icon: 'f(x)' },
+  { id: 'graph', label: 'Graphique', icon: '📈' },
   { id: 'quantity', label: 'Grandeur', icon: 'Q' },
   { id: 'image', label: 'Image', icon: '🖼' },
 ];
 
 const ITEM_KIND_IDS = ITEM_KINDS.map((kind) => kind.id);
+// Le graphique est un rôle principal uniquement : il pilote tout le rendu du nœud.
+const PRIMARY_ONLY_KINDS = ['graph'];
 const DEFAULT_KIND = 'text';
 
 // Rôles dont le contenu est une expression rendue avec KaTeX.
@@ -38,10 +43,18 @@ const hasKind = (node, kind) => getNodeKinds(node).includes(kind);
 
 const isMathNode = (node) => MATH_KINDS.includes(node?.type);
 
+const isGraphNode = (node) => node?.type === 'graph';
+
+// Item dont le contenu est une formule : rôle principal formule/fonction, ou texte/grandeur
+// auquel on a ajouté le rôle « Formule » ou « Fonction » (rendu KaTeX + éditeur de formule).
+const hasFormulaContent = (node) =>
+  isMathNode(node) ||
+  (['text', 'quantity'].includes(node?.type || DEFAULT_KIND) && getNodeKinds(node).some((kind) => MATH_KINDS.includes(kind)));
+
 // Rôles supplémentaires uniquement (sans le rôle principal), restreints aux rôles connus.
 const sanitizeExtraKinds = (type, kinds) =>
   [...new Set(Array.isArray(kinds) ? kinds : [])].filter(
-    (kind) => ITEM_KIND_IDS.includes(kind) && kind !== type
+    (kind) => ITEM_KIND_IDS.includes(kind) && kind !== type && !PRIMARY_ONLY_KINDS.includes(kind)
   );
 
 // Remet un item (ancien ou nouveau format) dans un état cohérent.
@@ -51,6 +64,9 @@ const normalizeNodeItem = (node) => {
   const next = { ...node, type, kinds };
   if (type === 'quantity' || kinds.includes('quantity') || node.quantity) {
     next.quantity = createQuantity(node.quantity);
+  }
+  if (type === 'graph') {
+    next.graph = createGraph(node.graph);
   }
   return next;
 };
@@ -73,6 +89,9 @@ export {
   getNodeKinds,
   hasKind,
   isMathNode,
+  isGraphNode,
+  hasFormulaContent,
+  PRIMARY_ONLY_KINDS,
   sanitizeExtraKinds,
   normalizeNodeItem,
   formatQuantity,
