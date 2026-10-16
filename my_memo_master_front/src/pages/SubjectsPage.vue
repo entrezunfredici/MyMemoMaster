@@ -13,18 +13,18 @@
         v-model="searchQuery"
         type="text"
         placeholder="Rechercher dans tous les contenus…"
-        class="w-full px-4 py-3 !pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+        class="w-full px-4 py-3 !pl-10 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
       />
-      <span class="absolute left-3 top-3.5 text-gray-400">🔍</span>
+      <span class="absolute left-3 top-3.5 text-gray-500">🔍</span>
       <button aria-label="Effacer la recherche"
         v-if="searchQuery"
         @click="searchQuery = ''"
-        class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 text-lg leading-none"
+        class="absolute right-3 top-3 text-gray-500 hover:text-gray-600 text-lg leading-none"
       >×</button>
     </div>
 
     <!-- Chargement -->
-    <div v-if="searchStore.loading" class="text-center text-gray-400 py-12">
+    <div v-if="searchStore.loading" class="text-center text-gray-500 py-12">
       Chargement des contenus…
     </div>
 
@@ -42,7 +42,7 @@
       </p>
 
       <!-- Aucun résultat -->
-      <p v-if="visibleGroups.length === 0" class="text-center text-gray-400 py-12">
+      <p v-if="visibleGroups.length === 0" class="text-center text-gray-500 py-12">
         Aucun contenu trouvé{{ searchQuery ? ` pour « ${searchQuery} »` : '' }}.
       </p>
 
@@ -64,12 +64,12 @@
                 :class="group.subjectId ? 'bg-primary' : 'bg-gray-300'"
               />
               <span class="font-semibold text-heading text-base">{{ group.subjectName }}</span>
-              <span class="text-xs text-gray-400 font-normal">
+              <span class="text-xs text-gray-500 font-normal">
                 {{ group.total }} contenu{{ group.total !== 1 ? 's' : '' }}
               </span>
             </div>
             <svg
-              class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0"
+              class="w-4 h-4 text-gray-500 transition-transform flex-shrink-0"
               :class="isExpanded(group.subjectId) ? 'rotate-180' : ''"
               fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
             >
@@ -117,7 +117,7 @@
               <!-- Sujet vide -->
               <p
                 v-if="group.total === 0"
-                class="px-5 py-4 text-sm text-gray-400 italic"
+                class="px-5 py-4 text-sm text-gray-500 italic"
               >
                 Aucun contenu associé à ce sujet.
               </p>
@@ -233,7 +233,7 @@ const ContentSection = defineComponent({
   },
   setup(props) {
     return () => h('div', { class: 'px-5 py-3' }, [
-      h('p', { class: 'text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2' },
+      h('p', { class: 'text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2' },
         `${props.icon} ${props.label}`),
       h('ul', { class: 'space-y-1' },
         props.items.map(item =>

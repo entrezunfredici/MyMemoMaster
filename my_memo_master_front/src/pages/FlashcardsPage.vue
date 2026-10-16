@@ -38,13 +38,13 @@
                 :key="level"
                 class="flex-1 text-center bg-white border border-gray-200 rounded p-1"
               >
-                <div class="text-[10px] text-gray-400 font-bold">B{{ level }}</div>
+                <div class="text-[10px] text-gray-500 font-bold">B{{ level }}</div>
                 <div class="text-xs font-semibold text-primary">
                   {{ cardStore.systemStats[system.idSystem].totalByLevel?.[level] || 0 }}
                 </div>
                 <div
                   class="text-[10px] font-semibold"
-                  :class="(cardStore.systemStats[system.idSystem].boxes[level] || 0) > 0 ? 'text-orange-500' : 'text-gray-300'"
+                  :class="(cardStore.systemStats[system.idSystem].boxes[level] || 0) > 0 ? 'text-orange-700' : 'text-gray-500'"
                 >
                   {{ cardStore.systemStats[system.idSystem].boxes[level] || 0 }}↑
                 </div>
@@ -60,7 +60,7 @@
             </button>
             <button
               @click.stop="openPlanModal(system)"
-              class="text-sm text-green-600 hover:underline font-medium"
+              class="text-sm text-green-700 hover:underline font-medium"
             >
               + Planifier
             </button>
@@ -94,11 +94,11 @@
               />
             </div>
             <div class="mb-4">
-              <label class="form-label">Sujet <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <label class="form-label">Sujet <span class="text-gray-500 font-normal">(optionnel)</span></label>
               <SubjectSelectorComponent v-model="form.subjectId" />
             </div>
             <div class="mb-4">
-              <label class="form-label">Carte mentale liée <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <label class="form-label">Carte mentale liée <span class="text-gray-500 font-normal">(optionnel)</span></label>
               <select
                 aria-label="Carte mentale liée au système"
                 v-model="form.idMindMap"
@@ -114,7 +114,7 @@
               </p>
             </div>
             <div class="mb-6">
-              <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <label class="form-label">Tags <span class="text-gray-500 font-normal">(optionnel)</span></label>
               <TagSelectorComponent v-model="form.tagIds" />
             </div>
             <div class="btn-row">

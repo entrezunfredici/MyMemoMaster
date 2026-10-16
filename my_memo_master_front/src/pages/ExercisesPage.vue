@@ -28,7 +28,7 @@
           <!-- Statut privé / groupes assignés -->
           <span
             v-if="!test.classGroups?.length"
-            class="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200"
+            class="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600 border border-gray-200"
           >Privé</span>
           <span
             v-for="group in test.classGroups"
@@ -64,7 +64,7 @@
             Sélectionnez les groupes qui auront accès à cet exercice.<br>
             Les scores de ces étudiants apparaîtront dans vos KPI pédagogiques.
           </p>
-          <div v-if="assignableGroups.length === 0" class="text-sm text-gray-400 italic mb-4">
+          <div v-if="assignableGroups.length === 0" class="text-sm text-gray-500 italic mb-4">
             Vous n'avez aucun groupe classe. Créez-en un depuis la page Classe.
           </div>
           <div v-else class="space-y-2 mb-6">
@@ -75,10 +75,10 @@
             >
               <input type="checkbox" :value="group.id" v-model="selectedGroupIds" class="accent-primary w-4 h-4" />
               <span class="font-medium text-sm text-heading">{{ group.name }}</span>
-              <span v-if="group.level" class="text-xs text-gray-400">{{ group.level }}</span>
+              <span v-if="group.level" class="text-xs text-gray-500">{{ group.level }}</span>
             </label>
           </div>
-          <p class="text-xs text-gray-400 mb-4">Aucune sélection = l'exercice reste privé.</p>
+          <p class="text-xs text-gray-500 mb-4">Aucune sélection = l'exercice reste privé.</p>
           <div class="btn-row">
             <button type="button" @click="submitAssign" :disabled="assignSubmitting" class="btn-modal-submit">
               {{ assignSubmitting ? 'Enregistrement...' : 'Enregistrer' }}
@@ -108,7 +108,7 @@
 
             <!-- Tags -->
             <div class="form-group--lg">
-              <label class="form-label">Tags <span class="text-gray-400 font-normal">(optionnel)</span></label>
+              <label class="form-label">Tags <span class="text-gray-500 font-normal">(optionnel)</span></label>
               <TagSelectorComponent v-model="form.tagIds" />
             </div>
 
@@ -120,7 +120,7 @@
                   <button type="button" @click="openAiFlow" class="bg-primary hover:bg-primary/90 text-on-primary font-bold py-1 px-3 rounded text-sm transition">
                     ✨ Générer par IA
                   </button>
-                  <button type="button" @click="addQuestion" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition border-2 border-green-800">
+                  <button type="button" @click="addQuestion" class="bg-green-700 hover:bg-green-800 text-white font-bold py-1 px-3 rounded text-sm transition border-2 border-green-800">
                     + Ajouter une question
                   </button>
                 </div>
@@ -130,7 +130,7 @@
                 <div v-for="(q, idx) in form.questions" :key="q._key" class="bg-gray-50 border border-gray-200 p-4 rounded-lg">
                   <div class="flex justify-between items-center mb-3">
                     <span :id="`exercise-question-${idx}`" class="font-semibold text-sm text-heading">Question {{ idx + 1 }}</span>
-                    <button v-if="form.questions.length > 1" type="button" @click="removeQuestion(idx)" class="text-red-500 hover:text-red-700 text-sm font-medium">
+                    <button v-if="form.questions.length > 1" type="button" @click="removeQuestion(idx)" class="text-red-600 hover:text-red-700 text-sm font-medium">
                       Supprimer
                     </button>
                   </div>
@@ -163,7 +163,7 @@
                       </FormulaHelper>
                     </div>
                     <div>
-                      <label class="form-label--xs">Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span></label>
+                      <label class="form-label--xs">Autres formulations acceptées <span class="text-gray-500 font-normal">(optionnel)</span></label>
                       <div v-for="(alt, ai) in q.openAltAnswers" :key="ai" class="flex items-center gap-2 mb-2">
                         <input
                           :aria-label="`Formulation acceptée ${ai + 1}`"
@@ -176,7 +176,7 @@
                           type="button"
                           :aria-label="`Supprimer la formulation acceptée ${ai + 1}`"
                           @click="q.openAltAnswers.splice(ai, 1)"
-                          class="text-gray-400 hover:text-red-500 text-lg leading-none"
+                          class="text-gray-500 hover:text-red-600 text-lg leading-none"
                         >✕</button>
                       </div>
                       <button
@@ -197,8 +197,8 @@
                     <div class="space-y-2" role="radiogroup" :aria-labelledby="`exercise-question-${idx} exercise-mcq-legend-${idx}`">
                       <div v-for="(opt, oi) in q.mcqOptions" :key="oi" class="flex items-center gap-2">
                         <input :aria-label="`Marquer l'option ${oi + 1} comme correcte`" type="radio" :name="`mcq-correct-${idx}`" :value="oi" v-model="q.mcqCorrectIdx" class="accent-primary" />
-                        <input :aria-label="`Texte de l'option ${oi + 1}`" :value="opt.text" @input="setExerciseOptionText(q, oi, $event.target.value)" type="text" placeholder="Option..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
-                        <button v-if="q.mcqOptions.length > 2" type="button" @click="removeExerciseOption(q, oi)" class="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
+                        <input :aria-label="`Texte de l'option ${oi + 1}`" :value="opt.text" @input="setExerciseOptionText(q, oi, $event.target.value)" type="text" placeholder="Option..." class="flex-1 px-3 py-1.5 border border-gray-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
+                        <button v-if="q.mcqOptions.length > 2" type="button" @click="removeExerciseOption(q, oi)" class="text-red-600 hover:text-red-600 text-lg leading-none">✕</button>
                       </div>
                     </div>
                     <button type="button" @click="addExerciseOption(q)" class="mt-2 text-sm text-primary hover:underline font-medium">+ Ajouter une option</button>
@@ -213,11 +213,11 @@
                     <div v-if="q.fillBlanks.length" class="space-y-2">
                       <label class="form-label--xs">Réponses attendues</label>
                       <div v-for="(blank, bi) in q.fillBlanks" :key="bi" class="flex items-center gap-2">
-                        <span class="text-xs text-gray-400 w-14 shrink-0">Trou {{ bi }}</span>
-                        <input :aria-label="`Réponse du trou ${bi}`" v-model="q.fillBlanks[bi]" type="text" :placeholder="`Réponse du trou ${bi}`" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
+                        <span class="text-xs text-gray-500 w-14 shrink-0">Trou {{ bi }}</span>
+                        <input :aria-label="`Réponse du trou ${bi}`" v-model="q.fillBlanks[bi]" type="text" :placeholder="`Réponse du trou ${bi}`" class="flex-1 px-3 py-1.5 border border-gray-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
                       </div>
                     </div>
-                    <p v-else class="text-xs text-gray-400 italic">Utilisez <code v-pre class="bg-gray-200 px-1 rounded">{{0}}</code>, <code v-pre class="bg-gray-200 px-1 rounded">{{1}}</code>… dans le texte pour créer des trous.</p>
+                    <p v-else class="text-xs text-gray-500 italic">Utilisez <code v-pre class="bg-gray-200 px-1 rounded">{{0}}</code>, <code v-pre class="bg-gray-200 px-1 rounded">{{1}}</code>… dans le texte pour créer des trous.</p>
                   </template>
 
                   <!-- reorder -->
@@ -225,9 +225,9 @@
                     <label class="block text-xs font-semibold text-gray-500 mb-2">Fragments dans le bon ordre (l'étudiant devra les reconstituer)</label>
                     <div class="space-y-2">
                       <div v-for="(frag, fi) in q.reorderFragments" :key="fi" class="flex items-center gap-2">
-                        <span class="text-xs text-gray-400 w-5 shrink-0">{{ fi + 1 }}.</span>
-                        <input :aria-label="`Fragment ${fi + 1}`" v-model="q.reorderFragments[fi]" type="text" placeholder="Fragment..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
-                        <button v-if="q.reorderFragments.length > 2" type="button" @click="q.reorderFragments.splice(fi, 1)" class="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
+                        <span class="text-xs text-gray-500 w-5 shrink-0">{{ fi + 1 }}.</span>
+                        <input :aria-label="`Fragment ${fi + 1}`" v-model="q.reorderFragments[fi]" type="text" placeholder="Fragment..." class="flex-1 px-3 py-1.5 border border-gray-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" required />
+                        <button v-if="q.reorderFragments.length > 2" type="button" @click="q.reorderFragments.splice(fi, 1)" class="text-red-600 hover:text-red-600 text-lg leading-none">✕</button>
                       </div>
                     </div>
                     <button type="button" @click="q.reorderFragments.push('')" class="mt-2 text-sm text-primary hover:underline font-medium">+ Ajouter un fragment</button>
@@ -251,10 +251,10 @@
                 >
                   <input type="checkbox" :value="group.id" v-model="form.groupIds" class="accent-primary w-4 h-4" />
                   <span class="text-sm font-medium text-heading">{{ group.name }}</span>
-                  <span v-if="group.level" class="text-xs text-gray-400">{{ group.level }}</span>
+                  <span v-if="group.level" class="text-xs text-gray-500">{{ group.level }}</span>
                 </label>
               </div>
-              <p class="text-xs text-gray-400 mt-2">Aucune sélection = l'exercice reste privé.</p>
+              <p class="text-xs text-gray-500 mt-2">Aucune sélection = l'exercice reste privé.</p>
             </div>
 
             <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>

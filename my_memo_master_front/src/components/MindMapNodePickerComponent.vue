@@ -56,7 +56,7 @@
       <p class="text-xs mt-1" :class="modelValue ? 'text-primary font-semibold' : 'text-gray-500'" aria-live="polite">
         <template v-if="modelValue && selectedNode">
           Nœud lié : {{ nodeText(selectedNode) }}
-          <button type="button" class="ml-2 text-gray-400 hover:text-red-500 underline font-normal" @click="$emit('update:modelValue', null)">
+          <button type="button" class="ml-2 text-gray-500 hover:text-red-600 underline font-normal" @click="$emit('update:modelValue', null)">
             Retirer
           </button>
         </template>
