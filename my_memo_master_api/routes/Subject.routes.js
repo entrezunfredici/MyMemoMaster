@@ -1,12 +1,14 @@
-const express = require("express");
-const subject = require("../controllers/Subject.controller.js");
-//const authMiddleware = require("../middlewares/Auth.middleware");
+const express = require('express')
+const subject = require('../controllers/Subject.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const subjectValidators = require('../validators/Subject.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /subjects/all:
+ * /subjects:
  *   get:
  *     summary: Récupère tous les sujets
  *     tags: [Subjects]
@@ -29,7 +31,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/all", subject.findAll);
+router.get('/', authMiddleware, subject.findAll)
 
 /**
  * @swagger
@@ -63,11 +65,11 @@ router.get("/all", subject.findAll);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/:id", subject.findOne);
+router.get('/:id', authMiddleware, subject.findOne)
 
 /**
  * @swagger
- * /subjects/add:
+ * /subjects:
  *   post:
  *     summary: Ajoute un nouveau sujet
  *     tags: [Subjects]
@@ -98,7 +100,7 @@ router.get("/:id", subject.findOne);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/add", subject.create);
+router.post('/', authMiddleware, subjectValidators.create, validate, subject.create)
 
 /**
  * @swagger
@@ -131,7 +133,7 @@ router.post("/add", subject.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:id", subject.update);
+router.put('/:id', authMiddleware, subjectValidators.update, validate, subject.update)
 
 /**
  * @swagger
@@ -154,7 +156,7 @@ router.put("/:id", subject.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:id", subject.delete);
+router.delete('/:id', authMiddleware, subject.delete)
 
 module.exports = (app) => {
   /**
@@ -163,5 +165,5 @@ module.exports = (app) => {
    *   - name: Subjects
    *     description: Gestion des sujets
    */
-  app.use("/subjects", router);
-};
+  app.use('/subjects', router)
+}

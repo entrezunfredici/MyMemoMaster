@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mymemomaster-preprod
+  labels:
+    app.kubernetes.io/name: mymemomaster
+    app.kubernetes.io/instance: preprod

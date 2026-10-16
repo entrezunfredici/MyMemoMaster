@@ -1,14 +1,14 @@
 [
-    {
-        "id": 1,
-        "name": "Meter",
-        "denomination": "m",
-        "physicalQuantityName": "Lenght"
-    },
-    {
-        "id": 2,
-        "name": "Seconds",
-        "denomination": "s",
-        "physicalQuantityName": "Time"
-    }
+  {
+    "id": 1,
+    "name": "Meter",
+    "denomination": "m",
+    "physicalQuantityName": "Lenght"
+  },
+  {
+    "id": 2,
+    "name": "Seconds",
+    "denomination": "s",
+    "physicalQuantityName": "Time"
+  }
 ]

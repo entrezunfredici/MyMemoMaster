@@ -1,0 +1,266 @@
+# =============================================================================
+#  values.yaml — Valeurs partagées (base commune preprod + prod)
+#  Les surcharges par environnement sont dans values-preprod.yaml / values-prod.yaml
+# =============================================================================
+
+# ── Docker Hub ────────────────────────────────────────────────────────────────
+dockerhubUsername: fredissimo
+
+image:
+  api:
+    name: ""        # défini dans values-{env}.yaml
+    tag: latest
+  front:
+    name: ""        # défini dans values-{env}.yaml
+    tag: latest
+
+# ── Déploiement ───────────────────────────────────────────────────────────────
+replicas:
+  api: 1
+  front: 1
+
+# Injecté par le CD via --set rolloutTimestamp=$(date +%s)
+# Force un rolling update même si l'image :latest n'a pas changé
+rolloutTimestamp: ""
+
+# Nom du Secret K8s créé manuellement sur le cluster (ne pas inclure dans le chart)
+# Défaut calculé dans _helpers.tpl : {{ .Release.Name }}-secrets
+# Ex: mmm-preprod-secrets / mmm-prod-secrets
+secretName: ""
+
+# ── Configuration applicative (ConfigMap) ─────────────────────────────────────
+config:
+  NODE_ENV: production
+  ENVIRONMENT: ""           # "preprod" | "prod"
+  API_PORT: "3000"
+  METRICS_PORT: "9090"
+  API_BYPASS_AUTH: "false"
+  # Profondeur de la chaîne de proxies devant l'API (voir app.js).
+  #   "1" — ingress-nginx seul (Cloudflare en DNS-only / nuage gris)
+  #   "2" — Cloudflare en proxy (nuage orange) + ingress-nginx
+  # À passer à "2" EN MÊME TEMPS que l'activation du proxy Cloudflare : le mettre
+  # à 2 sans Cloudflare devant rend l'en-tête X-Forwarded-For falsifiable.
+  TRUST_PROXY_HOPS: "1"
+  AUTH_JWT_EXPIRES_IN: 1d
+  PG_DB: mymemomasterdb
+  PG_PORT: "5432"
+  DB_SYNC_MAX_RETRIES: "5"
+  DB_SYNC_RETRY_DELAY: "5000"
+  PG_POOL_MAX: "10"
+  PG_POOL_MIN: "2"
+  PG_POOL_ACQUIRE: "30000"
+  PG_POOL_IDLE: "10000"
+  REDIS_PORT: "6379"
+  # Relais SMTP Brevo. Domaine authentifié (brevo-code + DKIM brevo1/brevo2 + DMARC).
+  # SMTP_USER est un login dédié Brevo (…@smtp-brevo.com), PAS l'email du compte ;
+  # SMTP_PASS est la clé SMTP « xsmtpsib-… », pas une clé API v3 « xkeysib-… ».
+  # Hostinger reste l'hébergeur des MX pour la RÉCEPTION sur support@.
+  SMTP_HOST: smtp-relay.brevo.com
+  SMTP_PORT: "587"
+  SMTP_SECURE: "false"
+  # Aligné sur l'expéditeur vérifié dans Brevo (« support », DKIM + DMARC validés).
+  # Le domaine étant authentifié, un noreply@my-memo-master.com fonctionnerait aussi
+  # (vérifié par un envoi réel le 2026-08-27) ; on garde support@ pour que les
+  # réponses des utilisateurs arrivent dans une boîte réellement relevée.
+  EMAIL_FROM: support@my-memo-master.com
+  API_PUBLIC_URL: ""        # défini dans values-{env}.yaml
+  CORS_ORIGIN: ""           # défini dans values-{env}.yaml
+  # URL publique du front — sert à construire le lien de vérification email
+  APP_FRONT_URL: ""         # défini dans values-{env}.yaml
+  VITE_API_URL: ""          # défini dans values-{env}.yaml
+  VITE_FRONT_URL: ""        # défini dans values-{env}.yaml
+  PGADMIN_DEFAULT_EMAIL: admin@my-memo-master.com
+
+  # ── Stockage S3 (Infomaniak Swiss Backup) ────────────────────────────────
+  S3_ENDPOINT: ""
+  S3_REGION: us-east-1
+  S3_BUCKET: ""
+  S3_PUBLIC_URL: ""
+  S3_FORCE_PATH_STYLE: "true"
+  # Préfixe des clés d'objets de l'environnement (bucket partagé) — voir helpers/storageKeys.js.
+  # Vide = pas de préfixe (clés historiques `uploads/...`, `mindmaps/...`).
+  S3_KEY_PREFIX: ""
+
+  # ── Auth refresh token ────────────────────────────────────────────────────
+  AUTH_REFRESH_TOKEN_EXPIRES_DAYS: "7"
+
+  # ── Inscriptions ───────────────────────────────────────────────────────────
+  MAX_USERS: ""              # vide/0 = pas de limite ; sinon plafond de comptes
+
+  # ── Génération de Leitner par IA (C-01) ────────────────────────────────────
+  # Mêmes 8 variables que docker-compose.yml (service api, profils dev/test) — restées
+  # absentes du chart jusqu'ici (dette signalée dans CHANGELOG_AGENT.md, 2026-09-02 :
+  # "docker-compose.yml ne transmettait jamais les variables Mistral/IA au conteneur api",
+  # jamais reportée côté K8s). Vides ici : helpers/mistralConfig.js et helpers/aiQuotaConfig.js
+  # ont chacun un défaut applicatif sensé (mistral-small-latest, timeout 30s, 10
+  # générations/jour, 20 $/mois) — laisser vide revient à accepter ce défaut, comme en local.
+  # MISTRAL_API_KEY N'EST PAS ICI : c'est un secret, à ajouter dans le Secret K8s existant
+  # (mmm-{env}-secrets), jamais dans une ConfigMap versionnée — voir
+  # docs/MANUEL_DEPLOIEMENT_KUBERNETES.md §3.2.
+  MISTRAL_API_URL: ""
+  MISTRAL_MODEL: ""
+  MISTRAL_OCR_API_URL: ""
+  MISTRAL_OCR_MODEL: ""
+  MISTRAL_TIMEOUT_MS: ""
+  AI_QUOTA_MAX_GENERATIONS_PER_DAY: ""
+  AI_BUDGET_MAX_USD_PER_MONTH: ""
+  AI_GRADING_MAX_PER_DAY: ""
+  AI_GRADING_BUDGET_MAX_USD_PER_MONTH: ""
+  SEMANTIC_PREWARM: ""     # vide/true = MiniLM préchauffé au démarrage ; false = chargé à la demande (mode dégradé seul)
+
+# ── Domaines & Ingress ────────────────────────────────────────────────────────
+domain:
+  api: ""         # défini dans values-{env}.yaml
+  front: ""       # défini dans values-{env}.yaml
+  pgadmin: ""     # défini dans values-{env}.yaml (si pgadmin.enabled)
+
+certManager:
+  clusterIssuer: letsencrypt-prod-cloudflare
+
+# ── Stockage (PVC) ────────────────────────────────────────────────────────────
+# Classe de stockage des volumes persistants. Vide = classe par défaut du cluster.
+# Cluster Infomaniak (pck-*), classes disponibles :
+#   csi-cinder-sc-retain  (défaut du cluster) — le volume Cinder SURVIT à la
+#     suppression du PVC : protection contre la perte de données, mais le volume
+#     continue d'être facturé tant qu'il n'est pas supprimé à la main.
+#   csi-cinder-sc-delete — le volume est supprimé avec le PVC.
+storageClass: ""
+
+# ── Ordonnancement / priorité ────────────────────────────────────────────────
+# PriorityClass appliquée à tous les pods de la release. Vide = priorité 0.
+# Les classes sont créées une fois sur le cluster : k8s/priorityclasses.yml
+priorityClassName: ""
+
+# ── Quota de namespace ───────────────────────────────────────────────────────
+# Plafonne ce que la release peut consommer sur un cluster partagé avec un autre
+# environnement. Désactivé par défaut : à n'activer que sur l'environnement que
+# l'on accepte de voir bridé (la preprod), jamais sur celui que l'on protège.
+# IMPORTANT : dimensionner AU-DESSUS de la somme des limites en régime établi
+# PLUS le pod supplémentaire créé pendant un rolling update (maxSurge). Un quota
+# calé au plus juste bloque sa propre mise à jour : le nouveau pod est refusé,
+# l'ancien n'est jamais retiré, le déploiement reste bloqué (constaté 2026-08-27).
+resourceQuota:
+  enabled: false
+  requests:
+    cpu: "2"
+    memory: 3Gi
+  limits:
+    cpu: "4"
+    memory: 6Gi
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+postgres:
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# ── Sauvegarde PostgreSQL (CronJob → S3) ─────────────────────────────────────
+# pg_dump -Fc quotidien envoyé sur s3://<S3_BUCKET>/backups/<ENVIRONMENT>/ (mêmes
+# identifiants S3 que l'API), puis purge : seuls les `keep` dumps les plus récents sont
+# conservés. Désactivé par défaut ; activé dans values-{env}.yaml. Images externes
+# (Docker Hub) : postgres:17-alpine = celle de la base ; amazon/aws-cli épinglée en 2.15.x
+# (les versions plus récentes ajoutent des checksums que certains S3 compatibles refusent).
+backup:
+  enabled: false
+  schedule: "0 3 * * *"     # 03:00 UTC
+  keep: 14
+  images:
+    postgres: postgres:17-alpine
+    awscli: amazon/aws-cli:2.15.30
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+redis:
+  # false = Deployment sans PVC (preprod, données éphémères)
+  # true  = StatefulSet avec PVC (prod, données persistées)
+  persistent: false
+  storage: 2Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ── API ───────────────────────────────────────────────────────────────────────
+api:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+front:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# ── PgAdmin (admin DB optionnel) ─────────────────────────────────────────────
+pgadmin:
+  enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ── Monitoring (Prometheus central par environnement) ────────────────────────
+# Scrape les pods annotés prometheus.io/* du namespace de la release.
+# Non exposé par l'Ingress — accès via kubectl port-forward (voir prometheus.yaml)
+monitoring:
+  enabled: true
+  imageTag: v3.5.0        # LTS — épingler explicitement, jamais :latest
+  scrapeInterval: 30s
+  retention: 15d
+  # false = Deployment + emptyDir (preprod, historique éphémère)
+  # true  = StatefulSet + PVC (prod, historique persisté)
+  persistent: false
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # ── Alertes (Alertmanager → Discord) ────────────────────────────────────────
+  # Second volet de la recommandation R3 du Bloc 4 : alertes sur métriques
+  # fines (5xx, latence p95, event loop) évaluées par le Prometheus du chart.
+  # Prérequis avant d'activer : ajouter la clé DISCORD_WEBHOOK_URL au Secret
+  # manuel <release>-secrets (sinon le pod Alertmanager ne démarre pas et le
+  # déploiement --atomic rollback).
+  alerting:
+    enabled: false
+    imageTag: v0.28.1     # épingler explicitement, jamais :latest
+    # Part de réponses 5xx sur 5 min au-delà de laquelle on alerte (0.05 = 5 %)
+    errorRateThreshold: 0.05
+    # Latence p95 (secondes) au-delà de laquelle on alerte
+    latencyP95Seconds: 1
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi

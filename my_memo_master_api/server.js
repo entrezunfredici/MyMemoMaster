@@ -1,53 +1,111 @@
-const http = require('http');
-const db = require('./models');
-const app = require('./app');
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') })
+const http = require('http')
+const db = require('./models')
+const app = require('./app')
+const logger = require('./helpers/logger')
+const { register } = require('./helpers/metrics')
+const semanticService = require('./services/Semantic.service')
 
-const DEFAULT_MAX_RETRIES = 10;
-const DEFAULT_RETRY_DELAY_MS = 5000;
+const DEFAULT_MAX_RETRIES = 10
+const DEFAULT_RETRY_DELAY_MS = 5000
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const toPositiveInt = (value, fallback) => {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
 
-// 1) Start listening immediately (Cloud Run expects the port to open ASAP)
-const PORT = Number(process.env.PORT || process.env.API_PORT || 8080);
-const HOST = '0.0.0.0';
-const shouldSyncSchema = (process.env.ENVIRONMENT || '').trim().toLowerCase() !== 'prod';
+const PORT = Number(process.env.PORT || process.env.API_PORT || 8080)
+const HOST = '0.0.0.0'
+const shouldSyncSchema = (process.env.ENVIRONMENT || '').trim().toLowerCase() !== 'prod'
 
-const server = http.createServer(app);
+const server = http.createServer(app)
 server.listen(PORT, HOST, () => {
-  console.log(`[API] Listening on ${HOST}:${PORT}`);
-});
+  logger.info(`[API] Listening on ${HOST}:${PORT}`)
+})
 
-// 2) Handle DB init in the background so boot is not blocked
-(async () => {
-  const maxRetries = toPositiveInt(process.env.DB_SYNC_MAX_RETRIES, DEFAULT_MAX_RETRIES);
-  const retryDelayMs = toPositiveInt(process.env.DB_SYNC_RETRY_DELAY, DEFAULT_RETRY_DELAY_MS);
-  let schemaSynced = false;
+// CHOIX: serveur HTTP dédié aux métriques, sur un port distinct de l'API publique
+// RAISON: l'Ingress/Traefik ne route que le port applicatif (${PORT}) — un serveur
+//         séparé garantit que /metrics reste inatteignable de l'extérieur sans
+//         dépendre d'une règle d'exclusion fragile côté reverse-proxy
+const METRICS_PORT = Number(process.env.METRICS_PORT || 9090)
+const metricsServer = http.createServer(async (req, res) => {
+  if (req.method === 'GET' && req.url === '/metrics') {
+    try {
+      res.writeHead(200, { 'Content-Type': register.contentType })
+      res.end(await register.metrics())
+    } catch (error) {
+      logger.error(`Metrics endpoint error: ${error?.message || error}`)
+      res.writeHead(500)
+      res.end()
+    }
+  } else {
+    res.writeHead(404)
+    res.end()
+  }
+})
+metricsServer.listen(METRICS_PORT, HOST, () => {
+  logger.info(`[Metrics] Listening on ${HOST}:${METRICS_PORT}`)
+})
+
+;(async () => {
+  const maxRetries = toPositiveInt(process.env.DB_SYNC_MAX_RETRIES, DEFAULT_MAX_RETRIES)
+  const retryDelayMs = toPositiveInt(process.env.DB_SYNC_RETRY_DELAY, DEFAULT_RETRY_DELAY_MS)
+  let schemaSynced = false
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const dbEmpty = await db.isDatabaseEmpty();
+      const dbEmpty = await db.isDatabaseEmpty()
 
       if (!schemaSynced && (shouldSyncSchema || dbEmpty)) {
-        const reason = dbEmpty ? 'empty database detected' : 'dev/test mode';
-        console.log(`[DB] Running Sequelize sync (${reason})…`);
-        await db.syncModels();
-        schemaSynced = true;
+        const reason = dbEmpty ? 'empty database detected' : 'dev/test mode'
+        logger.info(`[DB] Running Sequelize sync (${reason})…`)
+        await db.syncModels()
+        schemaSynced = true
       }
 
-      await db.instance.authenticate();
-      console.log('\x1b[32m%s\x1b[0m', 'Database connection OK');
-      return;
+      await db.instance.authenticate()
+      logger.info('Database connection OK')
+      return
     } catch (err) {
-      console.error(`DB connect failed (${attempt}/${maxRetries})`, err?.message || err);
+      logger.error(`DB connect failed (${attempt}/${maxRetries}): ${err?.message || err}`)
       if (attempt < maxRetries) {
-        await wait(retryDelayMs);
+        await wait(retryDelayMs)
       }
     }
   }
 
-  console.error('DB still unreachable; API keeps serving non-DB routes.');
-})();
+  logger.error('DB still unreachable; API keeps serving non-DB routes.')
+})()
+
+// Pre-warm the semantic model in the background so the first correction (Leitner
+// ou submit d'exercice) doesn't block a user request for 30+ seconds.
+// CHOIX: une vraie inférence (gradeSemantic) plutôt que getModel() seul
+// RAISON: charger le pipeline ne suffit pas — la première inférence paie encore
+// l'initialisation de la session ONNX (~30 s observés en conteneur), qui gelait
+// la première soumission d'exercice après chaque redémarrage.
+// CHOIX (2026-09-01): deux chaînes différentes, pas la même deux fois
+// RAISON: gradeSemantic('x', 'x') prend le court-circuit "correspondance exacte"
+// (normalizeSymbolic(a) === normalizeSymbolic(b) est trivialement vrai sur deux
+// chaînes identiques) — il retournait avant même d'appeler getModel(). Le
+// pré-chauffage ne chargeait donc jamais réellement le modèle : le vrai
+// chargement (et son pic mémoire, ONNX WASM) n'arrivait qu'à la première
+// correction d'un vrai utilisateur, en pleine session plutôt qu'au démarrage
+// en tâche de fond — observé en local : le conteneur API (512 Mo) s'est fait
+// tuer par l'OOM killer pile à ce moment, avec le pré-chauffage qui se
+// terminait "avec succès" sans jamais avoir chargé quoi que ce soit.
+// CHOIX (2026-10-09): préchauffage désactivable (SEMANTIC_PREWARM=false), activé par défaut
+// RAISON: depuis que Mistral juge les réponses (MistralGrading.service), MiniLM ne sert plus qu'au
+// mode dégradé (plafond atteint / Mistral indisponible). Le préchauffer coûte ~450-800 Mo de RAM
+// par pod en permanence ; le désactiver libère cette mémoire, au prix d'un premier verdict dégradé
+// lent (~30 s) après chaque redémarrage — à choisir selon la fréquence attendue du mode dégradé.
+if (process.env.SEMANTIC_PREWARM !== 'false') {
+  semanticService
+    .gradeSemantic('préchauffage du modèle', 'texte différent pour forcer un vrai calcul d\'embedding')
+    .then(() => logger.info('[SemanticService] Pre-warm inference done.'))
+    .catch((err) => {
+      logger.warn(`[SemanticService] Pre-warm failed: ${err?.message || err}`)
+    })
+} else {
+  logger.info('[SemanticService] Pre-warm désactivé (SEMANTIC_PREWARM=false) : modèle chargé à la demande.')
+}

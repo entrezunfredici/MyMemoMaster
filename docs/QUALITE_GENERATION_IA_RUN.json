@@ -1,0 +1,401 @@
+{
+  "summary": {
+    "runAt": "2026-09-02T17:16:35.001Z",
+    "model": "mistral-small-latest",
+    "fixtureCount": 7,
+    "successCount": 6,
+    "successRate": 0.8571428571428571,
+    "averageLatencyMs": 3353,
+    "totalCardsProduced": 19,
+    "totalGenuineExcerpts": 18,
+    "totalDuplicates": 0,
+    "shortfallCasesRespected": 6,
+    "shortfallCasesTotal": 2
+  },
+  "results": [
+    {
+      "id": "svt-photosynthese",
+      "note": "Cas nominal, taille modeste — reprend le texte d'exemple de generation_ia_prompt_cartes.md §9.",
+      "success": true,
+      "latencyMs": 4267,
+      "requestedCardCount": 3,
+      "producedCardCount": 3,
+      "warning": null,
+      "usage": {
+        "model": "mistral-small-latest",
+        "promptTokens": 829,
+        "completionTokens": 325
+      },
+      "genuineExcerptCount": 3,
+      "genuineExcerptRate": 1,
+      "duplicateCount": 0,
+      "duplicates": [],
+      "shortfallWarningRespected": true,
+      "mcqCorrectCounts": [],
+      "cards": [
+        {
+          "statement": "Quels organismes réalisent la photosynthèse selon le texte ?",
+          "type": "open",
+          "answer": "Les plantes, les algues et certaines bactéries.",
+          "acceptedAnswers": [
+            "Plantes, algues et certaines bactéries",
+            "Les plantes, les algues et certaines bactéries"
+          ],
+          "options": null,
+          "sourceExcerpt": "La photosynthèse est le processus par lequel les plantes, les algues et certaines bactéries convertissent l'énergie lumineuse en énergie chimique."
+        },
+        {
+          "statement": "Dans quel organite cellulaire se déroule principalement la photosynthèse ?",
+          "type": "open",
+          "answer": "Les chloroplastes.",
+          "acceptedAnswers": [
+            "Chloroplastes"
+          ],
+          "options": null,
+          "sourceExcerpt": "Elle se déroule principalement dans les chloroplastes, grâce à un pigment appelé chlorophylle."
+        },
+        {
+          "statement": "Quels sont les produits de la photosynthèse mentionnés dans le texte ?",
+          "type": "open",
+          "answer": "Le glucose et l'oxygène.",
+          "acceptedAnswers": [
+            "Glucose et oxygène",
+            "Glucose, oxygène"
+          ],
+          "options": null,
+          "sourceExcerpt": "Le processus consomme du dioxyde de carbone et de l'eau, et produit du glucose et de l'oxygène."
+        }
+      ]
+    },
+    {
+      "id": "histoire-revolution",
+      "note": "Cas nominal, texte plus long et plus dense en dates/faits.",
+      "success": true,
+      "latencyMs": 3177,
+      "requestedCardCount": 4,
+      "producedCardCount": 4,
+      "warning": null,
+      "usage": {
+        "model": "mistral-small-latest",
+        "promptTokens": 921,
+        "completionTokens": 517
+      },
+      "genuineExcerptCount": 4,
+      "genuineExcerptRate": 1,
+      "duplicateCount": 0,
+      "duplicates": [],
+      "shortfallWarningRespected": true,
+      "mcqCorrectCounts": [],
+      "cards": [
+        {
+          "statement": "Quel événement marque le début de l'insurrection populaire à Paris lors de la Révolution française ?",
+          "type": "open",
+          "answer": "La prise de la Bastille le 14 juillet 1789.",
+          "acceptedAnswers": [
+            "Prise de la Bastille",
+            "Prise de la Bastille le 14 juillet 1789",
+            "14 juillet 1789"
+          ],
+          "options": null,
+          "sourceExcerpt": "Le 14 juillet 1789, la prise de la Bastille marque le début de l'insurrection populaire à Paris."
+        },
+        {
+          "statement": "Quelle assemblée abolit les privilèges féodaux dans la nuit du 4 août 1789 ?",
+          "type": "open",
+          "answer": "L'Assemblée constituante.",
+          "acceptedAnswers": [
+            "Assemblée constituante",
+            "Assemblée nationale constituante"
+          ],
+          "options": null,
+          "sourceExcerpt": "Dans la nuit du 4 août 1789, l'Assemblée constituante abolit les privilèges féodaux."
+        },
+        {
+          "statement": "Quels principes fondamentaux sont proclamés par la Déclaration des droits de l'homme et du citoyen adoptée le 26 août 1789 ?",
+          "type": "open",
+          "answer": "La liberté, l'égalité et la propriété.",
+          "acceptedAnswers": [
+            "Liberté, égalité, propriété",
+            "Liberté",
+            "Égalité",
+            "Propriété"
+          ],
+          "options": null,
+          "sourceExcerpt": "Le 26 août 1789, elle adopte la Déclaration des droits de l'homme et du citoyen, qui proclame la liberté, l'égalité et la propriété comme droits naturels."
+        },
+        {
+          "statement": "En quelle année la monarchie constitutionnelle est-elle instaurée pendant la Révolution française ?",
+          "type": "open",
+          "answer": "1791.",
+          "acceptedAnswers": [
+            "1791"
+          ],
+          "options": null,
+          "sourceExcerpt": "La monarchie constitutionnelle est instaurée en 1791, avant que la Première République ne soit proclamée le 21 septembre 1792."
+        }
+      ]
+    },
+    {
+      "id": "maths-pythagore-mcq",
+      "note": "Cas nominal QCM — vérifie options 3-4, exactement 1 bonne réponse (déjà couvert par le schéma, revérifié ici).",
+      "success": true,
+      "latencyMs": 5134,
+      "requestedCardCount": 3,
+      "producedCardCount": 3,
+      "warning": null,
+      "usage": {
+        "model": "mistral-small-latest",
+        "promptTokens": 2217,
+        "completionTokens": 937
+      },
+      "genuineExcerptCount": 2,
+      "genuineExcerptRate": 0.6666666666666666,
+      "duplicateCount": 0,
+      "duplicates": [],
+      "shortfallWarningRespected": true,
+      "mcqCorrectCounts": [
+        1,
+        1,
+        1
+      ],
+      "cards": [
+        {
+          "statement": "Dans un triangle rectangle, quelle relation lie les longueurs des côtés a, b et c (avec c l'hypoténuse) ?",
+          "type": "mcq",
+          "answer": null,
+          "acceptedAnswers": null,
+          "options": [
+            {
+              "text": "a² = b² + c²",
+              "correct": false
+            },
+            {
+              "text": "b² = a² + c²",
+              "correct": false
+            },
+            {
+              "text": "c² = a² + b²",
+              "correct": true
+            }
+          ],
+          "sourceExcerpt": "le carré de la longueur de l'hypoténuse est égal à la somme des carrés des longueurs des deux autres côtés. Si l'hypoténuse mesure c et les deux autres côtés a et b, alors c² = a² + b²."
+        },
+        {
+          "statement": "Le théorème de Pythagore s'applique-t-il à tous les types de triangles ?",
+          "type": "mcq",
+          "answer": null,
+          "acceptedAnswers": null,
+          "options": [
+            {
+              "text": "Oui, à tous les triangles.",
+              "correct": false
+            },
+            {
+              "text": "Non, uniquement aux triangles rectangles.",
+              "correct": true
+            },
+            {
+              "text": "Uniquement aux triangles isocèles.",
+              "correct": false
+            }
+          ],
+          "sourceExcerpt": "Le théorème de Pythagore énonce que, dans un triangle rectangle, ..."
+        },
+        {
+          "statement": "Quel est l'objectif principal du théorème de Pythagore ?",
+          "type": "mcq",
+          "answer": null,
+          "acceptedAnswers": null,
+          "options": [
+            {
+              "text": "Démontrer que tous les triangles sont rectangles.",
+              "correct": false
+            },
+            {
+              "text": "Calculer la longueur d'un côté inconnu d'un triangle rectangle si les deux autres sont connues.",
+              "correct": true
+            },
+            {
+              "text": "Trouver l'aire d'un triangle rectangle.",
+              "correct": false
+            }
+          ],
+          "sourceExcerpt": "Ce théorème permet de calculer la longueur d'un côté inconnu d'un triangle rectangle si les deux autres sont connues."
+        }
+      ]
+    },
+    {
+      "id": "anglais-source-sortie-fr",
+      "note": "Texte source en anglais, sortie demandée en français — vérifie §5.4 (langue de sortie indépendante de la langue source).",
+      "success": true,
+      "latencyMs": 2012,
+      "requestedCardCount": 2,
+      "producedCardCount": 2,
+      "warning": null,
+      "usage": {
+        "model": "mistral-small-latest",
+        "promptTokens": 821,
+        "completionTokens": 297
+      },
+      "genuineExcerptCount": 2,
+      "genuineExcerptRate": 1,
+      "duplicateCount": 0,
+      "duplicates": [],
+      "shortfallWarningRespected": true,
+      "mcqCorrectCounts": [],
+      "cards": [
+        {
+          "statement": "Quelle est la fonction principale des mitochondries dans une cellule eucaryote ?",
+          "type": "open",
+          "answer": "Générer la majeure partie de l'ATP (adénosine triphosphate), source d'énergie chimique de la cellule.",
+          "acceptedAnswers": [
+            "Produire la majorité de l'ATP de la cellule",
+            "Générer l'ATP utilisé comme source d'énergie chimique",
+            "Fournir l'ATP nécessaire à la cellule"
+          ],
+          "options": null,
+          "sourceExcerpt": "They are often described as the \"powerhouse of the cell\" because they generate most of the cell's supply of adenosine triphosphate (ATP), used as a source of chemical energy."
+        },
+        {
+          "statement": "Quel élément génétique les mitochondries possèdent-elles en propre, distinct du noyau cellulaire ?",
+          "type": "open",
+          "answer": "Leur propre ADN (ADN mitochondrial).",
+          "acceptedAnswers": [
+            "De l'ADN mitochondrial",
+            "Un ADN séparé de l'ADN nucléaire",
+            "De l'ADN mitochondrial distinct de l'ADN nucléaire"
+          ],
+          "options": null,
+          "sourceExcerpt": "Mitochondria have their own DNA, separate from the nuclear DNA of the cell."
+        }
+      ]
+    },
+    {
+      "id": "contenu-insuffisant",
+      "note": "Cas limite §5.3/§7 : texte source très court pour un cardCount élevé — attendu : moins de cartes que demandé + warning, jamais de bourrage.",
+      "success": true,
+      "latencyMs": 1933,
+      "requestedCardCount": 5,
+      "producedCardCount": 2,
+      "warning": "Le texte source ne contient pas suffisamment d'informations distinctes pour générer 5 cartes sans enfreindre la règle 3 (pas de redondance ou de reformulation). Seules 2 cartes ont pu être créées de manière valide.",
+      "usage": {
+        "model": "mistral-small-latest",
+        "promptTokens": 779,
+        "completionTokens": 303
+      },
+      "genuineExcerptCount": 2,
+      "genuineExcerptRate": 1,
+      "duplicateCount": 0,
+      "duplicates": [],
+      "shortfallWarningRespected": true,
+      "mcqCorrectCounts": [],
+      "cards": [
+        {
+          "statement": "Quelle est la valeur de la vitesse de la lumière dans le vide, exprimée en mètres par seconde ?",
+          "type": "open",
+          "answer": "299 792 458 m/s",
+          "acceptedAnswers": [
+            "299 792 458 mètres par seconde",
+            "299 792 458 m/s"
+          ],
+          "options": null,
+          "sourceExcerpt": "La vitesse de la lumière dans le vide est d'environ 299 792 458 mètres par seconde."
+        },
+        {
+          "statement": "Dans quel milieu la vitesse de la lumière est-elle égale à 299 792 458 m/s ?",
+          "type": "open",
+          "answer": "Dans le vide",
+          "acceptedAnswers": [
+            "Le vide"
+          ],
+          "options": null,
+          "sourceExcerpt": "La vitesse de la lumière dans le vide est d'environ 299 792 458 mètres par seconde."
+        }
+      ]
+    },
+    {
+      "id": "cardcount-disproportionne",
+      "note": "Cas limite §5.3/§7 : cardCount délibérément disproportionné par rapport à la taille du chunk.",
+      "success": true,
+      "latencyMs": 3596,
+      "requestedCardCount": 15,
+      "producedCardCount": 5,
+      "warning": "Le texte source ne contient pas suffisamment d'informations atomiques pour générer 15 cartes distinctes sans enfreindre les règles (notamment la règle 3). Seules 6 cartes ont pu être créées en respectant strictement les contraintes. 1 carte(s) supprimée(s) automatiquement car redondante(s) avec une autre carte du même lot.",
+      "usage": {
+        "model": "mistral-small-latest",
+        "promptTokens": 808,
+        "completionTokens": 651
+      },
+      "genuineExcerptCount": 5,
+      "genuineExcerptRate": 1,
+      "duplicateCount": 0,
+      "duplicates": [],
+      "shortfallWarningRespected": true,
+      "mcqCorrectCounts": [],
+      "cards": [
+        {
+          "statement": "Quelle est la formule chimique de la molécule d'eau ?",
+          "type": "open",
+          "answer": "H2O",
+          "acceptedAnswers": [
+            "H2O"
+          ],
+          "options": null,
+          "sourceExcerpt": "L'eau est une molécule composée de deux atomes d'hydrogène et d'un atome d'oxygène, de formule chimique H2O."
+        },
+        {
+          "statement": "Combien d'atomes d'hydrogène composent une molécule d'eau ?",
+          "type": "open",
+          "answer": "2",
+          "acceptedAnswers": [
+            "2",
+            "deux"
+          ],
+          "options": null,
+          "sourceExcerpt": "L'eau est une molécule composée de deux atomes d'hydrogène et d'un atome d'oxygène, de formule chimique H2O."
+        },
+        {
+          "statement": "Combien d'atomes d'oxygène composent une molécule d'eau ?",
+          "type": "open",
+          "answer": "1",
+          "acceptedAnswers": [
+            "1",
+            "un"
+          ],
+          "options": null,
+          "sourceExcerpt": "L'eau est une molécule composée de deux atomes d'hydrogène et d'un atome d'oxygène, de formule chimique H2O."
+        },
+        {
+          "statement": "Citez les trois états physiques sous lesquels l'eau peut exister.",
+          "type": "open",
+          "answer": "solide (glace), liquide, gazeux (vapeur)",
+          "acceptedAnswers": [
+            "solide (glace), liquide, gazeux (vapeur)",
+            "glace, liquide, vapeur",
+            "solide, liquide, gazeux"
+          ],
+          "options": null,
+          "sourceExcerpt": "Elle existe sous trois états : solide (glace), liquide et gazeux (vapeur)."
+        },
+        {
+          "statement": "Quel est l'état physique de l'eau appelé 'glace' ?",
+          "type": "open",
+          "answer": "solide",
+          "acceptedAnswers": [
+            "solide"
+          ],
+          "options": null,
+          "sourceExcerpt": "Elle existe sous trois états : solide (glace), liquide et gazeux (vapeur)."
+        }
+      ]
+    },
+    {
+      "id": "type-mixed",
+      "note": "cardType 'mixed' — le modèle choisit open/mcq carte par carte, aucune contrainte de type imposée.",
+      "success": false,
+      "latencyMs": 4884,
+      "error": "La génération n'a pas produit un résultat exploitable. Réessayez.",
+      "statusCode": 502
+    }
+  ]
+}

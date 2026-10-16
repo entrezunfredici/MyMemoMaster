@@ -1,86 +1,219 @@
-const path = require("path");
-const dotenv = require("dotenv");
-const express = require("express");
-const favicon = require("serve-favicon");
-const swaggerUi = require("swagger-ui-express");
-const swaggerJsdoc = require("swagger-jsdoc");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const swaggerSpec = swaggerJsdoc(require("./config/swagger.config.js"));
+const path = require('path')
+const dotenv = require('dotenv')
+const express = require('express')
+const helmet = require('helmet')
+const favicon = require('serve-favicon')
+const swaggerUi = require('swagger-ui-express')
+const swaggerJsdoc = require('swagger-jsdoc')
+const cors = require('cors')
+const bodyParser = require('body-parser')
+const swaggerSpec = swaggerJsdoc(require('./config/swagger.config.js'))
+const morgan = require('morgan')
+const logger = require('./helpers/logger')
+const metricsMiddleware = require('./middlewares/metrics.middleware')
+const sanitize = require('./middlewares/sanitize.middleware')
+const errorHandler = require('./middlewares/errorHandler.middleware')
+const { apiLimiter } = require('./middlewares/rateLimit.middleware')
 
 // Importation des routes
-const subjectRoutes = require("./routes/Subject.routes");
-const roleRoutes = require("./routes/Role.routes");
-const testRoutes = require("./routes/Test.routes");
-const leitnerSystemRoutes = require("./routes/LeitnerSystem.routes.js");
-const leitnerCardRoutes = require("./routes/LeitnerCard.routes");
-const leitnerBoxRoutes = require("./routes/LeitnerBox.routes");
-const kpiRoutes = require("./routes/Kpi.routes");
-const responseRoutes = require("./routes/Response.routes");
-const userRoutes = require("./routes/User.routes");
-const unitRoutes = require("./routes/Unit.routes");
-const leitnerSystemsUsersRoutes = require("./routes/LeitnerSystemsUsers.routes");
-const fieldsRoutes = require("./routes/Fields.routes.js");
-const fieldsTypeRoutes = require("./routes/FieldsType.routes.js");
-const diagrammeRoutes = require("./routes/Diagramme.routes");
-const questionRoutes = require("./routes/Question.routes");
-const tutorialRoutes = require("./routes/Tutorials.routes");
-const gradingRoutes = require("./routes/Grading.routes");
-const { startFifoCron } = require('./jobs/fifo.cron');
+const subjectRoutes = require('./routes/Subject.routes')
+const roleRoutes = require('./routes/Role.routes')
+const testRoutes = require('./routes/Test.routes')
+const leitnerSystemRoutes = require('./routes/LeitnerSystem.routes.js')
+const leitnerCardRoutes = require('./routes/LeitnerCard.routes')
+const leitnerBoxRoutes = require('./routes/LeitnerBox.routes')
+const kpiRoutes = require('./routes/Kpi.routes')
+const responseRoutes = require('./routes/Response.routes')
+const userRoutes = require('./routes/User.routes')
+const unitRoutes = require('./routes/Unit.routes')
+const leitnerSystemsUsersRoutes = require('./routes/LeitnerSystemsUsers.routes')
+const fieldsRoutes = require('./routes/Fields.routes.js')
+const fieldsTypeRoutes = require('./routes/FieldsType.routes.js')
+const diagrammeRoutes = require('./routes/Diagramme.routes')
+const questionRoutes = require('./routes/Question.routes')
+const tutorialRoutes = require('./routes/Tutorials.routes')
+const gradingRoutes = require('./routes/Grading.routes')
+const semanticRoutes = require('./routes/Semantic.routes')
+const mistralGradingRoutes = require('./routes/MistralGrading.routes')
+const onboardingStateRoutes = require('./routes/OnboardingState.routes')
+const storageRoutes = require('./routes/Storage.routes')
+const classGroupRoutes = require('./routes/ClassGroup.routes')
+const invitationRoutes = require('./routes/Invitation.routes')
+const revisionSessionRoutes = require('./routes/RevisionSession.routes')
+const calendarEventRoutes = require('./routes/CalendarEvent.routes')
+const deadlineRoutes = require('./routes/Deadline.routes')
+const reminderRoutes = require('./routes/Reminder.routes')
+const planningRoutes = require('./routes/Planning.routes')
+const testResultRoutes = require('./routes/TestResult.routes')
+const tagRoutes = require('./routes/Tag.routes')
+const searchRoutes = require('./routes/Search.routes')
+const etablissementRoutes = require('./routes/Etablissement.routes')
+const auditLogRoutes = require('./routes/AuditLog.routes')
+const leitnerReviewSessionRoutes = require('./routes/LeitnerReviewSession.routes')
+const mindMapViewSessionRoutes = require('./routes/MindMapViewSession.routes')
+const aiGenerationBatchRoutes = require('./routes/AiGenerationBatch.routes')
+const aiExerciseGenerationRoutes = require('./routes/AiExerciseGeneration.routes')
+const { instance } = require('./models')
+const { startFifoCron } = require('./jobs/fifo.cron')
+const { startReminderWorker } = require('./jobs/reminder.worker')
+const { startKpiAlertCron } = require('./jobs/kpiAlert.cron')
 
-dotenv.config({ path: path.resolve(__dirname, "../.env") }); // .env is placed in the root directory of the project
+dotenv.config({ path: path.resolve(__dirname, '../.env') }) // .env is placed in the root directory of the project
 
-const app = express();
+const app = express()
 
-// CORS
+// CHOIX: nombre de proxies de confiance devant l'API, configurable par environnement.
+// RAISON: la profondeur de la chaîne dépend du déploiement —
+//   1 (défaut) : Traefik seul (docker-compose), ou ingress-nginx seul (K8s sans Cloudflare)
+//   2          : Cloudflare + ingress-nginx (K8s derrière le proxy Cloudflare)
+// Mal calibré, req.ip pointe sur un proxy au lieu du client : tous les visiteurs
+// partagent alors un même bucket de rate limiting et les logs de sécurité
+// (échecs de connexion, refus RBAC) enregistrent l'IP du proxy.
+app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS, 10) || 1)
+
+// Métriques RED (Rate, Errors, Duration) — exposées sur un serveur HTTP séparé
+// (voir server.js, port METRICS_PORT), jamais via l'Ingress public
+app.use(metricsMiddleware)
+
+// HTTP access logs — Morgan piped into Winston (désactivé en test pour éviter le bruit)
+if (process.env.NODE_ENV !== 'test') {
+  const isProd = process.env.NODE_ENV === 'production'
+  const morganStream = { write: (msg) => logger.http(msg.trim()) }
+  app.use(morgan(isProd ? 'combined' : 'dev', { stream: morganStream }))
+}
+
+// Security headers
+// CHOIX: CSP explicite (défauts Helmet + blob: pour les images) plutôt que helmet() nu
+// RAISON: audit OWASP A05-M4 — rendre la politique auditable dans le code ; les défauts
+//         Helmet v8 (default-src 'self', object-src 'none'…) conviennent à une API JSON
+//         + Swagger UI ; blob: requis pour les aperçus d'images uploadées
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        imgSrc: ["'self'", 'data:', 'blob:']
+      }
+    }
+  })
+)
+
+// CORS — supporte plusieurs origines via CORS_ORIGIN séparé par des virgules
+// CHOIX: origin en fonction plutôt qu'en string
+// RAISON: cors avec string retourne toujours l'origine configurée sans comparer ;
+//         la fonction permet de ne pas poser le header pour les origines inconnues
+const CORS_ORIGINS = (process.env.CORS_ORIGIN || process.env.VITE_FRONT_URL || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
 app.use(
   cors({
-    origin: process.env.VITE_FRONT_URL,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: (origin, callback) => {
+      if (!origin || CORS_ORIGINS.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(null, false)
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
   })
-);
-console.log("CORS autorise les requêtes depuis :", process.env.VITE_FRONT_URL);
-// app.use(cors()); // Autorise toutes les requêtes (à ne pas laisser en prod)
-
+)
 
 // Body parser
-app.use(bodyParser.json());
+// CHOIX: plafond dédié 100 Mo pour /api/v1/diagrammes (cartes mentales), posé AVANT le plafond
+// global 10kb ci-dessous.
+// RAISON: mindMapJson (nœuds + liens + zones, voir diagrams/mindmap_rules.md) est envoyé en entier
+// dans le corps JSON de POST/PUT /diagrammes (pas de multipart ici, contrairement à l'upload
+// d'image) — 10 Ko se remplissait dès ~15-25 nœuds et échouait en 413 avant même le validator,
+// sans qu'aucune règle métier ne documente une telle limite (voir DECISIONS.md). body-parser
+// ignore un second parsing JSON une fois `req._body` déjà positionné (node_modules/body-parser/
+// lib/types/json.js) : ce middleware scopé au préfixe /api/v1/diagrammes "gagne" donc pour ces
+// routes, et le plafond global 10kb continue de s'appliquer inchangé à tout le reste de l'API.
+app.use('/api/v1/diagrammes', bodyParser.json({ limit: '100mb' }))
+app.use(bodyParser.json({ limit: '10kb' }))
+
+// Sanitize HTML tags from all body string fields
+app.use(sanitize)
 
 // Middleware for favicon
-app.use(favicon(__dirname + "/public/favicon.ico"));
+app.use(favicon(__dirname + '/public/favicon.ico'))
 
-// Static files for uploaded assets
-app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
+// Static files for uploaded assets — doit être sous /api/ pour passer Traefik (règle PathPrefix `/api`)
+app.use('/api/uploads', express.static(path.join(__dirname, 'public', 'uploads')))
 
-// Middleware pour servir la documentation Swagger
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+}
 
-// Routes
-subjectRoutes(app);
-roleRoutes(app);
-testRoutes(app);
-responseRoutes(app);
-unitRoutes(app);
-userRoutes(app);
-kpiRoutes(app);
-leitnerSystemRoutes(app);
-leitnerCardRoutes(app);
-leitnerBoxRoutes(app);
-leitnerSystemsUsersRoutes(app);
-fieldsRoutes(app);
-fieldsTypeRoutes(app);
-diagrammeRoutes(app);
-questionRoutes(app);
-tutorialRoutes(app);
-gradingRoutes(app);
+// Health endpoint — ciblé par les readiness probes K8s (helm/templates/deployment-api.yaml)
+// CHOIX: déclaré avant le routeur v1 pour échapper au rate limiting global
+// RAISON: une sonde kubelet consommant le bucket anonyme (ou bloquée par le limiteur)
+//         ferait passer les pods NotReady en cascade — le health check doit toujours répondre
+app.get('/api/v1/health', async (_req, res) => {
+  try {
+    await instance.authenticate()
+    res.status(200).json({ status: 'ok' })
+  } catch (error) {
+    logger.error(`Health check — base de données injoignable : ${error?.message || error}`)
+    res.status(503).json({ status: 'unavailable' })
+  }
+})
+
+// Routes v1
+const v1 = express.Router()
+v1.use(apiLimiter)
+subjectRoutes(v1)
+roleRoutes(v1)
+testRoutes(v1)
+responseRoutes(v1)
+unitRoutes(v1)
+userRoutes(v1)
+kpiRoutes(v1)
+leitnerSystemRoutes(v1)
+leitnerCardRoutes(v1)
+leitnerBoxRoutes(v1)
+leitnerSystemsUsersRoutes(v1)
+fieldsRoutes(v1)
+fieldsTypeRoutes(v1)
+diagrammeRoutes(v1)
+questionRoutes(v1)
+tutorialRoutes(v1)
+gradingRoutes(v1)
+semanticRoutes(v1)
+mistralGradingRoutes(v1)
+onboardingStateRoutes(v1)
+storageRoutes(v1)
+classGroupRoutes(v1)
+invitationRoutes(v1)
+revisionSessionRoutes(v1)
+calendarEventRoutes(v1)
+deadlineRoutes(v1)
+reminderRoutes(v1)
+planningRoutes(v1)
+testResultRoutes(v1)
+leitnerReviewSessionRoutes(v1)
+mindMapViewSessionRoutes(v1)
+tagRoutes(v1)
+searchRoutes(v1)
+etablissementRoutes(v1)
+auditLogRoutes(v1)
+aiGenerationBatchRoutes(v1)
+aiExerciseGenerationRoutes(v1)
+app.use('/api/v1', v1)
 
 // ... Autres middlewares
-startFifoCron();
+startFifoCron()
+startReminderWorker()
+startKpiAlertCron()
 
 // Si rien n'est trouvé
-app.use(({ res }) => {
-  return res.status(404).json({ message: "Route not found" });
-});
+app.use((_req, res) => {
+  return res.status(404).json({ message: 'Route introuvable.' })
+})
 
-module.exports = app;
+// Global error handler (must be last)
+app.use(errorHandler)
+
+module.exports = app

@@ -1,0 +1,205 @@
+# =============================================================================
+#  SonarQube Community Build
+#
+#  StatefulSet et non Deployment : l'index Elasticsearch de /opt/sonarqube/data
+#  ne supporte pas deux instances ecrivant sur le meme volume. Le StatefulSet
+#  applique « on arrete avant de demarrer », la ou un Deployment lancerait le
+#  nouveau pod pendant que l'ancien tient encore le volume — corruption de
+#  l'index a la cle.
+#
+#  replicas: 1 est une contrainte de l'edition Community, pas un choix de
+#  dimensionnement : la haute disponibilite est une fonctionnalite Data Center.
+# =============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "sq.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}
+spec:
+  serviceName: {{ .Release.Name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # L'image tourne en uid 1000 ; fsGroup aligne la propriete des PVC
+      # fraichement provisionnes, sinon SonarQube echoue a ecrire son index.
+      securityContext:
+        fsGroup: 1000
+      # Arret propre : Elasticsearch a besoin de temps pour vider ses buffers
+      # sur disque. Un SIGKILL a 30 s (defaut) laisse un index a reparer.
+      terminationGracePeriodSeconds: 120
+      initContainers:
+        {{- if .Values.sonarqube.sysctl.enabled }}
+        # ── Reglage sysctl du NŒUD ───────────────────────────────────────────
+        # vm.max_map_count n'est pas namespace : ce conteneur modifie le nœud
+        # entier, pas seulement ce pod, et le reglage est perdu au reboot du
+        # nœud (il est reapplique au demarrage suivant du pod).
+        - name: init-sysctl
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              sysctl -w vm.max_map_count={{ .Values.sonarqube.sysctl.maxMapCount }}
+              sysctl -w fs.file-max={{ .Values.sonarqube.sysctl.fileMax }}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+        {{- end }}
+        # ── Attente de PostgreSQL ────────────────────────────────────────────
+        # SonarQube ne retente pas la connexion JDBC au demarrage : si la base
+        # n'est pas prete, le pod part en CrashLoopBackOff jusqu'a ce qu'un
+        # redemarrage tombe au bon moment. On bloque ici plutot que de subir.
+        - name: wait-postgres
+          image: {{ .Values.postgres.image }}
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h {{ include "sq.postgresService" . }} -p 5432 -U "$PG_USER"; do
+                echo "PostgreSQL indisponible — nouvelle tentative dans 3s"
+                sleep 3
+              done
+          env:
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sq.secretName" . }}
+                  key: PG_USER
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+      containers:
+        - name: sonarqube
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 1000
+          ports:
+            - name: http
+              containerPort: 9000
+          env:
+            # Le nom de base est aussi porte par la ConfigMap (consommee par
+            # PostgreSQL) ; il est repris ici depuis la MEME valeur du chart,
+            # les deux ne peuvent donc pas diverger.
+            - name: SONAR_JDBC_URL
+              value: "jdbc:postgresql://{{ include "sq.postgresService" . }}:5432/{{ .Values.config.PG_DB }}"
+            - name: SONAR_JDBC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sq.secretName" . }}
+                  key: PG_USER
+            - name: SONAR_JDBC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sq.secretName" . }}
+                  key: PG_PASS
+            - name: SONAR_WEB_JAVAOPTS
+              value: {{ .Values.sonarqube.webJavaOpts | quote }}
+            - name: SONAR_CE_JAVAOPTS
+              value: {{ .Values.sonarqube.ceJavaOpts | quote }}
+            - name: SONAR_SEARCH_JAVAOPTS
+              value: {{ .Values.sonarqube.searchJavaOpts | quote }}
+            {{- if .Values.sonarqube.esBootstrapChecksDisable }}
+            - name: SONAR_ES_BOOTSTRAP_CHECKS_DISABLE
+              value: "true"
+            {{- end }}
+          # Sondes en httpGet et non exec : la requete est emise par le kubelet,
+          # ce qui evite de supposer la presence de curl ou wget dans l'image.
+          # Contrepartie assumee : /api/system/status repond 200 des l'amorcage,
+          # avec {{ `{"status":"STARTING"}` }} — la sonde de disponibilite ne
+          # distingue donc pas « demarre » de « pret ». Sans effet ici (une
+          # seule replique, pas de repartition de charge), et la CI attend
+          # explicitement "status":"UP" avant de lancer une analyse.
+          startupProbe:
+            httpGet:
+              path: /api/system/status
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            # 10 min : un premier demarrage migre le schema de base et
+            # reconstruit l'index Elasticsearch.
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /api/system/status
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/system/status
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.sonarqube.resources | nindent 12 }}
+          volumeMounts:
+            - name: sonarqube-data
+              mountPath: /opt/sonarqube/data
+            - name: sonarqube-extensions
+              mountPath: /opt/sonarqube/extensions
+            # Logs et temp en emptyDir : regeneres a chaque demarrage, aucune
+            # raison de les persister ni de les payer en volume Cinder.
+            - name: sonarqube-logs
+              mountPath: /opt/sonarqube/logs
+            - name: sonarqube-temp
+              mountPath: /opt/sonarqube/temp
+      volumes:
+        - name: sonarqube-logs
+          emptyDir: {}
+        - name: sonarqube-temp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: sonarqube-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- if .Values.storageClass }}
+        storageClassName: {{ .Values.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.sonarqube.storage }}
+    - metadata:
+        name: sonarqube-extensions
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- if .Values.storageClass }}
+        storageClassName: {{ .Values.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.sonarqube.extensionsStorage }}

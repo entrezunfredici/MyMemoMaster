@@ -1,43 +1,43 @@
-"use strict";
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("LeitnerCard", {
+    await queryInterface.createTable('LeitnerCard', {
       idCard: {
         type: Sequelize.INTEGER,
         allowNull: false,
         autoIncrement: true,
-        primaryKey: true,
+        primaryKey: true
       },
       fifo: {
         type: Sequelize.BOOLEAN,
         allowNull: true,
-        defaultValue: true,
+        defaultValue: true
       },
       dateTimeFifo: {
         type: Sequelize.DATE,
-        allowNull: true,
+        allowNull: true
       },
       idQuestion: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Question",
-          key: "idQuestion",
-        },
+          model: 'Question',
+          key: 'idQuestion'
+        }
       },
       idBox: {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: "LeitnerBox",
-          key: "idBox",
-        },
-      },
-    });
+          model: 'LeitnerBox',
+          key: 'idBox'
+        }
+      }
+    })
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("LeitnerCard");
-  },
-};
+    await queryInterface.dropTable('LeitnerCard')
+  }
+}

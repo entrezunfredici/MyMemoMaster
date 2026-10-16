@@ -16,7 +16,7 @@ export const useResponseStore = defineStore('responses', {
   actions: {
     async fetchAllResponsesByQuestion(questionId) {
       try {
-        const resp = await api.get(`responses/all/${questionId}`)
+        const resp = await api.get(`responses/question/${questionId}`)
         if (resp.status !== 200) {
           notif.notify(resp.data.message, 'error')
           return false
@@ -61,7 +61,7 @@ export const useResponseStore = defineStore('responses', {
 
     async createResponse() {
       try {
-        const resp = await api.post('responses/add', this.response)
+        const resp = await api.post('responses', this.response)
         if (resp.status !== 201) {
           notif.notify(resp.data.message, 'error')
           return false

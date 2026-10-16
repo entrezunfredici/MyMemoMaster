@@ -1,58 +1,62 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes } = require('sequelize')
 
 module.exports = (instance) => {
   const Fields = instance.define(
-    "Fields",
+    'Fields',
     {
       id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false,
+        allowNull: false
       },
       fieldletter: {
         type: DataTypes.STRING(5),
-        allowNull: false,
+        allowNull: false
       },
       data: {
         type: DataTypes.JSON,
-        allowNull: true,
+        allowNull: true
       },
       idUnit: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: "units",
-          key: "id",
+          model: 'units',
+          key: 'id'
         },
-        onDelete: "SET NULL",
-        onUpdate: "CASCADE",
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
       },
       idType: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: "FieldsType",
-          key: "idType",
+          model: 'FieldsType',
+          key: 'idType'
         },
-        onDelete: "SET NULL",
-        onUpdate: "CASCADE",
-      },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
+      }
     },
-    { tableName: "Fields", timestamps: false }
-  );
+    {
+      tableName: 'Fields',
+      timestamps: false,
+      indexes: [{ fields: ['idType'] }, { fields: ['idUnit'] }]
+    }
+  )
 
   //Associations
   Fields.associate = (models) => {
     Fields.belongsTo(models.FieldsType, {
-      foreignKey: "idType",
-      as: "fieldType",
-    });
+      foreignKey: 'idType',
+      as: 'fieldType'
+    })
     Fields.belongsTo(models.Unit, {
-      foreignKey: "idUnit",
-      as: "units",
-    });
-  };
+      foreignKey: 'idUnit',
+      as: 'units'
+    })
+  }
 
-  return Fields;
-};
+  return Fields
+}

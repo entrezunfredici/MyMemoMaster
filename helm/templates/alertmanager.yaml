@@ -1,0 +1,132 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.alerting.enabled }}
+# =============================================================================
+#  Alertmanager (un par environnement/namespace) — second volet de la
+#  recommandation R3 du Bloc 4 : alertes sur métriques fines (erreurs, latence,
+#  saturation) au-delà du up/down couvert par la sonde d'uptime externe.
+#
+#  Reçoit les alertes évaluées par le Prometheus du chart (voir rules.yml dans
+#  prometheus.yaml) et les route vers le webhook Discord du projet — le même
+#  canal que notify_ci.yml, cd.yml et uptime.yml.
+#
+#  Le webhook est lu depuis la clé DISCORD_WEBHOOK_URL du Secret manuel
+#  {{ include "mmm.secretName" . }} (montée en fichier, jamais en clair dans
+#  la config). Activer via monitoring.alerting.enabled une fois la clé posée.
+#
+#  Non exposé par l'Ingress — accès via :
+#    kubectl port-forward svc/{{ .Release.Name }}-alertmanager 9093:9093 -n {{ .Release.Namespace }}
+# =============================================================================
+
+# ── Configuration Alertmanager ────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-alertmanager-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+data:
+  alertmanager.yml: |
+    route:
+      receiver: discord
+      # Regroupe les instances d'une même alerte (ex : 2 pods API en erreur)
+      # en une seule notification
+      group_by: [alertname]
+      group_wait: 30s
+      group_interval: 5m
+      # CHOIX: relance toutes les 4h tant que l'alerte est active
+      # RAISON: cohérent avec la sonde d'uptime (relance assumée, pas de
+      #         déduplication totale) sans spammer toutes les 5 min
+      repeat_interval: 4h
+
+    receivers:
+      - name: discord
+        discord_configs:
+          - webhook_url_file: /etc/alertmanager/secrets/discord-webhook-url
+            title: '{{ "{{" }} .CommonLabels.alertname {{ "}}" }} ({{ .Release.Namespace }})'
+
+---
+
+# ── Deployment ────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-alertmanager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-alertmanager
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-alertmanager
+      annotations:
+        # Redémarre le pod quand la config change (pas de hot-reload)
+        checksum/config: {{ .Values.monitoring.alerting | toYaml | sha256sum }}
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:{{ .Values.monitoring.alerting.imageTag }}
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
+          ports:
+            - name: http
+              containerPort: 9093
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9093
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.monitoring.alerting.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+            - name: webhook-secret
+              mountPath: /etc/alertmanager/secrets
+              readOnly: true
+            - name: storage
+              mountPath: /alertmanager
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-alertmanager-config
+        # Webhook Discord monté en fichier depuis le Secret manuel — la clé
+        # DISCORD_WEBHOOK_URL doit exister, sinon le pod ne démarre pas
+        # (échec visible au déploiement, rollback --atomic)
+        - name: webhook-secret
+          secret:
+            secretName: {{ include "mmm.secretName" . }}
+            items:
+              - key: DISCORD_WEBHOOK_URL
+                path: discord-webhook-url
+        # Silences/état de notification éphémères — acceptable, une alerte
+        # active sera ré-émise après redémarrage
+        - name: storage
+          emptyDir: {}
+
+---
+
+# ── Service ───────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-alertmanager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Release.Name }}-alertmanager
+  ports:
+    - port: 9093
+      targetPort: 9093
+{{- end }}

@@ -1,3 +1,11 @@
+jest.mock('../../services/AuditLog.service', () => ({
+  log: jest.fn().mockResolvedValue({})
+}))
+
+jest.mock('../../helpers/tokenBlacklist', () => ({
+  revokeUserTokens: jest.fn().mockResolvedValue(undefined)
+}))
+
 jest.mock('../../models/index', () => ({
   User: {
     findAll: jest.fn(),
@@ -6,107 +14,178 @@ jest.mock('../../models/index', () => ({
     create: jest.fn(),
     update: jest.fn(),
     destroy: jest.fn(),
+    count: jest.fn()
   },
   Role: {
-    findByPk: jest.fn(),
+    findByPk: jest.fn()
   },
   UserOnboardingState: {
     create: jest.fn(),
     findOne: jest.fn(),
-    update: jest.fn(),
+    update: jest.fn()
   },
-}));
+  Invitation: {
+    findAll: jest.fn()
+  },
+  ClassGroupUsers: {
+    findOrCreate: jest.fn()
+  },
+  Etablissement: {
+    findByPk: jest.fn(),
+    sequelize: { transaction: jest.fn((cb) => cb({})) }
+  }
+}))
 
-const { User, Role, UserOnboardingState } = require('../../models/index');
-const UserService = require('../../services/User.service');
+const { User, Role, UserOnboardingState, Invitation, Etablissement } = require('../../models/index')
+const bcrypt = require('bcryptjs')
+const UserService = require('../../services/User.service')
 
 describe('UserService', () => {
+  const originalMaxUsers = process.env.MAX_USERS
+
   afterEach(() => {
-    jest.clearAllMocks();
-  });
+    jest.clearAllMocks()
+    if (originalMaxUsers === undefined) delete process.env.MAX_USERS
+    else process.env.MAX_USERS = originalMaxUsers
+  })
 
   describe('findAll', () => {
     it('should return all users without passwords', async () => {
       User.findAll.mockResolvedValue([
         { userId: 1, name: 'User 1', password: 'hashedpassword' },
-        { id: 2, name: 'User 2' },
-      ]);
+        { id: 2, name: 'User 2' }
+      ])
 
-      const users = await UserService.findAll();
+      const users = await UserService.findAll()
 
-      expect(User.findAll).toHaveBeenCalled();
+      expect(User.findAll).toHaveBeenCalled()
       expect(users).toEqual([
         { userId: 1, name: 'User 1' },
-        { id: 2, name: 'User 2' },
-      ]);
-    });
-  });
+        { id: 2, name: 'User 2' }
+      ])
+    })
+  })
 
   describe('findByEmail', () => {
     it('should return a user by email', async () => {
       User.findOne.mockResolvedValue({
-        userId: 1, email: 'test@example.com', password: 'hashedpassword'
-      });
+        userId: 1,
+        email: 'test@example.com',
+        password: 'hashedpassword'
+      })
 
-      const user = await UserService.findByEmail('test@example.com');
+      const user = await UserService.findByEmail('test@example.com')
 
-      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
-      expect(user).toEqual({ userId: 1, email: 'test@example.com' });
-    });
+      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } })
+      expect(user).toEqual({ userId: 1, email: 'test@example.com' })
+    })
 
     it('should return null if no user is found', async () => {
-      User.findOne.mockResolvedValue(null);
+      User.findOne.mockResolvedValue(null)
 
-      const user = await UserService.findByEmail('nonexistent@example.com');
+      const user = await UserService.findByEmail('nonexistent@example.com')
 
-      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'nonexistent@example.com' } });
-      expect(user).toBeNull();
-    });
-  });
+      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'nonexistent@example.com' } })
+      expect(user).toBeNull()
+    })
+  })
 
   describe('findOne', () => {
     it('should return a user by ID', async () => {
       User.findByPk.mockResolvedValue({
-        userId: 1, name: 'User 1', password: 'hashedpassword'
-      });
+        userId: 1,
+        name: 'User 1',
+        password: 'hashedpassword'
+      })
 
-      const user = await UserService.findOne(1);
+      const user = await UserService.findOne(1)
 
-      expect(User.findByPk).toHaveBeenCalledWith(1);
-      expect(user).toEqual({ userId: 1, name: 'User 1' });
-    });
+      expect(User.findByPk).toHaveBeenCalledWith(1)
+      expect(user).toEqual({ userId: 1, name: 'User 1' })
+    })
 
     it('should return null if no user is found', async () => {
-      User.findByPk.mockResolvedValue(null);
+      User.findByPk.mockResolvedValue(null)
 
-      const user = await UserService.findOne(99);
+      const user = await UserService.findOne(99)
 
-      expect(User.findByPk).toHaveBeenCalledWith(99);
-      expect(user).toBeNull();
-    });
-  });
+      expect(User.findByPk).toHaveBeenCalledWith(99)
+      expect(user).toBeNull()
+    })
+  })
+
+  describe('isRegistrationOpen', () => {
+    it('isRegistrationOpen - MAX_USERS non défini - retourne true sans requêter la base', async () => {
+      delete process.env.MAX_USERS
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(true)
+      expect(User.count).not.toHaveBeenCalled()
+    })
+
+    it('isRegistrationOpen - MAX_USERS à 0 - retourne true (limite désactivée)', async () => {
+      process.env.MAX_USERS = '0'
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(true)
+      expect(User.count).not.toHaveBeenCalled()
+    })
+
+    it('isRegistrationOpen - total sous la limite - retourne true', async () => {
+      process.env.MAX_USERS = '10'
+      User.count.mockResolvedValue(9)
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(true)
+    })
+
+    it('isRegistrationOpen - limite atteinte - retourne false', async () => {
+      process.env.MAX_USERS = '10'
+      User.count.mockResolvedValue(10)
+
+      const open = await UserService.isRegistrationOpen()
+
+      expect(open).toBe(false)
+    })
+
+    it('isRegistrationOpen - ne compte que les comptes actifs (désactiver un compte libère une place)', async () => {
+      process.env.MAX_USERS = '10'
+      User.count.mockResolvedValue(3)
+
+      await UserService.isRegistrationOpen()
+
+      expect(User.count).toHaveBeenCalledWith({ where: { isActive: true } })
+    })
+  })
 
   describe('create', () => {
     it('should create a new user', async () => {
-      User.findOne.mockResolvedValue(null);
+      delete process.env.MAX_USERS
+      User.findOne.mockResolvedValue(null)
       User.create.mockResolvedValue({
-        userId: 1, email: 'test@example.com', name: 'Test User'
-      });
+        userId: 1,
+        email: 'test@example.com',
+        name: 'Test User'
+      })
 
       UserOnboardingState.create.mockResolvedValue({
         userId: 1,
         tourSeen: false,
         checklist: {}
-      });
+      })
+      Invitation.findAll.mockResolvedValue([])
 
       const user = await UserService.create({
         email: 'test@example.com',
         name: 'Test User',
-        password: 'securepassword',
-      });
+        password: 'securepassword'
+      })
 
-      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
-      expect(User.create).toHaveBeenCalled();
+      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } })
+      expect(User.create).toHaveBeenCalled()
       expect(UserOnboardingState.create).toHaveBeenCalledWith({
         userId: 1,
         tourSeen: false,
@@ -115,8 +194,8 @@ describe('UserService', () => {
           profile_completed: false,
           first_action: false
         }
-      });
-      expect(user).toEqual({ userId: 1, email: 'test@example.com', name: 'Test User' });
+      })
+      expect(user).toEqual({ userId: 1, email: 'test@example.com', name: 'Test User' })
       expect(UserOnboardingState.create).toHaveBeenCalledWith({
         userId: 1,
         tourSeen: false,
@@ -125,61 +204,533 @@ describe('UserService', () => {
           profile_completed: false,
           first_action: false
         }
-      });
-    });
+      })
+    })
 
     it('should throw an error if email is already used', async () => {
-      User.findOne.mockResolvedValue({ userId: 1, email: 'test@example.com' });
+      delete process.env.MAX_USERS
+      User.findOne.mockResolvedValue({ userId: 1, email: 'test@example.com' })
 
       await expect(
         UserService.create({
           email: 'test@example.com',
           name: 'Test User',
-          password: 'securepassword',
+          password: 'securepassword'
         })
-      ).rejects.toThrow('Email déjà utilisé');
+      ).rejects.toThrow('Email déjà utilisé')
 
-      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
-    });
-  });
+      expect(User.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } })
+    })
+
+    it('create - MAX_USERS atteint - lève une erreur avant de vérifier l\'email', async () => {
+      process.env.MAX_USERS = '5'
+      User.count.mockResolvedValue(5)
+
+      await expect(
+        UserService.create({
+          email: 'test@example.com',
+          name: 'Test User',
+          password: 'securepassword'
+        })
+      ).rejects.toThrow('Limite d\'utilisateurs atteinte')
+
+      expect(User.findOne).not.toHaveBeenCalled()
+      expect(User.create).not.toHaveBeenCalled()
+    })
+  })
 
   describe('update', () => {
     it('should update a user by ID', async () => {
-      User.update.mockResolvedValue([1]); // Sequelize update returns an array with the number of affected rows
+      User.update.mockResolvedValue([1]) // Sequelize update returns an array with the number of affected rows
       User.findByPk.mockResolvedValue({
-        userId: 1, name: 'Updated User'
-      });
+        userId: 1,
+        name: 'Updated User'
+      })
 
-      const user = await UserService.update(1, { name: 'Updated User' });
+      const user = await UserService.update(1, { name: 'Updated User' })
 
-      expect(User.update).toHaveBeenCalledWith({ name: 'Updated User' }, { where: { userId: 1 } });
-      expect(user).toEqual({ userId: 1, name: 'Updated User' });
-    });
-  });
+      expect(User.update).toHaveBeenCalledWith({ name: 'Updated User' }, { where: { userId: 1 } })
+      expect(user).toEqual({ userId: 1, name: 'Updated User' })
+    })
+  })
 
   describe('delete', () => {
     it('should delete a user by ID', async () => {
-      User.destroy.mockResolvedValue(1); // Sequelize destroy returns the number of affected rows
+      User.destroy.mockResolvedValue(1) // Sequelize destroy returns the number of affected rows
 
-      await UserService.delete(1);
+      await UserService.delete(1)
 
-      expect(User.destroy).toHaveBeenCalledWith({ where: { userId: 1 } });
-    });
-  });
+      expect(User.destroy).toHaveBeenCalledWith({ where: { userId: 1 } })
+    })
+  })
+
+  describe('setResetPasswordCode', () => {
+    it('stocke le hash bcrypt en base et retourne le code brut à 6 chiffres', async () => {
+      User.update.mockResolvedValue([1])
+
+      const code = await UserService.setResetPasswordCode(1)
+
+      expect(typeof code).toBe('string')
+      expect(/^\d{6}$/.test(code)).toBe(true)
+
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).not.toBe(code) // le hash ≠ le code brut
+      expect(fields.resetPasswordCode.startsWith('$2')).toBe(true) // hash bcrypt
+      expect(fields.resetPasswordCodeExpiresAt).toBeInstanceOf(Date)
+      expect(fields.resetPasswordCodeAttempts).toBe(0)
+    })
+  })
+
+  describe('verifyResetPasswordCode', () => {
+    const bcrypt = require('bcryptjs')
+    const CODE = '123456'
+    const future = () => new Date(Date.now() + 10 * 60 * 1000)
+
+    it('retourne true si le code correspond et est non expiré, puis invalide le code', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: future(),
+        resetPasswordCodeAttempts: 0
+      })
+
+      const result = await UserService.verifyResetPasswordCode(1, CODE)
+
+      expect(result).toBe(true)
+      // Usage unique : le code est effacé après un succès
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).toBeNull()
+      expect(fields.resetPasswordCodeExpiresAt).toBeNull()
+      expect(fields.resetPasswordCodeAttempts).toBe(0)
+    })
+
+    it('retourne false si le code ne correspond pas et incrémente le compteur d essais', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: future(),
+        resetPasswordCodeAttempts: 0
+      })
+
+      const result = await UserService.verifyResetPasswordCode(1, '654321')
+
+      expect(result).toBe(false)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCodeAttempts).toBe(1)
+      expect(fields.resetPasswordCode).toBeUndefined() // le code reste utilisable
+    })
+
+    it('retourne false et invalide le code au 5e essai infructueux', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: future(),
+        resetPasswordCodeAttempts: 4
+      })
+
+      const result = await UserService.verifyResetPasswordCode(1, '654321')
+
+      expect(result).toBe(false)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).toBeNull()
+      expect(fields.resetPasswordCodeAttempts).toBe(0)
+    })
+
+    it('retourne false si le code est expiré', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: bcrypt.hashSync(CODE, 4),
+        resetPasswordCodeExpiresAt: new Date(Date.now() - 1000),
+        resetPasswordCodeAttempts: 0
+      })
+
+      const result = await UserService.verifyResetPasswordCode(1, CODE)
+
+      expect(result).toBe(false)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.resetPasswordCode).toBeNull()
+    })
+
+    it('retourne false si aucun code n est en attente', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        resetPasswordCode: null,
+        resetPasswordCodeExpiresAt: null,
+        resetPasswordCodeAttempts: 0
+      })
+
+      const result = await UserService.verifyResetPasswordCode(1, CODE)
+
+      expect(result).toBe(false)
+    })
+  })
 
   describe('setRole', () => {
     it('should set a role for a user', async () => {
-      Role.findByPk.mockResolvedValue({ userId: 1, name: 'Admin' });
-      User.update.mockResolvedValue([1]);
+      Role.findByPk.mockResolvedValue({ userId: 1, name: 'Admin' })
+      User.update.mockResolvedValue([1])
       User.findByPk.mockResolvedValue({
-        userId: 1, name: 'User 1', roleId: 1
-      });
+        userId: 1,
+        name: 'User 1',
+        roleId: 1
+      })
 
-      const user = await UserService.setRole(1, 1);
+      const user = await UserService.setRole(1, 1)
 
-      expect(Role.findByPk).toHaveBeenCalledWith(1);
-      expect(User.update).toHaveBeenCalledWith({ roleId: 1 }, { where: { userId: 1 } });
-      expect(user).toEqual({ userId: 1, name: 'User 1', roleId: 1 });
-    });
-  });
-});
+      expect(Role.findByPk).toHaveBeenCalledWith(1)
+      expect(User.update).toHaveBeenCalledWith({ roleId: 1 }, { where: { userId: 1 } })
+      expect(user).toEqual({ userId: 1, name: 'User 1', roleId: 1 })
+    })
+  })
+
+  // ── Bcrypt — verifyPassword ────────────────────────────────────────────────
+
+  describe('verifyPassword', () => {
+    it('retourne true si le mot de passe en clair correspond au hash stocké', async () => {
+      const plain = 'MonPassword1'
+      const hash = await bcrypt.hash(plain, 10)
+      User.findByPk.mockResolvedValue({ password: hash })
+
+      const result = await UserService.verifyPassword(1, plain)
+
+      expect(result).toBe(true)
+      expect(User.findByPk).toHaveBeenCalledWith(1)
+    })
+
+    it('retourne false si le mot de passe ne correspond pas au hash', async () => {
+      const hash = await bcrypt.hash('CorrectPassword1', 10)
+      User.findByPk.mockResolvedValue({ password: hash })
+
+      const result = await UserService.verifyPassword(1, 'WrongPassword1')
+
+      expect(result).toBe(false)
+    })
+  })
+
+  // ── Bcrypt — setPassword ───────────────────────────────────────────────────
+
+  describe('setPassword', () => {
+    it('lance une erreur si le mot de passe est absent (chaîne vide)', async () => {
+      await expect(UserService.setPassword(1, '')).rejects.toThrow('Mot de passe manquant')
+    })
+
+    it('lance une erreur si le mot de passe est trop court (< 10 chars)', async () => {
+      await expect(UserService.setPassword(1, 'Short1')).rejects.toThrow(
+        'Le mot de passe doit contenir au moins 10 caractères'
+      )
+    })
+
+    it('stocke un hash bcrypt et non le mot de passe en clair', async () => {
+      User.update.mockResolvedValue([1])
+      const plain = 'MonMotDePasse1'
+
+      await UserService.setPassword(1, plain)
+
+      const [fields, opts] = User.update.mock.calls[0]
+      expect(fields.password).not.toBe(plain)
+      expect(opts).toEqual({ where: { userId: 1 } })
+      const isValid = await bcrypt.compare(plain, fields.password)
+      expect(isValid).toBe(true)
+    })
+  })
+
+  // ── Refresh token — hachage SHA-256 ────────────────────────────────────────
+
+  describe('setRefreshToken', () => {
+    it('stocke le hash SHA-256 du token (pas le token brut)', async () => {
+      const crypto = require('crypto')
+      User.update.mockResolvedValue([1])
+      const rawToken = crypto.randomBytes(64).toString('hex')
+
+      await UserService.setRefreshToken(1, rawToken, new Date(Date.now() + 86400000))
+
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.refreshToken).not.toBe(rawToken)
+      expect(fields.refreshToken).toHaveLength(64) // SHA-256 hex = 64 chars
+      expect(/^[0-9a-f]+$/.test(fields.refreshToken)).toBe(true)
+    })
+  })
+
+  describe('verifyRefreshToken', () => {
+    it("retrouve l'utilisateur en hachant le token brut avant la requete DB", async () => {
+      const crypto = require('crypto')
+      const rawToken = crypto.randomBytes(64).toString('hex')
+      const hash = crypto.createHash('sha256').update(rawToken).digest('hex')
+      const future = new Date(Date.now() + 86400000)
+
+      User.findOne.mockResolvedValue({ userId: 1, refreshTokenExpiresAt: future })
+
+      const result = await UserService.verifyRefreshToken(rawToken)
+
+      expect(User.findOne).toHaveBeenCalledWith({ where: { refreshToken: hash } })
+      expect(result).not.toBeNull()
+    })
+
+    it('retourne null si le token est expiré', async () => {
+      const crypto = require('crypto')
+      const rawToken = crypto.randomBytes(64).toString('hex')
+      const past = new Date(Date.now() - 1000)
+
+      User.findOne.mockResolvedValue({ userId: 1, refreshTokenExpiresAt: past })
+
+      const result = await UserService.verifyRefreshToken(rawToken)
+
+      expect(result).toBeNull()
+    })
+
+    it('retourne null si token absent', async () => {
+      const result = await UserService.verifyRefreshToken(null)
+      expect(User.findOne).not.toHaveBeenCalled()
+      expect(result).toBeNull()
+    })
+
+    it('retourne null si le compte est désactivé (isActive: false) même si le token est valide', async () => {
+      const crypto = require('crypto')
+      const rawToken = crypto.randomBytes(64).toString('hex')
+      const future = new Date(Date.now() + 86400000)
+
+      User.findOne.mockResolvedValue({ userId: 1, refreshTokenExpiresAt: future, isActive: false })
+
+      const result = await UserService.verifyRefreshToken(rawToken)
+
+      expect(result).toBeNull()
+    })
+  })
+
+  // ── validEmailCode — expiration ────────────────────────────────────────────
+
+  describe('setValidEmailCode', () => {
+    it("stocke un code et une date d'expiration (30 min)", async () => {
+      User.update.mockResolvedValue([1])
+
+      await UserService.setValidEmailCode(1)
+
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.validEmailCode).toBeDefined()
+      expect(fields.validEmailCodeExpiresAt).toBeInstanceOf(Date)
+      const diffMs = fields.validEmailCodeExpiresAt - Date.now()
+      expect(diffMs).toBeGreaterThan(29 * 60 * 1000)
+      expect(diffMs).toBeLessThanOrEqual(30 * 60 * 1000 + 100)
+    })
+  })
+
+  describe('verifyValidEmailCode', () => {
+    it('retourne true si le code est correct et non expiré', async () => {
+      const future = new Date(Date.now() + 10 * 60 * 1000)
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: future,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '123456')
+
+      expect(result).toBe(true)
+      expect(mockUser.validEmailCode).toBeNull()
+      expect(mockUser.validEmailCodeExpiresAt).toBeNull()
+      expect(mockUser.save).toHaveBeenCalled()
+    })
+
+    it('retourne false si le code est incorrect', async () => {
+      const future = new Date(Date.now() + 10 * 60 * 1000)
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: future,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '999999')
+
+      expect(result).toBe(false)
+    })
+
+    it('retourne false si le code est expiré', async () => {
+      const past = new Date(Date.now() - 1000)
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: past,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '123456')
+
+      expect(result).toBe(false)
+    })
+
+    it("retourne false si pas de date d'expiration", async () => {
+      const mockUser = {
+        validEmailCode: '123456',
+        validEmailCodeExpiresAt: null,
+        save: jest.fn().mockResolvedValue()
+      }
+      User.findByPk.mockResolvedValue(mockUser)
+
+      const result = await UserService.verifyValidEmailCode(1, '123456')
+
+      expect(result).toBe(false)
+    })
+  })
+
+  // ── Bcrypt — create (hachage au moment de la persistance) ─────────────────
+
+  describe('create — hachage du mot de passe', () => {
+    it('hache le mot de passe avant de le passer à User.create', async () => {
+      const plain = 'SecurePass1'
+      User.findOne.mockResolvedValue(null)
+      User.create.mockImplementation((data) => ({
+        ...data,
+        userId: 1,
+        dataValues: { ...data, userId: 1 },
+      }))
+      UserOnboardingState.create.mockResolvedValue({})
+      Invitation.findAll.mockResolvedValue([])
+
+      await UserService.create({ email: 'test@example.com', name: 'Test', password: plain })
+
+      const [createArgs] = User.create.mock.calls[0]
+      expect(createArgs.password).not.toBe(plain)
+      const isHash = await bcrypt.compare(plain, createArgs.password)
+      expect(isHash).toBe(true)
+    })
+  })
+
+  // ── _processPendingEmailInvitations ─────────────────────────────────────────
+
+  describe('create — invitation admin_etablissement en attente', () => {
+    const baseUser = { email: 'gerant@example.com', name: 'Gérant', password: 'securepassword' }
+
+    beforeEach(() => {
+      User.findOne.mockResolvedValue(null)
+      User.create.mockResolvedValue({ userId: 10, email: baseUser.email, name: baseUser.name })
+      UserOnboardingState.create.mockResolvedValue({})
+    })
+
+    it('promeut le nouveau compte en transaction et révoque l\'ancien gérant', async () => {
+      const etabUpdate = jest.fn().mockResolvedValue()
+      const invUpdate = jest.fn().mockResolvedValue()
+      Etablissement.findByPk.mockResolvedValue({ id: 3, adminId: 99, update: etabUpdate })
+      Invitation.findAll.mockResolvedValue([
+        { role: 'admin_etablissement', etablissementId: 3, update: invUpdate }
+      ])
+
+      await UserService.create(baseUser)
+
+      // Transaction utilisée pour les 3 écritures liées
+      expect(Etablissement.sequelize.transaction).toHaveBeenCalledTimes(1)
+      // Ancien gérant (99) rétrogradé, nouveau (10) promu
+      expect(User.update).toHaveBeenCalledWith(
+        { roleId: 2 },
+        expect.objectContaining({ where: { userId: 99 } })
+      )
+      expect(User.update).toHaveBeenCalledWith(
+        { roleId: 4 },
+        expect.objectContaining({ where: { userId: 10 } })
+      )
+      expect(etabUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ adminId: 10 }),
+        expect.anything()
+      )
+      expect(invUpdate).toHaveBeenCalledWith({ status: 'accepted', targetUserId: 10 })
+    })
+
+    it('ne rétrograde personne si l\'établissement n\'avait pas encore de gérant', async () => {
+      const etabUpdate = jest.fn().mockResolvedValue()
+      const invUpdate = jest.fn().mockResolvedValue()
+      Etablissement.findByPk.mockResolvedValue({ id: 3, adminId: null, update: etabUpdate })
+      Invitation.findAll.mockResolvedValue([
+        { role: 'admin_etablissement', etablissementId: 3, update: invUpdate }
+      ])
+
+      await UserService.create(baseUser)
+
+      expect(User.update).not.toHaveBeenCalledWith(
+        { roleId: 2 },
+        expect.anything()
+      )
+      expect(User.update).toHaveBeenCalledWith(
+        { roleId: 4 },
+        expect.objectContaining({ where: { userId: 10 } })
+      )
+    })
+
+    it('n\'écrit rien si l\'établissement de l\'invitation n\'existe plus', async () => {
+      const invUpdate = jest.fn().mockResolvedValue()
+      Etablissement.findByPk.mockResolvedValue(null)
+      Invitation.findAll.mockResolvedValue([
+        { role: 'admin_etablissement', etablissementId: 999, update: invUpdate }
+      ])
+
+      await UserService.create(baseUser)
+
+      expect(Etablissement.sequelize.transaction).not.toHaveBeenCalled()
+      expect(invUpdate).toHaveBeenCalledWith({ status: 'accepted', targetUserId: 10 })
+    })
+  })
+
+  // ── setActive ──────────────────────────────────────────────────────────────
+
+  describe('setActive', () => {
+    it('active un compte et retourne l\'utilisateur mis à jour', async () => {
+      User.findByPk.mockResolvedValueOnce({ userId: 5, roleId: 2, isActive: false })
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 5, isActive: true } })
+
+      const result = await UserService.setActive(5, true, 1)
+
+      expect(User.update).toHaveBeenCalledWith({ isActive: true }, { where: { userId: 5 } })
+      expect(result).toBeDefined()
+    })
+
+    it('retourne null si l\'utilisateur cible est introuvable', async () => {
+      User.findByPk.mockResolvedValueOnce(null)
+
+      const result = await UserService.setActive(999, false, 1)
+
+      expect(result).toBeNull()
+      expect(User.update).not.toHaveBeenCalled()
+    })
+
+    it('retourne false si roleId=4 tente d\'agir sur un admin plateforme (roleId=1)', async () => {
+      User.findByPk.mockResolvedValueOnce({ userId: 1, roleId: 1, isActive: true })
+
+      const result = await UserService.setActive(1, false, 4)
+
+      expect(result).toBe(false)
+      expect(User.update).not.toHaveBeenCalled()
+    })
+
+    it('retourne false si roleId=1 tente de désactiver un autre admin plateforme (roleId=1)', async () => {
+      User.findByPk.mockResolvedValueOnce({ userId: 2, roleId: 1, isActive: true })
+
+      const result = await UserService.setActive(2, false, 1)
+
+      expect(User.update).not.toHaveBeenCalled()
+      expect(result).toBe(false)
+    })
+
+    it('révoque les tokens en cours (A07-M1) quand le compte est désactivé', async () => {
+      const tokenBlacklist = require('../../helpers/tokenBlacklist')
+      User.findByPk.mockResolvedValueOnce({ userId: 5, roleId: 2, isActive: true })
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 5, isActive: false } })
+
+      await UserService.setActive(5, false, 1)
+
+      expect(tokenBlacklist.revokeUserTokens).toHaveBeenCalledWith(5)
+    })
+
+    it('ne révoque rien quand le compte est (ré)activé', async () => {
+      const tokenBlacklist = require('../../helpers/tokenBlacklist')
+      User.findByPk.mockResolvedValueOnce({ userId: 5, roleId: 2, isActive: false })
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValueOnce({ dataValues: { userId: 5, isActive: true } })
+
+      await UserService.setActive(5, true, 1)
+
+      expect(tokenBlacklist.revokeUserTokens).not.toHaveBeenCalled()
+    })
+  })
+})

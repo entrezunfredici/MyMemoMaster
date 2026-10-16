@@ -1,91 +1,407 @@
 <template>
-  <p v-if="roleStore.role.name">Rôle : {{ roleStore.role.name }}</p>
-  <p v-else>Chargement du rôle...</p>
-  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
-    <section class="order-2 lg:order-1 p-5 bg-light rounded-[7px]">
-      <div class="w-full">
-        <h4 v-if="roleStore.role.name == 'Admin'" class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4"> Catégorie Administrateur</h4>
-        <h4 v-else class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4"> Catégorie utilisateur</h4>
+  <div class="settings">
+
+    <!-- Sidebar -->
+    <aside class="settings__sidebar">
+      <div class="settings__sidebar-group">
+        <p class="settings__sidebar-label">Mon compte</p>
+        <router-link to="/profile" class="settings__sidebar-link">Profil &amp; sécurité</router-link>
       </div>
-      <div class="flex flex-col">
-          <h4 class="text-primary text-xl neue-haas-grotesk-r font-semibold pb-4">
-            Paramètres utilisateur
-          </h4>
-          <div class="flex flex-col">
-            <Button class="align-left-button w-full">Mon compte</Button><br>
-            <Button class="align-left-button w-full">Profil</Button><br>
-            <Button class="align-left-button w-full">Données et confidentialité</Button><br>
+
+      <div class="settings__sidebar-group">
+        <p class="settings__sidebar-label">Application</p>
+        <button
+          v-for="item in appSections"
+          :key="item.id"
+          class="settings__sidebar-link"
+          :class="{ 'settings__sidebar-link--active': activeSection === item.id }"
+          @click="activeSection = item.id"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+    </aside>
+
+    <!-- Panneau principal -->
+    <main class="settings__panel">
+
+      <!-- Apparence -->
+      <template v-if="activeSection === 'apparence'">
+        <h2 class="settings__title">Apparence</h2>
+        <div class="settings__row">
+          <div>
+            <p class="settings__row-label">Mode sombre</p>
+            <p class="settings__row-hint">Applique un thème sombre à l'interface.</p>
           </div>
-      </div>
-      <div class="flex flex-col">
-          <h4 class="text-primary text-xl neue-haas-grotesk-r font-semibold pb-4">
-            Paramètres de l'application
-          </h4>
-          <div class="flex flex-col">
-            <Button class="align-left-button w-full">Apparence</Button>
-            <Button class="align-left-button w-full">Accessibilité</Button>
-            <Button class="align-left-button w-full">Notifications</Button>
-            <Button class="align-left-button w-full">Raccourcis clavier</Button>
-          </div>
-      </div>
-    </section>
-    <section class="order-1 lg:order-2 p-5 bg-light rounded-[7px]">
-      <div class="w-full">
-        <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4">
-          Apparence
-        </h4>
-        <p>Densité de l'interface : Par défaut</p>
-        <p>Taille de la police : 12 (Par défaut)</p>
-          <div class="flex justify-between">
-            <p>Dark mode</p> <br>
+          <ToggleButton v-model="darkMode" ariaLabel="Mode sombre" />
+        </div>
+      </template>
+
+      <!-- Notifications -->
+      <template v-if="activeSection === 'notifications'">
+        <h2 class="settings__title">Notifications</h2>
+
+        <div class="settings__info-box mb-6">
+          <p>
+            Les rappels de calendrier sont gérés depuis la page
+            <router-link to="/calendar" class="settings__link">Calendrier</router-link>.
+          </p>
+        </div>
+
+        <!-- Alertes KPI -->
+        <template v-if="alertStore.loading">
+          <p class="text-sm text-gray-400">Chargement des préférences…</p>
+        </template>
+
+        <template v-else-if="alertStore.settings">
+          <h3 class="settings__subtitle">Alertes de progression (bilan quotidien)</h3>
+          <p class="settings__section-hint mb-4">
+            Un résumé quotidien est envoyé à 18h si des alertes sont déclenchées.
+            Toutes les alertes du jour sont regroupées en une seule notification.
+          </p>
+
+          <!-- Activer/désactiver tout -->
+          <div class="settings__row">
             <div>
-            <ToggleButton v-model="isToggled" />
-            <p>({{ isToggled ? 'Activé' : 'Désactivé' }})</p>
+              <p class="settings__row-label">Activer les alertes de progression</p>
+              <p class="settings__row-hint">Active ou désactive toutes les alertes KPI d'un coup.</p>
             </div>
+            <ToggleButton
+              :modelValue="alertStore.settings.enabled"
+              ariaLabel="Activer les alertes de progression"
+              @update:modelValue="save({ enabled: $event })"
+            />
           </div>
-          <p>Lorem ipsum</p>
-          <p>Lorem ipsum</p>
-          <p>Lorem ipsum</p>
-          <p>Lorem ipsum</p><br>
-          <p>Lorem ipsum</p>
-          <p>Lorem ipsum</p>
-          <div class="flex justify-between">
-            <p>Lorem ipsum</p>
-            <ToggleButton/>
-          </div>
-          <p>Lorem ipsum</p>
-          <p>Lorem ipsum</p><br>
-          <p>Lorem ipsum</p>
-          <div class="flex justify-between">
-            <p>Lorem ipsum</p>
-            <ToggleButton/>
-          </div>
-      </div>
-    </section>
+
+          <template v-if="alertStore.settings.enabled">
+            <!-- Canaux -->
+            <p class="settings__group-label mt-4 mb-2">Canaux de notification</p>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">Notification dans l'appli</p>
+                <p class="settings__row-hint">Affichée dans la cloche en haut à droite.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.inAppEnabled"
+                ariaLabel="Notification dans l'application"
+                @update:modelValue="save({ inAppEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">Notification par e-mail</p>
+                <p class="settings__row-hint">Envoyée à l'adresse liée à ton compte.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.emailEnabled"
+                ariaLabel="Notification par e-mail"
+                @update:modelValue="save({ emailEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row settings__row--disabled">
+              <div>
+                <p class="settings__row-label">Notification mobile (push)</p>
+                <p class="settings__row-hint">Disponible quand l'application mobile sera publiée.</p>
+              </div>
+              <ToggleButton :modelValue="false" :disabled="true" ariaLabel="Notification mobile (push) — indisponible" />
+            </div>
+
+            <!-- Types d'alertes -->
+            <p class="settings__group-label mt-6 mb-2">Types d'alertes</p>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">🔥 Streak en danger</p>
+                <p class="settings__row-hint">Alerte si tu n'as pas encore révisé aujourd'hui et que ton streak est en cours.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.streakAlertEnabled"
+                ariaLabel="Alerte streak en danger"
+                @update:modelValue="save({ streakAlertEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">📉 Discipline basse</p>
+                <p class="settings__row-hint">
+                  Alerte si le score de discipline (30 j) passe sous
+                  <strong>{{ alertStore.settings.thresholdDiscipline }} %</strong>.
+                </p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.disciplineAlertEnabled"
+                ariaLabel="Alerte discipline basse"
+                @update:modelValue="save({ disciplineAlertEnabled: $event })"
+              />
+            </div>
+
+            <div class="settings__row" v-if="alertStore.settings.disciplineAlertEnabled">
+              <div>
+                <p class="settings__row-label">Seuil de discipline</p>
+                <p class="settings__row-hint">En dessous de ce pourcentage, une alerte est envoyée.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <input aria-label="Seuil d'alerte discipline"
+                  type="range"
+                  min="10"
+                  max="80"
+                  step="5"
+                  :value="alertStore.settings.thresholdDiscipline"
+                  @change="save({ thresholdDiscipline: Number($event.target.value) })"
+                  class="w-28 accent-primary"
+                />
+                <span class="text-sm font-medium text-primary w-10 text-right">
+                  {{ alertStore.settings.thresholdDiscipline }} %
+                </span>
+              </div>
+            </div>
+
+            <div class="settings__row">
+              <div>
+                <p class="settings__row-label">📚 Baisse des scores</p>
+                <p class="settings__row-hint">Alerte si tes scores récents baissent de plus de 10 points.</p>
+              </div>
+              <ToggleButton
+                :modelValue="alertStore.settings.scoreDropAlertEnabled"
+                ariaLabel="Alerte baisse des scores"
+                @update:modelValue="save({ scoreDropAlertEnabled: $event })"
+              />
+            </div>
+          </template>
+        </template>
+      </template>
+
+      <!-- Accessibilité -->
+      <template v-if="activeSection === 'accessibilite'">
+        <h2 class="settings__title">Accessibilité</h2>
+        <div class="settings__info-box">
+          <p>Les options d'accessibilité (taille de police, contraste) seront disponibles dans une prochaine version.</p>
+        </div>
+      </template>
+
+    </main>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { useRoleStore } from '@/stores/roles'
-import Button from '@/components/ButtonComponent.vue'
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import ToggleButton from '@/components/ToggleButton.vue'
+import { useKpiAlertSettingsStore } from '@/stores/kpiAlertSettings'
 
-const isToggled = ref(false)
+const DARK_MODE_KEY = 'mmm_dark_mode'
 
-const roleStore = useRoleStore()
+const appSections = [
+  { id: 'apparence', label: 'Apparence' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'accessibilite', label: 'Accessibilité' }
+]
 
-onMounted(async () => {
-  const userRoleId = 1 //recuperer l'id dans user
-  await roleStore.fetchRoleById(userRoleId)
+const activeSection = ref('apparence')
+const darkMode = ref(false)
+const alertStore = useKpiAlertSettingsStore()
+
+onMounted(() => {
+  darkMode.value = localStorage.getItem(DARK_MODE_KEY) === 'true'
+  applyDarkMode(darkMode.value)
 })
 
+watch(activeSection, (val) => {
+  if (val === 'notifications' && !alertStore.settings) {
+    alertStore.fetchSettings()
+  }
+})
+
+watch(darkMode, (val) => {
+  localStorage.setItem(DARK_MODE_KEY, String(val))
+  applyDarkMode(val)
+})
+
+function applyDarkMode(enabled) {
+  document.documentElement.classList.toggle('dark-mode', enabled)
+}
+
+function save(updates) {
+  alertStore.updateSettings(updates)
+}
 </script>
 
 <style scoped>
-.align-left-button {
-  justify-content: flex-start !important;
-  text-align: left !important;
+.settings {
+  display: flex;
+  gap: 0;
+  min-height: calc(100vh - 80px);
+}
+
+.settings__sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--gray-200);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings__sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings__sidebar-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-500);
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+
+.settings__sidebar-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.settings__sidebar-link:hover {
+  background: var(--gray-100);
+  color: rgb(var(--primary));
+}
+
+.settings__sidebar-link--active {
+  background: var(--surface-soft);
+  color: rgb(var(--primary));
+  font-weight: 600;
+}
+
+.settings__panel {
+  flex: 1;
+  padding: 32px 40px;
+  max-width: 560px;
+}
+
+.settings__title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: rgb(var(--primary));
+  margin-bottom: 24px;
+}
+
+.settings__subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 4px;
+}
+
+.settings__section-hint {
+  font-size: 0.82rem;
+  color: var(--gray-500);
+  line-height: 1.5;
+}
+
+.settings__group-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-500);
+}
+
+.settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.settings__row--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.settings__row-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+.settings__row-hint {
+  font-size: 0.82rem;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+.settings__info-box {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+.settings__link {
+  color: rgb(var(--primary));
+  text-decoration: underline;
+}
+
+/* Mobile : menu au-dessus du panneau (colonne unique) au lieu de deux colonnes qui débordaient de l'écran */
+@media (max-width: 768px) {
+  .settings {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .settings__sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    border-right: none;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 12px 0 16px;
+  }
+
+  .settings__sidebar-link {
+    width: auto;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .settings__sidebar-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .settings__sidebar-label {
+    width: 100%;
+  }
+
+  .settings__panel {
+    padding: 20px 0;
+    max-width: none;
+    min-width: 0;
+  }
 }
 </style>

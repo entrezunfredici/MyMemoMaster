@@ -1,0 +1,400 @@
+const dayjs = require('dayjs')
+const { RevisionSession, TestResult, Test, Subject, LeitnerSystem, LeitnerBox, LeitnerCard, ClassGroup } = require('../models')
+const leitnerReviewSessionService = require('./LeitnerReviewSession.service')
+const mindMapViewSessionService = require('./MindMapViewSession.service')
+
+/**
+ * Retourne le lundi de la semaine (ISO) contenant la date donnée.
+ * @param {string|Dayjs} date
+ * @returns {string} YYYY-MM-DD
+ */
+function isoWeekStart(date) {
+  const d = dayjs(date)
+  const day = d.day() // 0=Dim, 1=Lun…6=Sam
+  const offset = day === 0 ? 6 : day - 1
+  return d.subtract(offset, 'day').format('YYYY-MM-DD')
+}
+
+class KpiService {
+  /**
+   * Calcule tous les KPI personnels d'un étudiant.
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @returns {object} KPI agrégés (révision, exercices, leitner, sujets, discipline, badges)
+   */
+  async getMyKpis(userId) {
+    const [sessions, testResults, leitnerSystems, leitnerReviewSessions, mindMapViewSessions] = await Promise.all([
+      RevisionSession.findAll({ where: { userId }, order: [['date', 'DESC']] }),
+      TestResult.findAll({
+        where: { userId },
+        include: [
+          {
+            model: Test,
+            as: 'test',
+            attributes: ['testId', 'name', 'subjectId'],
+            required: true,
+            include: [
+              { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+              { model: ClassGroup, as: 'classGroups', through: { attributes: [] }, required: false, attributes: ['id', 'name'] }
+            ]
+          }
+        ],
+        order: [['completedAt', 'ASC']]
+      }),
+      LeitnerSystem.findAll({
+        where: { idUser: userId },
+        include: [
+          {
+            model: LeitnerBox,
+            as: 'leitnerBoxes',
+            include: [{ model: LeitnerCard, as: 'leitnerCards' }]
+          },
+          { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
+        ]
+      }),
+      leitnerReviewSessionService.findByUser(userId),
+      mindMapViewSessionService.findByUser(userId)
+    ])
+
+    // Seuls les résultats des tests privés (sans groupe assigné) alimentent les KPI persos
+    const privateTestResults = testResults.filter((r) => !r.test?.classGroups?.length)
+    const groupTestResults = testResults.filter((r) => r.test?.classGroups?.length)
+
+    const revisionKpi = this._computeRevision(sessions)
+    // Temps de révision = uniquement le temps réellement chronométré (exercices privés +
+    // sessions Leitner + consultations de cartes mentales) — voir _computeRealMinutes. Ne
+    // reflète plus les créneaux planifiés dans RevisionSession (isDone) : une case cochée par
+    // l'utilisateur ne garantit ni qu'il a réellement révisé, ni combien de temps il y a passé.
+    revisionKpi.totalMinutes = this._computeRealMinutes(privateTestResults, leitnerReviewSessions, mindMapViewSessions)
+    const exercisesKpi = this._computeExercises(privateTestResults)
+    const leitnerKpi = this._computeLeitner(leitnerSystems)
+    const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
+    const disciplineKpi = this._computeDiscipline(sessions)
+    const pedagogicalKpi = this._computePedagogical(groupTestResults)
+    const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
+
+    return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, pedagogical: pedagogicalKpi, badges }
+  }
+
+  /**
+   * Calcule les KPI personnels filtrés par matières consenties.
+   * Leitner et exercices sont filtrés par subjectIds. Sessions planifiées (RevisionSession)
+   * et discipline sont partagées telles quelles (données générales non liées à une matière) —
+   * seul revision.totalMinutes (temps réel chronométré) est filtré, puisqu'il provient des
+   * exercices/sessions Leitner/consultations de cartes mentales déjà restreints aux matières
+   * consenties.
+   *
+   * @param {number} userId
+   * @param {number[]} subjectIds - Liste des subjectId consentis
+   * @returns {object} KPI filtrés
+   */
+  async getPersonalKpisForSubjects(userId, subjectIds) {
+    const [sessions, testResults, leitnerSystems, leitnerReviewSessions, mindMapViewSessions] = await Promise.all([
+      RevisionSession.findAll({ where: { userId }, order: [['date', 'DESC']] }),
+      TestResult.findAll({
+        where: { userId },
+        include: [
+          {
+            model: Test,
+            as: 'test',
+            attributes: ['testId', 'name', 'subjectId'],
+            where: { subjectId: subjectIds },
+            required: true,
+            include: [
+              { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+              { model: ClassGroup, as: 'classGroups', through: { attributes: [] }, required: false, attributes: ['id'] }
+            ]
+          }
+        ],
+        order: [['completedAt', 'ASC']]
+      }),
+      LeitnerSystem.findAll({
+        where: { idUser: userId, subjectId: subjectIds },
+        include: [
+          {
+            model: LeitnerBox,
+            as: 'leitnerBoxes',
+            include: [{ model: LeitnerCard, as: 'leitnerCards' }]
+          },
+          { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] }
+        ]
+      }),
+      leitnerReviewSessionService.findByUser(userId, subjectIds),
+      mindMapViewSessionService.findByUser(userId, subjectIds)
+    ])
+
+    const privateTestResults = testResults.filter((r) => !r.test?.classGroups?.length)
+
+    const revisionKpi = this._computeRevision(sessions)
+    // Temps réel, restreint aux matières consenties comme le reste de cette méthode
+    // (contrairement à getMyKpis, ici le filtre par matière s'applique aussi au temps).
+    revisionKpi.totalMinutes = this._computeRealMinutes(privateTestResults, leitnerReviewSessions, mindMapViewSessions)
+    const exercisesKpi = this._computeExercises(privateTestResults)
+    const leitnerKpi = this._computeLeitner(leitnerSystems)
+    const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
+    const disciplineKpi = this._computeDiscipline(sessions)
+    const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
+
+    return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, badges }
+  }
+
+  /**
+   * @private
+   */
+  _computeRevision(sessions) {
+    const completed = sessions.filter((s) => s.isDone)
+    const total = sessions.length
+    const totalCompleted = completed.length
+    const completionRate = total > 0 ? Math.round((totalCompleted / total) * 100) : 0
+
+    // Streak — jours consécutifs avec au moins une session complétée
+    const uniqueDates = [...new Set(completed.map((s) => s.date))].sort().reverse()
+    let streakDays = 0
+    const today = dayjs().format('YYYY-MM-DD')
+    const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
+
+    if (uniqueDates.length > 0 && (uniqueDates[0] === today || uniqueDates[0] === yesterday)) {
+      let expected = dayjs(uniqueDates[0])
+      for (const d of uniqueDates) {
+        if (d === expected.format('YYYY-MM-DD')) {
+          streakDays++
+          expected = expected.subtract(1, 'day')
+        } else break
+      }
+    }
+
+    // 30 derniers jours
+    const thirtyAgo = dayjs().subtract(30, 'day').format('YYYY-MM-DD')
+    const sessionsLast30 = sessions.filter((s) => s.date >= thirtyAgo)
+    const completedLast30 = sessionsLast30.filter((s) => s.isDone)
+
+    // Activité par semaine — 8 dernières semaines
+    const weeklyMap = {}
+    for (let i = 7; i >= 0; i--) {
+      const ws = isoWeekStart(dayjs().subtract(i, 'week').format('YYYY-MM-DD'))
+      weeklyMap[ws] = 0
+    }
+    for (const s of sessions) {
+      const ws = isoWeekStart(s.date)
+      if (ws in weeklyMap) weeklyMap[ws] += s.isDone ? 1 : 0
+    }
+    const weeklyActivity = Object.entries(weeklyMap).map(([week, count]) => ({ week, count }))
+
+    // NOTE: totalMinutes n'est plus calculé ici depuis les créneaux planifiés
+    // (startTime/endTime des RevisionSession cochées "terminé") — une case cochée
+    // par l'utilisateur ne garantit ni qu'il a réellement révisé, ni combien de
+    // temps il y a passé. Le champ est renseigné par l'appelant (getMyKpis /
+    // getPersonalKpisForSubjects) depuis _computeRealMinutes, seule mesure fiable
+    // car chronométrée par le front. Les autres indicateurs ci-dessus (streak,
+    // taux de complétion, sessions planifiées/complétées) continuent de mesurer
+    // le respect du planning et restent inchangés.
+    const revivedToday = completed.some((s) => s.date === today)
+
+    return { totalPlanned: total, totalCompleted, completionRate, streakDays, sessionsLast30Days: sessionsLast30.length, completedLast30Days: completedLast30.length, weeklyActivity, revivedToday }
+  }
+
+  /**
+   * Additionne le temps réellement chronométré (front) sur les exercices, les
+   * sessions Leitner et les consultations de cartes mentales — seule source du
+   * KPI "Temps total de révision" (voir NOTE dans _computeRevision). Les valeurs
+   * absentes (durationSeconds null — résultats antérieurs à ce champ, ou soumis
+   * par un appelant qui ne le fournit pas) sont ignorées plutôt que traitées
+   * comme 0, pour ne pas fausser la moyenne si ce chiffre est un jour affiché
+   * ailleurs.
+   *
+   * @private
+   * @param {TestResult[]} testResults
+   * @param {LeitnerReviewSession[]} leitnerReviewSessions
+   * @param {MindMapViewSession[]} mindMapViewSessions
+   * @returns {number} minutes, arrondies
+   */
+  _computeRealMinutes(testResults, leitnerReviewSessions, mindMapViewSessions) {
+    const testSeconds = testResults.reduce((acc, r) => acc + (r.durationSeconds || 0), 0)
+    const leitnerSeconds = leitnerReviewSessions.reduce((acc, s) => acc + (s.durationSeconds || 0), 0)
+    const mindMapSeconds = mindMapViewSessions.reduce((acc, s) => acc + (s.durationSeconds || 0), 0)
+    return Math.round((testSeconds + leitnerSeconds + mindMapSeconds) / 60)
+  }
+
+  /**
+   * @private
+   */
+  _computeExercises(testResults) {
+    if (testResults.length === 0) {
+      return { totalTests: 0, avgScore: 0, maxScore: 0, minScore: 0, recentTrend: 0, scoreHistory: [] }
+    }
+
+    const percentages = testResults.map((r) => Math.round((r.score / r.total) * 100))
+    const avgScore = Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
+    const maxScore = Math.max(...percentages)
+    const minScore = Math.min(...percentages)
+
+    // Tendance : moyenne deuxième moitié vs première moitié
+    let recentTrend = 0
+    if (percentages.length >= 4) {
+      const half = Math.floor(percentages.length / 2)
+      const firstAvg = percentages.slice(0, half).reduce((a, b) => a + b, 0) / half
+      const lastAvg = percentages.slice(-half).reduce((a, b) => a + b, 0) / half
+      recentTrend = Math.round(lastAvg - firstAvg)
+    }
+
+    const scoreHistory = [...testResults]
+      .reverse()
+      .slice(0, 10)
+      .map((r) => ({
+        date: r.completedAt,
+        score: r.score,
+        total: r.total,
+        percentage: Math.round((r.score / r.total) * 100),
+        testName: r.test?.name || 'Inconnu'
+      }))
+
+    return { totalTests: testResults.length, avgScore, maxScore, minScore, recentTrend, scoreHistory }
+  }
+
+  /**
+   * @private
+   */
+  _computeLeitner(systems) {
+    const cardsByBox = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    let totalCards = 0
+    let totalCorrect = 0
+    let totalReviews = 0
+    let cardsDue = 0
+    const now = dayjs()
+
+    for (const system of systems) {
+      for (const box of system.leitnerBoxes || []) {
+        const lvl = box.level
+        for (const card of box.leitnerCards || []) {
+          totalCards++
+          if (lvl >= 1 && lvl <= 5) cardsByBox[lvl]++
+          totalCorrect += card.correct_count || 0
+          totalReviews += card.review_count || 0
+          const nra = card.next_review_at
+          if (!nra || dayjs(nra).isBefore(now) || dayjs(nra).isSame(now)) cardsDue++
+        }
+      }
+    }
+
+    const globalSuccessRate = totalReviews > 0 ? Math.round((totalCorrect / totalReviews) * 100) : 0
+    const advancedCards = cardsByBox[4] + cardsByBox[5]
+    const mastery = totalCards > 0 ? Math.round((advancedCards / totalCards) * 100) : 0
+
+    return { totalCards, cardsByBox, globalSuccessRate, mastery, cardsDue }
+  }
+
+  /**
+   * @private
+   */
+  _computeSubjects(testResults, leitnerSystems) {
+    const subjectMap = {}
+
+    for (const r of testResults) {
+      const sub = r.test?.subject
+      if (sub) {
+        if (!subjectMap[sub.subjectId]) subjectMap[sub.subjectId] = { subjectId: sub.subjectId, name: sub.name, tests: 0, systems: 0 }
+        subjectMap[sub.subjectId].tests++
+      }
+    }
+
+    for (const sys of leitnerSystems) {
+      if (sys.subject) {
+        const sub = sys.subject
+        if (!subjectMap[sub.subjectId]) subjectMap[sub.subjectId] = { subjectId: sub.subjectId, name: sub.name, tests: 0, systems: 0 }
+        subjectMap[sub.subjectId].systems++
+      }
+    }
+
+    const list = Object.values(subjectMap)
+    return { totalUnique: list.length, list }
+  }
+
+  /**
+   * @private
+   */
+  _computeDiscipline(sessions) {
+    const today = dayjs()
+    const startWeek = isoWeekStart(today.format('YYYY-MM-DD'))
+    const endWeek = dayjs(startWeek).add(6, 'day').format('YYYY-MM-DD')
+
+    const thisWeek = sessions.filter((s) => s.date >= startWeek && s.date <= endWeek)
+    const plannedThisWeek = thisWeek.length
+    const completedThisWeek = thisWeek.filter((s) => s.isDone).length
+
+    const thirtyAgo = today.subtract(30, 'day').format('YYYY-MM-DD')
+    const last30 = sessions.filter((s) => s.date >= thirtyAgo)
+    const completedLast30 = last30.filter((s) => s.isDone)
+    const disciplineScore = last30.length > 0 ? Math.round((completedLast30.length / last30.length) * 100) : 0
+
+    return { plannedThisWeek, completedThisWeek, disciplineScore }
+  }
+
+  /**
+   * @private
+   * Calcule les KPI pédagogiques (exercices assignés par un enseignant à un groupe).
+   */
+  _computePedagogical(groupTestResults) {
+    if (groupTestResults.length === 0) {
+      return { totalTests: 0, avgScore: null, scoreHistory: [], bySubject: [] }
+    }
+
+    const percentages = groupTestResults.map((r) => Math.round((r.score / r.total) * 100))
+    const avgScore = Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
+
+    const scoreHistory = [...groupTestResults]
+      .reverse()
+      .slice(0, 10)
+      .map((r) => ({
+        date: r.completedAt,
+        score: r.score,
+        total: r.total,
+        percentage: Math.round((r.score / r.total) * 100),
+        testName: r.test?.name || 'Inconnu',
+        groups: (r.test?.classGroups ?? []).map((g) => g.name)
+      }))
+
+    // Agrégation par matière
+    const subjectMap = {}
+    for (const r of groupTestResults) {
+      const sub = r.test?.subject
+      if (!sub) continue
+      if (!subjectMap[sub.subjectId]) {
+        subjectMap[sub.subjectId] = { subjectId: sub.subjectId, name: sub.name, totalTests: 0, totalPct: 0 }
+      }
+      subjectMap[sub.subjectId].totalTests++
+      subjectMap[sub.subjectId].totalPct += Math.round((r.score / r.total) * 100)
+    }
+    const bySubject = Object.values(subjectMap).map((s) => ({
+      subjectId: s.subjectId,
+      name: s.name,
+      totalTests: s.totalTests,
+      avgScore: Math.round(s.totalPct / s.totalTests)
+    }))
+
+    return { totalTests: groupTestResults.length, avgScore, scoreHistory, bySubject }
+  }
+
+  /**
+   * @private
+   */
+  _computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi }) {
+    const { streakDays, completedLast30Days } = revisionKpi
+    const { totalTests, scoreHistory } = exercisesKpi
+    const { mastery } = leitnerKpi
+    const { totalUnique } = subjectsKpi
+
+    const hasPerfect = scoreHistory.some((s) => s.percentage === 100)
+
+    return [
+      { id: 'streak7', label: '7 jours de suite', description: 'Réviser 7 jours consécutifs', icon: '🔥', unlocked: streakDays >= 7 },
+      { id: 'streak30', label: '30 jours de suite', description: 'Réviser 30 jours consécutifs', icon: '🏆', unlocked: streakDays >= 30 },
+      { id: 'perfectScore', label: 'Score parfait', description: 'Obtenir 100% à un exercice', icon: '⭐', unlocked: hasPerfect },
+      { id: 'tenTests', label: '10 exercices', description: 'Compléter 10 séries d\'exercices', icon: '📚', unlocked: totalTests >= 10 },
+      { id: 'fiveSubjects', label: 'Polyvalent', description: 'Étudier 5 matières différentes', icon: '🎯', unlocked: totalUnique >= 5 },
+      { id: 'leitnerMastery', label: 'Maîtrise Leitner', description: 'Plus de 50% des cartes en boîte 4 ou 5', icon: '🧠', unlocked: mastery >= 50 },
+      { id: 'regular', label: 'Régulier', description: '20 sessions complétées dans les 30 derniers jours', icon: '📅', unlocked: completedLast30Days >= 20 }
+    ]
+  }
+}
+
+module.exports = new KpiService()

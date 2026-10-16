@@ -1,11 +1,14 @@
-const express = require("express");
-const fieldController = require("../controllers/Fields.controller.js");
+const express = require('express')
+const fieldController = require('../controllers/Fields.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const fieldsValidators = require('../validators/Fields.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /fields/all:
+ * /fields:
  *   get:
  *     summary: Récupère tous les champs
  *     tags:
@@ -35,7 +38,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/all", fieldController.findAll);
+router.get('/', fieldController.findAll)
 
 /**
  * @swagger
@@ -59,11 +62,11 @@ router.get("/all", fieldController.findAll);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.get("/:id", fieldController.findOne);
+router.get('/:id', fieldController.findOne)
 
 /**
  * @swagger
- * /fields/add:
+ * /fields:
  *   post:
  *     summary: Ajoute un nouveau champ
  *     tags:
@@ -92,7 +95,7 @@ router.get("/:id", fieldController.findOne);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.post("/add", fieldController.create);
+router.post('/', authMiddleware, fieldsValidators.create, validate, fieldController.create)
 
 /**
  * @swagger
@@ -132,7 +135,7 @@ router.post("/add", fieldController.create);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.put("/:id", fieldController.update);
+router.put('/:id', authMiddleware, fieldsValidators.update, validate, fieldController.update)
 
 /**
  * @swagger
@@ -156,7 +159,7 @@ router.put("/:id", fieldController.update);
  *       500:
  *         description: Erreur interne du serveur
  */
-router.delete("/:id", fieldController.delete);
+router.delete('/:id', authMiddleware, fieldController.delete)
 
 module.exports = (app) => {
   /**
@@ -165,5 +168,5 @@ module.exports = (app) => {
    *   name: Fields
    *   description: Gestion des champs
    */
-  app.use("/fields", router);
-};
+  app.use('/fields', router)
+}

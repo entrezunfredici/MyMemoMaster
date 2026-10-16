@@ -1,344 +1,479 @@
 <template>
-  <div class="mindmap-palette">
-    <header class="mindmap-palette__header">
-      <h3>Outils</h3>
-      <span class="mindmap-palette__tool">Mode: {{ activeToolLabel }}</span>
-    </header>
+  <div class="palette">
 
-    <div class="mindmap-palette__section">
-      <div class="mindmap-palette__buttons">
+    <!-- ── Créer ──────────────────────────────────────────────────────────── -->
+    <section class="palette__section">
+      <h4 class="palette__section-title">Créer</h4>
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type par défaut</label>
+        <select aria-label="Type par défaut" class="palette__select palette__select--inline" :value="store.nodeType" @change="store.setNodeType($event.target.value)">
+          <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
+        </select>
+      </div>
+      <p class="palette__hint">
+        <kbd>⇧</kbd>&thinsp;+ clic sur le canvas ou un nœud pour créer. Bouton <strong>+</strong> sur un nœud pour ajouter un enfant.
+      </p>
+    </section>
+
+    <!-- ── Modes ──────────────────────────────────────────────────────────── -->
+    <section class="palette__section">
+      <h4 class="palette__section-title">Mode</h4>
+      <div class="palette__mode-row">
         <button
-          v-for="tool in tools"
-          :key="tool.id"
-          :class="['mindmap-palette__button', { 'mindmap-palette__button--active': store.tool === tool.id }]"
-          @click="store.setTool(tool.id)"
+          :class="['palette__mode-btn', { 'palette__mode-btn--active': store.tool === 'link' }]"
+          @click="store.setTool(store.tool === 'link' ? 'select' : 'link')"
         >
-          <span class="mindmap-palette__icon">{{ tool.icon }}</span>
-          <span>{{ tool.label }}</span>
+          <span>→</span> Lien
+        </button>
+        <button
+          :class="['palette__mode-btn', { 'palette__mode-btn--active': store.tool === 'zone' }]"
+          @click="store.setTool(store.tool === 'zone' ? 'select' : 'zone')"
+        >
+          <span>□</span> Zone
         </button>
       </div>
-    </div>
-
-    <div class="mindmap-palette__section">
-      <h4>Creer des items</h4>
-      <div class="mindmap-palette__actions">
-        <button @click="createSubjectItem">{{ subjectCreationLabel }}</button>
-        <button @click="addChild" :disabled="!selectedNode">{{ childCreationLabel }}</button>
+      <p v-if="store.tool === 'link'" class="palette__hint palette__hint--info">
+        Mode lien actif — cliquez sur un nœud source, puis sur la cible.
+      </p>
+      <div v-if="store.tool === 'link'" class="palette__field palette__field--row">
+        <label class="palette__label">Type</label>
+        <select aria-label="Type des nouvelles branches" class="palette__select palette__select--inline" :value="store.linkType" @change="store.setLinkType($event.target.value)">
+          <option v-for="bt in branchTypes" :key="bt.id" :value="bt.id">{{ bt.label }}</option>
+        </select>
       </div>
-      <p class="mindmap-palette__hint">{{ creationHint }}</p>
-    </div>
+    </section>
 
-    <div class="mindmap-palette__section" v-if="selectedNode">
-      <h4>Item selectionne</h4>
-      <div class="mindmap-palette__field">
-        <label>Titre</label>
-        <input v-model="editableLabel" @change="updateLabel" />
+    <!-- ── Item sélectionné ───────────────────────────────────────────────── -->
+    <section class="palette__section palette__section--selected" v-if="selectedNode">
+      <h4 class="palette__section-title">
+        Options
+        <span class="palette__node-label">{{ selectedNode.label }}</span>
+      </h4>
+
+      <!-- Type du nœud -->
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type</label>
+        <select aria-label="Type du nœud" class="palette__select palette__select--inline" :value="selectedNode.type" @change="updateNodeType($event.target.value)">
+          <option v-for="nt in nodeTypes" :key="nt.id" :value="nt.id">{{ nt.label }}</option>
+        </select>
       </div>
-      <div v-if="isTextNodeSelected" class="mindmap-palette__text-style">
-        <div class="mindmap-palette__text-toolbar">
-          <button type="button" :class="{ active: isBold }" @click="toggleBold">
-            <span class="mindmap-palette__text-icon mindmap-palette__text-icon--bold">G</span>
-          </button>
-          <button type="button" :class="{ active: isItalic }" @click="toggleItalic">
-            <span class="mindmap-palette__text-icon mindmap-palette__text-icon--italic">I</span>
-          </button>
-          <button type="button" :class="{ active: isUnderline }" @click="toggleUnderline">
-            <span class="mindmap-palette__text-icon mindmap-palette__text-icon--underline">U</span>
-          </button>
+
+      <!-- Rôles supplémentaires -->
+      <div class="palette__field">
+        <label class="palette__label">Aussi</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="kind in extraKindOptions"
+            :key="kind.id"
+            type="button"
+            :aria-pressed="hasKind(selectedNode, kind.id)"
+            :class="['palette__kind-btn', { 'palette__kind-btn--active': hasKind(selectedNode, kind.id) }]"
+            @click="toggleExtraKind(kind.id)"
+          >{{ kind.label }}</button>
         </div>
-        <div class="mindmap-palette__field mindmap-palette__field--inline">
-          <label>Couleur du texte</label>
-          <input type="color" :value="textColor" @input="updateTextColor($event.target.value)" />
+      </div>
+
+      <!-- Grandeur -->
+      <template v-if="isQuantityNodeSelected">
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Symbole</label>
+          <input aria-label="Symbole de la grandeur" type="text" class="palette__number" maxlength="12"
+            :value="selectedNode.quantity?.symbol || ''" @input="updateQuantity('symbol', $event.target.value)" />
         </div>
-        <div class="mindmap-palette__field mindmap-palette__field--inline">
-          <label>Taille (px)</label>
-          <input
+        <!-- Grandeur numérique (valeur saisie) ou grandeur formule (valeur calculée) -->
+        <div v-if="canChooseQuantityMode" class="palette__field">
+          <label class="palette__label">Type de grandeur</label>
+          <div class="palette__shape-row" role="group" aria-label="Type de grandeur">
+            <button type="button" :aria-pressed="!quantityIsFormula"
+              :class="['palette__kind-btn', { 'palette__kind-btn--active': !quantityIsFormula }]"
+              @click="setQuantityMode('number')">Numérique</button>
+            <button type="button" :aria-pressed="quantityIsFormula"
+              :class="['palette__kind-btn', { 'palette__kind-btn--active': quantityIsFormula }]"
+              @click="setQuantityMode('formula')">Formule</button>
+          </div>
+        </div>
+        <p v-if="quantityIsFormula" class="palette__hint">Valeur calculée par la formule à partir des grandeurs reliées.</p>
+        <div v-else class="palette__field palette__field--row">
+          <label class="palette__label">Valeur</label>
+          <input aria-label="Valeur de la grandeur" type="number" step="any" class="palette__number"
+            :value="selectedNode.quantity?.value ?? ''" @change="updateQuantity('value', $event.target.value)" />
+        </div>
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Unité</label>
+          <input aria-label="Unité de la grandeur" type="text" class="palette__number" maxlength="16"
+            :value="selectedNode.quantity?.unit || ''" @input="updateQuantity('unit', $event.target.value)" />
+        </div>
+      </template>
+
+      <!-- Couleur de fond + forme -->
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Fond</label>
+        <input aria-label="Couleur de fond" type="color" class="palette__color" :value="selectedNode.style?.primaryColor || mindmapColors.nodeBg" @input="updateColor($event.target.value)" />
+      </div>
+
+      <div class="palette__field">
+        <label class="palette__label">Forme</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="s in shapes"
+            :key="s.id"
+            :class="['palette__shape-btn', { 'palette__shape-btn--active': (selectedNode.style?.shape || 'bubble') === s.id }]"
+            @click="updateShape(s.id)"
+          >{{ s.label }}</button>
+        </div>
+      </div>
+
+      <!-- Options texte -->
+      <template v-if="isTextNodeSelected">
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Couleur texte</label>
+          <input aria-label="Couleur du texte" type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
+        </div>
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Taille (px)</label>
+          <input aria-label="Taille du texte en pixels"
             type="number"
-            min="10"
-            max="48"
+            class="palette__number"
+            min="10" max="48"
             :value="fontSize"
             @change="updateFontSize($event.target.value)"
           />
         </div>
+        <div class="palette__toolbar">
+          <button type="button" :class="['palette__toolbar-btn', { active: isBold }]" @click="toggleBold">
+            <strong>G</strong>
+          </button>
+          <button type="button" :class="['palette__toolbar-btn', { active: isItalic }]" @click="toggleItalic">
+            <em>I</em>
+          </button>
+          <button type="button" :class="['palette__toolbar-btn', { active: isUnderline }]" @click="toggleUnderline">
+            <u>S</u>
+          </button>
+        </div>
+      </template>
+
+      <!-- Formule -->
+      <template v-if="isFormulaNodeSelected || isGraphNodeSelected">
+        <div class="palette__field palette__field--row">
+          <label class="palette__label">Couleur texte</label>
+          <input aria-label="Couleur du texte" type="color" class="palette__color" :value="textColor" @input="updateTextColor($event.target.value)" />
+        </div>
+        <div class="palette__field">
+          <label class="palette__label">{{ isGraphNodeSelected ? 'Fonction à tracer (y = f(x))' : 'Formule' }}</label>
+          <div v-if="editableContent" class="palette__formula-preview" v-html="formulaPreviewHtml" />
+          <p v-else class="palette__hint">Aucune formule — ouvrez l'interpréteur pour en saisir une.</p>
+          <div class="palette__actions-row">
+            <button class="palette__btn" type="button" @click="openInterpreter">Saisir avec l'interpréteur</button>
+            <button v-if="editableContent" class="palette__btn palette__btn--ghost" type="button" @click="clearFormulaContent">Effacer</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Image -->
+      <PaletteImageField v-if="isImageNodeSelected" :node="selectedNode" />
+
+      <!-- Flashcard liée -->
+      <PaletteCardLink :node="selectedNode" />
+
+      <!-- Actions nœud -->
+      <div class="palette__node-actions">
+        <button class="palette__btn palette__btn--ghost" @click="toggleCollapse">
+          {{ selectedNode.collapsed ? 'Réafficher' : 'Masquer' }}
+        </button>
+        <button class="palette__btn palette__btn--danger" @click="removeNode">Supprimer</button>
       </div>
-      <div class="mindmap-palette__field">
-        <label>Contenu</label>
-        <template v-if="isImageNodeSelected">
-          <input
-            ref="imageInputRef"
-            class="mindmap-palette__file-input"
-            type="file"
-            accept="image/*"
-            @change="handleImageSelection"
-          />
-          <div class="mindmap-palette__image-actions">
-            <button type="button" @click="triggerImageSelection" :disabled="isUploadingImage">
-              {{ isUploadingImage ? 'Envoi en cours…' : 'Choisir une image' }}
-            </button>
-            <button
-              v-if="selectedNode && selectedNode.content"
-              type="button"
-              class="secondary"
-              @click="removeImageFromNode"
-              :disabled="isUploadingImage"
-            >
-              Retirer l'image
-            </button>
-          </div>
-          <p v-if="imageUploadError" class="mindmap-palette__error">{{ imageUploadError }}</p>
-          <div v-if="selectedNode && selectedNode.content" class="mindmap-palette__preview">
-            <img :src="selectedNode.content" :alt="selectedNode.label" />
-            <span class="mindmap-palette__preview-url">{{ selectedNode.content }}</span>
-          </div>
-          <p class="mindmap-palette__hint">Formats acceptés: JPG, PNG, GIF, WEBP ou SVG (max. 5 Mo).</p>
-        </template>
-        <template v-else-if="isFormulaNodeSelected">
-          <textarea
-            v-model="editableContent"
-            rows="5"
-            placeholder="Utilise la syntaxe de l'interpréteur (ex: frac(a,b))"
-            @change="updateContent"
-          ></textarea>
-          <div
-            v-if="editableContent"
-            class="mindmap-palette__formula-preview"
-            v-html="formulaPreviewHtml"
-          ></div>
-          <div class="mindmap-palette__formula-actions">
-            <button type="button" @click="openInterpreter">Ouvrir l'interpréteur</button>
-            <button
-              v-if="editableContent"
-              type="button"
-              class="secondary"
-              @click="clearFormulaContent"
-            >
-              Effacer
-            </button>
-          </div>
-          <p class="mindmap-palette__hint">
-            Ouvre l'interpréteur pour Insérer des symboles (ex:
-            <code>frac(a,b)</code>, <code>sqrt(x)</code>,
-            <code><text bold color:red>Important</text></code>).
-          </p>
-        </template>
-        <template v-else>
-          <textarea
-            v-model="editableContent"
-            rows="4"
-            @change="updateContent"
-          ></textarea>
-        </template>
-      </div>
-      <div class="mindmap-palette__field">
-        <label>Niveau de maîtrise</label>
-        <select :value="selectedNode.mastery" @change="updateMastery($event.target.value)">
-          <option v-for="level in masteryLevels" :key="level.id" :value="level.id">{{ level.label }}</option>
+    </section>
+
+    <!-- ── Branche sélectionnée ───────────────────────────────────────────── -->
+    <section class="palette__section palette__section--selected" v-else-if="selectedLink">
+      <h4 class="palette__section-title">Branche</h4>
+
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Type</label>
+        <select aria-label="Type de la branche" class="palette__select palette__select--inline" :value="selectedLink.type" @change="store.updateLink(selectedLink.id, { type: $event.target.value })">
+          <option v-for="bt in branchTypes" :key="bt.id" :value="bt.id">{{ bt.label }}</option>
         </select>
       </div>
-      <div class="mindmap-palette__colors">
-        <label>Couleur principale</label>
-        <input type="color" :value="selectedNode.style?.primaryColor || '#1E3A8A'" @input="updateColor($event.target.value)" />
+      <div class="palette__field palette__field--row">
+        <input aria-label="Nom du nouveau type de branche" v-model="newBranchType" type="text" class="palette__number" maxlength="30" placeholder="Nouveau type…" @keydown.enter.prevent="createBranchType" />
+        <button class="palette__btn" type="button" @click="createBranchType">Créer</button>
       </div>
-      <div class="mindmap-palette__actions">
-        <button @click="toggleCollapse">{{ selectedNode.collapsed ? 'Reafficher' : 'Masquer' }}</button>
-        <button class="danger" @click="removeNode">Supprimer</button>
-      </div>
-    </div>
 
-    <div class="mindmap-palette__section">
-      <h4>Zones</h4>
-      <div class="mindmap-palette__field">
-        <label>Nom</label>
-        <input v-model="zoneName" placeholder="Nom de la zone" />
+      <div class="palette__field">
+        <label class="palette__label">Sens</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="d in LINK_DIRECTIONS"
+            :key="d.id"
+            type="button"
+            :aria-pressed="selectedLink.direction === d.id"
+            :class="['palette__kind-btn', { 'palette__kind-btn--active': selectedLink.direction === d.id }]"
+            @click="store.updateLink(selectedLink.id, { direction: d.id })"
+          >{{ d.label }}</button>
+        </div>
       </div>
-      <div class="mindmap-palette__colors">
-        <label>Couleur</label>
-        <input type="color" v-model="zoneColor" />
+
+      <div class="palette__field">
+        <label class="palette__label">Forme</label>
+        <div class="palette__shape-row">
+          <button
+            v-for="s in LINK_SHAPES"
+            :key="s.id"
+            type="button"
+            :aria-pressed="selectedLink.style?.shape === s.id"
+            :class="['palette__kind-btn', { 'palette__kind-btn--active': selectedLink.style?.shape === s.id }]"
+            @click="store.updateLink(selectedLink.id, { style: { shape: s.id } })"
+          >{{ s.label }}</button>
+        </div>
       </div>
-      <div class="mindmap-palette__actions">
-        <button @click="createZone">Creer une zone</button>
+
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Couleur</label>
+        <input aria-label="Couleur principale de la branche" type="color" class="palette__color" :value="selectedLink.style?.primaryColor" @input="store.updateLink(selectedLink.id, { style: { primaryColor: $event.target.value } })" />
       </div>
-      <div v-if="zones.length" class="mindmap-palette__zones">
-        <span>Assigner a une zone</span>
-        <div class="mindmap-palette__zone-list">
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Milieu</label>
+        <input aria-label="Couleur secondaire de la branche" type="color" class="palette__color" :value="selectedLink.style?.secondaryColor" @input="store.updateLink(selectedLink.id, { style: { secondaryColor: $event.target.value } })" />
+      </div>
+
+      <div v-if="outgoingCount > 1" class="palette__field palette__field--row">
+        <label class="palette__label">Lecture {{ readingRank }}/{{ outgoingCount }}</label>
+        <button class="palette__btn" type="button" :disabled="readingRank <= 1" aria-label="Lire plus tôt" @click="store.moveLink(selectedLink.id, -1)">↑</button>
+        <button class="palette__btn" type="button" :disabled="readingRank >= outgoingCount" aria-label="Lire plus tard" @click="store.moveLink(selectedLink.id, 1)">↓</button>
+      </div>
+
+      <div class="palette__actions-row">
+        <button class="palette__btn palette__btn--danger" type="button" @click="store.removeLink(selectedLink.id)">Supprimer</button>
+      </div>
+    </section>
+
+    <section class="palette__section palette__section--empty" v-else>
+      <p class="palette__hint">Sélectionnez un item ou une branche pour modifier ses options.</p>
+    </section>
+
+    <!-- ── Zones ──────────────────────────────────────────────────────────── -->
+    <section class="palette__section">
+      <h4 class="palette__section-title">Zones</h4>
+      <div class="palette__field">
+        <input aria-label="Nom de la zone" class="palette__input" v-model="zoneName" placeholder="Nom de la zone" />
+      </div>
+      <div class="palette__field palette__field--row">
+        <label class="palette__label">Couleur</label>
+        <input aria-label="Couleur de la zone" type="color" class="palette__color" v-model="zoneColor" />
+      </div>
+      <button class="palette__btn" @click="createZone">Créer une zone</button>
+      <div v-if="zones.length && selectedNode" class="palette__zone-assign">
+        <label class="palette__label">Assigner à</label>
+        <div class="palette__zone-chips">
           <button
             v-for="zone in zones"
             :key="zone.id"
-            :class="['mindmap-palette__zone-chip', { active: selectedNodeZone === zone.id }]"
+            :class="['palette__zone-chip', { active: selectedNodeZone === zone.id }]"
             @click="assignZone(zone.id)"
-          >
-            {{ zone.name }}
-          </button>
-          <button class="mindmap-palette__zone-chip" @click="assignZone(null)">Aucune</button>
+          >{{ zone.name }}</button>
+          <button class="palette__zone-chip" @click="assignZone(null)">Aucune</button>
         </div>
       </div>
-    </div>
-
-    <div class="mindmap-palette__section" v-if="!selectedNode">
-      <p>Selectionne un item pour modifier son contenu.</p>
-    </div>
+    </section>
   </div>
+
+  <!-- ── Modale interpréteur ────────────────────────────────────────────── -->
   <teleport to="body">
-    <div v-if="showInterpreter" class="mindmap-interpreter-modal">
-      <div class="mindmap-interpreter-modal__backdrop" @click="closeInterpreter"></div>
-      <div class="mindmap-interpreter-modal__dialog">
-        <div class="mindmap-interpreter-modal__header">
-          <h3>interpréteur de formules</h3>
-          <button type="button" class="mindmap-interpreter-modal__close" @click="closeInterpreter">
-            &times;
-          </button>
+    <div v-if="store.interpreterOpen" class="interp-modal">
+      <div class="interp-modal__backdrop" @click="closeInterpreter" />
+      <div class="interp-modal__dialog">
+        <div class="interp-modal__header">
+          <h3>Interpréteur de formules</h3>
+          <button aria-label="Fermer l'interpréteur" type="button" class="interp-modal__close" @click="closeInterpreter">&times;</button>
         </div>
         <Interpreter
           v-model="interpreterValue"
           :show-apply="true"
           apply-label="Insérer dans l'item"
+          :bg-color="selectedNode?.style?.primaryColor || ''"
+          :text-color="selectedNode?.style?.textColor || ''"
           @apply="applyInterpreter"
         />
+      </div>
+    </div>
+  </teleport>
+
+  <!-- ── Proposition : créer les grandeurs des variables de la formule ───── -->
+  <teleport to="body">
+    <div v-if="variablePrompt" class="interp-modal" role="dialog" aria-modal="true" aria-labelledby="variable-prompt-title">
+      <div class="interp-modal__backdrop" @click="dismissVariablePrompt" />
+      <div class="interp-modal__dialog interp-modal__dialog--narrow">
+        <div class="interp-modal__header">
+          <h3 id="variable-prompt-title">Créer les grandeurs de la formule ?</h3>
+          <button aria-label="Ignorer" type="button" class="interp-modal__close" @click="dismissVariablePrompt">&times;</button>
+        </div>
+        <p class="palette__hint">Ces variables n'ont pas encore de grandeur reliée. Cochez celles à créer : chacune sera reliée à la formule par une branche « Calcul ».</p>
+        <ul class="variable-prompt__list">
+          <li v-for="item in variablePrompt.items" :key="item.symbol">
+            <label class="variable-prompt__item">
+              <input type="checkbox" v-model="item.checked" :aria-label="'Créer la grandeur ' + item.symbol" />
+              <span>{{ item.symbol }}</span>
+            </label>
+          </li>
+        </ul>
+        <div class="variable-prompt__actions">
+          <button type="button" class="palette__btn" @click="confirmVariablePrompt">Créer les grandeurs</button>
+          <button type="button" class="palette__btn palette__btn--ghost" @click="dismissVariablePrompt">Ignorer</button>
+        </div>
       </div>
     </div>
   </teleport>
 </template>
 
 <script setup>
+import './palette/palette.css';
+import { mindmapColors } from '@/helpers/themeColors';
 import { computed, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { masteryList } from '@/helpers/mindmap';
-import { api } from '@/helpers/api';
-import { VITE_API_URL } from '@/config';
+import { ITEM_KINDS, MATH_KINDS, PRIMARY_ONLY_KINDS, hasKind, hasFormulaContent, isGraphNode } from '@/helpers/mindmap/mindmapItems';
+import { LINK_DIRECTIONS, LINK_SHAPES, getOutgoingLinks } from '@/helpers/mindmap/mindmapLinks';
 import Interpreter from '@/components/interpreter/Interpreter.vue';
+import PaletteImageField from './palette/PaletteImageField.vue';
+import PaletteCardLink from './palette/PaletteCardLink.vue';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
-import {
-  normalizeCreationType,
-  getNodeLabel,
-  getSubjectActionLabel,
-  getChildActionLabel,
-} from '@/helpers/mindmapCreation';
+import { missingVariables } from '@/helpers/mindmap/mindmapCalc';
 
 const store = useMindMapBuilderStore();
 
-const tools = [
-  { id: 'select', label: 'Selection', icon: 'Sel' },
-  { id: 'text', label: 'Texte', icon: 'Txt' },
-  { id: 'formula', label: 'Formule', icon: 'Fx' },
-  { id: 'image', label: 'Image', icon: 'Img' },
-  { id: 'link', label: 'Lien', icon: '->' },
-  { id: 'zone', label: 'Zone', icon: '[]' },
+const nodeTypes = ITEM_KINDS;
+
+const shapes = [
+  { id: 'bubble', label: 'Bulle' },
+  { id: 'rect', label: 'Rect' },
+  { id: 'pill', label: 'Pilule' },
 ];
 
-const masteryLevels = masteryList;
-
 const selectedNode = computed(() => store.selectedNode);
+const selectedLink = computed(() => store.selectedLink || null);
+const branchTypes = computed(() => store.map.branchTypes || []);
+const newBranchType = ref('');
+const outgoingLinks = computed(() =>
+  selectedLink.value ? getOutgoingLinks(store.map.links, selectedLink.value.from) : []
+);
+const outgoingCount = computed(() => outgoingLinks.value.length);
+const readingRank = computed(
+  () => outgoingLinks.value.findIndex((link) => link.id === selectedLink.value?.id) + 1
+);
+
+const createBranchType = () => {
+  const id = store.addBranchType(newBranchType.value);
+  if (!id || !selectedLink.value) return;
+  store.updateLink(selectedLink.value.id, { type: id });
+  newBranchType.value = '';
+};
+
 const selectedNodeZone = computed(() => selectedNode.value?.zoneId || null);
 const zones = computed(() => store.map.zones || []);
-const creationType = computed(() => normalizeCreationType(store.tool));
-const subjectCreationLabel = computed(() => getSubjectActionLabel(creationType.value));
-const childCreationLabel = computed(() => getChildActionLabel(creationType.value));
-const creationHint = computed(() => {
-  if (selectedNode.value) {
-    return `Le prochain element sera relie a "${selectedNode.value.label}".`;
-  }
-  return 'Selectionne un item pour lui ajouter un enfant, sinon un item sera relie au sujet principal.';
-});
 
-const editableLabel = ref('');
+const isImageNodeSelected = computed(() => selectedNode.value?.type === 'image');
+const isFormulaNodeSelected = computed(() => hasFormulaContent(selectedNode.value));
+const isGraphNodeSelected = computed(() => isGraphNode(selectedNode.value));
+const isQuantityNodeSelected = computed(() => hasKind(selectedNode.value, 'quantity'));
+const extraKindOptions = computed(() =>
+  ITEM_KINDS.filter((kind) => kind.id !== selectedNode.value?.type && !PRIMARY_ONLY_KINDS.includes(kind.id))
+);
+// Une grandeur (principale ou ajoutée à un texte) est soit numérique, soit calculée par une formule.
+const canChooseQuantityMode = computed(() => ['quantity', 'text'].includes(selectedNode.value?.type));
+const quantityIsFormula = computed(() => MATH_KINDS.some((kind) => hasKind(selectedNode.value, kind)));
+const isTextNodeSelected = computed(() => selectedNode.value?.type === 'text');
+
 const editableContent = ref('');
 const zoneName = ref('Zone');
-const zoneColor = ref('#BFDBFE');
-const imageInputRef = ref(null);
-const isUploadingImage = ref(false);
-const imageUploadError = ref('');
-const isImageNodeSelected = computed(() => selectedNode.value?.type === 'image');
-const isFormulaNodeSelected = computed(() => selectedNode.value?.type === 'formula');
-const isTextNodeSelected = computed(() => selectedNode.value?.type === 'text');
-const showInterpreter = ref(false);
+const zoneColor = ref(mindmapColors.zone);
 const interpreterValue = ref('');
-const textColor = ref('#eef2ff');
-const fontSize = ref(14);
+const textColor = ref(mindmapColors.nodeText);
+const fontSize = ref(13);
 const isBold = ref(false);
 const isItalic = ref(false);
 const isUnderline = ref(false);
+
+watch(() => store.interpreterOpen, (open) => {
+  if (open && (isFormulaNodeSelected.value || isGraphNodeSelected.value)) {
+    interpreterValue.value = editableContent.value || selectedNode.value?.content || '';
+  }
+});
+
 const formulaPreviewHtml = computed(() =>
-  isFormulaNodeSelected.value && editableContent.value
+  (isFormulaNodeSelected.value || isGraphNodeSelected.value) && editableContent.value
     ? renderMathMultiline(editableContent.value)
     : ''
 );
 
-const resolveImageUrl = (payload = {}) => {
-  if (!payload) return '';
-  if (payload.url) return payload.url;
-  if (payload.path) {
-    try {
-      return new URL(payload.path, VITE_API_URL).toString();
-    } catch (error) {
-      return payload.path;
-    }
-  }
-  return '';
-};
-
 watch(
   selectedNode,
   (node) => {
-    editableLabel.value = node?.label || '';
     editableContent.value = node?.content || '';
-    imageUploadError.value = '';
-    if (imageInputRef.value) {
-      imageInputRef.value.value = '';
-    }
-    textColor.value = node?.style?.textColor || '#eef2ff';
-    fontSize.value = Number.parseInt(node?.style?.fontSize, 10) || 14;
+    textColor.value = node?.style?.textColor || mindmapColors.nodeText;
+    fontSize.value = Number.parseInt(node?.style?.fontSize, 10) || 13;
     isBold.value = (node?.style?.fontWeight || 'normal') !== 'normal';
     isItalic.value = (node?.style?.fontStyle || 'normal') !== 'normal';
     isUnderline.value = (node?.style?.textDecoration || 'none').includes('underline');
-    if (isFormulaNodeSelected.value) {
-      interpreterValue.value = node?.content || '';
-    } else {
-      interpreterValue.value = '';
-    }
-    showInterpreter.value = false;
+    if (isFormulaNodeSelected.value || isGraphNodeSelected.value) interpreterValue.value = node?.content || '';
+    else interpreterValue.value = '';
+    store.closeInterpreter();
   },
   { immediate: true }
 );
 
-const activeToolLabel = computed(() => {
-  const match = tools.find((tool) => tool.id === store.tool);
-  return match ? match.label : 'Selection';
-});
+// Le contenu n'est conservé que si le nouveau rôle principal l'affiche de la même façon.
+const contentFamily = (type) => (MATH_KINDS.includes(type) || type === 'graph' ? 'math' : type);
 
-const updateLabel = () => {
+const updateNodeType = (type) => {
   if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { label: editableLabel.value });
+  const payload = { type };
+  if (contentFamily(selectedNode.value.type) !== contentFamily(type)) {
+    payload.content = type === 'text' ? (selectedNode.value.content || '') : '';
+  }
+  store.updateNode(selectedNode.value.id, payload);
 };
 
-const updateContent = () => {
+const toggleExtraKind = (kind) => {
   if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { content: editableContent.value });
+  const node = selectedNode.value;
+  const enabling = !hasKind(node, kind);
+  store.toggleNodeKind(node.id, kind);
+  // Activer « Formule » / « Fonction » sur un texte ou une grandeur propose directement l'éditeur de formule.
+  if (enabling && MATH_KINDS.includes(kind) && ['text', 'quantity'].includes(node.type)) {
+    // Le texte par défaut (titre recopié) n'a pas de sens comme formule : on part d'une saisie vide.
+    if (node.content === node.label) {
+      editableContent.value = '';
+      store.updateNode(node.id, { content: '' });
+    }
+    interpreterValue.value = editableContent.value || node.content || '';
+    store.openInterpreter();
+  }
 };
 
-const openInterpreter = () => {
+// Passe d'une grandeur numérique à une grandeur formule et inversement. Repasser en numérique garde
+// la formule en mémoire (elle est simplement ignorée) : la rebasculer la retrouve.
+const setQuantityMode = (mode) => {
   if (!selectedNode.value) return;
-  interpreterValue.value = editableContent.value || '';
-  showInterpreter.value = true;
+  const node = selectedNode.value;
+  if (mode === 'formula') {
+    if (!quantityIsFormula.value) toggleExtraKind('formula');
+    return;
+  }
+  MATH_KINDS.filter((kind) => hasKind(node, kind)).forEach((kind) => store.toggleNodeKind(node.id, kind));
 };
 
-const closeInterpreter = () => {
-  showInterpreter.value = false;
+const updateQuantity = (field, value) => {
+  if (!selectedNode.value) return;
+  store.updateNodeQuantity(selectedNode.value.id, { [field]: value });
 };
 
-const applyInterpreter = (value) => {
+const updateColor = (value) => {
   if (!selectedNode.value) return;
-  const nextValue =
-    typeof value === 'string' ? value : interpreterValue.value ?? editableContent.value ?? '';
-  interpreterValue.value = nextValue;
-  editableContent.value = nextValue;
-  store.updateNode(selectedNode.value.id, { content: nextValue });
-  showInterpreter.value = false;
+  store.updateNodeStyle(selectedNode.value.id, { primaryColor: value });
 };
 
-const clearFormulaContent = () => {
+const updateShape = (value) => {
   if (!selectedNode.value) return;
-  editableContent.value = '';
-  store.updateNode(selectedNode.value.id, { content: '' });
+  store.updateNodeStyle(selectedNode.value.id, { shape: value });
 };
 
 const updateTextColor = (value) => {
@@ -350,131 +485,71 @@ const updateTextColor = (value) => {
 const updateFontSize = (value) => {
   if (!selectedNode.value) return;
   const numeric = Number.parseInt(value, 10);
-  const safeValue = Number.isFinite(numeric) ? Math.min(48, Math.max(10, numeric)) : 14;
+  const safeValue = Number.isFinite(numeric) ? Math.min(48, Math.max(10, numeric)) : 13;
   fontSize.value = safeValue;
   store.updateNodeStyle(selectedNode.value.id, { fontSize: safeValue });
 };
 
 const toggleBold = () => {
   if (!selectedNode.value) return;
-  const next = isBold.value ? 'normal' : 'bold';
   isBold.value = !isBold.value;
-  store.updateNodeStyle(selectedNode.value.id, { fontWeight: next });
+  store.updateNodeStyle(selectedNode.value.id, { fontWeight: isBold.value ? 'bold' : 'normal' });
 };
 
 const toggleItalic = () => {
   if (!selectedNode.value) return;
-  const next = isItalic.value ? 'normal' : 'italic';
   isItalic.value = !isItalic.value;
-  store.updateNodeStyle(selectedNode.value.id, { fontStyle: next });
+  store.updateNodeStyle(selectedNode.value.id, { fontStyle: isItalic.value ? 'italic' : 'normal' });
 };
 
 const toggleUnderline = () => {
   if (!selectedNode.value) return;
-  const next = isUnderline.value ? 'none' : 'underline';
   isUnderline.value = !isUnderline.value;
-  store.updateNodeStyle(selectedNode.value.id, { textDecoration: next });
+  store.updateNodeStyle(selectedNode.value.id, { textDecoration: isUnderline.value ? 'underline' : 'none' });
 };
 
-const triggerImageSelection = () => {
+const openInterpreter = () => {
   if (!selectedNode.value) return;
-  imageUploadError.value = '';
-  imageInputRef.value?.click();
+  interpreterValue.value = editableContent.value || '';
+  store.openInterpreter();
 };
 
-const handleImageSelection = async (event) => {
+const closeInterpreter = () => { store.closeInterpreter(); };
+
+const applyInterpreter = (value) => {
   if (!selectedNode.value) return;
-  const file = event?.target?.files?.[0];
-  if (!file) return;
-
-  imageUploadError.value = '';
-
-  if (file.size > 5 * 1024 * 1024) {
-    imageUploadError.value = "L'image dépasse la taille maximale de 5 Mo.";
-    if (event.target) {
-      event.target.value = '';
-    }
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append('image', file);
-
-  isUploadingImage.value = true;
-
-  try {
-    const response = await api.post('diagrammes/upload-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-
-    if (!response || !response.data) {
-      throw new Error('UPLOAD_FAILED');
-    }
-
-    const imageUrl = resolveImageUrl(response.data);
-    if (!imageUrl) {
-      throw new Error('INVALID_IMAGE_URL');
-    }
-
-    store.updateNode(selectedNode.value.id, { content: imageUrl });
-    editableContent.value = imageUrl;
-  } catch (error) {
-    console.error("Erreur lors de l'upload de l'image de carte mentale :", error);
-    imageUploadError.value =
-      "L'image n'a pas pu être téléchargée. Vérifie le format et réessaie.";
-  } finally {
-    isUploadingImage.value = false;
-    if (event?.target) {
-      event.target.value = '';
-    }
-  }
+  const nextValue = typeof value === 'string' ? value : interpreterValue.value ?? editableContent.value ?? '';
+  interpreterValue.value = nextValue;
+  editableContent.value = nextValue;
+  store.updateNode(selectedNode.value.id, { content: nextValue });
+  store.closeInterpreter();
+  if (!isGraphNodeSelected.value) proposeVariables(selectedNode.value.id);
 };
 
-const removeImageFromNode = () => {
+// Après saisie d'une formule : propose de créer les grandeurs des variables qui n'en ont pas encore.
+const variablePrompt = ref(null);
+
+const proposeVariables = (nodeId) => {
+  const missing = missingVariables(store.map, nodeId);
+  variablePrompt.value = missing.length
+    ? { nodeId, items: missing.map((symbol) => ({ symbol, checked: true })) }
+    : null;
+};
+
+const confirmVariablePrompt = () => {
+  const prompt = variablePrompt.value;
+  variablePrompt.value = null;
+  if (!prompt) return;
+  const symbols = prompt.items.filter((item) => item.checked).map((item) => item.symbol);
+  if (symbols.length) store.createQuantitiesForFormula(prompt.nodeId, symbols);
+};
+
+const dismissVariablePrompt = () => { variablePrompt.value = null; };
+
+const clearFormulaContent = () => {
   if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { content: '' });
   editableContent.value = '';
-  imageUploadError.value = '';
-};
-
-const updateMastery = (value) => {
-  if (!selectedNode.value) return;
-  store.updateNode(selectedNode.value.id, { mastery: value });
-};
-
-const updateColor = (value) => {
-  if (!selectedNode.value) return;
-  store.updateNodeStyle(selectedNode.value.id, { primaryColor: value });
-};
-
-const createSubjectItem = () => {
-  if (!store.map.subjectNodeId) return;
-  const type = creationType.value;
-  const nodeLabel = getNodeLabel(type);
-  const payload = {
-    label: nodeLabel,
-    type,
-    parentId: store.map.subjectNodeId,
-  };
-  if (type !== 'text') {
-    payload.content = '';
-  }
-  store.addNode(payload);
-};
-
-const addChild = () => {
-  if (!selectedNode.value) return;
-  const type = creationType.value;
-  const nodeLabel = getNodeLabel(type);
-  const payload = {
-    label: nodeLabel,
-    type,
-    parentId: selectedNode.value.id,
-  };
-  if (type !== 'text') {
-    payload.content = '';
-  }
-  store.addNode(payload);
+  store.updateNode(selectedNode.value.id, { content: '' });
 };
 
 const toggleCollapse = () => {
@@ -488,10 +563,9 @@ const removeNode = () => {
 };
 
 const createZone = () => {
-  const id = store.addZone({ name: zoneName.value.trim() || 'Zone', color: zoneColor.value });
+  store.addZone({ name: zoneName.value.trim() || 'Zone', color: zoneColor.value });
   zoneName.value = 'Zone';
-  zoneColor.value = '#BFDBFE';
-  return id;
+  zoneColor.value = mindmapColors.zone;
 };
 
 const assignZone = (zoneId) => {
@@ -501,367 +575,8 @@ const assignZone = (zoneId) => {
 </script>
 
 <style scoped>
-.mindmap-palette {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background: #ffffff;
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  height: 100%;
-}
-
-.mindmap-palette__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.mindmap-palette__tool {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.mindmap-palette__section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mindmap-palette__buttons {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.mindmap-palette__button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #f3f4f6;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  color: #1f2937;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.mindmap-palette__button:hover {
-  background: #e0f2fe;
-  transform: translateY(-1px);
-}
-
-.mindmap-palette__button--active {
-  background: #1d4ed8;
-  color: #ffffff;
-}
-
-.mindmap-palette__icon {
-  font-size: 18px;
-}
-
-.mindmap-palette__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.mindmap-palette__field label {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #475569;
-}
-
-.mindmap-palette__field input,
-.mindmap-palette__field textarea,
-.mindmap-palette__field select {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  font-size: 14px;
-  color: #0f172a;
-  background: #f8fafc;
-}
-
-.mindmap-palette__file-input {
-  display: none;
-}
-
-.mindmap-palette__image-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.mindmap-palette__image-actions button {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  background: #38bdf8;
-  color: #0f172a;
-  transition: background 0.2s ease;
-}
-
-.mindmap-palette__image-actions button:hover {
-  background: #0ea5e9;
-}
-
-.mindmap-palette__image-actions button.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.mindmap-palette__image-actions button.secondary:hover {
-  background: #cbd5f5;
-}
-
-.mindmap-palette__image-actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.mindmap-palette__error {
-  margin: 6px 0 0;
-  color: #b91c1c;
-  font-size: 12px;
-}
-
-.mindmap-palette__preview {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.mindmap-palette__preview img {
-  max-width: 100%;
-  border-radius: 8px;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
-}
-
-.mindmap-palette__preview-url {
-  font-size: 12px;
-  word-break: break-all;
-  color: #1f2937;
-}
-
-.mindmap-palette__formula-preview {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-.mindmap-palette__formula-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.mindmap-palette__formula-actions button {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  background: #2563eb;
-  color: #ffffff;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.mindmap-palette__formula-actions button:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
-}
-
-.mindmap-palette__formula-actions button.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.mindmap-palette__formula-actions button.secondary:hover {
-  background: #cbd5f5;
-}
-
-.mindmap-palette__text-style {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-}
-
-.mindmap-palette__text-toolbar {
-  display: flex;
-  gap: 8px;
-}
-
-.mindmap-palette__text-toolbar button {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.mindmap-palette__text-toolbar button:hover {
-  background: #dbeafe;
-  transform: translateY(-1px);
-}
-
-.mindmap-palette__text-toolbar button.active {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #1d4ed8;
-}
-
-.mindmap-palette__text-icon {
-  font-weight: 700;
-}
-
-.mindmap-palette__text-icon--italic {
-  font-style: italic;
-}
-
-.mindmap-palette__text-icon--underline {
-  text-decoration: underline;
-}
-
-.mindmap-palette__field--inline {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.mindmap-palette__field--inline label {
-  margin: 0;
-}
-
-.mindmap-palette__field--inline input[type='number'] {
-  width: 90px;
-}
-
-.mindmap-palette__colors {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.mindmap-palette__colors label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #475569;
-}
-
-.mindmap-palette__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mindmap-palette__actions button {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  background: #38bdf8;
-  color: #0f172a;
-  transition: background 0.2s ease;
-}
-
-.mindmap-palette__actions button:hover {
-  background: #0ea5e9;
-}
-
-.mindmap-palette__actions button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: #94a3b8;
-  color: #f1f5f9;
-}
-
-.mindmap-palette__actions .danger {
-  background: #f87171;
-  color: #fff;
-}
-
-.mindmap-palette__actions .danger:hover {
-  background: #ef4444;
-}
-
-.mindmap-palette__zones {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mindmap-palette__zone-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.mindmap-palette__zone-chip {
-  padding: 6px 12px;
-  border-radius: 9999px;
-  border: none;
-  background: #e2e8f0;
-  color: #1f2937;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.mindmap-palette__zone-chip.active {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.mindmap-palette__hint {
-  font-size: 12px;
-  color: #64748b;
-  margin-top: 4px;
-  line-height: 1.4;
-
-.mindmap-palette__hint code {
-  background: #e2e8f0;
-  color: #1f2937;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-family: 'Fira Code', monospace;
-}
-}
-
-.mindmap-interpreter-modal {
+/* Modale interpréteur */
+.interp-modal {
   position: fixed;
   inset: 0;
   display: flex;
@@ -871,46 +586,50 @@ const assignZone = (zoneId) => {
   z-index: 2000;
 }
 
-.mindmap-interpreter-modal__backdrop {
+.interp-modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgb(var(--slate-900-rgb) / 0.45);
   backdrop-filter: blur(2px);
 }
 
-.mindmap-interpreter-modal__dialog {
+.interp-modal__dialog {
   position: relative;
   width: min(960px, 100%);
   max-height: 80vh;
   overflow-y: auto;
-  background: #ffffff;
+  background: rgb(var(--white));
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 24px 60px rgb(var(--slate-900-rgb) / 0.35);
   z-index: 1;
 }
 
-.mindmap-interpreter-modal__header {
+.interp-modal__dialog--narrow { width: min(440px, 100%); }
+.variable-prompt__list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.variable-prompt__item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid var(--slate-200); border-radius: 8px;
+  background: var(--slate-50); color: var(--slate-900); font-weight: 600; cursor: pointer;
+}
+.variable-prompt__actions { display: flex; gap: 8px; }
+.interp-modal__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  color: #0f172a;
+  color: var(--slate-900);
 }
 
-.mindmap-interpreter-modal__close {
+.interp-modal__close {
   border: none;
   background: transparent;
   font-size: 24px;
   cursor: pointer;
+  color: var(--slate-900);
   line-height: 1;
-  color: #0f172a;
-  transition: transform 0.2s ease, color 0.2s ease;
+  transition: color 0.15s ease;
 }
 
-.mindmap-interpreter-modal__close:hover {
-  color: #2563eb;
-  transform: scale(1.1);
-}
+.interp-modal__close:hover { color: var(--blue-600); }
 </style>
-

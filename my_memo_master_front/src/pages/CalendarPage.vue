@@ -70,10 +70,10 @@ const {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: #f5f6fb;
+  background: var(--surface-muted);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #0f172a;
-  border: 10px solid #1a1aff;
+  color: var(--slate-900);
+  border: 10px solid rgb(var(--accent));
   border-radius: 16px;
 }
 
@@ -89,14 +89,14 @@ const {
   align-items: center;
   gap: 12px;
   padding: 18px 24px 12px;
-  background: #ffffff;
-  border-bottom: 0.5px solid #e2e8f0;
+  background: rgb(var(--white));
+  border-bottom: 0.5px solid var(--slate-200);
 }
 
 .view-toggle {
   margin-left: auto;
   display: flex;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -107,7 +107,7 @@ const {
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #64748b;
+  color: var(--slate-500);
   font-weight: 500;
   transition:
     background 0.15s,
@@ -115,8 +115,8 @@ const {
 }
 
 .view-toggle button.active {
-  background: #1a1aff;
-  color: #ffffff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
 }
 
 .cal-body {

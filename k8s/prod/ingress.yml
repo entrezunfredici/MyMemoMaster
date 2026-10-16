@@ -1,0 +1,79 @@
+# =============================================================================
+#  Ingress prod — MyMemoMaster
+#
+#  Domaines : api.my-memo-master.com / my-memo-master.com
+#  Namespace : mymemomaster
+#  SSL : Let's Encrypt via cert-manager + Cloudflare DNS01
+#
+#  Prérequis :
+#    - ingress-nginx installé sur le cluster
+#    - cert-manager installé
+#    - k8s/cert-manager/cloudflare-secret.yml appliqué
+#    - k8s/cert-manager/cluster-issuer-cloudflare.yml appliqué
+# =============================================================================
+
+# ── API ───────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mmm-prod-api
+  namespace: mymemomaster
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # CHOIX: relevé de 25m à 100m pour aligner sur le plafond body-parser dédié à
+    # /api/v1/diagrammes (cartes mentales, voir app.js et DECISIONS.md 2026-09-18) — sans ce
+    # relèvement, l'ingress rejetait déjà toute carte mentale au-delà de 25 Mo avant même
+    # d'atteindre l'API. Le reste de l'API reste borné à 10kb côté applicatif (app.js).
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.my-memo-master.com
+      secretName: mmm-prod-api-tls
+  rules:
+    - host: api.my-memo-master.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mmm-prod-api
+                port:
+                  number: 80
+
+---
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mmm-prod-front
+  namespace: mymemomaster
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-cloudflare
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - my-memo-master.com
+      secretName: mmm-prod-front-tls
+  rules:
+    - host: my-memo-master.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mmm-prod-front
+                port:
+                  number: 80

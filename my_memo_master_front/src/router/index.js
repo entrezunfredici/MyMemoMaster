@@ -12,14 +12,24 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   document.title = to.meta.title ? `${to.meta.title} - ${VITE_APP_NAME}` : VITE_APP_NAME;
 
-  //Check if the route is private and validate the token
   const authStore = useAuthStore()
+
+  // Guard authentification
   if (to.meta.private === true) {
-    if (!authStore.authenticated || !(authStore.user.connectionToken || authStore.token)) {
+    if (!authStore.authenticated || !authStore.token) {
       authStore.logout(false, null)
       return next({ path: '/auth' })
     }
   }
+
+  // Guard rôles : meta.roles = [1, 4] signifie "admin plateforme ou admin établissement seulement"
+  if (to.meta.roles && to.meta.roles.length > 0) {
+    const userRoleId = authStore.user?.roleId ?? null
+    if (!to.meta.roles.includes(userRoleId)) {
+      return next({ path: '/' })
+    }
+  }
+
   if (['register', 'auth'].includes(to.name) && authStore.authenticated) {
     return next({ path: '/profile' })
   }

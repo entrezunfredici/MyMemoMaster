@@ -1,0 +1,494 @@
+name: CD
+
+# Déclenché quand le CI se termine sur les branches de déploiement
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+      - staging
+      - dev
+
+permissions:
+  contents: read
+
+# =============================================================================
+#  Secrets GitHub requis :
+#
+#  Communs :
+#    DOCKERHUB_USERNAME      — nom d'utilisateur Docker Hub
+#    DOCKERHUB_PASSWORD      — mot de passe / token Docker Hub
+#    DISCORD_LOG             — webhook Discord pour les notifications
+#
+#  Branche dev → environnement "test" (VPS) :
+#    SSH_TEST_PRIVATE_KEY    — clé SSH privée pour le VPS test
+#    SSH_TEST_USERNAME       — utilisateur SSH du VPS test
+#    VPS_PORT                — port SSH du VPS
+#    VPS_IP                  — adresse IP du VPS
+#
+#  Branche staging → environnement "preprod" (Kubernetes — activé via variable
+#  K8S_PREPROD_ENABLED=true ; cluster en pause pour raisons de coût depuis 2026-07-12) :
+#    KUBECONFIG_PREPROD      — kubeconfig base64 pour le cluster K8s preprod
+#
+#  Branche main (Kubernetes prod — activé via variable K8S_PROD_ENABLED=true) :
+#    KUBECONFIG_PROD         — kubeconfig base64 pour le cluster K8s prod
+# =============================================================================
+
+jobs:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  1. BUILD & PUSH IMAGES DOCKER HUB
+  #     - test    : mymemomaster_test_api/front:latest
+  #     - preprod : mymemomaster_preprod_api/front:latest
+  #     - main    : mymemomaster_api/front:latest
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  push_images:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    outputs:
+      branch: ${{ steps.vars.outputs.branch }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Export branch name
+        id: vars
+        run: echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      # Préfixe d'image selon la branche : dev → _test_, staging → _preprod_, main → (aucun)
+      - name: Compute image names
+        id: images
+        run: |
+          case "${{ github.event.workflow_run.head_branch }}" in
+            dev)     PREFIX="mymemomaster_test_" ;;
+            staging) PREFIX="mymemomaster_preprod_" ;;
+            main)    PREFIX="mymemomaster_" ;;
+            *)       echo "Branche inattendue" ; exit 1 ;;
+          esac
+          echo "api=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}api:latest" >> $GITHUB_OUTPUT
+          echo "front=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}front:latest" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # cache-from/to gha : les couches Docker (npm ci, apt, onnxruntime…) sont réutilisées
+      # entre les runs — seul ce qui change est rebuildé. En cas de cache miss (éviction),
+      # le build repart simplement de zéro, sans échec.
+      - name: Build and Push — API
+        uses: docker/build-push-action@v6
+        with:
+          context: my_memo_master_api
+          push: true
+          tags: ${{ steps.images.outputs.api }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Build and Push — Front
+        uses: docker/build-push-action@v6
+        with:
+          context: my_memo_master_front
+          push: true
+          tags: ${{ steps.images.outputs.front }}
+          cache-from: type=gha,scope=front
+          cache-to: type=gha,scope=front,mode=max
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  1b. TAG DE VERSION + RELEASE GITHUB (staging/main uniquement)
+  #      Recommandation R1 du Bloc 4 (B4_RENDU.md §5) : les images :latest sont écrasées à
+  #      chaque merge, un rollback ne peut pas cibler une version précise. Convention AAAA.MM.n
+  #      déjà utilisée par le journal de versions (B4_RENDU.md §6) — incrémentée par mois et par
+  #      environnement, préfixée "staging-" pour ce dernier afin de ne jamais entrer en collision
+  #      avec les tags git de main sur le même dépôt.
+  #      N'affecte pas le déploiement : tourne en parallèle de deploy_preprod/deploy_prod, jamais
+  #      en amont — un échec de tag/release ne doit pas bloquer une mise en prod.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  tag_release:
+    name: Tag de version + Release GitHub
+    runs-on: ubuntu-latest
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'staging' || needs.push_images.outputs.branch == 'main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0 # historique complet requis pour lister les tags existants
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image names
+        id: images
+        run: |
+          case "${{ needs.push_images.outputs.branch }}" in
+            staging) PREFIX="mymemomaster_preprod_" ;;
+            main)    PREFIX="mymemomaster_" ;;
+          esac
+          echo "api=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}api" >> "$GITHUB_OUTPUT"
+          echo "front=${{ secrets.DOCKERHUB_USERNAME }}/${PREFIX}front" >> "$GITHUB_OUTPUT"
+
+      - name: Compute next version tag (AAAA.MM.n)
+        id: version
+        run: |
+          BRANCH="${{ needs.push_images.outputs.branch }}"
+          PREFIX=""
+          if [ "$BRANCH" = "staging" ]; then PREFIX="staging-"; fi
+          YM=$(date -u +%Y.%m)
+          LAST=$(git tag -l "${PREFIX}v${YM}.*" | sed -E "s/^${PREFIX}v${YM}\.//" | sort -n | tail -1)
+          NEXT=$(( ${LAST:-0} + 1 ))
+          VERSION="${PREFIX}v${YM}.${NEXT}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version calculée : $VERSION"
+
+      # Retague les images :latest déjà poussées par push_images sans rebuild (même manifeste/digest) —
+      # un rollback VPS/Helm peut ainsi cibler explicitement ":${VERSION}" plutôt que le ":latest" mouvant.
+      - name: Tag Docker images with the version (no rebuild)
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.images.outputs.api }}:${{ steps.version.outputs.version }} \
+            ${{ steps.images.outputs.api }}:latest
+          docker buildx imagetools create \
+            --tag ${{ steps.images.outputs.front }}:${{ steps.version.outputs.version }} \
+            ${{ steps.images.outputs.front }}:latest
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.version }}" \
+            -m "Déploiement ${{ needs.push_images.outputs.branch }} — ${{ steps.version.outputs.version }}" \
+            "${{ github.event.workflow_run.head_sha }}"
+          git push origin "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --title "${{ steps.version.outputs.version }}" \
+            --notes "Déploiement automatique — branche \`${{ needs.push_images.outputs.branch }}\`, commit \`${{ github.event.workflow_run.head_sha }}\`.
+
+          Images Docker Hub :
+          - \`${{ steps.images.outputs.api }}:${{ steps.version.outputs.version }}\`
+          - \`${{ steps.images.outputs.front }}:${{ steps.version.outputs.version }}\`
+
+          Détail fonctionnel : journal de versions (B4_RENDU.md §6)."
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  2a. DEPLOY TEST → VPS (docker compose)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  deploy_test:
+    name: Deploy to VPS (test)
+    runs-on: ubuntu-latest
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'dev'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Valide le compose racine avec le profil test et le template d'env VPS
+      - name: Validate docker-compose syntax
+        run: |
+          docker compose -f docker-compose.yml --profile test \
+            --env-file .env.test.example config -q
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_TEST_PRIVATE_KEY }}
+
+      - name: Add VPS to known_hosts
+        run: ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+
+      - name: Stop test environment
+        run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            mkdir -p /var/www/html/my_memo_master_test
+            cd /var/www/html/my_memo_master_test
+            if [ -f .env ]; then
+              env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env down || true
+            else
+              echo "No .env found — skipping docker compose down."
+            fi
+          EOF
+
+      # Le compose racine (unifié dev/test) est déployé tel quel sur le VPS ;
+      # seuls les services du profil test y sont démarrés (--profile test)
+      - name: Upload docker-compose
+        run: |
+          scp -P ${{ secrets.VPS_PORT }} \
+            docker-compose.yml \
+            ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }}:/var/www/html/my_memo_master_test/docker-compose.yml
+
+      - name: Validate test server env
+        run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            cd /var/www/html/my_memo_master_test
+            if [ ! -f .env ]; then
+              echo "Missing .env on the VPS at /var/www/html/my_memo_master_test/.env"
+              exit 1
+            fi
+            if ! grep -q '^ENVIRONMENT=test$' .env; then
+              echo "Expected ENVIRONMENT=test in .env — found:"
+              grep '^ENVIRONMENT=' .env || true
+              exit 1
+            fi
+            env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env config -q
+          EOF
+
+      - name: Deploy to VPS
+        run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.SSH_TEST_USERNAME }}@${{ secrets.VPS_IP }} << 'EOF'
+            set -e
+            cd /var/www/html/my_memo_master_test
+            # --profile test : n'active que les services VPS du compose unifié
+            # (api_server, front_server, pgadmin_server, backup) + postgres/redis (sans profil)
+            compose() {
+              env -i HOME="$HOME" PATH="$PATH" docker compose --profile test --env-file .env "$@"
+            }
+
+            compose pull
+            compose up -d postgres redis
+            compose up -d pgadmin_server api_server front_server backup
+            compose ps
+
+            attempt=1
+            max_attempts=24
+            services="postgres api_server front_server"
+            all_ready=0
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              all_ready=1
+              echo "Vérification $attempt/$max_attempts"
+              for service in $services; do
+                container_id=$(compose ps -q "$service")
+                if [ -z "$container_id" ]; then
+                  echo "Service $service : pas encore démarré"
+                  all_ready=0
+                  continue
+                fi
+                status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")
+                echo "$service => $status"
+                if [ "$status" != "healthy" ] && [ "$status" != "running" ]; then
+                  all_ready=0
+                fi
+              done
+              if [ "$all_ready" -eq 1 ]; then
+                echo "Tous les services sont démarrés."
+                break
+              fi
+              if [ "$attempt" -lt "$max_attempts" ]; then
+                sleep 5
+              fi
+              attempt=$((attempt + 1))
+            done
+
+            if [ "$all_ready" -ne 1 ]; then
+              echo "Échec de la vérification du déploiement."
+              compose ps
+              compose logs --tail=100
+              exit 1
+            fi
+          EOF
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  2b. DEPLOY PREPROD → Kubernetes via Helm
+  #      Release : mmm-preprod  /  Namespace : mymemomaster-preprod
+  #      Désactivé jusqu'à K8S_PREPROD_ENABLED=true dans Settings → Variables
+  #      (cluster preprod supprimé pour raisons de coût — à recréer plus tard).
+  #
+  #  Première fois : exécuter k8s/helm-migrate.sh preprod pour adopter les
+  #  ressources kubectl existantes avant de laisser Helm les gérer.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  deploy_preprod:
+    name: Deploy to Kubernetes (preprod)
+    runs-on: ubuntu-latest
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'staging' && vars.K8S_PREPROD_ENABLED == 'true'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Épinglé sur la version du cluster (v1.36.x) : le kubectl préinstallé
+      # sur ubuntu-latest n'est pas figé et peut dériver hors de l'écart ±1
+      # mineure supporté, avec des comportements silencieusement différents.
+      - name: Pin kubectl version
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.3
+
+      - name: Set up kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_PREPROD }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
+      - name: Verify cluster connection
+        run: kubectl cluster-info
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install mmm-preprod ./helm \
+            -f helm/values-preprod.yaml \
+            -n mymemomaster-preprod \
+            --create-namespace \
+            --set "rolloutTimestamp=$(date +%s)" \
+            --atomic \
+            --timeout 5m
+
+      - name: "[TEST] Debug node taints/conditions (temporaire)"
+        if: always()
+        run: |
+          {
+            echo "=== NODES ==="
+            kubectl get nodes -o wide
+            echo ""
+            for n in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
+              echo "=== NODE: $n (Taints/Conditions) ==="
+              kubectl describe node "$n" | sed -n '/^Taints:/,/^Addresses:/p'
+              echo ""
+            done
+            echo "=== PODS (resume par statut) ==="
+            kubectl get pods -n mymemomaster-preprod --no-headers | awk '{print $3}' | sort | uniq -c
+          } > /tmp/debug.txt
+          cat /tmp/debug.txt
+          PAYLOAD=$(jq -Rs '{content: ("```\n" + .[0:1900] + "\n```")}' /tmp/debug.txt)
+          curl -s -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "${{ secrets.DISCORD_LOG }}"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  2c. DEPLOY PROD → Kubernetes via Helm
+  #      Release : mmm-prod  /  Namespace : mymemomaster
+  #      Désactivé jusqu'à K8S_PROD_ENABLED=true dans Settings → Variables.
+  #
+  #  Première fois : exécuter k8s/helm-migrate.sh prod pour adopter les
+  #  ressources kubectl existantes avant de laisser Helm les gérer.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  deploy_prod:
+    name: Deploy to Kubernetes (prod)
+    runs-on: ubuntu-latest
+    needs: push_images
+    if: needs.push_images.outputs.branch == 'main' && vars.K8S_PROD_ENABLED == 'true'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Épinglé sur la version du cluster (v1.36.x) : le kubectl préinstallé
+      # sur ubuntu-latest n'est pas figé et peut dériver hors de l'écart ±1
+      # mineure supporté, avec des comportements silencieusement différents.
+      - name: Pin kubectl version
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.3
+
+      - name: Set up kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_PROD }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
+      - name: Verify cluster connection
+        run: kubectl cluster-info
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install mmm-prod ./helm \
+            -f helm/values-prod.yaml \
+            -n mymemomaster \
+            --create-namespace \
+            --set "rolloutTimestamp=$(date +%s)" \
+            --atomic \
+            --timeout 8m
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  3. NOTIFICATIONS DISCORD
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    needs: [push_images, tag_release, deploy_test, deploy_preprod, deploy_prod]
+    if: always() && needs.push_images.result == 'success'
+    steps:
+      # CHOIX: le job de déploiement réellement ciblé par la branche (deploy_test /
+      # deploy_preprod / deploy_prod) est distingué explicitement — "déployé" vs
+      # "SKIPPED" vs "échoué" — plutôt qu'un seul verdict global dérivé de
+      # contains(needs.*.result, 'failure').
+      # RAISON: un job conditionné par une variable GitHub (ex: deploy_prod, gardé par
+      # `vars.K8S_PROD_ENABLED == 'true'`) qui ne se déclenche pas prend le statut
+      # `skipped`, jamais `failure` — le message global restait donc "✅ réussi" alors
+      # que rien n'avait été propagé en prod. C'est exactement le symptôme "deploy_prod
+      # figé" documenté à répétition dans CHANGELOG_AGENT.md (27/08, 28/08, 31/08,
+      # 03/09) : jamais détecté par cette notification, seulement constaté a posteriori
+      # (image disponible sur Docker Hub, mais `helm history` resté sur une révision
+      # ancienne). Un skip qui ne correspond pas à la branche courante (ex: deploy_test
+      # sur un push main) reste ignoré — il est normal et ne doit pas alerter.
+      - name: Send notification
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+
+          case "$BRANCH" in
+            main)    TARGET_JOB="deploy_prod";    TARGET_RESULT="${{ needs.deploy_prod.result }}" ;;
+            staging) TARGET_JOB="deploy_preprod"; TARGET_RESULT="${{ needs.deploy_preprod.result }}" ;;
+            dev)     TARGET_JOB="deploy_test";    TARGET_RESULT="${{ needs.deploy_test.result }}" ;;
+            *)       TARGET_JOB="";               TARGET_RESULT="" ;;
+          esac
+
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            EMOJI="❌"
+            MESSAGE="Déploiement **${BRANCH}** échoué."
+          elif [[ -n "$TARGET_JOB" && "$TARGET_RESULT" == "skipped" ]]; then
+            EMOJI="⚠️"
+            MESSAGE="Images **${BRANCH}** buildées, mais **${TARGET_JOB}** non exécuté (skipped) — rien n'a été propagé sur le cluster. Vérifier la variable GitHub qui le conditionne (Settings → Secrets and variables → Actions → Variables)."
+          else
+            EMOJI="✅"
+            MESSAGE="Déploiement **${BRANCH}** réussi."
+          fi
+
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \"${EMOJI} ${MESSAGE}\"}" \
+            "${{ secrets.DISCORD_LOG }}"

@@ -1,0 +1,410 @@
+name: CI
+
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - dev
+      - '*devops*'
+      - 'dev_back_*'
+      - 'dev_front_*'
+      # Application mobile Android (Capacitor) : même code front, embarqué dans une WebView.
+      # CHOIX: branche traitée comme une branche front (voir `setup`) ; cd.yml reste filtré sur
+      # main/staging/dev, donc ces branches ne déploient rien.
+      - 'android_*'
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          BRANCH="${GITHUB_REF##*/}"
+          # android_* : l'app mobile n'embarque que le front (Vue) — l'API n'est ni modifiée ni testée ici
+          if [[ "$BRANCH" == dev_front_* || "$BRANCH" == android_* ]]; then
+            echo 'matrix={"include":[{"service":"front","path":"my_memo_master_front"}]}' >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == dev_back_* ]]; then
+            echo 'matrix={"include":[{"service":"api","path":"my_memo_master_api"}]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"include":[{"service":"api","path":"my_memo_master_api"},{"service":"front","path":"my_memo_master_front"}]}' >> $GITHUB_OUTPUT
+          fi
+
+  test_and_lint:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm ci
+
+      - name: Run Tests
+        working-directory: ${{ matrix.path }}
+        run: npm run test:coverage
+
+      # Jest et Vitest ecrivent tous deux des chemins relatifs a LEUR racine
+      # (le sous-projet), alors que le scanner Sonar tourne a la racine du depot.
+      # Sans ce prefixe, SonarQube ne rattache la couverture a aucun fichier et
+      # affiche 0 % SANS message d'erreur — la panne est donc invisible.
+      # Verifie le 2026-08-29 : les deux produisent « SF:src/... », jamais un
+      # chemin absolu, donc le prefixage est toujours applicable.
+      - name: Normalise coverage paths
+        working-directory: ${{ matrix.path }}
+        run: |
+          sed -i "s|^SF:|SF:${{ matrix.path }}/|" coverage/lcov.info
+          echo "Trois premiers chemins apres prefixage :"
+          grep -m3 '^SF:' coverage/lcov.info
+
+      # test_and_lint et sonarqube sont deux jobs distincts, donc deux runners :
+      # les fichiers produits ici n'existent pas la-bas. L'artefact est le seul
+      # moyen de les transmettre sans rejouer toute la suite de tests.
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: ${{ matrix.path }}/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Run Lint
+        working-directory: ${{ matrix.path }}
+        run: npm run lint
+
+      # Accessibilité (RGAA) — contrôles statiques, sans navigateur, donc rapides : échouent
+      # AVANT le build si une non-conformité est introduite.
+      #   - audit-a11y.mjs --strict : noms accessibles des champs (11.1), alt (1.1), clavier (7.1),
+      #     boutons symboles (11.9), langue (8.3) ;
+      #   - audit-colors.mjs : toute couleur vit dans src/assets/base.css (aucun hex/rgb en dur,
+      #     aucune variable indéfinie) — condition pour qu'un contraste se corrige à un seul endroit.
+      - name: Static Accessibility Audit (RGAA)
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run audit:a11y
+
+      - name: Colors Convention Audit (base.css)
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run audit:colors
+
+      # OWASP A06 — composants vulnérables : bloque si une dépendance de production
+      # a une vulnérabilité high/critical connue (les devDependencies sont exclues,
+      # elles n'entrent pas dans les images déployées)
+      #
+      # CHOIX: npm récent invoqué via `npx --package npm@latest`, isolé à cette seule
+      # commande, plutôt qu'un remplacement global du npm du job (essayé puis annulé
+      # le même jour — voir DECISIONS.md 2026-09-04). RAISON: `npm install -g
+      # npm@latest` avant `npm ci` a cassé la compilation native de sqlite3
+      # (devDependency, tests BDD en échec "Could not locate the bindings file",
+      # absent avant ce changement) — régression pire que le symptôme d'origine
+      # (le job échouait avec `Invalid package tree`, précédé d'un 400 sur
+      # l'endpoint `quick audit` que npm annonce lui-même en cours de retrait).
+      # `npx --package` télécharge npm@latest dans son propre cache et l'exécute
+      # sans toucher au npm utilisé par `npm ci`/test/lint dans les étapes
+      # précédentes de ce même job.
+      #
+      # CHOIX: 3 tentatives avec pause plutôt qu'un seul appel.
+      # RAISON: constaté en CI — l'endpoint bulk (recommandé, voir ci-dessus) renvoie
+      # par moments un 503 Service Unavailable, panne temporaire côté registre npm,
+      # sans rapport avec l'état réel de nos dépendances. Un seul essai ferait
+      # échouer le job sur un aléa d'infrastructure externe, indépendant de tout
+      # vulnérabilité réelle. Une vraie vulnérabilité high/critical échoue de façon
+      # stable sur les 3 tentatives (l'endpoint répond, juste avec un résultat
+      # positif) — la boucle n'affaiblit donc pas le contrôle, elle absorbe
+      # uniquement l'indisponibilité passagère du service.
+      - name: Audit Dependencies (OWASP A06)
+        working-directory: ${{ matrix.path }}
+        run: |
+          for attempt in 1 2 3; do
+            if npx --yes --package npm@latest -- npm audit --omit=dev --audit-level=high; then
+              exit 0
+            fi
+            echo "Tentative $attempt/3 échouée — nouvel essai dans 15s (le registre npm peut être temporairement indisponible)..."
+            sleep 15
+          done
+          echo "npm audit a échoué 3 fois de suite — vulnérabilité réelle probable, ou registre npm durablement indisponible."
+          exit 1
+
+      - name: Build
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run build
+
+      # Angle mort de audit-a11y.mjs et de test/a11y/axe.test.js (jsdom ne
+      # calcule pas les styles) : audit au vrai moteur de rendu (Chromium) sur la version
+      # buildée — voir docs/AUDIT_RGAA.md §5 :
+      #   - contrast.spec.js     : contraste RGAA 3.2 des pages publiques ;
+      #   - pages.spec.js        : WCAG 2.1 A/AA (toutes règles axe-core) sur les 26 pages,
+      #                            session et API simulées ;
+      #   - mindmap-editor.spec.js : éditeur de carte mentale, état par état, + mesure directe
+      #                            du contraste des textes dans les nœuds SVG.
+      # Le CD ne se déclenche que si cette CI réussit (workflow_run) : une régression
+      # d'accessibilité bloque donc aussi le déploiement. Le site déployé est ensuite
+      # contrôlé par a11y-live.yml.
+      - name: Install Playwright Chromium
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Accessibility Audit in Browser (RGAA 3.2 + WCAG 2.1 AA)
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run test:a11y
+
+      - name: Upload Accessibility Audit Traces
+        if: failure() && matrix.service == 'front'
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-test-results
+          path: ${{ matrix.path }}/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ─── JOB DÉSACTIVÉ (2026-10-02) ───────────────────────────────────────────
+  # SonarQube auto-hébergé retiré du cluster pour réduire les coûts d'hébergement
+  # (nœud dédié + ~4 Gi de RAM). Job conservé en commentaire pour une réactivation
+  # éventuelle ; chart dans helm-sonarqube/. Voir .agents/DECISIONS.md.
+  # ─────────────────────────────────────────────────────────────────────────
+  # Analyse statique continue sur l'instance SonarQube AUTO-HÉBERGÉE
+  # (chart helm-sonarqube/, namespace `sonarqube` du cluster Infomaniak).
+  # Remplace l'analyse SonarCloud — voir .agents/DECISIONS.md.
+  #
+  # L'instance est en ClusterIP SANS Ingress : elle n'est joignable ni depuis
+  # Internet, ni depuis un runner GitHub. Le runner ouvre donc un tunnel
+  # `kubectl port-forward` vers l'API Kubernetes — elle, publique et
+  # authentifiée par kubeconfig — et fait pointer le scanner sur 127.0.0.1.
+  # C'est ce qui permet de garder SonarQube non exposé sur Internet.
+  #
+  # L'action v6 est une action node20 : elle s'exécute NATIVEMENT sur le
+  # runner et non dans un conteneur Docker, donc 127.0.0.1 y désigne bien le
+  # runner et atteint le tunnel. Ne pas revenir à la v5 : en plus d'être
+  # dépréciée, elle émet elle-même un avertissement de vulnérabilité.
+  #
+  # Limité à main, comme précédemment : l'analyse multi-branches n'existe pas
+  # en édition Community (elle était payante sur SonarCloud, elle est
+  # simplement absente ici).
+  #
+  # Prérequis (Settings → Secrets and variables → Actions) :
+  #   SONAR_TOKEN      — token « Global Analysis » généré DANS l'instance
+  #                      (Administration → Security → Users → Tokens).
+  #                      L'ancien token sonarcloud.io ne vaut plus rien ici.
+  #   KUBECONFIG_SONAR — kubeconfig base64 du cluster hébergeant l'instance
+  #                      (même contenu que KUBECONFIG_PREPROD tant que les
+  #                      deux vivent sur le même cluster).
+#   sonarqube:
+#     name: SonarQube Analysis (auto-hébergé)
+#     runs-on: ubuntu-latest
+#     needs: test_and_lint
+#     if: success() && github.ref == 'refs/heads/main'
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v4
+#         with:
+#           # Historique complet requis par Sonar pour attribuer le "new code"
+#           fetch-depth: 0
+#
+#       # Couverture produite par test_and_lint. Les deux artefacts sont replaces
+#       # a l'emplacement attendu par sonar.javascript.lcov.reportPaths.
+#       - name: Download API coverage
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: coverage-api
+#           path: my_memo_master_api/coverage
+#
+#       - name: Download front coverage
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: coverage-front
+#           path: my_memo_master_front/coverage
+#
+#       # Épinglé sur la version du cluster (v1.36.x), même raison que dans cd.yml.
+#       - name: Pin kubectl version
+#         uses: azure/setup-kubectl@v4
+#         with:
+#           version: v1.36.3
+#
+#       - name: Set up kubectl
+#         run: |
+#           mkdir -p ~/.kube
+#           echo "${{ secrets.KUBECONFIG_SONAR }}" | base64 -d > ~/.kube/config
+#           chmod 600 ~/.kube/config
+#
+#       - name: Open tunnel to SonarQube
+#         run: |
+#           kubectl -n sonarqube port-forward svc/sonarqube 9000:9000 \
+#             > /tmp/port-forward.log 2>&1 &
+#           echo $! > /tmp/port-forward.pid
+#
+#           # La sonde de disponibilité du pod répond 200 dès l'amorçage
+#           # ("status":"STARTING"). On attend donc ici un "UP" explicite : sans
+#           # cela le scanner attaque une instance qui migre encore son schéma et
+#           # échoue sur une erreur peu lisible.
+#           for i in $(seq 1 60); do
+#             STATUS=$(curl -s --max-time 5 http://127.0.0.1:9000/api/system/status || true)
+#             case "$STATUS" in
+#               *'"status":"UP"'*)
+#                 echo "SonarQube UP après $i tentative(s)"
+#                 exit 0
+#                 ;;
+#             esac
+#             echo "En attente de SonarQube ($i/60) — ${STATUS:-pas de réponse}"
+#             sleep 5
+#           done
+#
+#           echo "::error::SonarQube n'a pas répondu UP en 5 minutes"
+#           cat /tmp/port-forward.log
+#           exit 1
+#
+#       - name: SonarQube Scan
+#         uses: SonarSource/sonarqube-scan-action@v6
+#         env:
+#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#           SONAR_HOST_URL: http://127.0.0.1:9000
+#
+#       - name: Close tunnel
+#         if: always()
+#         run: |
+#           if [ -f /tmp/port-forward.pid ]; then
+#             kill "$(cat /tmp/port-forward.pid)" 2>/dev/null || true
+#           fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  Parcours E2E authentifiés + test de charge — QA.03 / QA.05 / QA.06
+  #
+  #  Les trois tâches QA du §7.3 de docs/COMPTE_RENDU_METRIQUES.md étaient
+  #  déclarées « validé » sans rien dans le dépôt pour les soutenir. Ce job
+  #  est ce qui les rend confirmables : il rejoue les parcours à chaque passage
+  #  au lieu de s'appuyer sur une exécution manuelle datée.
+  #
+  #  Limité à main et staging : il monte la stack Docker complète et coûte
+  #  plusieurs minutes. Contrepartie assumée — une régression introduite sur
+  #  une branche de fonctionnalité n'est vue qu'à la fusion.
+  # ═══════════════════════════════════════════════════════════════════════════
+  e2e_and_load:
+    name: Parcours E2E + charge (QA.03/QA.05/QA.06)
+    runs-on: ubuntu-latest
+    needs: test_and_lint
+    if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # `front` (profil dev) s'attache au réseau `traefik_proxy`, déclaré
+      # EXTERNE dans docker-compose.yml. Il existe sur un poste de dev, jamais
+      # sur un runner neuf : sans cette création, `compose up` échoue avant
+      # d'avoir démarré quoi que ce soit.
+      - name: Create external Traefik network
+        run: docker network create traefik_proxy || true
+
+      # .env.ci ne contient aucune valeur réelle — stack jetable, détruite avec
+      # le runner. SEED_E2E_USERS=true y déclenche les comptes de test, et
+      # RATE_LIMIT_DISABLED=true évite que k6 ne mesure le rate limiter.
+      - name: Start application stack
+        run: docker compose --env-file .env.ci --profile dev up -d --build
+
+      # L'entrypoint joue npm install + migrations + seeders avant d'écouter :
+      # attendre le port ne suffirait pas, on attend la santé applicative.
+      - name: Wait for API to be healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost/api/v1/health | grep -q ok; then
+              echo "API prête après $((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::API toujours indisponible après 5 minutes"
+          docker compose --env-file .env.ci --profile dev logs --tail 80 api
+          exit 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: my_memo_master_front/package-lock.json
+
+      - name: Install front dependencies
+        working-directory: my_memo_master_front
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: my_memo_master_front
+        run: npx playwright install --with-deps chromium
+
+      # QA.03 et QA.05. Le global setup crée le groupe classe via l'API : sans
+      # groupe, /classroom affiche « Aucun groupe. » pour tous les rôles et les
+      # vues étudiant/enseignant sont indiscernables.
+      # .env.ci alimente docker compose via --env-file, mais PAS le shell qui
+      # lance Playwright : sans ce chargement, global-setup.js retombe sur ses
+      # valeurs par defaut (l'admin d'un poste de dev) et la connexion echoue
+      # contre la base de la CI. Constate au premier passage du job.
+      # On source le meme fichier plutot que de recopier les valeurs ici :
+      # deux listes finiraient par diverger.
+      - name: Run E2E journeys (QA.03 / QA.05)
+        working-directory: my_memo_master_front
+        run: |
+          # On ne source QUE les identifiants necessaires, jamais le fichier
+          # entier : `.` traite un .env comme du shell, donc n'importe quelle
+          # valeur contenant un espace y devient une commande. C'est exactement
+          # ce qui a casse ce job (exit 127, run 33303382884).
+          set -a
+          . <(grep -E '^(ADMIN_SEED_|E2E_)[A-Z_]+=' ../.env.ci)
+          set +a
+          npm run test:e2e
+
+      # QA.06. k6 tourne en conteneur sur le réseau de la stack et attaque
+      # l'API directement (http://api:3000), sans passer par Traefik : on
+      # mesure l'API, pas le proxy.
+      - name: Run load test (QA.06)
+        run: |
+          mkdir -p load-tests/results
+          # Meme precaution que pour l'etape E2E : sourcer au plus juste.
+          set -a
+          . <(grep -E '^E2E_STUDENT_[A-Z_]+=' ./.env.ci)
+          set +a
+          docker run --rm -i \
+            --network my_memo_master_ci_network \
+            -e BASE_URL=http://api:3000 \
+            -e E2E_STUDENT_EMAIL="$E2E_STUDENT_EMAIL" \
+            -e E2E_STUDENT_PASSWORD="$E2E_STUDENT_PASSWORD" \
+            grafana/k6 run - < load-tests/api-load.js \
+            | tee load-tests/results/run.log
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-evidence
+          path: |
+            my_memo_master_front/playwright-report/
+            my_memo_master_front/test-results/
+            load-tests/results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: docker compose --env-file .env.ci --profile dev logs --tail 120
+
+      - name: Stop application stack
+        if: always()
+        run: docker compose --env-file .env.ci --profile dev down -v

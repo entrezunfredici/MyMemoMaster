@@ -1,10 +1,10 @@
 [
-    {
-        "roleId": 1,
-        "name": "Admin"
-    },
-    {
-        "roleId": 2,
-        "name": "Étudiant"
-    }
+  {
+    "roleId": 1,
+    "name": "Admin"
+  },
+  {
+    "roleId": 2,
+    "name": "Étudiant"
+  }
 ]

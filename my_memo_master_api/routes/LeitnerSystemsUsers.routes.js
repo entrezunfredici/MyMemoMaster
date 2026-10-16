@@ -1,11 +1,14 @@
-const express = require("express");
-const controller = require("../controllers/LeitnerSystemsUsers.controller");
+const express = require('express')
+const controller = require('../controllers/LeitnerSystemsUsers.controller')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const leitnerSystemsUsersValidators = require('../validators/LeitnerSystemsUsers.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /leitnerSystemsUsers/add:
+ * /leitnersystemsusers:
  *   post:
  *     summary: Créer une relation entre un utilisateur et un système Leitner
  *     tags: [LeitnerSystemsUsers]
@@ -40,11 +43,11 @@ const router = express.Router();
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.post("/add", controller.create);
+router.post('/', authMiddleware, leitnerSystemsUsersValidators.create, validate, controller.create)
 
 /**
  * @swagger
- * /leitnerSystemsUsers/all:
+ * /leitnersystemsusers:
  *   get:
  *     summary: Récupérer toutes les relations entre utilisateurs et systèmes Leitner
  *     tags: [LeitnerSystemsUsers]
@@ -54,7 +57,7 @@ router.post("/add", controller.create);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/all", controller.findAll);
+router.get('/', authMiddleware, controller.findAll)
 
 /**
  * @swagger
@@ -83,7 +86,7 @@ router.get("/all", controller.findAll);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.get("/:idUser/:idSystem", controller.findOne);
+router.get('/:idUser/:idSystem', authMiddleware, controller.findOne)
 
 /**
  * @swagger
@@ -129,7 +132,13 @@ router.get("/:idUser/:idSystem", controller.findOne);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.put("/:idUser/:idSystem", controller.update);
+router.put(
+  '/:idUser/:idSystem',
+  authMiddleware,
+  leitnerSystemsUsersValidators.update,
+  validate,
+  controller.update
+)
 
 /**
  * @swagger
@@ -156,14 +165,14 @@ router.put("/:idUser/:idSystem", controller.update);
  *       500:
  *         description: Erreur interne du serveur.
  */
-router.delete("/:idUser/:idSystem", controller.delete);
+router.delete('/:idUser/:idSystem', authMiddleware, controller.delete)
 
 module.exports = (app) => {
-    /**
+  /**
    * @swagger
    * tags:
    *   name: LeitnerSystemsUsers
    *   description: Gestion des droits utilisateurs sur les systèmes Leitner
    */
-  app.use("/leitnersystemsusers", router);
-};
+  app.use('/leitnersystemsusers', router)
+}

@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-api
+spec:
+  replicas: {{ .Values.replicas.api }}
+  # CHOIX: stratégie de rollout explicite (maxUnavailable: 0, maxSurge: 1) plutôt que
+  # les défauts Kubernetes (25 %/25 %, en % des replicas).
+  # RAISON: avec replicas: {1, 2} (preprod/prod), les défauts arrondis donnent déjà
+  # ce même résultat aujourd'hui (0 indispo/1 pod de surge) — les valeurs ci-dessous
+  # pinnent ce comportement plutôt que d'en dépendre implicitement, pour qu'il ne
+  # change pas silencieusement si le nombre de replicas évolue (ex: 4 replicas → 25 %
+  # donnerait 1 pod indisponible pendant le rollout). L'ancien pod ne quitte le
+  # Service qu'une fois le nouveau Ready (readinessProbe ci-dessous) — jamais les
+  # deux à la fois hors service. Le pod de surge est déjà budgété dans le
+  # resourceQuota preprod (voir values.yaml — commentaire resourceQuota).
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-api
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-api
+      annotations:
+        # Cibles découvertes par le Prometheus du chart (kubernetes_sd_configs role: pod)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /metrics
+        {{- if .Values.rolloutTimestamp }}
+        rollout-timestamp: {{ .Values.rolloutTimestamp | quote }}
+        {{- end }}
+    spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      # Répartit les replicas sur des nœuds distincts : la perte d'un nœud ne peut
+      # pas emporter tous les pods à la fois. ScheduleAnyway (et non DoNotSchedule)
+      # pour qu'un cluster réduit à un seul nœud disponible reste déployable.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-api
+      containers:
+        - name: api
+          image: {{ include "mmm.imageApi" . }}
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: metrics
+              containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: {{ include "mmm.configName" . }}
+            - secretRef:
+                name: {{ include "mmm.secretName" . }}
+          env:
+            - name: PG_HOST
+              value: {{ .Release.Name }}-postgres
+            - name: REDIS_HOST
+              value: {{ .Release.Name }}-redis
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}

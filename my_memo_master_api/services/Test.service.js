@@ -1,224 +1,246 @@
-const { Test } = require("../models/index");
+const { Op } = require('sequelize')
+const { Test, Subject, Question, TestResult, Tag, ClassGroup, ClassGroupUsers, TestClassGroup } = require('../models/index')
 
-/**
- * @swagger
- * tags:
- *   name: Tests
- *   description: Gestion des tests
- */
+const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], through: { attributes: [] } }
+const CLASS_GROUPS_INCLUDE = { model: ClassGroup, as: 'classGroups', attributes: ['id', 'name'], through: { attributes: [] }, required: false }
+const mistralGradingService = require('./MistralGrading.service')
+const revisionSessionService = require('./RevisionSession.service')
+
 class TestService {
-    /**
-     * @swagger
-     * path:
-     *   /service/tests:
-     *     get:
-     *       summary: Récupérer tous les tests
-     *       description: Récupère la liste complète des tests.
-     *       tags: [Tests]
-     *       responses:
-     *         200:
-     *           description: Liste des tests
-     *           content:
-     *             application/json:
-     *               schema:
-     *                 type: array
-     *                 items:
-     *                   type: object
-     *                   properties:
-     *                     id:
-     *                       type: integer
-     *                       example: 1
-     *                     name:
-     *                       type: string
-     *                       example: "Test de connaissance"
-     *                     subjectId:
-     *                       type: integer
-     *                       example: 1
-     *         500:
-     *           description: Erreur interne du serveur
-     */
-    async findAll() {
-        return await Test.findAll();
+  /**
+   * Retourne les tests accessibles à l'utilisateur :
+   * - ses propres tests (privés ou assignés)
+   * - les tests assignés aux groupes dont il est membre
+   * - les tests legacy (userId null)
+   */
+  async findAll(userId) {
+    const memberships = await ClassGroupUsers.findAll({
+      where: { userId },
+      attributes: ['classGroupId'],
+      raw: true
+    })
+    const groupIds = memberships.map((m) => m.classGroupId)
+
+    let groupTestIds = []
+    if (groupIds.length > 0) {
+      const assignments = await TestClassGroup.findAll({
+        where: { classGroupId: groupIds },
+        attributes: ['testId'],
+        raw: true
+      })
+      groupTestIds = [...new Set(assignments.map((a) => a.testId))]
     }
 
-    /**
-     * @swagger
-     * path:
-     *   /service/tests/{id}:
-     *     get:
-     *       summary: Récupérer un test par ID
-     *       description: Récupère un test spécifique en fonction de l'ID fourni.
-     *       tags: [Tests]
-     *       parameters:
-     *         - in: path
-     *           name: id
-     *           required: true
-     *           schema:
-     *             type: integer
-     *           description: ID du test à récupérer.
-     *       responses:
-     *         200:
-     *           description: Détails du test
-     *           content:
-     *             application/json:
-     *               schema:
-     *                 type: object
-     *                 properties:
-     *                   id:
-     *                     type: integer
-     *                     example: 1
-     *                   name:
-     *                     type: string
-     *                     example: "Test de connaissance"
-     *                   subjectId:
-     *                     type: integer
-     *                     example: 1
-     *         404:
-     *           description: Test non trouvé
-     *         500:
-     *           description: Erreur interne du serveur
-     */
-    async findOne(id) {
-        return await Test.findByPk(id);
+    const orClauses = [{ userId }, { userId: null }]
+    if (groupTestIds.length > 0) {
+      orClauses.push({ testId: { [Op.in]: groupTestIds } })
     }
 
-    /**
-     * @swagger
-     * path:
-     *   /service/tests:
-     *     post:
-     *       summary: Créer un nouveau test
-     *       description: Crée un test avec les données fournies.
-     *       tags: [Tests]
-     *       requestBody:
-     *         required: true
-     *         content:
-     *           application/json:
-     *             schema:
-     *               type: object
-     *               properties:
-     *                 name:
-     *                   type: string
-     *                   example: "Test de connaissance"
-     *                 subjectId:
-     *                   type: integer
-     *                   example: 1
-     *       responses:
-     *         201:
-     *           description: Test créé avec succès
-     *           content:
-     *             application/json:
-     *               schema:
-     *                 type: object
-     *                 properties:
-     *                   id:
-     *                     type: integer
-     *                     example: 1
-     *                   name:
-     *                     type: string
-     *                     example: "Test de connaissance"
-     *                   subjectId:
-     *                     type: integer
-     *                     example: 1
-     *         400:
-     *           description: Requête invalide
-     *         500:
-     *           description: Erreur interne du serveur
-     */
-    async create(data) {
-        return await Test.create(data);
+    return await Test.findAll({
+      where: { [Op.or]: orClauses },
+      include: [
+        { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+        TAG_INCLUDE,
+        CLASS_GROUPS_INCLUDE
+      ]
+    })
+  }
+
+  /**
+   * Retourne un test si l'utilisateur est propriétaire ou membre d'un groupe assigné.
+   */
+  async findOne(id, userId) {
+    const test = await Test.findByPk(id, {
+      include: [
+        { model: Subject, as: 'subject', attributes: ['subjectId', 'name'] },
+        { model: Question, as: 'question', attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition'] },
+        TAG_INCLUDE,
+        CLASS_GROUPS_INCLUDE
+      ],
+      order: [[{ model: Question, as: 'question' }, 'questionPosition', 'ASC']]
+    })
+    if (!test) return null
+
+    // Propriétaire ou test legacy
+    if (test.userId === userId || test.userId === null) return test
+
+    // Membre d'un groupe assigné
+    const groupIds = (test.classGroups ?? []).map((g) => g.id)
+    if (groupIds.length > 0) {
+      const membership = await ClassGroupUsers.findOne({
+        where: { userId, classGroupId: groupIds }
+      })
+      if (membership) return test
     }
 
-    /**
-     * @swagger
-     * path:
-     *   /service/tests/{id}:
-     *     put:
-     *       summary: Mettre à jour un test existant
-     *       description: Met à jour les informations d'un test existant en fonction de l'ID fourni.
-     *       tags: [Tests]
-     *       parameters:
-     *         - in: path
-     *           name: id
-     *           required: true
-     *           schema:
-     *             type: integer
-     *           description: ID du test à mettre à jour.
-     *       requestBody:
-     *         required: true
-     *         content:
-     *           application/json:
-     *             schema:
-     *               type: object
-     *               properties:
-     *                 name:
-     *                   type: string
-     *                   example: "Test de mise à jour"
-     *                 subjectId:
-     *                   type: integer
-     *                   example: 1
-     *       responses:
-     *         200:
-     *           description: Test mis à jour avec succès
-     *           content:
-     *             application/json:
-     *               schema:
-     *                 type: object
-     *                 properties:
-     *                   id:
-     *                     type: integer
-     *                     example: 1
-     *                   name:
-     *                     type: string
-     *                     example: "Test de mise à jour"
-     *                   subjectId:
-     *                     type: integer
-     *                     example: 1
-     *         400:
-     *           description: Requête invalide
-     *         404:
-     *           description: Test non trouvé
-     *         500:
-     *           description: Erreur interne du serveur
-     */
-    async update(id, data) {
-        const test = await Test.findByPk(id);
-        if (!test) {
-            throw new Error(" Test not found");
+    return null // pas d'accès
+  }
+
+  async create(data) {
+    return await Test.create(data)
+  }
+
+  /**
+   * Mise à jour réservée au propriétaire.
+   * Retourne 'NOT_FOUND' ou 'FORBIDDEN' comme erreur signalée.
+   */
+  async update(id, data, userId) {
+    const test = await Test.findByPk(id)
+    if (!test) throw Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' })
+    if (test.userId !== null && test.userId !== userId) throw Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' })
+    return await test.update(data)
+  }
+
+  /**
+   * Suppression réservée au propriétaire.
+   */
+  async delete(id, userId) {
+    const test = await Test.findByPk(id)
+    if (!test) throw Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' })
+    if (test.userId !== null && test.userId !== userId) throw Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' })
+    return await test.destroy()
+  }
+
+  /**
+   * Assigne (ou désassigne) un test à des groupes.
+   * Seul le propriétaire peut modifier les assignations.
+   * @param {number} testId
+   * @param {number} userId
+   * @param {number[]} groupIds - tableau vide = test redevient privé
+   */
+  async assignGroups(testId, userId, groupIds) {
+    const test = await Test.findByPk(testId)
+    if (!test) throw Object.assign(new Error('Test introuvable'), { code: 'NOT_FOUND' })
+    if (test.userId !== userId) throw Object.assign(new Error('Accès interdit'), { code: 'FORBIDDEN' })
+
+    const groups = groupIds.length > 0 ? await ClassGroup.findAll({ where: { id: groupIds } }) : []
+    await test.setClassGroups(groups)
+
+    return test.reload({ include: [CLASS_GROUPS_INCLUDE] })
+  }
+
+  /**
+   * Évalue les réponses d'un utilisateur, sauvegarde le TestResult et retourne la correction.
+   * Accès identique à findOne : propriétaire, test legacy (userId null) ou membre d'un groupe assigné.
+   */
+  async submitAnswers(testId, userId, answers, durationSeconds = null) {
+    const test = await Test.findByPk(testId, {
+      include: [
+        {
+          model: Question,
+          as: 'question',
+          attributes: ['idQuestion', 'statement', 'type', 'content', 'questionPosition']
+        },
+        CLASS_GROUPS_INCLUDE
+      ],
+      order: [[{ model: Question, as: 'question' }, 'questionPosition', 'ASC']]
+    })
+    if (!test) return null
+
+    // Vérification d'accès (même logique que findOne)
+    if (test.userId !== userId && test.userId !== null) {
+      const groupIds = (test.classGroups ?? []).map((g) => g.id)
+      if (groupIds.length === 0) return null
+      const membership = await ClassGroupUsers.findOne({ where: { userId, classGroupId: groupIds } })
+      if (!membership) return null
+    }
+
+    const questions = test.question ?? []
+    const results = await Promise.all(questions.map(async q => {
+      const submission = answers.find(a => a.questionId === q.idQuestion)
+      const { correct, explanation, semanticScore, points, degraded, degradedMessage } = await this._checkAnswer(q, submission?.answer ?? null, userId)
+      return {
+        questionId: q.idQuestion,
+        correct,
+        correctAnswer: this._formatCorrectAnswer(q),
+        explanation,
+        semanticScore,
+        points,
+        ...(degraded ? { degraded: true, degradedMessage } : {})
+      }
+    }))
+
+    const score = parseFloat(results.reduce((acc, r) => acc + r.points, 0).toFixed(2))
+    const testResult = await TestResult.create({ testId, userId, score, total: questions.length, durationSeconds })
+
+    // Un exercice soumis est toujours "complet" (pas de notion de soumission partielle,
+    // contrairement à une session Leitner) — valide donc systématiquement la séance
+    // planifiée du jour correspondante, si elle existe (demande explicite de l'utilisateur,
+    // 2026-09-04 — voir RevisionSession.service.js#validateMatchingSessions).
+    await revisionSessionService.validateMatchingSessions({ userId, idTest: testId })
+
+    return { score, total: questions.length, results, resultId: testResult.resultId }
+  }
+
+  async _checkAnswer(question, answer, userId = null) {
+    const content = question.content ?? {}
+    switch (question.type) {
+      case 'open': {
+        const user = (answer ?? '').trim()
+        if (!user) return { correct: false, explanation: null, semanticScore: null, points: 0 }
+        // Toutes les formulations acceptées : la principale + les alternatives
+        // (ex : la formule symbolique et son énoncé en toutes lettres)
+        const accepted = [
+          content.correct_answer,
+          ...(Array.isArray(content.accepted_answers) ? content.accepted_answers : [])
+        ]
+          .map((s) => (s ?? '').trim())
+          .filter(Boolean)
+        if (accepted.length === 0) return { correct: false, explanation: null, semanticScore: null, points: 0 }
+        const result = await mistralGradingService.grade(accepted, user, question.statement, { userId })
+        return {
+          correct: result.is_correct,
+          explanation: result.explanation,
+          semanticScore: result.score,
+          points: result.score,
+          degraded: result.degraded === true,
+          degradedMessage: result.degraded_message ?? null
         }
-        return await test.update(data);
+      }
+      case 'mcq': {
+        if (answer === null || answer === undefined) return { correct: false, explanation: null, semanticScore: null, points: 0 }
+        const idx = Number(answer)
+        const opts = content.options ?? []
+        const correct = !isNaN(idx) && opts[idx]?.correct === true
+        return { correct, explanation: null, semanticScore: null, points: correct ? 1 : 0 }
+      }
+      case 'fill_blank': {
+        const blanks = content.blanks ?? []
+        const userBlanks = Array.isArray(answer) ? answer : []
+        const correct = (
+          blanks.length > 0 &&
+          blanks.every((b, i) => (userBlanks[i] ?? '').trim().toLowerCase() === b.trim().toLowerCase())
+        )
+        return { correct, explanation: null, semanticScore: null, points: correct ? 1 : 0 }
+      }
+      case 'reorder': {
+        const fragments = content.fragments ?? []
+        const userOrder = Array.isArray(answer) ? answer : []
+        const correct = (
+          fragments.length > 0 &&
+          fragments.length === userOrder.length &&
+          fragments.every((f, i) => f === userOrder[i])
+        )
+        return { correct, explanation: null, semanticScore: null, points: correct ? 1 : 0 }
+      }
+      default:
+        return { correct: false, explanation: null, semanticScore: null, points: 0 }
     }
+  }
 
-    /**
-     * @swagger
-     * path:
-     *   /service/tests/{id}:
-     *     delete:
-     *       summary: Supprimer un test
-     *       description: Supprime un test en fonction de l'ID fourni.
-     *       tags: [Tests]
-     *       parameters:
-     *         - in: path
-     *           name: id
-     *           required: true
-     *           schema:
-     *             type: integer
-     *           description: ID du test à supprimer.
-     *       responses:
-     *         200:
-     *           description: Test supprimé avec succès
-     *         404:
-     *           description: Test non trouvé
-     *         500:
-     *           description: Erreur interne du serveur
-     */
-    async delete(id) {
-        const test = await Test.findByPk(id);
-        if (!test) {
-            throw new Error("Test not found");
-        }
-        return await test.destroy();
+  _formatCorrectAnswer(question) {
+    const content = question.content ?? {}
+    switch (question.type) {
+      case 'open': return content.correct_answer ?? '—'
+      case 'mcq': {
+        const correct = (content.options ?? []).find(o => o.correct)
+        return correct?.text ?? '—'
+      }
+      case 'fill_blank': return (content.blanks ?? []).join(' / ')
+      case 'reorder': return (content.fragments ?? []).join(' ')
+      default: return '—'
     }
+  }
 }
 
-module.exports = new TestService();
+module.exports = new TestService()

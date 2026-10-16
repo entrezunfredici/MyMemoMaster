@@ -2,48 +2,66 @@
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
-// Convertit tes raccourcis en LaTeX
+// Exposants Unicode -> chiffres (x2 -> x^{2}, s-1 -> s^{-1}, en exposant)
+const SUPERSCRIPTS = {
+  '\u2070': '0', '\u00B9': '1', '\u00B2': '2', '\u00B3': '3', '\u2074': '4',
+  '\u2075': '5', '\u2076': '6', '\u2077': '7', '\u2078': '8', '\u2079': '9',
+  '\u207B': '-'
+}
+
+// Convertit tes raccourcis en LaTeX.
+// Idempotent sur du LaTeX : les lookbehind (?<!\\) empêchent de re-transformer
+// les commandes LaTeX (\ln(, \infty…) — depuis l'éditeur V2 (MathLive), la zone
+// brute et le contenu stocké peuvent contenir du LaTeX qui repasse par ici.
 export function toLatex(src) {
   let s = String(src ?? '').trim()
 
   // Normalisations rapides
   s = s
-    .replace(/\u00B2/g, '^2')     // x² -> x^2
-    .replace(/\u00B3/g, '^3')     // x³ -> x^3
+    // Suites d'exposants Unicode -> ^{...} accole (x2, s-1, m3 en exposant)
+    .replace(/[\u00B2\u00B3\u2070\u00B9\u2074-\u2079\u207B]+/g, (run) =>
+      '^{' + run.split('').map((c) => SUPERSCRIPTS[c] ?? c).join('') + '}'
+    )
+    // Accolades obligatoires : sans elles LaTeX ne met en exposant que le premier
+    // caractere (s^-2 affichait le 2 en taille normale, x^10 le 0)
+    .replace(/\^\(([^()]+)\)/g, '^{$1}')      // x^(n+1) -> x^{n+1}
+    .replace(/\^(-?\d+(?:\.\d+)?)/g, '^{$1}') // s^-2, x^10, y^1.5
     .replace(/->/g, '\\to ')
     .replace(/>=/g, '\\ge ')
     .replace(/<=/g, '\\le ')
     .replace(/∞/g, '\\infty')
-    .replace(/\b(infty)\b/gi, '\\infty')
+    .replace(/(?<!\\)\b(infty)\b/gi, '\\infty')
 
   // abs(x) -> |x|
-  s = s.replace(/\babs\(([^()]*)\)/g, '\\left|$1\\right|')
+  s = s.replace(/(?<!\\)\babs\(([^()]*)\)/g, '\\left|$1\\right|')
 
   // vec(A) / widevec(A)
   s = s
-    .replace(/\bvec\(([^()]*)\)/g, '\\vec{$1}')
-    .replace(/\bwidevec\(([^()]*)\)/g, '\\overrightarrow{$1}')
+    .replace(/(?<!\\)\bvec\(([^()]*)\)/g, '\\vec{$1}')
+    .replace(/(?<!\\)\bwidevec\(([^()]*)\)/g, '\\overrightarrow{$1}')
 
   // sqrt(x) + nsqrt(n,x)
   s = s
-    .replace(/\bsqrt\(([^()]*)\)/g, '\\sqrt{$1}')
-    .replace(/\bnsqrt\(([^,]+),\s*([^()]+)\)/g, '\\sqrt[$1]{$2}')
+    .replace(/(?<!\\)\bsqrt\(([^()]*)\)/g, '\\sqrt{$1}')
+    .replace(/(?<!\\)\bnsqrt\(([^,]+),\s*([^()]+)\)/g, '\\sqrt[$1]{$2}')
 
-  // frac/over
+  // over — syntaxe canonique de la fraction ; frac reste interprété pour le
+  // contenu historique mais n'est plus proposé ni accepté à la saisie
+  // (normalizeFormulaSyntax le réécrit en over)
   s = s
-    .replace(/\bfrac\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
-    .replace(/\bover\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
+    .replace(/(?<!\\)\bfrac\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
+    .replace(/(?<!\\)\bover\(([^,]+),\s*([^()]+)\)/g, '\\frac{$1}{$2}')
 
   // ln(x)
-  s = s.replace(/\bln\(([^()]*)\)/g, '\\ln\\left($1\\right)')
+  s = s.replace(/(?<!\\)\bln\(([^()]*)\)/g, '\\ln\\left($1\\right)')
 
   // overline/hat
   s = s
-    .replace(/\boverline\(([^()]*)\)/g, '\\overline{$1}')
-    .replace(/\bhat\(([^()]*)\)/g, '\\hat{$1}')
+    .replace(/(?<!\\)\boverline\(([^()]*)\)/g, '\\overline{$1}')
+    .replace(/(?<!\\)\bhat\(([^()]*)\)/g, '\\hat{$1}')
 
   // matrix(1,2;3,4) -> bmatrix
-  s = s.replace(/\bmat(?:rix)?\(([^()]*)\)/g, (_, inside) => {
+  s = s.replace(/(?<!\\)\bmat(?:rix)?\(([^()]*)\)/g, (_, inside) => {
     const rows = inside
       .split(';')
       .map(r => r.split(',').map(e => e.trim()).join(' & '))
@@ -84,9 +102,13 @@ export function toLatex(src) {
 }
 
 // Rend en HTML KaTeX (mode bloc par défaut)
+// output explicite : le MathML parallèle est requis pour les lecteurs d'écran (RGAA),
+// il ne doit pas dépendre du défaut de KaTeX.
 export function renderMath(input, { displayMode = true } = {}) {
-  const latex = toLatex(input)
-  return katex.renderToString(latex, { throwOnError: false, displayMode })
+  // \placeholder{} est une commande MathLive (trous de l'éditeur V2), inconnue de
+  // KaTeX : un trou rempli rend son contenu, un trou vide rend un carré
+  const latex = toLatex(input).replace(/\\placeholder\{([^{}]*)\}/g, (_, content) => content || '\\square')
+  return katex.renderToString(latex, { throwOnError: false, displayMode, output: 'htmlAndMathml' })
 }
 
 // Entrée multi-lignes -> plusieurs blocs KaTeX empilés
@@ -97,4 +119,113 @@ export function renderMathMultiline(input) {
     .filter(Boolean)
 
   return lines.map(l => renderMath(l, { displayMode: true })).join('')
+}
+
+// Échappe le HTML des segments de texte brut (le résultat est injecté en v-html)
+export function escapeHtml(input) {
+  return String(input ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// true si le texte contient au moins une formule délimitée $…$
+export function hasFormula(input) {
+  return /\$[^$]+\$/.test(String(input ?? ''))
+}
+
+// Réécrit les alias de syntaxe vers la forme canonique unique (frac -> over),
+// pour qu'une même formule n'ait qu'une seule écriture stockée : la correction
+// des réponses compare des chaînes, deux écritures d'une même fraction seraient
+// sinon jugées différentes. Appliqué à l'insertion (FormulaHelper) et avant
+// tout envoi de question/réponse à l'API.
+export function normalizeFormulaSyntax(input) {
+  return String(input ?? '').replace(/\bfrac\(/g, 'over(')
+}
+
+// Ajout de ligne/colonne à une matrice — en manipulation de chaîne LaTeX, pas
+// via l'API de commande MathLive (addColumnAfter/addRowAfter). Constat empirique
+// (2026-07-19) : ces commandes ne fonctionnent proprement que dans une fenêtre
+// très étroite (juste après insertion, curseur encore dans le placeholder) ;
+// dans tout autre cas — curseur au bord de la matrice, matrice mêlée à d'autre
+// contenu, champ vide — elles enveloppent TOUT le champ dans un \begin{split}
+// parasite, non réversible par setValue une fois fait (le champ reste corrompu).
+// Cette implémentation textuelle est déterministe et ne touche jamais rien
+// d'autre qu'une matrice reconnue comme telle.
+// Portée assumée : seule une formule entièrement constituée d'UNE matrice/cas
+// est modifiable ainsi (voir DECISIONS.md 2026-07-19, « commandes de matrice »).
+const SOLE_MATRIX_RE = /^\\begin\{([a-zA-Z]*matrix|cases)\}([\s\S]*)\\end\{\1\}$/
+
+const splitMatrixRows = (body) => body.split('\\\\').map((row) => row.trim())
+
+export function addMatrixColumn(latex) {
+  const m = String(latex ?? '').trim().match(SOLE_MATRIX_RE)
+  if (!m) return null
+  const [, env, body] = m
+  const rows = splitMatrixRows(body).map((row) => `${row} & \\placeholder{}`)
+  return `\\begin{${env}}${rows.join(' \\\\ ')}\\end{${env}}`
+}
+
+export function addMatrixRow(latex) {
+  const m = String(latex ?? '').trim().match(SOLE_MATRIX_RE)
+  if (!m) return null
+  const [, env, body] = m
+  const rows = splitMatrixRows(body)
+  const colCount = (rows[0].match(/&/g) || []).length + 1
+  rows.push(Array(colCount).fill('\\placeholder{}').join(' & '))
+  return `\\begin{${env}}${rows.join(' \\\\ ')}\\end{${env}}`
+}
+
+// Texte mixte -> HTML : les segments entre $…$ sont rendus en KaTeX inline,
+// le reste est échappé tel quel. Un '$' non apparié reste littéral.
+// Utilisé pour les énoncés/réponses des flashcards Leitner et des exercices.
+export function renderInlineMath(input) {
+  const src = String(input ?? '')
+  if (!src.includes('$')) return escapeHtml(src)
+
+  // Les index impairs du split correspondent aux groupes capturés (formules)
+  return src
+    .split(/\$([^$]+)\$/g)
+    .map((segment, i) =>
+      i % 2 === 1 ? renderMath(segment, { displayMode: false }) : escapeHtml(segment)
+    )
+    .join('')
+}
+
+/**
+ * Branche l'affichage du clavier virtuel MathLive sur le focus d'un <math-field>.
+ *
+ * CHOIX: affichage explicite (show/hide) plutôt que mathVirtualKeyboardPolicy = 'auto'
+ * RAISON: MathLive impose inputmode=none à sa zone de saisie, donc le clavier système ne s'ouvre
+ * jamais sur un <math-field> ; et sa règle 'auto' ne se déclenche que si matchMedia('(pointer: coarse)')
+ * est vrai — faux dans l'émulateur Android (pointeur « fin »), donc rien ne s'affichait. Le clic est
+ * aussi écouté : si le champ a déjà le focus (ouverture de la modale), aucun focusin ne se produit.
+ *
+ * @param {HTMLElement} field - Le <math-field>
+ * @param {{show: Function, hide: Function}} keyboard - window.mathVirtualKeyboard
+ * @param {{delay?: number, isFocused?: Function}} [options] - délai avant masquage (ms) et test du focus
+ * @returns {Function} Fonction de débranchement (retire les écouteurs et masque le clavier)
+ */
+export function bindVirtualKeyboard(field, keyboard, { delay = 300, isFocused } = {}) {
+  const stillFocused = isFocused || (() => document.activeElement === field)
+  let timer = null
+  const show = () => {
+    clearTimeout(timer)
+    keyboard.show({ animate: true })
+  }
+  const hide = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => { if (!stillFocused()) keyboard.hide() }, delay)
+  }
+  field.addEventListener('focusin', show)
+  field.addEventListener('click', show)
+  field.addEventListener('focusout', hide)
+  return () => {
+    clearTimeout(timer)
+    field.removeEventListener('focusin', show)
+    field.removeEventListener('click', show)
+    field.removeEventListener('focusout', hide)
+    keyboard.hide()
+  }
 }

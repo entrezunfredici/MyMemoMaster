@@ -1,3 +1,5 @@
+import { api } from '@/helpers/api'
+
 const routes = [
   {
     path: '/',
@@ -13,9 +15,18 @@ const routes = [
     name: 'exercises',
     component: () => import('../pages/ExercisesPage.vue'),
     meta: {
-      title: 'Exercises',
-      private: false
-    }
+      title: 'Exercices',
+      private: true,
+    },
+  },
+  {
+    path: '/exercises/:id',
+    name: 'exercise-detail',
+    component: () => import('../pages/ExerciseDetailPage.vue'),
+    meta: {
+      title: 'Détail de l\'exercice',
+      private: true,
+    },
   },
   {
     path: '/onboarding',
@@ -54,7 +65,16 @@ const routes = [
     }
   },
   {
-    path: '/flashcardssession',
+    path: '/flashcards/:systemId/cards',
+    name: 'flashcards.cards',
+    component: () => import('../pages/FlashcardsCardsPage.vue'),
+    meta: {
+      title: 'Gestion des cartes',
+      private: true
+    }
+  },
+  {
+    path: '/flashcardssession/:systemId',
     name: 'flashcardssession',
     component: () => import('../pages/FlashcardsSessionPage.vue'),
     meta: {
@@ -77,7 +97,16 @@ const routes = [
     component: () => import('../pages/CalendarPage.vue'),
     meta: {
       title: 'Calendrier',
-      private: false
+      private: true
+    }
+  },
+  {
+    path: '/todo',
+    name: 'todo',
+    component: () => import('../pages/TodoPage.vue'),
+    meta: {
+      title: 'To-do',
+      private: true
     }
   },
   {
@@ -116,6 +145,24 @@ const routes = [
       private: true
     }
   },
+  {
+    path: '/kpi',
+    name: 'kpi',
+    component: () => import('../pages/KpiPage.vue'),
+    meta: {
+      title: 'Ma Progression',
+      private: true
+    }
+  },
+  {
+    path: '/subjects',
+    name: 'subjects',
+    component: () => import('../pages/SubjectsPage.vue'),
+    meta: {
+      title: 'Mes contenus par sujet',
+      private: true
+    }
+  },
   // ==================== AUTH & ACCOUNT ====================
   {
     path: '/auth',
@@ -127,11 +174,53 @@ const routes = [
     }
   },
   {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('../pages/ForgotPasswordPage.vue'),
+    meta: {
+      title: 'Mot de passe oublié',
+      private: false
+    }
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('../pages/ResetPasswordPage.vue'),
+    meta: {
+      title: 'Réinitialiser le mot de passe',
+      private: false
+    }
+  },
+  {
+    path: '/verify-email',
+    name: 'verify-email',
+    component: () => import('../pages/VerifyEmailPage.vue'),
+    meta: {
+      title: 'Vérification email',
+      private: false
+    }
+  },
+  {
     path: '/register',
     name: 'register',
     component: () => import('../pages/register/InscriptionPage.vue'),
+    // Vérifie la limite MAX_USERS avant d'afficher le formulaire d'inscription
+    beforeEnter: async () => {
+      const resp = await api.get('users/registration-status')
+      if (resp?.data?.open === false) return { path: '/registration-full' }
+      return true
+    },
     meta: {
       title: 'register',
+      private: false
+    }
+  },
+  {
+    path: '/registration-full',
+    name: 'registration-full',
+    component: () => import('../pages/register/RegistrationFullPage.vue'),
+    meta: {
+      title: 'Inscriptions complètes',
       private: false
     }
   },

@@ -1,9 +1,9 @@
 <template>
   <div>
     <div class="month-nav">
-      <button class="icon-btn" @click="$emit('prev-month')">&#8592;</button>
+      <button class="icon-btn" aria-label="Mois précédent" @click="$emit('prev-month')">&#8592;</button>
       <h2>{{ MONTHS[month] }}</h2>
-      <button class="icon-btn" @click="$emit('next-month')">&#8594;</button>
+      <button class="icon-btn" aria-label="Mois suivant" @click="$emit('next-month')">&#8594;</button>
     </div>
 
     <div class="month-grid">
@@ -30,7 +30,13 @@
           weekend: isWeekend(year, month, day),
           selected: isSelected(year, month, day)
         }"
+        role="button"
+        tabindex="0"
+        :aria-label="`${day} ${MONTHS[month]} ${year}`"
+        :aria-pressed="isSelected(year, month, day)"
         @click="$emit('select-day', year, month, day)"
+        @keydown.enter.prevent="$emit('select-day', year, month, day)"
+        @keydown.space.prevent="$emit('select-day', year, month, day)"
       >
         <div class="day-num">{{ day }}</div>
         <div
@@ -82,17 +88,17 @@ defineEmits(['prev-month', 'next-month', 'select-day'])
   font-size: 18px;
   font-weight: 500;
   margin: 0;
-  color: #1a1aff;
+  color: rgb(var(--accent));
   min-width: 120px;
 }
 
 .month-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 12px;
   overflow: hidden;
-  background: #e2e8f0;
+  background: var(--slate-200);
   gap: 0.5px;
 }
 
@@ -101,14 +107,14 @@ defineEmits(['prev-month', 'next-month', 'select-day'])
   font-weight: 500;
   text-align: center;
   padding: 8px 4px;
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--slate-50);
+  color: var(--slate-500);
 }
 
 .month-day-cell {
   min-height: 90px;
   padding: 8px;
-  background: #ffffff;
+  background: rgb(var(--white));
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -117,34 +123,34 @@ defineEmits(['prev-month', 'next-month', 'select-day'])
 }
 
 .month-day-cell:hover {
-  background: #f0f4ff;
+  background: var(--surface-blue-soft);
 }
 
 .month-day-cell.other-month {
-  background: #f8fafc;
+  background: var(--slate-50);
   cursor: default;
 }
 
 .month-day-cell.other-month:hover {
-  background: #f8fafc;
+  background: var(--slate-50);
 }
 .month-day-cell.other-month .day-num {
-  color: #cbd5e1;
+  color: var(--slate-500);
 }
 .month-day-cell.weekend {
-  background: #fafaff;
+  background: var(--surface-tint);
 }
 
 .month-day-cell.selected {
-  background: #eef0ff !important;
-  outline: 1.5px solid #1a1aff;
+  background: var(--surface-indigo-soft) !important;
+  outline: 1.5px solid rgb(var(--accent));
   outline-offset: -1.5px;
 }
 
 .day-num {
   font-size: 13px;
   font-weight: 500;
-  color: #334155;
+  color: var(--slate-700);
   width: 26px;
   height: 26px;
   display: flex;
@@ -155,8 +161,8 @@ defineEmits(['prev-month', 'next-month', 'select-day'])
 }
 
 .month-day-cell.today .day-num {
-  background: #1a1aff;
-  color: #ffffff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
 }
 
 .event-pill {
@@ -170,49 +176,49 @@ defineEmits(['prev-month', 'next-month', 'select-day'])
 }
 
 .pill-blue {
-  background: rgba(26, 26, 255, 0.1);
-  color: #1a1aff;
+  background: rgb(var(--accent) / 0.1);
+  color: rgb(var(--accent));
 }
 .pill-green {
-  background: #eaf3de;
-  color: #3b6d11;
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
 }
 .pill-amber {
-  background: #faeeda;
-  color: #854f0b;
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
 }
 .pill-red {
-  background: #fcebeb;
-  color: #a32d2d;
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 .pill-purple {
-  background: #eeedfe;
-  color: #3c3489;
+  background: var(--status-purple-bg);
+  color: var(--status-purple-text);
 }
 
 .more-badge {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--slate-500);
   padding: 0 2px;
 }
 
 .icon-btn {
   width: 30px;
   height: 30px;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 8px;
-  background: #ffffff;
+  background: rgb(var(--white));
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--slate-500);
   font-size: 14px;
   transition: background 0.15s;
 }
 
 .icon-btn:hover {
-  background: #f1f5f9;
+  background: var(--slate-100);
 }
 
 @media (max-width: 600px) {

@@ -10,8 +10,6 @@ npm-debug.log
 .git
 .gitignore
 
-# Ignorer les fichiers de configuration de l'environnement
-#.env
 
 # Ignorer les fichiers de logs
 logs
@@ -20,3 +18,14 @@ logs
 # Ignorer les fichiers temporaires
 tmp
 *.tmp
+
+# Fichiers d'environnement — JAMAIS dans une image.
+# my_memo_master_api/.env contient AUTH_JWT_SECRET, SMTP_USER et SMTP_PASS ;
+# le `COPY . .` du Dockerfile les embarquerait dans une image construite en
+# local. Les images du CD sont batties depuis un checkout propre (ou .env est
+# ignore par git) et n'etaient donc pas concernees, mais rien n'empechait un
+# `docker build` local d'etre pousse. Signale par docker:S6470.
+.env
+.env.*
+!.env.example
+!.env.ci

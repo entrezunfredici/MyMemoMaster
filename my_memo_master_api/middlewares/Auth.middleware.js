@@ -1,32 +1,40 @@
-const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken')
+const logger = require('../helpers/logger')
+const tokenBlacklist = require('../helpers/tokenBlacklist')
 
-module.exports = (req, res, next) => {
-    if (process.env.API_BYPASS_AUTH == 'true') {
-        next();
-        return;
+module.exports = async (req, res, next) => {
+  const authHeader = req.headers['authorization']
+
+  if (!authHeader) {
+    res.status(401).send({ message: 'Authentification requise.' })
+    return
+  }
+
+  // RFC 6750 : seul le schéma "Bearer <token>" est accepté — un token nu est refusé.
+  // Tous les clients légitimes (front via helpers/api.js, Swagger UI bearerAuth)
+  // envoient le préfixe ; accepter un token sans schéma élargirait la surface d'attaque.
+  const [scheme, token, ...rest] = authHeader.split(' ')
+
+  if (scheme !== 'Bearer' || !token || rest.length > 0) {
+    res.status(401).send({ message: 'Token manquant.' })
+    return
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.AUTH_JWT_SECRET)
+
+    // A07-M1 : rejette les tokens émis avant la dernière révocation de l'utilisateur
+    // (logout, changement/reset de mot de passe, désactivation de compte) — voir helpers/tokenBlacklist.js
+    if (await tokenBlacklist.isTokenRevoked(decoded.id, decoded.iat)) {
+      res.status(401).send({ message: 'Session révoquée. Merci de vous reconnecter.' })
+      return
     }
 
-    const authHeader = req.headers['authorization'];
-
-    if (!authHeader) {
-        res.status(401).send({ message: 'No header provided!' });
-        return;
-    }
-
-    const token = authHeader.split(' ')[1] || authHeader || null; // * authHeader as 'Bearer <token>'
-
-    if (!token) {
-        res.status(401).send({ message: 'No token provided!' });
-        return;
-    }
-
-    try {
-        const decoded = jwt.verify(token, process.env.AUTH_JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (error) {
-        console.error(error?.message || error);
-        res.status(401).send({ message: 'Unauthorized!' });
-        return;
-    }
-};
+    req.user = decoded
+    next()
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(401).send({ message: 'Token invalide ou expiré.' })
+    return
+  }
+}

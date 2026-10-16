@@ -1,0 +1,960 @@
+<template>
+  <div class="w-full max-w-4xl mx-auto p-3 sm:p-6">
+
+    <!-- Écran de révision des cartes générées (C-01.09, Vue 3 de la maquette) — remplace
+         temporairement le contenu de la page, pas une modal, conforme à diagrams/generation_ia_ui.md
+         §6. -->
+    <AiValidationScreen
+      v-if="aiValidationBatch"
+      :batch="aiValidationBatch"
+      :mind-map-json="mindMapJson"
+      @close="handleValidationClose"
+      @validated="handleValidated"
+    />
+
+    <template v-else>
+
+    <!-- CHOIX: sous sm, « Retour » + titre sur la 1re ligne, les deux boutons d'action sur la 2e (pleine largeur)
+         RAISON: quatre éléments sur une ligne écrasaient le titre sous les boutons (360-412 px) -->
+    <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-3 mb-6">
+      <button @click="router.push('/flashcards')" class="text-primary font-semibold hover:underline whitespace-nowrap shrink-0">
+        ← Retour
+      </button>
+      <h2 class="flex-1 sm:flex-none min-w-0 break-words text-xl sm:text-2xl font-bold text-heading">{{ systemName }}</h2>
+      <div class="flex gap-2 basis-full sm:basis-auto">
+        <button
+          @click="openAiFlow"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-on-primary font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
+        >
+          ✨ Générer par IA
+        </button>
+        <button
+          @click="openAddModal"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-on-primary font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
+        >
+          + Ajouter une carte
+        </button>
+      </div>
+    </div>
+
+    <!-- Reprise d'un brouillon IA en attente de validation (C-01.09) — un batch "pending" existant
+         pour ce système, jamais fermé via l'écran de révision (ex. onglet fermé sans valider). -->
+    <div
+      v-if="pendingAiBatchForSystem"
+      class="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 mb-6"
+    >
+      <p class="text-sm text-primary">
+        ✨ Une génération par IA est en attente de validation ({{ pendingAiBatchForSystem.cards?.length ?? 0 }} cartes proposées)
+      </p>
+      <button @click="resumePendingBatch" class="text-sm font-semibold text-primary hover:underline">
+        Reprendre
+      </button>
+    </div>
+
+    <div v-if="loading" class="text-center text-gray-light py-10">Chargement des cartes...</div>
+
+    <div v-else>
+
+      <!-- Boîtes du système -->
+      <div class="mb-8 p-4 bg-white border border-gray-200 rounded-lg">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold uppercase text-gray-400">Boîtes du système</h3>
+          <button @click="openAddBoxModal" class="text-sm text-primary hover:underline font-medium">+ Ajouter une boîte</button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <div
+            v-for="box in systemBoxes"
+            :key="box.idBox"
+            class="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 text-sm"
+          >
+            <span
+              class="inline-block w-3 h-3 rounded-full border border-black/10"
+              :style="{ backgroundColor: boxColorToHex(box.color) }"
+              aria-hidden="true"
+            ></span>
+            <span class="font-semibold text-primary">B{{ box.level }}</span>
+            <span class="text-gray-500" :title="`${box.intervall} s`">{{ formatDuration(box.intervall) || `${box.intervall} s` }}</span>
+            <button @click="openEditBoxModal(box)" class="text-gray-400 hover:text-primary" title="Modifier">✎</button>
+            <button @click="handleDeleteBox(box)" class="text-gray-400 hover:text-red-500" title="Supprimer">✕</button>
+          </div>
+          <p v-if="systemBoxes.length === 0" class="text-gray-400 text-sm italic">Aucune boîte — ajoutez-en une pour commencer.</p>
+        </div>
+      </div>
+      <div v-if="allCards.length === 0" class="text-center text-gray-light py-10">
+        Aucune carte dans ce système. Ajoutez-en une !
+      </div>
+
+      <div v-for="level in [1, 2, 3, 4, 5]" :key="level" class="mb-6">
+        <div v-if="cardsByLevel[level]?.length">
+          <h3 class="text-sm font-bold uppercase text-gray-400 mb-2">Boîte {{ level }}</h3>
+          <div class="flex flex-col gap-2">
+            <div
+              v-for="card in cardsByLevel[level]"
+              :key="card.idCard"
+              class="flex items-start justify-between bg-white border border-gray-200 rounded-lg p-4 shadow-xs"
+            >
+              <div class="flex-1 min-w-0 pr-4">
+                <p class="font-semibold text-heading"><FormulaText :text="card.question?.statement || ''" /></p>
+                <p class="text-sm text-gray-500 mt-1 italic"><FormulaText :text="card.correctAnswer || '…'" /></p>
+              </div>
+              <div class="flex gap-2 flex-shrink-0">
+                <button
+                  @click="openEditModal(card)"
+                  class="hover:bg-gray-100 text-gray-600 py-1 px-2 rounded border border-gray-300 transition"
+                  title="Modifier"
+                >✎</button>
+                <button
+                  @click="handleDelete(card)"
+                  class="hover:bg-red-50 text-gray-600 py-1 px-2 rounded border border-gray-300 transition"
+                  title="Supprimer"
+                >✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </template>
+
+    <!-- Modal ajouter / modifier -->
+    <div
+      v-if="showModal"
+      class="modal-overlay"
+      @mousedown.self="closeModal"
+    >
+      <div class="modal-panel">
+        <button
+          @click="closeModal"
+          class="modal-close"
+          title="Fermer"
+        >&times;</button>
+        <h2 class="modal-title">
+          {{ editingCard ? 'Modifier la carte' : 'Nouvelle carte' }}
+        </h2>
+
+        <form @submit.prevent="submitForm">
+          <!-- Type de question (uniquement en création) -->
+          <div v-if="!editingCard" class="form-group">
+            <label class="form-label">Type de question</label>
+            <div class="flex gap-3">
+              <button
+                type="button"
+                class="flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg transition font-semibold text-sm"
+                :class="form.type === 'open' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500 hover:border-gray-400'"
+                @click="selectType('open')"
+              >
+                Ouverte
+              </button>
+              <button
+                type="button"
+                class="flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg transition font-semibold text-sm"
+                :class="form.type === 'mcq' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500 hover:border-gray-400'"
+                @click="selectType('mcq')"
+              >
+                QCM
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Question</label>
+            <FormulaHelper v-model="form.statement">
+              <textarea aria-label="Énoncé de la carte"
+                v-model="form.statement"
+                placeholder="Quelle est la loi d'Ohm ? (formules entre $…$)"
+                class="form-input"
+                rows="3"
+                required
+              />
+            </FormulaHelper>
+          </div>
+
+          <!-- Champ réponse : open uniquement -->
+          <div v-if="form.type === 'open'" class="form-group--lg">
+            <label class="form-label">Réponse correcte</label>
+            <FormulaHelper v-model="form.answer">
+              <textarea aria-label="Réponse de la carte"
+                v-model="form.answer"
+                placeholder="U = R × I"
+                class="form-input"
+                rows="2"
+                required
+              />
+            </FormulaHelper>
+          </div>
+
+          <!-- Réponses acceptées supplémentaires : open, création uniquement -->
+          <div v-if="form.type === 'open' && !editingCard" class="form-group--lg">
+            <label class="form-label">
+              Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <div v-for="(alt, ai) in form.altAnswers" :key="ai" class="flex items-center gap-2 mb-2">
+              <input
+                :aria-label="`Formulation acceptée ${ai + 1}`"
+                v-model="form.altAnswers[ai]"
+                type="text"
+                placeholder="Ex : la formule si la réponse principale est en toutes lettres"
+                class="form-input flex-1"
+              />
+              <button
+                type="button"
+                :aria-label="`Supprimer la formulation acceptée ${ai + 1}`"
+                @click="form.altAnswers.splice(ai, 1)"
+                class="text-gray-400 hover:text-red-500 text-lg leading-none"
+              >✕</button>
+            </div>
+            <button
+              type="button"
+              @click="form.altAnswers.push('')"
+              class="text-sm text-primary hover:underline font-medium"
+            >
+              + Ajouter une formulation acceptée
+            </button>
+          </div>
+
+          <!-- Qualité de la réponse de référence (AnswerQuality.service.js) — aperçu EN DIRECT
+               pendant la saisie (rien n'est encore enregistré), remplacé par le résultat réel une
+               fois la sauvegarde effectuée ; la modale reste alors ouverte tant qu'il y a un point
+               à vérifier plutôt que de se refermer immédiatement (DECISIONS.md 2026-09-12). -->
+          <!-- Zone à hauteur réservée (cartes ouvertes) : l'aperçu apparaît après un délai de saisie ;
+               sans place réservée, il décalait le reste de la modale et un clic pouvait tomber
+               sur un autre élément (nœud de la mini-carte, bouton « Ajouter »). -->
+          <div v-if="form.type === 'open'" class="form-group--lg min-h-[7rem]">
+            <template v-if="lastQuality.level">
+              <p class="text-sm mb-1" :class="qualitySaved ? 'text-green-700' : 'text-gray-500'">
+                {{ qualitySaved ? `✓ Carte enregistrée — ${editingCard ? 'réponse mise à jour' : 'réponse créée'}.` : 'Aperçu (non enregistré) :' }}
+              </p>
+              <AnswerQualityBadge :level="lastQuality.level" :warnings="lastQuality.warnings" />
+            </template>
+          </div>
+          <div v-else-if="lastQuality.level" class="form-group--lg">
+            <AnswerQualityBadge :level="lastQuality.level" :warnings="lastQuality.warnings" />
+          </div>
+          <p v-if="justCreated && form.type !== 'open'" class="text-sm text-green-700 mb-4">✓ Carte enregistrée.</p>
+
+          <!-- Nœud de la carte mentale liée (création et modification) -->
+          <div v-if="mindMapJson" class="form-group--lg">
+            <label class="form-label">
+              Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <MindMapNodePicker
+              v-model="form.mindMapNodeId"
+              :mind-map-json="mindMapJson"
+              @node-selected="onNodeSelected"
+            />
+          </div>
+
+          <!-- Options MCQ -->
+          <div v-if="form.type !== 'open'" class="form-group--lg">
+            <label id="mcq-card-legend" class="form-label">Options (sélectionne la bonne réponse)</label>
+            <!-- CHOIX: role="radiogroup" + aria-labelledby plutôt que <fieldset>/<legend>
+                 RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans le style par défaut du navigateur pour <fieldset> -->
+            <div class="space-y-2" role="radiogroup" aria-labelledby="mcq-card-legend">
+              <div v-for="(opt, oi) in form.mcqOptions" :key="oi" class="flex items-center gap-2">
+                <input :aria-label="`Marquer l'option ${oi + 1} comme correcte`"
+                  type="radio"
+                  :name="`mcq-correct-card`"
+                  :checked="opt.correct"
+                  @change="setMcqCorrect(oi)"
+                  class="accent-primary shrink-0"
+                />
+                <input :aria-label="`Texte de l'option ${oi + 1}`"
+                  :value="opt.text"
+                  @input="setOptionText(oi, $event.target.value)"
+                  type="text"
+                  :placeholder="`Option ${oi + 1}...`"
+                  class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                />
+                <button
+                  v-if="form.mcqOptions.length > 2"
+                  type="button"
+                  @click="removeMcqOption(oi)"
+                  class="text-gray-400 hover:text-red-500 text-lg leading-none"
+                >✕</button>
+              </div>
+            </div>
+            <button
+              type="button"
+              @click="addMcqOption()"
+              class="mt-2 text-sm text-primary hover:underline font-medium"
+            >
+              + Ajouter une option
+            </button>
+          </div>
+
+          <p v-if="formError" class="text-red-600 text-sm mb-4">{{ formError }}</p>
+
+          <div class="btn-row">
+            <button
+              v-if="!justCreated"
+              type="submit"
+              :disabled="submitting"
+              class="btn-modal-submit"
+            >
+              {{ submitting ? 'Enregistrement...' : editingCard ? 'Modifier' : 'Ajouter' }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="btn-modal-submit"
+              @click="openAddModal"
+            >
+              Ajouter une autre carte
+            </button>
+            <button
+              type="button"
+              @click="closeModal"
+              class="btn-modal-cancel"
+            >
+              {{ justCreated ? 'Fermer' : 'Annuler' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal boîte -->
+    <div
+      v-if="showBoxModal"
+      class="modal-overlay"
+      @mousedown.self="closeBoxModal"
+    >
+      <div class="modal-panel modal-panel--sm">
+        <button aria-label="Fermer" @click="closeBoxModal" class="modal-close">&times;</button>
+        <h2 class="modal-title">
+          {{ editingBox ? 'Modifier la boîte' : 'Nouvelle boîte' }}
+        </h2>
+        <form @submit.prevent="submitBoxForm">
+          <div class="form-group">
+            <label class="form-label">Niveau</label>
+            <input aria-label="Niveau de la boîte"
+              v-model="boxForm.level"
+              type="number"
+              min="1"
+              placeholder="Ex : 2"
+              class="form-input"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Intervalle (secondes)</label>
+            <input aria-label="Intervalle en secondes"
+              v-model="boxForm.intervall"
+              type="number"
+              min="1"
+              placeholder="Ex : 10"
+              class="form-input"
+              required
+            />
+          </div>
+          <div class="form-group--lg">
+            <label class="form-label">Couleur</label>
+            <input aria-label="Couleur de la boîte"
+              v-model="boxForm.color"
+              type="color"
+              class="h-10 w-16 cursor-pointer rounded border border-gray-200 bg-white p-1"
+            />
+          </div>
+          <p v-if="boxFormError" class="text-red-600 text-sm mb-4">{{ boxFormError }}</p>
+          <div class="btn-row">
+            <button
+              type="submit"
+              :disabled="submittingBox"
+              class="btn-modal-submit"
+            >
+              {{ submittingBox ? 'Enregistrement...' : editingBox ? 'Modifier' : 'Ajouter' }}
+            </button>
+            <button type="button" @click="closeBoxModal" class="btn-modal-cancel">
+              Annuler
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Génération de cartes par IA (C-01.08) — Vue 1 (configuration) puis Vue 2 (attente/erreur).
+         Montées via v-if pour toute la durée du flux : l'état saisi en Vue 1 survit à un aller-retour
+         par [Réessayer] (voir AiGenerateCardsModalComponent.vue). -->
+    <template v-if="showAiFlow">
+      <AiGenerateCardsModal
+        :visible="aiStep === 'config'"
+        :id-system="systemId"
+        :default-subject-context="systemSubjectName"
+        @close="closeAiFlow"
+        @submit="handleAiGenerate"
+      />
+      <AiGenerationProgressModal
+        :visible="aiStep === 'progress'"
+        :status="aiCardGenerationStore.status === 'error' ? 'error' : 'generating'"
+        :error-message="aiCardGenerationStore.errorMessage"
+        @cancel="closeAiFlow"
+        @close="closeAiFlow"
+        @retry="aiStep = 'config'"
+      />
+    </template>
+
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { api } from '@/helpers/api'
+import { notif } from '@/helpers/notif'
+import { boxColorToHex, hexToBoxColor } from '@/helpers/mindmap/mindmap'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
+import AiGenerateCardsModal from '@/components/AiGenerateCardsModalComponent.vue'
+import AiGenerationProgressModal from '@/components/AiGenerationProgressModalComponent.vue'
+import AiValidationScreen from '@/components/AiValidationScreenComponent.vue'
+import AnswerQualityBadge from '@/components/AnswerQualityBadgeComponent.vue'
+import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
+import { useGuidedTourStore } from '@/stores/guidedTour'
+import { formatDuration } from '@/helpers/functions'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
+
+const router = useRouter()
+const route = useRoute()
+const guidedTourStore = useGuidedTourStore()
+const systemId = Number(route.params.systemId)
+
+const loading = ref(true)
+const systemName = ref('')
+const allCards = ref([])
+const systemBoxes = ref([])
+
+// Nom du sujet du système (LeitnerSystem.subjectId → Subject.name), utilisé pour pré-remplir le
+// champ "Matière" (subjectContext) de la génération par IA — voir loadCards().
+const systemSubjectName = ref('')
+
+// Carte mentale liée au système (LeitnerSystem.idMindMap) — alimente le sélecteur de nœud
+const mindMapJson = ref(null)
+
+// --- cartes ---
+const showModal = ref(false)
+const submitting = ref(false)
+const formError = ref('')
+const editingCard = ref(null)
+const form = reactive({
+  statement: '',
+  answer: '',
+  altAnswers: [],
+  type: 'open',
+  mcqOptions: [{ text: '', correct: true }, { text: '', correct: false }],
+  mindMapNodeId: null,
+})
+// Résultat de AnswerQuality.service.js (back) affiché dans la modale (DECISIONS.md 2026-09-12) —
+// alimenté de deux façons : en direct pendant la saisie via POST /responses/quality-preview
+// (aucune persistance, `schedulePreview` ci-dessous), puis remplacé par le résultat réel renvoyé
+// par la sauvegarde (POST /responses ou PUT /responses/edit/:id) une fois enregistré. `level: null`
+// = pas encore évalué (champs incomplets, ou carte QCM sans réponse à évaluer).
+const lastQuality = reactive({ level: null, warnings: [] })
+// true seulement quand lastQuality reflète la réponse RÉELLEMENT enregistrée (POST /responses ou
+// PUT /responses/edit/:id) ; false pendant l'aperçu en direct (rien n'est encore sauvegardé) —
+// distingue les deux dans le libellé affiché sous le badge (cf. template).
+const qualitySaved = ref(false)
+// true quand la carte vient d'être créée et que la modale reste ouverte pour afficher la qualité :
+// le bouton « Ajouter » est alors remplacé, pour ne pas créer un doublon en recliquant.
+const justCreated = ref(false)
+
+// Aperçu de qualité EN DIRECT pendant la saisie, avant tout enregistrement — débounce (500 ms)
+// pour ne pas interroger l'API à chaque frappe ; `seq` ignore la réponse d'un appel devenu obsolète
+// si une saisie plus récente a déjà relancé un nouvel appel entre-temps (réponses réseau pouvant
+// arriver dans le désordre).
+let previewTimer = null
+let previewSeq = 0
+function schedulePreview() {
+  clearTimeout(previewTimer)
+
+  const statement = form.statement.trim()
+  const answer = form.answer.trim()
+  if (form.type !== 'open' || !statement || !answer) {
+    lastQuality.level = null
+    lastQuality.warnings = []
+    qualitySaved.value = false
+    return
+  }
+
+  previewTimer = setTimeout(async () => {
+    const mySeq = ++previewSeq
+    const acceptedAnswers = form.altAnswers.map((a) => a.trim()).filter(Boolean)
+    const resp = await api.post('responses/quality-preview', { statement, answer, acceptedAnswers })
+    if (mySeq !== previewSeq) return
+    if (resp && resp.status === 200) {
+      lastQuality.level = resp.data.qualityLevel
+      lastQuality.warnings = resp.data.qualityWarnings || []
+      qualitySaved.value = false
+    }
+  }, 500)
+}
+
+watch(
+  () => [form.statement, form.answer, form.type, ...form.altAnswers],
+  schedulePreview
+)
+
+// --- boîtes ---
+const showBoxModal = ref(false)
+const submittingBox = ref(false)
+const boxFormError = ref('')
+const editingBox = ref(null)
+const boxForm = reactive({ level: '', intervall: '', color: boxColorToHex(null) })
+
+// --- génération par IA (C-01.08 / C-01.09) ---
+const aiCardGenerationStore = useAiCardGenerationStore()
+const showAiFlow = ref(false)
+const aiStep = ref('config') // 'config' | 'progress'
+const aiValidationBatch = ref(null) // batch affiché à l'écran de révision (Vue 3), null si fermé
+
+// Le plus récent batch "pending" pour CE système (la liste du store couvre tous les systèmes de
+// l'utilisateur) — bandeau de reprise (C-01.09), masqué tant que l'écran de révision est déjà ouvert.
+const pendingAiBatchForSystem = computed(() => {
+  if (aiValidationBatch.value) return null
+  return aiCardGenerationStore.pendingBatches.find(b => b.idSystem === systemId) || null
+})
+
+const cardsByLevel = computed(() => {
+  const map = {}
+  allCards.value.forEach(card => {
+    const level = card.leitnerBox?.level ?? 1
+    if (!map[level]) map[level] = []
+    map[level].push(card)
+  })
+  return map
+})
+
+const loadCards = async () => {
+  const [sysResp, boxResp] = await Promise.all([
+    api.get(`leitnersystems/${systemId}`),
+    api.get('leitnerboxes'),
+  ])
+
+  if (sysResp?.status === 200) {
+    systemName.value = sysResp.data.name
+    systemSubjectName.value = sysResp.data.subject?.name || ''
+    // Si le système est lié à une carte mentale, on la charge pour le sélecteur de nœud
+    if (sysResp.data.idMindMap) {
+      const mmResp = await api.get(`diagrammes/${sysResp.data.idMindMap}`)
+      mindMapJson.value = mmResp?.status === 200 ? mmResp.data?.mindMapJson || null : null
+    } else {
+      mindMapJson.value = null
+    }
+  }
+  if (!boxResp || boxResp.status !== 200) return
+
+  const boxes = boxResp.data.filter(b => b.idSystem === systemId).sort((a, b) => a.level - b.level)
+  systemBoxes.value = boxes
+
+  const cardArrays = await Promise.all(
+    boxes.map(box => api.get(`leitnercards/leitnerboxes/${box.idBox}`))
+  )
+
+  const cards = cardArrays
+    .filter(r => r?.status === 200)
+    .flatMap(r => r.data)
+
+  // Charger la réponse correcte pour chaque carte
+  await Promise.all(cards.map(async (card) => {
+    // CHOIX: /responses/correction/:id plutôt que /responses/question/:id
+    // RAISON: ce dernier ne renvoie que les réponses `correction: false` — la réponse de référence
+    // n'y figurait jamais, d'où une modale « Modifier la carte » ouverte avec une réponse vide.
+    // 404 attendu pour une carte QCM (correction portée par `content`) : réponse laissée vide.
+    const resp = card.question?.type === 'mcq'
+      ? undefined
+      : await api.get(`responses/correction/${card.idQuestion}`)
+    card.correctAnswer = resp?.status === 200 ? resp.data?.content || '' : ''
+    card.idResponse = resp?.status === 200 ? resp.data?.idResponse || null : null
+  }))
+
+  allCards.value = cards
+}
+
+onMounted(async () => {
+  await loadCards()
+  loading.value = false
+  // Bandeau de reprise (C-01.09) — best-effort, ne bloque pas l'affichage de la page si ça échoue
+  aiCardGenerationStore.fetchPendingBatches()
+})
+
+const selectType = (newType) => {
+  if (form.type === newType) return
+  form.type = newType
+  form.answer = ''
+  form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+}
+
+const setOptionText = (idx, value) => {
+  form.mcqOptions = form.mcqOptions.map((o, i) => i === idx ? { ...o, text: value } : o)
+}
+
+const setMcqCorrect = (correctIdx) => {
+  form.mcqOptions = form.mcqOptions.map((o, i) => ({ ...o, correct: i === correctIdx }))
+}
+
+const addMcqOption = () => {
+  form.mcqOptions = [...form.mcqOptions, { text: '', correct: false }]
+}
+
+const removeMcqOption = (idx) => {
+  form.mcqOptions = form.mcqOptions.filter((_, i) => i !== idx)
+}
+
+const openAddModal = () => {
+  editingCard.value = null
+  form.statement = ''
+  form.answer = ''
+  form.altAnswers = []
+  form.type = 'open'
+  form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  form.mindMapNodeId = null
+  formError.value = ''
+  lastQuality.level = null
+  lastQuality.warnings = []
+  qualitySaved.value = false
+  justCreated.value = false
+  showModal.value = true
+}
+
+// Pré-remplit l'énoncé avec le libellé du nœud choisi si l'énoncé est encore vide
+const onNodeSelected = (node) => {
+  if (node && !form.statement.trim()) {
+    form.statement = node.label || ''
+  }
+}
+
+const openEditModal = async (card) => {
+  editingCard.value = card
+  form.statement = card.question?.statement || ''
+  form.answer = card.correctAnswer || ''
+  form.type = card.question?.type || 'open'
+  form.mindMapNodeId = card.mindMapNodeId || null
+  if (form.type === 'mcq' && Array.isArray(card.question?.content?.options)) {
+    form.mcqOptions = card.question.content.options.map(o => ({ text: o.text, correct: !!o.correct }))
+  } else {
+    form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  }
+  formError.value = ''
+  lastQuality.level = null
+  lastQuality.warnings = []
+  qualitySaved.value = false
+  justCreated.value = false
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  editingCard.value = null
+  form.statement = ''
+  form.answer = ''
+  form.altAnswers = []
+  form.type = 'open'
+  form.mcqOptions = [{ text: '', correct: true }, { text: '', correct: false }]
+  form.mindMapNodeId = null
+  formError.value = ''
+  lastQuality.level = null
+  lastQuality.warnings = []
+  qualitySaved.value = false
+  justCreated.value = false
+}
+
+const submitForm = async () => {
+  submitting.value = true
+  formError.value = ''
+
+  try {
+    if (editingCard.value) {
+      await handleUpdate()
+    } else {
+      await handleCreate()
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+const handleCreate = async () => {
+  if (form.type === 'mcq') {
+    if (form.mcqOptions.some(o => !o.text.trim())) {
+      formError.value = 'Toutes les options doivent avoir un texte.'
+      return
+    }
+    if (!form.mcqOptions.some(o => o.correct)) {
+      formError.value = 'Sélectionne la bonne réponse (radio).'
+      return
+    }
+  }
+
+  // 1. Créer la question (contenu selon le type) — syntaxe de formule normalisée
+  const questionPayload = {
+    statement: normalizeFormulaSyntax(form.statement),
+    questionPosition: 0,
+    type: form.type,
+    content: form.type === 'mcq'
+      ? { options: form.mcqOptions.map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) }
+      : null,
+  }
+
+  const qResp = await api.post('questions', questionPayload)
+  if (!qResp || qResp.status !== 201) {
+    formError.value = qResp?.data?.message || 'Erreur lors de la création de la question.'
+    return
+  }
+  const idQuestion = qResp.data.idQuestion
+
+  // 2. Créer la ou les réponses acceptées (open uniquement — la correction MCQ est dans content).
+  // Plusieurs réponses correction=true sont supportées par la correction sémantique
+  // (meilleur score retenu) : utile pour accepter la formule ET son énoncé en toutes lettres.
+  if (form.type === 'open') {
+    const acceptedAnswers = [form.answer, ...form.altAnswers]
+      .map((a) => a.trim())
+      .filter(Boolean)
+    let mainResponseId = null
+    for (const [i, answer] of acceptedAnswers.entries()) {
+      const rResp = await api.post('responses', {
+        content: normalizeFormulaSyntax(answer),
+        correction: true,
+        idQuestion,
+      })
+      if (!rResp || rResp.status !== 201) {
+        formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
+        return
+      }
+      if (i === 0) mainResponseId = rResp.data.idResponse
+    }
+    // AnswerQuality.service.js (back) tient compte des reformulations déjà en base au moment de
+    // CHAQUE création ci-dessus — la réponse principale (1ʳᵉ créée) ne voyait donc encore AUCUNE
+    // des formulations suivantes à cet instant. On la ré-enregistre à l'identique juste après
+    // (PUT, contenu inchangé) uniquement pour redéclencher le calcul de qualité une fois toutes
+    // les formulations réellement en base — DECISIONS.md 2026-09-12.
+    if (mainResponseId) {
+      const qualityResp = await api.put(`responses/edit/${mainResponseId}`, {
+        content: normalizeFormulaSyntax(acceptedAnswers[0]),
+      })
+      if (qualityResp && qualityResp.status === 200) {
+        lastQuality.level = qualityResp.data.qualityLevel
+        lastQuality.warnings = qualityResp.data.qualityWarnings || []
+        qualitySaved.value = true
+      }
+    }
+  }
+
+  // 3. Créer la carte (avec le nœud de carte mentale lié le cas échéant)
+  const cResp = await api.post('leitnercards', {
+    idQuestion,
+    idSystem: systemId,
+    mindMapNodeId: form.mindMapNodeId || null,
+  })
+  if (!cResp || cResp.status !== 201) {
+    formError.value = cResp?.data?.message || 'Erreur lors de la création de la carte.'
+    return
+  }
+
+  // Parcours guidé : une première flashcard valide l'étape « système de Leitner »
+  guidedTourStore.recordLinks({ flashcardId: cResp.data?.idCard ?? -1 })
+
+  notif.notify('Carte ajoutée avec succès.', 'success')
+  loading.value = true
+  await loadCards()
+  loading.value = false
+  // CHOIX: toujours rester sur l'écran de confirmation après une création, quelle que soit la qualité
+  // RAISON: la modale se fermait seulement pour « Bonne qualité », ce qui déroutait à l'ajout en série.
+  justCreated.value = true
+}
+
+const handleUpdate = async () => {
+  const card = editingCard.value
+  const isMcq = card.question?.type === 'mcq'
+
+  if (isMcq && form.mcqOptions.some(o => !o.text.trim())) {
+    formError.value = 'Toutes les options doivent avoir un texte.'
+    return
+  }
+
+  const qPayload = { statement: normalizeFormulaSyntax(form.statement) }
+  if (isMcq) {
+    qPayload.content = { options: form.mcqOptions.map(o => ({ text: normalizeFormulaSyntax(o.text), correct: o.correct })) }
+  }
+
+  const qResp = await api.put(`questions/edit/${card.idQuestion}`, qPayload)
+  if (!qResp || qResp.status !== 200) {
+    formError.value = qResp?.data?.message || 'Erreur lors de la mise à jour de la question.'
+    return
+  }
+
+  // Lien au nœud de la carte mentale (null = retirer) — uniquement si une carte mentale est liée au système
+  if (mindMapJson.value) {
+    const cardResp = await api.put(`leitnercards/${card.idCard}`, {
+      idQuestion: card.idQuestion,
+      mindMapNodeId: form.mindMapNodeId || null,
+    })
+    if (!cardResp || cardResp.status !== 200) {
+      formError.value = cardResp?.data?.message || 'Erreur lors de la mise à jour du lien avec la carte mentale.'
+      return
+    }
+  }
+
+  // Réponse uniquement pour les cartes ouvertes
+  if (!isMcq) {
+    if (card.idResponse) {
+      const rResp = await api.put(`responses/edit/${card.idResponse}`, { content: normalizeFormulaSyntax(form.answer) })
+      if (!rResp || rResp.status !== 200) {
+        formError.value = rResp?.data?.message || 'Erreur lors de la mise à jour de la réponse.'
+        return
+      }
+      lastQuality.level = rResp.data.qualityLevel
+      lastQuality.warnings = rResp.data.qualityWarnings || []
+      qualitySaved.value = true
+    } else if (form.answer.trim()) {
+      const rResp = await api.post('responses', {
+        content: normalizeFormulaSyntax(form.answer),
+        correction: true,
+        idQuestion: card.idQuestion,
+      })
+      if (!rResp || rResp.status !== 201) {
+        formError.value = rResp?.data?.message || 'Erreur lors de la création de la réponse.'
+        return
+      }
+      lastQuality.level = rResp.data.qualityLevel
+      lastQuality.warnings = rResp.data.qualityWarnings || []
+      qualitySaved.value = true
+    }
+  }
+
+  notif.notify('Carte mise à jour avec succès.', 'success')
+  loading.value = true
+  await loadCards()
+  loading.value = false
+  if (!lastQuality.level || lastQuality.level === 'high') closeModal()
+}
+
+const handleDelete = async (card) => {
+  if (!confirm(`Supprimer cette carte ?\n"${card.question?.statement}"`)) return
+
+  const resp = await api.del(`leitnercards/${card.idCard}`)
+  if (!resp || resp.status !== 200) {
+    notif.notify(resp?.data?.message || 'Erreur lors de la suppression.', 'error')
+    return
+  }
+
+  notif.notify('Carte supprimée.', 'success')
+  allCards.value = allCards.value.filter(c => c.idCard !== card.idCard)
+}
+
+const openAddBoxModal = () => {
+  editingBox.value = null
+  // Pré-remplit avec la couleur de la dernière boîte du système (réglable ensuite).
+  const lastBox = systemBoxes.value.reduce((last, b) => (!last || b.level > last.level ? b : last), null)
+  boxForm.level = ''
+  boxForm.intervall = ''
+  boxForm.color = boxColorToHex(lastBox?.color)
+  boxFormError.value = ''
+  showBoxModal.value = true
+}
+
+const openEditBoxModal = (box) => {
+  editingBox.value = box
+  boxForm.level = box.level
+  boxForm.intervall = box.intervall
+  boxForm.color = boxColorToHex(box.color)
+  boxFormError.value = ''
+  showBoxModal.value = true
+}
+
+const closeBoxModal = () => {
+  showBoxModal.value = false
+  editingBox.value = null
+  boxForm.level = ''
+  boxForm.intervall = ''
+  boxForm.color = boxColorToHex(null)
+  boxFormError.value = ''
+}
+
+const submitBoxForm = async () => {
+  submittingBox.value = true
+  boxFormError.value = ''
+  const data = { level: Number(boxForm.level), intervall: Number(boxForm.intervall), color: hexToBoxColor(boxForm.color), idSystem: systemId }
+  const resp = editingBox.value
+    ? await api.put(`leitnerboxes/${editingBox.value.idBox}`, data)
+    : await api.post('leitnerboxes', data)
+  const expectedStatus = editingBox.value ? 200 : 201
+  if (!resp || resp.status !== expectedStatus) {
+    boxFormError.value = resp?.data?.message || 'Erreur lors de l\'enregistrement.'
+    submittingBox.value = false
+    return
+  }
+  notif.notify(editingBox.value ? 'Boîte mise à jour.' : 'Boîte ajoutée.', 'success')
+  closeBoxModal()
+  loading.value = true
+  await loadCards()
+  loading.value = false
+  submittingBox.value = false
+}
+
+const handleDeleteBox = async (box) => {
+  if (!confirm(`Supprimer la boîte niveau ${box.level} ? Les cartes qu'elle contient resteront mais n'auront plus de boîte.`)) return
+  const resp = await api.del(`leitnerboxes/${box.idBox}`)
+  if (!resp || resp.status !== 200) {
+    notif.notify(resp?.data?.message || 'Erreur lors de la suppression.', 'error')
+    return
+  }
+  notif.notify('Boîte supprimée.', 'success')
+  systemBoxes.value = systemBoxes.value.filter(b => b.idBox !== box.idBox)
+}
+
+// --- génération par IA (C-01.08) ---
+
+const openAiFlow = () => {
+  aiCardGenerationStore.reset()
+  aiStep.value = 'config'
+  showAiFlow.value = true
+}
+
+// Referme tout le flux IA (Vue 1/Vue 2) sans rien persister — rappel du périmètre OUT
+// (« Génération sans validation utilisateur ») : aucune écriture n'a jamais eu lieu ici, seul
+// POST /ai-generation-batches a été appelé (brouillon "pending", pas des cartes réelles).
+const closeAiFlow = () => {
+  showAiFlow.value = false
+  aiCardGenerationStore.reset()
+}
+
+// Lance la génération (Vue 1 → Vue 2). Une génération réussie enchaîne directement sur l'écran de
+// révision (Vue 3, C-01.09) — le brouillon "pending" renvoyé par le store est passé tel quel à
+// AiValidationScreenComponent.
+const handleAiGenerate = async (config) => {
+  aiStep.value = 'progress'
+  const success = await aiCardGenerationStore.generate(config)
+  if (success) {
+    showAiFlow.value = false
+    aiValidationBatch.value = aiCardGenerationStore.lastBatch
+  }
+  // Échec : aiCardGenerationStore.status passe à 'error', AiGenerationProgressModal affiche l'état
+  // d'erreur (message + [Réessayer]/[Fermer]) — rien de plus à faire ici.
+}
+
+// --- écran de révision (C-01.09) ---
+
+// Reprend le batch "pending" affiché par le bandeau — même écran que juste après une génération.
+const resumePendingBatch = () => {
+  if (pendingAiBatchForSystem.value) aiValidationBatch.value = pendingAiBatchForSystem.value
+}
+
+// Fermeture de l'écran de révision (Annuler, ou [X]) — le batch a été marqué "discarded" par le
+// composant lui-même avant d'émettre 'close' ; on rafraîchit juste le bandeau de reprise pour qu'il
+// disparaisse.
+const handleValidationClose = async () => {
+  aiValidationBatch.value = null
+  await aiCardGenerationStore.fetchPendingBatches()
+}
+
+// Toutes les cartes cochées ont été promues avec succès (POST /questions → /responses →
+// /leitnercards par carte) et le batch a été marqué "validated" par le composant — on recharge la
+// liste des cartes du système pour voir apparaître les nouvelles, et le bandeau de reprise.
+const handleValidated = async () => {
+  aiValidationBatch.value = null
+  loading.value = true
+  await Promise.all([loadCards(), aiCardGenerationStore.fetchPendingBatches()])
+  loading.value = false
+}
+</script>

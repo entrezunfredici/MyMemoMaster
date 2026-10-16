@@ -1,32 +1,32 @@
-"use strict";
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Subject", {
+    await queryInterface.createTable('Subject', {
       subjectId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         autoIncrement: true,
-        primaryKey: true,
+        primaryKey: true
       },
       name: {
         type: Sequelize.STRING(50),
-        allowNull: false,
+        allowNull: false
       },
       updatedAt: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
       },
       createdAt: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
-      },
-    });
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      }
+    })
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("Subject");
-  },
-};
+    await queryInterface.dropTable('Subject')
+  }
+}

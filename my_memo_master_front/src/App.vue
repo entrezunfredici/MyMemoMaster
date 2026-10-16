@@ -1,6 +1,6 @@
 <template>
   <!-- NO LAYOUT -->
-  <div v-if="route?.name?.includes?.('auth')">
+  <div v-if="route?.name?.includes?.('auth') || route?.name === 'register' || route?.name === 'forgot-password' || route?.name === 'reset-password'">
     <main>
       <RouterView />
     </main>
@@ -14,41 +14,48 @@
       <nav class="flex flex-col items-center justify-between rounded-xl border-2 border-gray mb-4 p-2 w-20"
         style="height: calc(100% - 9rem);">
         <div class="flex flex-col items-center gap-3 justify-center">
-          <router-link to="/"
+          <router-link to="/" aria-label="Accueil"
             :class="[route?.name && route.name === 'home' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <HomeIcon class="size-8" />
           </router-link>
-          <router-link to="/tutorials"
-            :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-            <TutorialIcon class="size-8" />
-          </router-link>
-          <router-link to="/mindmaps"
+          <router-link to="/mindmaps" data-tour="mindmaps" aria-label="Cartes mentales"
             :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <MindmapIcon class="size-8" />
           </router-link>
-          <router-link to="/flashcards"
+          <router-link to="/flashcards" data-tour="flashcards" aria-label="Systèmes de Leitner"
             :class="[route?.name && route.name.includes('flashcards') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <FlashardIcon class="size-8" />
           </router-link>
-          <router-link to="/exercises"
+          <router-link to="/exercises" data-tour="exercises" aria-label="Exercices"
             :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ExercisesIcon class="size-8" />
           </router-link>
-          <router-link to="/classroom"
+          <router-link to="/classroom" data-tour="classroom" aria-label="Classe"
             :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ClassroomIcon class="size-8" />
           </router-link>
-          <!-- <router-link to="/credits"
-            :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-            <CreditsIcon class="size-8" />
-          </router-link> -->
+          <router-link to="/calendar" data-tour="calendar" aria-label="Calendrier & rappels"
+            :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+            title="Calendrier & rappels">
+            <CalendarIcon class="size-8" />
+          </router-link>
+          <router-link to="/todo" data-tour="todo" aria-label="To-do"
+            :class="[route?.name === 'todo' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+            title="To-do">
+            <CheckCircleIcon class="size-8" />
+          </router-link>
+          <router-link to="/kpi" data-tour="kpi" aria-label="Ma Progression"
+            :class="[route?.name === 'kpi' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
+            title="Ma Progression">
+            <KpiIcon class="size-8" />
+          </router-link>
         </div>
         <div class="flex flex-col items-center gap-3 justify-center">
-          <router-link to="/profile"
+          <router-link to="/profile" aria-label="Profil"
             :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ProfileIcon class="size-8" />
           </router-link>
-          <router-link to="/settings"
+          <router-link to="/settings" aria-label="Réglages"
             :class="[route?.name && route.name.includes('settings') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <SettingsIcon class="size-8" />
           </router-link>
@@ -57,10 +64,13 @@
     </aside>
 
     <div class="flex-1">
-      <header class="mt-20 lg:mt-16 xl:mt-12 mb-3">
+      <header class="mt-20 lg:mt-16 xl:mt-12 mb-3 flex items-start justify-between pr-4">
         <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
           route.meta.title }}</h1>
+        <NotificationBell class="mt-3" data-tour="notifications" />
       </header>
+      <GuidedTourBanner />
+      <OnboardingTour />
       <main class="mb-8 mr-4">
         <RouterView />
       </main>
@@ -68,52 +78,19 @@
   </div>
   <!-- MOBIL LAYOUT -->
   <div v-else-if="isMobile()" class="min-h-screen">
-    <header class="m-4">
-      <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
+    <header class="m-4 flex items-center justify-between">
+      <h1 class="text-primary text-[2rem] neue-haas-grotesk-b font-bold">{{
         route.meta.title }}</h1>
+      <NotificationBell data-tour="notifications" />
     </header>
+    <div class="m-4 mb-0">
+      <GuidedTourBanner />
+      <OnboardingTour />
+    </div>
     <main class="m-4 pb-[75px]">
       <RouterView />
     </main>
-    <nav
-      class="flex flex-wrap items-center justify-evenly rounded-xl border-2 border-gray p-2 m-2 fixed inset-x-0 bottom-0 w-[98%] bg-light">
-      <router-link to="/"
-        :class="[route?.name && route.name === 'home' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <HomeIcon class="size-8" />
-      </router-link>
-      <router-link to="/tutorials"
-        :class="[route?.name && route.name.includes('tutorials') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <TutorialIcon class="size-8" />
-      </router-link>
-      <router-link to="/mindmaps"
-        :class="[route?.name && route.name.includes('mindmaps') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <MindmapIcon class="size-8" />
-      </router-link>
-      <router-link to="/flashcards"
-        :class="[route?.name && route.name.includes('flashcards') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <FlashardIcon class="size-8" />
-      </router-link>
-      <router-link to="/exercises"
-        :class="[route?.name && route.name.includes('exercises') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <ExercisesIcon class="size-8" />
-      </router-link>
-      <router-link to="/classroom"
-        :class="[route?.name && route.name.includes('classroom') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <ExercisesIcon class="size-8" />
-      </router-link>
-      <!-- <router-link to="/credits"
-        :class="[route?.name && route.name.includes('credits') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <ExercisesIcon class="size-8" />
-      </router-link> -->
-      <router-link to="/profile"
-        :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <ProfileIcon class="size-8" />
-      </router-link>
-      <router-link to="/settings"
-        :class="[route?.name && route.name.includes('settings') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
-        <SettingsIcon class="size-8" />
-      </router-link>
-    </nav>
+    <MobileNav />
   </div>
 </template>
 
@@ -122,15 +99,19 @@ import { RouterView } from 'vue-router'
 import ExercisesIcon from '@/icons/ExercisesIcon.vue'
 import FlashardIcon from '@/icons/FlashardIcon.vue'
 import MindmapIcon from '@/icons/MindmapIcon.vue'
-import TutorialIcon from '@/icons/TutorialIcon.vue'
 import ProfileIcon from '@/icons/ProfileIcon.vue'
 import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
 import ClassroomIcon from '@/icons/ClassroomIcon.vue'
-import { HomeIcon } from '@heroicons/vue/24/outline'
+import KpiIcon from '@/icons/KpiIcon.vue'
+import { HomeIcon, CalendarIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
 import { isMobile } from '@/helpers/functions';
+import NotificationBell from '@/components/NotificationBellComponent.vue'
+import GuidedTourBanner from '@/components/GuidedTourBannerComponent.vue'
+import OnboardingTour from '@/components/OnboardingTourComponent.vue'
+import MobileNav from '@/components/MobileNavComponent.vue'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 

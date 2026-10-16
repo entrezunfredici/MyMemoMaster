@@ -1,5 +1,30 @@
 .env
+.env.dev
+.env.test
+.env.prod
 .idea
 *.sqlite
+.docker-tmp
+node_modules
+cadrage
+yarn.lock
+odoo-plugin
 
-server_docker_compose/server_proxy/
+# Secrets k8s — contiennent des tokens réels, ne jamais commiter
+k8s/cert-manager/cloudflare-secret.yml
+k8s/kubeconfig/
+
+PCU-N6AJX6E-openrc.txt
+
+# Valeurs réelles du Secret K8s — ne jamais commiter
+k8s/secrets*.env
+helm-sonarqube/secrets.env
+helm-sonarqube/credentials.local
+helm-sonarqube/KUBECONFIG_SONAR.b64
+
+# Cours PDF fournis par l'utilisateur pour tester la génération IA (droits d'auteur tiers) —
+# usage local ponctuel, ne doit pas entrer dans l'historique git (2026-09-12)
+cours_exemples/
+
+# Sauvegardes locales (jamais committées)
+/backups-local/

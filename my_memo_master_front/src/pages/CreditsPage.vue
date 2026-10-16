@@ -9,12 +9,13 @@
             <p>- Fred</p>
 
             <table class="credits-table w-full border-collapse text-left">
+                <caption class="sr-only">Équipe ayant travaillé sur My Memo Master</caption>
                 <thead>
                     <tr>
-                        <th>Prénom</th>
-                        <th>Nom</th>
-                        <th>Fonction</th>
-                        <th>Période</th>
+                        <th scope="col">Prénom</th>
+                        <th scope="col">Nom</th>
+                        <th scope="col">Fonction</th>
+                        <th scope="col">Période</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -36,8 +36,8 @@ const events = computed(() =>
 .detail-panel {
   width: 0;
   overflow: hidden;
-  background: #ffffff;
-  border-left: 0.5px solid #e2e8f0;
+  background: rgb(var(--white));
+  border-left: 0.5px solid var(--slate-200);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -50,7 +50,7 @@ const events = computed(() =>
 
 .detail-header {
   padding: 16px 16px 12px;
-  border-bottom: 0.5px solid #e2e8f0;
+  border-bottom: 0.5px solid var(--slate-200);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -60,14 +60,14 @@ const events = computed(() =>
 .detail-date {
   font-size: 13px;
   font-weight: 500;
-  color: #1a1aff;
+  color: rgb(var(--accent));
 }
 
 .detail-close {
   background: none;
   border: none;
   cursor: pointer;
-  color: #94a3b8;
+  color: var(--slate-500);
   font-size: 16px;
   line-height: 1;
   padding: 4px 6px;
@@ -78,8 +78,8 @@ const events = computed(() =>
 }
 
 .detail-close:hover {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--slate-100);
+  color: var(--slate-700);
 }
 
 .detail-body {
@@ -93,7 +93,7 @@ const events = computed(() =>
 
 .detail-empty {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--slate-500);
 }
 
 .ev-card {
@@ -103,24 +103,24 @@ const events = computed(() =>
 }
 
 .ev-card.blue {
-  background: rgba(26, 26, 255, 0.07);
-  border-color: rgba(26, 26, 255, 0.2);
+  background: rgb(var(--accent) / 0.07);
+  border-color: rgb(var(--accent) / 0.2);
 }
 .ev-card.green {
-  background: #eaf3de;
-  border-color: #c0dd97;
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
 }
 .ev-card.amber {
-  background: #faeeda;
-  border-color: #fac775;
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
 }
 .ev-card.red {
-  background: #fcebeb;
-  border-color: #f7c1c1;
+  background: var(--status-red-bg);
+  border-color: var(--status-red-border);
 }
 .ev-card.purple {
-  background: #eeedfe;
-  border-color: #cecbf6;
+  background: var(--status-purple-bg);
+  border-color: var(--status-purple-border);
 }
 
 .ev-label {
@@ -144,27 +144,27 @@ const events = computed(() =>
 .ev-label.blue,
 .ev-title.blue,
 .ev-meta.blue {
-  color: #1a1aff;
+  color: rgb(var(--accent));
 }
 .ev-label.green,
 .ev-title.green,
 .ev-meta.green {
-  color: #3b6d11;
+  color: var(--status-green-text);
 }
 .ev-label.amber,
 .ev-title.amber,
 .ev-meta.amber {
-  color: #854f0b;
+  color: var(--status-amber-text);
 }
 .ev-label.red,
 .ev-title.red,
 .ev-meta.red {
-  color: #a32d2d;
+  color: var(--status-red-text);
 }
 .ev-label.purple,
 .ev-title.purple,
 .ev-meta.purple {
-  color: #3c3489;
+  color: var(--status-purple-text);
 }
 
 @media (max-width: 900px) {

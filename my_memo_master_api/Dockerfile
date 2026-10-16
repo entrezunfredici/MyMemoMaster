@@ -1,22 +1,32 @@
-# File my_memo_master_api/Dockerfile
+# syntax=docker/dockerfile:1
+# ---- Stage 1: build native dependencies ----
+# node:22-bookworm-slim est basé sur Debian (glibc) — requis par onnxruntime-node (@xenova/transformers)
+FROM node:22-bookworm-slim AS deps
+# CVE image de base (Bloc 4) : le npm embarqué dans l'image officielle traîne souvent des versions
+# vulnérables de ses propres dépendances (tar, brace-expansion) ; se réaligner sur le dernier npm
+# les corrige sans attendre une nouvelle publication de l'image node elle-même.
+RUN npm install -g npm@latest
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package*.json ./
+# CHOIX: npm ci (lockfile strict, pas de résolution) + cache npm persistant entre builds (BuildKit)
+# RAISON: reproductible (mêmes versions que la CI) et bien plus rapide quand la couche est invalidée ;
+#         échoue volontairement si package-lock.json n'est plus synchro avec package.json
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
-FROM node:20-bullseye-slim
-
+# ---- Stage 2: production image (no build tools) ----
+FROM node:22-bookworm-slim AS production
+# entrypoint.sh exécute npm/npx au démarrage du conteneur (pas seulement au build) — même correctif
+# CVE que le stage deps, sur cette image indépendante.
+RUN npm install -g npm@latest
 WORKDIR /app
 
-COPY package*.json ./
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 make g++ \
-    && npm install \
-    && npm cache clean --force \
-    && apt-get purge -y --auto-remove python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-COPY . ./
+COPY entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-ENV NODE_ENV=production
-ENV PORT=8080
-EXPOSE 8080
+EXPOSE ${API_PORT}
 
-# Démarrage
-CMD ["npm","start"]
+CMD ["/entrypoint.sh"]

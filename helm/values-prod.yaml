@@ -1,0 +1,130 @@
+# =============================================================================
+#  values-prod.yaml — Surcharges environnement production
+#  Usage : helm upgrade --install mmm-prod ./helm -f helm/values-prod.yaml \
+#            -n mymemomaster --create-namespace
+# =============================================================================
+
+image:
+  api:
+    name: mymemomaster_api
+  front:
+    name: mymemomaster_front
+
+replicas:
+  api: 2
+  front: 2
+
+config:
+  # Proxy Cloudflare actif (nuage orange, verifie le 2026-08-26) : 2 sauts
+  # devant l'API (Cloudflare + ingress-nginx).
+  TRUST_PROXY_HOPS: "2"
+  ENVIRONMENT: prod
+  API_PUBLIC_URL: https://api.my-memo-master.com
+  CORS_ORIGIN: https://app.my-memo-master.com,https://localhost
+  APP_FRONT_URL: https://app.my-memo-master.com
+  VITE_API_URL: https://api.my-memo-master.com/api/v1
+  VITE_FRONT_URL: https://app.my-memo-master.com
+  # Stockage objet Infomaniak (S3). Sans S3_BUCKET l'API écrit sur le disque du pod :
+  # fichiers perdus à chaque redéploiement et non partagés entre les 2 réplicas (constaté
+  # le 2026-10-12 : « S3_BUCKET non configuré »). Même bucket et mêmes clés que la preprod
+  # pour l'instant ; clés d'objet `uploads/{userId}/...` sans préfixe d'environnement, donc
+  # à séparer (bucket dédié) avant l'arrivée de vrais utilisateurs.
+  S3_ENDPOINT: https://s3.swiss-backup04.infomaniak.com
+  S3_BUCKET: default
+  S3_KEY_PREFIX: prod/
+  S3_PUBLIC_URL: https://s3.swiss-backup04.infomaniak.com
+
+domain:
+  api: api.my-memo-master.com
+  # L'apex my-memo-master.com sert la landing page, hébergée hors cluster.
+  # L'application Kubernetes répond sur le sous-domaine app.
+  front: app.my-memo-master.com
+
+# Données de production : le volume survit à la suppression du PVC.
+storageClass: csi-cinder-sc-retain
+
+# Priorité haute : sous pression mémoire d'un nœud, la preprod est évincée avant
+# la prod. Prérequis : kubectl apply -f k8s/priorityclasses.yml
+priorityClassName: mmm-prod
+
+# Pas de quota sur la prod : c'est l'environnement que l'on protège, le plafonner
+# reviendrait à bloquer sa propre montée en charge.
+resourceQuota:
+  enabled: false
+
+postgres:
+  # Mesure du 2026-10-12 : base de 11 Mo, 65 Mo utilisés sur le volume de 20 Gi.
+  # Volume Cinder extensible (allowVolumeExpansion: true) : on repart à 5 Gi.
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# StatefulSet avec PVC — données de cache BullMQ persistées en prod
+redis:
+  persistent: true
+  storage: 2Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+api:
+  resources:
+    requests:
+      # Mesure réelle faite le 2026-09-01 (`docker stats`, conteneur local, modèle
+      # sémantique chargé) : ~795-825 Mi de RSS avec paraphrase-multilingual-MiniLM-L12-v2
+      # chargé en mémoire (Semantic.service.js) — bien au-dessus des ~120 Mo estimés
+      # lors du choix du modèle (poids sur disque, pas l'empreinte réelle du runtime
+      # ONNX WASM une fois chargé) et du défaut historique de 512Mi, qui poussait
+      # le scheduler à surbooker le nœud et exposait à l'OOMKill (racine d'un
+      # correctif de pré-chauffage cassé — voir DECISIONS.md 2026-09-01, le
+      # pré-chauffage ne chargeait en fait jamais le modèle avant ce correctif).
+      cpu: 200m
+      memory: 896Mi
+    limits:
+      cpu: 1000m
+      # ~700 Mi de marge au-dessus de la mesure au repos pour absorber des
+      # corrections sémantiques concurrentes (plusieurs utilisateurs en même
+      # temps). Vérifié : sans quota en prod (resourceQuota.enabled: false),
+      # tient largement sur les 3 nœuds du cluster (< 60 % de la mémoire
+      # allouable par nœud rien qu'en requests, même nœud que les 2 réplicas).
+      memory: 1536Mi
+
+front:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# PgAdmin désactivé en prod
+pgadmin:
+  enabled: false
+
+# Prometheus avec PVC — historique de métriques persisté en prod
+monitoring:
+  enabled: true
+  persistent: true
+  storage: 5Gi
+  retention: 15d
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# Sauvegarde quotidienne de Postgres vers S3 (backups/prod/, 14 derniers dumps)
+backup:
+  enabled: true

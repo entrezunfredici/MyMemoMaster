@@ -1,0 +1,5 @@
+# Dépendances pour scripts/deploy-https.py
+# Installer avec : pip install -r scripts/requirements-deploy.txt
+
+inquirer>=3.2.0
+paramiko>=3.4.0

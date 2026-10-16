@@ -2,9 +2,9 @@
   <div>
     <div class="year-toolbar">
       <div class="year-nav">
-        <button class="icon-btn" @click="$emit('update:year', year - 1)">&#8592;</button>
+        <button class="icon-btn" aria-label="Année précédente" @click="$emit('update:year', year - 1)">&#8592;</button>
         <span class="year-label">{{ year }}</span>
-        <button class="icon-btn" @click="$emit('update:year', year + 1)">&#8594;</button>
+        <button class="icon-btn" aria-label="Année suivante" @click="$emit('update:year', year + 1)">&#8594;</button>
       </div>
     </div>
 
@@ -13,7 +13,12 @@
         v-for="(m, idx) in MONTHS"
         :key="idx"
         class="month-block"
+        role="button"
+        tabindex="0"
+        :aria-label="`${MONTHS[idx]} ${year}`"
         @click="$emit('go-to-month', idx)"
+        @keydown.enter.prevent="$emit('go-to-month', idx)"
+        @keydown.space.prevent="$emit('go-to-month', idx)"
       >
         <h3>{{ m.toUpperCase() }}</h3>
         <div class="mini-grid">
@@ -42,7 +47,7 @@
 <script setup>
 import { MONTHS, DAYS_SHORT, getDaysInMonth, getFirstDay } from '../stores/calendar.js'
 
-const props = defineProps({
+defineProps({
   year: { type: Number, required: true },
   isToday: { type: Function, required: true },
   hasEvent: { type: Function, required: true }
@@ -87,14 +92,14 @@ defineEmits(['update:year', 'go-to-month'])
 .year-number {
   font-size: 140px;
   font-weight: 600;
-  color: #1a1aff;
+  color: rgb(var(--accent));
   line-height: 1;
   letter-spacing: -4px;
 }
 
 .month-block {
-  background: #ffffff;
-  border: 0.5px solid #e2e8f0;
+  background: rgb(var(--white));
+  border: 0.5px solid var(--slate-200);
   border-radius: 12px;
   padding: 12px;
   cursor: pointer;
@@ -102,13 +107,13 @@ defineEmits(['update:year', 'go-to-month'])
 }
 
 .month-block:hover {
-  border-color: #1a1aff;
+  border-color: rgb(var(--accent));
 }
 
 .month-block h3 {
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--slate-500);
   margin: 0 0 8px;
   letter-spacing: 0.5px;
 }
@@ -121,7 +126,7 @@ defineEmits(['update:year', 'go-to-month'])
 
 .mini-label {
   font-size: 9px;
-  color: #94a3b8;
+  color: var(--slate-500);
   text-align: center;
   padding: 1px 0;
 }
@@ -131,36 +136,36 @@ defineEmits(['update:year', 'go-to-month'])
   text-align: center;
   padding: 2px 1px;
   border-radius: 3px;
-  color: #334155;
+  color: var(--slate-700);
 }
 
 .mini-cell.today {
-  background: #1a1aff;
-  color: #ffffff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
 }
 
 .mini-cell.has-event {
-  background: rgba(26, 26, 255, 0.12);
-  color: #1a1aff;
+  background: rgb(var(--accent) / 0.12);
+  color: rgb(var(--accent));
 }
 
 .icon-btn {
   width: 30px;
   height: 30px;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 8px;
-  background: #ffffff;
+  background: rgb(var(--white));
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--slate-500);
   font-size: 14px;
   transition: background 0.15s;
 }
 
 .icon-btn:hover {
-  background: #f1f5f9;
+  background: var(--slate-100);
 }
 
 @media (max-width: 900px) {

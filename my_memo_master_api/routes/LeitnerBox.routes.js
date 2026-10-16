@@ -1,11 +1,14 @@
-const express = require("express");
-const leitnerBox = require("../controllers/LeitnerBox.controller.js");
+const express = require('express')
+const leitnerBox = require('../controllers/LeitnerBox.controller.js')
+const authMiddleware = require('../middlewares/Auth.middleware')
+const validate = require('../middlewares/validate.middleware')
+const leitnerBoxValidators = require('../validators/LeitnerBox.validators')
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
- * /leitnerboxes/all:
+ * /leitnerboxes:
  *   get:
  *     summary: Obtenir toutes les boîtes de Leitner
  *     tags: [LeitnerBoxes]
@@ -15,7 +18,7 @@ const router = express.Router();
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/all", leitnerBox.findAll);
+router.get('/', authMiddleware, leitnerBox.findAll)
 
 /**
  * @swagger
@@ -38,11 +41,11 @@ router.get("/all", leitnerBox.findAll);
  *       500:
  *         description: Erreur serveur.
  */
-router.get("/:id", leitnerBox.findOne);
+router.get('/:id', authMiddleware, leitnerBox.findOne)
 
 /**
  * @swagger
- * /leitnerboxes/add:
+ * /leitnerboxes:
  *   post:
  *     summary: Ajouter une nouvelle boîte de Leitner
  *     tags: [LeitnerBoxes]
@@ -71,7 +74,7 @@ router.get("/:id", leitnerBox.findOne);
  *       500:
  *         description: Erreur serveur.
  */
-router.post("/add", leitnerBox.create);
+router.post('/', authMiddleware, leitnerBoxValidators.create, validate, leitnerBox.create)
 
 /**
  * @swagger
@@ -106,7 +109,7 @@ router.post("/add", leitnerBox.create);
  *       500:
  *         description: Erreur serveur.
  */
-router.put("/:id", leitnerBox.update);
+router.put('/:id', authMiddleware, leitnerBoxValidators.update, validate, leitnerBox.update)
 
 /**
  * @swagger
@@ -129,7 +132,7 @@ router.put("/:id", leitnerBox.update);
  *       500:
  *         description: Erreur serveur.
  */
-router.delete("/:id", leitnerBox.delete);
+router.delete('/:id', authMiddleware, leitnerBox.delete)
 
 module.exports = (app) => {
   /**
@@ -138,5 +141,5 @@ module.exports = (app) => {
    *   name: LeitnerBoxes
    *   description: Gestion des boîtes de Leitner
    */
-  app.use("/leitnerboxes", router);
-};
+  app.use('/leitnerboxes', router)
+}

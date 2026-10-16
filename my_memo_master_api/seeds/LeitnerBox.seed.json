@@ -3,14 +3,14 @@
     "idBox": 1,
     "level": 1,
     "intervall": 5,
-    "color": 123456,
+    "color": 14942465,
     "idSystem": null
   },
   {
     "idBox": 2,
     "level": 2,
     "intervall": 10,
-    "color": 654321,
+    "color": 16487945,
     "idSystem": null
   },
   {
@@ -24,14 +24,14 @@
     "idBox": 4,
     "level": 4,
     "intervall": 20,
-    "color": 222222,
+    "color": 720846,
     "idSystem": null
   },
   {
     "idBox": 5,
     "level": 5,
     "intervall": 30,
-    "color": 333333,
+    "color": 7935,
     "idSystem": null
   }
 ]

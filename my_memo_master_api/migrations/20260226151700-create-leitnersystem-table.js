@@ -1,40 +1,40 @@
-"use strict";
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("LeitnerSystem", {
+    await queryInterface.createTable('LeitnerSystem', {
       idSystem: {
         type: Sequelize.INTEGER,
         allowNull: false,
         autoIncrement: true,
-        primaryKey: true,
+        primaryKey: true
       },
       sujet: {
         type: Sequelize.JSON,
-        allowNull: true,
+        allowNull: true
       },
       name: {
         type: Sequelize.STRING(50),
-        allowNull: true,
+        allowNull: true
       },
       idUser: {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: "User",
-          key: "userId",
+          model: 'User',
+          key: 'userId'
         },
-        onDelete: "SET NULL",
-        onUpdate: "CASCADE",
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
       },
       idMindMap: {
         type: Sequelize.INTEGER,
-        allowNull: true,
-      },
-    });
+        allowNull: true
+      }
+    })
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("LeitnerSystem");
-  },
-};
+    await queryInterface.dropTable('LeitnerSystem')
+  }
+}

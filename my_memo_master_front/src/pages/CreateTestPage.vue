@@ -1,5 +1,5 @@
 <template>
-  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
+  <div class="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
     <section class="order-2 lg:order-1 p-5 bg-light rounded-[7px]">
       <div class="w-full">
         <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold pb-4">
@@ -16,17 +16,49 @@
 
         <div class="py-4">
           <span class="text-lg font-medium text-gray-light">Question</span>
-          <input v-model="question.statement" type="text" placeholder="Quelle est la loi de bernouilli ?" class="w-full p-2 rounded-lg text-dark" />
+          <FormulaHelper v-model="question.statement">
+            <input aria-label="Énoncé de la question" v-model="question.statement" type="text" placeholder="Quelle est la loi de bernouilli ? (formules entre $…$)" class="w-full p-2 rounded-lg text-dark" />
+          </FormulaHelper>
         </div>
 
         <div class="py-4">
           <span class="text-lg font-medium text-gray-light">Réponse</span>
-          <textarea v-model="response.content" placeholder="Quelle est la réponse ?" class="w-full p-2 rounded-lg text-dark" />
+          <FormulaHelper v-model="response.content">
+            <textarea aria-label="Réponse attendue" v-model="response.content" placeholder="Quelle est la réponse ?" class="w-full p-2 rounded-lg text-dark" />
+          </FormulaHelper>
         </div>
 
         <div class="py-4 flex justify-end">
-          <button class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-[#F5F5F5]">
-            Insert image
+          <input
+            ref="imageInput"
+            type="file"
+            accept="image/*"
+            class="hidden"
+            aria-label="Choisir une image pour la question"
+            @change="handleImageChange"
+          />
+          <div v-if="question.imageUrl" class="flex items-center gap-3">
+            <img
+              :src="question.imageUrl"
+              :alt="question.imageOriginalName || 'Image de la question'"
+              class="h-16 w-16 object-cover rounded-lg border border-gray"
+            />
+            <span class="text-sm text-gray-light truncate max-w-[160px]">{{ question.imageOriginalName }}</span>
+            <XMarkIcon
+              class="size-6 text-dark cursor-pointer hover:brightness-50"
+              role="button"
+              aria-label="Retirer l'image"
+              @click="handleRemoveImage"
+            />
+          </div>
+          <button
+            v-else
+            type="button"
+            class="flex items-center py-3 gap-2 bg-primary rounded-lg px-5 text-[color:var(--neutral-100)] disabled:opacity-50"
+            :disabled="questionStore.uploading"
+            @click="imageInput.click()"
+          >
+            {{ questionStore.uploading ? 'Envoi en cours…' : 'Insérer une image' }}
           </button>
         </div>
 
@@ -40,8 +72,11 @@
           </h4>
           <div class="flex flex-col gap-4">
             <div v-for="(q) in questions" :key="q.idQuestion"
-              class="flex justify-between border-2 bg-[#FFF] border-gray rounded-lg px-4 py-2">
-              <span class="text-lg text-dark">{{ q.statement }}</span>
+              class="flex justify-between items-center border-2 bg-[color:rgb(var(--white))] border-gray rounded-lg px-4 py-2">
+              <div class="flex items-center gap-2">
+                <img v-if="q.imageUrl" :src="q.imageUrl" :alt="q.imageOriginalName || ''" class="h-10 w-10 object-cover rounded" />
+                <span class="text-lg text-dark"><FormulaText :text="q.statement || ''" /></span>
+              </div>
               <XMarkIcon class="size-6 text-dark cursor-pointer hover:brightness-50" @click="deleteQuestion(q.idQuestion)" />
             </div>
           </div>
@@ -66,6 +101,9 @@ import { XMarkIcon } from '@heroicons/vue/24/solid'
 import Mindmap from '@/components/MindmapComponent.vue'
 import Dropdown from '@/components/DropdownComponent.vue'
 import Button from '@/components/ButtonComponent.vue'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
 import { useQuestionStore } from '@/stores/questions'
 import { useResponseStore } from '@/stores/responses'
 import { useTestStore } from '@/stores/tests'
@@ -82,8 +120,28 @@ const test = ref({
   subjectId: 1
 })
 
-const question = ref({ statement: '', questionPosition: 0, type: 'text', idTest: null })
+const emptyImageFields = () => ({ imageUrl: null, imageKey: null, imageMimeType: null, imageOriginalName: null, imageSize: null })
+
+const question = ref({ statement: '', questionPosition: 0, type: 'text', idTest: null, ...emptyImageFields() })
 const response = ref({ content: '', correction: true, questionId: null })
+const imageInput = ref(null)
+
+const handleImageChange = async (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = '' // permet de resélectionner le même fichier ensuite
+  if (!file) return
+  const uploaded = await questionStore.uploadImage(file)
+  if (uploaded) Object.assign(question.value, uploaded)
+}
+
+const handleRemoveImage = async () => {
+  // Question pas encore créée côté serveur : on efface juste le brouillon local, pas d'appel API.
+  if (question.value.idQuestion) {
+    const removed = await questionStore.removeImage(question.value.idQuestion)
+    if (!removed) return
+  }
+  Object.assign(question.value, emptyImageFields())
+}
 
 const handleAddQuestion = async () => {
   // Étape 1 - Créer le test une seule fois
@@ -95,7 +153,9 @@ const handleAddQuestion = async () => {
     question.value.idTest = testStore.test.id // Utilise l’ID renvoyé par l’API
   }
 
-  // Étape 2 - Ajouter la question
+  // Étape 2 - Ajouter la question (syntaxe de formule normalisée)
+  question.value.statement = normalizeFormulaSyntax(question.value.statement)
+  response.value.content = normalizeFormulaSyntax(response.value.content)
   question.value.questionPosition = questions.value.length + 1
   questionStore.question = question.value
   const questionCreated = await questionStore.createQuestion()
@@ -109,7 +169,7 @@ const handleAddQuestion = async () => {
       questions.value.push({ ...questionStore.question })
 
       // Réinitialise les champs
-      question.value = { statement: '', questionPosition: 0, type: 'text', idTest: testStore.test.id }
+      question.value = { statement: '', questionPosition: 0, type: 'text', idTest: testStore.test.id, ...emptyImageFields() }
       response.value = { content: '', correction: true, questionId: null }
     }
   }

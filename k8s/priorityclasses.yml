@@ -1,0 +1,26 @@
+# =============================================================================
+#  PriorityClass — arbitrage d'éviction entre prod et preprod
+#
+#  Ressources CLUSTER-SCOPED, volontairement hors du chart Helm : deux releases
+#  (mmm-prod et mmm-preprod) ne peuvent pas revendiquer le même objet cluster.
+#  À appliquer UNE SEULE FOIS sur le cluster :
+#      kubectl apply -f k8s/priorityclasses.yml
+#
+#  Effet : sous pression mémoire d'un nœud, kubelet évince d'abord les pods de
+#  plus faible priorité — la preprod cède avant la production, jamais l'inverse.
+# =============================================================================
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: mmm-prod
+value: 1000
+globalDefault: false
+description: "MyMemoMaster production — évincée en dernier."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: mmm-preprod
+value: 100
+globalDefault: false
+description: "MyMemoMaster preprod — évincée en premier sous pression."

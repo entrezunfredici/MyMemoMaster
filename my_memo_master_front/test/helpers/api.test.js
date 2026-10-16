@@ -1,0 +1,349 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+// vi.hoisted garantit que ces mocks sont disponibles avant que vi.mock() ne soit évalué
+const { mockGet, mockPost, mockPut, mockDelete, mockLogout, mockUseAuthStore, mockNotify } = vi.hoisted(() => ({
+  mockNotify: vi.fn(),
+  mockGet: vi.fn(),
+  mockPost: vi.fn(),
+  mockPut: vi.fn(),
+  mockDelete: vi.fn(),
+  mockLogout: vi.fn(),
+  mockUseAuthStore: vi.fn(),
+}))
+
+vi.mock('@/config', () => ({
+  VITE_API_URL: 'http://localhost/api/v1',
+  VITE_API_SECURITY_MODE: 'public',
+  VITE_API_KEY_HEADER: 'X-API-Key',
+  VITE_API_KEY_VALUE: '',
+  VITE_API_BEARER_HEADER: 'Authorization',
+  VITE_API_BEARER_TOKEN: '',
+  VITE_API_GOOGLE_TOKEN_URL: '',
+  VITE_API_GOOGLE_AUDIENCE: '',
+  VITE_API_GOOGLE_AUTH_HEADER: 'Authorization',
+}))
+
+// CHOIX: useAuthStore mocké via vi.fn() (plutôt qu'une factory statique) pour que les
+// tests api.postBeacon puissent faire varier authenticated/token par test (mockReturnValueOnce).
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: mockUseAuthStore,
+}))
+
+vi.mock('@/helpers/notif', () => ({
+  notif: { notify: mockNotify },
+}))
+
+vi.mock('axios', () => ({
+  default: {
+    create: () => ({
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
+      },
+      get: mockGet,
+      post: mockPost,
+      put: mockPut,
+      delete: mockDelete,
+    }),
+  },
+}))
+
+import { api } from '@/helpers/api'
+
+describe('api.js — couche API front', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockUseAuthStore.mockReturnValue({ authenticated: false, token: null, user: {}, logout: mockLogout })
+  })
+
+  // ==================== Erreur réseau : message unique ====================
+  describe('api — coupure réseau', () => {
+    let clock = 0
+    beforeEach(() => {
+      // le délai anti-doublon est un état de module : chaque test repart 1 min plus tard
+      vi.useFakeTimers()
+      clock += 60_000
+      vi.setSystemTime(new Date(2026, 9, 13, 12, 0, 0).getTime() + clock)
+    })
+    afterEach(() => vi.useRealTimers())
+
+    it('get - erreur réseau - affiche un message « serveur injoignable » et retourne undefined', async () => {
+      mockGet.mockRejectedValue(new Error('Network Error'))
+      const result = await api.get('users/1')
+      expect(result).toBeUndefined()
+      expect(mockNotify).toHaveBeenCalledOnce()
+      expect(mockNotify).toHaveBeenCalledWith('Impossible de joindre le serveur. Vérifiez votre connexion.', 'error')
+    })
+
+    it('get - plusieurs erreurs réseau rapprochées - un seul message', async () => {
+      mockGet.mockRejectedValue(new Error('Network Error'))
+      await Promise.all([api.get('a'), api.get('b'), api.get('c')])
+      expect(mockNotify).toHaveBeenCalledOnce()
+    })
+
+    it('get - nouvelle erreur réseau après le délai - prévient à nouveau', async () => {
+      mockGet.mockRejectedValue(new Error('Network Error'))
+      await api.get('a')
+      vi.advanceTimersByTime(6000)
+      await api.get('b')
+      expect(mockNotify).toHaveBeenCalledTimes(2)
+    })
+
+    it('post - erreur réseau - même message', async () => {
+      mockPost.mockRejectedValue(new Error('Network Error'))
+      const result = await api.post('users/login', { email: 'a' })
+      expect(result).toBeUndefined()
+      expect(mockNotify).toHaveBeenCalledOnce()
+    })
+
+    it('get - réponse serveur en erreur (error.response) - pas de message réseau', async () => {
+      mockGet.mockRejectedValue(Object.assign(new Error('Request failed'), { response: { status: 500 } }))
+      const result = await api.get('users/1')
+      expect(result).toBeUndefined()
+      expect(mockNotify).not.toHaveBeenCalled()
+    })
+
+    it('get - API injoignable derrière le proxy (503) - affiche le message', async () => {
+      mockGet.mockRejectedValue(Object.assign(new Error('Service Unavailable'), { response: { status: 503 } }))
+      await api.get('users/1')
+      expect(mockNotify).toHaveBeenCalledOnce()
+    })
+
+    it('get - requête annulée - pas de message réseau', async () => {
+      mockGet.mockRejectedValue(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' }))
+      await api.get('users/1')
+      expect(mockNotify).not.toHaveBeenCalled()
+    })
+  })
+
+  // ==================== api.get ====================
+  describe('api.get', () => {
+    it('get - endpoint valide, statut 200 - retourne { data, status }', async () => {
+      mockGet.mockResolvedValue({ data: { id: 1 }, status: 200 })
+      const result = await api.get('users/1')
+      expect(result).toEqual({ data: { id: 1 }, status: 200 })
+    })
+
+    it('get - statut 204 - retourne undefined', async () => {
+      mockGet.mockResolvedValue({ data: null, status: 204 })
+      const result = await api.get('users/1')
+      expect(result).toBeUndefined()
+    })
+
+    it('get - statut 401 - appelle logout et retourne undefined', async () => {
+      mockGet.mockResolvedValue({ data: {}, status: 401 })
+      const result = await api.get('users/1')
+      expect(mockLogout).toHaveBeenCalledOnce()
+      expect(result).toBeUndefined()
+    })
+
+    // Régression : jusqu'au 2026-09-01, une erreur réseau/5xx redirigeait toute
+    // l'app vers /error-server, y compris pour un appel secondaire après un succès
+    // déjà affiché (ex: 2ᵉ question d'une série, le test étant déjà créé) — perte de
+    // tout le contexte en cours pour une erreur non fatale. L'appelant gère déjà ce
+    // cas (resp undefined) ; ne plus rediriger, seulement logger et retourner undefined.
+    it('get - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
+      mockGet.mockRejectedValue(new Error('Network Error'))
+      const result = await api.get('users/1')
+      expect(console.error).toHaveBeenCalled()
+      expect(result).toBeUndefined()
+    })
+
+    it('get - endpoint absent - lève une erreur', async () => {
+      await expect(api.get()).rejects.toThrow()
+    })
+
+    it('get - endpoint non-string - lève une erreur', async () => {
+      await expect(api.get(42)).rejects.toThrow()
+    })
+  })
+
+  // ==================== api.post ====================
+  describe('api.post', () => {
+    it('post - données valides, statut 201 - retourne { data, status }', async () => {
+      mockPost.mockResolvedValue({ data: { id: 1 }, status: 201 })
+      const result = await api.post('users/register', { name: 'Test', email: 'test@test.com' })
+      expect(result).toEqual({ data: { id: 1 }, status: 201 })
+    })
+
+    it('post - statut 204 - retourne undefined', async () => {
+      mockPost.mockResolvedValue({ data: null, status: 204 })
+      const result = await api.post('users/1', {})
+      expect(result).toBeUndefined()
+    })
+
+    it('post - statut 401 - appelle logout et retourne undefined', async () => {
+      mockPost.mockResolvedValue({ data: {}, status: 401 })
+      const result = await api.post('users/1', {})
+      expect(mockLogout).toHaveBeenCalledOnce()
+      expect(result).toBeUndefined()
+    })
+
+    it('post - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
+      mockPost.mockRejectedValue(new Error('Network Error'))
+      const result = await api.post('users/1', {})
+      expect(console.error).toHaveBeenCalled()
+      expect(result).toBeUndefined()
+    })
+
+    it('post - endpoint absent - lève une erreur', async () => {
+      await expect(api.post()).rejects.toThrow()
+    })
+
+    // Régression : validate.middleware.js renvoie { errors: [...] } (express-validator)
+    // sur un 400, jamais { message } — sans cette normalisation, tout appelant qui lit
+    // resp.data.message retombait sur son message générique, quelle que soit la vraie
+    // raison du rejet (trouvé sur la création de séance de révision).
+    it('post - statut 400 avec { errors } (validate.middleware) - data.message reprend errors[0].msg', async () => {
+      mockPost.mockResolvedValue({
+        data: { errors: [{ msg: "L'heure de fin doit être postérieure à l'heure de début." }] },
+        status: 400,
+      })
+      const result = await api.post('revision-sessions', {})
+      expect(result.data.message).toBe("L'heure de fin doit être postérieure à l'heure de début.")
+      expect(result.status).toBe(400)
+    })
+
+    it('post - statut 400 avec { message } déjà présent - ne le remplace pas par errors', async () => {
+      mockPost.mockResolvedValue({
+        data: { message: 'Message explicite du contrôleur.', errors: [{ msg: 'Autre message.' }] },
+        status: 400,
+      })
+      const result = await api.post('revision-sessions', {})
+      expect(result.data.message).toBe('Message explicite du contrôleur.')
+    })
+
+    it('post - statut 400 sans errors ni message - data.message reste absent', async () => {
+      mockPost.mockResolvedValue({ data: {}, status: 400 })
+      const result = await api.post('revision-sessions', {})
+      expect(result.data.message).toBeUndefined()
+    })
+  })
+
+  // ==================== api.put ====================
+  describe('api.put', () => {
+    it('put - données valides, statut 200 - retourne { data, status }', async () => {
+      mockPut.mockResolvedValue({ data: { id: 1, name: 'Nouveau' }, status: 200 })
+      const result = await api.put('users/1', { name: 'Nouveau' })
+      expect(result).toEqual({ data: { id: 1, name: 'Nouveau' }, status: 200 })
+    })
+
+    it('put - statut 401 - appelle logout et retourne undefined', async () => {
+      mockPut.mockResolvedValue({ data: {}, status: 401 })
+      const result = await api.put('users/1', {})
+      expect(mockLogout).toHaveBeenCalledOnce()
+      expect(result).toBeUndefined()
+    })
+
+    it('put - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
+      mockPut.mockRejectedValue(new Error('Network Error'))
+      const result = await api.put('users/1', {})
+      expect(console.error).toHaveBeenCalled()
+      expect(result).toBeUndefined()
+    })
+
+    it('put - endpoint absent - lève une erreur', async () => {
+      await expect(api.put()).rejects.toThrow()
+    })
+  })
+
+  // ==================== api.del ====================
+  describe('api.del', () => {
+    it('del - endpoint valide, statut 200 - retourne { data, status }', async () => {
+      mockDelete.mockResolvedValue({ data: { message: 'Supprimé' }, status: 200 })
+      const result = await api.del('users/1')
+      expect(result).toEqual({ data: { message: 'Supprimé' }, status: 200 })
+    })
+
+    it('del - statut 204 - retourne undefined', async () => {
+      mockDelete.mockResolvedValue({ data: null, status: 204 })
+      const result = await api.del('users/1')
+      expect(result).toBeUndefined()
+    })
+
+    it('del - statut 401 - appelle logout et retourne undefined', async () => {
+      mockDelete.mockResolvedValue({ data: {}, status: 401 })
+      const result = await api.del('users/1')
+      expect(mockLogout).toHaveBeenCalledOnce()
+      expect(result).toBeUndefined()
+    })
+
+    it('del - erreur réseau - ne redirige plus, logue l\'erreur et retourne undefined', async () => {
+      mockDelete.mockRejectedValue(new Error('Network Error'))
+      const result = await api.del('users/1')
+      expect(console.error).toHaveBeenCalled()
+      expect(result).toBeUndefined()
+    })
+
+    it('del - endpoint absent - lève une erreur', async () => {
+      await expect(api.del()).rejects.toThrow()
+    })
+  })
+
+  // ==================== api.postBeacon ====================
+  describe('api.postBeacon', () => {
+    it('postBeacon - non authentifié - fetch sans en-tête Authorization', () => {
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost/api/v1/mindmap-view-sessions',
+        expect.objectContaining({
+          method: 'POST',
+          keepalive: true,
+          body: JSON.stringify({ idMindMap: 2, durationSeconds: 120 }),
+        })
+      )
+      expect(mockFetch.mock.calls[0][1].headers.Authorization).toBeUndefined()
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - authentifié - fetch avec en-tête Authorization Bearer', () => {
+      mockUseAuthStore.mockReturnValue({ authenticated: true, token: 'jwt-token', user: {}, logout: mockLogout })
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })
+
+      expect(mockFetch.mock.calls[0][1].headers.Authorization).toBe('Bearer jwt-token')
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - authentifié via user.connectionToken (fallback) - envoie ce token', () => {
+      mockUseAuthStore.mockReturnValue({ authenticated: true, token: null, user: { connectionToken: 'conn-token' }, logout: mockLogout })
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })
+
+      expect(mockFetch.mock.calls[0][1].headers.Authorization).toBe('Bearer conn-token')
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - endpoint absent - ne fait rien (pas d\'exception, best-effort)', () => {
+      const mockFetch = vi.fn()
+      vi.stubGlobal('fetch', mockFetch)
+
+      expect(() => api.postBeacon()).not.toThrow()
+      expect(mockFetch).not.toHaveBeenCalled()
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - fetch indisponible (SSR/environnement sans fetch global) - ne lève pas', () => {
+      vi.stubGlobal('fetch', undefined)
+
+      expect(() => api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })).not.toThrow()
+      vi.unstubAllGlobals()
+    })
+
+    it('postBeacon - fetch lève synchroniquement - ne propage pas (best-effort)', () => {
+      vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Network Error') }))
+
+      expect(() => api.postBeacon('mindmap-view-sessions', { idMindMap: 2, durationSeconds: 120 })).not.toThrow()
+      vi.unstubAllGlobals()
+    })
+  })
+})

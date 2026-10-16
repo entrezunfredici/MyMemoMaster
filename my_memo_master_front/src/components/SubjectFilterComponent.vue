@@ -3,10 +3,14 @@
     <!-- Bouton "Tous" -->
     <div
       :class="[
-        'p-1 px-4 border-b-2 border-b-gray hover:border-b-primary text-gray hover:text-primary cursor-pointer',
+        'p-1 px-4 shrink-0 whitespace-nowrap border-b-2 border-b-gray hover:border-b-primary text-gray hover:text-primary cursor-pointer',
         !route.query.subject ? 'border-b-primary text-primary' : ''
       ]"
+      role="button"
+      tabindex="0"
       @click="resetSubject"
+      @keydown.enter.prevent="resetSubject"
+      @keydown.space.prevent="resetSubject"
     >
       Tous
     </div>
@@ -16,10 +20,14 @@
       v-for="subject in subjectStore.subjects"
       :key="subject.subjectId"
       :class="[
-        'p-1 px-4 border-b-2 border-b-gray hover:border-b-primary text-gray hover:text-primary cursor-pointer',
+        'p-1 px-4 shrink-0 whitespace-nowrap border-b-2 border-b-gray hover:border-b-primary text-gray hover:text-primary cursor-pointer',
         route.query.subject === subject.subjectId.toString() ? 'border-b-primary text-primary' : ''
       ]"
+      role="button"
+      tabindex="0"
       @click="toggleSubject(subject.subjectId)"
+      @keydown.enter.prevent="toggleSubject(subject.subjectId)"
+      @keydown.space.prevent="toggleSubject(subject.subjectId)"
     >
       {{ subject.name }}
     </div>

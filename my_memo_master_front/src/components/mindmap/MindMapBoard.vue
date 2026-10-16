@@ -2,7 +2,7 @@
   <div
     class="mindmap-board"
     ref="containerRef"
-    @wheel.prevent="onWheel"
+    @wheel="onWheel"
     @contextmenu.prevent
   >
     <svg
@@ -13,31 +13,6 @@
       @pointerleave="onPointerUp"
       @pointerdown="onBackgroundPointerDown"
     >
-      <defs>
-        <marker
-          id="arrow-forward"
-          viewBox="0 0 10 10"
-          refX="10"
-          refY="5"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto-start-reverse"
-        >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1E3A8A" />
-        </marker>
-        <marker
-          id="arrow-backward"
-          viewBox="0 0 10 10"
-          refX="0"
-          refY="5"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto"
-        >
-          <path d="M 10 0 L 0 5 L 10 10 z" fill="#1E3A8A" />
-        </marker>
-      </defs>
-
       <g :transform="`translate(${pan.x}, ${pan.y}) scale(${zoom})`">
         <MindMapZone
           v-for="zone in zones"
@@ -53,6 +28,8 @@
           :source="store.map.nodes[link.from]"
           :target="store.map.nodes[link.to]"
           :selected="store.selectedLinkId === link.id"
+          :type-label="getBranchTypeLabel(store.map.branchTypes, link.type)"
+          :reading-rank="readingRanks[link.id] || null"
           @link-pointerdown="onLinkPointerDown"
         />
 
@@ -73,9 +50,10 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { creationTools, getNodeLabel, normalizeCreationType } from '@/helpers/mindmapCreation';
+import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
 import MindMapNode from './MindMapNode.vue';
 import MindMapLink from './MindMapLink.vue';
+import { getBranchTypeLabel, getOutgoingLinks } from '@/helpers/mindmap/mindmapLinks';
 import MindMapZone from './MindMapZone.vue';
 
 const store = useMindMapBuilderStore();
@@ -91,6 +69,12 @@ const zoneDragOffset = ref({ x: 0, y: 0 });
 const isPanning = ref(false);
 const panStart = ref({ x: 0, y: 0 });
 const pointerStart = ref({ x: 0, y: 0 });
+
+const pendingDragNodeId = ref(null);
+const pendingDragPointerId = ref(null);
+const pendingDragStart = ref({ x: 0, y: 0 });
+const isPendingPan = ref(false);
+const DRAG_THRESHOLD = 5;
 
 const zones = computed(() => store.map.zones || []);
 
@@ -123,6 +107,20 @@ const visibleNodeIds = computed(() => {
 
 const visibleNodes = computed(() => visibleNodeIds.value.map((id) => store.map.nodes[id]));
 
+// Rang de lecture des branches, uniquement pour les items à plusieurs branches sortantes.
+const readingRanks = computed(() => {
+  const ranks = {};
+  const sources = new Set(store.map.links.map((link) => link.from));
+  sources.forEach((fromId) => {
+    const outgoing = getOutgoingLinks(store.map.links, fromId);
+    if (outgoing.length < 2) return;
+    outgoing.forEach((link, index) => {
+      ranks[link.id] = index + 1;
+    });
+  });
+  return ranks;
+});
+
 const visibleLinks = computed(() =>
   store.map.links.filter((link) =>
     visibleNodeIds.value.includes(link.from) && visibleNodeIds.value.includes(link.to)
@@ -138,6 +136,31 @@ const centerOnSubject = () => {
     y: rect.height / 2 - node.layout.y * zoom.value,
   };
 };
+
+// Recentre sur un nœud fraîchement créé s'il apparaît hors de la zone visible
+const revealNodeIfOffscreen = (node) => {
+  if (!node?.layout || !containerRef.value) return;
+  const rect = containerRef.value.getBoundingClientRect();
+  const margin = 60;
+  const screenX = node.layout.x * zoom.value + pan.value.x;
+  const screenY = node.layout.y * zoom.value + pan.value.y;
+  const offscreen = screenX < margin || screenY < margin
+    || screenX > rect.width - margin || screenY > rect.height - margin;
+  if (!offscreen) return;
+  pan.value = {
+    x: rect.width / 2 - node.layout.x * zoom.value,
+    y: rect.height / 2 - node.layout.y * zoom.value,
+  };
+};
+
+watch(
+  () => Object.keys(store.map.nodes || {}).length,
+  (count, previous) => {
+    if (!previous || count <= previous) return;
+    const ids = Object.keys(store.map.nodes);
+    revealNodeIfOffscreen(store.map.nodes[ids[ids.length - 1]]);
+  }
+);
 
 onMounted(() => {
   window.addEventListener('resize', centerOnSubject);
@@ -173,15 +196,16 @@ const onNodePointerDown = ({ event, node }) => {
     return;
   }
 
-  const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+  const additive = event.ctrlKey || event.metaKey;
   store.selectNode(node.id, additive);
-  draggingNodeId.value = node.id;
+  pendingDragNodeId.value = node.id;
+  pendingDragPointerId.value = event.pointerId;
+  pendingDragStart.value = { x: event.clientX, y: event.clientY };
   const coords = toBoardCoords(event);
   dragOffset.value = {
     x: coords.x - node.layout.x,
     y: coords.y - node.layout.y,
   };
-  svgRef.value?.setPointerCapture?.(event.pointerId);
 };
 
 const onZonePointerDown = ({ event, zone }) => {
@@ -199,30 +223,33 @@ const onLinkPointerDown = ({ link }) => {
 };
 
 const onBackgroundPointerDown = (event) => {
-  const isCreationTool = creationTools.includes(store.tool);
   const isPrimaryButton = event.button === 0;
   const clickedSvgBackground = event.target === svgRef.value;
 
-  if (isCreationTool && isPrimaryButton && clickedSvgBackground) {
+  if (event.shiftKey && isPrimaryButton && clickedSvgBackground) {
     if (!store.map.subjectNodeId) return;
     const coords = toBoardCoords(event);
-    const type = normalizeCreationType(store.tool);
+    const type = store.nodeType || 'text';
     const label = getNodeLabel(type);
+    const parentId = store.selectedNodeIds[0] || store.map.subjectNodeId;
     store.addNode({
       label,
       type,
-      parentId: store.map.subjectNodeId,
+      parentId,
       content: type === 'text' ? undefined : '',
       position: coords,
     });
     return;
   }
 
-  if (clickedSvgBackground && isPrimaryButton) {
-    store.resetSelection();
+  if (isPrimaryButton && clickedSvgBackground) {
+    isPendingPan.value = true;
+    pointerStart.value = { x: event.clientX, y: event.clientY };
+    panStart.value = { ...pan.value };
+    return;
   }
 
-  if (event.button === 1 || event.button === 2 || event.altKey) {
+  if (event.button === 1) {
     isPanning.value = true;
     pointerStart.value = { x: event.clientX, y: event.clientY };
     panStart.value = { ...pan.value };
@@ -230,6 +257,17 @@ const onBackgroundPointerDown = (event) => {
 };
 
 const onPointerMove = (event) => {
+  if (pendingDragNodeId.value) {
+    const dx = event.clientX - pendingDragStart.value.x;
+    const dy = event.clientY - pendingDragStart.value.y;
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+      draggingNodeId.value = pendingDragNodeId.value;
+      svgRef.value?.setPointerCapture?.(pendingDragPointerId.value);
+      pendingDragNodeId.value = null;
+      pendingDragPointerId.value = null;
+    }
+  }
+
   if (draggingNodeId.value) {
     const coords = toBoardCoords(event);
     const x = coords.x - dragOffset.value.x;
@@ -240,13 +278,15 @@ const onPointerMove = (event) => {
     const x = coords.x - zoneDragOffset.value.x;
     const y = coords.y - zoneDragOffset.value.y;
     store.updateZone(draggingZoneId.value, { layout: { x, y } });
-  } else if (isPanning.value) {
+  } else if (isPendingPan.value || isPanning.value) {
     const dx = event.clientX - pointerStart.value.x;
     const dy = event.clientY - pointerStart.value.y;
-    pan.value = {
-      x: panStart.value.x + dx,
-      y: panStart.value.y + dy,
-    };
+    if (!isPanning.value && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+      isPanning.value = true;
+    }
+    if (isPanning.value) {
+      pan.value = { x: panStart.value.x + dx, y: panStart.value.y + dy };
+    }
   }
 };
 
@@ -254,12 +294,24 @@ const onPointerUp = (event) => {
   if (draggingNodeId.value || draggingZoneId.value) {
     svgRef.value?.releasePointerCapture?.(event.pointerId);
   }
+
+  if (isPendingPan.value && !isPanning.value) {
+    store.resetSelection();
+  }
+
   draggingNodeId.value = null;
   draggingZoneId.value = null;
+  pendingDragNodeId.value = null;
+  pendingDragPointerId.value = null;
   isPanning.value = false;
+  isPendingPan.value = false;
 };
 
 const onWheel = (event) => {
+  // Zoom uniquement avec Ctrl/⌘ (comme pinch-to-zoom) : sans modificateur, la molette fait défiler
+  // la page au lieu de piéger l'utilisateur dans le canevas.
+  if (!event.ctrlKey && !event.metaKey) return;
+  event.preventDefault();
   const rect = svgRef.value?.getBoundingClientRect();
   if (!rect) return;
   const wheelDelta = event.deltaY > 0 ? -0.1 : 0.1;
@@ -283,16 +335,20 @@ const onWheel = (event) => {
 .mindmap-board {
   width: 100%;
   height: 100%;
-  background: #f1f5f9;
+  background: var(--slate-100);
   border-radius: 16px;
   overflow: hidden;
   position: relative;
+  /* Maj+clic crée un nœud : sans ça, il sélectionne aussi le texte de la page */
+  user-select: none;
 }
 
 .mindmap-board__svg {
   width: 100%;
   height: 100%;
   cursor: grab;
+  /* CHOIX: touch-action none : le glisser au doigt déplace la carte (pointer events) au lieu de faire défiler la page */
+  touch-action: none;
 }
 
 .mindmap-board__svg:active {

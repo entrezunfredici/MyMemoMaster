@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-front
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mmm.labels" . | nindent 4 }}
+    app: {{ .Release.Name }}-front
+spec:
+  replicas: {{ .Values.replicas.front }}
+  # Stratégie de rollout explicite — voir le même CHOIX/RAISON dans deployment-api.yaml.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-front
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-front
+      {{- if .Values.rolloutTimestamp }}
+      annotations:
+        rollout-timestamp: {{ .Values.rolloutTimestamp | quote }}
+      {{- end }}
+    spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      # Répartit les replicas sur des nœuds distincts : la perte d'un nœud ne peut
+      # pas emporter tous les pods à la fois. ScheduleAnyway (et non DoNotSchedule)
+      # pour qu'un cluster réduit à un seul nœud disponible reste déployable.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-front
+      containers:
+        - name: front
+          image: {{ include "mmm.imageFront" . }}
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              cat > /usr/share/nginx/html/config.js << EOF
+              window.__APP_CONFIG__ = {
+                API_URL: "${VITE_API_URL}",
+                FRONT_URL: "${VITE_FRONT_URL}"
+              };
+              EOF
+              if ! grep -q '/config.js' /usr/share/nginx/html/index.html; then
+                sed -i '/type="module"/i \  <script src="/config.js"></script>' /usr/share/nginx/html/index.html
+              fi
+              exec nginx -g 'daemon off;'
+          envFrom:
+            - configMapRef:
+                name: {{ include "mmm.configName" . }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.front.resources | nindent 12 }}

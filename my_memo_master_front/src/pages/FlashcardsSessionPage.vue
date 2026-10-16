@@ -1,215 +1,318 @@
 <template>
-  <div class="grid grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-primary rounded-[10px] p-1.5">
-    
-    <section class="col-span-1 lg:col-span-2 order-2 lg:order-1 p-5 bg-light rounded-[7px] flex flex-col h-full">
-      <div class="w-full flex-grow">
-        <div class="grid grid-cols-5 gap-2 mb-6 text-center">
-          <div
-            v-for="(count, group) in groupCounts"
-            :key="group"
-            class="bg-white rounded border border-gray p-1"
-          >
-            <div class="text-[10px] uppercase text-gray-light font-bold">
-              {{ groupLabels[group] }}
-            </div>
-            <div class="text-sm font-semibold text-primary">
-              {{ count }}
-            </div>
-          </div>
-        </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-1 gap-1.5 bg-grey rounded-[2px] p-1.5">
 
-        <div class="flex justify-between items-center pb-4">
+    <section class="mx-0 md:mx-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-3 md:p-5 bg-light rounded-[7px] flex flex-col h-full">
+      <div class="w-full flex-grow">
+
+        <!-- CHOIX: sur mobile « Retour » et le compteur sont sur une ligne, le titre passe dessous (order-last)
+             RAISON: le titre d'un système peut être long (« Cours 9 - Statique des fluides ») ; sur une seule
+             ligne à trois colonnes il écrasait le bouton et le compteur -->
+        <div class="flex flex-wrap md:flex-nowrap justify-between items-center gap-x-3 gap-y-2 pb-4">
           <button
             @click="confirmExit"
-            class="text-primary font-semibold hover:underline"
+            class="text-primary font-semibold hover:underline whitespace-nowrap shrink-0"
           >
             ← Retour
           </button>
-          <h4 class="text-primary text-2xl neue-haas-grotesk-r font-semibold">
-            Session : {{ sessionName }}
+          <h4 class="order-last md:order-none basis-full md:basis-auto text-primary text-lg md:text-2xl neue-haas-grotesk-r font-semibold">
+            Session : {{ systemStore.system.name || '...' }}
           </h4>
-          <span class="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-            {{ currentIndex + 1 }} / {{ cards.length }}
+          <span class="shrink-0 whitespace-nowrap text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
+            {{ currentIndex + 1 }} / {{ cardStore.dueCards.length }}
           </span>
         </div>
 
-        <div v-if="!isFinished" class="space-y-4">
-          <div class="py-2">
-            <span class="text-sm font-medium text-gray-light uppercase">Question</span>
-            <div class="w-full p-3 bg-white border border-gray rounded-lg text-dark font-medium mt-1">
-              {{ currentCard.question }}
-            </div>
+        <div v-if="loading" class="text-center text-gray-light py-10">
+          Chargement des cartes...
+        </div>
+
+        <div v-else-if="cardStore.dueCards.length === 0" class="text-center py-10">
+          <h3 class="text-2xl font-bold text-primary mb-4">Aucune carte à réviser !</h3>
+          <p class="mb-6 text-gray-light">Revenez plus tard, vos cartes ne sont pas encore dues.</p>
+          <Button :callback="() => router.push('/flashcards')">Retour aux systèmes</Button>
+        </div>
+
+        <div v-else-if="!isFinished" class="space-y-4">
+          <div id="session-question-statement" class="w-full p-3 bg-white text-dark text-xl text-center font-semibold mt-1">
+            <FormulaText :text="currentCard.question?.statement || ''" />
           </div>
 
-          <div class="py-2">
+          <!-- Réponse ouverte -->
+          <div v-if="currentCard.question?.type !== 'mcq'" class="py-2">
             <span class="text-sm font-medium text-gray-light uppercase">Ta Réponse</span>
-            
-            <textarea 
-              v-if="currentCard.type === 'text'"
-              v-model="userAnswer"
-              :disabled="showFeedback"
-              placeholder="Saisissez votre réponse..." 
-              class="w-full p-3 rounded-lg text-dark border-2 border-gray focus:border-primary outline-none transition mt-1"
-              rows="3"
-            />
+            <FormulaHelper v-model="userAnswer" :disabled="showFeedback || submitting">
+              <textarea aria-label="Saisissez votre réponse"
+                v-model="userAnswer"
+                :disabled="showFeedback || submitting"
+                placeholder="Saisissez votre réponse... (formules entre $…$)"
+                class="w-full p-3 rounded-lg text-dark border-2 border-gray focus:border-primary outline-none transition mt-1"
+                rows="3"
+              />
+            </FormulaHelper>
+          </div>
 
-            <div v-else class="grid gap-2 mt-1">
-              <button 
-                v-for="opt in currentCard.options" :key="opt"
-                @click="userAnswer = opt"
-                :disabled="showFeedback"
+          <!-- QCM -->
+          <div v-else class="py-2 space-y-2">
+            <span id="session-mcq-legend" class="text-sm font-medium text-gray-light uppercase">Choisis la bonne réponse</span>
+            <!-- CHOIX: role="radiogroup" + aria-labelledby plutôt que <fieldset>/<legend>
+                 RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans le style par défaut du navigateur pour <fieldset> -->
+            <template v-if="currentCard.question.content?.options?.length">
+              <div role="radiogroup" aria-labelledby="session-question-statement session-mcq-legend">
+              <label
+                v-for="(opt, oi) in currentCard.question.content.options"
+                :key="oi"
+                class="flex items-center gap-3 p-3 border-2 rounded-lg transition"
                 :class="[
-                  'w-full p-3 text-left rounded-lg border-2 transition',
-                  userAnswer === opt ? 'border-primary bg-primary/5' : 'border-gray bg-white',
-                  showFeedback && opt === currentCard.answer ? 'border-green-500 bg-green-50' : '',
-                  showFeedback && userAnswer === opt && opt !== currentCard.answer ? 'border-red-500 bg-red-50' : ''
+                  showFeedback ? 'cursor-default' : 'cursor-pointer',
+                  mcqOptClass(String(oi), opt),
                 ]"
               >
-                {{ opt }}
-              </button>
+                <input
+                  type="radio"
+                  :name="`session-mcq`"
+                  :value="String(oi)"
+                  v-model="userAnswer"
+                  :disabled="showFeedback || submitting"
+                  class="accent-primary shrink-0"
+                />
+                <span class="text-dark"><FormulaText :text="opt.text || ''" /></span>
+              </label>
+              </div>
+            </template>
+            <p v-else class="text-sm text-red-400 italic py-2">
+              Options manquantes.
+            </p>
+          </div>
+
+          <!-- Zone aria-live toujours présente dans le DOM (sinon les lecteurs d'écran
+               peuvent rater l'insertion) : le résultat de la correction est annoncé (RGAA 13.x) ;
+               le texte ✅/❌ double l'information portée par la couleur (RGAA 3.x) -->
+          <div aria-live="polite">
+            <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="cardStore.lastCorrection?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+              <p class="font-bold mb-1">{{ feedbackTitle }}</p>
+              <!-- Score IA uniquement pour les questions ouvertes -->
+              <p v-if="currentCard.question?.type !== 'mcq'" class="text-sm">
+                Score : {{ Math.round((cardStore.lastCorrection?.score || 0) * 100) }}%
+                <span class="opacity-80">(réussite à partir de {{ PASS_THRESHOLD_PERCENT }}%)</span>
+              </p>
+              <p v-if="!cardStore.lastCorrection?.success" class="text-sm italic mt-1">
+                Réponse attendue : <FormulaText :text="cardStore.lastCorrection?.correction || ''" />
+              </p>
+              <p v-if="cardStore.lastCorrection?.explanation" class="text-sm mt-1 opacity-80">
+                <FormulaText :text="cardStore.lastCorrection?.explanation" />
+              </p>
+              <p
+                v-if="cardStore.lastCorrection?.degraded"
+                class="text-sm mt-1 text-amber-700"
+                role="status"
+                data-testid="degraded-notice"
+              >
+                {{ cardStore.lastCorrection?.degraded_message }}
+              </p>
+              <Button class="mt-4 w-full" :callback="nextStep">Continuer</Button>
             </div>
           </div>
 
-          <div v-if="showFeedback" class="p-4 rounded-lg transition-all" :class="isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-            <p class="font-bold mb-1">{{ isCorrect ? '✅ Excellent !' : '❌ À revoir' }}</p>
-            <p v-if="!isCorrect" class="text-sm italic">Réponse : {{ currentCard.answer }}</p>
-            <Button class="mt-4 w-full" :callback="nextStep">Continuer</Button>
-          </div>
-
-          <div v-else class="pb-4 w-full flex justify-center mt-4">
-            <Button class="w-full" :callback="handleValidation" :disabled="!userAnswer">Valider</Button>
+          <div v-if="!showFeedback" class="pb-4 w-full flex justify-center mt-4">
+            <Button
+              class="w-full"
+              :callback="handleValidation"
+              :disabled="!userAnswer || submitting"
+            >
+              {{ submitting ? 'Correction en cours...' : 'Valider' }}
+            </Button>
           </div>
         </div>
 
         <div v-else class="text-center py-10">
           <h3 class="text-2xl font-bold text-primary mb-4">Session terminée !</h3>
-          <p class="mb-6">Vous avez progressé sur {{ cards.length }} notions.</p>
-          <Button :callback="reset">Recommencer</Button>
+          <p class="mb-2">Vous avez révisé {{ cardStore.dueCards.length }} cartes.</p>
+          <p v-if="averageScorePercent !== null" class="mb-6" data-testid="average-score">
+            Score moyen : <strong>{{ averageScorePercent }}%</strong> ·
+            {{ cardStore.dueCards.length - errors.length }} réussie(s), {{ errors.length }} à revoir
+          </p>
+          <Button :callback="() => router.push('/flashcards')">Retour aux systèmes</Button>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="mx-0 md:mx-16 mt-4 md:mt-16 col-span-1 lg:col-span-2 order-2 lg:order-1 p-3 md:p-5 bg-light rounded-[7px] flex flex-col h-full">
+      <div v-if="errors.length > 0" class="mb-4">
+        <h4 class="text-primary text-lg font-semibold pb-2">Dernières erreurs</h4>
+        <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
+          <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-primary/10 rounded-lg px-3 py-2 text-sm">
+            <span><FormulaText :text="err.question?.statement || ''" /></span>
+          </div>
         </div>
       </div>
 
-      <div v-if="!isFinished" class="border-t-2 border-primary mt-6 pt-4">
-        <h4 class="text-primary text-lg font-semibold pb-2 italic">Dernières erreurs</h4>
-        <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
-          <div v-for="(err, idx) in errors" :key="idx" class="flex justify-between bg-white border border-red-200 rounded-lg px-3 py-2 text-sm">
-            <span>{{ err.question }}</span>
-            <XMarkIcon class="size-4 text-red-500" />
+      <h4 class="text-primary text-lg font-semibold pb-2">Répartition par boîte</h4>
+      <div class="grid grid-cols-5 gap-2 mb-6 text-center">
+        <div
+          v-for="level in (boxStore.levelsForSystem(systemId).length ? boxStore.levelsForSystem(systemId) : [1, 2, 3, 4, 5])"
+          :key="level"
+          class="bg-white rounded border border-gray p-1"
+        >
+          <div class="text-[10px] uppercase text-gray-light font-bold">
+            Boîte {{ level }}
+          </div>
+          <div class="text-sm font-semibold text-primary">
+            {{ boxCounts[level] || 0 }}
           </div>
         </div>
       </div>
     </section>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import Mindmap from '@/components/MindmapComponent.vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import Button from '@/components/ButtonComponent.vue'
-import { XMarkIcon } from '@heroicons/vue/24/solid'
-import { useRouter } from 'vue-router'
+import FormulaText from '@/components/FormulaTextComponent.vue'
+import FormulaHelper from '@/components/FormulaHelperComponent.vue'
+import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
+import { useLeitnerCardStore } from '@/stores/leitnerCards'
+import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
+import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
+import { useLeitnerReviewSessionStore } from '@/stores/leitnerReviewSessions'
 
 const router = useRouter()
+const route = useRoute()
+const cardStore = useLeitnerCardStore()
+const systemStore = useLeitnerSystemStore()
+const boxStore = useLeitnerBoxStore()
+const reviewSessionStore = useLeitnerReviewSessionStore()
 
-const confirmExit = () => {
-  const confirmed = window.confirm(
-    "⚠️ Attention : la session en cours sera perdue. Voulez-vous vraiment quitter ?"
-  )
+const systemId = Number(route.params.systemId)
 
-  if (confirmed) {
-    router.push('/flashcards') 
-  }
-}
-
-// --- DATA & MOCK ---
-const sessionName = ref("Physique Quantique")
-const groupCounts = ref({
-  G1: 5,
-  G2: 8,
-  G3: 15,
-  G4: 3,
-  G5: 12
-})
-
-const groupLabels = {
-  G1: "Aujourd'hui",
-  G2: "Demain",
-  G3: "3 jours",
-  G4: "1 semaine",
-  G5: "1 mois"
-}
-
-const cards = ref([
-  { 
-    id: 1, 
-    question: "Quelle est la loi de Bernoulli ?", 
-    answer: "P + ρgh + ½ρv² = cst", 
-    type: "text" },
-  { 
-    id: 2, 
-    question: "L'entropie d'un système isolé...", 
-    options: ["Diminue", "Reste constante ou augmente", "Est toujours nulle"], 
-    answer: "Reste constante ou augmente", type: "choice" },
-  { 
-    id: 3, 
-    question: "Quelle est l'unité de la force dans le Système International ?", 
-    answer: "Newton", 
-    type: "text" 
-  },
-  { 
-    id: 4, 
-    question: "Selon la loi d'Ohm, quelle est la relation entre U, R et I ?", 
-    options: ["U = R / I", "U = R + I", "U = R * I"], 
-    answer: "U = R * I", 
-    type: "choice" 
-  },
-  { 
-    id: 5, 
-    question: "Quel principe stipule que rien ne se perd, rien ne se crée, tout se transforme ?", 
-    answer: "Lavoisier", 
-    type: "text" 
-  }
-])
-
-// --- STATE ---
+const loading = ref(true)
 const currentIndex = ref(0)
-const userAnswer = ref("")
+const userAnswer = ref('')
 const showFeedback = ref(false)
+const submitting = ref(false)
 const isFinished = ref(false)
 const errors = ref([])
+// Scores (0-1) des questions ouvertes corrigées — alimente le score moyen de l'écran de fin
+const openScores = ref([])
 
-// --- LOGIQUE ---
-const currentCard = computed(() => cards.value[currentIndex.value])
-const isCorrect = computed(() => {
-  if (!userAnswer.value) return false
-  return userAnswer.value.toLowerCase().trim() === currentCard.value.answer.toLowerCase().trim()
+// CHOIX: seuil recopié du back (MistralGrading.service.js, CORRECT_THRESHOLD = 0.8) pour l'afficher
+// RAISON: l'API ne le renvoie pas ; garder les deux valeurs alignées.
+const PASS_THRESHOLD_PERCENT = 80
+
+const feedbackTitle = computed(() => {
+  const c = cardStore.lastCorrection
+  if (!c?.success) return '❌ À revoir'
+  // Réussite avec un manque signalé (score < 100 %) : ne pas annoncer « Excellent » en contradiction
+  return c.score !== undefined && c.score < 1 && currentCard.value?.question?.type !== 'mcq' ? '✅ Correct' : '✅ Excellent !'
 })
 
-const handleValidation = () => {
-  showFeedback.value = true
-  if (!isCorrect.value) {
-    errors.value.push(currentCard.value)
-    cards.value.push(currentCard.value) // A refaire le jour meme
-  } else {
-    groupCounts.value.G2++     // Progression
-    groupCounts.value.G1--
+const averageScorePercent = computed(() =>
+  openScores.value.length
+    ? Math.round((openScores.value.reduce((a, b) => a + b, 0) / openScores.value.length) * 100)
+    : null
+)
+
+// Chronométrage du temps réellement passé sur la session (alimente le KPI
+// "Temps total de révision") — démarré une fois les cartes chargées, pas
+// pendant le chargement lui-même.
+const startedAt = ref(null)
+// Nombre de cartes réellement corrigées (submitResponse réussi), indépendant de
+// currentIndex/nextStep qui ne servent qu'à la navigation d'écran — voir CHOIX
+// sur logSessionProgress ci-dessous.
+const reviewedCount = ref(0)
+let sessionLogged = false
+
+onMounted(async () => {
+  await Promise.all([
+    cardStore.fetchDueCards(systemId),
+    systemStore.fetchSystemById(systemId),
+    boxStore.fetchBoxes(),
+  ])
+  startedAt.value = Date.now()
+  loading.value = false
+})
+
+const currentCard = computed(() => cardStore.dueCards[currentIndex.value])
+
+const boxCounts = computed(() => {
+  const counts = {}
+  cardStore.dueCards.forEach(card => {
+    const level = card.leitnerBox?.level
+    if (level) counts[level] = (counts[level] || 0) + 1
+  })
+  return counts
+})
+
+function mcqOptClass(oiStr, opt) {
+  if (!showFeedback.value) {
+    return userAnswer.value === oiStr ? 'border-primary bg-primary/10' : 'border-gray'
   }
+  if (opt.correct) return 'border-green-500 bg-green-50'
+  if (userAnswer.value === oiStr) return 'border-red-400 bg-red-50'
+  return 'border-gray'
+}
+
+const handleValidation = async () => {
+  submitting.value = true
+  const ok = await cardStore.submitResponse(currentCard.value.idCard, normalizeFormulaSyntax(userAnswer.value))
+  submitting.value = false
+
+  if (!ok) return  // le store a déjà affiché le notif d'erreur
+
+  // Comptée dès la correction réussie, pas à la navigation vers la carte suivante :
+  // submitResponse a déjà fait avancer la carte dans ses boîtes côté serveur à ce
+  // stade, la garder pour "Continuer" sous-compterait la dernière carte visible si
+  // l'utilisateur quitte avant d'avoir cliqué ce bouton.
+  reviewedCount.value++
+
+  if (currentCard.value.question?.type !== 'mcq') openScores.value.push(cardStore.lastCorrection?.score || 0)
+  if (!cardStore.lastCorrection?.success) {
+    errors.value.push(currentCard.value)
+  }
+  showFeedback.value = true
+}
+
+// CHOIX: journaliser le temps réellement passé même si l'utilisateur quitte en
+// cours de session (confirmExit), plutôt que seulement à la toute fin.
+// RAISON: décision initiale du 2026-09-01 (abandon non journalisé) revenue sur
+// demande explicite de l'utilisateur — le temps déjà passé sur les cartes
+// effectivement corrigées reste une mesure réelle, quelle que soit la façon dont
+// la session se termine. Un seul point d'appel pour les deux cas (fin normale et
+// sortie anticipée), gardé par `sessionLogged` pour ne jamais journaliser deux
+// fois la même session, et par `reviewedCount >= 1` pour ne rien envoyer si
+// l'utilisateur quitte avant d'avoir corrigé la moindre carte (le validateur API
+// exige cardsReviewed >= 1, et une session à 0 carte n'a rien à mesurer).
+// `completed` distingue les deux cas côté API : seule une session menée à son
+// terme valide en plus automatiquement une séance planifiée correspondante
+// (voir RevisionSession.service.js#validateMatchingSessions) — une sortie
+// anticipée reste journalisée pour le temps, mais ne valide rien.
+const logSessionProgress = (completed) => {
+  if (sessionLogged || !startedAt.value || reviewedCount.value < 1) return
+  sessionLogged = true
+  const durationSeconds = Math.round((Date.now() - startedAt.value) / 1000)
+  reviewSessionStore.logSession(systemId, reviewedCount.value, durationSeconds, completed)
 }
 
 const nextStep = () => {
-  if (currentIndex.value < cards.value.length - 1) {
+  if (currentIndex.value < cardStore.dueCards.length - 1) {
     currentIndex.value++
-    userAnswer.value = ""
+    userAnswer.value = ''
     showFeedback.value = false
+    submitting.value = false
   } else {
     isFinished.value = true
+    logSessionProgress(true)
   }
 }
 
-const reset = () => {
-  currentIndex.value = 0
-  userAnswer.value = ""
-  showFeedback.value = false
-  isFinished.value = false
-  errors.value = []
+const confirmExit = () => {
+  const confirmed = window.confirm('⚠️ Attention : la session en cours sera perdue. Voulez-vous vraiment quitter ?')
+  if (confirmed) {
+    logSessionProgress(false)
+    router.push('/flashcards')
+  }
 }
 </script>
