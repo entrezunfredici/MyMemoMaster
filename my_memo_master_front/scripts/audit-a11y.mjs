@@ -15,6 +15,7 @@
  * Usage :
  *   node scripts/audit-a11y.mjs            → rapport lisible
  *   node scripts/audit-a11y.mjs --json     → rapport JSON (CI / documentation)
+ *   node scripts/audit-a11y.mjs --strict   → code de sortie 1 s'il reste une non-conformité (CI)
  *
  * Limites (audit heuristique, complémentaire d'axe-core en tests) :
  *   - les composants label custom et les associations dynamiques (:for/:id liés)
@@ -26,6 +27,7 @@ import { join, relative } from 'node:path'
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
 const SRC = join(ROOT, 'src')
 const JSON_MODE = process.argv.includes('--json')
+const STRICT = process.argv.includes('--strict')
 
 const vueFiles = []
 const walk = (dir) => {
@@ -151,4 +153,4 @@ if (JSON_MODE) {
   console.log(`\nTotal non-conformités détectées : ${totalIssues}`)
 }
 
-process.exit(0)
+process.exit(STRICT && totalIssues > 0 ? 1 : 0)

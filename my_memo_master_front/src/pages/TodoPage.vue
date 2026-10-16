@@ -36,14 +36,14 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #f5f6fb;
+  background: var(--surface-muted);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .todo-header {
   padding: 20px 20px 14px;
-  background: #ffffff;
-  border-bottom: 0.5px solid #e2e8f0;
+  background: rgb(var(--white));
+  border-bottom: 0.5px solid var(--slate-200);
   display: flex;
   align-items: baseline;
   gap: 12px;
@@ -52,20 +52,20 @@ onMounted(async () => {
 .todo-title {
   font-size: 22px;
   font-weight: 600;
-  color: #1a1aff;
+  color: rgb(var(--accent));
   margin: 0;
 }
 
 .todo-date-label {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--slate-500);
   text-transform: capitalize;
 }
 
 .todo-body {
   flex: 1;
   overflow: hidden;
-  background: #ffffff;
+  background: rgb(var(--white));
   display: flex;
   flex-direction: column;
 }

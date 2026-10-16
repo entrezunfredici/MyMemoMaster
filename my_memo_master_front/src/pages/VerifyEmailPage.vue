@@ -9,7 +9,7 @@
 
     <div v-else-if="verified" class="text-center py-8">
       <p class="text-green-600 font-semibold mb-4">Votre email a été vérifié avec succès !</p>
-      <router-link to="/auth" class="text-[#1E3BA1] underline">Se connecter</router-link>
+      <router-link to="/auth" class="text-primary underline">Se connecter</router-link>
     </div>
 
     <form v-else @submit.prevent="submit" class="w-full max-w-md mt-4">
@@ -52,7 +52,7 @@
         <button
           type="submit"
           :disabled="submitting"
-          class="w-full bg-[#1E3BA1] text-white hover:bg-[#162c7a] py-2 px-4 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+          class="w-full bg-primary text-on-primary hover:bg-primary-dark py-2 px-4 rounded disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {{ submitting ? 'Vérification...' : 'Vérifier mon email' }}
         </button>
@@ -60,7 +60,7 @@
           type="button"
           :disabled="resending"
           @click="resend"
-          class="w-full border border-[#1E3BA1] text-[#1E3BA1] hover:bg-blue-50 py-2 px-4 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+          class="w-full border border-primary text-primary hover:bg-blue-50 py-2 px-4 rounded disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {{ resending ? 'Envoi en cours...' : 'Renvoyer le code' }}
         </button>

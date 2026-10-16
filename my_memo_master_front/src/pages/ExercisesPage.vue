@@ -117,7 +117,7 @@
               <div class="flex justify-between items-center mb-4">
                 <label class="form-label">Questions</label>
                 <div class="flex gap-2">
-                  <button type="button" @click="openAiFlow" class="bg-primary hover:bg-primary/90 text-white font-bold py-1 px-3 rounded text-sm transition">
+                  <button type="button" @click="openAiFlow" class="bg-primary hover:bg-primary/90 text-on-primary font-bold py-1 px-3 rounded text-sm transition">
                     ✨ Générer par IA
                   </button>
                   <button type="button" @click="addQuestion" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition border-2 border-green-800">

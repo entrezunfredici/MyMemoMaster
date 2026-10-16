@@ -280,17 +280,17 @@ const apply = () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: #ffffff;
+  background: rgb(var(--white));
   padding: 24px;
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 30px rgb(var(--slate-900-rgb) / 0.08);
 }
 
 .interpreter__heading {
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--slate-900);
 }
 
 .interpreter__mathfield {
@@ -299,12 +299,12 @@ const apply = () => {
   min-height: 64px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #cbd5f5;
-  background: #f9fafb;
+  border: 1px solid var(--periwinkle-200);
+  background: var(--gray-50);
   font-size: 20px;
 }
 .interpreter__mathfield:focus-within {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--blue-600);
   outline-offset: 1px;
 }
 /* La palette à onglets remplace le clavier virtuel et le menu MathLive */
@@ -314,9 +314,9 @@ const apply = () => {
 }
 
 .interpreter__palette-v2 {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--slate-200);
   border-radius: 14px;
-  background: #f8fafc;
+  background: var(--slate-50);
   overflow: hidden;
 }
 
@@ -324,8 +324,8 @@ const apply = () => {
   display: flex;
   gap: 2px;
   padding: 8px 8px 0;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f1f5f9;
+  border-bottom: 1px solid var(--slate-200);
+  background: var(--slate-100);
 }
 
 .interpreter__tab {
@@ -333,18 +333,18 @@ const apply = () => {
   border: none;
   border-radius: 10px 10px 0 0;
   background: transparent;
-  color: #475569;
+  color: var(--slate-600);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
 }
 .interpreter__tab--active {
-  background: #f8fafc;
-  color: #1d4ed8;
-  box-shadow: inset 0 2px 0 #2563eb;
+  background: var(--slate-50);
+  color: var(--blue-700);
+  box-shadow: inset 0 2px 0 var(--blue-600);
 }
 .interpreter__tab:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--blue-600);
   outline-offset: -2px;
 }
 
@@ -364,7 +364,7 @@ const apply = () => {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--slate-500);
 }
 
 .interpreter__grid {
@@ -377,17 +377,17 @@ const apply = () => {
   min-width: 42px;
   padding: 7px 10px;
   border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
-  color: #1d4ed8;
+  border: 1px solid var(--periwinkle-200);
+  background: rgb(var(--white));
+  color: var(--blue-700);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.interpreter__symbol:hover:not(:disabled) { background: #dbeafe; }
+.interpreter__symbol:hover:not(:disabled) { background: var(--blue-100); }
 .interpreter__symbol:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--blue-600);
   outline-offset: 1px;
 }
 .interpreter__symbol:disabled {
@@ -396,21 +396,21 @@ const apply = () => {
 }
 
 .interpreter__textarea {
-  width: 100%; min-height: 72px; padding: 12px; border-radius: 12px; border: 1px solid #cbd5f5;
-  font-size: 14px; font-family: 'Fira Code', monospace; background: #f9fafb; color: #0f172a;
+  width: 100%; min-height: 72px; padding: 12px; border-radius: 12px; border: 1px solid var(--periwinkle-200);
+  font-size: 14px; font-family: 'Fira Code', monospace; background: var(--gray-50); color: var(--slate-900);
 }
 
 .interpreter__preview {
-  min-height: 80px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;
-  background: #ffffff; font-size: 16px; color: #0f172a;
+  min-height: 80px; border: 1px solid var(--slate-200); border-radius: 12px; padding: 16px;
+  background: rgb(var(--white)); font-size: 16px; color: var(--slate-900);
 }
 
 .interpreter__units-error {
   margin-bottom: 8px;
   padding: 8px 12px;
-  border: 1px solid #fecaca;
-  background: #fff1f2;
-  color: #b91c1c;
+  border: 1px solid var(--red-200);
+  background: var(--rose-50);
+  color: var(--red-700);
   border-radius: 8px;
   font-weight: 600;
 }
@@ -418,14 +418,14 @@ const apply = () => {
 .interpreter__hint {
   margin-bottom: 8px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--slate-500);
 }
 
 .interpreter__hint--matrix {
   margin: 0;
   padding: 8px 16px 12px;
   font-weight: 600;
-  color: #b45309;
+  color: var(--amber-700);
 }
 
 .interpreter__actions {
@@ -440,13 +440,13 @@ const apply = () => {
   border: none;
   font-weight: 600;
   cursor: pointer;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--blue-600);
+  color: rgb(var(--white));
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .interpreter__actions button:hover {
-  background: #1d4ed8;
+  background: var(--blue-700);
   transform: translateY(-1px);
 }
 </style>

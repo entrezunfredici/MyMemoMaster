@@ -141,6 +141,19 @@ describe('LeitnerSystemService', () => {
     expect(boxes.map((b) => b.intervall)).toEqual([86400, 259200, 604800, 1209600, 2592000])
   })
 
+  test('create - les 5 boîtes par défaut ont chacune une couleur distincte : rouge, orange, vert, turquoise, bleu', async () => {
+    instance.transaction.mockResolvedValue(mockTransaction)
+    LeitnerSystem.create.mockResolvedValue({ idSystem: 3, idUser: 3, subjectId: 1 })
+    LeitnerBox.bulkCreate.mockResolvedValue([])
+    LeitnerSystem.findByPk.mockResolvedValue({})
+
+    await LeitnerSystemService.create({ name: 'Test', idUser: 3, subjectId: 1 })
+
+    const [boxes] = LeitnerBox.bulkCreate.mock.calls[0]
+    expect(boxes.map((b) => b.color)).toEqual([0xe40101, 0xfb9609, 0x01b207, 0x0affce, 0x001eff])
+    expect(new Set(boxes.map((b) => b.color)).size).toBe(5)
+  })
+
   test('create - erreur DB - rollback et propage l\'erreur', async () => {
     instance.transaction.mockResolvedValue(mockTransaction)
     LeitnerSystem.create.mockRejectedValue(new Error('DB error'))

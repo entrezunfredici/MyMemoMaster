@@ -13,7 +13,14 @@ exports.addCard = [
 ]
 
 exports.updateCard = [
-  body('idQuestion').isInt({ min: 1 }).withMessage('idQuestion doit être un entier positif')
+  body('idQuestion').isInt({ min: 1 }).withMessage('idQuestion doit être un entier positif'),
+  body('mindMapNodeId')
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('mindMapNodeId doit être une chaîne')
+    .trim()
+    .isLength({ min: 1, max: 64 })
+    .withMessage('mindMapNodeId doit contenir entre 1 et 64 caractères')
 ]
 
 exports.correctResponse = [

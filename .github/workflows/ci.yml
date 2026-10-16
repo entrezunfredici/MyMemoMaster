@@ -89,6 +89,22 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run lint
 
+      # Accessibilité (RGAA) — contrôles statiques, sans navigateur, donc rapides : échouent
+      # AVANT le build si une non-conformité est introduite.
+      #   - audit-a11y.mjs --strict : noms accessibles des champs (11.1), alt (1.1), clavier (7.1),
+      #     boutons symboles (11.9), langue (8.3) ;
+      #   - audit-colors.mjs : toute couleur vit dans src/assets/base.css (aucun hex/rgb en dur,
+      #     aucune variable indéfinie) — condition pour qu'un contraste se corrige à un seul endroit.
+      - name: Static Accessibility Audit (RGAA)
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run audit:a11y
+
+      - name: Colors Convention Audit (base.css)
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run audit:colors
+
       # OWASP A06 — composants vulnérables : bloque si une dépendance de production
       # a une vulnérabilité high/critical connue (les devDependencies sont exclues,
       # elles n'entrent pas dans les images déployées)
@@ -133,18 +149,34 @@ jobs:
         run: npm run build
 
       # Angle mort de audit-a11y.mjs et de test/a11y/axe.test.js (jsdom ne
-      # calcule pas les styles) : contraste RGAA 3.2 mesuré au vrai moteur de
-      # rendu, sur les pages publiques buildées — voir docs/AUDIT_RGAA.md §5
-      # et e2e-a11y/contrast.spec.js.
+      # calcule pas les styles) : audit au vrai moteur de rendu (Chromium) sur la version
+      # buildée — voir docs/AUDIT_RGAA.md §5 :
+      #   - contrast.spec.js     : contraste RGAA 3.2 des pages publiques ;
+      #   - pages.spec.js        : WCAG 2.1 A/AA (toutes règles axe-core) sur les 26 pages,
+      #                            session et API simulées ;
+      #   - mindmap-editor.spec.js : éditeur de carte mentale, état par état, + mesure directe
+      #                            du contraste des textes dans les nœuds SVG.
+      # Le CD ne se déclenche que si cette CI réussit (workflow_run) : une régression
+      # d'accessibilité bloque donc aussi le déploiement. Le site déployé est ensuite
+      # contrôlé par a11y-live.yml.
       - name: Install Playwright Chromium
         if: matrix.service == 'front'
         working-directory: ${{ matrix.path }}
         run: npx playwright install --with-deps chromium
 
-      - name: Run Accessibility Contrast Audit (RGAA 3.2)
+      - name: Run Accessibility Audit in Browser (RGAA 3.2 + WCAG 2.1 AA)
         if: matrix.service == 'front'
         working-directory: ${{ matrix.path }}
-        run: npm run test:a11y:contrast
+        run: npm run test:a11y
+
+      - name: Upload Accessibility Audit Traces
+        if: failure() && matrix.service == 'front'
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-test-results
+          path: ${{ matrix.path }}/test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   # ─── JOB DÉSACTIVÉ (2026-10-02) ───────────────────────────────────────────
   # SonarQube auto-hébergé retiré du cluster pour réduire les coûts d'hébergement

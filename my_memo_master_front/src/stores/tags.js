@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
+import { tagColors } from '@/helpers/themeColors'
 
 export const useTagStore = defineStore('tags', {
   state: () => ({
@@ -23,10 +24,10 @@ export const useTagStore = defineStore('tags', {
     /**
      * Crée un nouveau tag et l'ajoute dans le store.
      * @param {string} name
-     * @param {string} [color='#6366F1']
+     * @param {string} [color] défaut : tagColors.default
      * @returns {object|null} le tag créé ou null en cas d'erreur
      */
-    async createTag(name, color = '#6366F1') {
+    async createTag(name, color = tagColors.default) {
       try {
         const resp = await api.post('tags', { name, color })
         if (resp?.status !== 201) {

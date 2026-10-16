@@ -129,8 +129,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   gap: 4px;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   background: rgb(var(--light));
-  border-top: 1px solid #e2e8f0;
-  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+  border-top: 1px solid var(--slate-200);
+  box-shadow: 0 -4px 16px rgb(var(--slate-900-rgb) / 0.08);
 }
 
 .mobile-nav__tab {
@@ -150,7 +150,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .mobile-nav__tab--active {
   background: rgb(var(--primary));
-  color: #ffffff;
+  color: rgb(var(--white));
 }
 
 .mobile-nav__label {
@@ -163,7 +163,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   position: fixed;
   inset: 0;
   z-index: 44;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgb(var(--slate-900-rgb) / 0.45);
 }
 
 .mobile-sheet {
@@ -179,7 +179,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   background: rgb(var(--light));
   border-radius: 20px;
   margin: 0 8px;
-  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 -8px 24px rgb(var(--slate-900-rgb) / 0.18);
 }
 
 .mobile-sheet__item {
@@ -189,7 +189,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   min-height: 52px;
   padding: 8px 12px;
   border-radius: 12px;
-  background: #f1f5f9;
+  background: var(--slate-100);
   color: rgb(var(--primary));
   font-weight: 600;
   font-size: 14px;
@@ -197,6 +197,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .mobile-sheet__item--active {
   background: rgb(var(--primary));
-  color: #ffffff;
+  color: rgb(var(--white));
 }
 </style>

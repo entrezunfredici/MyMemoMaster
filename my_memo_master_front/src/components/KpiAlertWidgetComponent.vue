@@ -98,8 +98,8 @@ onMounted(() => {
 
 <style scoped>
 .kpi-widget {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: rgb(var(--white));
+  border: 1px solid var(--slate-200);
   border-radius: 12px;
   padding: 16px 18px;
   display: flex;
@@ -116,12 +116,12 @@ onMounted(() => {
 .kpi-widget__title {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--slate-900);
 }
 
 .kpi-widget__link {
   font-size: 12px;
-  color: #1e3ba1;
+  color: rgb(var(--primary));
   text-decoration: none;
   font-weight: 500;
 }
@@ -140,7 +140,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #64748b;
+  color: var(--slate-500);
   font-size: 13px;
 }
 
@@ -163,28 +163,28 @@ onMounted(() => {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #f8fafc;
-  border-left: 3px solid #94a3b8;
+  background: var(--slate-50);
+  border-left: 3px solid var(--slate-400);
 }
 
 .kpi-widget__item--streak_risk {
-  border-left-color: #f97316;
-  background: #fff7ed;
+  border-left-color: var(--orange-500);
+  background: var(--orange-50);
 }
 
 .kpi-widget__item--discipline_low {
-  border-left-color: #eab308;
-  background: #fefce8;
+  border-left-color: var(--yellow-500);
+  background: var(--yellow-50);
 }
 
 .kpi-widget__item--score_drop {
-  border-left-color: #ef4444;
-  background: #fef2f2;
+  border-left-color: var(--red-500);
+  background: var(--red-50);
 }
 
 .kpi-widget__item--leitner_due {
-  border-left-color: #1e3ba1;
-  background: #eff6ff;
+  border-left-color: rgb(var(--primary));
+  background: var(--blue-50);
 }
 
 .kpi-widget__icon {
@@ -195,7 +195,7 @@ onMounted(() => {
 
 .kpi-widget__text {
   font-size: 13px;
-  color: #334155;
+  color: var(--slate-700);
   line-height: 1.4;
 }
 </style>

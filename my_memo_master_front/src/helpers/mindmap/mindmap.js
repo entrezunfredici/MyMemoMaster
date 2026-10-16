@@ -1,17 +1,14 @@
-﻿const masteryColors = {
-  undefined: '#C0C5D2',
-  low: '#E74C3C',
-  medium: '#F39C12',
-  high: '#27AE60',
-};
+﻿import { normalizeNodeItem } from './mindmapItems';
+import { normalizeLink } from './mindmapLinks';
+import { mindmapColors } from '@/helpers/themeColors';
 
 const defaultBranchTypes = [
   { id: 'appartenance', label: 'Appartenance' },
   { id: 'composition', label: 'Composition' },
-  { id: 'definition', label: 'Definition' },
+  { id: 'definition', label: 'Définition' },
   { id: 'calcul', label: 'Calcul' },
-  { id: 'causalite', label: 'Causalite' },
-  { id: 'correlation', label: 'Correlation' },
+  { id: 'causalite', label: 'Causalité' },
+  { id: 'correlation', label: 'Corrélation' },
 ];
 
 const defaultShapes = [
@@ -27,10 +24,17 @@ const masteryList = [
   { id: 'high', label: 'Bonne maitrise' },
 ];
 
+// La couleur d'une boîte est réglable par système et stockée côté API en entier 0xRRGGBB
+// (colonne BIGINT) ; sa palette par défaut est dans LeitnerSystem.service.js (DEFAULT_BOXES).
 const boxColorToHex = (bigintColor) => {
   const n = Number(bigintColor);
-  if (!Number.isFinite(n) || n < 0) return '#C0C5D2';
+  if (!Number.isFinite(n) || n < 0 || n > 0xffffff) return mindmapColors.secondary;
   return '#' + n.toString(16).padStart(6, '0');
+};
+
+const hexToBoxColor = (hex) => {
+  const match = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  return match ? parseInt(match[1], 16) : null;
 };
 
 const boxLevelToMastery = (level) => {
@@ -72,12 +76,12 @@ const createBlankMindMap = (title = 'Nouvelle carte mentale') => {
         mastery: 'undefined',
         zoneId: null,
         style: {
-          primaryColor: '#1E3A8A',
-          secondaryColor: masteryColors.undefined,
+          primaryColor: mindmapColors.nodeBg,
+          secondaryColor: mindmapColors.secondary,
           shape: 'bubble',
           width: 220,
           height: 120,
-          textColor: '#eef2ff',
+          textColor: mindmapColors.nodeText,
           fontSize: 14,
           fontWeight: 'normal',
           fontStyle: 'normal',
@@ -105,8 +109,10 @@ const createBlankMindMap = (title = 'Nouvelle carte mentale') => {
 
 const ensureSecondaryColor = (node) => {
   if (!node.style) node.style = {};
-  const target = masteryColors[node.mastery] || masteryColors.undefined;
-  node.style.secondaryColor = target;
+  // Item lié à une flashcard : la couleur secondaire est celle de sa boîte de Leitner
+  // (posée par linkCard / syncCardMasteries), sinon couleur neutre (la maîtrise n'a pas de couleur propre).
+  if (node.idCard && node.style.secondaryColor) return node;
+  node.style.secondaryColor = mindmapColors.secondary;
   return node;
 };
 
@@ -131,22 +137,22 @@ const normalizeMindMap = (raw) => {
       zones: Array.isArray(raw.zones) ? raw.zones : [],
       branchTypes: raw.branchTypes || defaultBranchTypes,
       nodes: {},
-      links: Array.isArray(raw.links) ? raw.links : [],
+      links: Array.isArray(raw.links) ? raw.links.map(normalizeLink) : [],
       history: raw.history || { stack: [], index: -1 },
       updatedAt: raw.updatedAt || new Date().toISOString(),
     };
 
     Object.values(raw.nodes).forEach((node) => {
       const cloned = JSON.parse(JSON.stringify(node));
-      map.nodes[cloned.id] = ensureSecondaryColor({
+      map.nodes[cloned.id] = ensureSecondaryColor(normalizeNodeItem({
         ...cloned,
         style: {
-          primaryColor: (cloned === null || cloned === void 0 ? void 0 : cloned.style)?.primaryColor || '#1E3A8A',
+          primaryColor: (cloned === null || cloned === void 0 ? void 0 : cloned.style)?.primaryColor || mindmapColors.nodeBg,
           secondaryColor: cloned?.style?.secondaryColor,
           shape: cloned?.style?.shape || 'bubble',
           width: cloned?.style?.width || 220,
           height: cloned?.style?.height || 120,
-          textColor: cloned?.style?.textColor || '#eef2ff',
+          textColor: cloned?.style?.textColor || mindmapColors.nodeText,
           fontSize: Number.parseInt(cloned?.style?.fontSize, 10) || 14,
           fontWeight: cloned?.style?.fontWeight || 'normal',
           fontStyle: cloned?.style?.fontStyle || 'normal',
@@ -159,7 +165,7 @@ const normalizeMindMap = (raw) => {
           angle: cloned?.layout?.angle,
         },
         meta: cloned.meta || {},
-      });
+      }));
     });
 
     if (!map.subjectNodeId) {
@@ -190,12 +196,12 @@ const normalizeMindMap = (raw) => {
         mastery: 'undefined',
         zoneId: null,
         style: {
-          primaryColor: node.color || '#1E3A8A',
-          secondaryColor: masteryColors.undefined,
+          primaryColor: node.color || mindmapColors.nodeBg,
+          secondaryColor: mindmapColors.secondary,
           shape: 'bubble',
           width: node.width || 220,
           height: node.height || 120,
-          textColor: node.textColor || '#eef2ff',
+          textColor: node.textColor || mindmapColors.nodeText,
           fontSize: Number.parseInt(node.fontSize, 10) || 14,
           fontWeight: node.fontWeight || 'normal',
           fontStyle: node.fontStyle || 'normal',
@@ -224,8 +230,8 @@ const normalizeMindMap = (raw) => {
       type: link.type || 'appartenance',
       order: link.order ?? index,
       style: {
-        primaryColor: link.color || '#1E3A8A',
-        secondaryColor: link.secondaryColor || '#C0C5D2',
+        primaryColor: link.color || mindmapColors.nodeBg,
+        secondaryColor: link.secondaryColor || mindmapColors.secondary,
         bezier: !!link.curve,
       },
       interactions: {
@@ -304,11 +310,11 @@ const applyRadialLayout = (map, options = {}) => {
 const serializeMindMap = (map) => JSON.parse(JSON.stringify(map));
 
 export {
-  masteryColors,
   masteryList,
   defaultBranchTypes,
   defaultShapes,
   boxColorToHex,
+  hexToBoxColor,
   boxLevelToMastery,
   createId,
   createBlankMindMap,

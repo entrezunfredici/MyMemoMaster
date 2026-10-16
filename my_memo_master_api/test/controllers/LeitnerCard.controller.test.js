@@ -250,6 +250,26 @@ describe('LeitnerCard Controller', () => {
       expect(res.status).toBe(200)
     })
 
+    it('400 — mindMapNodeId invalide (chaîne vide)', async () => {
+      const res = await request(app)
+        .put(`${BASE}/leitnercards/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ idQuestion: 2, mindMapNodeId: '' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('200 — mindMapNodeId null accepté (retrait du lien)', async () => {
+      leitnerCardService.updateCard.mockResolvedValue({ ...mockCard, mindMapNodeId: null })
+
+      const res = await request(app)
+        .put(`${BASE}/leitnercards/1`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ idQuestion: 2, mindMapNodeId: null })
+
+      expect(res.status).toBe(200)
+    })
+
     it('403 — droits insuffisants ou carte introuvable', async () => {
       leitnerCardService.updateCard.mockResolvedValue(null)
 
