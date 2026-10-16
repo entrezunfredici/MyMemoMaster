@@ -171,7 +171,7 @@
       <text
         text-anchor="middle"
         dominant-baseline="central"
-        style="fill: var(--slate-900)"
+        :style="{ fill: collapseSymbolColor }"
         font-size="14"
         font-weight="700"
       >{{ node.collapsed ? '+' : '−' }}</text>
@@ -197,7 +197,7 @@
 </template>
 
 <script setup>
-import { mindmapColors, themeHex } from '@/helpers/themeColors';
+import { mindmapColors, themeHex, readableTextColor } from '@/helpers/themeColors';
 import { computed, ref, nextTick } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
@@ -224,6 +224,9 @@ const width = computed(() => props.node.style?.width || 220);
 const height = computed(() => props.node.style?.height || 120);
 const primaryColor = computed(() => props.node.style?.primaryColor || mindmapColors.nodeBg);
 const secondaryColor = computed(() => props.node.style?.secondaryColor || mindmapColors.secondary);
+// Symbole +/− du bouton de repliage : lisible sur n'importe quelle couleur secondaire (couleur de la boîte
+// Leitner de la carte liée, choisie librement par l'étudiant : du jaune au bleu foncé).
+const collapseSymbolColor = computed(() => readableTextColor(secondaryColor.value));
 const shape = computed(() => props.node.style?.shape || 'bubble');
 const borderRadius = computed(() => {
   // Un graphique est un bloc rectangulaire : un grand arrondi rognerait le repère et les boutons.

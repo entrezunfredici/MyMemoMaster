@@ -5092,3 +5092,10 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : le contenu utilisateur est interpolé (`{{ }}`, échappé par Vue) ; `v-html` n'est conservé que pour le HTML produit par KaTeX (formules), jamais pour du texte saisi.
 **Alternative écartée** : ajouter une librairie d'assainissement (dépendance pour un besoin qui disparaît si on n'injecte plus de HTML).
 **Conséquences** : un texte contenant des balises s'affiche littéralement. La protection ne dépend plus de l'API ; le comportement d'enregistrement de l'API (balises supprimées) reste à revoir côté back.
+
+### [2026-10-16] Couleurs par défaut des boîtes de Leitner : une teinte distincte par boîte
+
+**Contexte** : la palette par défaut (DECISIONS 2026-09-13 : rouge, orange, jaune, vert clair, vert) donnait des boîtes 3 à 5 peu distinguables d'un coup d'œil (jaune puis deux verts).
+**Décision** : les nouveaux systèmes reçoivent rouge `#E40101`, orange `#FB9609`, vert `#01B207`, turquoise `#0AFFCE`, bleu `#001EFF` (boîtes 1 à 5, du moins au mieux maîtrisé) — valeurs choisies par le product owner. Seul `DEFAULT_BOXES` (`LeitnerSystem.service.js`) et le seed de développement changent ; le front n'a aucune copie de ces couleurs (il lit `LeitnerBox.color`).
+**Alternative écartée** : migrer les systèmes existants — leurs couleurs ont pu être choisies ou conservées volontairement par l'étudiant, et rien ne distingue les deux ; elles restent modifiables par boîte.
+**Conséquences** : les systèmes existants gardent l'ancienne palette (à migrer à la demande, uniquement les boîtes encore aux anciennes valeurs par défaut). La couleur d'une boîte est aussi la bordure des items de carte mentale liés : le symbole +/− du bouton de repliage prend donc la couleur lisible (blanc ou noir, `readableTextColor`) sur la couleur de la boîte — le bleu `#001EFF` rendait l'ancien symbole sombre illisible (≈ 2:1). Le niveau 3 vaut désormais `111111` en décimal, valeur d'un ancien placeholder traité par la migration 20260913 (déjà exécutée, sans effet sur une base à jour).
