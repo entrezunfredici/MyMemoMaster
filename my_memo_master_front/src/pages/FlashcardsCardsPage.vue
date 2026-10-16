@@ -24,13 +24,13 @@
       <div class="flex gap-2 basis-full sm:basis-auto">
         <button
           @click="openAiFlow"
-          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-on-primary font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           ✨ Générer par IA
         </button>
         <button
           @click="openAddModal"
-          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-on-primary font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           + Ajouter une carte
         </button>
@@ -402,7 +402,7 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
-import { boxColorToHex, hexToBoxColor } from '@/helpers/mindmap'
+import { boxColorToHex, hexToBoxColor } from '@/helpers/mindmap/mindmap'
 import FormulaText from '@/components/FormulaTextComponent.vue'
 import FormulaHelper from '@/components/FormulaHelperComponent.vue'
 import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'

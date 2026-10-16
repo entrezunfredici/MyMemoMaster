@@ -1,4 +1,4 @@
-import { mindmapColors } from './themeColors';
+import { mindmapColors } from '@/helpers/themeColors';
 // Branches de carte mentale : types (extensibles par l'étudiant), sens, forme,
 // ordre de lecture et géométrie de tracé.
 

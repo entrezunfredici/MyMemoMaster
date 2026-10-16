@@ -5,7 +5,7 @@ import {
   getBranchTypeLabel,
   getOutgoingLinks,
   computeLinkGeometry,
-} from '@/helpers/mindmapLinks'
+} from '@/helpers/mindmap/mindmapLinks'
 
 const node = (x, y, w = 200, h = 100) => ({ layout: { x, y }, style: { width: w, height: h } })
 

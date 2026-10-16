@@ -5,15 +5,15 @@
     <div
       class="relative flex flex-wrap gap-1.5 items-center min-h-[42px] pl-2.5 pr-8 py-1.5 border rounded-lg cursor-text transition-all"
       :class="anyOpen ? 'border-purple-400 ring-2 ring-purple-100' : 'border-gray-300 hover:border-gray-400'"
-      style="background-color: white !important"
+      style="background-color: rgb(var(--white)) !important"
       @click="handleFieldClick"
     >
       <!-- Chips des tags sélectionnés -->
       <span
         v-for="tag in selectedTags"
         :key="tag.tagId"
-        class="inline-flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full text-xs font-semibold text-white select-none flex-shrink-0"
-        :style="{ backgroundColor: tag.color || DEFAULT_COLOR }"
+        class="inline-flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full text-xs font-semibold select-none flex-shrink-0"
+        :style="{ backgroundColor: tag.color || DEFAULT_COLOR, color: readableTextColor(tag.color || DEFAULT_COLOR) }"
         @click.stop
       >
         <!-- Pastille couleur (ouvre le sélecteur) -->
@@ -142,14 +142,12 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useTagStore } from '@/stores/tags'
+import { tagColors, readableTextColor } from '@/helpers/themeColors'
 
-const PALETTE = [
-  '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
-  '#22C55E', '#10B981', '#14B8A6', '#06B6D4', '#3B82F6',
-  '#6366F1', '#8B5CF6', '#D946EF', '#EC4899', '#64748B'
-]
+// Couleurs enregistrées en base : lues dans base.css (--red-500…) via themeColors.
+const PALETTE = tagColors.palette
 
-const DEFAULT_COLOR = '#6366F1'
+const DEFAULT_COLOR = tagColors.default
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] }

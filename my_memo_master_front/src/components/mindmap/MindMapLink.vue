@@ -42,12 +42,12 @@
         :width="labelWidth"
         height="22"
         rx="11"
-        fill="#ffffff"
+        style="fill: rgb(var(--white))"
         :stroke="primaryColor"
         stroke-width="1"
         opacity="0.95"
       />
-      <text text-anchor="middle" dominant-baseline="middle" y="-1" font-size="12" font-weight="600" fill="#111827">
+      <text text-anchor="middle" dominant-baseline="middle" y="-1" font-size="12" font-weight="600" style="fill: var(--gray-900)">
         {{ linkLabel }}
       </text>
     </g>
@@ -57,7 +57,7 @@
 <script setup>
 import { mindmapColors } from '@/helpers/themeColors';
 import { computed } from 'vue';
-import { computeLinkGeometry } from '@/helpers/mindmapLinks';
+import { computeLinkGeometry } from '@/helpers/mindmap/mindmapLinks';
 
 const props = defineProps({
   link: { type: Object, required: true },

@@ -84,8 +84,8 @@ function goTo(path) {
   gap: 16px;
   width: 100%;
   text-align: left;
-  background: #ffffff;
-  border: 2px solid #6366f1;
+  background: rgb(var(--white));
+  border: 2px solid var(--indigo-500);
   border-radius: 12px;
   padding: 16px 20px;
   cursor: pointer;
@@ -93,8 +93,8 @@ function goTo(path) {
 }
 
 .home__tour-btn:hover {
-  background: #eef2ff;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  background: var(--indigo-50);
+  box-shadow: 0 4px 12px rgb(var(--indigo-500-rgb) / 0.2);
 }
 
 .home__tour-icon {
@@ -109,12 +109,12 @@ function goTo(path) {
 .home__tour-title {
   font-weight: 700;
   font-size: 18px;
-  color: #4338ca;
+  color: var(--indigo-700);
 }
 
 .home__tour-subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--gray-500);
 }
 
 .home__replay-btn {
@@ -122,14 +122,14 @@ function goTo(path) {
   background: none;
   border: none;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--gray-500);
   cursor: pointer;
   text-decoration: underline;
   padding: 4px 0;
 }
 
 .home__replay-btn:hover {
-  color: #4338ca;
+  color: var(--indigo-700);
 }
 
 .home__alerts {

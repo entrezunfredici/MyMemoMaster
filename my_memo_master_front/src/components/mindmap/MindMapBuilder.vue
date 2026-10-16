@@ -156,11 +156,11 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #ffffff;
+  background: rgb(var(--white));
   padding: 16px;
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--slate-200);
+  box-shadow: 0 8px 24px rgb(var(--slate-900-rgb) / 0.08);
 }
 
 .mindmap-builder__title {
@@ -173,14 +173,14 @@ defineExpose({
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: var(--slate-500);
   font-weight: 600;
 }
 
 .mindmap-builder__title input {
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid #cbd5f5;
+  border: 1px solid var(--periwinkle-200);
   min-width: 280px;
   font-size: 16px;
 }
@@ -210,9 +210,9 @@ defineExpose({
 }
 
 .mindmap-builder__actions .primary {
-  background: #2563eb;
-  color: #ffffff;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+  background: var(--blue-600);
+  color: rgb(var(--white));
+  box-shadow: 0 10px 20px rgb(var(--blue-600-rgb) / 0.25);
 }
 
 .mindmap-builder__actions .primary:hover:not(:disabled) {
@@ -220,8 +220,8 @@ defineExpose({
 }
 
 .mindmap-builder__actions .secondary {
-  background: #e0f2fe;
-  color: #0f172a;
+  background: var(--sky-100);
+  color: var(--slate-900);
 }
 
 .mindmap-builder__content {
@@ -233,10 +233,10 @@ defineExpose({
 }
 
 .mindmap-builder__board {
-  background: #ffffff;
+  background: rgb(var(--white));
   border-radius: 20px;
   padding: 16px;
-  box-shadow: inset 0 0 0 1px #e2e8f0;
+  box-shadow: inset 0 0 0 1px var(--slate-200);
 }
 
 .mindmap-builder__board :deep(.mindmap-board) {
@@ -288,9 +288,9 @@ defineExpose({
     min-width: 44px;
     min-height: 44px;
     border-radius: 12px;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    color: #1e293b;
+    border: 1px solid var(--slate-300);
+    background: rgb(var(--white));
+    color: var(--slate-800);
     cursor: pointer;
   }
 
@@ -304,10 +304,10 @@ defineExpose({
     gap: 6px;
     min-width: 200px;
     padding: 8px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: rgb(var(--white));
+    border: 1px solid var(--slate-200);
     border-radius: 12px;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+    box-shadow: 0 12px 28px rgb(var(--slate-900-rgb) / 0.2);
   }
 
   .mindmap-builder__actions.is-open {
@@ -335,9 +335,9 @@ defineExpose({
     z-index: 41;
     height: 55dvh;
     padding: 0 8px calc(8px + env(safe-area-inset-bottom));
-    background: #ffffff;
+    background: rgb(var(--white));
     border-radius: 20px 20px 0 0;
-    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.2);
+    box-shadow: 0 -8px 24px rgb(var(--slate-900-rgb) / 0.2);
     transform: translateY(100%);
     visibility: hidden;
     transition: transform 0.2s ease, visibility 0.2s;
@@ -359,10 +359,10 @@ defineExpose({
     padding: 0 20px;
     border: none;
     border-radius: 24px;
-    background: #2563eb;
-    color: #ffffff;
+    background: var(--blue-600);
+    color: rgb(var(--white));
     font-weight: 700;
-    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 10px 20px rgb(var(--blue-600-rgb) / 0.35);
     cursor: pointer;
   }
 }

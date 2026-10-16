@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeFormula, computeAllFormulas, missingVariables, formatCalculation } from '@/helpers/mindmapCalc'
+import { computeFormula, computeAllFormulas, missingVariables, formatCalculation } from '@/helpers/mindmap/mindmapCalc'
 
 const quantityNode = (id, symbol, value, unit) => ({
   id, label: id, type: 'quantity', kinds: [], quantity: { symbol, value, unit },

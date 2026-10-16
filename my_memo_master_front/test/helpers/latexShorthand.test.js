@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeLatexShorthand } from '@/helpers/latexShorthand'
+import { normalizeLatexShorthand } from '@/helpers/mindmap/latexShorthand'
 
 describe('latexShorthand', () => {
   it('ajoute les accolades manquantes de \\frac', () => {

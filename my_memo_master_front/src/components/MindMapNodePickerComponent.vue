@@ -17,7 +17,7 @@
             :y1="map.nodes[link.from].layout.y"
             :x2="map.nodes[link.to].layout.x"
             :y2="map.nodes[link.to].layout.y"
-            stroke="#94a3b8"
+            style="stroke: var(--slate-400)"
             stroke-width="3"
           />
           <g
@@ -39,14 +39,14 @@
               :width="nodeWidth(node)"
               :height="nodeHeight(node)"
               :rx="nodeHeight(node) / 2"
-              :fill="node.id === modelValue ? mindmapColors.nodeBg : '#ffffff'"
+              :fill="node.id === modelValue ? mindmapColors.nodeBg : WHITE"
               :stroke="node.id === modelValue ? mindmapColors.nodeBg : node.style?.primaryColor || mindmapColors.nodeBg"
               :stroke-width="node.id === modelValue ? 8 : 4"
             />
             <text
               text-anchor="middle"
               dominant-baseline="middle"
-              :fill="node.id === modelValue ? '#ffffff' : '#1e293b'"
+              :fill="node.id === modelValue ? WHITE : SLATE_TEXT"
               font-size="28"
               font-weight="600"
             >{{ truncate(nodeText(node)) }}</text>
@@ -67,9 +67,12 @@
 </template>
 
 <script setup>
-import { mindmapColors } from '@/helpers/themeColors';
+import { mindmapColors, themeHex } from '@/helpers/themeColors';
 import { computed } from 'vue'
-import { normalizeMindMap, applyRadialLayout } from '@/helpers/mindmap'
+import { normalizeMindMap, applyRadialLayout } from '@/helpers/mindmap/mindmap'
+
+const WHITE = themeHex('--white');
+const SLATE_TEXT = themeHex('--slate-800');
 
 const props = defineProps({
   mindMapJson: { type: [Object, String], required: true },
@@ -130,8 +133,8 @@ const toggleNode = (nodeId) => {
 <style scoped>
 .mindmap-node-picker__board {
   /* Fond opaque explicite — règle projet pour les panneaux flottants */
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: rgb(var(--white));
+  border: 1px solid var(--slate-200);
   border-radius: 0.5rem;
   overflow: hidden;
 }
@@ -151,7 +154,7 @@ const toggleNode = (nodeId) => {
 }
 
 .mindmap-node-picker__node:focus rect {
-  stroke: #f59e0b;
+  stroke: rgb(var(--warning));
   stroke-width: 8;
 }
 </style>

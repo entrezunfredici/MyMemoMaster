@@ -3,7 +3,7 @@ import {
   boxColorToHex,
   hexToBoxColor,
   ensureSecondaryColor,
-} from '@/helpers/mindmap'
+} from '@/helpers/mindmap/mindmap'
 import { mindmapColors, themeColor } from '@/helpers/themeColors'
 
 describe('couleurs des boîtes de Leitner', () => {

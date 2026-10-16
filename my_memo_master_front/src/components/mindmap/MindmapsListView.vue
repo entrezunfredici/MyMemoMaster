@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { api } from '@/helpers/api'
+import { mindmapApi } from '@/helpers/mindmap/mindmapApi'
 import { useToast } from 'vue-toastification'
 import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
@@ -34,7 +34,7 @@ const filteredDiagrams = computed(() =>
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchDiagrams = async () => {
   try {
-    const response = await api.get('diagrammes')
+    const response = await mindmapApi.listDiagrams()
     diagrams.value = response?.data || []
   } catch {
     toast.error('Erreur lors du chargement des cartes mentales.')
@@ -82,7 +82,7 @@ const confirmRename = async () => {
   if (!diagram) return
   const newSubjectId = editedSubjectId.value || diagram.subjectId
   try {
-    const response = await api.put(`/diagrammes/${currentEditId.value}`, {
+    const response = await mindmapApi.updateDiagram(currentEditId.value, {
       mmName: editedName.value,
       mindMapJson: diagram.mindMapJson,
       subjectId: newSubjectId,
@@ -104,7 +104,7 @@ const confirmRename = async () => {
 const confirmDelete = async (diagram) => {
   if (!confirm(`Supprimer la carte "${diagram.mmName}" ? Cette action est irréversible.`)) return
   try {
-    const response = await api.del(`diagrammes/${diagram.idMindMap}`)
+    const response = await mindmapApi.deleteDiagram(diagram.idMindMap)
     // CHOIX: `api.del` retourne `undefined` quand le serveur répond 204 (no content) —
     // Diagramme.controller.delete ne renvoie jamais de corps sur succès (voir stores/diagrammes.js).
     // RAISON: sans ce cas, une suppression réussie était traitée comme un échec.
@@ -234,8 +234,8 @@ onMounted(fetchDiagrams)
 <style scoped>
 .subject-badge {
   display: inline-block;
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--blue-50);
+  color: var(--blue-600);
   font-size: 12px;
   font-weight: 600;
   border-radius: 6px;

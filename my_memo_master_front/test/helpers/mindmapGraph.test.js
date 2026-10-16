@@ -7,7 +7,7 @@ import {
   panView,
   niceTicks,
   buildPlotPath,
-} from '@/helpers/mindmapGraph'
+} from '@/helpers/mindmap/mindmapGraph'
 
 const evalAt = (latex, x, params) => parseGraphFormula(latex).fn(x, params)
 

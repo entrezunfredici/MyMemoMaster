@@ -232,8 +232,8 @@ async function deleteAccount() {
 }
 
 .profile__card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: rgb(var(--white));
+  border: 1px solid var(--gray-200);
   border-radius: 12px;
   padding: 24px;
 }
@@ -248,7 +248,7 @@ async function deleteAccount() {
 .profile__title {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #1E3BA1;
+  color: rgb(var(--primary));
   margin-bottom: 16px;
 }
 
@@ -266,17 +266,17 @@ async function deleteAccount() {
 
 .profile__info-label {
   font-weight: 500;
-  color: #374151;
+  color: var(--gray-700);
   min-width: 60px;
 }
 
 .profile__info-value {
-  color: #6b7280;
+  color: var(--gray-500);
 }
 
 .profile__badge {
-  background: #eff2fb;
-  color: #1E3BA1;
+  background: var(--surface-soft);
+  color: rgb(var(--primary));
   font-size: 0.8rem;
   font-weight: 600;
   padding: 2px 10px;
@@ -297,12 +297,12 @@ async function deleteAccount() {
 
 .profile__field label {
   font-size: 0.9rem;
-  color: #374151;
+  color: var(--gray-700);
 }
 
 .profile__field input {
   padding: 10px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   border-radius: 8px;
   font-size: 0.95rem;
   outline: none;
@@ -310,14 +310,14 @@ async function deleteAccount() {
 }
 
 .profile__field input:focus {
-  border-color: #1E3BA1;
-  box-shadow: 0 0 0 2px rgba(30, 59, 161, 0.15);
+  border-color: rgb(var(--primary));
+  box-shadow: 0 0 0 2px rgb(var(--primary) / 0.15);
 }
 
 .profile__btn {
   align-self: flex-start;
-  background: #1E3BA1;
-  color: #fff;
+  background: rgb(var(--primary));
+  color: rgb(var(--white));
   border: none;
   padding: 10px 24px;
   border-radius: 8px;
@@ -327,7 +327,7 @@ async function deleteAccount() {
 }
 
 .profile__btn:hover:not(:disabled) {
-  background: #162c7a;
+  background: rgb(var(--primary-dark));
 }
 
 .profile__btn:disabled {
@@ -342,44 +342,44 @@ async function deleteAccount() {
 
 .profile__error {
   font-size: 0.85rem;
-  color: #dc2626;
+  color: rgb(var(--danger));
 }
 
 .profile__deconnect-label {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--gray-800);
 }
 
 .profile__deconnect-hint {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--gray-500);
   margin-top: 2px;
 }
 
 .profile__card--danger-zone {
-  border-color: #fca5a5;
-  background: #fff5f5;
+  border-color: var(--red-300);
+  background: var(--danger-surface);
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .profile__title--danger {
-  color: #dc2626;
+  color: rgb(var(--danger));
 }
 
 .profile__danger-desc {
   font-size: 0.9rem;
-  color: #374151;
+  color: var(--gray-700);
   line-height: 1.5;
 }
 
 .profile__btn--red {
-  background: #dc2626;
+  background: rgb(var(--danger));
   align-self: flex-start;
 }
 
 .profile__btn--red:hover:not(:disabled) {
-  background: #b91c1c;
+  background: var(--red-700);
 }
 </style>

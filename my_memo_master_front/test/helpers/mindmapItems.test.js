@@ -7,7 +7,7 @@ import {
   normalizeNodeItem,
   formatQuantity,
   createQuantity,
-} from '@/helpers/mindmapItems'
+} from '@/helpers/mindmap/mindmapItems'
 
 describe('mindmapItems', () => {
   it('getNodeKinds — rôle principal en tête, sans doublon', () => {

@@ -1,4 +1,8 @@
-const creationTools = ['text', 'formula', 'function', 'graph', 'quantity', 'image'];
+import { ITEM_KIND_IDS } from './mindmapItems';
+
+// Types d'items créables : une seule liste, celle de mindmapItems.js (ITEM_KINDS). Chaque type doit
+// avoir ses libellés ci-dessous (test/helpers/mindmapCreation.test.js le vérifie).
+const creationTools = ITEM_KIND_IDS;
 
 const creationLabels = {
   text: {

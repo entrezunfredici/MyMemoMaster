@@ -8,11 +8,11 @@ import {
   ensureSecondaryColor,
   boxColorToHex,
   boxLevelToMastery,
-} from '@/helpers/mindmap';
-import { createBranchType, getOutgoingLinks, normalizeLink } from '@/helpers/mindmapLinks';
-import { createQuantity, normalizeNodeItem, sanitizeExtraKinds } from '@/helpers/mindmapItems';
-import { createGraph } from '@/helpers/mindmapGraph';
-import { computeAllFormulas, missingVariables } from '@/helpers/mindmapCalc';
+} from '@/helpers/mindmap/mindmap';
+import { createBranchType, getOutgoingLinks, normalizeLink } from '@/helpers/mindmap/mindmapLinks';
+import { createQuantity, normalizeNodeItem, sanitizeExtraKinds } from '@/helpers/mindmap/mindmapItems';
+import { createGraph } from '@/helpers/mindmap/mindmapGraph';
+import { computeAllFormulas, missingVariables } from '@/helpers/mindmap/mindmapCalc';
 import { api } from '@/helpers/api';
 import { mindmapColors } from '@/helpers/themeColors';
 
@@ -32,7 +32,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
   state: () => ({
     map: createBlankMindMap(),
     tool: defaultTool,
-    nodeType: 'text', // 'text' | 'formula' | 'function' | 'graph' | 'quantity' | 'image'
+    nodeType: 'text', // un des types de ITEM_KINDS (helpers/mindmapItems.js)
     selectedNodeIds: [],
     selectedLinkId: null,
     linkType: 'appartenance', // type appliqué aux nouvelles branches créées à la main

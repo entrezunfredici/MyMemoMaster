@@ -22,7 +22,7 @@
       text-anchor="middle"
       dominant-baseline="hanging"
       :y="-height / 2 + 12"
-      fill="#1f2937"
+      style="fill: var(--gray-800)"
       font-weight="600"
     >
       {{ zone.name }}

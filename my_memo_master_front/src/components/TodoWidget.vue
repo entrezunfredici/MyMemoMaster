@@ -180,7 +180,7 @@ function formatDate(dateStr) {
 /* ── Onglets ── */
 .todo-tabs {
   display: flex;
-  border-bottom: 0.5px solid #e2e8f0;
+  border-bottom: 0.5px solid var(--slate-200);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -190,7 +190,7 @@ function formatDate(dateStr) {
   padding: 8px 4px;
   font-size: 10px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--slate-500);
   background: none;
   border: none;
   cursor: pointer;
@@ -205,13 +205,13 @@ function formatDate(dateStr) {
 }
 
 .todo-tab.active {
-  color: #1a1aff;
-  border-bottom-color: #1a1aff;
+  color: rgb(var(--accent));
+  border-bottom-color: rgb(var(--accent));
 }
 
 .todo-tab-count {
-  background: #1a1aff;
-  color: #fff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
   border-radius: 99px;
   font-size: 9px;
   font-weight: 700;
@@ -228,7 +228,7 @@ function formatDate(dateStr) {
 
 .todo-empty {
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--slate-500);
   text-align: center;
   margin: 20px 0;
 }
@@ -239,17 +239,17 @@ function formatDate(dateStr) {
   align-items: center;
   gap: 8px;
   padding: 7px 14px;
-  border-bottom: 0.5px solid #f8fafc;
+  border-bottom: 0.5px solid var(--slate-50);
   transition: background 0.1s;
 }
 
 .todo-item:hover {
-  background: #f8fafc;
+  background: var(--slate-50);
 }
 
 .todo-item--done .todo-name {
   text-decoration: line-through;
-  color: #94a3b8;
+  color: var(--slate-500);
 }
 
 /* ── Checkbox ── */
@@ -267,7 +267,7 @@ function formatDate(dateStr) {
 .todo-check-box {
   width: 16px;
   height: 16px;
-  border: 1.5px solid #cbd5e1;
+  border: 1.5px solid var(--slate-300);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -277,8 +277,8 @@ function formatDate(dateStr) {
 }
 
 .todo-check:checked + .todo-check-box {
-  background: #16a34a;
-  border-color: #16a34a;
+  background: var(--green-600);
+  border-color: var(--green-600);
 }
 
 .todo-check:checked + .todo-check-box::after {
@@ -286,7 +286,7 @@ function formatDate(dateStr) {
   display: block;
   width: 5px;
   height: 9px;
-  border: 2px solid #fff;
+  border: 2px solid rgb(var(--white));
   border-top: none;
   border-left: none;
   transform: rotate(45deg) translate(-1px, -1px);
@@ -309,7 +309,7 @@ function formatDate(dateStr) {
 .todo-name {
   font-size: 12px;
   font-weight: 500;
-  color: #0f172a;
+  color: var(--slate-900);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -317,13 +317,13 @@ function formatDate(dateStr) {
 
 .todo-sub {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--slate-500);
   display: flex;
   gap: 6px;
 }
 
 .todo-date {
-  color: #94a3b8;
+  color: var(--slate-500);
 }
 
 /* ── Badge type ── */
@@ -338,12 +338,12 @@ function formatDate(dateStr) {
 }
 
 .todo-badge--session {
-  background: rgba(22, 163, 74, 0.1);
-  color: #16a34a;
+  background: rgb(var(--green-600-rgb) / 0.1);
+  color: var(--green-800);
 }
 
 .todo-badge--deadline {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  background: rgb(var(--red-500-rgb) / 0.1);
+  color: var(--red-700);
 }
 </style>

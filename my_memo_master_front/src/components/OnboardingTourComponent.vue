@@ -28,12 +28,12 @@ onMounted(async () => {
 <style>
 /* Fond blanc explicite — règle projet pour les panneaux superposés */
 .driver-popover.onboarding-popover {
-  background: #ffffff;
+  background: rgb(var(--white));
   border-radius: 12px;
 }
 
 .onboarding-popover .driver-popover-title {
-  color: #4338ca;
+  color: var(--indigo-700);
 }
 
 .onboarding-popover button.driver-popover-next-btn,
@@ -44,14 +44,14 @@ onMounted(async () => {
 }
 
 .onboarding-popover button.driver-popover-next-btn {
-  background: #6366f1;
-  color: #ffffff;
-  border: 1px solid #4f46e5;
+  background: var(--indigo-600);
+  color: rgb(var(--white));
+  border: 1px solid var(--indigo-700);
 }
 
 .onboarding-popover button.driver-popover-next-btn:hover,
 .onboarding-popover button.driver-popover-next-btn:focus {
-  background: #4f46e5;
-  color: #ffffff;
+  background: var(--indigo-700);
+  color: rgb(var(--white));
 }
 </style>

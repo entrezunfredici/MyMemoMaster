@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseUnit, formatDim, addDim, scaleDim } from '@/helpers/quantityUnits'
+import { parseUnit, formatDim, addDim, scaleDim } from '@/helpers/mindmap/quantityUnits'
 
 describe('quantityUnits', () => {
   it('parse les unités de base, avec préfixe et casse tolérée', () => {

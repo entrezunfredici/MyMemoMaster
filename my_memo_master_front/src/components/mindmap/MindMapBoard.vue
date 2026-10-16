@@ -50,10 +50,10 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { getNodeLabel } from '@/helpers/mindmapCreation';
+import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
 import MindMapNode from './MindMapNode.vue';
 import MindMapLink from './MindMapLink.vue';
-import { getBranchTypeLabel, getOutgoingLinks } from '@/helpers/mindmapLinks';
+import { getBranchTypeLabel, getOutgoingLinks } from '@/helpers/mindmap/mindmapLinks';
 import MindMapZone from './MindMapZone.vue';
 
 const store = useMindMapBuilderStore();
@@ -335,7 +335,7 @@ const onWheel = (event) => {
 .mindmap-board {
   width: 100%;
   height: 100%;
-  background: #f1f5f9;
+  background: var(--slate-100);
   border-radius: 16px;
   overflow: hidden;
   position: relative;

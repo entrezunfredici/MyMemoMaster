@@ -1,6 +1,6 @@
 ﻿import { normalizeNodeItem } from './mindmapItems';
 import { normalizeLink } from './mindmapLinks';
-import { mindmapColors } from './themeColors';
+import { mindmapColors } from '@/helpers/themeColors';
 
 const defaultBranchTypes = [
   { id: 'appartenance', label: 'Appartenance' },

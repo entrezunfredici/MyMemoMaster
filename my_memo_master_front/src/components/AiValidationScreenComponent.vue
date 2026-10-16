@@ -7,7 +7,7 @@
       <h2 class="text-2xl font-bold text-heading">Cartes proposées ({{ cards.length }})</h2>
       <button
         @click="acceptAll"
-        class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-5 rounded-lg transition"
+        class="bg-primary hover:bg-primary/90 text-on-primary font-bold py-2 px-5 rounded-lg transition"
       >
         Tout accepter ({{ cards.length }})
       </button>

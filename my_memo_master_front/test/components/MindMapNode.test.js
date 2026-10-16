@@ -302,3 +302,17 @@ describe('MindMapNode — texte avec rôle « Formule » / « Fonction »', () =
     expect(renderMathMultiline).toHaveBeenCalledWith('y=x^2')
   })
 })
+
+describe("MindMapNode — texte de l'utilisateur", () => {
+  it("affiche le contenu comme du texte : aucune balise HTML n'est interprétée", () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'text', content: '<img src=x onerror=alert(1)> si x<2 et y>3' }) })
+    const body = wrapper.find('.mindmap-node__body')
+    expect(body.find('img').exists()).toBe(false)
+    expect(body.text()).toBe('<img src=x onerror=alert(1)> si x<2 et y>3')
+  })
+
+  it("invite d'ajout quand le contenu est vide, avec l'élément dédié", () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'text', content: '' }) })
+    expect(wrapper.find('.mindmap-node__body .mindmap-node__placeholder').text()).toContain('Double-clic')
+  })
+})

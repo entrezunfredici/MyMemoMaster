@@ -136,6 +136,7 @@ import { ref, computed, watch, onMounted, defineComponent, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSearchStore } from '@/stores/search'
 import { useSubjectStore } from '@/stores/subjects'
+import { tagColors, readableTextColor } from '@/helpers/themeColors'
 
 const router = useRouter()
 const searchStore = useSearchStore()
@@ -247,8 +248,8 @@ const ContentSection = defineComponent({
               (props.getTags(item) || []).slice(0, 3).map(tag =>
                 h('span', {
                   key: tag.tagId,
-                  class: 'px-1.5 py-0.5 rounded-full text-[10px] font-semibold text-white',
-                  style: { backgroundColor: tag.color || '#6366F1' }
+                  class: 'px-1.5 py-0.5 rounded-full text-[10px] font-semibold',
+                  style: { backgroundColor: tag.color || tagColors.default, color: readableTextColor(tag.color || tagColors.default) }
                 }, tag.name)
               )
             )

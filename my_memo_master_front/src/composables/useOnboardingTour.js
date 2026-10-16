@@ -98,8 +98,21 @@ export function useOnboardingTour() {
     const steps = buildSteps()
     if (steps.length === 0) return false
 
+    // CHOIX: retirer aria-expanded / aria-controls de l'élément factice de driver.js.
+    // RAISON: pour une étape flottante (sans sélecteur) driver.js ancre le popover sur un <div>
+    // vide (#driver-dummy-element) et y pose aria-expanded : attribut interdit sur un div sans rôle
+    // (axe-core « aria-allowed-attr », critique — RGAA 7.1/8.2). Les étapes ancrées sur un vrai
+    // bouton ou lien gardent leurs attributs.
+    const cleanDummyAria = () => {
+      const dummy = document.getElementById('driver-dummy-element')
+      dummy?.removeAttribute('aria-expanded')
+      dummy?.removeAttribute('aria-controls')
+    }
+
     const tour = driver({
       steps,
+      onPopoverRender: cleanDummyAria,
+      onHighlighted: cleanDummyAria,
       showProgress: true,
       progressText: '{{current}} / {{total}}',
       nextBtnText: 'Suivant',

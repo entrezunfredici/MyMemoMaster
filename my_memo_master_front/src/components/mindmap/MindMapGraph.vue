@@ -51,7 +51,7 @@
     <div
       v-else
       class="mmgraph__formula"
-      :style="{ color: node.style?.textColor || '#dbeafe' }"
+      :style="{ color: node.style?.textColor || mindmapColors.nodeText }"
       v-html="formulaHtml"
     />
 
@@ -77,6 +77,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
+import { mindmapColors } from '@/helpers/themeColors';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
 import {
   parseGraphFormula,
@@ -88,7 +89,7 @@ import {
   buildPlotPath,
   paramRange,
   DEFAULT_VIEW,
-} from '@/helpers/mindmapGraph';
+} from '@/helpers/mindmap/mindmapGraph';
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -206,7 +207,7 @@ const endPan = (event) => {
   gap: 4px;
   flex: 1;
   min-height: 0;
-  color: #dbeafe;
+  color: var(--mindmap-node-text);
   cursor: default;
 }
 .mmgraph__toolbar {
@@ -227,19 +228,19 @@ const endPan = (event) => {
   padding: 0 6px;
   font-size: 11px;
   line-height: 1;
-  color: #e2e8f0;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  color: var(--mindmap-graph-btn-text);
+  background: var(--mindmap-graph-btn-bg);
+  border: 1px solid var(--mindmap-graph-btn-border);
   border-radius: 5px;
   cursor: pointer;
 }
 .mmgraph__btn:hover {
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--mindmap-graph-btn-bg-hover);
 }
 .mmgraph__btn--on {
-  background: #0369a1;
-  border-color: #7dd3fc;
-  color: #ffffff;
+  background: var(--mindmap-graph-btn-active-bg);
+  border-color: var(--mindmap-graph-btn-active-border);
+  color: rgb(var(--white));
 }
 .mmgraph__plot {
   display: block;
@@ -252,24 +253,24 @@ const endPan = (event) => {
   cursor: grabbing;
 }
 .mmgraph__bg {
-  fill: rgba(15, 23, 42, 0.4);
+  fill: var(--mindmap-graph-bg);
 }
 .mmgraph__grid line {
-  stroke: rgba(148, 163, 184, 0.2);
+  stroke: var(--mindmap-graph-grid);
   stroke-width: 1;
 }
 .mmgraph__axes line {
-  stroke: rgba(226, 232, 240, 0.8);
+  stroke: var(--mindmap-graph-axis);
   stroke-width: 1.2;
 }
 .mmgraph__labels text {
   font-size: 9px;
-  fill: #cbd5e1;
+  fill: var(--mindmap-graph-label);
   pointer-events: none;
 }
 .mmgraph__curve {
   fill: none;
-  stroke: #38bdf8;
+  stroke: var(--mindmap-graph-accent);
   stroke-width: 2;
   stroke-linejoin: round;
 }
@@ -294,7 +295,7 @@ const endPan = (event) => {
   cursor: text;
 }
 .mmgraph__error {
-  color: #fecaca;
+  color: var(--mindmap-error-text);
   font-style: normal;
 }
 .mmgraph__params {
@@ -312,7 +313,7 @@ const endPan = (event) => {
 .mmgraph__param input[type='range'] {
   flex: 1;
   min-width: 0;
-  accent-color: #38bdf8;
+  accent-color: var(--mindmap-graph-accent);
 }
 .mmgraph__param-name {
   width: 2.2em;

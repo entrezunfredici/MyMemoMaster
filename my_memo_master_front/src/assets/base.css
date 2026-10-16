@@ -39,6 +39,110 @@
     --mindmap-secondary: #C0C5D2;
     --mindmap-zone: #BFDBFE;
     --mindmap-zone-border: #60A5FA;
+    --mindmap-error-text: #fecaca;
+
+    /* Cartes mentales : item « Graphique » (repère, courbe, boutons, curseurs).
+       Utilisées uniquement en CSS (var(...)), donc pas de repli dans themeColors.js. */
+    --mindmap-graph-bg: rgba(15, 23, 42, 0.4);
+    --mindmap-graph-grid: rgba(148, 163, 184, 0.2);
+    --mindmap-graph-axis: rgba(226, 232, 240, 0.8);
+    --mindmap-graph-label: #cbd5e1;
+    --mindmap-graph-accent: #38bdf8;
+    --mindmap-graph-btn-text: #e2e8f0;
+    --mindmap-graph-btn-bg: rgba(15, 23, 42, 0.45);
+    --mindmap-graph-btn-bg-hover: rgba(15, 23, 42, 0.7);
+    --mindmap-graph-btn-border: rgba(148, 163, 184, 0.5);
+    --mindmap-graph-btn-active-bg: #0369a1;
+    --mindmap-graph-btn-active-border: #7dd3fc;
+
+    /* Couleurs de thème supplémentaires (triplets RGB, utilisées via rgb(var(--x) / alpha)) */
+    --accent: 26 26 255;
+    --accent-dark: 0 0 204;
+    --black: 0 0 0;
+    --primary-dark: 22 44 122;
+
+    /* Palette (hex) — valeurs de la palette Tailwind 3 ou propres au projet. Les composants
+       ne doivent contenir AUCUNE couleur en dur : ils utilisent var(--nom). Contrôlé par
+       `npm run audit:colors` (CI). Lues aussi en JS via helpers/themeColors.js. */
+    --amber-500: #f59e0b;
+    --amber-700: #b45309;
+    --blue-50: #eff6ff;
+    --blue-100: #dbeafe;
+    --blue-200: #bfdbfe;
+    --blue-300: #93c5fd;
+    --blue-500: #3b82f6;
+    --blue-600: #2563eb;
+    --blue-700: #1d4ed8;
+    --blue-800: #1e40af;
+    --blue-900: #1e3a8a;
+    --cyan-500: #06b6d4;
+    --danger-surface: #fff5f5;
+    --emerald-500: #10b981;
+    --fuchsia-500: #d946ef;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --gray-disabled: #cccccc;
+    --green-50: #f0fdf4;
+    --green-300: #86efac;
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --green-800: #166534;
+    --indigo-50: #eef2ff;
+    --indigo-200: #c7d2fe;
+    --indigo-500: #6366f1;
+    --indigo-600: #4f46e5;
+    --indigo-700: #4338ca;
+    --lime-500: #84cc16;
+    --neutral-100: #f5f5f5;
+    --orange-50: #fff7ed;
+    --orange-500: #f97316;
+    --periwinkle-200: #cbd5f5;
+    --pink-500: #ec4899;
+    --red-50: #fef2f2;
+    --red-200: #fecaca;
+    --red-300: #fca5a5;
+    --red-500: #ef4444;
+    --red-700: #b91c1c;
+    --rose-50: #fff1f2;
+    --sky-100: #e0f2fe;
+    --sky-400: #38bdf8;
+    --sky-500: #0ea5e9;
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-400: #94a3b8;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+    --surface-muted: #f5f6fb;
+    --surface-soft: #eff2fb;
+    --surface-tint: #fafaff;
+    --surface-tint-strong: #f0f0ff;
+    --teal-500: #14b8a6;
+    --violet-500: #8b5cf6;
+    --violet-600: #7c3aed;
+    --yellow-50: #fefce8;
+    --yellow-500: #eab308;
+
+    /* Palette — triplets RGB des couleurs utilisées avec transparence : rgb(var(--x-rgb) / alpha) */
+    --blue-500-rgb: 59 130 246;
+    --blue-600-rgb: 37 99 235;
+    --green-600-rgb: 22 163 74;
+    --indigo-500-rgb: 99 102 241;
+    --red-500-rgb: 239 68 68;
+    --sky-400-rgb: 56 189 248;
+    --slate-900-rgb: 15 23 42;
 }
 
 /* Vue-toastification overrides */
