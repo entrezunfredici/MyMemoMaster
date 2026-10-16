@@ -1,6 +1,6 @@
 # Audit d'accessibilité RGAA — MyMemoMaster (front)
 
-**Date** : 2026-07-06, complété le 2026-08-29, étendu le 2026-08-30
+**Date** : 2026-07-06, complété le 2026-08-29, étendu les 2026-08-30 et 2026-10-16
 **Référentiel** : RGAA 4 (fondé sur WCAG 2.1) — choix justifié dans le dossier B2, section 5.3 : standard officiel français, public cible incluant des établissements scolaires potentiellement soumis à obligation légale.
 **Périmètre** : l'intégralité du code front (`my_memo_master_front/src/`, 79 fichiers `.vue` au 2026-08-29) + `index.html`.
 
@@ -10,9 +10,10 @@
 
 | Niveau | Outil | Ce qu'il vérifie | Quand il tourne |
 |---|---|---|---|
-| Statique | [`scripts/audit-a11y.mjs`](../my_memo_master_front/scripts/audit-a11y.mjs) (développé pour le projet) | Noms accessibles des champs (11.1), `alt` des images (1.1), équivalents clavier des éléments cliquables (7.1), noms des boutons symboles (11.9), langue de la page (8.3), zones `aria-live` (13.x) | À la demande : `node scripts/audit-a11y.mjs` (option `--json` pour la CI) |
+| Statique | [`scripts/audit-a11y.mjs`](../my_memo_master_front/scripts/audit-a11y.mjs) (développé pour le projet) | Noms accessibles des champs (11.1), `alt` des images (1.1), équivalents clavier des éléments cliquables (7.1), noms des boutons symboles (11.9), langue de la page (8.3), zones `aria-live` (13.x) | **À chaque push (CI)** : `npm run audit:a11y` (mode `--strict`, échoue à la première non-conformité) |
 | Runtime (jsdom) | axe-core via Vitest ([`test/a11y/axe.test.js`](../my_memo_master_front/test/a11y/axe.test.js)) | Le DOM réellement rendu de 8 composants montés isolément : rôles ARIA, noms accessibles calculés, structure — ce que l'analyse statique ne voit pas. La règle `color-contrast` y est désactivée : jsdom ne calcule pas les styles | **À chaque push** (suite Vitest en CI) — l'accessibilité est non régressive |
 | Navigateur (Chromium) | axe-core via Playwright ([`e2e-a11y/contrast.spec.js`](../my_memo_master_front/e2e-a11y/contrast.spec.js), `npm run test:a11y:contrast`) | **Contraste RGAA 3.2** sur les pages publiques réellement rendues (`vite build` + `vite preview`) — le seul niveau qui calcule vraiment les styles | **À chaque push** (CI, après le build front) |
+| Couleurs (convention) | [`scripts/audit-colors.mjs`](../my_memo_master_front/scripts/audit-colors.mjs) | Aucune couleur en dur dans `src/` hors `assets/base.css` et `helpers/themeColors.js` ; aucune variable `var(--…)` non définie (une faute de frappe = propriété ignorée = contraste perdu en silence) | **À chaque push (CI)** : `npm run audit:colors` |
 | Manuel | Revue de code + navigation clavier | Motifs justifiés (overlays), cohérence des libellés, parcours réels | Lors de l'audit |
 
 Reproduire l'audit :
@@ -21,7 +22,10 @@ Reproduire l'audit :
 cd my_memo_master_front
 node scripts/audit-a11y.mjs           # audit statique
 npx vitest run test/a11y/             # audit runtime axe-core (jsdom)
-npm run build && npm run test:a11y:contrast   # audit de contraste (Chromium)
+npm run build && npm run test:a11y            # audits navigateur (Chromium) : contraste, 26 pages, éditeur de carte mentale
+npm run audit:a11y                            # audit statique, mode strict (comme la CI)
+npm run audit:colors                          # convention « toutes les couleurs dans base.css »
+A11Y_BASE_URL=https://… npx playwright test   # audit d'un site déjà déployé (pages publiques)
 ```
 
 ## 2. Résultats mesurés — avant / après la campagne du 2026-07-06
@@ -78,6 +82,39 @@ Suite à la demande de « s'occuper des 106 critères RGAA » sur `docs/COMPTE_R
 **Les deux ont été corrigés** (`aria-label` explicite, ajouté à l'input pour le premier, aux deux boutons pour le second) — non pas parce qu'un outil l'exigeait, mais par cohérence avec le correctif déjà appliqué au même anti-patron ailleurs dans le projet (`ToggleButton.vue`, 2026-08-29). **C'est la démonstration, pas seulement l'affirmation, de la limite de l'outillage automatisé** : un outil vérifie qu'un nom accessible *existe algorithmiquement* ; juger qu'il est *fiable* (title vs aria-label selon le contexte du DOM) et *pertinent* (un glyphe n'est pas une action) reste un jugement humain — exactement ce que RGAA 11.1/11.9 demandent en réalité, au-delà du test mécanique.
 
 **Vérifié** : `npx vitest run` → 701/701 tests front verts (12 nouveaux + 689 existants, aucune régression), `npm run lint` → 0 erreur, `node scripts/audit-a11y.mjs` → 0/79 fichiers (inchangé).
+
+---
+
+## 2 quater. Campagne du 2026-10-16 — toutes les pages, éditeur de carte mentale, CI/CD
+
+**Déclencheur** : migration de toutes les couleurs du front vers `src/assets/base.css` (534 littéraux, 39 fichiers — voir DECISIONS 2026-10-16) avec l'exigence de ne pas régresser sur le RGAA. La migration étant mécanique, l'audit a été étendu pour la prouver, puis pour mesurer ce que les 8 pages publiques ne montraient pas.
+
+**1. Preuve que la migration ne change aucune couleur** (avant les corrections du point 3) : (a) pour chaque bloc `<style>` et feuille `.css`, la suite des couleurs de l'ancienne version et celle de la nouvelle, variables résolues, sont identiques — 503 couleurs / 93 fichiers, 0 divergence ; (b) relevé des couleurs calculées (color, fond, bordures, fill, stroke, ombres…) de chaque élément de 26 pages et de l'éditeur de carte mentale dans 8 états, avant/après : 77 835 valeurs, 0 écart ; (c) état survolé des boutons vérifié à la main (`hover:bg-primary-dark` = `#162c7a`).
+
+**2. Nouveaux audits navigateur** (Chromium sur la version buildée, API simulée) :
+- `e2e-a11y/pages.spec.js` — **26 pages**, publiques et privées (session injectée, toute requête API répond `[]`), toutes les règles WCAG 2.1 A/AA d'axe-core ; la visite guidée (driver.js) y est ouverte, donc auditée ;
+- `e2e-a11y/mindmap-editor.spec.js` — liste puis éditeur de carte mentale, état par état (un item de chaque type sélectionné : texte, formule, grandeur, graphique, image), plus une **mesure directe du contraste des textes** (`helpers/contrast.js`) : axe répond « à vérifier » pour les 36 textes posés dans des `<foreignObject>` sur une forme SVG, faute de pouvoir résoudre leur fond ;
+- `e2e-a11y/live-public.spec.js` + `contrast.spec.js` sur un site déployé (`A11Y_BASE_URL`), via `.github/workflows/a11y-live.yml`.
+
+**3. Non-conformités réelles trouvées et corrigées** (elles existaient avant la campagne, indépendamment de la migration) :
+
+| Critère | Où | Mesure | Correction |
+|---|---|---|---|
+| 3.2 contraste | Boutons `bg-primary` + `text-white` : `/verify-email`, `/exercises`, `/flashcards`, `/flashcards/:id/cards`, `/mindmaps`, filtre de `KpiPage`, écran de validation IA | texte **noir** sur `#1e3ba1` : 2,19:1 (`text-white` ne génère aucune classe, voir §2 bis) | nouvelle couleur Tailwind `on-primary` (blanc) → classe `text-on-primary` sur ces seuls éléments (9 lignes) |
+| 3.2 contraste | Libellés gris clair (`slate-400`/`slate-300`/`gray-400`) sur blanc : réglages, calendrier, à-faire, rappels, palette et statut de sauvegarde de l'éditeur, croix de fermeture des modales | 1,5 à 2,6:1 | `slate-500`/`gray-500` (≥ 4,8:1), 50 règles CSS |
+| 3.2 contraste | Textes d'état vert/rouge (`green-500/600`, `red-500`, `danger`) sur blanc ou sur leur teinte pâle | 2,3 à 3,8:1 | `green-800` / `red-700` (≥ 6:1) |
+| 3.2 contraste | Boutons blancs sur `indigo-500` (bandeau du parcours guidé, bouton « Suivant » de la visite), sur `red-500` (suppression dans la palette) et sur `secondary` (confirmation destructive des modales) | 3,3 à 4,5:1 | `indigo-600`, `danger` : ≥ 4,8:1 |
+| 3.2 contraste | « Glissez une image ici » (nœud image) | 4,43:1 à 11 px | opacité 0,7 → 0,85 |
+| 3.2 contraste | Puces de tag (sélecteur de tags, page Contenus par sujet) : `text-white` sans effet → texte noir sur la couleur du tag ; le blanc comme le noir donnaient < 4,5:1 sur certains tons (`indigo-500` : 4,47 en blanc) | 4,1 à 4,5:1 | `readableTextColor()` (`themeColors.js`) choisit le noir pur ou le blanc selon le fond : ≥ 4,58:1 pour **toute** couleur ; testé sur la palette et sur 216 couleurs libres |
+| 7.1 / 8.2 ARIA | `#driver-dummy-element` (étapes flottantes de la visite guidée) | `aria-expanded` interdit sur un `<div>` sans rôle — axe « critical » sur **chaque page** quand la visite s'ouvre | attributs retirés par les hooks `onPopoverRender`/`onHighlighted` (`useOnboardingTour.js`) |
+
+**Résultat** : 26 pages × WCAG 2.1 A/AA = **0 violation** ; éditeur de carte mentale, 8 états = **0 violation axe et 0 texte sous le seuil** ; `npm run audit:a11y` 0 ; `npm run audit:colors` 0 ; `npx vitest run` 67 fichiers verts.
+
+**Garde-fous ajoutés** : `test/helpers/themeColors.test.js` vérifie que les valeurs de repli JS égalent `base.css` et que le blanc sur `--primary`/`--primary-dark` et `--accent` sur blanc restent ≥ 4,5:1.
+
+**Limites connues de cet audit** (aucun outil ne les couvre) : (1) pages affichées dans leur état *vide* — listes, modales et formulaires remplis ne sont vus que par `axe.test.js` (jsdom, sans contraste) ; une étude statique des règles CSS a servi de filet, mais un texte clair sur fond clair dans un état non rendu peut encore exister ; (2) **hors périmètre par décision** : les couleurs de fond et de texte choisies librement par l'utilisateur dans une carte mentale ne sont pas auditées (inconnues à l'avance, modifiables à tout moment par l'utilisateur) — seules les couleurs par défaut (fond `#1E3A8A`, texte `#eef2ff`) sont mesurées ; (3) pas de test lecteur d'écran réel, ni de navigation clavier automatisée.
+
+**Dette constatée, non corrigée** : `tailwind.config.js` remplace toute la palette (voir §5) — **455 occurrences** de classes de palette inexistantes (`bg-gray-100`, `text-red-500`, `ring-purple-100`…) sont silencieusement ignorées, et `text-white`/`bg-white` (23 + 76 lignes) sont sans effet. Les activer d'un bloc changerait le rendu de dizaines d'écrans (certains `text-white` sont posés sur un fond qui n'existe pas) ; la correction se fait au cas par cas, comme ci-dessus.
 
 ---
 

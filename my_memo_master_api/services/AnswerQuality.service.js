@@ -145,7 +145,14 @@ class AnswerQualityService {
     }
 
     // Règle 9 : autonomie de la réponse principale
-    if (!this.sharesSubjectWithStatement(statement, primary)) {
+    // CHOIX: ne pas exiger de mot commun avec l'énoncé pour une formule/valeur isolée (non phrase)
+    // RAISON: « ΔS = Sech + Scréée » est correcte sans répéter les mots de la question ; le critère
+    // lexical ne vaut que pour une réponse rédigée.
+    // Mots « rédigés » (3 lettres ou plus, hors symboles/opérateurs) : une formule texte brut comme
+    // « ΔS = Sech + Scréée » dépasse 5 tokens sans pour autant être une phrase.
+    const proseWords = this.stripFormulaSegments(primary).split(/\s+/).filter((t) => /^[A-Za-zÀ-ÿ'’-]{3,}[.,;:]?$/.test(t))
+    const isBareFormula = primaryHasFormula && proseWords.length < MIN_SENTENCE_WORDS
+    if (!isBareFormula && !this.sharesSubjectWithStatement(statement, primary)) {
       warnings.push(
         "La réponse ne semble mentionner aucun mot-clé distinctif de l'énoncé — vérifie qu'elle " +
         'reste compréhensible sans relire la question (évite les pronoms ou tournures elliptiques).'

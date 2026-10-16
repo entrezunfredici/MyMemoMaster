@@ -9,6 +9,7 @@ import { renderMathMultiline } from '@/components/interpreter/interpreter.js'
 
 vi.mock('@/components/interpreter/interpreter.js', () => ({
   renderMathMultiline: vi.fn((input) => `<span class="katex-mock">${input}</span>`),
+  toLatex: vi.fn((input) => String(input ?? '')),
 }))
 vi.mock('@/helpers/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }))
 vi.mock('@/config', () => ({ VITE_API_URL: 'http://localhost:3000' }))
@@ -174,10 +175,144 @@ describe('MindMapNode', () => {
 
   // ── Drag & drop sur image ─────────────────────────────────────────────────
 
+  it("double-clic sur le symbole d'une grandeur ouvre les champs symbole et unité", async () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'quantity', content: '' }) })
+    await wrapper.find('.mindmap-node__quantity-label').trigger('dblclick')
+    expect(wrapper.find('.mindmap-node__quantity-editor').exists()).toBe(true)
+    expect(wrapper.findAll('.mindmap-node__quantity-input')).toHaveLength(2)
+  })
+
+  it("Entrée dans l'éditeur de grandeur enregistre symbole et unité via store.updateNodeQuantity", async () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'quantity', content: '' }) })
+    const store = useMindMapBuilderStore()
+    await wrapper.find('.mindmap-node__quantity-label').trigger('dblclick')
+    const [symbol, unit] = wrapper.findAll('.mindmap-node__quantity-input')
+    await symbol.setValue('m')
+    await unit.setValue('kg')
+    await unit.trigger('keydown.enter')
+    expect(store.updateNodeQuantity).toHaveBeenCalledWith('node-1', { symbol: 'm', unit: 'kg' })
+    expect(wrapper.find('.mindmap-node__quantity-editor').exists()).toBe(false)
+  })
+
+  it("Échap dans l'éditeur de grandeur annule sans enregistrer", async () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'quantity', content: '' }) })
+    const store = useMindMapBuilderStore()
+    await wrapper.find('.mindmap-node__quantity-label').trigger('dblclick')
+    await wrapper.find('.mindmap-node__quantity-input').trigger('keydown.escape')
+    expect(store.updateNodeQuantity).not.toHaveBeenCalled()
+    expect(wrapper.find('.mindmap-node__quantity-editor').exists()).toBe(false)
+  })
+
+  it("la valeur d'une grandeur s'édite directement, sans double-clic", async () => {
+    const wrapper = mountNode({
+      node: makeNode({ type: 'quantity', content: '', quantity: { symbol: 'M', value: null, unit: 'kg' } }),
+    })
+    const store = useMindMapBuilderStore()
+    const input = wrapper.find('.mindmap-node__quantity-value')
+    expect(input.exists()).toBe(true)
+    await input.setValue('2')
+    await input.trigger('change')
+    expect(store.updateNodeQuantity).toHaveBeenCalledWith('node-1', { value: '2' })
+  })
+
+  it("affiche le résultat calculé d'une formule reliée à des grandeurs", () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'formula', content: 'E = M' }) })
+    const store = useMindMapBuilderStore()
+    store.$patch({})
+    store.map.nodes['node-1'] = makeNode({ type: 'formula', content: 'E = M' })
+    store.map.nodes.q = { id: 'q', type: 'quantity', kinds: [], quantity: { symbol: 'M', value: 3, unit: 'kg' } }
+    store.map.links = [{ id: 'l', from: 'node-1', to: 'q' }]
+    return wrapper.vm.$nextTick().then(() => {
+      expect(wrapper.find('.mindmap-node__quantity--result').text()).toBe('E = 3 kg')
+    })
+  })
+
   it("dragover sur .mindmap-node__image active l'état de survol (isDragOver)", async () => {
     const wrapper = mountNode({ node: makeNode({ type: 'image', content: '' }) })
     await wrapper.find('.mindmap-node__image').trigger('dragover')
     expect(wrapper.find('.mindmap-node__image').classes()).toContain('mindmap-node__image--drag')
     expect(wrapper.find('.mindmap-node__image-placeholder').text()).toContain('Déposer ici')
+  })
+})
+
+describe('MindMapNode — nœud graphique', () => {
+  const graphNode = (overrides = {}) =>
+    makeNode({
+      type: 'graph',
+      content: 'y=ax^{2}',
+      graph: { xMin: -10, xMax: 10, yMin: -6, yMax: 6, params: { a: 2 }, mode: 'plot' },
+      style: { ...makeNode().style, width: 340, height: 300 },
+      ...overrides,
+    })
+
+  it("affiche le repère, la courbe et un curseur par paramètre pour un nœud de type 'graph'", () => {
+    const wrapper = mountNode({ node: graphNode() })
+    expect(wrapper.find('.mmgraph__plot').exists()).toBe(true)
+    expect(wrapper.find('.mmgraph__curve').attributes('d')).toMatch(/^M/)
+    expect(wrapper.findAll('input[type="range"]')).toHaveLength(1)
+    expect(wrapper.find('.mindmap-node__body').exists()).toBe(false)
+  })
+
+  it('mode « formule » : affiche la formule avec la valeur du paramètre, sans tracé', () => {
+    const wrapper = mountNode({ node: graphNode({ graph: { ...graphNode().graph, mode: 'formula' } }) })
+    expect(wrapper.find('.mmgraph__plot').exists()).toBe(false)
+    expect(renderMathMultiline).toHaveBeenCalledWith('y=2x^{2}')
+  })
+
+  it('formule vide : invite à saisir, sans tracé ni curseur', () => {
+    const wrapper = mountNode({ node: graphNode({ content: '' }) })
+    expect(wrapper.find('.mmgraph__empty').text()).toContain('Double-clic')
+    expect(wrapper.find('.mmgraph__plot').exists()).toBe(false)
+  })
+
+  it('formule non traçable : affiche l’erreur', () => {
+    const wrapper = mountNode({ node: graphNode({ content: 'y=(x+1' }) })
+    expect(wrapper.find('.mmgraph__error').exists()).toBe(true)
+  })
+
+  it('les boutons du nœud appellent le store (mode, zoom, réinitialisation)', async () => {
+    const wrapper = mountNode({ node: graphNode() })
+    const store = useMindMapBuilderStore()
+    const buttons = wrapper.findAll('.mmgraph__btn')
+    await buttons.find((b) => b.text() === 'Formule').trigger('click')
+    expect(store.updateNodeGraph).toHaveBeenCalledWith('node-1', { mode: 'formula' })
+    await wrapper.find('[aria-label="Zoom avant"]').trigger('click')
+    expect(store.updateNodeGraph).toHaveBeenLastCalledWith('node-1', expect.objectContaining({ xMin: -7, xMax: 7 }))
+    await wrapper.find('[aria-label="Réinitialiser la vue"]').trigger('click')
+    expect(store.updateNodeGraph).toHaveBeenLastCalledWith('node-1', { xMin: -10, xMax: 10, yMin: -6, yMax: 6 })
+  })
+
+  it('le curseur valide la valeur du paramètre au relâchement', async () => {
+    const wrapper = mountNode({ node: graphNode() })
+    const store = useMindMapBuilderStore()
+    const slider = wrapper.find('input[type="range"]')
+    slider.element.value = '3'
+    await slider.trigger('input')
+    expect(store.updateNodeGraph).not.toHaveBeenCalled()
+    await slider.trigger('change')
+    expect(store.updateNodeGraph).toHaveBeenCalledWith('node-1', { params: { a: 3 } })
+  })
+})
+
+describe('MindMapNode — texte avec rôle « Formule » / « Fonction »', () => {
+  it('rend le contenu comme formule (KaTeX) au lieu du texte brut', () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'text', kinds: ['function'], content: 'y=x^2' }) })
+    expect(wrapper.find('.mindmap-node__formula').exists()).toBe(true)
+    expect(wrapper.find('.mindmap-node__body').exists()).toBe(false)
+    expect(renderMathMultiline).toHaveBeenCalledWith('y=x^2')
+  })
+})
+
+describe("MindMapNode — texte de l'utilisateur", () => {
+  it("affiche le contenu comme du texte : aucune balise HTML n'est interprétée", () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'text', content: '<img src=x onerror=alert(1)> si x<2 et y>3' }) })
+    const body = wrapper.find('.mindmap-node__body')
+    expect(body.find('img').exists()).toBe(false)
+    expect(body.text()).toBe('<img src=x onerror=alert(1)> si x<2 et y>3')
+  })
+
+  it("invite d'ajout quand le contenu est vide, avec l'élément dédié", () => {
+    const wrapper = mountNode({ node: makeNode({ type: 'text', content: '' }) })
+    expect(wrapper.find('.mindmap-node__body .mindmap-node__placeholder').text()).toContain('Double-clic')
   })
 })

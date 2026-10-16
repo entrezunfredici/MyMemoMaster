@@ -24,13 +24,13 @@
       <div class="flex gap-2 basis-full sm:basis-auto">
         <button
           @click="openAiFlow"
-          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-on-primary font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           ✨ Générer par IA
         </button>
         <button
           @click="openAddModal"
-          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
+          class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-on-primary font-bold py-2 px-3 sm:px-5 text-sm sm:text-base rounded-lg transition"
         >
           + Ajouter une carte
         </button>
@@ -67,6 +67,11 @@
             :key="box.idBox"
             class="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 text-sm"
           >
+            <span
+              class="inline-block w-3 h-3 rounded-full border border-black/10"
+              :style="{ backgroundColor: boxColorToHex(box.color) }"
+              aria-hidden="true"
+            ></span>
             <span class="font-semibold text-primary">B{{ box.level }}</span>
             <span class="text-gray-500" :title="`${box.intervall} s`">{{ formatDuration(box.intervall) || `${box.intervall} s` }}</span>
             <button @click="openEditBoxModal(box)" class="text-gray-400 hover:text-primary" title="Modifier">✎</button>
@@ -226,9 +231,10 @@
           <div v-else-if="lastQuality.level" class="form-group--lg">
             <AnswerQualityBadge :level="lastQuality.level" :warnings="lastQuality.warnings" />
           </div>
+          <p v-if="justCreated && form.type !== 'open'" class="text-sm text-green-700 mb-4">✓ Carte enregistrée.</p>
 
-          <!-- Nœud de la carte mentale liée (création uniquement) -->
-          <div v-if="!editingCard && mindMapJson" class="form-group--lg">
+          <!-- Nœud de la carte mentale liée (création et modification) -->
+          <div v-if="mindMapJson" class="form-group--lg">
             <label class="form-label">
               Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
             </label>
@@ -331,7 +337,7 @@
               required
             />
           </div>
-          <div class="form-group--lg">
+          <div class="form-group">
             <label class="form-label">Intervalle (secondes)</label>
             <input aria-label="Intervalle en secondes"
               v-model="boxForm.intervall"
@@ -340,6 +346,14 @@
               placeholder="Ex : 10"
               class="form-input"
               required
+            />
+          </div>
+          <div class="form-group--lg">
+            <label class="form-label">Couleur</label>
+            <input aria-label="Couleur de la boîte"
+              v-model="boxForm.color"
+              type="color"
+              class="h-10 w-16 cursor-pointer rounded border border-gray-200 bg-white p-1"
             />
           </div>
           <p v-if="boxFormError" class="text-red-600 text-sm mb-4">{{ boxFormError }}</p>
@@ -388,6 +402,7 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
+import { boxColorToHex, hexToBoxColor } from '@/helpers/mindmap/mindmap'
 import FormulaText from '@/components/FormulaTextComponent.vue'
 import FormulaHelper from '@/components/FormulaHelperComponent.vue'
 import MindMapNodePicker from '@/components/MindMapNodePickerComponent.vue'
@@ -485,7 +500,7 @@ const showBoxModal = ref(false)
 const submittingBox = ref(false)
 const boxFormError = ref('')
 const editingBox = ref(null)
-const boxForm = reactive({ level: '', intervall: '' })
+const boxForm = reactive({ level: '', intervall: '', color: boxColorToHex(null) })
 
 // --- génération par IA (C-01.08 / C-01.09) ---
 const aiCardGenerationStore = useAiCardGenerationStore()
@@ -614,6 +629,7 @@ const openEditModal = async (card) => {
   form.statement = card.question?.statement || ''
   form.answer = card.correctAnswer || ''
   form.type = card.question?.type || 'open'
+  form.mindMapNodeId = card.mindMapNodeId || null
   if (form.type === 'mcq' && Array.isArray(card.question?.content?.options)) {
     form.mcqOptions = card.question.content.options.map(o => ({ text: o.text, correct: !!o.correct }))
   } else {
@@ -742,8 +758,9 @@ const handleCreate = async () => {
   loading.value = true
   await loadCards()
   loading.value = false
-  if (!lastQuality.level || lastQuality.level === 'high') closeModal()
-  else justCreated.value = true
+  // CHOIX: toujours rester sur l'écran de confirmation après une création, quelle que soit la qualité
+  // RAISON: la modale se fermait seulement pour « Bonne qualité », ce qui déroutait à l'ajout en série.
+  justCreated.value = true
 }
 
 const handleUpdate = async () => {
@@ -764,6 +781,18 @@ const handleUpdate = async () => {
   if (!qResp || qResp.status !== 200) {
     formError.value = qResp?.data?.message || 'Erreur lors de la mise à jour de la question.'
     return
+  }
+
+  // Lien au nœud de la carte mentale (null = retirer) — uniquement si une carte mentale est liée au système
+  if (mindMapJson.value) {
+    const cardResp = await api.put(`leitnercards/${card.idCard}`, {
+      idQuestion: card.idQuestion,
+      mindMapNodeId: form.mindMapNodeId || null,
+    })
+    if (!cardResp || cardResp.status !== 200) {
+      formError.value = cardResp?.data?.message || 'Erreur lors de la mise à jour du lien avec la carte mentale.'
+      return
+    }
   }
 
   // Réponse uniquement pour les cartes ouvertes
@@ -815,8 +844,11 @@ const handleDelete = async (card) => {
 
 const openAddBoxModal = () => {
   editingBox.value = null
+  // Pré-remplit avec la couleur de la dernière boîte du système (réglable ensuite).
+  const lastBox = systemBoxes.value.reduce((last, b) => (!last || b.level > last.level ? b : last), null)
   boxForm.level = ''
   boxForm.intervall = ''
+  boxForm.color = boxColorToHex(lastBox?.color)
   boxFormError.value = ''
   showBoxModal.value = true
 }
@@ -825,6 +857,7 @@ const openEditBoxModal = (box) => {
   editingBox.value = box
   boxForm.level = box.level
   boxForm.intervall = box.intervall
+  boxForm.color = boxColorToHex(box.color)
   boxFormError.value = ''
   showBoxModal.value = true
 }
@@ -834,13 +867,14 @@ const closeBoxModal = () => {
   editingBox.value = null
   boxForm.level = ''
   boxForm.intervall = ''
+  boxForm.color = boxColorToHex(null)
   boxFormError.value = ''
 }
 
 const submitBoxForm = async () => {
   submittingBox.value = true
   boxFormError.value = ''
-  const data = { level: Number(boxForm.level), intervall: Number(boxForm.intervall), color: 123456, idSystem: systemId }
+  const data = { level: Number(boxForm.level), intervall: Number(boxForm.intervall), color: hexToBoxColor(boxForm.color), idSystem: systemId }
   const resp = editingBox.value
     ? await api.put(`leitnerboxes/${editingBox.value.idBox}`, data)
     : await api.post('leitnerboxes', data)

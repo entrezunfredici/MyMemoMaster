@@ -10,6 +10,10 @@
 // derrière lui. Voir e2e-a11y/contrast.spec.js pour la liste et pourquoi.
 import { defineConfig, devices } from '@playwright/test'
 
+// A11Y_BASE_URL : audit d'un site DÉJÀ DÉPLOYÉ (workflow a11y-live.yml) — pas de serveur de preview
+// local, et seuls les parcours sans API simulée tournent (e2e-a11y/contrast.spec.js, live-public.spec.js).
+const LIVE_URL = process.env.A11Y_BASE_URL
+
 export default defineConfig({
   testDir: './e2e-a11y',
   fullyParallel: true,
@@ -17,12 +21,12 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: LIVE_URL || 'http://127.0.0.1:4173',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
-  webServer: {
+  webServer: LIVE_URL ? undefined : {
     // `dist/` doit déjà exister (`npm run build`) — c'est le cas en CI où ce
     // job suit le build ; en local, lancer `npm run build` avant ce script.
     // --host 127.0.0.1 explicite : `vite preview` sans --host ne bind qu'en

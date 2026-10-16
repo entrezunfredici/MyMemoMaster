@@ -10,6 +10,8 @@ export default {
     colors: {
       /* Theme colors */
       primary: 'rgb(var(--primary) / <alpha-value>)',
+      'on-primary': 'rgb(var(--white) / <alpha-value>)',
+      'primary-dark': 'rgb(var(--primary-dark) / <alpha-value>)',
       'light-primary': 'rgb(var(--light-primary) / <alpha-value>)',
       secondary: 'rgb(var(--secondary) / <alpha-value>)',
       'light-secondary': 'rgb(var(--light-secondary) / <alpha-value>)',

@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: center;
   z-index: 50;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(var(--black) / 0.5);
 }
 
 /* Panel */
@@ -19,9 +19,9 @@
    boutons du bas (signalé par capture, viewport réduit). Toutes les tailles de
    modale héritent désormais du même comportement scrollable. */
 .modal-panel {
-  background-color: white;
+  background-color: rgb(var(--white));
   border-radius: 0.5rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 25px -5px rgb(var(--black) / 0.1), 0 10px 10px -5px rgb(var(--black) / 0.04);
   padding: 2rem;
   width: 100%;
   max-width: 28rem;
@@ -41,13 +41,13 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #9CA3AF;
+  color: var(--gray-500);
   font-size: 1.5rem;
   line-height: 1;
   font-weight: 700;
   padding: 0;
 }
-.modal-close:hover { color: #374151; }
+.modal-close:hover { color: var(--gray-700); }
 
 /* Titre */
 .modal-title {
@@ -74,7 +74,7 @@
   display: block;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6B7280;
+  color: var(--gray-500);
   margin-bottom: 0.25rem;
 }
 
@@ -82,10 +82,10 @@
 .modal-panel .form-input {
   width: 100%;
   padding: 0.5rem 1rem;
-  border: 1px solid #D1D5DB;
+  border: 1px solid var(--gray-300);
   border-radius: 0.5rem;
   outline: none;
-  background-color: white;
+  background-color: rgb(var(--white));
   font-size: 1rem;
 }
 .modal-panel .form-input:focus {
@@ -105,7 +105,7 @@
 .btn-modal-submit {
   flex: 1;
   background-color: rgb(var(--primary));
-  color: white;
+  color: rgb(var(--white));
   font-weight: 700;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
@@ -119,8 +119,8 @@
 /* Bouton annuler */
 .btn-modal-cancel {
   flex: 1;
-  background-color: #F3F4F6;
-  color: #374151;
+  background-color: var(--gray-100);
+  color: var(--gray-700);
   font-weight: 700;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
@@ -128,13 +128,13 @@
   cursor: pointer;
   transition: background-color 0.2s;
 }
-.btn-modal-cancel:hover { background-color: #E5E7EB; }
+.btn-modal-cancel:hover { background-color: var(--gray-200); }
 
 /* Bouton d'action destructive (suppression, révocation) */
 .btn-modal-danger {
   flex: 1;
-  background-color: rgb(var(--secondary));
-  color: rgb(var(--light));
+  background-color: rgb(var(--danger));
+  color: rgb(var(--white));
   font-weight: 700;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
@@ -142,4 +142,4 @@
   cursor: pointer;
   transition: background-color 0.2s;
 }
-.btn-modal-danger:hover { background-color: rgb(var(--secondary) / 0.9); }
+.btn-modal-danger:hover { background-color: rgb(var(--danger) / 0.9); }

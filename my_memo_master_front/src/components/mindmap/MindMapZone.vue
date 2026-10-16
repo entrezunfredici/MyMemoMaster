@@ -22,7 +22,7 @@
       text-anchor="middle"
       dominant-baseline="hanging"
       :y="-height / 2 + 12"
-      fill="#1f2937"
+      style="fill: var(--gray-800)"
       font-weight="600"
     >
       {{ zone.name }}
@@ -31,6 +31,7 @@
 </template>
 
 <script setup>
+import { mindmapColors } from '@/helpers/themeColors';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -47,8 +48,8 @@ const width = computed(() => layout.value.width || 320);
 const height = computed(() => layout.value.height || 240);
 const zoneTransform = computed(() => `translate(${layout.value.x || 0}, ${layout.value.y || 0})`);
 
-const fillColor = computed(() => props.zone.color || '#BFDBFE');
-const borderColor = computed(() => props.zone.color || '#60A5FA');
+const fillColor = computed(() => props.zone.color || mindmapColors.zone);
+const borderColor = computed(() => props.zone.color || mindmapColors.zoneBorder);
 
 const handlePointerDown = (event) => {
   emit('zone-pointerdown', { event, zone: props.zone });

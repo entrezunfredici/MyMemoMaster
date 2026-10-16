@@ -1,25 +1,53 @@
 <template>
   <g class="mindmap-link" @pointerdown.stop="handlePointerDown">
+    <defs>
+      <marker
+        :id="markerEndId"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="8"
+        markerHeight="8"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" :fill="primaryColor" />
+      </marker>
+    </defs>
+    <!-- Zone de clic élargie -->
+    <path :d="geometry.d" stroke="transparent" stroke-width="16" fill="none" class="mindmap-link__hit" />
     <path
-      :d="pathD"
-      :stroke="link.style?.primaryColor || '#1E3A8A'"
+      :d="geometry.d"
+      :stroke="primaryColor"
       :stroke-width="selected ? 4 : 2.5"
       fill="none"
-      marker-end="url(#arrow-forward)"
-      :marker-start="link.direction === 'bidirectional' ? 'url(#arrow-backward)' : null"
+      :marker-end="`url(#${markerEndId})`"
+      :marker-start="link.direction === 'bidirectional' ? `url(#${markerEndId})` : null"
       class="mindmap-link__path"
     />
+    <!-- Couleur secondaire au milieu de la branche -->
+    <circle
+      :cx="geometry.mid.x"
+      :cy="geometry.mid.y"
+      r="6"
+      :fill="secondaryColor"
+      :stroke="primaryColor"
+      stroke-width="1.5"
+      class="mindmap-link__middle"
+    />
+    <!-- Type de la branche, au-dessus -->
     <g v-if="linkLabel" :transform="labelTransform" class="mindmap-link__label">
       <rect
-        x="-48"
+        :x="-labelWidth / 2"
         y="-12"
-        width="96"
-        height="24"
-        rx="12"
-        :fill="link.style?.secondaryColor || '#9CA3AF'"
-        opacity="0.9"
+        :width="labelWidth"
+        height="22"
+        rx="11"
+        style="fill: rgb(var(--white))"
+        :stroke="primaryColor"
+        stroke-width="1"
+        opacity="0.95"
       />
-      <text text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="600" fill="#111827">
+      <text text-anchor="middle" dominant-baseline="middle" y="-1" font-size="12" font-weight="600" style="fill: var(--gray-900)">
         {{ linkLabel }}
       </text>
     </g>
@@ -27,75 +55,38 @@
 </template>
 
 <script setup>
+import { mindmapColors } from '@/helpers/themeColors';
 import { computed } from 'vue';
+import { computeLinkGeometry } from '@/helpers/mindmap/mindmapLinks';
 
 const props = defineProps({
-  link: {
-    type: Object,
-    required: true,
-  },
-  source: {
-    type: Object,
-    required: true,
-  },
-  target: {
-    type: Object,
-    required: true,
-  },
-  selected: {
-    type: Boolean,
-    default: false,
-  },
+  link: { type: Object, required: true },
+  source: { type: Object, required: true },
+  target: { type: Object, required: true },
+  selected: { type: Boolean, default: false },
+  // Libellé du type (les types personnalisés ne sont connus que de la carte).
+  typeLabel: { type: String, default: '' },
+  // Rang de lecture (1, 2…) quand l'item source a plusieurs branches sortantes, sinon null.
+  readingRank: { type: Number, default: null },
 });
 
 const emit = defineEmits(['link-pointerdown']);
 
-const controlOffset = computed(() => {
-  const dx = props.target.layout.x - props.source.layout.x;
-  const dy = props.target.layout.y - props.source.layout.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  return Math.min(220, Math.max(120, distance * 0.4));
+const primaryColor = computed(() => props.link.style?.primaryColor || mindmapColors.nodeBg);
+const secondaryColor = computed(() => props.link.style?.secondaryColor || mindmapColors.secondary);
+const markerEndId = computed(() => `arrow-${props.link.id}`);
+const geometry = computed(() =>
+  computeLinkGeometry(props.link.style?.shape || 'curve', props.source, props.target)
+);
+
+const linkLabel = computed(() => {
+  const label = props.typeLabel || props.link.type || '';
+  if (!label) return '';
+  return props.readingRank ? `${props.readingRank}. ${label}` : label;
 });
-
-const pathD = computed(() => {
-  const { source, target } = props;
-  const dx = target.layout.x - source.layout.x;
-  const dy = target.layout.y - source.layout.y;
-  const angle = Math.atan2(dy, dx);
-  const offset = controlOffset.value;
-  const c1x = source.layout.x + Math.cos(angle) * offset;
-  const c1y = source.layout.y + Math.sin(angle) * offset;
-  const c2x = target.layout.x - Math.cos(angle) * offset;
-  const c2y = target.layout.y - Math.sin(angle) * offset;
-  return `M ${source.layout.x} ${source.layout.y} C ${c1x} ${c1y} ${c2x} ${c2y} ${target.layout.x} ${target.layout.y}`;
-});
-
-const linkLabel = computed(() => props.link.type || '');
-
-// Distance entre le centre d'un nœud et le bord de son rectangle, dans la direction (ux, uy)
-const distanceToEdge = (node, ux, uy) => {
-  const halfW = (node.style?.width || 220) / 2;
-  const halfH = (node.style?.height || 120) / 2;
-  const tx = Math.abs(ux) > 1e-6 ? halfW / Math.abs(ux) : Infinity;
-  const ty = Math.abs(uy) > 1e-6 ? halfH / Math.abs(uy) : Infinity;
-  return Math.min(tx, ty);
-};
-
-// Étiquette au milieu du segment VISIBLE (entre les bords des deux nœuds) plutôt qu'entre leurs
-// centres : elle ne passe plus sous le nœud ni sous le bouton « + » qui déborde à sa droite.
-const labelTransform = computed(() => {
-  const { source, target } = props;
-  const dx = target.layout.x - source.layout.x;
-  const dy = target.layout.y - source.layout.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 1e-6) return `translate(${source.layout.x}, ${source.layout.y})`;
-  const ux = dx / dist;
-  const uy = dy / dist;
-  const exit = distanceToEdge(source, ux, uy);
-  const entry = dist - distanceToEdge(target, ux, uy);
-  const mid = entry > exit ? (exit + entry) / 2 : dist / 2;
-  return `translate(${source.layout.x + ux * mid}, ${source.layout.y + uy * mid})`;
-});
+const labelWidth = computed(() => Math.max(48, linkLabel.value.length * 7 + 18));
+// Le type est affiché au-dessus du milieu de la branche.
+const labelTransform = computed(() => `translate(${geometry.value.mid.x}, ${geometry.value.mid.y - 20})`);
 
 const handlePointerDown = (event) => {
   emit('link-pointerdown', { event, link: props.link });
@@ -108,11 +99,12 @@ const handlePointerDown = (event) => {
   transition: stroke-width 0.2s ease;
 }
 
-.mindmap-link__path:hover {
-  stroke-width: 4px;
+.mindmap-link__hit {
+  cursor: pointer;
 }
 
-.mindmap-link__label {
+.mindmap-link__label,
+.mindmap-link__middle {
   pointer-events: none;
 }
 </style>

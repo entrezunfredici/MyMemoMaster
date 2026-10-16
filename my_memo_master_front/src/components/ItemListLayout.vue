@@ -17,7 +17,7 @@
       </div>
       <button
         @click="$emit('create')"
-        class="bg-primary hover:bg-primary/90 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg whitespace-nowrap w-full sm:w-auto sm:ml-auto"
+        class="bg-primary hover:bg-primary/90 text-on-primary font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg whitespace-nowrap w-full sm:w-auto sm:ml-auto"
       >
         {{ createLabel }}
       </button>
@@ -34,7 +34,7 @@
           :class="[
             'px-3 py-1.5 rounded-lg font-semibold transition duration-200 border-2 text-sm',
             selectedSubjectId === subject.subjectId
-              ? 'bg-primary text-white border-primary'
+              ? 'bg-primary text-on-primary border-primary'
               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
           ]"
         >

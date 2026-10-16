@@ -4848,6 +4848,54 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Alternative écartée** : corriger les références à la génération seulement (ne règle pas les fiches existantes ni les formulations hétérogènes) ; seuil `CORRECT_THRESHOLD` abaissé à 0,6 (ferait passer des réponses réellement incomplètes).
 **Conséquences** : prompt plus long (~+400 tokens d'entrée par correction, coût ≈ +0,00001 $ par appel non caché). Risque résiduel : le modèle suit imparfaitement la règle « ou » (« les frottements » seuls reste à 0,4-0,6) ; les cas limites dépendent du jugement du modèle.
 
+
+### [2026-10-11] Items multi-rôles : `type` principal conservé + `kinds[]` supplémentaires
+
+**Contexte** : un item doit pouvoir être plusieurs choses à la fois (formule et grandeur physique), alors que `type` était unique et pilote le rendu/contenu.
+**Décision** : garder `type` comme rôle principal (rétrocompatible avec les cartes et le rendu existants) et ajouter `kinds: string[]` pour les rôles supplémentaires ; les données propres à un rôle vivent dans un objet dédié (`quantity: { symbol, value, unit }`). Normalisation à chargement et dans `updateNode`.
+**Alternative écartée** : remplacer `type` par un tableau `kinds` unique — casse tous les consommateurs de `node.type` et les cartes sauvegardées, migration lourde pour un gain nul à ce stade.
+**Conséquences** : le contenu (`content`) reste unique, porté par le rôle principal ; `quantity.value` est numérique ou `null`, base du calcul futur via liens de composition.
+
+
+### [2026-10-11] Branches : forme `style.shape`, marqueurs de flèche par branche, extrémités au bord des items
+
+**Contexte** : la flèche était posée au centre de l'item cible donc masquée par celui-ci, un seul marqueur global bleu servait à toutes les branches, et `bezier` était un booléen.
+**Décision** : `style.shape` (`curve`/`straight`/`elbow`) remplace `bezier` (conservé en miroir) ; un `<marker>` par branche (id `arrow-<linkId>`) pour suivre la couleur ; tracé calculé aux bords des rectangles ; types de branche personnalisés stockés dans `map.branchTypes`.
+**Alternative écartée** : `context-stroke` pour les marqueurs (support navigateur inégal) ; type de branche libre non référencé (pas de liste ni de libellé stable).
+**Conséquences** : N marqueurs dans le DOM pour N branches (négligeable) ; l'id d'un type personnalisé est un slug, donc renommer un type changerait l'id — pas de renommage proposé pour l'instant.
+
+
+### [2026-10-11] Couleur de boîte Leitner : entier 0xRRGGBB conservé, palette rouge → vert
+
+**Contexte** : `LeitnerBox.color` (BIGINT) valait des placeholders (123456…) en dur dans le front, le seed et les boîtes par défaut ; lus en 0xRRGGBB ils donnaient des teintes sombres quasi identiques, et l'utilisateur ne pouvait pas choisir.
+**Décision** : garder l'entier 0xRRGGBB (aucun changement de schéma), valider `color` en entier 0–16777215, convertir via `boxColorToHex`/`hexToBoxColor` côté front avec un `<input type="color">`. Palette par défaut niveau 1→5 : `#E74C3C`, `#F39C12`, `#F1C40F`, `#2ECC71`, `#27AE60`. Migration ciblée des anciens placeholders uniquement.
+**Alternative écartée** : colonne `color` en chaîne `#rrggbb` — migration de type plus risquée et contrat API modifié pour un gain faible.
+**Conséquences** : la couleur secondaire d'un item de carte mentale lié à une carte provient de la boîte (`ensureSecondaryColor` ne l'écrase plus quand `idCard` est défini) ; la palette existe en deux exemplaires (API/front) à garder alignés.
+
+
+### [2026-10-11] Couleurs par défaut : variables CSS dans base.css, lues en JS via getters
+
+**Contexte** : les couleurs par défaut des cartes mentales et des boîtes Leitner étaient dupliquées en hex dans une dizaine de fichiers JS/Vue, alors que le thème vit déjà dans `base.css`.
+**Décision** : déclarer ces couleurs en variables CSS (`--mastery-*`, `--mindmap-*`) et les lire à l'exécution (`getComputedStyle`) via `helpers/themeColors.js`, avec un repli identique pour les tests. Lecture par getters et non constantes de module (ordre de chargement du CSS non garanti).
+**Alternative écartée** : module JS source unique injecté dans le CSS (le besoin exprimé est que `base.css` soit la source) ; migration en bloc des 39 fichiers à hex en dur (risque de régression de contraste RGAA, hors besoin).
+**Précision** : `base.css` ne contient que le stable côté front. Les couleurs des boîtes de Leitner sont réglables par système, donc définies uniquement côté API (`LeitnerBox.color`, défaut `DEFAULT_BOXES`) ; aucune copie front.
+**Conséquences** : les hex doivent rester hex (attributs SVG, `<input type="color">`, JSON sauvegardé) donc pas de format `rgb` triplet ; le repli est une duplication assumée .
+
+
+### [2026-10-11] Calcul des formules de carte mentale : évaluateur maison + algèbre d'unités SI, sans dépendance
+
+**Contexte** : relier une formule à des grandeurs doit en calculer le résultat et son unité (ex. masse + vitesse → énergie en J).
+**Décision** : évaluateur récursif écrit dans `helpers/mindmapCalc.js` (nombres, + − × ÷, puissances, `\frac`, `\sqrt`, multiplication implicite, symboles à indice/grecs) qui propage valeur et dimension SI ; `helpers/quantityUnits.js` convertit les unités saisies (préfixes, composées, casse tolérée) et nomme le résultat (J, N, W, Pa, V, C, Ω, Hz, sinon écriture composée). Variables associées aux grandeurs reliées par leur symbole. Résultat dérivé par un getter Pinia, non persisté.
+**Alternative écartée** : `mathjs` (dépendance non approuvée, lourde, et la gestion d'unités ne s'appuie pas sur nos symboles) ; stocker le résultat dans le JSON (désynchronisation à chaque modification de valeur).
+**Conséquences** : couverture limitée aux opérations listées (erreurs lisibles sinon) ; résultat toujours en SI ; la maîtrise n'a plus de couleur propre (couleur d'un item lié = couleur de la boîte, définie côté API).
+
+
+### [2026-10-11] Grandeurs d'une formule : proposition à valider, jamais de création silencieuse
+
+**Contexte** : relier à la main une grandeur à chaque variable d'une formule est fastidieux, mais la détection des variables est ambiguë (`MV`, constantes `g`/`π`, `d` d'une dérivée).
+**Décision** : après « Insérer dans l'item », une fenêtre liste les variables détectées sans grandeur reliée (cases cochées) ; seules les variables cochées sont créées, via `createQuantitiesForFormula`, qui revérifie les variables manquantes et ne touche à rien d'existant. Branche de type « Calcul », positionnement par le placement radial existant de `addNode`.
+**Alternative écartée** : création automatique à chaque modification (encombre la carte à la moindre faute de saisie, impose des suppressions) ; bouton séparé dans la palette (une étape de plus pour le cas courant).
+**Conséquences** : la détection réutilise le lexer du calcul (une seule définition d'une « variable ») ; l'action du store reste utilisable par d'autres entrées (bouton, IA).
 ### [2026-10-12] Migration vers un control plane partagé : workers 2 × A4-Ram8-Disk20-Perf1, mesures réelles à l'appui
 **Contexte** : Suite à l'abandon de SonarQube (2026-10-02), la migration vers un control plane partagé (cluster à recréer, 2 workers) a été dimensionnée. Le metrics-server du cluster dédié était en panne depuis 46 jours (`x509: cannot validate certificate ... doesn't contain any IP SANs` sur les kubelets) : réparé le jour même avec `--kubelet-insecure-tls`, ce qui a débloqué aussi le namespace `sonarqube` (bloqué en `Terminating` par l'APIService `metrics.k8s.io` en `MissingEndpoints`). Mesures `kubectl top` (instantané au repos, sans charge) : nœuds 2,3 Gi et 2,8 Gi de RAM (40-49 %), 83 m et 146 m de CPU (2-3 %) ; API prod 471-560 Mi (requests 896 Mi), Postgres prod 40 Mi, Redis 3 Mi, front 4-5 Mi, PgAdmin preprod 195 Mi ; add-ons (cilium, ingress, cert-manager, coredns) ≈ 0,97 Gi.
 **Décision** : 2 workers **A4-Ram8-Disk20-Perf1** (0,01664 €/h, ≈ 12,15 € HT/mois pièce), zone `az-3` (zone des volumes Cinder actuels). Le stockage de données reste sur des volumes Cinder (≈ 0,08 €/Go/mois HT) : 27 Gi sans Prometheus, indépendants du disque du worker (20 Go suffisent : images ≈ 2,6 Go, 0 % d'ephemeral-storage utilisé). Volumes SonarQube orphelins (5 + 10 + 2 Gi) sauvegardés en local (`backups-local/`, ignoré par git, archives `.tar.gz` relues) puis PV supprimés.
@@ -4976,3 +5024,78 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `android/app/build.gradle` lit `android/keystore.properties` (ignoré par git) ; sans lui, `bundleRelease` produit un `.aab` **non signé** plutôt que d'échouer ou de signer avec la clé de debug.
 **Alternative écartée** : secrets de signature dans `gradle.properties` du dépôt ou signature par la clé de debug (publiable par erreur, non remplaçable).
 **Conséquences** : la clé de signature doit être sauvegardée par son propriétaire ; Play App Signing recommandé.
+
+### [2026-10-15] Qualité des réponses : une formule isolée est dispensée du recoupement lexical avec l'énoncé
+**Contexte** : retour de test du parcours guidé — « ΔS = Sech + Scréée… » (correcte) était classée « À revoir » faute de mot commun avec la question, alors que répéter les mots de l'énoncé suffit à obtenir « Bonne qualité ».
+**Décision** : `AnswerQuality.assess` n'applique plus la règle 9 (mot-clé distinctif commun) à une réponse contenant une formule et ayant moins de 5 mots rédigés (≥ 3 lettres). L'avertissement « formule non balisée » (règle 8) reste actif.
+**Alternative écartée** : supprimer la règle 9 (elle détecte encore les réponses elliptiques en phrases) ; vérification sémantique de la justesse (hors périmètre : le service reste consultatif et lexical).
+**Conséquences** : le critère reste lexical — il ne juge pas l'exactitude ; une phrase qui répète la question garde « Bonne qualité ».
+
+### [2026-10-15] Modale d'ajout de carte : toujours rester sur l'écran de confirmation après création
+**Contexte** : la modale se fermait pour « Bonne qualité » mais restait ouverte (« Ajouter une autre carte ») sinon, ce qui déroutait lors d'ajouts en série.
+**Décision** : après une création, `justCreated` est toujours activé (confirmation + « Ajouter une autre carte » / « Fermer »). L'édition d'une carte se ferme toujours si la qualité est bonne (inchangé).
+**Alternative écartée** : toujours fermer (masquerait les avertissements de qualité).
+**Conséquences** : un clic de plus (« Fermer ») pour une carte unique.
+
+### [2026-10-15] Couleur de boîte des nœuds liés côté flashcard : résolue à la synchronisation, sans écrire `idCard` dans le nœud
+
+**Contexte** : deux sens de liaison coexistent (`node.idCard` dans le JSON de la carte mentale ; `LeitnerCard.mindMapNodeId` en base). Seul le premier alimentait la couleur secondaire.
+**Décision** : `syncCardMasteries` récupère aussi les systèmes dont `idMindMap` = carte éditée, charge leurs cartes (qui exposent désormais `mindMapNodeId`) et applique niveau/couleur de la boîte au nœud correspondant.
+**Alternative écartée** : copier `idCard`/`idSystem` dans le nœud (duplique la source de vérité, devient obsolète si la carte est déliée/supprimée).
+**Conséquences** : un appel `GET leitnersystems/` supplémentaire à l'ouverture d'une carte mentale enregistrée ; `GET leitnercards/system/:id` expose `mindMapNodeId`.
+
+### [2026-10-16] Item « Graphique » de carte mentale : tracé maison sans dépendance, formule source de vérité
+**Contexte** : demande d'un « GeoGebra dans un nœud » : une formule qui se transforme en graphique puis de nouveau en formule. MathLive/KaTeX gèrent déjà la saisie et le rendu des formules.
+**Décision** : nouveau rôle principal `graph` ; contenu = formule LaTeX `y = f(x)` (même saisie que les formules) ; état de vue, valeurs des paramètres et mode d'affichage dans `node.graph`. Analyse LaTeX → fonction JS (`helpers/mindmapGraph.js`) et tracé en SVG écrits dans le projet : **aucune dépendance ajoutée**. « Graphique → formule » = bascule d'affichage vers la formule avec les valeurs des paramètres substituées (les curseurs modifient la courbe et la formule).
+**Alternative écartée** : `function-plot` (tire d3, ~300 Ko) ou JSXGraph/GeoGebra (riche mais lourd, gestes tactiles en conflit avec le canevas, licence GeoGebra non commerciale) ; `mathjs`/`compute-engine` pour l'évaluation (un analyseur de ~150 lignes suffit pour y = f(x), et celui de `mindmapCalc.js` est lié aux unités et ne gère pas les fonctions). Non stocké : l'image du graphique (se régénère).
+**Conséquences** : périmètre limité à y = f(x) ; ajouter courbes paramétriques/implicites, points déplaçables ou régression demandera soit d'étendre cet analyseur soit de réévaluer JSXGraph (chargé en lazy).
+
+### [2026-10-16] Grandeur ↔ résultat de formule : liaison par symbole (casse ignorée), sans stocker la valeur
+**Contexte** : une formule `V = D/T` calculait `V` mais la grandeur `v` reliée gardait sa valeur saisie, incohérente avec le calcul.
+**Décision** : la grandeur reliée à une formule et de même symbole que son résultat (comparaison sans casse, pour ce lien seulement) prend le résultat calculé à l'affichage et dans les formules en aval ; la valeur n'est jamais écrite dans `node.quantity` (le calcul reste « à la volée »).
+**Alternative écartée** : copier la valeur dans la grandeur (source de vérité dupliquée, obsolète dès qu'une entrée change) ; correspondance exacte seulement (`V` ≠ `v`, cas réel rencontré) ; imposer la grandeur-formule (« Aussi → Formule »), qui reste possible.
+**Conséquences** : une valeur saisie sur une grandeur ainsi alimentée n'est qu'un repli ; deux grandeurs `v`/`V` reliées à la même formule recevraient toutes deux le résultat.
+
+### [2026-10-16] Couleurs : migration complète vers `base.css`, garde-fou en CI
+
+**Contexte** : 534 couleurs en dur dans 39 fichiers (hex, `rgba()`, classes Tailwind `bg-[#…]`, attributs SVG, couleurs de graphiques et de tags), alors que DECISIONS 2026-10-11 avait fait de `base.css` la source et laissé le reste à migrer (migration en bloc écartée : risque de régression de contraste RGAA).
+**Décision** : migration mécanique et prouvée. (1) Les littéraux deviennent des variables : thème existant en triplet RGB (`rgb(var(--primary) / a)`), palette Tailwind 3 sous son nom (`--slate-500`), 7 couleurs propres au projet (`--accent`, `--surface-muted`…), triplets `--x-rgb` pour les usages avec transparence. (2) JS : `themeHex`/`themeRgba`/`tagColors` dans `themeColors.js` (les couleurs de tags restent enregistrées en `#RRGGBB` majuscules, comme en base). (3) SVG : `style="fill: var(--…)"` plutôt que l'attribut. (4) Tailwind : `bg-primary`, `hover:bg-primary-dark`, `text-on-primary` (nouvelles couleurs de thème), `bg-[color:rgb(var(--white))]` pour le reste. (5) `scripts/audit-colors.mjs` échoue en CI s'il reste un littéral ou une variable indéfinie ; `themeColors.test.js` garde les replis JS identiques à `base.css`. Équivalence prouvée par comparaison des suites de couleurs (503/503) et des couleurs calculées avant/après sur 26 pages et 8 états de l'éditeur (77 835/77 835).
+**Alternative écartée** : variables sémantiques (`--text-muted`…) pour toutes les couleurs — 118 valeurs distinctes, nommage arbitraire sans connaître l'usage, risque de changer des teintes ; ajout de la palette Tailwind complète au thème (active ~455 classes aujourd'hui sans effet, rendu imprévisible).
+**Conséquences** : une couleur se change à un seul endroit ; les noms de palette (`--slate-500`) décrivent la teinte, pas le rôle — un renommage sémantique reste possible fichier par fichier. `text-white` ne génère toujours aucune classe (voir RGAA §2 bis/2 quater).
+
+### [2026-10-16] Audits RGAA dans le CI/CD : 3 niveaux, tous bloquants
+
+**Contexte** : seuls le contraste des 8 pages publiques et axe-core (jsdom, composants isolés) tournaient en CI ; l'audit statique n'était lancé qu'à la main et sortait toujours en succès. Aucun audit sur les pages privées, l'éditeur de carte mentale, ni le site déployé. Côté OWASP, seul `npm audit` (A06) est en CI.
+**Décision** : (1) **CI, avant build** : `npm run audit:a11y` (statique, `--strict`) et `npm run audit:colors`. (2) **CI, après build** : `npm run test:a11y` = contraste des pages publiques + WCAG 2.1 A/AA d'axe-core sur 26 pages (session injectée, API simulée) + éditeur de carte mentale état par état avec mesure directe du contraste (axe ne résout pas le fond des `<foreignObject>`). (3) **Après déploiement** : `a11y-live.yml` (fin de CD, chaque lundi, à la demande) audite les pages publiques des URL de la variable `A11Y_BASE_URLS` ; sans variable, sortie en succès (même principe que `uptime.yml`) ; alerte Discord en cas d'échec. Le CD ne démarre que si la CI réussit (`workflow_run`) : un échec RGAA bloque donc aussi le déploiement.
+**Alternative écartée** : Lighthouse CI / pa11y (autre moteur, moins de règles qu'axe-core déjà en dépendance, scores non déterministes) ; auditer les pages privées en production (exigerait un compte de test dédié et des données réelles) ; un job séparé (réinstallerait Node, les dépendances et Chromium pour 17 s de tests).
+**Conséquences** : +~1 min de CI front (Chromium déjà installé pour le contraste) ; les pages sont auditées dans leur état *vide* (limite documentée dans AUDIT_RGAA §2 quater) ; une exception justifiée se déclare dans `KNOWN_VIOLATIONS` (`pages.spec.js`) plutôt que de désactiver le test. À la première mise en ligne, créer la variable de dépôt `A11Y_BASE_URLS` pour activer l'audit du site déployé. Les audits OWASP restent limités à A06 (`npm audit`) : l'ajout d'un scan dynamique (ZAP) ou d'une analyse statique de sécurité est un sujet distinct, non traité ici.
+
+### [2026-10-16] Contraste : corrections ciblées plutôt que réactivation de la palette Tailwind
+
+**Contexte** : l'audit de toutes les pages a mesuré des textes noirs sur le bleu primaire (`text-white` sans effet), des libellés `slate-400`/`gray-400` à 2,5:1, des verts/rouges d'état trop clairs et un attribut ARIA interdit posé par driver.js.
+**Décision** : corriger élément par élément — `text-on-primary` (nouvelle couleur de thème, blanc) sur les seuls boutons `bg-primary` ; texte secondaire passé à `slate-500`/`gray-500` ; états en `green-800`/`red-700` ; fonds de boutons en `indigo-600`/`danger` ; `aria-expanded` retiré de l'élément factice de driver.js (hooks `onPopoverRender`/`onHighlighted`).
+**Alternative écartée** : ajouter `white`/`black` (ou la palette entière) à `theme.colors` — activerait `bg-white` (76 lignes), `text-white` (23) et ~455 classes de palette aujourd'hui ignorées : changement visuel imprévisible sur tout le front.
+**Précisions** : (1) les puces de tag (couleur libre de la palette, enregistrée en base) choisissent leur texte avec `readableTextColor` — noir pur ou blanc selon le fond, ≥ 4,58:1 pour toute couleur (un presque-noir comme `gray-900` laissait des tons moyens sous 4,5:1, constaté par test) ; (2) les couleurs de fond/texte **choisies par l'utilisateur** dans une carte mentale ne sont pas auditées ni contraintes : décision produit — elles sont inconnues à l'avance et l'utilisateur peut les modifier.
+**Conséquences** : les textes secondaires sont un peu plus foncés (hiérarchie conservée) ; un `text-white` posé sur un fond sombre ailleurs reste sans effet tant qu'il n'est pas traité au cas par cas.
+
+### [2026-10-16] Palette des cartes mentales : CSS global préfixé `.palette`, sections en sous-composants
+
+**Contexte** : `MindMapPalette.vue` faisait 1297 lignes (400 de template, 400 de script, 500 de CSS `scoped`), mélangeant formule, image, flashcard, zones. Un `<style scoped>` n'atteint pas l'intérieur des sous-composants : extraire une section obligeait à dupliquer ou à `:deep()` tout le CSS.
+**Décision** : le CSS partagé passe dans `components/mindmap/palette/palette.css`, feuille globale dont **chaque sélecteur est préfixé par `.palette`** — spécificité identique à celle de l'attribut `scoped` (classe + classe = classe + attribut), donc aucun changement de cascade. Les sections autonomes (`PaletteImageField`, `PaletteCardLink`) portent leur état et leurs appels et reçoivent l'item en prop. La modale de l'interpréteur (teleportée dans `<body>`, hors `.palette`) garde son style `scoped`.
+**Alternative écartée** : `:deep()` sur chaque règle du parent (fragile, illisible) ; dupliquer le CSS dans chaque sous-composant ; CSS global sans préfixe (collisions possibles, spécificité plus faible que `scoped`).
+**Vérification** : comparaison de toutes les propriétés CSS calculées avant/après sur 14 états de la palette (1 671 éléments, 0 écart) — la seule vérification qui prouve qu'un déplacement de CSS ne change pas la cascade.
+**Conséquences** : tout nouveau sous-composant de la palette doit être rendu dans `.palette` et réutiliser ses classes `palette__*` ; une règle ajoutée dans `palette.css` doit être préfixée `.palette ` (sinon elle perd à spécificité égale face aux règles de base).
+
+### [2026-10-16] Texte des items de carte mentale : interpolation, jamais `v-html`
+
+**Contexte** : le corps d'un item texte était rendu avec `v-html` : seule la suppression des balises par le middleware `sanitize` de l'API (qui coupe aussi « x<2 et y>3 ») évitait l'injection de HTML.
+**Décision** : le contenu utilisateur est interpolé (`{{ }}`, échappé par Vue) ; `v-html` n'est conservé que pour le HTML produit par KaTeX (formules), jamais pour du texte saisi.
+**Alternative écartée** : ajouter une librairie d'assainissement (dépendance pour un besoin qui disparaît si on n'injecte plus de HTML).
+**Conséquences** : un texte contenant des balises s'affiche littéralement. La protection ne dépend plus de l'API ; le comportement d'enregistrement de l'API (balises supprimées) reste à revoir côté back.
+
+### [2026-10-16] Couleurs par défaut des boîtes de Leitner : une teinte distincte par boîte
+
+**Contexte** : la palette par défaut (DECISIONS 2026-09-13 : rouge, orange, jaune, vert clair, vert) donnait des boîtes 3 à 5 peu distinguables d'un coup d'œil (jaune puis deux verts).
+**Décision** : les nouveaux systèmes reçoivent rouge `#E40101`, orange `#FB9609`, vert `#01B207`, turquoise `#0AFFCE`, bleu `#001EFF` (boîtes 1 à 5, du moins au mieux maîtrisé) — valeurs choisies par le product owner. Seul `DEFAULT_BOXES` (`LeitnerSystem.service.js`) et le seed de développement changent ; le front n'a aucune copie de ces couleurs (il lit `LeitnerBox.color`).
+**Alternative écartée** : migrer les systèmes existants — leurs couleurs ont pu être choisies ou conservées volontairement par l'étudiant, et rien ne distingue les deux ; elles restent modifiables par boîte.
+**Conséquences** : les systèmes existants gardent l'ancienne palette (à migrer à la demande, uniquement les boîtes encore aux anciennes valeurs par défaut). La couleur d'une boîte est aussi la bordure des items de carte mentale liés : le symbole +/− du bouton de repliage prend donc la couleur lisible (blanc ou noir, `readableTextColor`) sur la couleur de la boîte — le bleu `#001EFF` rendait l'ancien symbole sombre illisible (≈ 2:1). Le niveau 3 vaut désormais `111111` en décimal, valeur d'un ancien placeholder traité par la migration 20260913 (déjà exécutée, sans effet sur une base à jour).

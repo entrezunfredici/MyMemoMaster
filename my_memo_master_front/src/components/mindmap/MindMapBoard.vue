@@ -13,31 +13,6 @@
       @pointerleave="onPointerUp"
       @pointerdown="onBackgroundPointerDown"
     >
-      <defs>
-        <marker
-          id="arrow-forward"
-          viewBox="0 0 10 10"
-          refX="10"
-          refY="5"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto-start-reverse"
-        >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1E3A8A" />
-        </marker>
-        <marker
-          id="arrow-backward"
-          viewBox="0 0 10 10"
-          refX="0"
-          refY="5"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto"
-        >
-          <path d="M 10 0 L 0 5 L 10 10 z" fill="#1E3A8A" />
-        </marker>
-      </defs>
-
       <g :transform="`translate(${pan.x}, ${pan.y}) scale(${zoom})`">
         <MindMapZone
           v-for="zone in zones"
@@ -53,6 +28,8 @@
           :source="store.map.nodes[link.from]"
           :target="store.map.nodes[link.to]"
           :selected="store.selectedLinkId === link.id"
+          :type-label="getBranchTypeLabel(store.map.branchTypes, link.type)"
+          :reading-rank="readingRanks[link.id] || null"
           @link-pointerdown="onLinkPointerDown"
         />
 
@@ -73,9 +50,10 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { getNodeLabel } from '@/helpers/mindmapCreation';
+import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
 import MindMapNode from './MindMapNode.vue';
 import MindMapLink from './MindMapLink.vue';
+import { getBranchTypeLabel, getOutgoingLinks } from '@/helpers/mindmap/mindmapLinks';
 import MindMapZone from './MindMapZone.vue';
 
 const store = useMindMapBuilderStore();
@@ -128,6 +106,20 @@ const visibleNodeIds = computed(() => {
 });
 
 const visibleNodes = computed(() => visibleNodeIds.value.map((id) => store.map.nodes[id]));
+
+// Rang de lecture des branches, uniquement pour les items à plusieurs branches sortantes.
+const readingRanks = computed(() => {
+  const ranks = {};
+  const sources = new Set(store.map.links.map((link) => link.from));
+  sources.forEach((fromId) => {
+    const outgoing = getOutgoingLinks(store.map.links, fromId);
+    if (outgoing.length < 2) return;
+    outgoing.forEach((link, index) => {
+      ranks[link.id] = index + 1;
+    });
+  });
+  return ranks;
+});
 
 const visibleLinks = computed(() =>
   store.map.links.filter((link) =>
@@ -343,7 +335,7 @@ const onWheel = (event) => {
 .mindmap-board {
   width: 100%;
   height: 100%;
-  background: #f1f5f9;
+  background: var(--slate-100);
   border-radius: 16px;
   overflow: hidden;
   position: relative;

@@ -68,6 +68,8 @@ Le JSON stocke l'intégralité de la carte mentale. Format attendu par le store 
       "id": "<id>",
       "label": "Libellé affiché",
       "type": "text",
+      "kinds": ["quantity"],
+      "quantity": { "symbol": "v", "value": 12, "unit": "m/s" },
       "content": "Contenu détaillé du nœud",
       "mastery": "undefined",
       "zoneId": null,
@@ -99,6 +101,7 @@ Le JSON stocke l'intégralité de la carte mentale. Format attendu par le store 
       "style": {
         "primaryColor": "#1E3A8A",
         "secondaryColor": "#C0C5D2",
+        "shape": "curve",
         "bezier": true
       },
       "interactions": {
@@ -184,7 +187,11 @@ Si l'utilisateur édite le canvas **sans** avoir sélectionné de carte existant
 
 | Règle | Détail |
 |-------|--------|
-| Types de lien | `'appartenance'` (hiérarchique), extensible |
+| Types de lien | 6 types par défaut (`branchTypes` de la carte) + types créés par l'étudiant (`addBranchType`, id = slug du libellé, doublons refusés) |
+| Rôles d'un item | `type` = rôle principal (rendu/contenu) ; `kinds` = rôles supplémentaires (text, formula, function, quantity, image) ; `quantity` = `{ symbol, value, unit }` |
+| Forme | `style.shape` : `curve` / `straight` / `elbow` (ancien `bezier:false` → `straight`) |
+| Ordre de lecture | `order` rang parmi les branches sortantes d'un item (`moveLink`) ; affiché « n. type » dès 2 branches sortantes |
+| Affichage | flèche(s) aux extrémités (un ou deux sens) ramenée(s) au bord des items ; type au-dessus du milieu ; couleur secondaire = pastille au milieu |
 | Direction | `'forward'` par défaut |
 | Doublon | Un lien `(from, to)` ne peut exister qu'une fois — vérifié dans `addLink()` |
 | Lien sur soi-même | Interdit (`from === to` → retour null) |

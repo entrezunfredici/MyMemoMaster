@@ -599,10 +599,10 @@ const trailingDays = computed(() => {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: #f5f6fb;
+  background: var(--surface-muted);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #0f172a;
-  border: 10px solid #1a1aff;
+  color: var(--slate-900);
+  border: 10px solid rgb(var(--accent));
   border-radius: 16px;
 }
 
@@ -620,21 +620,21 @@ const trailingDays = computed(() => {
   align-items: center;
   gap: 12px;
   padding: 18px 24px 12px;
-  background: #ffffff;
-  border-bottom: 0.5px solid #e2e8f0;
+  background: rgb(var(--white));
+  border-bottom: 0.5px solid var(--slate-200);
 }
 
 .cal-header h1 {
   font-size: 22px;
   font-weight: 500;
-  color: #1a1aff;
+  color: rgb(var(--accent));
   margin: 0;
 }
 
 .view-toggle {
   margin-left: auto;
   display: flex;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -645,7 +645,7 @@ const trailingDays = computed(() => {
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #64748b;
+  color: var(--slate-500);
   font-weight: 500;
   transition:
     background 0.15s,
@@ -653,8 +653,8 @@ const trailingDays = computed(() => {
 }
 
 .view-toggle button.active {
-  background: #1a1aff;
-  color: #ffffff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
 }
 
 .cal-content {
@@ -693,7 +693,7 @@ const trailingDays = computed(() => {
 .year-number {
   font-size: 140px;
   font-weight: 600;
-  color: #1a1aff;
+  color: rgb(var(--accent));
   line-height: 1;
   letter-spacing: -4px;
 }
@@ -701,20 +701,20 @@ const trailingDays = computed(() => {
 .icon-btn {
   width: 30px;
   height: 30px;
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 8px;
-  background: #ffffff;
+  background: rgb(var(--white));
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--slate-500);
   font-size: 14px;
   transition: background 0.15s;
 }
 
 .icon-btn:hover {
-  background: #f1f5f9;
+  background: var(--slate-100);
 }
 
 .year-grid {
@@ -724,8 +724,8 @@ const trailingDays = computed(() => {
 }
 
 .month-block {
-  background: #ffffff;
-  border: 0.5px solid #e2e8f0;
+  background: rgb(var(--white));
+  border: 0.5px solid var(--slate-200);
   border-radius: 12px;
   padding: 12px;
   cursor: pointer;
@@ -735,13 +735,13 @@ const trailingDays = computed(() => {
 }
 
 .month-block:hover {
-  border-color: #1a1aff;
+  border-color: rgb(var(--accent));
 }
 
 .month-block h3 {
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--slate-500);
   margin: 0 0 8px;
   letter-spacing: 0.5px;
 }
@@ -754,7 +754,7 @@ const trailingDays = computed(() => {
 
 .mini-label {
   font-size: 9px;
-  color: #94a3b8;
+  color: var(--slate-500);
   text-align: center;
   padding: 1px 0;
 }
@@ -764,18 +764,18 @@ const trailingDays = computed(() => {
   text-align: center;
   padding: 2px 1px;
   border-radius: 3px;
-  color: #334155;
+  color: var(--slate-700);
 }
 
 .mini-cell.today {
-  background: #1a1aff;
-  color: #ffffff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
   border-radius: 3px;
 }
 
 .mini-cell.has-event {
-  background: rgba(26, 26, 255, 0.12);
-  color: #1a1aff;
+  background: rgb(var(--accent) / 0.12);
+  color: rgb(var(--accent));
 }
 
 /* ── Vue mensuelle ── */
@@ -790,7 +790,7 @@ const trailingDays = computed(() => {
   font-size: 18px;
   font-weight: 500;
   margin: 0;
-  color: #1a1aff;
+  color: rgb(var(--accent));
   min-width: 120px;
 }
 
@@ -799,10 +799,10 @@ const trailingDays = computed(() => {
 .month-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  border: 0.5px solid #e2e8f0;
+  border: 0.5px solid var(--slate-200);
   border-radius: 12px;
   overflow: hidden;
-  background: #e2e8f0;
+  background: var(--slate-200);
   gap: 0.5px;
 }
 
@@ -811,34 +811,34 @@ const trailingDays = computed(() => {
   font-weight: 500;
   text-align: center;
   padding: 8px 4px;
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--slate-50);
+  color: var(--slate-500);
 }
 
 .month-day-cell {
   min-width: 0;
   min-height: 90px;
   padding: 8px;
-  background: #ffffff;
+  background: rgb(var(--white));
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .month-day-cell.other-month {
-  background: #f8fafc;
+  background: var(--slate-50);
 }
 .month-day-cell.other-month .day-num {
-  color: #cbd5e1;
+  color: var(--slate-500);
 }
 .month-day-cell.weekend {
-  background: #fafaff;
+  background: var(--surface-tint);
 }
 
 .day-num {
   font-size: 13px;
   font-weight: 500;
-  color: #334155;
+  color: var(--slate-700);
   width: 26px;
   height: 26px;
   display: flex;
@@ -849,8 +849,8 @@ const trailingDays = computed(() => {
 }
 
 .month-day-cell.today .day-num {
-  background: #1a1aff;
-  color: #ffffff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
 }
 
 /* Pills d'événements colorées par type */
@@ -865,24 +865,24 @@ const trailingDays = computed(() => {
 }
 
 .event-pill--calendar {
-  background: rgba(26, 26, 255, 0.1);
-  color: #1a1aff;
+  background: rgb(var(--accent) / 0.1);
+  color: rgb(var(--accent));
 }
 
 .event-pill--deadline {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  background: rgb(var(--red-500-rgb) / 0.1);
+  color: var(--red-700);
 }
 
 .event-pill--revision {
-  background: rgba(22, 163, 74, 0.1);
-  color: #16a34a;
+  background: rgb(var(--green-600-rgb) / 0.1);
+  color: var(--green-800);
 }
 
 /* ── Onglets sidebar ── */
 .sidebar-tabs {
   display: flex;
-  border-bottom: 0.5px solid #e2e8f0;
+  border-bottom: 0.5px solid var(--slate-200);
   flex-shrink: 0;
 }
 
@@ -891,7 +891,7 @@ const trailingDays = computed(() => {
   padding: 10px 8px;
   font-size: 11px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--slate-500);
   background: none;
   border: none;
   cursor: pointer;
@@ -902,16 +902,16 @@ const trailingDays = computed(() => {
 }
 
 .sidebar-tab.active {
-  color: #1a1aff;
-  border-bottom-color: #1a1aff;
+  color: rgb(var(--accent));
+  border-bottom-color: rgb(var(--accent));
 }
 
 /* ── Agenda latéral ── */
 .cal-agenda {
   width: 220px;
   flex-shrink: 0;
-  background: #ffffff;
-  border-left: 0.5px solid #e2e8f0;
+  background: rgb(var(--white));
+  border-left: 0.5px solid var(--slate-200);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -919,7 +919,7 @@ const trailingDays = computed(() => {
 
 .agenda-section {
   padding: 14px 14px 12px;
-  border-bottom: 0.5px solid #f1f5f9;
+  border-bottom: 0.5px solid var(--slate-100);
 }
 
 .agenda-legend {
@@ -930,7 +930,7 @@ const trailingDays = computed(() => {
 .agenda-title {
   font-size: 10px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--slate-500);
   text-transform: uppercase;
   letter-spacing: 0.7px;
   margin: 0 0 10px;
@@ -938,7 +938,7 @@ const trailingDays = computed(() => {
 
 .agenda-empty {
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--slate-500);
   margin: 0;
 }
 
@@ -952,8 +952,8 @@ const trailingDays = computed(() => {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid #e2e8f0;
-  border-top-color: #1a1aff;
+  border: 2px solid var(--slate-200);
+  border-top-color: rgb(var(--accent));
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
@@ -969,7 +969,7 @@ const trailingDays = computed(() => {
   align-items: flex-start;
   gap: 8px;
   padding: 5px 0;
-  border-top: 0.5px solid #f8fafc;
+  border-top: 0.5px solid var(--slate-50);
 }
 
 .agenda-item:first-of-type {
@@ -978,7 +978,7 @@ const trailingDays = computed(() => {
 
 .agenda-time {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--slate-500);
   flex-shrink: 0;
   min-width: 34px;
   padding-top: 1px;
@@ -995,37 +995,37 @@ const trailingDays = computed(() => {
 }
 
 .agenda-item--revision .agenda-name {
-  color: #16a34a;
+  color: var(--green-800);
 }
 
 .agenda-item--deadline .agenda-name {
-  color: #dc2626;
+  color: rgb(var(--danger));
 }
 
 .agenda-item--leitner .agenda-name {
-  color: #7c3aed;
+  color: var(--violet-600);
 }
 
 .agenda-item--overdue .agenda-name {
-  color: #dc2626;
+  color: rgb(var(--danger));
   font-weight: 600;
 }
 
 .agenda-title--overdue {
-  color: #dc2626;
+  color: rgb(var(--danger));
 }
 
 .agenda-badge {
   font-size: 10px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--slate-500);
   flex-shrink: 0;
   min-width: 26px;
   padding-top: 1px;
 }
 
 .agenda-badge--overdue {
-  color: #dc2626;
+  color: rgb(var(--danger));
 }
 
 .legend-item {
@@ -1037,7 +1037,7 @@ const trailingDays = computed(() => {
 
 .legend-item span:last-child {
   font-size: 12px;
-  color: #64748b;
+  color: var(--slate-500);
 }
 
 .legend-dot {
@@ -1048,22 +1048,22 @@ const trailingDays = computed(() => {
 }
 
 .legend-dot--calendar {
-  background: #1a1aff;
+  background: rgb(var(--accent));
 }
 
 .legend-dot--deadline {
-  background: #dc2626;
+  background: rgb(var(--danger));
 }
 
 .legend-dot--revision {
-  background: #16a34a;
+  background: var(--green-600);
 }
 
 /* ── Modale détail ── */
 .detail-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: rgb(var(--slate-900-rgb) / 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1072,11 +1072,11 @@ const trailingDays = computed(() => {
 }
 
 .detail-modal {
-  background: #ffffff;
+  background: rgb(var(--white));
   border-radius: 16px;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 20px 60px rgb(var(--black) / 0.18);
   overflow: hidden;
 }
 
@@ -1086,7 +1086,7 @@ const trailingDays = computed(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 18px 18px 14px;
-  border-bottom: 0.5px solid #f1f5f9;
+  border-bottom: 0.5px solid var(--slate-100);
 }
 
 .detail-modal__meta {
@@ -1107,24 +1107,24 @@ const trailingDays = computed(() => {
 }
 
 .detail-modal__badge--deadline {
-  background: rgba(239, 68, 68, 0.12);
-  color: #dc2626;
+  background: rgb(var(--red-500-rgb) / 0.12);
+  color: var(--red-700);
 }
 
 .detail-modal__badge--revision {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
+  background: rgb(var(--green-600-rgb) / 0.12);
+  color: var(--green-800);
 }
 
 .detail-modal__badge--calendar {
-  background: rgba(26, 26, 255, 0.1);
-  color: #1a1aff;
+  background: rgb(var(--accent) / 0.1);
+  color: rgb(var(--accent));
 }
 
 .detail-modal__title {
   font-size: 16px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--slate-900);
   margin: 0;
   line-height: 1.3;
 }
@@ -1134,7 +1134,7 @@ const trailingDays = computed(() => {
   background: none;
   border: none;
   cursor: pointer;
-  color: #94a3b8;
+  color: var(--slate-500);
   padding: 2px;
   border-radius: 6px;
   display: flex;
@@ -1143,7 +1143,7 @@ const trailingDays = computed(() => {
 }
 
 .detail-modal__close:hover {
-  color: #0f172a;
+  color: var(--slate-900);
 }
 
 .detail-modal__body {
@@ -1155,13 +1155,13 @@ const trailingDays = computed(() => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #94a3b8;
+  color: var(--slate-500);
   margin: 0 0 12px;
 }
 
 .detail-modal__info {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--slate-500);
   margin: 0;
 }
 
@@ -1181,8 +1181,8 @@ const trailingDays = computed(() => {
   height: 32px;
   border-radius: 8px;
   border: none;
-  background: #1a1aff;
-  color: #fff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -1194,7 +1194,7 @@ const trailingDays = computed(() => {
 }
 
 .add-btn:hover {
-  background: #0000cc;
+  background: rgb(var(--accent-dark));
 }
 
 /* ── Cellule jour cliquable ── */
@@ -1203,7 +1203,7 @@ const trailingDays = computed(() => {
 }
 
 .month-day-cell:hover {
-  background: #f0f0ff;
+  background: var(--surface-tint-strong);
 }
 
 /* ── Formulaire création ── */
@@ -1234,21 +1234,21 @@ const trailingDays = computed(() => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8;
+  color: var(--slate-500);
 }
 
 .required {
-  color: #dc2626;
+  color: rgb(var(--danger));
 }
 
 .create-form__field input,
 .create-form__field textarea {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--slate-200);
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 13px;
-  color: #0f172a;
-  background: #f8fafc;
+  color: var(--slate-900);
+  background: var(--slate-50);
   outline: none;
   transition: border-color 0.15s;
   font-family: inherit;
@@ -1257,8 +1257,8 @@ const trailingDays = computed(() => {
 
 .create-form__field input:focus,
 .create-form__field textarea:focus {
-  border-color: #1a1aff;
-  background: #fff;
+  border-color: rgb(var(--accent));
+  background: rgb(var(--white));
 }
 
 .create-form__actions {
@@ -1271,24 +1271,24 @@ const trailingDays = computed(() => {
 .btn-cancel {
   padding: 8px 16px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #64748b;
+  border: 1px solid var(--slate-200);
+  background: rgb(var(--white));
+  color: var(--slate-500);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .btn-cancel:hover {
-  background: #f1f5f9;
+  background: var(--slate-100);
 }
 
 .btn-submit {
   padding: 8px 16px;
   border-radius: 8px;
   border: none;
-  background: #1a1aff;
-  color: #fff;
+  background: rgb(var(--accent));
+  color: rgb(var(--white));
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1296,7 +1296,7 @@ const trailingDays = computed(() => {
 }
 
 .btn-submit:hover:not(:disabled) {
-  background: #0000cc;
+  background: rgb(var(--accent-dark));
 }
 
 .btn-submit:disabled {
