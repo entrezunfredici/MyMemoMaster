@@ -16,111 +16,17 @@
       <p class="text-sm text-gray-500 mb-8">{{ test.subject?.name }}</p>
 
       <!-- Mode quiz -->
-      <div v-if="!resultsShown" class="space-y-8">
-        <div
+      <div v-if="!quiz.resultsShown.value" class="space-y-8">
+        <QuizQuestion
           v-for="(question, idx) in questions"
           :key="question.idQuestion"
-          class="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200"
-        >
-          <h3 class="text-lg font-semibold text-heading mb-4">Question {{ idx + 1 }}</h3>
-          <p :id="`question-statement-${idx}`" class="text-base text-body mb-5"><FormulaText :text="question.statement || ''" /></p>
-          <img
-            v-if="question.imageUrl"
-            :src="question.imageUrl"
-            :alt="question.imageOriginalName || `Illustration de la question ${idx + 1}`"
-            class="max-w-full rounded-lg border border-gray-200 mb-5"
-          />
-
-          <!-- open -->
-          <template v-if="question.type === 'open'">
-            <FormulaHelper v-model="userAnswers[idx]">
-              <textarea aria-label="Entrez votre réponse ici"
-                v-model="userAnswers[idx]"
-                placeholder="Entrez votre réponse ici... (formules entre $…$)"
-                class="w-full px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                rows="3"
-              />
-            </FormulaHelper>
-          </template>
-
-          <!-- mcq -->
-          <template v-else-if="question.type === 'mcq'">
-            <!-- CHOIX: role="radiogroup" + aria-labelledby plutôt que <fieldset>/<legend>
-                 RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans reprendre le style
-                 par défaut du navigateur pour <fieldset> (bordure/marge) — l'énoncé de la
-                 question (id="question-statement-N" ci-dessus) sert de légende programmatique. -->
-            <div class="space-y-2" role="radiogroup" :aria-labelledby="`question-statement-${idx}`">
-              <label
-                v-for="oi in mcqDisplayOrder[idx]"
-                :key="oi"
-                class="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition"
-                :class="userAnswers[idx] === oi ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'"
-              >
-                <input
-                  type="radio"
-                  :name="`q-${idx}`"
-                  :checked="userAnswers[idx] === oi"
-                  @change="userAnswers[idx] = oi"
-                  class="accent-blue-600"
-                />
-                <span><FormulaText :text="question.content.options[oi]?.text || ''" /></span>
-              </label>
-            </div>
-          </template>
-
-          <!-- fill_blank -->
-          <template v-else-if="question.type === 'fill_blank'">
-            <div class="prose text-base mb-4 leading-relaxed">
-              <span
-                v-for="(part, pi) in parsedTemplate(question)"
-                :key="pi"
-              >
-                <FormulaText v-if="part.type === 'text'" :text="part.value" />
-                <input :aria-label="`Réponse du trou ${part.index}`"
-                  v-else
-                  v-model="userAnswers[idx][part.index]"
-                  type="text"
-                  :placeholder="`trou ${part.index}`"
-                  class="inline-block border-b-2 border-blue-400 bg-transparent text-center w-28 mx-1 focus:outline-none focus:border-blue-600"
-                />
-              </span>
-            </div>
-          </template>
-
-          <!-- reorder -->
-          <template v-else-if="question.type === 'reorder'">
-            <p class="text-sm text-gray-500 mb-3">Clique sur les fragments dans le bon ordre :</p>
-            <div class="flex flex-wrap gap-2 mb-4">
-              <button
-                v-for="(frag, fi) in shuffledFragments[idx]"
-                :key="fi"
-                type="button"
-                :disabled="selectedFragments[idx].includes(fi)"
-                @click="selectFragment(idx, fi)"
-                class="px-3 py-1.5 border-2 rounded-lg text-sm font-medium transition"
-                :class="selectedFragments[idx].includes(fi) ? 'border-gray-200 text-gray-300 bg-gray-50 cursor-not-allowed' : 'border-blue-400 text-blue-700 hover:bg-blue-50'"
-              >
-                <FormulaText :text="frag" />
-              </button>
-            </div>
-            <div class="min-h-10 flex flex-wrap gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg">
-              <span class="text-gray-500 text-sm italic" v-if="!selectedFragments[idx].length">Sélectionne les fragments ci-dessus...</span>
-              <button
-                v-for="(fi, pos) in selectedFragments[idx]"
-                :key="pos"
-                type="button"
-                @click="unselectFragment(idx, pos)"
-                class="px-3 py-1.5 border-2 border-green-400 text-green-700 rounded-lg text-sm font-medium hover:bg-red-50 hover:border-red-400 hover:text-red-700 transition"
-                title="Cliquer pour retirer"
-              >
-                <FormulaText :text="shuffledFragments[idx][fi]" />
-              </button>
-            </div>
-          </template>
-        </div>
+          :question="question"
+          :index="idx"
+          :state="quiz.states[idx]"
+        />
 
         <button
-          @click="submitAnswers"
+          @click="quiz.submit"
           class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition mt-4 border-2 border-blue-800 hover:scale-105"
         >
           Vérifier les résultats
@@ -128,152 +34,36 @@
       </div>
 
       <!-- Mode résultats -->
-      <!-- RGAA 13.x — zone aria-live toujours montée : le score est annoncé aux
-           lecteurs d'écran quand il apparaît (la zone doit précéder le changement) -->
-      <div aria-live="polite">
-        <div v-if="resultsShown" class="bg-gradient-to-r from-blue-600 to-blue-700 p-8 rounded-lg text-white text-center mb-8">
-          <h2 class="text-3xl font-bold mb-2">Votre score</h2>
-          <p class="text-5xl font-bold">{{ formatPoints(correctCount) }}/{{ questions.length }}</p>
-          <p class="text-lg mt-2">{{ Math.round((correctCount / questions.length) * 100) }}%</p>
-        </div>
-      </div>
-      <div v-if="resultsShown" class="space-y-6">
+      <QuizResults
+        :questions="questions"
+        :states="quiz.states"
+        :results="quiz.results"
+        :correct-count="quiz.correctCount.value"
+        :shown="quiz.resultsShown.value"
+        @reset="quiz.reset"
+      />
 
-        <!-- Détail par question -->
-        <div
-          v-for="(question, idx) in questions"
-          :key="question.idQuestion"
-          class="bg-gray-50 p-6 rounded-lg border-l-4"
-          :class="resultTone(idx).border"
-        >
-          <div class="flex items-start justify-between mb-3">
-            <h3 class="text-lg font-semibold text-heading">Question {{ idx + 1 }}</h3>
-            <div class="flex items-center gap-2">
-              <span
-                v-if="partialPoints(idx) !== null"
-                class="text-sm font-semibold text-gray-700"
-                data-testid="partial-points"
-              >
-                Note : {{ formatPoints(partialPoints(idx)) }} / 1
-              </span>
-              <span
-                class="font-bold py-1 px-3 rounded text-white text-sm"
-                :class="resultTone(idx).badge"
-              >
-                {{ resultTone(idx).label }}
-              </span>
-            </div>
-          </div>
-          <p class="text-base text-body mb-4"><FormulaText :text="question.statement || ''" /></p>
-          <img
-            v-if="question.imageUrl"
-            :src="question.imageUrl"
-            :alt="question.imageOriginalName || `Illustration de la question ${idx + 1}`"
-            class="max-w-full rounded-lg border border-gray-200 mb-4"
-          />
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-white p-4 rounded-lg border border-gray-200">
-              <p class="font-semibold text-gray-700 mb-2 text-sm">Votre réponse</p>
-              <p class="text-gray-600 text-sm"><FormulaText :text="formatUserAnswer(question, idx)" /></p>
-            </div>
-            <div class="bg-white p-4 rounded-lg border border-gray-200">
-              <p class="font-semibold text-gray-700 mb-2 text-sm">Réponse attendue</p>
-              <p class="text-gray-600 text-sm"><FormulaText :text="formatCorrectAnswer(question)" /></p>
-            </div>
-          </div>
-          <p
-            v-if="question.type === 'open' && questionResults[idx]?.explanation"
-            class="mt-3 text-xs text-gray-500 italic"
-          >
-            {{ questionResults[idx].explanation }}
-          </p>
-          <p
-            v-if="questionResults[idx]?.degraded"
-            class="mt-1 text-xs text-amber-700"
-            role="status"
-            data-testid="degraded-notice"
-          >
-            {{ questionResults[idx].degradedMessage }}
-          </p>
-        </div>
-
-        <button
-          @click="resetQuiz"
-          class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition border-2 border-gray-800"
-        >
-          Recommencer
-        </button>
-      </div>
-
-      <!-- Échéances liées à cet exercice -->
-      <div v-if="deadlineStore.testDeadlines.length" class="mt-12 border-t border-gray-200 pt-8">
-        <h2 class="text-xl font-bold text-heading mb-4">Échéances liées à cet exercice</h2>
-        <div class="space-y-2">
-          <div v-for="dl in deadlineStore.testDeadlines" :key="dl.id"
-            class="rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between">
-            <div>
-              <p class="text-sm font-semibold text-gray-800">{{ dl.name }}</p>
-              <p class="text-xs text-gray-500">
-                {{ dl.occurrence?.calendarEvent?.name }} ·
-                {{ formatDeadlineDate(dl.dueDate) }}
-                <span v-if="dl.dueTime"> à {{ dl.dueTime.slice(0,5) }}</span>
-              </p>
-            </div>
-            <span class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">{{ deadlineTypeLabel(dl.type) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Historique des résultats -->
-      <div v-if="resultHistory.length" class="mt-12 border-t border-gray-200 pt-8">
-        <h2 class="text-xl font-bold text-heading mb-4">Historique de vos résultats</h2>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm border-collapse">
-            <caption class="sr-only">Historique de vos résultats</caption>
-            <thead>
-              <tr class="bg-gray-100 text-left">
-                <th scope="col" class="px-4 py-2 rounded-tl-lg font-semibold text-gray-600">Date</th>
-                <th scope="col" class="px-4 py-2 font-semibold text-gray-600">Score</th>
-                <th scope="col" class="px-4 py-2 rounded-tr-lg font-semibold text-gray-600">Résultat</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="r in resultHistory"
-                :key="r.resultId"
-                class="border-b border-gray-100 hover:bg-gray-50"
-              >
-                <td class="px-4 py-3 text-gray-600">{{ formatDate(r.completedAt) }}</td>
-                <td class="px-4 py-3 font-semibold">{{ formatPoints(r.score) }}/{{ r.total }}</td>
-                <td class="px-4 py-3">
-                  <span
-                    class="px-2 py-1 rounded-full text-xs font-bold"
-                    :class="(r.score / r.total) >= 0.5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-                  >
-                    {{ Math.round((r.score / r.total) * 100) }}%
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ExerciseLinkedDeadlines />
+      <ExerciseResultHistory :history="resultHistory" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { deadlineTypeLabel } from '@/helpers/classroomFormat'
-import { ref, reactive, computed, onMounted } from 'vue'
+// Page de détail d'un exercice : chargement, puis le quiz (QuizQuestion), l'écran de résultats (QuizResults), les
+// échéances liées et l'historique. L'état du quiz (réponses, envoi, résultats, chronomètre) est dans
+// useExerciseQuiz ; la logique pure (mélange, formatage, notes) dans helpers/exerciseQuiz.js.
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTestStore } from '@/stores/tests'
 import { useTestResultStore } from '@/stores/testResults'
 import { useDeadlineStore } from '@/stores/deadlines'
 import { notif } from '@/helpers/notif'
-import FormulaText from '@/components/FormulaTextComponent.vue'
-import FormulaHelper from '@/components/FormulaHelperComponent.vue'
-import { normalizeFormulaSyntax } from '@/components/interpreter/interpreter.js'
+import QuizQuestion from '@/components/exercises/quiz/QuizQuestion.vue'
+import QuizResults from '@/components/exercises/quiz/QuizResults.vue'
+import ExerciseLinkedDeadlines from '@/components/exercises/quiz/ExerciseLinkedDeadlines.vue'
+import ExerciseResultHistory from '@/components/exercises/quiz/ExerciseResultHistory.vue'
+import { useExerciseQuiz } from '@/composables/useExerciseQuiz'
 
 const route = useRoute()
 const testStore = useTestStore()
@@ -281,27 +71,12 @@ const testResultStore = useTestResultStore()
 const deadlineStore = useDeadlineStore()
 
 const loading = ref(true)
-const resultsShown = ref(false)
 
 const test = computed(() => testStore.test?.testId ? testStore.test : null)
 const questions = computed(() => test.value?.question ?? [])
 const resultHistory = computed(() => testResultStore.results)
 
-const userAnswers = reactive([])
-const selectedFragments = reactive([])
-const shuffledFragments = reactive([])
-// Ordre d'affichage des options de QCM (indices d'origine mélangés) : sans cela la bonne réponse
-// apparaîtrait toujours dans l'ordre de saisie, souvent en premier.
-const mcqDisplayOrder = reactive([])
-const questionResults = reactive([])
-const correctCount = ref(0)
-
-// Chronométrage du temps réellement passé sur le quiz (alimente le KPI "Temps
-// total de révision") — démarré quand les questions deviennent interactives,
-// pas pendant le chargement de la page ni l'affichage des résultats précédents.
-const startedAt = ref(null)
-
-// ── lifecycle ─────────────────────────────────────────────────────────────────
+const quiz = useExerciseQuiz({ test, questions })
 
 onMounted(async () => {
   const id = Number(route.params.id)
@@ -315,201 +90,7 @@ onMounted(async () => {
     loading.value = false
     return
   }
-  initAnswers()
-  startedAt.value = Date.now()
+  quiz.start()
   loading.value = false
 })
-
-function initAnswers() {
-  userAnswers.splice(0)
-  selectedFragments.splice(0)
-  shuffledFragments.splice(0)
-  mcqDisplayOrder.splice(0)
-
-  questions.value.forEach((q) => {
-    const order = (q.content?.options ?? []).map((_, i) => i)
-    if (q.type === 'mcq') shuffled(order)
-    mcqDisplayOrder.push(order)
-    if (q.type === 'open') {
-      userAnswers.push('')
-    } else if (q.type === 'mcq') {
-      userAnswers.push(null)
-    } else if (q.type === 'fill_blank') {
-      const count = (q.content?.blanks ?? []).length
-      userAnswers.push(Array(count).fill(''))
-    } else if (q.type === 'reorder') {
-      userAnswers.push([])
-      selectedFragments.push([])
-      const frags = [...(q.content?.fragments ?? [])]
-      shuffled(frags)
-      shuffledFragments.push(frags)
-      return
-    }
-    if (q.type !== 'reorder') {
-      selectedFragments.push([])
-      shuffledFragments.push([])
-    }
-  })
-}
-
-function shuffled(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]]
-  }
-}
-
-// ── fill_blank ────────────────────────────────────────────────────────────────
-
-function parsedTemplate(question) {
-  const template = question.content?.template ?? ''
-  const parts = []
-  let lastIndex = 0
-  const regex = /\{\{(\d+)\}\}/g
-  let match
-  while ((match = regex.exec(template)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({ type: 'text', value: template.slice(lastIndex, match.index) })
-    }
-    parts.push({ type: 'blank', index: parseInt(match[1]) })
-    lastIndex = match.index + match[0].length
-  }
-  if (lastIndex < template.length) {
-    parts.push({ type: 'text', value: template.slice(lastIndex) })
-  }
-  return parts
-}
-
-// ── reorder ───────────────────────────────────────────────────────────────────
-
-function selectFragment(qIdx, fragIdx) {
-  selectedFragments[qIdx].push(fragIdx)
-  userAnswers[qIdx] = selectedFragments[qIdx].map(fi => shuffledFragments[qIdx][fi])
-}
-
-function unselectFragment(qIdx, pos) {
-  selectedFragments[qIdx].splice(pos, 1)
-  userAnswers[qIdx] = selectedFragments[qIdx].map(fi => shuffledFragments[qIdx][fi])
-}
-
-// ── correction ────────────────────────────────────────────────────────────────
-
-// Normalise la syntaxe des formules d'une réponse avant envoi (string ou
-// tableau de strings — les index MCQ restent intacts)
-function normalizeAnswer(answer) {
-  if (typeof answer === 'string') return normalizeFormulaSyntax(answer)
-  if (Array.isArray(answer)) {
-    return answer.map(a => (typeof a === 'string' ? normalizeFormulaSyntax(a) : a))
-  }
-  return answer
-}
-
-async function submitAnswers() {
-  const answers = questions.value.map((q, idx) => ({
-    questionId: q.idQuestion,
-    answer: normalizeAnswer(userAnswers[idx] ?? null)
-  }))
-
-  const durationSeconds = startedAt.value ? Math.round((Date.now() - startedAt.value) / 1000) : null
-  const result = await testResultStore.submitTest(test.value.testId, answers, durationSeconds)
-  if (!result) {
-    notif.notify('Erreur lors de la correction.', 'error')
-    return
-  }
-
-  questionResults.splice(0)
-  const resultMap = Object.fromEntries(result.results.map(r => [r.questionId, r]))
-  questions.value.forEach(q => {
-    questionResults.push(resultMap[q.idQuestion] ?? { correct: false, correctAnswer: '—' })
-  })
-  correctCount.value = result.score
-  resultsShown.value = true
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-/**
- * Formate un nombre de points à la française, 2 décimales au plus (« 2,4 »).
- */
-function formatPoints(value) {
-  return Number(value ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
-}
-
-/**
- * Crédit partiel d'une question (note strictement entre 0 et 1, ex. 0,6 pour une réponse ouverte
- * incomplète), ou `null` pour un résultat binaire (0 ou 1, QCM, texte à trous…).
- */
-function partialPoints(idx) {
-  const points = questionResults[idx]?.points
-  return typeof points === 'number' && points > 0 && points < 1 ? points : null
-}
-
-/**
- * Aspect d'une question corrigée : correcte (vert), partielle (ambre : pas correcte mais crédit > 0),
- * ou incorrecte (rouge).
- */
-function resultTone(idx) {
-  const result = questionResults[idx]
-  if (result?.correct) return { label: 'Correct', badge: 'bg-green-500', border: 'border-green-500' }
-  if (partialPoints(idx) !== null) return { label: 'Partiel', badge: 'bg-amber-700', border: 'border-amber-500' }
-  return { label: 'Incorrect', badge: 'bg-red-500', border: 'border-red-500' }
-}
-
-function resetQuiz() {
-  resultsShown.value = false
-  initAnswers()
-  startedAt.value = Date.now()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-// ── affichage correction ──────────────────────────────────────────────────────
-
-function formatUserAnswer(question, idx) {
-  const ans = userAnswers[idx]
-  switch (question.type) {
-    case 'open':
-      return ans || '(Pas de réponse)'
-    case 'mcq': {
-      const opts = question.content?.options ?? []
-      return ans !== null && opts[ans] ? opts[ans].text : '(Pas de réponse)'
-    }
-    case 'fill_blank':
-      return (ans ?? []).join(' / ') || '(Pas de réponse)'
-    case 'reorder':
-      return (ans ?? []).join(' ') || '(Pas de réponse)'
-    default:
-      return '—'
-  }
-}
-
-function formatCorrectAnswer(question) {
-  const content = question.content ?? {}
-  switch (question.type) {
-    case 'open':
-      return content.correct_answer ?? '—'
-    case 'mcq': {
-      const correct = (content.options ?? []).find(o => o.correct)
-      return correct?.text ?? '—'
-    }
-    case 'fill_blank':
-      return (content.blanks ?? []).join(' / ')
-    case 'reorder':
-      return (content.fragments ?? []).join(' ')
-    default:
-      return '—'
-  }
-}
-
-function formatDate(isoDate) {
-  if (!isoDate) return '—'
-  return new Date(isoDate).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  })
-}
-
-function formatDeadlineDate(dueDate) {
-  if (!dueDate) return '—'
-  return new Date(dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
 </script>
