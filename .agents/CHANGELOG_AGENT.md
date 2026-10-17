@@ -13286,3 +13286,41 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Tests** : `ProfilePage` réécrit pour le contrat page → store (5 tests) ; `ForgotPasswordPage` / `ResetPasswordPage` montés avec Pinia ; nouveaux : `auth.profile.store` (14), `subjects.createSubject.store` (5), `useStoredFile` (12), `exercisesApi` (9). Suite front 103 fichiers, ESLint, audits RGAA / couleurs / Tailwind à 0, build, Playwright axe-core.
 **Hypothèse** : `ExercisesPage` garde ses appels dans un module d'accès plutôt que dans les stores `tests` / `questions`, dont les actions ne renvoient qu'un booléen et notifient en interne (voir `submitCreate`).
 **Dette restante liée** : `ExercisesPage` reste volumineuse (714 lignes) ; `ClassroomEnseignantView` (≈ 880 lignes).
+
+
+## [2026-10-17] [REF] Suppression de `AdminPage.vue` (code mort) et note de la future page d'administration (branche `dev_front_split_pages`)
+
+**Constat** : `AdminPage.vue` n'avait aucune route ni import (seul son test la référençait) ; c'était une version de juillet de l'onglet « Plateforme » de `/classroom` (`ClassroomPlateformeView`, qui l'a remplacée avec en plus l'invitation par email). Les deux s'adressent au même rôle (administrateur plateforme, `roleId = 1`).
+**Fait** : `AdminPage.vue` et son test (24 tests d'un code non atteignable) supprimés ; note corrigée dans `docs/AUDIT_RGAA_106.md` ; commentaire de `MobileNavComponent.vue` pointé vers le nouveau document.
+**À FAIRE (second temps)** : créer une vraie page d'administration plateforme — gestion des rôles, rôle d'un compte, journal d'audit global. Trois fonctions que l'API expose déjà (`requireRole(1)`) et qu'aucun écran n'utilise. Cahier des charges, contraintes et routes dans **`docs/A_FAIRE_PAGE_ADMINISTRATION.md`**.
+**Tests** : suite front 102 fichiers, ESLint.
+
+
+## [2026-10-17] [REF] `ExercisesPage` découpée : 714 → 128 lignes (branche `dev_front_split_pages`)
+
+**Contexte** : première des « pages trop grosses » (ExercisesPage 714, ClassroomEnseignantView 865, ClassroomEtablissementView 616, ClassroomEtudiantView 540, ExerciseDetailPage 518, MindMapPalette 635, MindMapNode 625, store mindmapBuilder 504).
+**Fait** (même modèle que `FlashcardsCardsPage` : les fenêtres gèrent leur état, la page les pilote par une référence) :
+- `components/exercises/ExerciseFormModal.vue` (155 l.) — fenêtre de création / modification + flux IA ; pilotée par `openCreate()` / `openEdit(test)`.
+- `components/exercises/ExerciseQuestionEditor.vue` (140 l.) — une question : type, énoncé, champs propres aux 4 types. L'objet `question` appartient au formulaire parent et est édité en place (alias `computed`, voir le commentaire du fichier).
+- `components/exercises/ExerciseAssignModal.vue` (72 l.) — assignation aux groupes ; `open(test)`.
+- `composables/useExerciseForm.js` (état, ouverture, création, modification), `useExerciseAiFlow.js` (génération IA), `useAssignableGroups.js` (groupes où l'utilisateur est enseignant).
+- `helpers/exerciseQuestionEdit.js` — question vierge, options QCM, trous, `isBlankUntouchedQuestion`, `extractErrorMessage` (fonctions pures).
+**Preuve de non-régression** : avant de remplacer la page, copie de l'ancienne version comparée à la nouvelle dans **10 états** (liste, création vide, 4 types de questions renseignés, suppression de question/option, édition de 4 types chargés, partage de groupes, assignation, IA configuration / révision, erreur de formulaire) : DOM et valeurs des champs **identiques** ; une modification volontaire d'un libellé fait échouer 8 des 10 scénarios (la comparaison est donc sensible). Échafaudage supprimé après vérification. Les 27 tests existants de la page passent sans modification.
+**Tests** : +24 `exerciseQuestionEdit` (helpers), +15 `ExerciseQuestionEditor`, +8 `ExerciseAssignModal`, +14 `useExerciseForm` ; suite front 106 fichiers, ESLint, audits RGAA / couleurs / Tailwind à 0, build, 36 tests Playwright axe-core.
+**Reste (pages trop grosses)** : ClassroomEnseignantView, ClassroomEtablissementView, ClassroomEtudiantView, ExerciseDetailPage, MindMapPalette (≈ 250 lignes de script), MindMapNode, store mindmapBuilder.
+
+
+## [2026-10-17] [REF] `ClassroomEnseignantView` découpée : 865 → 135 lignes (branche `dev_front_split_pages`)
+
+**Contexte** : deuxième des « pages trop grosses » (après `ExercisesPage`) ; la plus grosse du front et **sans aucun test**.
+**Fait** : un panneau par fonction dans `components/classroom/teacher/` (11 composants, 27 à 183 lignes) —
+`TeacherGroupPicker`, `TeacherAnalyticsPanel` (+ `TeacherStudentKpi`, KPI personnels partagés), `TeacherSectionsPanel`, `TeacherDeadlinesPanel`, `TeacherSectionForm`, `TeacherResourceForm`, `TeacherResourceList`, `TeacherDeadlineForm`, `TeacherInviteForm`, `TeacherMembersPanel`. Chacun possède son formulaire et ses actions ; la page ne garde que la sélection du groupe, le chargement de ses données et la modale de confirmation.
+- `composables/useConfirmAction.js` : la modale de confirmation **unique** (section, échéance, ressource, membre) est fournie par la page (`provideConfirmAction`) ; les panneaux demandent une confirmation par `useConfirmAction()` sans connaître la page.
+- `helpers/classroomFormat.js` : formatage et libellés purs (dates, tailles, icônes, types, minutes, discipline).
+**Preuve de non-régression** : avant de remplacer la vue, copie de l'ancienne version comparée à la nouvelle dans **15 états** (groupe par défaut, étudiant déplié avec KPI complets / sans consentement / en chargement, rendu déplié, les 4 confirmations de suppression, formulaires vides puis renseignés, second groupe, sélection au clavier, gérant d'établissement avec un groupe sans membre, aucun groupe) : DOM et valeurs des champs **identiques**. Quatre modifications volontaires de libellés (3 composants) ont chacune fait échouer la comparaison ; la 4ᵉ a révélé un cas non couvert (groupe sans membre), ajouté. Échafaudage supprimé après vérification.
+**Deux changements de comportement assumés** :
+1. L'analyse pédagogique se charge désormais par le panneau lui-même (jeton `refreshToken` : même rechargement qu'avant à chaque clic sur un groupe, y compris le groupe déjà affiché). Le « Chargement… » des sections et des échéances n'attend donc plus l'analyse — il se termine au plus tôt, jamais plus tard.
+2. **Correction d'un défaut trouvé par les nouveaux tests** : l'icône d'un fichier `.pptx` ou `.xlsx` était celle d'un document Word (leur type MIME contient « officedocument », testé avant « presentation » / « sheet »). L'ordre des vérifications est corrigé dans `fileIcon`.
+**Tests** : `classroomFormat` 41, `useConfirmAction` 6, panneaux 60, page 16 ; suite front 110 fichiers, ESLint, audits RGAA / couleurs / Tailwind à 0, build, 36 tests Playwright axe-core.
+**Constat (non traité, RGAA)** : dans `TeacherAnalyticsPanel`, chaque ligne d'étudiant est un `role="button"` qui CONTIENT du contenu interactif déplié (fiche détaillée, KPI) — contenu interactif imbriqué dans un bouton ARIA, à restructurer (bouton d'en-tête + panneau frère, comme l'accordéon de `SubjectsPage`). Le panneau de sections a le même motif pour les rendus.
+**Reste (pages trop grosses)** : ClassroomEtablissementView (616), ClassroomEtudiantView (540), ExerciseDetailPage (518), MindMapPalette (635), MindMapNode (625), store `mindmapBuilder` (504).

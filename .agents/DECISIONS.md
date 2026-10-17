@@ -5160,3 +5160,27 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : toute requête passe par (1) un store quand l'action a un état partagé ou notifie (`auth`, `subjects`), (2) un composable quand elle est réutilisée avec de la logique d'interface (`useStoredFile`), ou (3) un module d'accès `helpers/*Api.js` qui renvoie la réponse brute quand la page doit lire le statut ou le message (`exercisesApi`, `flashcardsApi`). `@/helpers/api` est interdit par ESLint dans `src/pages` et `src/components`.
 **Alternative écartée** : tout faire passer par les stores existants (les actions de `tests` / `questions` renvoient un booléen et notifient en interne : la page perdrait le message d'erreur précis qu'elle affiche) ; une règle uniquement documentaire (l'écart serait revenu, comme pour les 7 fichiers actuels).
 **Conséquences** : une route vit à un seul endroit et se teste à part ; les pages se testent contre un store simulé (contrat page ↔ store) et le store se teste contre l'API simulée ; ajouter un appel direct dans une page fait échouer le lint en CI.
+
+
+## 2026-10-17 — `AdminPage` : supprimer puis recréer plutôt que modifier
+
+**Contexte** : une page d'administration dédiée est souhaitée (rôles, rôle des comptes, audit global) ; `AdminPage.vue` existait mais n'était pas routée et dupliquait à 92 % l'onglet « Plateforme ».
+**Décision** : suppression immédiate de l'ancien fichier, et recréation ultérieure d'une page au contenu différent (cahier des charges dans `docs/A_FAIRE_PAGE_ADMINISTRATION.md`).
+**Alternative écartée** : modifier l'existant. Aucune ligne de la page n'est réutilisable (gestion des établissements, déjà couverte par l'onglet Plateforme), elle gardait un doublon à maintenir en parallèle, et son ancien test donnait l'impression d'une couverture sur du code inatteignable.
+**Conséquences** : le doublon disparaît sans changer le comportement de l'application ; la future page repart d'un cahier des charges et des conventions actuelles (stores, `v-dialog`, route `meta.roles`).
+
+
+## 2026-10-17 — Découpage de page : la fenêtre porte son état, la page la pilote par référence
+
+**Contexte** : `ExercisesPage` mêlait liste, formulaire de 4 types de questions, flux IA et assignation (714 lignes, 411 de script).
+**Décision** : un composant par fenêtre qui possède son composable et expose `open…()` ; la page n'a plus que la liste, les filtres et la suppression. Les opérations d'édition d'une question sont des fonctions pures (`helpers/exerciseQuestionEdit.js`) ; la question elle-même reste un objet réactif du formulaire parent, édité en place par `ExerciseQuestionEditor` via un alias `computed`.
+**Alternative écartée** : faire remonter chaque modification par événements (`update:question`) — il faudrait recopier les tableaux imbriqués (options, formulations, fragments) à chaque frappe, avec risque de désynchronisation, pour aucun gain de lisibilité ; passer le formulaire en `provide/inject` (couplage implicite entre fichiers).
+**Conséquences** : même comportement et même DOM que l'ancienne page (prouvé par comparaison) ; les tests de la page, qui passent par le DOM et les stores simulés, n'ont pas bougé ; chaque morceau se teste seul.
+
+
+## 2026-10-17 — Une modale de confirmation commune fournie par la page (`provide` / `inject`)
+
+**Contexte** : `ClassroomEnseignantView` utilisait une seule modale pour quatre suppressions (section, échéance, ressource, retrait de membre). Découpée en panneaux, chacun a besoin de la déclencher.
+**Décision** : la page appelle `provideConfirmAction()` et affiche la modale ; chaque panneau appelle `useConfirmAction()` pour obtenir `askConfirm(titre, message, action)`. Une erreur explicite est levée si aucun parent n'a fourni la fonction.
+**Alternative écartée** : une modale par panneau (plusieurs instances, DOM différent de l'existant, quatre fois le même code) ; faire remonter des événements `ask-confirm` à la page (la page devrait connaître chaque action destructrice, ce qui ramènerait la logique qu'on vient d'en retirer) ; un store Pinia global (état partagé entre pages sans nécessité).
+**Conséquences** : la page ne connaît aucune suppression ; un nouveau panneau obtient la confirmation en une ligne ; les panneaux se testent seuls avec une fonction `ask` simulée (`provide: { [CONFIRM_ACTION_KEY]: spy }`).
