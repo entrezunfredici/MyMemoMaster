@@ -136,6 +136,16 @@ describe('AdminPage', () => {
       expect(modal(wrapper).find('input[aria-label="ID admin (optionnel)"]').element.value).toBe('8')
     })
 
+    it('RGAA 7.1 : dialogue modal nommé par son titre, fermé par Échap', async () => {
+      const { wrapper } = mountPage()
+      await openEdit(wrapper)
+      const d = wrapper.find('[role="dialog"]')
+      expect(d.attributes('aria-modal')).toBe('true')
+      expect(wrapper.find(`#${d.attributes('aria-labelledby')}`).text()).toBe("Modifier l'établissement")
+      await d.trigger('keydown', { key: 'Escape' })
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    })
+
     it('succès - envoie les valeurs et ferme', async () => {
       const { wrapper, store } = mountPage()
       store.updateEtab.mockResolvedValue(true)

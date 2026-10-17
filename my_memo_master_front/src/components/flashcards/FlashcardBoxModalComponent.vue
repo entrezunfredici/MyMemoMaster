@@ -3,11 +3,11 @@
   <div
     v-if="showModal"
     class="modal-overlay"
-    @mousedown.self="close"
+    @mousedown.self="close" v-dialog="close" role="dialog" aria-modal="true" aria-labelledby="flashcard-box-modal-title"
   >
     <div class="modal-panel modal-panel--sm">
       <button aria-label="Fermer" @click="close" class="modal-close">&times;</button>
-      <h2 class="modal-title">
+      <h2 id="flashcard-box-modal-title" class="modal-title">
         {{ editingBox ? 'Modifier la boîte' : 'Nouvelle boîte' }}
       </h2>
       <form @submit.prevent="submit">
@@ -60,6 +60,7 @@
 </template>
 
 <script setup>
+import { dialogDirective as vDialog } from '@/directives/dialog'
 // Fenêtre d'ajout / modification d'une boîte de Leitner. Se pilote depuis la page avec
 // `openAdd()` / `openEdit(box)` (via une référence de composant) ; la logique est dans useBoxForm.
 import { useBoxForm } from '@/composables/useBoxForm'

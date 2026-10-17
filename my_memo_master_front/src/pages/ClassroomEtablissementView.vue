@@ -58,9 +58,9 @@
         <h2 class="text-lg font-semibold text-dark">Journal d'activité</h2>
         <div class="flex flex-wrap gap-2">
           <input aria-label="Action (ex: USER_INVITED)" v-model="auditFilters.action" type="text" placeholder="Action (ex: USER_INVITED)"
-            class="rounded-lg border border-gray px-3 py-1.5 text-sm" />
+            class="rounded-lg border border-gray-500 px-3 py-1.5 text-sm" />
           <input aria-label="Limite (défaut 100)" v-model="auditFilters.limit" type="number" placeholder="Limite (défaut 100)"
-            class="rounded-lg border border-gray px-3 py-1.5 text-sm w-36" />
+            class="rounded-lg border border-gray-500 px-3 py-1.5 text-sm w-36" />
           <button @click="reloadAudit"
             class="rounded-lg bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20 transition">
             Filtrer
@@ -170,13 +170,13 @@
         <h3 class="text-sm font-semibold text-primary">Nouvelle classe</h3>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
           <input aria-label="Nom" v-model="createGroupForm.name" type="text" placeholder="Nom *"
-            class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
           <input aria-label="Code (ex: MP2I-A)" v-model="createGroupForm.code" type="text" placeholder="Code (ex: MP2I-A)"
-            class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
           <input aria-label="Niveau (ex: Prépa)" v-model="createGroupForm.level" type="text" placeholder="Niveau (ex: Prépa)"
-            class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
           <input aria-label="Description" v-model="createGroupForm.description" type="text" placeholder="Description"
-            class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
         </div>
         <div class="flex gap-2">
           <button @click="submitCreateGroup"
@@ -223,8 +223,8 @@
               <h3 class="text-sm font-semibold text-primary">Nouveau créneau</h3>
               <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <input aria-label="Nom" v-model="eventForm.name" type="text" placeholder="Nom *"
-                  class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-                <select aria-label="Type d'événement" v-model="eventForm.type" class="rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+                  class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
+                <select aria-label="Type d'événement" v-model="eventForm.type" class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm bg-white">
                   <option value="cours">Cours</option>
                   <option value="examen">Examen</option>
                   <option value="autre">Autre</option>
@@ -245,7 +245,7 @@
 
               <!-- Récurrence automatique -->
               <template v-if="eventForm.recurrenceMode === 'auto'">
-                <select aria-label="Fréquence" v-model="eventForm.frequency" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+                <select aria-label="Fréquence" v-model="eventForm.frequency" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm bg-white">
                   <option value="weekly">Hebdomadaire</option>
                   <option value="biweekly">Bi-hebdomadaire</option>
                   <option value="monthly">Mensuel</option>
@@ -263,11 +263,11 @@
                 <div class="grid grid-cols-2 gap-2">
                   <div>
                     <label class="text-xs text-dark/60">Début de période</label>
-                    <input aria-label="Date de début" v-model="eventForm.startDate" type="date" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+                    <input aria-label="Date de début" v-model="eventForm.startDate" type="date" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
                   </div>
                   <div>
                     <label class="text-xs text-dark/60">Fin de période</label>
-                    <input aria-label="Date de fin" v-model="eventForm.endDate" type="date" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+                    <input aria-label="Date de fin" v-model="eventForm.endDate" type="date" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
                   </div>
                 </div>
               </template>
@@ -276,18 +276,18 @@
               <template v-else>
                 <div>
                   <label class="text-xs text-dark/60">Date</label>
-                  <input aria-label="Date" v-model="eventForm.date" type="date" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+                  <input aria-label="Date" v-model="eventForm.date" type="date" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
                 </div>
               </template>
 
               <div class="grid grid-cols-2 gap-2">
                 <div>
                   <label class="text-xs text-dark/60">Heure début</label>
-                  <input aria-label="Heure de début" v-model="eventForm.startTime" type="time" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+                  <input aria-label="Heure de début" v-model="eventForm.startTime" type="time" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
                 </div>
                 <div>
                   <label class="text-xs text-dark/60">Heure fin</label>
-                  <input aria-label="Heure de fin" v-model="eventForm.endTime" type="time" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+                  <input aria-label="Heure de fin" v-model="eventForm.endTime" type="time" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
                 </div>
               </div>
 
@@ -337,7 +337,7 @@
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Inviter</h3>
             <input aria-label="Email" v-model="inviteForm.targetEmail" type="email" placeholder="Email *"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
             <div class="flex gap-2">
               <button @click="inviteForm.role = 'student'"
                 :class="[inviteForm.role === 'student' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm flex-1']">
@@ -367,7 +367,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                   <select aria-label="Rôle du membre" :value="m.role" @change="changeRole(m.userId, $event.target.value)"
-                    class="rounded-lg border border-gray px-2 py-1 text-xs bg-white">
+                    class="rounded-lg border border-gray-500 px-2 py-1 text-xs bg-white">
                     <option value="student">Étudiant</option>
                     <option value="teacher">Enseignant</option>
                   </select>

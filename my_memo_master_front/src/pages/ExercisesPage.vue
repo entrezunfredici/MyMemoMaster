@@ -57,9 +57,9 @@
     <!-- Modals -->
     <template #modals>
       <!-- Modal assignation groupes -->
-      <div v-if="showAssignModal" class="modal-overlay" @mousedown.self="closeAssignModal">
+      <div v-if="showAssignModal" class="modal-overlay" @mousedown.self="closeAssignModal" v-dialog="closeAssignModal" role="dialog" aria-modal="true" aria-labelledby="exercise-assign-modal-title">
         <div class="modal-panel">
-          <h2 class="modal-title">Assigner aux groupes classes</h2>
+          <h2 id="exercise-assign-modal-title" class="modal-title">Assigner aux groupes classes</h2>
           <p class="text-sm text-gray-500 mb-4">
             Sélectionnez les groupes qui auront accès à cet exercice.<br>
             Les scores de ces étudiants apparaîtront dans vos KPI pédagogiques.
@@ -89,9 +89,9 @@
       </div>
 
       <!-- Modal création / édition exercice -->
-      <div v-if="showModal" class="modal-overlay" @mousedown.self="closeModal">
+      <div v-if="showModal" class="modal-overlay" @mousedown.self="closeModal" v-dialog="closeModal" role="dialog" aria-modal="true" aria-labelledby="exercise-modal-title">
         <div class="modal-panel modal-panel--lg">
-          <h2 class="modal-title">{{ isEditMode ? 'Modifier l\'exercice' : 'Nouvel exercice' }}</h2>
+          <h2 id="exercise-modal-title" class="modal-title">{{ isEditMode ? 'Modifier l\'exercice' : 'Nouvel exercice' }}</h2>
 
           <form @submit.prevent="submitExercise">
             <!-- Nom -->
@@ -302,6 +302,7 @@
 </template>
 
 <script setup>
+import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/helpers/api'

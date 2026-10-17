@@ -45,7 +45,7 @@
                 v-model="userAnswer"
                 :disabled="showFeedback || submitting"
                 placeholder="Saisissez votre réponse... (formules entre $…$)"
-                class="w-full p-3 rounded-lg text-dark border-2 border-gray focus:border-primary outline-none transition mt-1"
+                class="w-full p-3 rounded-lg text-dark border-2 border-gray-500 focus:border-primary outline-none transition mt-1"
                 rows="3"
               />
             </FormulaHelper>

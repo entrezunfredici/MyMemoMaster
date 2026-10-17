@@ -119,6 +119,15 @@ Suite à la demande de « s'occuper des 106 critères RGAA » sur `docs/COMPTE_R
 
 ---
 
+## 2 quinquies. Campagne du 2026-10-17 — modales, clavier, bordures de champ
+
+- **9 modales** reçoivent `role="dialog"`, `aria-modal`, un nom (`aria-labelledby` → titre) et la directive `v-dialog` (focus, boucle de Tab, Échap, restitution) — `src/directives/dialog.js`, 11 tests. Une règle de l'audit statique bloquante en CI (`audit-a11y.mjs --strict`) empêche toute nouvelle modale sans ces attributs.
+- **Clavier (RGAA 7.1)** : `SubjectsPage` (contenus = boutons ; accordéon `aria-expanded` / `aria-controls`), `ClassroomEtudiantView` (zone de dépôt : bouton « parcourez »), `CreateTestPage` (icônes de suppression → boutons nommés). Règle d'audit ajoutée pour les icônes Heroicons cliquables (rendues `aria-hidden`).
+- **Contraste des bordures de champ (3:1)** : **50 champs** `border-gray` → `border-gray-500` (le « 12 » du §2 quater était sous-estimé : seules les balises sur une ligne étaient comptées). Cette dette est **soldée**.
+- **Vérifié** : 36 tests Playwright axe-core WCAG 2.1 A/AA + contraste verts ; audit statique à 0 non-conformité.
+- **Reste** : revue visuelle humaine de la nouvelle teinte des bordures ; création de la variable de dépôt `A11Y_BASE_URLS` pour activer l'audit des environnements déployés (`a11y-live.yml`) ; audit manuel au lecteur d'écran (NVDA / VoiceOver), que l'outillage automatique ne remplace pas.
+
+
 ## 3. Motifs justifiés (non-conformités apparentes, conformes après analyse)
 
 - **Overlays de modale** (`@click`/`@click.self` sur le fond pour fermer) : la fermeture au clic hors panneau est une redondance de confort ; l'action de fermeture reste accessible au clavier via le bouton « Fermer » (désormais nommé) présent dans chaque panneau. Rendre l'overlay focusable ajouterait une étape de tabulation parasite.

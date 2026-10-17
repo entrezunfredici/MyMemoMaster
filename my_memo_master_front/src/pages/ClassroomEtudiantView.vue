@@ -26,7 +26,7 @@
           v-model="search"
           type="text"
           placeholder="Rechercher une section, un rendu, une ressource..."
-          class="w-full rounded-xl border-2 border-gray px-4 py-3 !pr-10 text-sm focus:border-primary focus:outline-none transition" />
+          class="w-full rounded-xl border-2 border-gray-500 px-4 py-3 !pr-10 text-sm focus:border-primary focus:outline-none transition" />
         <button aria-label="Effacer la recherche" v-if="search" @click="search = ''"
           class="absolute right-3 top-1/2 -translate-y-1/2 text-dark/40 hover:text-dark">✕</button>
       </div>
@@ -111,9 +111,8 @@
                 @dragover.prevent="dragOverId = r.id"
                 @dragleave.prevent="dragOverId = null"
                 @drop.prevent="(e) => onDropRendu(e, r)"
-                @click="() => triggerFileInput(r.id)"
                 :class="[
-                  'cursor-pointer rounded-xl border-2 border-dashed px-4 py-4 text-center transition',
+                  'rounded-xl border-2 border-dashed px-4 py-4 text-center transition',
                   dragOverId === r.id ? 'border-secondary bg-secondary/5' : 'border-gray hover:border-secondary/50'
                 ]">
                 <div v-if="pendingFiles[r.id]">
@@ -121,10 +120,12 @@
                   <p class="text-xs text-dark/60 mt-0.5">{{ formatFileSize(pendingFiles[r.id].size) }}</p>
                   <button @click.stop="delete pendingFiles[r.id]" class="mt-1 text-xs text-secondary hover:underline">Retirer</button>
                 </div>
-                <div v-else>
-                  <p class="text-sm text-dark/60">Glissez votre rendu ici ou <span class="text-secondary underline">parcourez</span></p>
-                  <p class="text-xs text-dark/40 mt-1">PDF, Word, Image — max 10 Mo</p>
-                </div>
+                <!-- RGAA 7.1 : la zone ne répond au glisser-déposer qu'à la souris ; l'action « choisir un fichier »
+                     est portée par un vrai bouton, atteignable et activable au clavier. -->
+                <button v-else type="button" class="w-full cursor-pointer" @click="() => triggerFileInput(r.id)">
+                  <span class="block text-sm text-dark/60">Glissez votre rendu ici ou <span class="text-secondary underline">parcourez</span></span>
+                  <span class="block text-xs text-dark/40 mt-1">PDF, Word, Image — max 10 Mo</span>
+                </button>
               </div>
               <input aria-label="Choisir un fichier à rendre" :ref="el => fileInputs[r.id] = el" type="file"
                 accept=".pdf,.doc,.docx,image/*"
@@ -244,12 +245,12 @@
             <template v-else>
               <div class="flex flex-col gap-2 sm:flex-row">
                 <select aria-label="Enseignant" v-model="grantForm.teacherId" @change="grantForm.subjectId = null"
-                  class="flex-1 rounded-lg border-2 border-gray bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                  class="flex-1 rounded-lg border-2 border-gray-500 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
                   <option :value="null">Choisir un enseignant du groupe</option>
                   <option v-for="t in availableTeachers" :key="t.userId" :value="t.userId">{{ t.user?.name }}</option>
                 </select>
                 <select aria-label="Sujet" v-model="grantForm.subjectId"
-                  class="flex-1 rounded-lg border-2 border-gray bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                  class="flex-1 rounded-lg border-2 border-gray-500 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
                   <option :value="null">Toutes mes matières (accès global)</option>
                   <option v-for="s in availableSubjects" :key="s.subjectId" :value="s.subjectId">{{ s.name }}</option>
                 </select>

@@ -385,7 +385,7 @@
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Créer une section / un rendu</h3>
             <input aria-label="Titre" v-model="sectionForm.title" type="text" placeholder="Titre *"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
             <div class="flex gap-2">
               <button @click="sectionForm.type = 'section'"
                 :class="[sectionForm.type === 'section' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm flex-1']">Section</button>
@@ -393,8 +393,8 @@
                 :class="[sectionForm.type === 'rendu' ? 'bg-secondary text-light' : 'bg-light text-secondary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm flex-1']">Rendu</button>
             </div>
             <input aria-label="Description" v-model="sectionForm.description" type="text" placeholder="Description"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <input aria-label="Date limite" v-model="sectionForm.dueDate" type="date" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
+            <input aria-label="Date limite" v-model="sectionForm.dueDate" type="date" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
             <button @click="submitSection"
               class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
               Créer
@@ -406,8 +406,8 @@
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Partager un document</h3>
             <input aria-label="Titre" v-model="resourceForm.title" type="text" placeholder="Titre *"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <select aria-label="Type de ressource" v-model="resourceForm.type" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
+            <select aria-label="Type de ressource" v-model="resourceForm.type" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm bg-white">
               <option value="cours">Cours</option>
               <option value="carte_mentale">Carte mentale</option>
               <option value="sujet">Sujet / DS</option>
@@ -475,24 +475,24 @@
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Ajouter une échéance</h3>
             <input aria-label="Titre" v-model="deadlineForm.name" type="text" placeholder="Titre *"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <select aria-label="Type d'échéance" v-model="deadlineForm.type" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
+            <select aria-label="Type d'échéance" v-model="deadlineForm.type" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm bg-white">
               <option value="ds">DS</option>
               <option value="devoir">Devoir / DM</option>
               <option value="exposé">Exposé</option>
               <option value="autre">Autre</option>
             </select>
-            <select aria-label="Séance concernée" v-model="deadlineForm.occurrenceId" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+            <select aria-label="Séance concernée" v-model="deadlineForm.occurrenceId" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm bg-white">
               <option value="">Séance concernée *</option>
               <option v-for="occ in allOccurrences" :key="occ.id" :value="occ.id">
                 {{ occ.calendarEvent?.name }} — {{ formatDate(occ.date) }}
               </option>
             </select>
             <input aria-label="Date limite" v-model="deadlineForm.dueDate" type="date" placeholder="Date limite *"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
             <input aria-label="Heure limite" v-model="deadlineForm.dueTime" type="time"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
-            <select aria-label="Exercice associé" v-model="deadlineForm.testId" class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm bg-white">
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
+            <select aria-label="Exercice associé" v-model="deadlineForm.testId" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm bg-white">
               <option :value="null">Exercice associé (optionnel)</option>
               <option v-for="t in testStore.tests" :key="t.testId" :value="t.testId">{{ t.name }}</option>
             </select>
@@ -507,7 +507,7 @@
           <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
             <h3 class="text-base font-semibold text-dark">Inviter un étudiant</h3>
             <input aria-label="Email" v-model="inviteForm.targetEmail" type="email" placeholder="Email *"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
             <button @click="submitInvite"
               class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
               Envoyer l'invitation

@@ -1,4 +1,5 @@
 <script setup>
+import { dialogDirective as vDialog } from '@/directives/dialog'
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
 import { useMindMapViewSessionStore } from '@/stores/mindmapViewSessions'
@@ -170,10 +171,10 @@ onBeforeUnmount(() => {
   </div>
 
   <!-- Modal nom (première création / export) -->
-  <div v-if="showExportModal" class="modal-overlay" @mousedown.self="showExportModal = false">
+  <div v-if="showExportModal" class="modal-overlay" @mousedown.self="showExportModal = false" v-dialog="() => { showExportModal = false }" role="dialog" aria-modal="true" aria-labelledby="mindmap-export-modal-title">
     <div class="modal-panel">
       <button aria-label="Fermer" @click="showExportModal = false" class="modal-close">&times;</button>
-      <h2 class="modal-title">Enregistrer la carte mentale</h2>
+      <h2 id="mindmap-export-modal-title" class="modal-title">Enregistrer la carte mentale</h2>
       <form @submit.prevent="confirmExportModal">
         <div class="mb-4">
           <label class="form-label">Nom</label>
