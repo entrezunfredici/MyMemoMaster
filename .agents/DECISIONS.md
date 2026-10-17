@@ -5168,3 +5168,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : suppression immédiate de l'ancien fichier, et recréation ultérieure d'une page au contenu différent (cahier des charges dans `docs/A_FAIRE_PAGE_ADMINISTRATION.md`).
 **Alternative écartée** : modifier l'existant. Aucune ligne de la page n'est réutilisable (gestion des établissements, déjà couverte par l'onglet Plateforme), elle gardait un doublon à maintenir en parallèle, et son ancien test donnait l'impression d'une couverture sur du code inatteignable.
 **Conséquences** : le doublon disparaît sans changer le comportement de l'application ; la future page repart d'un cahier des charges et des conventions actuelles (stores, `v-dialog`, route `meta.roles`).
+
+
+## 2026-10-17 — Découpage de page : la fenêtre porte son état, la page la pilote par référence
+
+**Contexte** : `ExercisesPage` mêlait liste, formulaire de 4 types de questions, flux IA et assignation (714 lignes, 411 de script).
+**Décision** : un composant par fenêtre qui possède son composable et expose `open…()` ; la page n'a plus que la liste, les filtres et la suppression. Les opérations d'édition d'une question sont des fonctions pures (`helpers/exerciseQuestionEdit.js`) ; la question elle-même reste un objet réactif du formulaire parent, édité en place par `ExerciseQuestionEditor` via un alias `computed`.
+**Alternative écartée** : faire remonter chaque modification par événements (`update:question`) — il faudrait recopier les tableaux imbriqués (options, formulations, fragments) à chaque frappe, avec risque de désynchronisation, pour aucun gain de lisibilité ; passer le formulaire en `provide/inject` (couplage implicite entre fichiers).
+**Conséquences** : même comportement et même DOM que l'ancienne page (prouvé par comparaison) ; les tests de la page, qui passent par le DOM et les stores simulés, n'ont pas bougé ; chaque morceau se teste seul.

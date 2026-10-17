@@ -13294,3 +13294,17 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Fait** : `AdminPage.vue` et son test (24 tests d'un code non atteignable) supprimés ; note corrigée dans `docs/AUDIT_RGAA_106.md` ; commentaire de `MobileNavComponent.vue` pointé vers le nouveau document.
 **À FAIRE (second temps)** : créer une vraie page d'administration plateforme — gestion des rôles, rôle d'un compte, journal d'audit global. Trois fonctions que l'API expose déjà (`requireRole(1)`) et qu'aucun écran n'utilise. Cahier des charges, contraintes et routes dans **`docs/A_FAIRE_PAGE_ADMINISTRATION.md`**.
 **Tests** : suite front 102 fichiers, ESLint.
+
+
+## [2026-10-17] [REF] `ExercisesPage` découpée : 714 → 128 lignes (branche `dev_front_split_pages`)
+
+**Contexte** : première des « pages trop grosses » (ExercisesPage 714, ClassroomEnseignantView 865, ClassroomEtablissementView 616, ClassroomEtudiantView 540, ExerciseDetailPage 518, MindMapPalette 635, MindMapNode 625, store mindmapBuilder 504).
+**Fait** (même modèle que `FlashcardsCardsPage` : les fenêtres gèrent leur état, la page les pilote par une référence) :
+- `components/exercises/ExerciseFormModal.vue` (155 l.) — fenêtre de création / modification + flux IA ; pilotée par `openCreate()` / `openEdit(test)`.
+- `components/exercises/ExerciseQuestionEditor.vue` (140 l.) — une question : type, énoncé, champs propres aux 4 types. L'objet `question` appartient au formulaire parent et est édité en place (alias `computed`, voir le commentaire du fichier).
+- `components/exercises/ExerciseAssignModal.vue` (72 l.) — assignation aux groupes ; `open(test)`.
+- `composables/useExerciseForm.js` (état, ouverture, création, modification), `useExerciseAiFlow.js` (génération IA), `useAssignableGroups.js` (groupes où l'utilisateur est enseignant).
+- `helpers/exerciseQuestionEdit.js` — question vierge, options QCM, trous, `isBlankUntouchedQuestion`, `extractErrorMessage` (fonctions pures).
+**Preuve de non-régression** : avant de remplacer la page, copie de l'ancienne version comparée à la nouvelle dans **10 états** (liste, création vide, 4 types de questions renseignés, suppression de question/option, édition de 4 types chargés, partage de groupes, assignation, IA configuration / révision, erreur de formulaire) : DOM et valeurs des champs **identiques** ; une modification volontaire d'un libellé fait échouer 8 des 10 scénarios (la comparaison est donc sensible). Échafaudage supprimé après vérification. Les 27 tests existants de la page passent sans modification.
+**Tests** : +9 `exerciseQuestionEdit` (helpers), +15 `ExerciseQuestionEditor`, +8 `ExerciseAssignModal`, +17 `useExerciseForm` ; suite front 106 fichiers, ESLint, audits RGAA / couleurs / Tailwind à 0, build, 36 tests Playwright axe-core.
+**Reste (pages trop grosses)** : ClassroomEnseignantView, ClassroomEtablissementView, ClassroomEtudiantView, ExerciseDetailPage, MindMapPalette (≈ 250 lignes de script), MindMapNode, store mindmapBuilder.
