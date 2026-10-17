@@ -172,3 +172,24 @@ Les secrets suivants sont actifs et doivent être régénérés si le `.env` a �
 - Le modèle `User` manque du champ `validEmailCodeExpiresAt` (voir H4 ci-dessus)
 - La table `Storage` (fichiers S3) ne mappe pas `userId ↔ s3Key`, ce qui rend l'ownership impossible à vérifier côté API
 - `generateToken.js` était historiquement appelé pour des tokens non-critiques — vérifier tous les call sites après correction
+
+
+---
+
+## Mise à jour 2026-10-17 — Contrôles automatisés en CI
+
+Jusqu'ici le CI ne lançait que `npm audit` (A06). Le workflow `.github/workflows/security.yml` ajoute :
+
+| Contrôle | Outil | OWASP couvert | Déclenchement | Bloquant |
+|----------|-------|---------------|---------------|----------|
+| Analyse statique du code | CodeQL (`security-extended`) | A01, A03, A02, A10… | push main/staging/dev/`*devops*`, PR, hebdo | non (alertes dans Security › Code scanning) |
+| Secrets dans l'historique | gitleaks v8.30.1 | A02, A05 | idem | oui |
+| Application en fonctionnement | OWASP ZAP 2.17.0 (baseline + API passif) | A05, A04 | main/staging/`*devops*`, hebdo, manuel | oui sur les règles FAIL de `.zap/rules.tsv` |
+
+**Premiers résultats**
+- gitleaks : 0 fuite sur 907 commits. Le fichier `PCU-N6AJX6E-openrc.txt` (racine) ne contient que des identifiants de projet OpenStack ; le mot de passe est saisi à l'exécution (ligne commentée).
+- ZAP sur le front servi par nginx : **F-09 (A05, moyenne) — aucun en-tête de sécurité** (CSP, anti-clickjacking, nosniff, Permissions-Policy absents, version de nginx exposée). ✅ Corrigé : `my_memo_master_front/nginx-security-headers.conf` + `server_tokens off`. L'API était déjà couverte par Helmet.
+- CodeQL : 50 alertes au premier passage. Corrigées : injection de commande dans `notify_ci.yml` (critique), ReDoS dans `sanitize.middleware.js` et `formulaNotation.js`, injection de propriété (`__proto__`), injection de journaux. Acceptées avec justification : voir `.agents/CHANGELOG_AGENT.md` (2026-10-17).
+- Restent en avertissement (assumés) : CSP à jeton générique `https:`/`wss:` en `connect-src` (URL d'API configurée à l'exécution) ; COOP/COEP/CORP absents (`window.open()` et ressources inter-origines).
+
+**Réglages GitHub à activer par un propriétaire du dépôt** (désactivés au 2026-10-17) : Secret scanning, Push protection, Dependabot security updates.

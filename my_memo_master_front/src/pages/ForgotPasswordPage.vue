@@ -54,6 +54,9 @@ async function submit() {
     }
     notif.notify('Code envoyé ! Vérifiez votre email.', 'success')
     router.push({ path: '/reset-password', query: { email: email.value.trim() } })
+  } catch {
+    // Erreur réseau / serveur injoignable : sans ce message, l'utilisateur ne voyait aucun retour.
+    errorMessage.value = 'Impossible de contacter le serveur. Réessayez dans un instant.'
   } finally {
     submitting.value = false
   }

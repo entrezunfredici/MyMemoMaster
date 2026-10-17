@@ -27,6 +27,9 @@ on:
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   probe:
     name: Sonde /api/v1/health
