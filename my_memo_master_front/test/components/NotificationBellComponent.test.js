@@ -83,7 +83,7 @@ describe('NotificationBellComponent', () => {
 
   it("n'affiche pas de badge si aucun rappel en attente", () => {
     const wrapper = mountBell({ reminders: [] })
-    expect(wrapper.find('.bg-red-500').exists()).toBe(false)
+    expect(wrapper.find('.bg-red-600').exists()).toBe(false)
   })
 
   it('affiche un badge rouge avec le nombre de rappels pending', () => {
@@ -91,7 +91,7 @@ describe('NotificationBellComponent', () => {
       reminders: [makePendingReminder(), makePendingReminder({ id: 2 })]
     })
 
-    const badge = wrapper.find('.bg-red-500')
+    const badge = wrapper.find('.bg-red-600')
     expect(badge.exists()).toBe(true)
     expect(badge.text()).toBe('2')
   })
@@ -100,7 +100,7 @@ describe('NotificationBellComponent', () => {
     const reminders = Array.from({ length: 10 }, (_, i) => makePendingReminder({ id: i + 1 }))
     const wrapper = mountBell({ reminders })
 
-    expect(wrapper.find('.bg-red-500').text()).toBe('9+')
+    expect(wrapper.find('.bg-red-600').text()).toBe('9+')
   })
 
   // ── Ouverture / fermeture du panneau ──────────────────────────────────────

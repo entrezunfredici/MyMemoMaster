@@ -105,6 +105,14 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run audit:colors
 
+      # Une classe Tailwind de couleur dont la teinte n'existe pas dans le thème (bg-gray-100, text-red-600…)
+      # est ignorée sans erreur : le composant s'affiche sans le style prévu. Ce contrôle échoue dès qu'une
+      # telle classe apparaît (voir DECISIONS 2026-10-16).
+      - name: Tailwind Color Classes Audit
+        if: matrix.service == 'front'
+        working-directory: ${{ matrix.path }}
+        run: npm run audit:tailwind
+
       # OWASP A06 — composants vulnérables : bloque si une dépendance de production
       # a une vulnérabilité high/critical connue (les devDependencies sont exclues,
       # elles n'entrent pas dans les images déployées)

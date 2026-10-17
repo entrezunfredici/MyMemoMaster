@@ -7,13 +7,13 @@
       <span class="mr-2">←</span> Retour aux exercices
     </router-link>
 
-    <div v-if="loading" class="text-center text-gray-400 py-16">Chargement...</div>
+    <div v-if="loading" class="text-center text-gray-500 py-16">Chargement...</div>
 
-    <div v-else-if="!test" class="text-center text-gray-400 py-16">Exercice introuvable.</div>
+    <div v-else-if="!test" class="text-center text-gray-500 py-16">Exercice introuvable.</div>
 
     <div v-else class="bg-white rounded-lg shadow-lg p-4 sm:p-8">
       <h1 class="text-2xl sm:text-4xl font-bold mb-2 text-heading break-words">{{ test.name }}</h1>
-      <p class="text-sm text-gray-400 mb-8">{{ test.subject?.name }}</p>
+      <p class="text-sm text-gray-500 mb-8">{{ test.subject?.name }}</p>
 
       <!-- Mode quiz -->
       <div v-if="!resultsShown" class="space-y-8">
@@ -37,7 +37,7 @@
               <textarea aria-label="Entrez votre réponse ici"
                 v-model="userAnswers[idx]"
                 placeholder="Entrez votre réponse ici... (formules entre $…$)"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                class="w-full px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                 rows="3"
               />
             </FormulaHelper>
@@ -104,7 +104,7 @@
               </button>
             </div>
             <div class="min-h-10 flex flex-wrap gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg">
-              <span class="text-gray-400 text-sm italic" v-if="!selectedFragments[idx].length">Sélectionne les fragments ci-dessus...</span>
+              <span class="text-gray-500 text-sm italic" v-if="!selectedFragments[idx].length">Sélectionne les fragments ci-dessus...</span>
               <button
                 v-for="(fi, pos) in selectedFragments[idx]"
                 :key="pos"
@@ -131,7 +131,7 @@
       <!-- RGAA 13.x — zone aria-live toujours montée : le score est annoncé aux
            lecteurs d'écran quand il apparaît (la zone doit précéder le changement) -->
       <div aria-live="polite">
-        <div v-if="resultsShown" class="bg-gradient-to-r from-blue-500 to-blue-700 p-8 rounded-lg text-white text-center mb-8">
+        <div v-if="resultsShown" class="bg-gradient-to-r from-blue-600 to-blue-700 p-8 rounded-lg text-white text-center mb-8">
           <h2 class="text-3xl font-bold mb-2">Votre score</h2>
           <p class="text-5xl font-bold">{{ formatPoints(correctCount) }}/{{ questions.length }}</p>
           <p class="text-lg mt-2">{{ Math.round((correctCount / questions.length) * 100) }}%</p>

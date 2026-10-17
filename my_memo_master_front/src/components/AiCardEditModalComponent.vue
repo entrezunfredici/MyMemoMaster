@@ -29,7 +29,7 @@
 
       <div v-if="form.type === 'open'" class="form-group--lg">
         <label class="form-label">
-          Réponses alternatives acceptées <span class="text-gray-400 font-normal">(optionnel)</span>
+          Réponses alternatives acceptées <span class="text-gray-500 font-normal">(optionnel)</span>
         </label>
         <div v-for="(alt, ai) in form.acceptedAnswers" :key="ai" class="flex items-center gap-2 mb-2">
           <input
@@ -42,7 +42,7 @@
             type="button"
             :aria-label="`Supprimer la réponse alternative ${ai + 1}`"
             @click="form.acceptedAnswers.splice(ai, 1)"
-            class="text-gray-400 hover:text-red-500 text-lg leading-none"
+            class="text-gray-500 hover:text-red-600 text-lg leading-none"
           >✕</button>
         </div>
         <button type="button" @click="form.acceptedAnswers.push('')" class="text-sm text-primary hover:underline font-medium">
@@ -66,14 +66,14 @@
               :aria-label="`Texte de l'option ${oi + 1}`"
               v-model="opt.text"
               type="text"
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              class="flex-1 px-3 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
             />
             <button
               v-if="form.options.length > 2"
               type="button"
               :aria-label="`Supprimer l'option ${oi + 1}`"
               @click="removeOption(oi)"
-              class="text-gray-400 hover:text-red-500 text-lg leading-none"
+              class="text-gray-500 hover:text-red-600 text-lg leading-none"
             >✕</button>
           </div>
         </div>
@@ -85,7 +85,7 @@
       <!-- Nœud de la carte mentale liée (optionnel, même sélecteur qu'à la création manuelle) -->
       <div v-if="mindMapJson" class="form-group--lg">
         <label class="form-label">
-          Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
+          Nœud de la carte mentale <span class="text-gray-500 font-normal">(optionnel)</span>
         </label>
         <MindMapNodePicker
           v-model="form.mindMapNodeId"

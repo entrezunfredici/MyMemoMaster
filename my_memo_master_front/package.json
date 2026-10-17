@@ -13,6 +13,7 @@
     "test:a11y": "playwright test",
     "audit:a11y": "node scripts/audit-a11y.mjs --strict",
     "audit:colors": "node scripts/audit-colors.mjs",
+    "audit:tailwind": "node scripts/audit-tailwind.mjs",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
     "test:coverage": "vitest run --coverage",

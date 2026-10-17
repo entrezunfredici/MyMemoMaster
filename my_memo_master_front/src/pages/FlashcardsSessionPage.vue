@@ -79,7 +79,7 @@
               </label>
               </div>
             </template>
-            <p v-else class="text-sm text-red-400 italic py-2">
+            <p v-else class="text-sm text-red-600 italic py-2">
               Options manquantes.
             </p>
           </div>

@@ -58,7 +58,7 @@
       <!-- Boîtes du système -->
       <div class="mb-8 p-4 bg-white border border-gray-200 rounded-lg">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-bold uppercase text-gray-400">Boîtes du système</h3>
+          <h3 class="text-sm font-bold uppercase text-gray-500">Boîtes du système</h3>
           <button @click="openAddBoxModal" class="text-sm text-primary hover:underline font-medium">+ Ajouter une boîte</button>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -74,10 +74,10 @@
             ></span>
             <span class="font-semibold text-primary">B{{ box.level }}</span>
             <span class="text-gray-500" :title="`${box.intervall} s`">{{ formatDuration(box.intervall) || `${box.intervall} s` }}</span>
-            <button @click="openEditBoxModal(box)" class="text-gray-400 hover:text-primary" title="Modifier">✎</button>
-            <button @click="handleDeleteBox(box)" class="text-gray-400 hover:text-red-500" title="Supprimer">✕</button>
+            <button @click="openEditBoxModal(box)" class="text-gray-500 hover:text-primary" title="Modifier">✎</button>
+            <button @click="handleDeleteBox(box)" class="text-gray-500 hover:text-red-600" title="Supprimer">✕</button>
           </div>
-          <p v-if="systemBoxes.length === 0" class="text-gray-400 text-sm italic">Aucune boîte — ajoutez-en une pour commencer.</p>
+          <p v-if="systemBoxes.length === 0" class="text-gray-500 text-sm italic">Aucune boîte — ajoutez-en une pour commencer.</p>
         </div>
       </div>
       <div v-if="allCards.length === 0" class="text-center text-gray-light py-10">
@@ -86,7 +86,7 @@
 
       <div v-for="level in [1, 2, 3, 4, 5]" :key="level" class="mb-6">
         <div v-if="cardsByLevel[level]?.length">
-          <h3 class="text-sm font-bold uppercase text-gray-400 mb-2">Boîte {{ level }}</h3>
+          <h3 class="text-sm font-bold uppercase text-gray-500 mb-2">Boîte {{ level }}</h3>
           <div class="flex flex-col gap-2">
             <div
               v-for="card in cardsByLevel[level]"
@@ -187,7 +187,7 @@
           <!-- Réponses acceptées supplémentaires : open, création uniquement -->
           <div v-if="form.type === 'open' && !editingCard" class="form-group--lg">
             <label class="form-label">
-              Autres formulations acceptées <span class="text-gray-400 font-normal">(optionnel)</span>
+              Autres formulations acceptées <span class="text-gray-500 font-normal">(optionnel)</span>
             </label>
             <div v-for="(alt, ai) in form.altAnswers" :key="ai" class="flex items-center gap-2 mb-2">
               <input
@@ -201,7 +201,7 @@
                 type="button"
                 :aria-label="`Supprimer la formulation acceptée ${ai + 1}`"
                 @click="form.altAnswers.splice(ai, 1)"
-                class="text-gray-400 hover:text-red-500 text-lg leading-none"
+                class="text-gray-500 hover:text-red-600 text-lg leading-none"
               >✕</button>
             </div>
             <button
@@ -236,7 +236,7 @@
           <!-- Nœud de la carte mentale liée (création et modification) -->
           <div v-if="mindMapJson" class="form-group--lg">
             <label class="form-label">
-              Nœud de la carte mentale <span class="text-gray-400 font-normal">(optionnel)</span>
+              Nœud de la carte mentale <span class="text-gray-500 font-normal">(optionnel)</span>
             </label>
             <MindMapNodePicker
               v-model="form.mindMapNodeId"
@@ -264,13 +264,13 @@
                   @input="setOptionText(oi, $event.target.value)"
                   type="text"
                   :placeholder="`Option ${oi + 1}...`"
-                  class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  class="flex-1 px-3 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                 />
                 <button
                   v-if="form.mcqOptions.length > 2"
                   type="button"
                   @click="removeMcqOption(oi)"
-                  class="text-gray-400 hover:text-red-500 text-lg leading-none"
+                  class="text-gray-500 hover:text-red-600 text-lg leading-none"
                 >✕</button>
               </div>
             </div>
@@ -353,7 +353,7 @@
             <input aria-label="Couleur de la boîte"
               v-model="boxForm.color"
               type="color"
-              class="h-10 w-16 cursor-pointer rounded border border-gray-200 bg-white p-1"
+              class="h-10 w-16 cursor-pointer rounded border border-gray-500 bg-white p-1"
             />
           </div>
           <p v-if="boxFormError" class="text-red-600 text-sm mb-4">{{ boxFormError }}</p>
