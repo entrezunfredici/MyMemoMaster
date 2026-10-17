@@ -55,7 +55,7 @@ RGAA recommande un échantillon représentatif de tous les types de page, plafon
 | 14 | `/settings`                                                | Formulaire de préférences,`ToggleButton` déjà audité                                                  |
 | 15 | `/classroom` (vue plateforme, `ClassroomPlateformeView`) | Tableau de données côté administration plateforme —**remplace `/admin`**, non routé (voir note) |
 
-**Note sur `/admin`** : `src/pages/AdminPage.vue` existe mais n'est référencé par **aucune route** ni **aucun autre composant** du dépôt (`grep -r AdminPage src/` → 0 résultat hors le fichier lui-même). C'est du code mort, pas un défaut RGAA — hors périmètre de cet audit, mais à signaler séparément si ce n'est pas déjà su.
+**Note sur `/admin`** : `src/pages/AdminPage.vue` (ancienne version, jamais routée, de l'onglet « Plateforme ») a été **supprimée le 2026-10-17**. Une vraie page d'administration (rôles, rôle des comptes, journal d'audit global) reste à créer : voir `docs/A_FAIRE_PAGE_ADMINISTRATION.md`.
 
 **Accès aux pages privées** : via le seeder E2E déjà en place (`SEED_E2E_USERS=true`, comptes étudiant/enseignant), même mécanisme que `my_memo_master_front/e2e/journeys.spec.js` — pas de nouveau compte à créer.
 

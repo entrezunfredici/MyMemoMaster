@@ -13286,3 +13286,11 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Tests** : `ProfilePage` réécrit pour le contrat page → store (5 tests) ; `ForgotPasswordPage` / `ResetPasswordPage` montés avec Pinia ; nouveaux : `auth.profile.store` (14), `subjects.createSubject.store` (5), `useStoredFile` (12), `exercisesApi` (9). Suite front 103 fichiers, ESLint, audits RGAA / couleurs / Tailwind à 0, build, Playwright axe-core.
 **Hypothèse** : `ExercisesPage` garde ses appels dans un module d'accès plutôt que dans les stores `tests` / `questions`, dont les actions ne renvoient qu'un booléen et notifient en interne (voir `submitCreate`).
 **Dette restante liée** : `ExercisesPage` reste volumineuse (714 lignes) ; `ClassroomEnseignantView` (≈ 880 lignes).
+
+
+## [2026-10-17] [REF] Suppression de `AdminPage.vue` (code mort) et note de la future page d'administration (branche `dev_front_split_pages`)
+
+**Constat** : `AdminPage.vue` n'avait aucune route ni import (seul son test la référençait) ; c'était une version de juillet de l'onglet « Plateforme » de `/classroom` (`ClassroomPlateformeView`, qui l'a remplacée avec en plus l'invitation par email). Les deux s'adressent au même rôle (administrateur plateforme, `roleId = 1`).
+**Fait** : `AdminPage.vue` et son test (24 tests d'un code non atteignable) supprimés ; note corrigée dans `docs/AUDIT_RGAA_106.md` ; commentaire de `MobileNavComponent.vue` pointé vers le nouveau document.
+**À FAIRE (second temps)** : créer une vraie page d'administration plateforme — gestion des rôles, rôle d'un compte, journal d'audit global. Trois fonctions que l'API expose déjà (`requireRole(1)`) et qu'aucun écran n'utilise. Cahier des charges, contraintes et routes dans **`docs/A_FAIRE_PAGE_ADMINISTRATION.md`**.
+**Tests** : suite front 102 fichiers, ESLint.

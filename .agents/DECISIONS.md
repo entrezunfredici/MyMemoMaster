@@ -5160,3 +5160,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : toute requête passe par (1) un store quand l'action a un état partagé ou notifie (`auth`, `subjects`), (2) un composable quand elle est réutilisée avec de la logique d'interface (`useStoredFile`), ou (3) un module d'accès `helpers/*Api.js` qui renvoie la réponse brute quand la page doit lire le statut ou le message (`exercisesApi`, `flashcardsApi`). `@/helpers/api` est interdit par ESLint dans `src/pages` et `src/components`.
 **Alternative écartée** : tout faire passer par les stores existants (les actions de `tests` / `questions` renvoient un booléen et notifient en interne : la page perdrait le message d'erreur précis qu'elle affiche) ; une règle uniquement documentaire (l'écart serait revenu, comme pour les 7 fichiers actuels).
 **Conséquences** : une route vit à un seul endroit et se teste à part ; les pages se testent contre un store simulé (contrat page ↔ store) et le store se teste contre l'API simulée ; ajouter un appel direct dans une page fait échouer le lint en CI.
+
+
+## 2026-10-17 — `AdminPage` : supprimer puis recréer plutôt que modifier
+
+**Contexte** : une page d'administration dédiée est souhaitée (rôles, rôle des comptes, audit global) ; `AdminPage.vue` existait mais n'était pas routée et dupliquait à 92 % l'onglet « Plateforme ».
+**Décision** : suppression immédiate de l'ancien fichier, et recréation ultérieure d'une page au contenu différent (cahier des charges dans `docs/A_FAIRE_PAGE_ADMINISTRATION.md`).
+**Alternative écartée** : modifier l'existant. Aucune ligne de la page n'est réutilisable (gestion des établissements, déjà couverte par l'onglet Plateforme), elle gardait un doublon à maintenir en parallèle, et son ancien test donnait l'impression d'une couverture sur du code inatteignable.
+**Conséquences** : le doublon disparaît sans changer le comportement de l'application ; la future page repart d'un cahier des charges et des conventions actuelles (stores, `v-dialog`, route `meta.roles`).
