@@ -305,7 +305,7 @@
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '@/helpers/api'
+import { exercisesApi } from '@/helpers/exercisesApi'
 import { notif } from '@/helpers/notif'
 import { useTestStore } from '@/stores/tests'
 import { useSubjectStore } from '@/stores/subjects'
@@ -478,7 +478,7 @@ async function handleReviewConfirm(acceptedQuestions) {
 
   if (acceptedQuestions.length) {
     const questions = acceptedQuestions.map((q) => ({ statement: q.statement, type: q.type, content: buildContent(q) }))
-    const resp = await api.post('ai-exercise-generations/validate-import', { questions })
+    const resp = await exercisesApi.validateImport(questions)
     const rejected = resp?.status === 200 ? resp.data.rejected : []
     if (rejected.length) {
       const rejectedIndexes = new Set(rejected.map((r) => r.index))
@@ -574,7 +574,7 @@ async function openEditModal(test) {
   questionsToDelete.value = []
   formError.value = ''
 
-  const resp = await api.get(`tests/${test.testId}`)
+  const resp = await exercisesApi.getTest(test.testId)
   if (!resp || resp.status !== 200) {
     notif.notify('Impossible de charger l\'exercice.', 'error')
     return
@@ -629,8 +629,8 @@ async function submitCreate() {
     // d'erreur serveur ou de validation — n'était accessible qu'via un toast interne au store,
     // jamais remontée ici ; le formulaire affichait alors systématiquement le message générique
     // "Erreur lors de la création de l'exercice.", quelle que soit la cause réelle). Même choix
-    // déjà fait par submitEdit() ci-dessous pour la mise à jour du test (api.put direct).
-    const testResp = await api.post('tests', { name: form.name, subjectId: Number(form.subjectId) })
+    // déjà fait par submitEdit() ci-dessous pour la mise à jour du test (appel API direct, sans passer par le store).
+    const testResp = await exercisesApi.createTest({ name: form.name, subjectId: Number(form.subjectId) })
     if (!testResp || testResp.status !== 201) { formError.value = extractErrorMessage(testResp, 'Erreur lors de la création de l\'exercice.'); return }
     testStore.test = testResp.data
     const testId = testResp.data.testId
@@ -638,7 +638,7 @@ async function submitCreate() {
 
     for (let i = 0; i < form.questions.length; i++) {
       const q = form.questions[i]
-      const resp = await api.post('questions', { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q), idTest: testId, ...questionImagePayload(q) })
+      const resp = await exercisesApi.createQuestion({ statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q), idTest: testId, ...questionImagePayload(q) })
       if (!resp || resp.status !== 201) { formError.value = extractErrorMessage(resp, `Erreur question ${i + 1}.`); return }
     }
 
@@ -656,11 +656,11 @@ async function submitEdit() {
   submitting.value = true
   formError.value = ''
   try {
-    const testResp = await api.put(`tests/${editTestId.value}`, { name: form.name, subjectId: Number(form.subjectId) })
+    const testResp = await exercisesApi.updateTest(editTestId.value, { name: form.name, subjectId: Number(form.subjectId) })
     if (!testResp || testResp.status !== 200) { formError.value = extractErrorMessage(testResp, 'Erreur mise à jour exercice.'); return }
 
     for (const qId of questionsToDelete.value) {
-      const resp = await api.del(`questions/${qId}`)
+      const resp = await exercisesApi.deleteQuestion(qId)
       if (resp !== undefined) { formError.value = 'Erreur lors de la suppression d\'une question.'; return }
     }
 
@@ -668,10 +668,10 @@ async function submitEdit() {
       const q = form.questions[i]
       const payload = { statement: q.statement, questionPosition: i, type: q.type, content: buildContent(q), ...questionImagePayload(q) }
       if (q.idQuestion) {
-        const resp = await api.put(`questions/edit/${q.idQuestion}`, payload)
+        const resp = await exercisesApi.updateQuestion(q.idQuestion, payload)
         if (!resp || resp.status !== 200) { formError.value = extractErrorMessage(resp, `Erreur mise à jour question ${i + 1}.`); return }
       } else {
-        const resp = await api.post('questions', { ...payload, idTest: editTestId.value })
+        const resp = await exercisesApi.createQuestion({ ...payload, idTest: editTestId.value })
         if (!resp || resp.status !== 201) { formError.value = extractErrorMessage(resp, `Erreur création question ${i + 1}.`); return }
       }
     }

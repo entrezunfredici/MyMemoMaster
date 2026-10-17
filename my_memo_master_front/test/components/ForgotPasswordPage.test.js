@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage.vue'
 
 const { mockPost, mockNotify, mockPush } = vi.hoisted(() => ({ mockPost: vi.fn(), mockNotify: vi.fn(), mockPush: vi.fn() }))
 vi.mock('@/helpers/api', () => ({ api: { post: mockPost } }))
 vi.mock('@/helpers/notif', () => ({ notif: { notify: mockNotify } }))
+vi.mock('@/router', () => ({ default: { push: vi.fn() } }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mockPush }) }))
 
 const mountPage = () =>
-  mount(ForgotPasswordPage, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' }, AuthFormLayout: { template: '<div><slot /></div>' } } } })
+  mount(ForgotPasswordPage, { global: { plugins: [createPinia()], stubs: { RouterLink: { template: '<a><slot /></a>' }, AuthFormLayout: { template: '<div><slot /></div>' } } } })
 
 const submit = async (wrapper, email) => {
   await wrapper.find('#fp-email').setValue(email)

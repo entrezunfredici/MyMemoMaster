@@ -97,7 +97,7 @@
                   <p class="text-xs text-dark/60">{{ submissionStore.mySubmissions[r.id].originalName }}</p>
                   <div class="flex gap-2 mt-1 justify-end">
                     <button @click="openFile(submissionStore.mySubmissions[r.id].fileKey)" class="text-xs text-primary underline">Voir</button>
-                    <button @click="downloadFile(submissionStore.mySubmissions[r.id].fileKey, submissionStore.mySubmissions[r.id].originalName)" class="text-xs text-primary underline">Télécharger</button>
+                    <button @click="downloadFile(submissionStore.mySubmissions[r.id].fileKey)" class="text-xs text-primary underline">Télécharger</button>
                     <button @click="retireRendu(r)" class="text-xs text-secondary underline">Retirer</button>
                   </div>
                 </div>
@@ -192,7 +192,7 @@
                 </p>
               </div>
             </div>
-            <button v-if="r.fileKey" @click="downloadFile(r.fileKey, null)"
+            <button v-if="r.fileKey" @click="downloadFile(r.fileKey)"
               class="rounded-lg border border-primary px-3 py-1 text-xs text-primary hover:bg-primary hover:text-light transition">
               Télécharger
             </button>
@@ -298,6 +298,7 @@
 </template>
 
 <script setup>
+import { useStoredFile } from '@/composables/useStoredFile'
 import { ref, computed, onMounted, watch, reactive } from 'vue'
 import ModalComponent from '@/components/ModalComponent.vue'
 import { useClassGroupStore } from '@/stores/classGroups'
@@ -308,8 +309,6 @@ import { useClassGroupSectionStore } from '@/stores/classGroupSections'
 import { useClassGroupSubmissionStore } from '@/stores/classGroupSubmissions'
 import { useKpiConsentStore } from '@/stores/kpiConsent'
 import { useSubjectStore } from '@/stores/subjects'
-import { api } from '@/helpers/api'
-import { notif } from '@/helpers/notif'
 
 const classGroupStore = useClassGroupStore()
 const calendarStore = useCalendarEventStore()
@@ -493,37 +492,7 @@ async function retireRendu(rendu) {
   await submissionStore.deleteSubmission(selectedId.value, rendu.id, sub.id)
 }
 
-async function downloadFile(fileKey) {
-  if (!fileKey) { notif.notify('Aucun fichier associé.', 'error'); return }
-  try {
-    const resp = await api.get('storage/presign', { key: fileKey, disposition: 'attachment' })
-    if (resp?.status === 200 && resp.data?.url) {
-      window.location.href = resp.data.url
-    } else {
-      notif.notify('Impossible de télécharger le fichier.', 'error')
-    }
-  } catch {
-    notif.notify('Impossible de télécharger le fichier.', 'error')
-  }
-}
-
-async function openFile(fileKey) {
-  if (!fileKey) { notif.notify('Aucun fichier associé.', 'error'); return }
-  const newWindow = window.open('', '_blank')
-  if (!newWindow) { notif.notify('Popup bloqué — autorisez les popups pour ce site.', 'error'); return }
-  try {
-    const resp = await api.get('storage/presign', { key: fileKey })
-    if (resp?.status === 200 && resp.data?.url) {
-      newWindow.location.href = resp.data.url
-    } else {
-      newWindow.close()
-      notif.notify("Impossible d'ouvrir le fichier.", 'error')
-    }
-  } catch {
-    newWindow.close()
-    notif.notify("Impossible d'ouvrir le fichier.", 'error')
-  }
-}
+const { openFile, downloadFile } = useStoredFile()
 
 // Helpers
 function formatDate(value) {

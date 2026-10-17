@@ -52,12 +52,13 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api } from '@/helpers/api'
+import { useAuthStore } from '@/stores/auth'
 import { notif } from '@/helpers/notif'
 import AuthFormLayout from '@/components/AuthFormLayout.vue'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const email = ref(route.query.email || '')
 const code = ref('')
@@ -73,19 +74,17 @@ async function submit() {
   }
   submitting.value = true
   try {
-    const resp = await api.post('users/reset-password', {
+    const result = await authStore.resetPasswordWithCode({
       email: email.value.trim(),
       code: code.value.trim(),
       newPassword: newPassword.value
     })
-    if (!resp || resp.status !== 201) {
-      errorMessage.value = resp?.data?.message || 'Code invalide ou expiré.'
+    if (!result.ok) {
+      errorMessage.value = result.message
       return
     }
     notif.notify('Mot de passe réinitialisé avec succès !', 'success')
     router.push('/auth')
-  } catch {
-    errorMessage.value = 'Impossible de contacter le serveur. Réessayez dans un instant.'
   } finally {
     submitting.value = false
   }

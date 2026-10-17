@@ -13271,3 +13271,18 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 - **Garde-fous CI** (`scripts/audit-a11y.mjs --strict`) : 2 règles ajoutées — *fenêtre modale sans comportement de dialogue* (toute `div.modal-overlay` / `fixed inset-0` doit avoir `role="dialog"`, `aria-modal`, un nom et `v-dialog` ou le `@keydown.tab` de `ModalComponent`) et *icône Heroicons cliquable* ; la règle « clic sans clavier » couvre aussi `li, tr, td, p, svg, section, article`. `findTags` ne s'arrête plus au `=>` d'une fonction fléchée dans un attribut (écart invisible jusqu'ici). Contrôle négatif : une modale sans rôle fait échouer l'audit.
 **Tests** : +11 (`v-dialog`), +3 `SubjectsPage` (accordéon, boutons), +4 modales (FlashcardsPage ×3, AdminPage, ClassroomPlateformeView) ; suite front 99 fichiers, ESLint, audits RGAA / couleurs / Tailwind à 0, build, **36 tests Playwright axe-core WCAG 2.1 A/AA + contraste verts**.
 **Limites** : `border-gray-500` sur les 6 fichiers n'a pas fait l'objet d'une revue visuelle humaine (changement de teinte de bordure uniquement). Le workflow `a11y-live.yml` reste inactif tant que la variable de dépôt `A11Y_BASE_URLS` n'est pas créée (elle exige les URL publiques des environnements).
+
+
+## [2026-10-17] [REF] Plus aucun appel API direct dans les pages et composants (branche `dev_front_api_calls`)
+
+**Contexte** : dette technique « 17 appels `api.*` directs dans des pages/composants » (recomptage ; 16 annoncés auparavant).
+**Fait** (comportement identique, messages et statuts attendus inchangés) :
+- `ForgotPasswordPage`, `ResetPasswordPage` → actions `requestPasswordReset(email)` / `resetPasswordWithCode({ email, code, newPassword })` du store `auth`, qui renvoient `{ ok, message }` (ces pages affichent l'erreur dans le formulaire, pas en notification) ; l'exception réseau y est interceptée (message « Impossible de contacter le serveur »).
+- `ProfilePage` → `updateProfile({ name, email })` et `changePassword({ oldPassword, newPassword })` du store `auth` (qui notifient et mettent à jour l'utilisateur).
+- `SubjectSelectorComponent` → `createSubject(name)` du store `subjects` (renvoie le sujet créé, ou `false` après notification).
+- `ClassroomEnseignantView` / `ClassroomEtudiantView` → composable `useStoredFile()` (`openFile`, `downloadFile(fileKey, { newTab })`) : l'URL pré-signée (`GET storage/presign`) était demandée deux fois à l'identique dans chaque vue. Le téléchargement conserve son comportement propre à chaque vue (nouvel onglet chez l'enseignant, même fenêtre chez l'étudiant). Les appels `downloadFile(x, null)` / `downloadFile(x, nom)` de l'étudiant, qui passaient un second argument ignoré, sont nettoyés.
+- `ExercisesPage` (8 appels) → `helpers/exercisesApi.js`, sur le modèle de `flashcardsApi.js` : réponses brutes (la page affiche la vraie raison d'un échec).
+- **Garde-fou** : règle ESLint `no-restricted-imports` — `@/helpers/api` est interdit dans `src/pages/**` et `src/components/**` ; un test négatif la déclenche. Imports `api` / `notif` devenus inutiles retirés.
+**Tests** : `ProfilePage` réécrit pour le contrat page → store (5 tests) ; `ForgotPasswordPage` / `ResetPasswordPage` montés avec Pinia ; nouveaux : `auth.profile.store` (14), `subjects.createSubject.store` (5), `useStoredFile` (12), `exercisesApi` (9). Suite front 103 fichiers, ESLint, audits RGAA / couleurs / Tailwind à 0, build, Playwright axe-core.
+**Hypothèse** : `ExercisesPage` garde ses appels dans un module d'accès plutôt que dans les stores `tests` / `questions`, dont les actions ne renvoient qu'un booléen et notifient en interne (voir `submitCreate`).
+**Dette restante liée** : `ExercisesPage` reste volumineuse (714 lignes) ; `ClassroomEnseignantView` (≈ 880 lignes).

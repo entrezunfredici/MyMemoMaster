@@ -5152,3 +5152,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : l'action est portée par `<button type="button">` avec un nom accessible (`aria-label` si le contenu est une icône) ; l'icône y est un enfant décoratif. L'audit statique signale tout `@click` sur une icône Heroicons ou sur `li/tr/td/p/svg/section/article`.
 **Alternative écartée** : ajouter `role="button" tabindex="0" @keydown` partout (réimplémente un bouton, fragile, et ne fonctionne pas sur les icônes Heroicons).
 **Conséquences** : le style des icônes passe sur le `<button>` parent ; les tests ciblent `button`.
+
+
+## 2026-10-17 — Pas d'appel API dans une page ou un composant (règle ESLint)
+
+**Contexte** : 17 appels `api.*` éparpillés dans 7 fichiers ; la route `storage/presign` et sa gestion d'erreur étaient copiées dans deux vues ; la logique d'authentification (mot de passe oublié, profil) était dupliquée entre pages et store.
+**Décision** : toute requête passe par (1) un store quand l'action a un état partagé ou notifie (`auth`, `subjects`), (2) un composable quand elle est réutilisée avec de la logique d'interface (`useStoredFile`), ou (3) un module d'accès `helpers/*Api.js` qui renvoie la réponse brute quand la page doit lire le statut ou le message (`exercisesApi`, `flashcardsApi`). `@/helpers/api` est interdit par ESLint dans `src/pages` et `src/components`.
+**Alternative écartée** : tout faire passer par les stores existants (les actions de `tests` / `questions` renvoient un booléen et notifient en interne : la page perdrait le message d'erreur précis qu'elle affiche) ; une règle uniquement documentaire (l'écart serait revenu, comme pour les 7 fichiers actuels).
+**Conséquences** : une route vit à un seul endroit et se teste à part ; les pages se testent contre un store simulé (contrat page ↔ store) et le store se teste contre l'API simulée ; ajouter un appel direct dans une page fait échouer le lint en CI.

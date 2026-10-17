@@ -131,8 +131,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/helpers/api'
-import { notif } from '@/helpers/notif'
 import { missingsElementsPassword } from '@/helpers/functions'
 
 const authStore = useAuthStore()
@@ -165,19 +163,8 @@ onMounted(async () => {
 
 async function saveProfile() {
   savingProfile.value = true
-  const resp = await api.put(`users/${authStore.user.userId}`, {
-    name: form.value.name,
-    email: form.value.email,
-  })
+  await authStore.updateProfile({ name: form.value.name, email: form.value.email })
   savingProfile.value = false
-
-  if (!resp || resp.status !== 200) {
-    notif.notify(resp?.data?.message || 'Erreur lors de la mise à jour.', 'error')
-    return
-  }
-
-  authStore.user = { ...authStore.user, ...resp.data }
-  notif.notify('Profil mis à jour avec succès.', 'success')
 }
 
 async function changePassword() {
@@ -195,20 +182,13 @@ async function changePassword() {
   }
 
   savingPassword.value = true
-  const resp = await api.put(`users/${authStore.user.userId}/change-password`, {
-    id: authStore.user.userId,
+  const ok = await authStore.changePassword({
     oldPassword: security.value.oldPassword,
     newPassword: security.value.newPassword,
   })
   savingPassword.value = false
 
-  if (!resp || resp.status !== 200) {
-    notif.notify(resp?.data?.message || 'Erreur lors du changement de mot de passe.', 'error')
-    return
-  }
-
-  notif.notify('Mot de passe modifié avec succès.', 'success')
-  security.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+  if (ok) security.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
 }
 
 async function deleteAccount() {
