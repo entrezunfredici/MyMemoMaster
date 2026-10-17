@@ -24,8 +24,29 @@ const HTML_ELEMENTS = [
   'template', 'textarea', 'tfoot', 'th', 'thead', 'time', 'title', 'tr', 'track', 'u', 'ul', 'var', 'video', 'wbr',
 ]
 
-const HTML_TAG_RE = new RegExp('<\\/?(?:' + HTML_ELEMENTS.join('|') + ')(?:[\\s/][^<>]*=[^<>]*)?\\s*\\/?>', 'gi')
-const HTML_MARKUP_RE = /<!--[\s\S]*?-->|<![a-z][^<>]*>|<\?[\s\S]*?\?>/gi
+// CHOIX: expressions à ambiguïté nulle (chaque caractère ne peut être consommé que par un seul quantificateur).
+// RAISON: la première version, `[^<>]*=[^<>]*` puis `\s*`, était polynomiale : une longue suite d'« = » ou
+// d'espaces sans « > » final la faisait revenir en arrière en O(n²) (ReDoS, alerte CodeQL
+// js/polynomial-redos). Or ce middleware s'applique à TOUS les corps de requête, dont les cartes mentales
+// (limite 100 Mo). Ici la zone d'attributs est « tout sauf < > = » jusqu'au premier « = », puis le reste.
+const HTML_TAG_RE = new RegExp('<\\/?(?:' + HTML_ELEMENTS.join('|') + ')(?:[\\s/][^<>=]*=[^<>]*|\\s*\\/?)>', 'gi')
+// Déclaration `<!DOCTYPE …>` : bornée par le prochain « < » ou « > », donc linéaire.
+const HTML_DECLARATION_RE = /<![a-z][^<>]*>/gi
+
+// Commentaires `<!-- -->` et instructions `<? ?>` : retirés par recherche de la fin avec indexOf (linéaire).
+// Une expression lazy `<!--[\s\S]*?-->` est quadratique sur « <!--<!--<!--… » sans fermeture.
+function stripDelimited(text, open, close) {
+  let out = ''
+  let from = 0
+  for (;;) {
+    const start = text.indexOf(open, from)
+    if (start === -1) return out + text.slice(from)
+    const end = text.indexOf(close, start + open.length)
+    if (end === -1) return out + text.slice(from)
+    out += text.slice(from, start)
+    from = end + close.length
+  }
+}
 
 // Retire les balises jusqu'à stabilité : « <scr<script>ipt> » redevient « <script> » après un seul passage.
 function stripHtml(text) {
@@ -33,7 +54,9 @@ function stripHtml(text) {
   let current = text
   do {
     previous = current
-    current = current.replace(HTML_MARKUP_RE, '').replace(HTML_TAG_RE, '')
+    current = stripDelimited(stripDelimited(current, '<!--', '-->'), '<?', '?>')
+      .replace(HTML_DECLARATION_RE, '')
+      .replace(HTML_TAG_RE, '')
   } while (current !== previous)
   return current
 }
@@ -48,7 +71,15 @@ function sanitizeValue(value) {
 function sanitizeObject(obj) {
   const result = {}
   for (const key of Object.keys(obj)) {
-    result[key] = sanitizeValue(obj[key])
+    // defineProperty plutôt que `result[key] =` : avec la clé « __proto__ », l'affectation changerait le
+    // prototype de `result` (injection de propriété, alerte CodeQL js/remote-property-injection) ; ici
+    // elle crée une simple propriété de données, inoffensive.
+    Object.defineProperty(result, key, {
+      value: sanitizeValue(obj[key]),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    })
   }
   return result
 }

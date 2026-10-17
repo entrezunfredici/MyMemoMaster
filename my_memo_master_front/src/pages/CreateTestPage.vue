@@ -44,12 +44,11 @@
               class="h-16 w-16 object-cover rounded-lg border border-gray"
             />
             <span class="text-sm text-gray-light truncate max-w-[160px]">{{ question.imageOriginalName }}</span>
-            <XMarkIcon
-              class="size-6 text-dark cursor-pointer hover:brightness-50"
-              role="button"
-              aria-label="Retirer l'image"
-              @click="handleRemoveImage"
-            />
+            <!-- RGAA 7.1 / 12.x : l'icône Heroicons est rendue aria-hidden et perd role/aria-label ;
+                 l'action doit être portée par un vrai bouton (clavier + lecteur d'écran). -->
+            <button type="button" aria-label="Retirer l'image" class="cursor-pointer" @click="handleRemoveImage">
+              <XMarkIcon class="size-6 text-dark hover:brightness-50" />
+            </button>
           </div>
           <button
             v-else
@@ -77,7 +76,9 @@
                 <img v-if="q.imageUrl" :src="q.imageUrl" :alt="q.imageOriginalName || ''" class="h-10 w-10 object-cover rounded" />
                 <span class="text-lg text-dark"><FormulaText :text="q.statement || ''" /></span>
               </div>
-              <XMarkIcon class="size-6 text-dark cursor-pointer hover:brightness-50" @click="deleteQuestion(q.idQuestion)" />
+              <button type="button" class="cursor-pointer" :aria-label="`Supprimer la question ${q.statement || ''}`" @click="deleteQuestion(q.idQuestion)">
+                <XMarkIcon class="size-6 text-dark hover:brightness-50" />
+              </button>
             </div>
           </div>
         </div>

@@ -84,6 +84,8 @@ async function submit() {
     }
     notif.notify('Mot de passe réinitialisé avec succès !', 'success')
     router.push('/auth')
+  } catch {
+    errorMessage.value = 'Impossible de contacter le serveur. Réessayez dans un instant.'
   } finally {
     submitting.value = false
   }

@@ -53,6 +53,13 @@ const MIN_SUBSTANTIAL_LENGTH = 15
 // richesse de acceptedAnswers n'a de sens que pour ce type de réponse).
 const MIN_SENTENCE_WORDS = 5
 
+// Réponse « terme » : un ou deux mots faits de lettres seulement (« Newton », « Isaac Newton », « le
+// newton », « énergie cinétique »). C'est la forme normale d'une réponse factuelle (unité, nom, lieu) :
+// elle ne répète pas les mots de la question et n'a pas à être plus longue. « oui / non / vrai / faux »
+// en sont exclus — ces réponses-là ne se comprennent qu'avec la question.
+const BARE_TERM = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*(\s+[A-Za-zÀ-ÿ'’-]+)?$/
+const YES_NO = /^(oui|non|vrai|faux)$/i
+
 // Recouvrement de mots-clés (cf. Semantic.service.computeKeywordOverlap) au-delà duquel deux
 // formulations sont jugées quasi-identiques, donc n'apportant aucune couverture supplémentaire.
 const NEAR_DUPLICATE_OVERLAP_THRESHOLD = 0.85
@@ -98,6 +105,15 @@ class AnswerQualityService {
     const answerKeywords = this.extractDistinctiveKeywords(this.stripFormulaSegments(answer))
     if (statementKeywords.size === 0 || answerKeywords.size === 0) return true
     return [...statementKeywords].some((k) => answerKeywords.has(k))
+  }
+
+  /**
+   * Réponse « terme » : un ou deux mots, lettres seulement (voir BARE_TERM) — réponse factuelle
+   * légitime, exemptée des contrôles d'autonomie et de longueur.
+   */
+  isBareTerm(answer) {
+    const text = (answer || '').trim()
+    return BARE_TERM.test(text) && !YES_NO.test(text)
   }
 
   /**
@@ -152,7 +168,8 @@ class AnswerQualityService {
     // « ΔS = Sech + Scréée » dépasse 5 tokens sans pour autant être une phrase.
     const proseWords = this.stripFormulaSegments(primary).split(/\s+/).filter((t) => /^[A-Za-zÀ-ÿ'’-]{3,}[.,;:]?$/.test(t))
     const isBareFormula = primaryHasFormula && proseWords.length < MIN_SENTENCE_WORDS
-    if (!isBareFormula && !this.sharesSubjectWithStatement(statement, primary)) {
+    // Une réponse « terme » (« Newton » à « Unité SI de la force ? ») ne répète pas les mots de la question.
+    if (!isBareFormula && !this.isBareTerm(primary) && !this.sharesSubjectWithStatement(statement, primary)) {
       warnings.push(
         "La réponse ne semble mentionner aucun mot-clé distinctif de l'énoncé — vérifie qu'elle " +
         'reste compréhensible sans relire la question (évite les pronoms ou tournures elliptiques).'
@@ -160,7 +177,7 @@ class AnswerQualityService {
     }
 
     // Réponse principale très courte (hors cas légitime d'une formule/valeur isolée)
-    if (primary.length < MIN_SUBSTANTIAL_LENGTH && !primaryHasFormula) {
+    if (primary.length < MIN_SUBSTANTIAL_LENGTH && !primaryHasFormula && !this.isBareTerm(primary)) {
       warnings.push('La réponse principale est très courte — vérifie qu\'elle reste complète et informative.')
     }
 
