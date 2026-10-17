@@ -15,7 +15,7 @@
           </div>
           <p class="text-xs text-dark/60 mt-0.5">{{ ev.occurrences?.length ?? 0 }} séance(s)</p>
         </div>
-        <button @click="deleteGroupEvent(ev.id)" class="text-secondary text-xs hover:underline">Supprimer</button>
+        <button @click="confirmDeleteEvent(ev)" class="text-secondary text-xs hover:underline">Supprimer</button>
       </div>
       <div v-if="ev.occurrences?.length" class="mt-2 flex flex-wrap gap-1">
         <span v-for="occ in ev.occurrences.slice(0, 5)" :key="occ.id"
@@ -31,6 +31,7 @@
 <script setup>
 // Créneaux déjà planifiés pour le groupe (suppression incluse). Extrait de pages/ClassroomEtablissementView.vue.
 import { useCalendarEventStore } from '@/stores/calendarEvents'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 import { formatDate } from '@/helpers/classroomFormat'
 
 const props = defineProps({
@@ -39,9 +40,18 @@ const props = defineProps({
 })
 
 const calendarStore = useCalendarEventStore()
+const askConfirm = useConfirmAction()
 
-async function deleteGroupEvent(eventId) {
-  await calendarStore.deleteEvent(eventId)
-  await calendarStore.fetchByGroup(props.groupId, true)
+// Une suppression de créneau partait SANS confirmation (retour de test fonctionnel) ; elle supprime aussi
+// toutes ses séances.
+function confirmDeleteEvent(ev) {
+  askConfirm(
+    'Supprimer le créneau',
+    `Supprimer le créneau « ${ev.name} » et ses ${ev.occurrences?.length ?? 0} séance(s) ? Cette action est irréversible.`,
+    async () => {
+      await calendarStore.deleteEvent(ev.id)
+      await calendarStore.fetchByGroup(props.groupId, true)
+    },
+  )
 }
 </script>

@@ -60,6 +60,7 @@
 import { plural } from '@/helpers/plural'
 import { ref, reactive } from 'vue'
 import { useClassGroupStore } from '@/stores/classGroups'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 
 defineProps({
   groups: { type: Array, required: true },
@@ -68,6 +69,7 @@ defineProps({
 const emit = defineEmits(['select', 'deleted'])
 
 const classGroupStore = useClassGroupStore()
+const askConfirm = useConfirmAction()
 const showCreateGroup = ref(false)
 const createGroupForm = reactive({ name: '', code: '', level: '', description: '', error: '' })
 
@@ -86,9 +88,14 @@ async function submitCreateGroup() {
   }
 }
 
-async function confirmDeleteGroup(g) {
-  if (!confirm(`Supprimer le groupe "${g.name}" ? Cette action est irréversible.`)) return
-  const ok = await classGroupStore.deleteGroup(g.id)
-  if (ok) emit('deleted', g.id)
+function confirmDeleteGroup(g) {
+  askConfirm(
+    'Supprimer le groupe',
+    `Supprimer le groupe « ${g.name} » ? Cette action est irréversible.`,
+    async () => {
+      const ok = await classGroupStore.deleteGroup(g.id)
+      if (ok) emit('deleted', g.id)
+    },
+  )
 }
 </script>

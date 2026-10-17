@@ -60,6 +60,8 @@
 
     </template>
 
+    <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
+
   </div>
 </template>
 
@@ -83,12 +85,16 @@ import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useInvitationStore } from '@/stores/invitations'
 import { useEtablissementStore } from '@/stores/etablissement'
 import { useRole } from '@/composables/useRole'
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 
 const classGroupStore = useClassGroupStore()
 const calendarStore = useCalendarEventStore()
 const invitationStore = useInvitationStore()
 const etabStore = useEtablissementStore()
 const { isAdminEtablissement } = useRole()
+// Modale de confirmation commune à tous les onglets (les composants enfants la déclenchent par useConfirmAction)
+const { confirmModal, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 
 // ── Onglets ────────────────────────────────────────────────────────────────
 

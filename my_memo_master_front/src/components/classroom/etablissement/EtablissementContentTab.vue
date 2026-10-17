@@ -40,15 +40,20 @@
 <script setup>
 // Onglet « Contenu » : modération des ressources et sections de l'établissement. Extrait de pages/ClassroomEtablissementView.vue.
 import { useEtablissementStore } from '@/stores/etablissement'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 
 const props = defineProps({
   etabId: { type: Number, default: null },
 })
 
 const etabStore = useEtablissementStore()
+const askConfirm = useConfirmAction()
 
-async function confirmDeleteContent(type, id, title) {
-  if (!confirm(`Supprimer "${title}" ? Cette action est irréversible.`)) return
-  await etabStore.deleteContent(props.etabId, type, id)
+function confirmDeleteContent(type, id, title) {
+  askConfirm(
+    'Supprimer le contenu',
+    `Supprimer « ${title} » ? Cette action est irréversible.`,
+    () => etabStore.deleteContent(props.etabId, type, id),
+  )
 }
 </script>

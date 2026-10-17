@@ -58,11 +58,14 @@
     <template #modals>
       <ExerciseAssignModal ref="assignModal" />
       <ExerciseFormModal ref="formModal" />
+      <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
     </template>
   </ItemListLayout>
 </template>
 
 <script setup>
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 // Page « Exercices » : liste filtrable des exercices. La création / modification (avec génération IA)
 // est dans ExerciseFormModal, l'assignation aux groupes dans ExerciseAssignModal ; la page ne porte que la
 // liste, les filtres et la suppression.
@@ -88,6 +91,8 @@ const authStore = useAuthStore()
 const guidedTourStore = useGuidedTourStore()
 const diagrammeStore = useDiagrammeStore()
 const { isEnseignant } = useRole()
+
+const { confirmModal, askConfirm, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 
 const formModal = ref(null)
 const assignModal = ref(null)
@@ -121,8 +126,11 @@ onMounted(async () => {
   loading.value = false
 })
 
-async function deleteTest(test) {
-  if (!confirm(`Supprimer l'exercice "${test.name}" ?`)) return
-  await testStore.deleteTest(test.testId)
+function deleteTest(test) {
+  askConfirm(
+    "Supprimer l'exercice",
+    `Supprimer l'exercice « ${test.name} » ? Cette action est irréversible.`,
+    () => testStore.deleteTest(test.testId),
+  )
 }
 </script>

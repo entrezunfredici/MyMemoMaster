@@ -163,11 +163,15 @@
         </div>
       </div>
 
+
+      <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
     </template>
   </ItemListLayout>
 </template>
 
 <script setup>
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 import { plural } from '@/helpers/plural'
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, computed, onMounted } from 'vue'
@@ -186,6 +190,7 @@ import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 
 const router = useRouter()
+const { confirmModal, askConfirm, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 const systemStore = useLeitnerSystemStore()
 const cardStore = useLeitnerCardStore()
 const boxStore = useLeitnerBoxStore()
@@ -348,11 +353,16 @@ const submitForm = async () => {
   submitting.value = false
 }
 
-const handleDelete = async (system) => {
-  if (!confirm(`Supprimer le système "${system.name}" ? Cette action est irréversible.`)) return
-  const ok = await systemStore.deleteSystem(system.idSystem)
-  if (ok) {
-    delete cardStore.systemStats[system.idSystem]
-  }
+const handleDelete = (system) => {
+  askConfirm(
+    'Supprimer le système',
+    `Supprimer le système « ${system.name} » ? Cette action est irréversible.`,
+    async () => {
+      const ok = await systemStore.deleteSystem(system.idSystem)
+      if (ok) {
+        delete cardStore.systemStats[system.idSystem]
+      }
+    },
+  )
 }
 </script>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import FlashcardsPage from '@/pages/FlashcardsPage.vue'
@@ -382,38 +382,51 @@ describe('FlashcardsPage', () => {
     })
   })
 
-  describe('suppression', () => {
-    let confirmSpy
-    beforeEach(() => { confirmSpy = vi.spyOn(window, 'confirm') })
-    afterEach(() => confirmSpy.mockRestore())
+  describe('suppression (modale de confirmation commune)', () => {
+    const askDelete = async (wrapper) => {
+      await systemRow(wrapper, 'Anglais').find('[data-testid="delete"]').trigger('click')
+      await flushPromises()
+    }
+    const answer = async (wrapper, selector) => {
+      await wrapper.find(selector).trigger('click')
+      await flushPromises()
+    }
 
-    it('confirmation refusée - rien n’est supprimé', async () => {
-      confirmSpy.mockReturnValue(false)
+    it('« Supprimer » ouvre une confirmation nominative ; rien n’est supprimé avant la réponse', async () => {
       const { wrapper, system } = mountPage()
       await flushPromises()
-      await systemRow(wrapper, 'Anglais').find('[data-testid="delete"]').trigger('click')
-      expect(confirmSpy).toHaveBeenCalledWith('Supprimer le système "Anglais" ? Cette action est irréversible.')
+      await askDelete(wrapper)
+      const d = wrapper.find('[role="dialog"][aria-label="Supprimer le système"]')
+      expect(d.exists()).toBe(true)
+      expect(d.text()).toContain('Supprimer le système « Anglais » ? Cette action est irréversible.')
       expect(system.deleteSystem).not.toHaveBeenCalled()
     })
 
-    it('confirmation acceptée - supprime et oublie les statistiques du système', async () => {
-      confirmSpy.mockReturnValue(true)
+    it('« Annuler » ferme la confirmation sans rien supprimer', async () => {
+      const { wrapper, system } = mountPage()
+      await flushPromises()
+      await askDelete(wrapper)
+      await answer(wrapper, '.btn-modal-cancel')
+      expect(system.deleteSystem).not.toHaveBeenCalled()
+      expect(wrapper.find('[aria-label="Supprimer le système"]').exists()).toBe(false)
+    })
+
+    it('« Confirmer » supprime le système et oublie ses statistiques', async () => {
       const { wrapper, system, card } = mountPage({ systemStats: { 2: { total: 1, boxes: {} } } })
       system.deleteSystem.mockResolvedValue(true)
       await flushPromises()
-      await systemRow(wrapper, 'Anglais').find('[data-testid="delete"]').trigger('click')
-      await flushPromises()
+      await askDelete(wrapper)
+      await answer(wrapper, '.btn-modal-danger')
       expect(system.deleteSystem).toHaveBeenCalledWith(2)
       expect(card.systemStats[2]).toBeUndefined()
     })
 
     it('échec de suppression - les statistiques sont conservées', async () => {
-      confirmSpy.mockReturnValue(true)
       const { wrapper, system, card } = mountPage({ systemStats: { 2: { total: 1, boxes: {} } } })
       system.deleteSystem.mockResolvedValue(false)
       await flushPromises()
-      await systemRow(wrapper, 'Anglais').find('[data-testid="delete"]').trigger('click')
-      await flushPromises()
+      await askDelete(wrapper)
+      await answer(wrapper, '.btn-modal-danger')
       expect(card.systemStats[2]).toBeDefined()
     })
   })

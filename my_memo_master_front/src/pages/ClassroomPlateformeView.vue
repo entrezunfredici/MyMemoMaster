@@ -269,16 +269,20 @@
         </div>
       </div>
     </section>
+    <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
   </div>
 </template>
 
 <script setup>
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 import { formatDateTime } from '@/helpers/classroomFormat'
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, onMounted } from 'vue'
 import { useEtablissementStore } from '@/stores/etablissement'
 
 const etabStore = useEtablissementStore()
+const { confirmModal, askConfirm, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 
 const selectedId = ref(null)
 const detailTab = ref('stats')
@@ -370,15 +374,23 @@ async function submitAssignAdmin() {
   }
 }
 
-async function confirmDelete(etab) {
-  if (!confirm(`Supprimer "${etab.name}" ? Cette action est irréversible.`)) return
-  await etabStore.deleteEtab(etab.id)
-  if (selectedId.value === etab.id) selectedId.value = null
+function confirmDelete(etab) {
+  askConfirm(
+    "Supprimer l'établissement",
+    `Supprimer « ${etab.name} » ? Cette action est irréversible.`,
+    async () => {
+      await etabStore.deleteEtab(etab.id)
+      if (selectedId.value === etab.id) selectedId.value = null
+    },
+  )
 }
 
-async function confirmDeleteContent(type, id, title) {
-  if (!confirm(`Supprimer "${title}" ? Cette action est irréversible.`)) return
-  await etabStore.deleteContent(selectedId.value, type, id)
+function confirmDeleteContent(type, id, title) {
+  askConfirm(
+    'Supprimer le contenu',
+    `Supprimer « ${title} » ? Cette action est irréversible.`,
+    () => etabStore.deleteContent(selectedId.value, type, id),
+  )
 }
 
 </script>

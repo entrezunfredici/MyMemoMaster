@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import EtablissementStatsTab from '@/components/classroom/etablissement/EtablissementStatsTab.vue'
@@ -14,24 +14,25 @@ import { useEtablissementStore } from '@/stores/etablissement'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
 import { useInvitationStore } from '@/stores/invitations'
+import { CONFIRM_ACTION_KEY } from '@/composables/useConfirmAction'
 
 vi.mock('@/helpers/api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), del: vi.fn() } }))
 vi.mock('@/helpers/notif', () => ({ notif: { notify: vi.fn() } }))
 
 const GROUP_ID = 3
 
+// `ask` = fonction de confirmation fournie par la page parente (provideConfirmAction) : on l'espionne
+let ask
 function mountPanel(component, { props = {}, state = {} } = {}) {
   const pinia = createTestingPinia({ createSpy: vi.fn, stubActions: true, initialState: state })
-  return mount(component, { props, global: { plugins: [pinia] } })
+  return mount(component, { props, global: { plugins: [pinia], provide: { [CONFIRM_ACTION_KEY]: ask } } })
 }
 const btn = (w, text) => w.findAll('button').find((b) => b.text().trim() === text)
 
-let confirmSpy
 beforeEach(() => {
   vi.clearAllMocks()
-  confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  ask = vi.fn()
 })
-afterEach(() => confirmSpy.mockRestore())
 
 describe('EtablissementStatsTab', () => {
   const STATS = { groupCount: 2, totalMembers: 9, activeMembers: 7, pendingInvitations: 1, validatedAccounts: 8, inactiveMembers: 2, roleBreakdown: { students: 6, teachers: 3 } }
@@ -113,25 +114,26 @@ describe('EtablissementContentTab', () => {
     expect(text).toContain('Aucune section.')
   })
 
-  it('suppression confirmée : type et identifiant transmis pour l’établissement', async () => {
+  it('« Supprimer » demande confirmation ; rien n’est supprimé avant que l’action soit exécutée', async () => {
     const w = mountContent(CONTENT)
     await btn(w, 'Supprimer').trigger('click')
-    await flushPromises()
-    expect(confirmSpy).toHaveBeenCalledWith('Supprimer "Cours.pdf" ? Cette action est irréversible.')
-    expect(useEtablissementStore().deleteContent).toHaveBeenCalledWith(5, 'resource', 11)
+    expect(ask).toHaveBeenCalledTimes(1)
+    expect(ask.mock.calls[0][0]).toBe('Supprimer le contenu')
+    expect(ask.mock.calls[0][1]).toBe('Supprimer « Cours.pdf » ? Cette action est irréversible.')
+    expect(useEtablissementStore().deleteContent).not.toHaveBeenCalled()
   })
 
-  it('suppression refusée : rien n’est supprimé', async () => {
-    confirmSpy.mockReturnValue(false)
+  it('l’action confirmée transmet le type et l’identifiant pour l’établissement', async () => {
     const w = mountContent(CONTENT)
-    await w.findAll('button').filter((b) => b.text() === 'Supprimer')[1].trigger('click')
-    expect(useEtablissementStore().deleteContent).not.toHaveBeenCalled()
+    await btn(w, 'Supprimer').trigger('click')
+    await ask.mock.calls[0][2]()
+    expect(useEtablissementStore().deleteContent).toHaveBeenCalledWith(5, 'resource', 11)
   })
 
   it('section : type « section »', async () => {
     const w = mountContent(CONTENT)
     await w.findAll('button').filter((b) => b.text() === 'Supprimer')[1].trigger('click')
-    await flushPromises()
+    await ask.mock.calls[0][2]()
     expect(useEtablissementStore().deleteContent).toHaveBeenCalledWith(5, 'section', 12)
   })
 })
@@ -264,12 +266,14 @@ describe('EtablissementGroupPicker', () => {
   })
 
   describe('suppression', () => {
-    it('confirmée et réussie : émet « deleted » avec l’identifiant', async () => {
+    it('demande confirmation nominative, puis l’action confirmée émet « deleted » avec l’identifiant', async () => {
       const w = mountPicker()
       useClassGroupStore().deleteGroup.mockResolvedValue(true)
       await w.findAll('button[aria-label="Supprimer le groupe"]')[1].trigger('click')
-      await flushPromises()
-      expect(confirmSpy).toHaveBeenCalledWith('Supprimer le groupe "L3" ? Cette action est irréversible.')
+      expect(ask.mock.calls[0][0]).toBe('Supprimer le groupe')
+      expect(ask.mock.calls[0][1]).toBe('Supprimer le groupe « L3 » ? Cette action est irréversible.')
+      expect(useClassGroupStore().deleteGroup).not.toHaveBeenCalled()
+      await ask.mock.calls[0][2]()
       expect(useClassGroupStore().deleteGroup).toHaveBeenCalledWith(2)
       expect(w.emitted('deleted')).toEqual([[2]])
     })
@@ -280,14 +284,11 @@ describe('EtablissementGroupPicker', () => {
       expect(w.emitted('select')).toBeUndefined()
     })
 
-    it('refusée ou en échec : pas d’événement', async () => {
+    it('suppression en échec : pas d’événement « deleted »', async () => {
       const w = mountPicker()
-      confirmSpy.mockReturnValueOnce(false)
-      await w.findAll('button[aria-label="Supprimer le groupe"]')[0].trigger('click')
-      expect(useClassGroupStore().deleteGroup).not.toHaveBeenCalled()
       useClassGroupStore().deleteGroup.mockResolvedValue(false)
       await w.findAll('button[aria-label="Supprimer le groupe"]')[0].trigger('click')
-      await flushPromises()
+      await ask.mock.calls[0][2]()
       expect(w.emitted('deleted')).toBeUndefined()
     })
   })
@@ -433,10 +434,18 @@ describe('EtablissementEventList', () => {
     expect(text).not.toMatch(/01:00/)
   })
 
-  it('suppression : supprime puis recharge les créneaux du groupe', async () => {
+  it('« Supprimer » demande confirmation (elle partait sans) en citant le créneau et ses séances', async () => {
     const w = mountList()
     await btn(w, 'Supprimer').trigger('click')
-    await flushPromises()
+    expect(ask.mock.calls[0][0]).toBe('Supprimer le créneau')
+    expect(ask.mock.calls[0][1]).toContain('« Maths » et ses 7 séance(s)')
+    expect(useCalendarEventStore().deleteEvent).not.toHaveBeenCalled()
+  })
+
+  it('l’action confirmée supprime puis recharge les créneaux du groupe', async () => {
+    const w = mountList()
+    await btn(w, 'Supprimer').trigger('click')
+    await ask.mock.calls[0][2]()
     expect(useCalendarEventStore().deleteEvent).toHaveBeenCalledWith(61)
     expect(useCalendarEventStore().fetchByGroup).toHaveBeenCalledWith(GROUP_ID, true)
   })

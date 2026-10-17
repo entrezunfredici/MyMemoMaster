@@ -32,18 +32,7 @@
   </div>
 
   <!-- Modal confirmation suppression/retrait -->
-  <ModalComponent
-    :visible="confirmModal.visible"
-    :title="confirmModal.title"
-    size="sm"
-    @close="closeConfirmModal"
-  >
-    <p class="text-sm text-dark/70">{{ confirmModal.message }}</p>
-    <template #footer>
-      <button class="btn-modal-cancel" @click="closeConfirmModal">Annuler</button>
-      <button class="btn-modal-danger" @click="runConfirmedAction">Confirmer</button>
-    </template>
-  </ModalComponent>
+  <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
 </template>
 
 <script setup>
@@ -52,7 +41,7 @@
 // porte que la sélection du groupe, le chargement de ses données et la modale de confirmation commune
 // (fournie aux panneaux par provideConfirmAction).
 import { ref, computed, onMounted, watch } from 'vue'
-import ModalComponent from '@/components/ModalComponent.vue'
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
 import TeacherGroupPicker from '@/components/classroom/teacher/TeacherGroupPicker.vue'
 import TeacherAnalyticsPanel from '@/components/classroom/teacher/TeacherAnalyticsPanel.vue'
 import TeacherSectionsPanel from '@/components/classroom/teacher/TeacherSectionsPanel.vue'

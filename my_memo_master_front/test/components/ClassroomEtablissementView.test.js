@@ -160,8 +160,8 @@ describe('ClassroomEtablissementView — groupe sélectionné', () => {
     await wrapper.findAll('[role="button"][tabindex="0"]').find((e) => e.text().includes('L3 Info')).trigger('click')
     await flushPromises()
     useClassGroupStore().deleteGroup.mockResolvedValue(true)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     await wrapper.findAll('button[aria-label="Supprimer le groupe"]')[1].trigger('click')
+    await wrapper.find('.btn-modal-danger').trigger('click')
     await flushPromises()
     // le store simulé conserve la liste : la page retombe sur groups[0]
     expect(wrapper.text()).toContain('Emploi du temps — MP2I A')
@@ -171,10 +171,20 @@ describe('ClassroomEtablissementView — groupe sélectionné', () => {
     const { wrapper } = mountView()
     await flushPromises()
     useClassGroupStore().deleteGroup.mockResolvedValue(true)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     await wrapper.findAll('button[aria-label="Supprimer le groupe"]')[1].trigger('click')
+    await wrapper.find('.btn-modal-danger').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Emploi du temps — MP2I A')
+  })
+
+  it('une suppression de groupe demande confirmation (modale commune) avant toute action', async () => {
+    const { wrapper } = mountView()
+    await flushPromises()
+    await wrapper.findAll('button[aria-label="Supprimer le groupe"]')[0].trigger('click')
+    expect(wrapper.find('[role="dialog"]').text()).toContain('Supprimer le groupe « MP2I A » ? Cette action est irréversible.')
+    expect(useClassGroupStore().deleteGroup).not.toHaveBeenCalled()
+    await wrapper.find('.btn-modal-cancel').trigger('click')
+    expect(useClassGroupStore().deleteGroup).not.toHaveBeenCalled()
   })
 
   it('l’onglet « Comptes » reflète le groupe sélectionné', async () => {

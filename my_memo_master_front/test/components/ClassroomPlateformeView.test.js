@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import ClassroomPlateformeView from '@/pages/ClassroomPlateformeView.vue'
@@ -46,12 +46,13 @@ const openTab = async (wrapper, label) => {
 }
 
 describe('ClassroomPlateformeView', () => {
-  let confirmSpy
-  beforeEach(() => {
-    vi.clearAllMocks()
-    confirmSpy = vi.spyOn(window, 'confirm')
-  })
-  afterEach(() => confirmSpy.mockRestore())
+  beforeEach(() => vi.clearAllMocks())
+
+  // Confirmations : modale commune (ConfirmActionModal), plus de confirm() natif
+  const answer = async (wrapper, selector) => {
+    await wrapper.find(selector).trigger('click')
+    await flushPromises()
+  }
 
   describe('liste des établissements', () => {
     it('charge la liste au montage', () => {
@@ -206,29 +207,29 @@ describe('ClassroomPlateformeView', () => {
   })
 
   describe('suppression d’un établissement', () => {
-    it('confirmation refusée - rien n’est supprimé', async () => {
-      confirmSpy.mockReturnValue(false)
+    it('« Supprimer » ouvre une confirmation nominative ; « Annuler » ne supprime rien', async () => {
       const { wrapper, store } = mountPage()
       await button(wrapper, 'Supprimer', rowOf(wrapper, 'Collège Hugo')).trigger('click')
-      expect(confirmSpy).toHaveBeenCalledWith('Supprimer "Collège Hugo" ? Cette action est irréversible.')
+      const d = wrapper.find('[role="dialog"]')
+      expect(d.attributes('aria-label')).toBe("Supprimer l'établissement")
+      expect(d.text()).toContain('Supprimer « Collège Hugo » ? Cette action est irréversible.')
+      await answer(wrapper, '.btn-modal-cancel')
       expect(store.deleteEtab).not.toHaveBeenCalled()
     })
 
-    it('confirmation acceptée - supprime', async () => {
-      confirmSpy.mockReturnValue(true)
+    it('« Confirmer » supprime', async () => {
       const { wrapper, store } = mountPage()
       await button(wrapper, 'Supprimer', rowOf(wrapper, 'Collège Hugo')).trigger('click')
-      await flushPromises()
+      await answer(wrapper, '.btn-modal-danger')
       expect(store.deleteEtab).toHaveBeenCalledWith(2)
     })
 
     it('supprimer l’établissement affiché ferme le panneau de détail', async () => {
-      confirmSpy.mockReturnValue(true)
       const { wrapper } = mountPage()
       await openDetail(wrapper)
       expect(wrapper.find('button[aria-label="Fermer le détail"]').exists()).toBe(true)
       await button(wrapper, 'Supprimer', rowOf(wrapper, 'Lycée Pasteur')).trigger('click')
-      await flushPromises()
+      await answer(wrapper, '.btn-modal-danger')
       expect(wrapper.find('button[aria-label="Fermer le détail"]').exists()).toBe(false)
     })
   })
@@ -325,24 +326,26 @@ describe('ClassroomPlateformeView', () => {
         expect(wrapper.text()).toContain('Aucune section.')
       })
 
-      it('suppression confirmée - transmet le type et l’identifiant', async () => {
-        confirmSpy.mockReturnValue(true)
-        const { wrapper, store } = mountPage()
+      const askDeleteContent = async (wrapper, store) => {
         await openContent(wrapper, store)
         const row = wrapper.findAll('.min-w-0').find((d) => d.text().includes('Cours 1')).element.parentElement
         row.querySelector('button').click()
         await flushPromises()
-        expect(confirmSpy).toHaveBeenCalledWith('Supprimer "Cours 1" ? Cette action est irréversible.')
+      }
+
+      it('suppression confirmée - transmet le type et l’identifiant', async () => {
+        const { wrapper, store } = mountPage()
+        await askDeleteContent(wrapper, store)
+        expect(wrapper.find('[role="dialog"]').text()).toContain('Supprimer « Cours 1 » ? Cette action est irréversible.')
+        expect(store.deleteContent).not.toHaveBeenCalled()
+        await answer(wrapper, '.btn-modal-danger')
         expect(store.deleteContent).toHaveBeenCalledWith(1, 'resource', 11)
       })
 
-      it('suppression refusée - aucun appel', async () => {
-        confirmSpy.mockReturnValue(false)
+      it('suppression annulée - aucun appel', async () => {
         const { wrapper, store } = mountPage()
-        await openContent(wrapper, store)
-        const row = wrapper.findAll('.min-w-0').find((d) => d.text().includes('Cours 1')).element.parentElement
-        row.querySelector('button').click()
-        await flushPromises()
+        await askDeleteContent(wrapper, store)
+        await answer(wrapper, '.btn-modal-cancel')
         expect(store.deleteContent).not.toHaveBeenCalled()
       })
     })
