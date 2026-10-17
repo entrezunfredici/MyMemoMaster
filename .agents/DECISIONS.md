@@ -5184,3 +5184,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : la page appelle `provideConfirmAction()` et affiche la modale ; chaque panneau appelle `useConfirmAction()` pour obtenir `askConfirm(titre, message, action)`. Une erreur explicite est levée si aucun parent n'a fourni la fonction.
 **Alternative écartée** : une modale par panneau (plusieurs instances, DOM différent de l'existant, quatre fois le même code) ; faire remonter des événements `ask-confirm` à la page (la page devrait connaître chaque action destructrice, ce qui ramènerait la logique qu'on vient d'en retirer) ; un store Pinia global (état partagé entre pages sans nécessité).
 **Conséquences** : la page ne connaît aucune suppression ; un nouveau panneau obtient la confirmation en une ligne ; les panneaux se testent seuls avec une fonction `ask` simulée (`provide: { [CONFIRM_ACTION_KEY]: spy }`).
+
+
+## 2026-10-17 — Tutoriels : filtres côté serveur, état dans l'URL
+
+**Contexte** : la page affichait des données factices ; l'API sait déjà filtrer (`subjectId`, `revisionTips`, `search`) et paginer.
+**Décision** : la page ne filtre rien localement ; sujet et « tips » sont des paramètres de l'URL, relus pour interroger l'API (une seule clé texte surveillée, pour ne recharger que sur un vrai changement) ; 100 tutoriels par page, sans pagination d'interface (le volume attendu est faible).
+**Alternative écartée** : tout charger puis filtrer en local (inutile avec un filtrage serveur disponible, et la pagination de l'API ne serait plus respectée) ; garder l'état des filtres dans le composant (perdu au rechargement, non partageable par lien).
+**Conséquences** : une URL de tutoriels filtrés se partage ; si le catalogue dépasse 100 entrées, il faudra ajouter une pagination d'interface (le store transmet déjà `page`).

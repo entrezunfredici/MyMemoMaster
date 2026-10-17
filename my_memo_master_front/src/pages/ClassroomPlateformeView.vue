@@ -168,7 +168,7 @@
               class="rounded-xl border border-gray/50 px-3 py-2 text-xs text-dark/70 flex items-center justify-between">
               <span class="font-mono text-primary">{{ log.action }}</span>
               <span>{{ log.actor?.name ?? '—' }}</span>
-              <span class="text-dark/40">{{ formatDate(log.createdAt) }}</span>
+              <span class="text-dark/40">{{ formatDateTime(log.createdAt) }}</span>
             </div>
           </div>
         </div>
@@ -194,7 +194,7 @@
               <span class="font-mono text-primary font-semibold min-w-0 truncate">{{ log.action }}</span>
               <span class="text-dark/70">{{ log.entityType }} #{{ log.entityId ?? '—' }}</span>
               <span class="text-dark/50">{{ log.actor?.name ?? '—' }}</span>
-              <span class="text-dark/40 shrink-0">{{ formatDate(log.createdAt) }}</span>
+              <span class="text-dark/40 shrink-0">{{ formatDateTime(log.createdAt) }}</span>
             </div>
           </div>
         </div>
@@ -273,6 +273,7 @@
 </template>
 
 <script setup>
+import { formatDateTime } from '@/helpers/classroomFormat'
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, onMounted } from 'vue'
 import { useEtablissementStore } from '@/stores/etablissement'
@@ -380,8 +381,4 @@ async function confirmDeleteContent(type, id, title) {
   await etabStore.deleteContent(selectedId.value, type, id)
 }
 
-function formatDate(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
 </script>

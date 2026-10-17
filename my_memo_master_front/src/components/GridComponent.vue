@@ -7,7 +7,7 @@
       <slot name="item" :item="item"></slot>
     </div>
   </div>
-  <NoItem v-else-if="props.enableNoItem" />
+  <NoItem v-else-if="props.enableNoItem" :message="props.emptyMessage" />
 </template>
 
 <script setup>
@@ -28,6 +28,12 @@ const props = defineProps({
     type: Boolean,
     required: false,
     default: true,
+  },
+  // Message affiché quand `items` est vide (défaut : celui de NoItemComponent)
+  emptyMessage: {
+    type: String,
+    required: false,
+    default: undefined,
   },
   maxHeight: {
     type: Number,

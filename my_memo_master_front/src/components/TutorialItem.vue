@@ -1,7 +1,7 @@
 <template>
     <!-- RGAA 7.x/12.x — lien natif plutôt que div @click : focusable et activable au clavier -->
     <a
-        :href="props.tutorial.url"
+        :href="props.tutorial.link"
         target="_blank"
         rel="noopener noreferrer"
         class="flex flex-row items-center gap-2 no-underline text-inherit"
@@ -12,7 +12,7 @@
         </div>
         <div class="p-4">
             <h4 class="text-xl font-bold">{{ props.tutorial.name }}</h4>
-            <p class="text-md">{{ props.tutorial.description }}</p>
+            <p v-if="props.tutorial.description" class="text-md">{{ props.tutorial.description }}</p>
             <div class="flex flex-row gap-2 mt-2">
                 <Pill v-if="props?.tutorial?.subject?.name" :text="props.tutorial.subject.name" />
                 <Pill v-if="props?.tutorial.revision_tips" text="Tips de révision" />

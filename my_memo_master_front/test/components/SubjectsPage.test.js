@@ -67,7 +67,7 @@ describe('SubjectsPage', () => {
       const { wrapper } = mountPage()
       await flushPromises()
       const counts = groupButtons(wrapper).map((b) => b.find('.text-xs').text())
-      expect(counts).toEqual(['1 contenu', '0 contenus', '2 contenus', '1 contenu'])
+      expect(counts).toEqual(['1 contenu', '0 contenu', '2 contenus', '1 contenu'])
     })
 
     it('compte les sujets quand aucune recherche n’est saisie', async () => {
@@ -242,7 +242,8 @@ describe('SubjectsPage', () => {
       await flushPromises()
       await wrapper.find('input').setValue('zzz')
       expect(wrapper.text()).toContain('Aucun contenu trouvé pour « zzz ».')
-      expect(wrapper.text()).toMatch(/0\s*résultats/)
+      // accord français : « 0 résultat » (singulier), pas « 0 résultats »
+      expect(wrapper.text()).toMatch(/0\s*résultat\s+pour/)
     })
 
     it('aucun contenu du tout - message sans requête', async () => {

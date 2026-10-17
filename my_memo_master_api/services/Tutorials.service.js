@@ -1,5 +1,5 @@
 const { Tutorials } = require('../models/index')
-const { Op } = require('sequelize')
+const { buildTutorialsWhere } = require('../helpers/tutorialsFilter')
 
 class TutorialsService {
   async findAll({ where, offset, limit }) {
@@ -33,19 +33,7 @@ class TutorialsService {
   }
 
   async count({ search, subjectId, revisionTips }) {
-    const where = {}
-    if (search) {
-      where[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } }
-        // { description: { [Op.like]: `%${search}%` } },
-      ]
-    }
-    if (subjectId) {
-      where.subjectId = subjectId
-    }
-    if (revisionTips !== undefined) {
-      where.revisionTips = revisionTips
-    }
+    const where = buildTutorialsWhere({ search, subjectId, revisionTips })
 
     return await Tutorials.count({ where })
   }

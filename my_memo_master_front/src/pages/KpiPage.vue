@@ -204,6 +204,7 @@
 </template>
 
 <script setup>
+import { plural } from '@/helpers/plural'
 import { computed, onMounted, defineComponent, h } from 'vue'
 import { Bar, Line } from 'vue-chartjs'
 import {
@@ -315,7 +316,7 @@ const barOptions = {
     legend: { display: false },
     tooltip: {
       callbacks: {
-        label: (ctx) => ` ${ctx.parsed.y} session${ctx.parsed.y !== 1 ? 's' : ''}`
+        label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, 'session')}`
       }
     }
   },
@@ -364,7 +365,7 @@ const leitnerBarOptions = {
     legend: { display: false },
     tooltip: {
       callbacks: {
-        label: (ctx) => ` ${ctx.parsed.y} carte${ctx.parsed.y !== 1 ? 's' : ''}`
+        label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, 'carte')}`
       }
     }
   },

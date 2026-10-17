@@ -73,7 +73,7 @@
             <span class="font-mono text-primary font-semibold truncate">{{ log.action }}</span>
             <span class="text-dark/70">{{ log.entityType }} #{{ log.entityId ?? '—' }}</span>
             <span class="text-dark/50">{{ log.actor?.name ?? '—' }}</span>
-            <span class="text-dark/40 shrink-0">{{ formatDate(log.createdAt) }}</span>
+            <span class="text-dark/40 shrink-0">{{ formatDateTime(log.createdAt) }}</span>
           </div>
         </div>
       </div>
@@ -321,7 +321,7 @@
                 <div v-if="ev.occurrences?.length" class="mt-2 flex flex-wrap gap-1">
                   <span v-for="occ in ev.occurrences.slice(0, 5)" :key="occ.id"
                     class="rounded-full bg-gray px-2 py-0.5 text-xs text-dark/70">
-                    {{ formatDate(occ.date) }} {{ occ.startTime?.slice(0,5) }}
+                    {{ formatDateTime(occ.date) }} {{ occ.startTime?.slice(0,5) }}
                   </span>
                   <span v-if="ev.occurrences.length > 5" class="text-xs text-dark/40">+{{ ev.occurrences.length - 5 }}</span>
                 </div>
@@ -402,6 +402,7 @@
 </template>
 
 <script setup>
+import { formatDateTime } from '@/helpers/classroomFormat'
 import { ref, computed, onMounted, watch, reactive } from 'vue'
 import { useClassGroupStore } from '@/stores/classGroups'
 import { useCalendarEventStore } from '@/stores/calendarEvents'
@@ -475,11 +476,6 @@ async function deactivate(userId) {
     const member = currentGroup.value?.members?.find((m) => m.userId === userId)
     if (member?.user) member.user.isActive = false
   }
-}
-
-function formatDate(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 const selectedId = ref(null)

@@ -1,6 +1,6 @@
-const { Op } = require('sequelize')
 const TutorialsService = require('../services/Tutorials.service')
 const logger = require('../helpers/logger')
+const { buildTutorialsWhere } = require('../helpers/tutorialsFilter')
 
 exports.findAll = async (req, res) => {
   let { page, perPage, search, subjectId, revisionTips } = req.query
@@ -14,20 +14,7 @@ exports.findAll = async (req, res) => {
     }
     const offset = (pagination.page - 1) * pagination.perPage
 
-    // Construct the where clause
-    let where = {}
-    if (search) {
-      where[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } }
-        // { description: { [Op.like]: `%${search}%` } },
-      ]
-    }
-    if (subjectId) {
-      where.subjectId = subjectId
-    }
-    if (revisionTips !== undefined) {
-      where.revisionTips = revisionTips
-    }
+    const where = buildTutorialsWhere({ search, subjectId, revisionTips })
 
     const tutorials = await TutorialsService.findAll({ where, offset, limit: pagination.perPage })
 

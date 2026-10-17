@@ -30,7 +30,7 @@
           <div v-if="cardStore.systemStats[system.idSystem]">
             <span class="text-sm text-gray-500">
               {{ cardStore.systemStats[system.idSystem].total }}
-              carte{{ cardStore.systemStats[system.idSystem].total !== 1 ? 's' : '' }} à réviser
+              {{ plural(cardStore.systemStats[system.idSystem].total, 'carte') }} à réviser
             </span>
             <div class="flex gap-1 mt-2 w-full">
               <div
@@ -168,6 +168,7 @@
 </template>
 
 <script setup>
+import { plural } from '@/helpers/plural'
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'

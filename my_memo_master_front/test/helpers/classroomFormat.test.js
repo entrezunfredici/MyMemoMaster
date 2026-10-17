@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatDate,
+  formatDateTime,
   formatFileSize,
   fileIcon,
   deadlineTypeLabel,
@@ -15,6 +16,16 @@ describe('formatDate', () => {
     expect(formatDate('2026-11-03T10:00:00Z')).toMatch(/^0?3 nov\.? 2026$/)
   })
   it.each([[null], [undefined], ['']])('valeur vide (%s) -> chaîne vide', (v) => {
+    expect(formatDate(v)).toBe('')
+  })
+})
+
+describe('formatDateTime', () => {
+  it('date et heure en français', () => {
+    expect(formatDateTime('2026-11-03T10:05:00')).toMatch(/^0?3 nov\.? 2026,? (à )?10:05$/)
+  })
+  it.each([[null], [undefined], ['']])('valeur vide (%s) -> « — » (différent de formatDate, qui renvoie une chaîne vide)', (v) => {
+    expect(formatDateTime(v)).toBe('—')
     expect(formatDate(v)).toBe('')
   })
 })

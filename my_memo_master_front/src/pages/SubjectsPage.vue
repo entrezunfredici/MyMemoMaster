@@ -33,11 +33,11 @@
       <!-- Compteur résultats -->
       <p class="text-sm text-gray-500 mb-4">
         <template v-if="searchQuery">
-          <strong>{{ totalResults }}</strong> résultat{{ totalResults !== 1 ? 's' : '' }}
+          <strong>{{ totalResults }}</strong> {{ plural(totalResults, 'résultat') }}
           pour « {{ searchQuery }} »
         </template>
         <template v-else>
-          <strong>{{ visibleGroups.length }}</strong> sujet{{ visibleGroups.length !== 1 ? 's' : '' }}
+          <strong>{{ visibleGroups.length }}</strong> {{ plural(visibleGroups.length, 'sujet') }}
         </template>
       </p>
 
@@ -67,7 +67,7 @@
               />
               <span class="font-semibold text-heading text-base">{{ group.subjectName }}</span>
               <span class="text-xs text-gray-500 font-normal">
-                {{ group.total }} contenu{{ group.total !== 1 ? 's' : '' }}
+                {{ group.total }} {{ plural(group.total, 'contenu') }}
               </span>
             </div>
             <svg
@@ -134,6 +134,7 @@
 </template>
 
 <script setup>
+import { plural } from '@/helpers/plural'
 import { ref, computed, watch, onMounted, defineComponent, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSearchStore } from '@/stores/search'

@@ -264,6 +264,7 @@
 </template>
 
 <script setup>
+import { deadlineTypeLabel } from '@/helpers/classroomFormat'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTestStore } from '@/stores/tests'
@@ -511,8 +512,4 @@ function formatDeadlineDate(dueDate) {
   return new Date(dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-function deadlineTypeLabel(type) {
-  const map = { ds: 'DS', devoir: 'Devoir', exposé: 'Exposé', autre: 'Autre' }
-  return map[type] ?? type
-}
 </script>

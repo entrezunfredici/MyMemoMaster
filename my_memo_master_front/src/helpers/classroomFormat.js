@@ -6,6 +6,12 @@ export function formatDate(value) {
   return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/** Date et heure, pour les journaux et les listes d'administration ; « — » quand la valeur est absente. */
+export function formatDateTime(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 export function formatFileSize(bytes) {
   if (!bytes) return ''
   if (bytes < 1024) return `${bytes} o`

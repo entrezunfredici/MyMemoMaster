@@ -91,7 +91,7 @@ describe('TutorialsService', () => {
       where: {
         [Op.or]: [{ name: { [Op.like]: `%Tutorial%` } }],
         subjectId: 1,
-        revisionTips: true
+        revision_tips: true
       }
     })
     expect(result).toEqual(mockCount)

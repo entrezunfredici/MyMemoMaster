@@ -81,6 +81,22 @@ describe('Tutorials Controller', () => {
       expect(res.status).toBe(200)
     })
 
+    it('200 — filtre par sujet et tips de révision : la même clause sert à la liste et au comptage', async () => {
+      tutorialsService.count.mockResolvedValue(1)
+      tutorialsService.findAll.mockResolvedValue([mockTutorial])
+
+      const res = await request(app).get(`${BASE}/tutorials?subjectId=3&revisionTips=true&perPage=50&page=2`)
+
+      expect(res.status).toBe(200)
+      expect(tutorialsService.findAll).toHaveBeenCalledWith({
+        where: { subjectId: '3', revision_tips: true },
+        offset: 50,
+        limit: 50
+      })
+      expect(tutorialsService.count).toHaveBeenCalledWith({ search: undefined, subjectId: '3', revisionTips: 'true' })
+      expect(res.body.pagination).toMatchObject({ page: 2, perPage: 50 })
+    })
+
     it('500 — le service échoue', async () => {
       tutorialsService.count.mockRejectedValue(new Error('DB error'))
 

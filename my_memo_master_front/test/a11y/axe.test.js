@@ -94,7 +94,7 @@ describe('Accessibilité (axe-core)', () => {
         tutorial: {
           name: 'Bien démarrer',
           description: 'Guide de prise en main',
-          url: 'https://example.com/tuto'
+          link: 'https://example.com/tuto'
         }
       },
       attachTo: document.body

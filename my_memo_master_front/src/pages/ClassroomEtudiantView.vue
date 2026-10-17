@@ -298,6 +298,7 @@
 </template>
 
 <script setup>
+import { formatDate, deadlineTypeLabel, resourceTypeLabel, fileIcon, formatFileSize } from '@/helpers/classroomFormat'
 import { useStoredFile } from '@/composables/useStoredFile'
 import { ref, computed, onMounted, watch, reactive } from 'vue'
 import ModalComponent from '@/components/ModalComponent.vue'
@@ -495,11 +496,6 @@ async function retireRendu(rendu) {
 const { openFile, downloadFile } = useStoredFile()
 
 // Helpers
-function formatDate(value) {
-  if (!value) return ''
-  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
 function badgeType(type) {
   if (type === 'examen') return 'rounded-full bg-secondary/10 px-2 py-1 text-xs text-secondary'
   return 'rounded-full bg-primary/10 px-2 py-1 text-xs text-primary'
@@ -511,30 +507,4 @@ function labelType(type) {
   return 'Cours'
 }
 
-function deadlineTypeLabel(type) {
-  const map = { ds: 'DS', devoir: 'Devoir', exposé: 'Exposé', autre: 'Autre' }
-  return map[type] ?? type
-}
-
-function resourceTypeLabel(type) {
-  const map = { cours: 'Cours', carte_mentale: 'Carte mentale', sujet: 'Sujet', autre: 'Autre' }
-  return map[type] ?? type
-}
-
-function fileIcon(mimeType) {
-  if (!mimeType) return '📄'
-  if (mimeType === 'application/pdf') return '📕'
-  if (mimeType.startsWith('image/')) return '🖼'
-  if (mimeType.includes('word') || mimeType.includes('document')) return '📝'
-  if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return '📊'
-  if (mimeType.includes('sheet') || mimeType.includes('excel')) return '📈'
-  return '📄'
-}
-
-function formatFileSize(bytes) {
-  if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} o`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
-}
 </script>
