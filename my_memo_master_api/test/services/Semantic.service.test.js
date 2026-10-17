@@ -263,6 +263,24 @@ describe('SemanticService', () => {
         })
       })
 
+      it('gradeWithoutModel - même écriture à la casse et aux espaces près - « correspondance exacte »', () => {
+        expect(SemanticService.gradeWithoutModel(['U = R × I'], 'u=r*i')).toMatchObject({
+          strategy: 'exact',
+          explanation: 'Correct (correspondance exacte).'
+        })
+      })
+
+      it('gradeWithoutModel - écriture différente mais équivalente - « formule équivalente », pas « exacte »', () => {
+        const result = SemanticService.gradeWithoutModel(['Ec = 1/2 m v^2'], 'Ec = m*v^2/2')
+        expect(result).toMatchObject({ is_correct: true, score: 1, strategy: 'algebraic', decision_zone: 'high' })
+        expect(result.explanation).toBe('Correct (formule équivalente à la réponse attendue).')
+        expect(result.explanation).not.toMatch(/exacte/)
+      })
+
+      it('gradeWithoutModel - formule différente - pas de verdict déterministe', () => {
+        expect(SemanticService.gradeWithoutModel(['Ec = 1/2 m v^2'], 'Ec = m*v^2')).toBeNull()
+      })
+
       it('gradeWithoutModel - nombre en lettres égal au nombre attendu - correct (numeric), sans modèle', () => {
         expect(SemanticService.gradeWithoutModel(['1789'], 'mille sept cent quatre-vingt-neuf')).toMatchObject({
           is_correct: true,
@@ -470,14 +488,14 @@ describe('SemanticService', () => {
       // (ordre différent) — seule l'équivalence algébrique les rapproche
       const result = await SemanticService.gradeSemantic('U = R*I', 'U = I*R')
       expect(result.is_correct).toBe(true)
-      expect(result.strategy).toBe('exact')
+      expect(result.strategy).toBe('algebraic')
       expect(result.score).toBe(1.0)
     })
 
     it('gradeSemantic - équivalence algébrique (division ≡ puissance inverse) - correcte sans embedding', async () => {
       const result = await SemanticService.gradeSemantic('over(F, S)', 'F*S^-1')
       expect(result.is_correct).toBe(true)
-      expect(result.strategy).toBe('exact')
+      expect(result.strategy).toBe('algebraic')
     })
 
     it('gradeSemantic - opérandes inversés avec similarité maximale - rejetés (garde anti-inversion)', async () => {

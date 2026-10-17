@@ -13205,3 +13205,16 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Changement mineur** : le minuteur de l'aperçu de qualité est annulé au démontage (il n'était jamais nettoyé).
 **Tests** : +62 (page) +3 (`flashcardsApi`) ; suite 75 fichiers / 1179 tests, ESLint, audits RGAA / couleurs / Tailwind, 35 tests Playwright verts.
 **Dette repérée (non traitée)** : les fenêtres de carte et de boîte n'ont pas de piège de focus ni de rôle `dialog` (RGAA) ; l'écran de révision IA (`AiValidationScreenComponent`) fait lui aussi ses appels API directement.
+
+
+## [2026-10-17] [FIX] Retours de test de session : score moyen, libellé de correction, ordre des QCM, aperçu de qualité (branche `dev_fix_session_feedback`)
+
+**Contexte** : un test de bout en bout (système « Session test Claude », 3 cartes, 2 justes + 1 fausse volontaire) a remonté quatre écarts.
+**Fait** :
+- Score moyen : `FlashcardsSessionPage.vue` compte désormais toutes les cartes corrigées (`cardScores`) ; une question ouverte vaut son score, un QCM vaut 100 % (réussi) ou 0 % (raté). Avant, un QCM raté était ignoré (« 100 % — 2 réussi(s), 1 à revoir »). Attendu ici : 67 %.
+- Libellé : `Semantic.service.js#gradeWithoutModel` distingue `exact` (« Correct (correspondance exacte). ») et `algebraic` (« Correct (formule équivalente à la réponse attendue). »).
+- Ordre des QCM : `helpers/shuffle.js` (`shuffledIndices`, Fisher-Yates, générateur injectable) ; les options sont affichées dans un ordre aléatoire fixé une fois par carte (`optionOrders`), l'indice d'origine reste la valeur envoyée à la correction.
+- Aperçu de qualité : `AnswerQuality.service.js` n'avertit plus pour une réponse « terme » (1–2 mots, sans chiffre ni ponctuation, hors oui/non/vrai/faux) : ni « très courte », ni « sans mot du sujet de la question ».
+**Tests** : API +tests `Semantic` (exact/algébrique) et `AnswerQuality` (terme) ; front +5 `shuffle`, +8 QCM/score moyen dans `FlashcardsSessionPage` ; ESLint et audits RGAA / couleurs / Tailwind verts.
+**Hypothèses** : « Newton » et « Mer Rouge » sont considérées comme des réponses valides par construction ; les avertissements restent actifs pour les réponses ≥ 3 mots.
+**Dette** : aucune nouvelle.

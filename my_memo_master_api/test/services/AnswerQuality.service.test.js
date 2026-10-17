@@ -55,6 +55,47 @@ describe('AnswerQualityService', () => {
     })
   })
 
+  describe('assess - réponse « terme » (unité, nom, lieu…)', () => {
+    it.each([
+      ['Unité SI de la force ?', ['Newton']],
+      ['Unité SI de la force ?', ['le newton']],
+      ["Qui a formulé la loi de la gravitation universelle ?", ['Isaac Newton']],
+      ["Quelle mer borde l'Égypte à l'est ?", ['Mer Rouge']],
+      ["Quel est le nom de la force qui s'oppose au mouvement ?", ['Frottement']],
+    ])('« %s » → « %s » : aucun avertissement', (statement, answers) => {
+      const warnings = AnswerQualityService.assess(statement, answers)
+      expect(warnings).toEqual([])
+      expect(AnswerQualityService.levelFromWarnings(warnings)).toBe('high')
+    })
+
+    it('« oui » / « non » / « vrai » / « faux » restent signalés (ne se comprennent qu’avec la question)', () => {
+      for (const answer of ['Oui', 'non', 'Vrai', 'faux']) {
+        const warnings = AnswerQualityService.assess('Le son se propage-t-il dans le vide ?', [answer])
+        expect([answer, warnings.length > 0]).toEqual([answer, true])
+      }
+    })
+
+    it('une valeur avec chiffres ou ponctuation n’est pas un « terme » : toujours signalée si trop courte', () => {
+      const warnings = AnswerQualityService.assess("Quelle est la vitesse du son dans l'air ?", ['340 environ.'])
+      expect(warnings.some((w) => w.includes('très courte'))).toBe(true)
+    })
+
+    it('trois mots ou plus : le contrôle d’autonomie s’applique (réponse elliptique)', () => {
+      const warnings = AnswerQualityService.assess("Qu'est-ce que l'énergie interne ?", ['Une fonction extensive'])
+      expect(warnings.some((w) => w.includes('mot-clé distinctif'))).toBe(true)
+    })
+
+    it('isBareTerm — 1 à 2 mots de lettres', () => {
+      expect(AnswerQualityService.isBareTerm('Newton')).toBe(true)
+      expect(AnswerQualityService.isBareTerm("l'ohm")).toBe(true)
+      expect(AnswerQualityService.isBareTerm('Isaac Newton')).toBe(true)
+      expect(AnswerQualityService.isBareTerm('Une fonction extensive')).toBe(false)
+      expect(AnswerQualityService.isBareTerm('1789')).toBe(false)
+      expect(AnswerQualityService.isBareTerm('Oui')).toBe(false)
+      expect(AnswerQualityService.isBareTerm('')).toBe(false)
+    })
+  })
+
   describe('assess - réponse courte (hors formule)', () => {
     it('signale une réponse-phrase très courte', () => {
       const warnings = AnswerQualityService.assess('Quelle est la vitesse du son dans l\'air ?', ['340 environ.'])

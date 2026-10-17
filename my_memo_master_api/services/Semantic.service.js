@@ -599,19 +599,28 @@ class SemanticService {
     // (« u=r*i » ≡ « U = R × I ») — ou algébriquement équivalente (« a/b » ≡
     // « a*b^-1 », « a+b » ≡ « b+a »…) — est correcte sans passer par
     // l'embedding : les embeddings comparent mal les écritures symboliques.
+    // Deux cas distincts, annoncés différemment : « exact » (même écriture à la normalisation près) et
+    // « algebraic » (écriture différente mais équivalente — « m*v^2/2 » ≡ « 1/2 m v² »). Annoncer
+    // « correspondance exacte » pour une simple équivalence induisait l'utilisateur en erreur.
     const studentSym = this.normalizeSymbolic(studentAnswer)
-    if (
-      studentSym &&
-      correctList.some(
-        (c) => this.normalizeSymbolic(c) === studentSym || this.algebraicallyEqual(studentAnswer, c)
-      )
-    ) {
-      return {
-        is_correct: true,
-        score: 1.0,
-        strategy: 'exact',
-        explanation: 'Correct (correspondance exacte).',
-        decision_zone: 'high'
+    if (studentSym) {
+      if (correctList.some((c) => this.normalizeSymbolic(c) === studentSym)) {
+        return {
+          is_correct: true,
+          score: 1.0,
+          strategy: 'exact',
+          explanation: 'Correct (correspondance exacte).',
+          decision_zone: 'high'
+        }
+      }
+      if (correctList.some((c) => this.algebraicallyEqual(studentAnswer, c))) {
+        return {
+          is_correct: true,
+          score: 1.0,
+          strategy: 'algebraic',
+          explanation: 'Correct (formule équivalente à la réponse attendue).',
+          decision_zone: 'high'
+        }
       }
     }
 
