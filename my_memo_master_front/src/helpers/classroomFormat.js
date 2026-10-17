@@ -60,3 +60,22 @@ export function formatMinutes(minutes) {
   const m = minutes % 60
   return h > 0 ? `${h}h${m > 0 ? ' ' + m + 'min' : ''}` : `${m} min`
 }
+
+/** Une échéance est « urgente » à 3 jours ou moins (ou déjà dépassée) ; sans date, jamais. */
+export function isUrgent(dueDate) {
+  if (!dueDate) return false
+  return (new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24) <= 3
+}
+
+/** Libellé du type d'un événement de calendrier ; « Cours » par défaut. */
+export function eventTypeLabel(type) {
+  if (type === 'examen') return 'Examen'
+  if (type === 'autre') return 'Autre'
+  return 'Cours'
+}
+
+/** Classes de la pastille d'un type d'événement : l'examen ressort en couleur secondaire. */
+export function eventTypeBadgeClass(type) {
+  if (type === 'examen') return 'rounded-full bg-secondary/10 px-2 py-1 text-xs text-secondary'
+  return 'rounded-full bg-primary/10 px-2 py-1 text-xs text-primary'
+}

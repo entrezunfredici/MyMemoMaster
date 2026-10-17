@@ -9,6 +9,9 @@ import {
   disciplineScoreClass,
   weeklyBarHeight,
   formatMinutes,
+  isUrgent,
+  eventTypeLabel,
+  eventTypeBadgeClass,
 } from '@/helpers/classroomFormat'
 
 describe('formatDate', () => {
@@ -104,4 +107,24 @@ describe('formatMinutes', () => {
     [60, '1h'],
     [135, '2h 15min'],
   ])('%s -> %s', (m, expected) => expect(formatMinutes(m)).toBe(expected))
+})
+
+describe('isUrgent', () => {
+  const inDays = (n) => new Date(Date.now() + n * 24 * 3600 * 1000).toISOString()
+  it.each([[null], [undefined], ['']])('sans date (%s) : jamais urgent', (v) => expect(isUrgent(v)).toBe(false))
+  it('échéance dépassée : urgent', () => expect(isUrgent(inDays(-2))).toBe(true))
+  it('dans 2 jours : urgent', () => expect(isUrgent(inDays(2))).toBe(true))
+  it('dans 3 jours moins une minute : urgent', () => expect(isUrgent(new Date(Date.now() + 3 * 24 * 3600 * 1000 - 60000).toISOString())).toBe(true))
+  it('dans 4 jours : pas urgent', () => expect(isUrgent(inDays(4))).toBe(false))
+})
+
+describe('type d’événement', () => {
+  it.each([['examen', 'Examen'], ['autre', 'Autre'], ['cours', 'Cours'], [undefined, 'Cours'], ['inconnu', 'Cours']])(
+    'eventTypeLabel(%s) -> %s',
+    (type, label) => expect(eventTypeLabel(type)).toBe(label),
+  )
+  it('l’examen a la pastille secondaire, tout le reste la pastille primaire', () => {
+    expect(eventTypeBadgeClass('examen')).toContain('bg-secondary/10')
+    for (const t of ['cours', 'autre', undefined]) expect(eventTypeBadgeClass(t)).toContain('bg-primary/10')
+  })
 })
