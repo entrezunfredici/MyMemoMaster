@@ -5176,3 +5176,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : un composant par fenêtre qui possède son composable et expose `open…()` ; la page n'a plus que la liste, les filtres et la suppression. Les opérations d'édition d'une question sont des fonctions pures (`helpers/exerciseQuestionEdit.js`) ; la question elle-même reste un objet réactif du formulaire parent, édité en place par `ExerciseQuestionEditor` via un alias `computed`.
 **Alternative écartée** : faire remonter chaque modification par événements (`update:question`) — il faudrait recopier les tableaux imbriqués (options, formulations, fragments) à chaque frappe, avec risque de désynchronisation, pour aucun gain de lisibilité ; passer le formulaire en `provide/inject` (couplage implicite entre fichiers).
 **Conséquences** : même comportement et même DOM que l'ancienne page (prouvé par comparaison) ; les tests de la page, qui passent par le DOM et les stores simulés, n'ont pas bougé ; chaque morceau se teste seul.
+
+
+## 2026-10-17 — Une modale de confirmation commune fournie par la page (`provide` / `inject`)
+
+**Contexte** : `ClassroomEnseignantView` utilisait une seule modale pour quatre suppressions (section, échéance, ressource, retrait de membre). Découpée en panneaux, chacun a besoin de la déclencher.
+**Décision** : la page appelle `provideConfirmAction()` et affiche la modale ; chaque panneau appelle `useConfirmAction()` pour obtenir `askConfirm(titre, message, action)`. Une erreur explicite est levée si aucun parent n'a fourni la fonction.
+**Alternative écartée** : une modale par panneau (plusieurs instances, DOM différent de l'existant, quatre fois le même code) ; faire remonter des événements `ask-confirm` à la page (la page devrait connaître chaque action destructrice, ce qui ramènerait la logique qu'on vient d'en retirer) ; un store Pinia global (état partagé entre pages sans nécessité).
+**Conséquences** : la page ne connaît aucune suppression ; un nouveau panneau obtient la confirmation en une ligne ; les panneaux se testent seuls avec une fonction `ask` simulée (`provide: { [CONFIRM_ACTION_KEY]: spy }`).
