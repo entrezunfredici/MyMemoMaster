@@ -58,19 +58,21 @@
                  RAISON: équivalent ARIA valide au RGAA 11.6/11.7, sans le style par défaut du navigateur pour <fieldset> -->
             <template v-if="currentCard.question.content?.options?.length">
               <div role="radiogroup" aria-labelledby="session-question-statement session-mcq-legend">
+              <!-- Options affichées dans un ordre aléatoire (stable pour la carte) ; la valeur envoyée
+                   à la correction reste l'indice D'ORIGINE de l'option. -->
               <label
-                v-for="(opt, oi) in currentCard.question.content.options"
-                :key="oi"
+                v-for="{ opt, index } in displayedOptions"
+                :key="index"
                 class="flex items-center gap-3 p-3 border-2 rounded-lg transition"
                 :class="[
                   showFeedback ? 'cursor-default' : 'cursor-pointer',
-                  mcqOptClass(String(oi), opt),
+                  mcqOptClass(String(index), opt),
                 ]"
               >
                 <input
                   type="radio"
                   :name="`session-mcq`"
-                  :value="String(oi)"
+                  :value="String(index)"
                   v-model="userAnswer"
                   :disabled="showFeedback || submitting"
                   class="accent-primary shrink-0"
@@ -178,6 +180,7 @@ import { useLeitnerCardStore } from '@/stores/leitnerCards'
 import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useLeitnerReviewSessionStore } from '@/stores/leitnerReviewSessions'
+import { shuffledIndices } from '@/helpers/shuffle'
 
 const router = useRouter()
 const route = useRoute()
@@ -195,8 +198,11 @@ const showFeedback = ref(false)
 const submitting = ref(false)
 const isFinished = ref(false)
 const errors = ref([])
-// Scores (0-1) des questions ouvertes corrigées — alimente le score moyen de l'écran de fin
-const openScores = ref([])
+// Score (0-1) de chaque carte corrigée — alimente le score moyen de l'écran de fin. Une question
+// ouverte compte pour son score ; un QCM compte 1 s'il est juste, 0 sinon (il n'a pas de score IA).
+// CHOIX: inclure les QCM dans la moyenne. RAISON: une moyenne limitée aux questions ouvertes ignorait
+// un QCM raté (« Score moyen : 100 % — 2 réussies, 1 à revoir » : incohérent avec les décomptes).
+const cardScores = ref([])
 
 // CHOIX: seuil recopié du back (MistralGrading.service.js, CORRECT_THRESHOLD = 0.8) pour l'afficher
 // RAISON: l'API ne le renvoie pas ; garder les deux valeurs alignées.
@@ -210,8 +216,8 @@ const feedbackTitle = computed(() => {
 })
 
 const averageScorePercent = computed(() =>
-  openScores.value.length
-    ? Math.round((openScores.value.reduce((a, b) => a + b, 0) / openScores.value.length) * 100)
+  cardScores.value.length
+    ? Math.round((cardScores.value.reduce((a, b) => a + b, 0) / cardScores.value.length) * 100)
     : null
 )
 
@@ -236,6 +242,20 @@ onMounted(async () => {
 })
 
 const currentCard = computed(() => cardStore.dueCards[currentIndex.value])
+
+// Ordre d'affichage des options d'un QCM : mélangé une fois par carte (sinon la bonne réponse, saisie
+// en premier à la création, serait toujours en tête et on retiendrait sa POSITION plutôt que sa
+// réponse). Conservé pour la carte (pas de remélange à chaque rendu).
+const optionOrders = new Map()
+const displayedOptions = computed(() => {
+  const card = currentCard.value
+  const options = card?.question?.content?.options || []
+  if (!options.length) return []
+  if (optionOrders.get(card.idCard)?.length !== options.length) {
+    optionOrders.set(card.idCard, shuffledIndices(options.length))
+  }
+  return optionOrders.get(card.idCard).map((index) => ({ opt: options[index], index }))
+})
 
 const boxCounts = computed(() => {
   const counts = {}
@@ -268,7 +288,11 @@ const handleValidation = async () => {
   // l'utilisateur quitte avant d'avoir cliqué ce bouton.
   reviewedCount.value++
 
-  if (currentCard.value.question?.type !== 'mcq') openScores.value.push(cardStore.lastCorrection?.score || 0)
+  cardScores.value.push(
+    currentCard.value.question?.type === 'mcq'
+      ? (cardStore.lastCorrection?.success ? 1 : 0)
+      : (cardStore.lastCorrection?.score || 0)
+  )
   if (!cardStore.lastCorrection?.success) {
     errors.value.push(currentCard.value)
   }

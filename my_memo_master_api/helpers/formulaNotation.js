@@ -28,7 +28,9 @@ function unifyFormulaNotation(text) {
 
   // Raccourcis V1 -> forme commune
   s = s
-    .replace(/\b(?:over|frac)\(\s*([^,()]+?)\s*,\s*([^()]+?)\s*\)/gi, '($1)/($2)')
+    // Les blancs sont retirés par trim() et non par `\s*` autour de groupes paresseux : cette forme était
+    // polynomiale sur de longues suites d'espaces (ReDoS, alerte CodeQL js/polynomial-redos).
+    .replace(/\b(?:over|frac)\(([^,()]+),([^()]+)\)/gi, (_m, num, den) => `(${num.trim()})/(${den.trim()})`)
     .replace(/\babs\(([^()]*)\)/gi, '|$1|')
 
   // LaTeX structurel (éditeur V2) -> forme commune

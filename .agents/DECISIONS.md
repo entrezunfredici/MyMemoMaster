@@ -5113,3 +5113,27 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : une balise est « < » ou « </ » + un nom d'élément HTML connu + (fermeture directe | zone d'attributs contenant « = »), plus commentaires/DOCTYPE/instructions de traitement ; retrait itéré jusqu'à stabilité ; texte non reconnu conservé tel quel.
 **Alternative écartée** : encoder `<` et `>` en entités (le front les afficherait littéralement après son propre échappement) ; interdire les chevrons (inacceptable pour des mathématiques) ; supprimer le middleware (le front échappe déjà, mais d'autres consommateurs de l'API — exports, e-mails, IA — verraient du HTML brut) ; bibliothèque d'assainissement (nouvelle dépendance pour un besoin cadré).
 **Conséquences** : le texte mathématique est conservé ; la protection reste une défense en profondeur (la sortie doit toujours être échappée à l'affichage) ; une comparaison dont les deux opérandes forment exactement une balise nue (`a<b>c`) reste ambiguë et est retirée.
+
+
+## 2026-10-17 — Corrections issues d'un test de session : stratégie `algebraic`, réponse « terme », QCM dans la moyenne, ordre des options
+
+**Contexte** : « Ec = m*v^2/2 » était validé « correspondance exacte » pour « Ec = 1/2 m v² » ; l'aperçu de qualité notait « À revoir » « Unité SI de la force ? / Newton » ; le score moyen ignorait les QCM ; la bonne option d'un QCM apparaissait toujours en premier.
+**Décision** : (1) `gradeWithoutModel` renvoie `strategy: 'algebraic'` avec un message propre quand seule l'équivalence algébrique a joué ; (2) une réponse de 1–2 mots alphabétiques est exemptée des avertissements de brièveté et de vocabulaire (sauf oui/non/vrai/faux) ; (3) le score moyen compte chaque carte corrigée, QCM = 1 ou 0 ; (4) les options de QCM sont mélangées côté front, une seule fois par carte, en conservant l'indice d'origine comme valeur soumise.
+**Alternative écartée** : mélanger côté API (l'API compare un indice : il faudrait renvoyer et stocker la permutation) ; mélanger à chaque rendu (l'ordre changerait après correction) ; abaisser les seuils de longueur pour tous les cas (laisserait passer les phrases trop vagues).
+**Conséquences** : l'API est inchangée pour les QCM ; la stratégie `algebraic` est une nouvelle valeur visible par les consommateurs de `strategy` ; les tests d'équivalence algébrique attendent désormais `'algebraic'`.
+
+
+## 2026-10-17 — Tests de pages : doublures des composants de mise en page, stores simulés
+
+**Contexte** : 17 pages et 5 stores sans test ; plusieurs pages (`FlashcardsPage`, `ClassroomPlateformeView`, `AdminPage`) orchestrent des stores et des fenêtres modales.
+**Décision** : les pages sont montées avec `createTestingPinia({ stubActions: true })` (actions des stores espionnées, comportement utile rejoué par `mockImplementation` quand la page lit l'état écrit par l'action) ; les composants de mise en page (`ItemListLayout`, `MenuItem`, sélecteurs) sont remplacés par des doublures minimales, ceux qui n'ont pas de logique propre (`ToggleButton`, `ButtonComponent`) restent réels. `vue-router` est mocké avec `importOriginal` pour garder `createRouter` quand un store importe le routeur.
+**Alternative écartée** : tests de bout en bout par page (lents, déjà couverts par Playwright pour l'accessibilité) ; mocks complets de `vue-router` sans `importOriginal` (cassent l'import de `@/router` par le store `auth`).
+**Conséquences** : les tests vérifient le contrat page ↔ stores (appels, arguments, états affichés) sans dépendre du détail des composants enfants ; une icône Heroicons ne porte pas `role`/`aria-label` — toute action doit être un vrai `<button>`.
+
+
+## 2026-10-17 — Sécurité en CI : workflow dédié, CodeQL + gitleaks + ZAP passif, seuls les en-têtes/cookies bloquent
+
+**Contexte** : demande de compléter `npm audit` par une analyse statique et dynamique (OWASP). Le dépôt est public (CodeQL gratuit), la pile Docker de test existe déjà (job E2E).
+**Décision** : workflow `security.yml` séparé de `ci.yml` ; CodeQL (SAST) ; gitleaks sur l'historique complet avec image épinglée ; ZAP *baseline* + scan API **passif** (`-S`) contre la pile jetable, image épinglée (2.17.0). Le blocage est limité à une liste explicite de règles FAIL (`.zap/rules.tsv`) : en-têtes de sécurité, fuite de version, drapeaux de cookies. Le reste est publié en avertissement.
+**Alternative écartée** : scan actif ZAP (lent, instable, peut créer des données et bloquer le cycle sur des faux positifs) ; Semgrep / `eslint-plugin-security` (nouvelle dépendance à signaler, doublon avec CodeQL) ; tout faire échouer dès le moindre avertissement (le premier passage produit du bruit informatif — COEP, cache — qui ferait ignorer le job) ; CSP figée dans nginx avec l'URL de l'API (varie par environnement).
+**Conséquences** : une régression d'en-têtes de sécurité fait échouer le job sur main / staging / planifié ; les alertes CodeQL sont triées dans l'onglet Security et ne bloquent pas la fusion tant que la protection de branche n'exige pas le statut ; le scan hebdomadaire détecte une vulnérabilité publiée entre deux commits. La CSP du front autorise `https:` en `connect-src` (l'API est configurée à l'exécution) — à resserrer si l'on fige un jour les domaines par environnement.

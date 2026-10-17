@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import FlashcardsSessionPage from '@/pages/FlashcardsSessionPage.vue'
@@ -294,6 +294,142 @@ describe('FlashcardsSessionPage', () => {
     expect(wrapper.text()).toContain('Session terminée')
     expect(wrapper.find('[data-testid="average-score"]').text()).toContain('40%')
     expect(wrapper.text()).toContain('Dernières erreurs')
+  })
+
+  // ── QCM : ordre des options et score moyen ──────────────────────────────────
+  describe('QCM', () => {
+    const mcqCard = (id, correctIndex = 0) => ({
+      idCard: id,
+      idBox: 1,
+      idQuestion: id,
+      leitnerBox: { level: 1, idSystem: 1 },
+      question: {
+        statement: `Question QCM ${id} ?`,
+        type: 'mcq',
+        content: {
+          options: ['Alpha', 'Beta', 'Gamma', 'Delta'].map((text, i) => ({ text, correct: i === correctIndex })),
+        },
+      },
+    })
+    const optionTexts = (wrapper) => wrapper.findAll('[role="radiogroup"] label').map((l) => l.text())
+    const optionValues = (wrapper) => wrapper.findAll('[role="radiogroup"] input').map((i) => i.element.value)
+    const click = async (wrapper, label) => {
+      await wrapper.findAll('button').find((b) => b.text() === label)?.trigger('click')
+      await flushPromises()
+    }
+
+    afterEach(() => vi.restoreAllMocks())
+
+    it('les options sont affichées dans un ordre mélangé, sans en perdre ni en dupliquer', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0) // tirage fixe : [1, 2, 3, 0]
+      const wrapper = mountSession([mcqCard(10)])
+      await flushPromises()
+      expect(optionTexts(wrapper)).toEqual(['Beta', 'Gamma', 'Delta', 'Alpha'])
+      expect([...optionTexts(wrapper)].sort()).toEqual(['Alpha', 'Beta', 'Delta', 'Gamma'])
+    })
+
+    it('la bonne réponse n’est plus systématiquement en première position', async () => {
+      const firstPositions = new Set()
+      for (let k = 0; k < 40; k++) {
+        const wrapper = mountSession([mcqCard(100 + k)])
+        await flushPromises()
+        firstPositions.add(optionTexts(wrapper)[0])
+        wrapper.unmount()
+      }
+      expect(firstPositions.size).toBeGreaterThan(1)
+    })
+
+    it('la valeur envoyée à la correction est l’indice D’ORIGINE de l’option choisie', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+      const wrapper = mountSession([mcqCard(11, 0)]) // « Alpha » (indice 0) est la bonne réponse
+      await flushPromises()
+      const cardStore = useLeitnerCardStore()
+      cardStore.submitResponse.mockImplementation(async () => {
+        cardStore.lastCorrection = { success: true, score: 1, correction: 'Alpha', explanation: '', decision_zone: 'high' }
+        return true
+      })
+      const alphaRadio = wrapper.findAll('[role="radiogroup"] label').find((l) => l.text() === 'Alpha').find('input')
+      expect(alphaRadio.element.value).toBe('0') // 4e à l'écran, mais indice 0
+      await alphaRadio.setValue(true)
+      await click(wrapper, 'Valider')
+      expect(cardStore.submitResponse).toHaveBeenCalledWith(11, '0')
+    })
+
+    it('les valeurs des options restent les indices d’origine, quel que soit l’affichage', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+      const wrapper = mountSession([mcqCard(12)])
+      await flushPromises()
+      expect(optionValues(wrapper)).toEqual(['1', '2', '3', '0'])
+    })
+
+    it('l’ordre reste le même après la correction (pas de remélange au rendu suivant)', async () => {
+      const wrapper = mountSession([mcqCard(13)])
+      await flushPromises()
+      const before = optionTexts(wrapper)
+      const cardStore = useLeitnerCardStore()
+      cardStore.submitResponse.mockImplementation(async () => {
+        cardStore.lastCorrection = { success: false, score: 0, correction: 'Alpha', explanation: '', decision_zone: 'high' }
+        return true
+      })
+      await wrapper.findAll('[role="radiogroup"] input')[0].setValue(true)
+      await click(wrapper, 'Valider')
+      expect(optionTexts(wrapper)).toEqual(before)
+    })
+
+    it('chaque carte a son propre ordre', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+      const wrapper = mountSession([mcqCard(14), mcqCard(15)])
+      await flushPromises()
+      const cardStore = useLeitnerCardStore()
+      cardStore.submitResponse.mockImplementation(async () => {
+        cardStore.lastCorrection = { success: true, score: 1, correction: 'Alpha', explanation: '', decision_zone: 'high' }
+        return true
+      })
+      await wrapper.findAll('[role="radiogroup"] input')[0].setValue(true)
+      await click(wrapper, 'Valider')
+      await click(wrapper, 'Continuer')
+      expect(wrapper.text()).toContain('Question QCM 15 ?')
+      expect(optionTexts(wrapper)).toHaveLength(4)
+    })
+
+    it('fin de session : un QCM raté compte pour 0 dans le score moyen (2 justes + 1 raté = 67 %)', async () => {
+      const wrapper = mountSession([mockCard, mockCard2, mcqCard(16)])
+      await flushPromises()
+      const cardStore = useLeitnerCardStore()
+      const answers = [
+        { success: true, score: 1 },
+        { success: true, score: 1 },
+        { success: false, score: 0 },
+      ]
+      let turn = 0
+      cardStore.submitResponse.mockImplementation(async () => {
+        cardStore.lastCorrection = { ...answers[turn++], correction: 'x', explanation: '', decision_zone: 'high' }
+        return true
+      })
+      for (let i = 0; i < 3; i++) {
+        if (i < 2) await wrapper.find('textarea').setValue('réponse')
+        else await wrapper.findAll('[role="radiogroup"] input')[0].setValue(true)
+        await click(wrapper, 'Valider')
+        await click(wrapper, 'Continuer')
+      }
+      const summary = wrapper.find('[data-testid="average-score"]').text()
+      expect(summary).toContain('67%')
+      expect(summary).toContain('2 réussie(s), 1 à revoir')
+    })
+
+    it('un QCM réussi compte pour 100 %', async () => {
+      const wrapper = mountSession([mcqCard(17)])
+      await flushPromises()
+      const cardStore = useLeitnerCardStore()
+      cardStore.submitResponse.mockImplementation(async () => {
+        cardStore.lastCorrection = { success: true, correction: 'Alpha', explanation: '', decision_zone: 'high' }
+        return true
+      })
+      await wrapper.findAll('[role="radiogroup"] input')[0].setValue(true)
+      await click(wrapper, 'Valider')
+      await click(wrapper, 'Continuer')
+      expect(wrapper.find('[data-testid="average-score"]').text()).toContain('100%')
+    })
   })
 
   it('fin de session — journalise la session (système, nb de cartes, durée >= 0)', async () => {

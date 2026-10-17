@@ -13205,3 +13205,57 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Changement mineur** : le minuteur de l'aperçu de qualité est annulé au démontage (il n'était jamais nettoyé).
 **Tests** : +62 (page) +3 (`flashcardsApi`) ; suite 75 fichiers / 1179 tests, ESLint, audits RGAA / couleurs / Tailwind, 35 tests Playwright verts.
 **Dette repérée (non traitée)** : les fenêtres de carte et de boîte n'ont pas de piège de focus ni de rôle `dialog` (RGAA) ; l'écran de révision IA (`AiValidationScreenComponent`) fait lui aussi ses appels API directement.
+
+
+## [2026-10-17] [FIX] Retours de test de session : score moyen, libellé de correction, ordre des QCM, aperçu de qualité (branche `dev_fix_session_feedback`)
+
+**Contexte** : un test de bout en bout (système « Session test Claude », 3 cartes, 2 justes + 1 fausse volontaire) a remonté quatre écarts.
+**Fait** :
+- Score moyen : `FlashcardsSessionPage.vue` compte désormais toutes les cartes corrigées (`cardScores`) ; une question ouverte vaut son score, un QCM vaut 100 % (réussi) ou 0 % (raté). Avant, un QCM raté était ignoré (« 100 % — 2 réussi(s), 1 à revoir »). Attendu ici : 67 %.
+- Libellé : `Semantic.service.js#gradeWithoutModel` distingue `exact` (« Correct (correspondance exacte). ») et `algebraic` (« Correct (formule équivalente à la réponse attendue). »).
+- Ordre des QCM : `helpers/shuffle.js` (`shuffledIndices`, Fisher-Yates, générateur injectable) ; les options sont affichées dans un ordre aléatoire fixé une fois par carte (`optionOrders`), l'indice d'origine reste la valeur envoyée à la correction.
+- Aperçu de qualité : `AnswerQuality.service.js` n'avertit plus pour une réponse « terme » (1–2 mots, sans chiffre ni ponctuation, hors oui/non/vrai/faux) : ni « très courte », ni « sans mot du sujet de la question ».
+**Tests** : API +tests `Semantic` (exact/algébrique) et `AnswerQuality` (terme) ; front +5 `shuffle`, +8 QCM/score moyen dans `FlashcardsSessionPage` ; ESLint et audits RGAA / couleurs / Tailwind verts.
+**Hypothèses** : « Newton » et « Mer Rouge » sont considérées comme des réponses valides par construction ; les avertissements restent actifs pour les réponses ≥ 3 mots.
+**Dette** : aucune nouvelle.
+
+
+## [2026-10-17] [ADD] Tests des pages et stores qui n'en avaient pas (branche `dev_fix_session_feedback`)
+
+**Contexte** : dette technique « 23 pages sans test dédié, 9 stores sans test ». Après recomptage : 17 pages et 5 stores réellement sans aucun test (les autres étaient couverts par des tests de composants ou d'autres fichiers).
+**Fait** :
+- Stores (5 fichiers, `test/stores/`) : `fields`, `roles`, `leitnerBoxes`, `responses`, `etablissement` — chaque action en succès, statut inattendu, erreur réseau ; effets sur l'état (liste, courant, statistiques, contenu) et notifications.
+- Pages (`test/components/`) : `StaticPages` (Account, Community, Onboarding, Credits), `TodoPage`, `MindmapsPage`, `ForgotPasswordPage`, `ResetPasswordPage`, `VerifyEmailPage`, `HomePage`, `CreateTestPage`, `TutorialsPage`, `SubjectsPage`, `FlashcardsPage`, `ClassroomPlateformeView`, `AdminPage`, `SettingsPage`.
+- Contrôle par mutation : en cassant volontairement deux comportements (pluriel des cartes, statut 201 de la réinitialisation), les tests concernés échouent.
+**Correction trouvée par les tests (RGAA)** : `CreateTestPage.vue` — les icônes « retirer l'image » et « supprimer la question » étaient des `<XMarkIcon>` cliquables : Heroicons les rend `aria-hidden="true"` et ignore `role`/`aria-label`, donc ni clavier ni lecteur d'écran ne pouvaient les activer. Elles sont désormais dans de vrais `<button type="button">` nommés (« Retirer l'image », « Supprimer la question … »), même rendu visuel. Test axe Playwright de `/create-test` vert.
+**Constats consignés, non corrigés** :
+- `store roles` : les actions n'ont aucune valeur de retour (les `return` sont dans des `.then`) ; les tests décrivent l'état et les notifications observables.
+- `AdminPage` et `ClassroomPlateformeView` sont deux copies quasi identiques (liste, détail, audit, contenu, gérant) : à factoriser.
+- `SubjectsPage` : lignes de résultats `<li @click>` sans clavier ni rôle, boutons d'accordéon sans `aria-expanded` (RGAA 7.1 / 12.x) ; `FlashcardsPage` et `SettingsPage` : modales sans `role="dialog"`.
+- `SubjectsPage` écrit « 0 contenus » (règle `!== 1`) ; l'usage français serait « 0 contenu ».
+- `TutorialsPage` affiche des données codées en dur (page provisoire).
+**Tests** : front 98 fichiers verts (+19), ESLint, audits RGAA / couleurs / Tailwind, build.
+
+
+## [2026-10-17] [ADD] Sécurité dans le CI : SAST, secrets, DAST + en-têtes de sécurité du front (branche `dev_devops_security`)
+
+**Contexte** : le CI ne couvrait que `npm audit` (OWASP A06). Aucune analyse du code, des secrets ni de l'application en fonctionnement.
+**Fait** :
+- `.github/workflows/security.yml` (déclenché sur main / staging / dev / `*devops*`, sur pull request, chaque lundi 05:17 UTC et à la demande) :
+  - **SAST — CodeQL** (`javascript-typescript` + `actions`, suite `security-extended`), configuration `.github/codeql/codeql-config.yml` (tests, mocks, e2e, `dist`, `node_modules` exclus). Résultats : onglet Security › Code scanning.
+  - **Secrets — gitleaks v8.30.1** sur tout l'historique (`fetch-depth: 0`, `--redact`). Constat au premier passage : 0 fuite sur 907 commits.
+  - **DAST — OWASP ZAP 2.17.0** sur la pile Docker (`.env.ci`) : *baseline* de l'application web via Traefik, puis scan passif (`-S`) de l'API depuis sa spécification OpenAPI générée à la volée (121 chemins). Seules les règles listées FAIL dans `.zap/rules.tsv` (CSP, anti-clickjacking, nosniff, fuite de version serveur, `X-Powered-By`, Permissions-Policy, drapeaux de cookies) font échouer le job ; le reste est un avertissement lisible dans le rapport HTML (artefact `zap-reports`).
+- **Correction trouvée par le DAST (A05)** : l'nginx du front ne posait aucun en-tête de sécurité. `my_memo_master_front/nginx-security-headers.conf` (inclus dans chaque `location`, copié par le `Dockerfile`) ajoute CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS ; `server_tokens off` masque la version de nginx.
+**Vérifié** : 0 violation de CSP en chargeant 7 pages dans Chromium sur l'image nginx ; ZAP : 5 FAIL avant correction → 0 FAIL après (le contrôle échoue bien sur l'ancienne image).
+**Bilan du premier passage CodeQL (50 alertes ouvertes)** et traitement :
+- *Corrigé* — `notify_ci.yml` (**critique**, `actions/code-injection`) : `BRANCH_NAME=${{ github.event.workflow_run.head_branch }}` insérait un nom de branche, choisi par celui qui pousse, dans le shell d'un job qui détient `DISCORD_LOG` ; le nom passe désormais par l'environnement et le JSON est construit par `jq`. `permissions: {}` ajouté (et `contents: read` à `uptime.yml`).
+- *Corrigé* — `sanitize.middleware.js` (code de la session précédente) : expressions quadratiques (ReDoS) sur de longues suites d'« = », d'espaces, de `<!--` ou `<?` non fermés — le middleware s'applique à tous les corps, jusqu'à 100 Mo pour les cartes mentales ; remplacées par des formes sans ambiguïté + recherche linéaire par `indexOf`. Clé `__proto__` : `Object.defineProperty` au lieu d'une affectation (injection de propriété).
+- *Corrigé* — `formulaNotation.js` : `\s*` autour de groupes paresseux (ReDoS ; l'ancienne expression ne terminait pas en 200 s sur 100 000 espaces).
+- *Corrigé* — journaux (`js/log-injection`, 20 alertes) : en production le format JSON échappait déjà les sauts de ligne ; le format texte (dev) les neutralise désormais dans `helpers/logger.js`. CodeQL ne voit pas ce correctif central et peut garder ces alertes ouvertes : à fermer comme « utilisé dans les tests / corrigé ailleurs ».
+- *Corrigé* (trouvé par la CI, pas par CodeQL) — `ForgotPasswordPage` / `ResetPasswordPage` : pas de `catch` → une erreur réseau devenait une exception non gérée sans message ; un message s'affiche désormais.
+- *Acceptées, à fermer dans l'onglet Security avec justification* : `/api/v1/health` sans rate limiting (volontaire, sonde K8s — voir `app.js`) ; `logout` / `VerifyEmailPage` « user-controlled-bypass » (le jeton fourni par l'utilisateur ne peut révoquer que sa propre session ; le lien d'e-mail est le mode d'emploi prévu) ; `cd.yml` `code-injection` / `untrusted-checkout` (le déclencheur est filtré sur `main`, `staging`, `dev` : `head_branch` ne peut pas être hostile) ; `actions/unpinned-tag` (actions référencées par tag de version et non par SHA : chantier distinct, à traiter avec Dependabot).
+**Hypothèses / limites** :
+- La CSP autorise `connect-src https: wss:` car l'URL de l'API est injectée à l'exécution (`window.__APP_CONFIG__`) et varie par environnement ; elle ne peut pas être figée dans nginx. `COOP`/`COEP` sont volontairement absents (`window.open()` dans les vues classe).
+- Les pages authentifiées n'ont pas été rejouées sous CSP en local (pas de session) ; le job `e2e_and_load` (main / staging) les parcourt via cette image nginx.
+- Le scan de l'API est non authentifié : il vérifie en-têtes, erreurs et configuration, pas la logique d'autorisation (couverte par les tests d'intégration).
+**Dette / à faire côté GitHub (réglages du dépôt, non modifiables par le code)** : activer *Secret scanning* + *Push protection* et *Dependabot security updates* (désactivés aujourd'hui, gratuits sur dépôt public) ; exiger le statut `Security` dans la protection de branche si l'on veut bloquer les fusions.
