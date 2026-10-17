@@ -1,0 +1,176 @@
+name: Security
+
+# Audits de sécurité complémentaires à `npm audit` (ci.yml, OWASP A06) :
+#   - SAST   : CodeQL sur le code source (A01 contrôle d'accès, A03 injection, A02 cryptographie, A10 SSRF…)
+#   - Secrets: gitleaks sur tout l'historique git (A02/A05)
+#   - DAST   : OWASP ZAP contre la pile Docker démarrée (A05 mauvaise configuration, en-têtes, fuites d'information)
+#
+# CHOIX: workflow séparé de ci.yml plutôt qu'un job de plus.
+# RAISON: ci.yml est conditionné par un filtre de branches et une matrice api/front pensés pour les tests ;
+# la sécurité s'applique à tout le dépôt, doit aussi tourner à intervalle régulier (une vulnérabilité
+# apparaît sans qu'aucun commit ne change) et ne doit pas bloquer le cycle de développement sur un
+# aléa d'un service externe (téléchargement de l'image ZAP, règles CodeQL).
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - dev
+      - '*devops*'
+  pull_request:
+    branches:
+      - main
+      - staging
+      - dev
+  schedule:
+    # Lundi 05:17 UTC : une vulnérabilité publiée entre deux commits est vue sous 7 jours.
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  SAST — CodeQL
+  #  Dépôt public : gratuit. Les alertes apparaissent dans l'onglet Security > Code scanning.
+  # ═══════════════════════════════════════════════════════════════════════════
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript,actions
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript-typescript-and-actions'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  Secrets — gitleaks
+  #  Historique complet (fetch-depth 0) : un secret supprimé d'un commit reste valide tant qu'il
+  #  n'a pas été révoqué. --redact : la valeur ne s'affiche jamais dans les journaux du job.
+  #  Image épinglée sur une version précise (pas `latest`) : le résultat doit être reproductible.
+  # ═══════════════════════════════════════════════════════════════════════════
+  secrets:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code (historique complet)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 \
+            detect --source=/repo --redact --no-banner --exit-code 1 \
+            --report-format sarif --report-path /repo/gitleaks.sarif
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          retention-days: 14
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  DAST — OWASP ZAP (baseline : exploration + règles passives, aucune attaque active)
+  #
+  #  Limité à main / staging / exécution planifiée / lancement manuel : il monte la pile Docker
+  #  complète (comme e2e_and_load dans ci.yml) et coûte plusieurs minutes.
+  #  Seules les règles classées FAIL dans .zap/rules.tsv font échouer le job ; le reste est un
+  #  avertissement lisible dans le rapport HTML (artefact).
+  # ═══════════════════════════════════════════════════════════════════════════
+  dast:
+    name: DAST (OWASP ZAP baseline)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging' || contains(github.ref, 'devops')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create external Traefik network
+        run: docker network create traefik_proxy || true
+
+      # .env.ci : aucune valeur réelle, pile jetable détruite avec le runner.
+      - name: Start application stack
+        run: docker compose --env-file .env.ci --profile dev up -d --build
+
+      - name: Wait for API to be healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost/api/v1/health | grep -q ok; then
+              echo "API prête après $((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::API toujours indisponible après 5 minutes"
+          docker compose --env-file .env.ci --profile dev logs --tail 80 api
+          exit 1
+
+      # Le conteneur ZAP s'exécute avec l'utilisateur zap (uid 1000) et écrit dans /zap/wrk :
+      # le dossier monté doit donc être accessible en écriture.
+      - name: Prepare report directory
+        run: |
+          mkdir -p zap-reports
+          chmod 777 zap-reports
+
+      # --network host : `localhost` désigne la machine du runner où Traefik écoute sur le port 80.
+      # -I : ne pas échouer sur de simples avertissements (seuls les FAIL de rules.tsv échouent).
+      - name: ZAP baseline — application web (front + routes /api)
+        run: |
+          docker run --rm --network host -v "$PWD/.zap:/zap/wrk/config:ro" -v "$PWD/zap-reports:/zap/wrk/out:rw" \
+            ghcr.io/zaproxy/zaproxy:2.17.0 zap-baseline.py \
+            -t http://localhost/ \
+            -c config/rules.tsv \
+            -r out/zap-baseline.html -J out/zap-baseline.json -w out/zap-baseline.md \
+            -I
+
+      # Scan de l'API à partir de sa spécification OpenAPI (générée depuis les annotations swagger-jsdoc
+      # du code, donc toujours à jour). -S : mode sûr, requêtes + règles PASSIVES uniquement (aucune
+      # attaque active). Sans jeton, la plupart des routes répondent 401 : on contrôle ici les en-têtes,
+      # les messages d'erreur et la configuration, pas la logique métier protégée.
+      # -O : la spécification déclare http://localhost/api/v1, joignable car --network host.
+      - name: Generate OpenAPI specification
+        run: docker compose --env-file .env.ci --profile dev exec -T api node -e "process.stdout.write(JSON.stringify(require('swagger-jsdoc')(require('./config/swagger.config.js'))))" > zap-reports/openapi.json
+
+      - name: ZAP API scan (passif)
+        run: |
+          docker run --rm --network host -v "$PWD/.zap:/zap/wrk/config:ro" -v "$PWD/zap-reports:/zap/wrk/out:rw"             ghcr.io/zaproxy/zaproxy:2.17.0 zap-api-scan.py             -t /zap/wrk/out/openapi.json -f openapi             -c config/rules.tsv             -r out/zap-api.html -J out/zap-api.json -w out/zap-api.md             -S -I
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports
+          path: zap-reports/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: docker compose --env-file .env.ci --profile dev logs --tail 120
+
+      - name: Stop application stack
+        if: always()
+        run: docker compose --env-file .env.ci --profile dev down -v

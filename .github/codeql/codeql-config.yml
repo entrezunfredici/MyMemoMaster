@@ -1,0 +1,15 @@
+name: MyMemoMaster CodeQL
+
+# Code exclu de l'analyse : tests, données de charge, code généré ou tiers. Les analyser produirait
+# des alertes sans rapport avec le code livré (mots de passe de test, fixtures, bundles minifiés).
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/coverage/**'
+  - '**/test/**'
+  - '**/__mocks__/**'
+  - '**/e2e/**'
+  - '**/e2e-a11y/**'
+  - 'load-tests/**'
+  - 'my_memo_master_api/public/**'
+  - 'docs/**'
