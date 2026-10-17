@@ -3,15 +3,16 @@
   <div
     v-if="showModal"
     class="modal-overlay"
-    @mousedown.self="close"
+    @mousedown.self="close" v-dialog="close" role="dialog" aria-modal="true" aria-labelledby="flashcard-card-modal-title"
   >
     <div class="modal-panel">
       <button
         @click="close"
         class="modal-close"
         title="Fermer"
+        aria-label="Fermer"
       >&times;</button>
-      <h2 class="modal-title">
+      <h2 id="flashcard-card-modal-title" class="modal-title">
         {{ editingCard ? 'Modifier la carte' : 'Nouvelle carte' }}
       </h2>
 
@@ -198,6 +199,7 @@
 </template>
 
 <script setup>
+import { dialogDirective as vDialog } from '@/directives/dialog'
 // Fenêtre d'ajout / modification d'une carte (ouverte ou QCM). Se pilote depuis la page avec
 // `openAdd()` / `openEdit(card)` (via une référence de composant) ; la logique est dans useCardForm.
 import FormulaHelper from '@/components/FormulaHelperComponent.vue'

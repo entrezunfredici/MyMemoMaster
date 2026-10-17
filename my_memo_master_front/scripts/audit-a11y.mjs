@@ -39,14 +39,15 @@ const walk = (dir) => {
 }
 walk(SRC)
 
-const findings = { 'RGAA 11.1 — champ sans nom accessible': [], 'RGAA 1.1 — image sans alt': [], 'RGAA 7.1 — clic sans équivalent clavier': [], 'RGAA 11.9 — bouton symbole sans nom accessible': [] }
+const findings = { 'RGAA 11.1 — champ sans nom accessible': [], 'RGAA 1.1 — image sans alt': [], 'RGAA 7.1 — clic sans équivalent clavier': [], 'RGAA 11.9 — bouton symbole sans nom accessible': [], 'RGAA 7.1 — fenêtre modale sans comportement de dialogue': [], 'RGAA 7.1 — icône cliquable (aria-hidden, inactivable au clavier)': [] }
 const info = {}
 
 const lineOf = (content, index) => content.slice(0, index).split('\n').length
 
 /** Extrait les balises ouvrantes `<tag ...>` avec leur position. */
 const findTags = (template, tag) => {
-  const re = new RegExp(`<${tag}(\\s[^>]*)?>`, 'gis')
+  // `=>` (fonction fléchée dans un attribut, ex. v-dialog="() => { … }") ne termine pas la balise
+  const re = new RegExp(`<${tag}(\\s(?:=>|[^>])*)?>`, 'gis')
   const out = []
   let m
   while ((m = re.exec(template)) !== null) out.push({ attrs: m[1] || '', index: m.index, raw: m[0] })
@@ -100,7 +101,7 @@ for (const file of vueFiles) {
   }
 
   // [7.1] div/span cliquables sans équivalent clavier
-  for (const tag of ['div', 'span']) {
+  for (const tag of ['div', 'span', 'li', 'tr', 'td', 'p', 'svg', 'section', 'article']) {
     for (const t of findTags(template, tag)) {
       if (!/@click(\.[a-z]+)*="/i.test(t.attrs)) continue
       // @click.stop nu (non-action), @click.self (fermeture d'overlay au clic hors
@@ -116,6 +117,33 @@ for (const file of vueFiles) {
           `${rel}:${lineOf(content, tplStart + t.index)} — <${tag}${t.attrs.trimEnd().slice(0, 60)}…>`
         )
       }
+    }
+  }
+
+
+  // [7.1] fenêtres modales : role="dialog" + aria-modal + nom + gestion du focus.
+  // Une modale reconnue à sa classe (`modal-overlay`) ou à son recouvrement plein écran (`fixed inset-0`).
+  // La gestion du focus (piège de Tab, Échap, restitution) vient de la directive v-dialog ; ModalComponent
+  // (référence) l'implémente lui-même et se reconnaît à son @keydown.tab.
+  for (const t of findTags(template, 'div')) {
+    if (!/class="[^"]*(modal-overlay|fixed inset-0)[^"]*"/i.test(t.attrs)) continue
+    const isDialog = /role="(alert)?dialog"/i.test(t.attrs) && hasAttr(t.attrs, 'aria-modal')
+    const named = hasAttr(t.attrs, 'aria-label', 'aria-labelledby')
+    const focusManaged = /v-dialog/.test(t.attrs) || /@keydown\.tab/.test(template)
+    if (!isDialog || !named || !focusManaged) {
+      findings['RGAA 7.1 — fenêtre modale sans comportement de dialogue'].push(
+        `${rel}:${lineOf(content, tplStart + t.index)} — ${[!isDialog && 'role="dialog" aria-modal', !named && 'nom', !focusManaged && 'v-dialog'].filter(Boolean).join(' + ')} manquant`
+      )
+    }
+  }
+
+  // [7.1] icônes Heroicons cliquables : le composant les rend aria-hidden et perd role/aria-label/tabindex,
+  // l'action doit être portée par un vrai <button> (voir CreateTestPage.vue).
+  for (const t of findTags(template, '[A-Z][A-Za-z0-9]*Icon')) {
+    if (/@click/i.test(t.attrs)) {
+      findings['RGAA 7.1 — icône cliquable (aria-hidden, inactivable au clavier)'].push(
+        `${rel}:${lineOf(content, tplStart + t.index)} — ${t.raw.slice(0, 70)}…`
+      )
     }
   }
 

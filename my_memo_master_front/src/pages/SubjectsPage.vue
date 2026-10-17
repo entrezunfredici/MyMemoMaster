@@ -56,6 +56,8 @@
           <!-- En-tête accordéon -->
           <button
             class="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50 transition-colors text-left"
+            :aria-expanded="isExpanded(group.subjectId)"
+            :aria-controls="`subject-panel-${group.subjectId ?? 'sans-sujet'}`"
             @click="toggle(group.subjectId)"
           >
             <div class="flex items-center gap-3">
@@ -79,7 +81,7 @@
 
           <!-- Contenu accordéon -->
           <Transition name="slide">
-            <div v-if="isExpanded(group.subjectId)" class="border-t border-gray-100 divide-y divide-gray-50">
+            <div v-if="isExpanded(group.subjectId)" :id="`subject-panel-${group.subjectId ?? 'sans-sujet'}`" class="border-t border-gray-100 divide-y divide-gray-50">
 
               <!-- Mind Maps -->
               <ContentSection
@@ -237,22 +239,26 @@ const ContentSection = defineComponent({
         `${props.icon} ${props.label}`),
       h('ul', { class: 'space-y-1' },
         props.items.map(item =>
-          h('li', {
-            key: props.getTitle(item),
-            class: 'flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group',
-            onClick: () => props.onClick(item)
-          }, [
-            h('span', { class: 'text-sm text-gray-800 font-medium group-hover:text-primary transition-colors truncate' },
-              props.getTitle(item)),
-            h('div', { class: 'flex gap-1 flex-shrink-0' },
-              (props.getTags(item) || []).slice(0, 3).map(tag =>
-                h('span', {
-                  key: tag.tagId,
-                  class: 'px-1.5 py-0.5 rounded-full text-[10px] font-semibold',
-                  style: { backgroundColor: tag.color || tagColors.default, color: readableTextColor(tag.color || tagColors.default) }
-                }, tag.name)
+          // RGAA 7.1 : un <li> cliquable n'est ni atteignable ni activable au clavier ; l'action est portée par
+          // un vrai <button> (nom = titre du contenu) à l'intérieur de l'élément de liste.
+          h('li', { key: props.getTitle(item) }, [
+            h('button', {
+              type: 'button',
+              class: 'w-full text-left flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group',
+              onClick: () => props.onClick(item)
+            }, [
+              h('span', { class: 'text-sm text-gray-800 font-medium group-hover:text-primary transition-colors truncate' },
+                props.getTitle(item)),
+              h('span', { class: 'flex gap-1 flex-shrink-0' },
+                (props.getTags(item) || []).slice(0, 3).map(tag =>
+                  h('span', {
+                    key: tag.tagId,
+                    class: 'px-1.5 py-0.5 rounded-full text-[10px] font-semibold',
+                    style: { backgroundColor: tag.color || tagColors.default, color: readableTextColor(tag.color || tagColors.default) }
+                  }, tag.name)
+                )
               )
-            )
+            ])
           ])
         )
       )

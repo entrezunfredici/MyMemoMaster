@@ -17,11 +17,11 @@
         <h3 class="text-sm font-semibold text-primary">Nouvel établissement</h3>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
           <input aria-label="Nom" v-model="createForm.name" type="text" placeholder="Nom *"
-            class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
           <input aria-label="Code (ex: ETAB01)" v-model="createForm.code" type="text" placeholder="Code (ex: ETAB01) *"
-            class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
           <input aria-label="ID admin (optionnel)" v-model="createForm.adminId" type="number" placeholder="ID admin (optionnel)"
-            class="rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
         </div>
         <p v-if="createForm.error" class="text-xs text-secondary">{{ createForm.error }}</p>
         <div class="flex gap-2">
@@ -81,17 +81,18 @@
     </section>
 
     <!-- Modale édition -->
-    <div v-if="editForm.visible"
+    <div v-if="editForm.visible" v-dialog="() => { editForm.visible = false }" role="dialog" aria-modal="true"
+      aria-labelledby="etab-edit-modal-title"
       class="fixed inset-0 z-50 flex items-center justify-center bg-dark/40 backdrop-blur-sm">
       <div class="w-full max-w-md rounded-2xl border-2 border-gray bg-white p-6 shadow-xl space-y-4">
-        <h3 class="text-lg font-semibold text-dark">Modifier l'établissement</h3>
+        <h3 id="etab-edit-modal-title" class="text-lg font-semibold text-dark">Modifier l'établissement</h3>
         <div class="space-y-2">
           <input aria-label="Nom" v-model="editForm.name" type="text" placeholder="Nom"
-            class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
           <input aria-label="Code" v-model="editForm.code" type="text" placeholder="Code"
-            class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
           <input aria-label="ID admin (optionnel)" v-model="editForm.adminId" type="number" placeholder="ID admin (optionnel)"
-            class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+            class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
         </div>
         <p v-if="editForm.error" class="text-xs text-secondary">{{ editForm.error }}</p>
         <div class="flex gap-2 justify-end">
@@ -183,11 +184,11 @@
         <div v-if="detailTab === 'audit'" class="space-y-3">
           <div class="flex flex-wrap gap-2">
             <input aria-label="Action (ex: USER_INVITED)" v-model="auditFilters.action" type="text" placeholder="Action (ex: USER_INVITED)"
-              class="rounded-lg border border-gray px-3 py-1.5 text-sm" />
+              class="rounded-lg border border-gray-500 px-3 py-1.5 text-sm" />
             <input aria-label="Type entité" v-model="auditFilters.entityType" type="text" placeholder="Type entité"
-              class="rounded-lg border border-gray px-3 py-1.5 text-sm" />
+              class="rounded-lg border border-gray-500 px-3 py-1.5 text-sm" />
             <input aria-label="Limite" v-model="auditFilters.limit" type="number" placeholder="Limite" min="1" max="500"
-              class="rounded-lg border border-gray px-3 py-1.5 text-sm w-24" />
+              class="rounded-lg border border-gray-500 px-3 py-1.5 text-sm w-24" />
             <button @click="reloadAudit"
               class="rounded-lg bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20 transition">
               Filtrer
@@ -223,7 +224,7 @@
               Il pourra créer et gérer les groupes classes de cet établissement.
             </p>
             <input aria-label="Email du gérant" v-model="gerantForm.email" type="email" placeholder="Email du gérant *"
-              class="w-full rounded-lg border-2 border-gray px-3 py-2 text-sm" />
+              class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
             <p v-if="gerantForm.error" class="text-xs text-secondary">{{ gerantForm.error }}</p>
             <div class="flex gap-2">
               <button @click="submitAssignAdmin"
@@ -284,6 +285,7 @@
 </template>
 
 <script setup>
+import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, onMounted } from 'vue'
 import { useEtablissementStore } from '@/stores/etablissement'
 import { useRole } from '@/composables/useRole'

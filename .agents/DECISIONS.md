@@ -5137,3 +5137,18 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : workflow `security.yml` séparé de `ci.yml` ; CodeQL (SAST) ; gitleaks sur l'historique complet avec image épinglée ; ZAP *baseline* + scan API **passif** (`-S`) contre la pile jetable, image épinglée (2.17.0). Le blocage est limité à une liste explicite de règles FAIL (`.zap/rules.tsv`) : en-têtes de sécurité, fuite de version, drapeaux de cookies. Le reste est publié en avertissement.
 **Alternative écartée** : scan actif ZAP (lent, instable, peut créer des données et bloquer le cycle sur des faux positifs) ; Semgrep / `eslint-plugin-security` (nouvelle dépendance à signaler, doublon avec CodeQL) ; tout faire échouer dès le moindre avertissement (le premier passage produit du bruit informatif — COEP, cache — qui ferait ignorer le job) ; CSP figée dans nginx avec l'URL de l'API (varie par environnement).
 **Conséquences** : une régression d'en-têtes de sécurité fait échouer le job sur main / staging / planifié ; les alertes CodeQL sont triées dans l'onglet Security et ne bloquent pas la fusion tant que la protection de branche n'exige pas le statut ; le scan hebdomadaire détecte une vulnérabilité publiée entre deux commits. La CSP du front autorise `https:` en `connect-src` (l'API est configurée à l'exécution) — à resserrer si l'on fige un jour les domaines par environnement.
+
+
+## 2026-10-17 — Modales : une directive `v-dialog` plutôt que migrer vers `ModalComponent`
+
+**Contexte** : 9 modales écrites à la main (classe `modal-overlay`, ou `fixed inset-0`) sans rôle `dialog`, sans piège de focus ni fermeture au clavier, montées par un `v-if` du composant parent. `ModalComponent` est conforme mais fonctionne avec une prop `visible`.
+**Décision** : directive `v-dialog="fermer"` (focus initial, boucle Tab, Échap, restitution du focus) combinée à `role="dialog" aria-modal="true" aria-labelledby` sur l'élément racine ; une règle de `audit-a11y.mjs` (bloquante en CI) interdit toute nouvelle modale sans ces attributs.
+**Alternative écartée** : migrer les 9 modales vers `ModalComponent` (réécrit leur balisage, leurs tests de structure et la gestion de fermeture ; risque de régression visuelle disproportionné pour le même résultat) ; un composable (il faut une prop réactive `visible`, que ces modales n'ont pas — elles apparaissent et disparaissent avec un `v-if`).
+**Conséquences** : le comportement clavier suit exactement le cycle de vie de l'élément ; Échap ne se propage pas (pas de fermeture en cascade) ; une nouvelle modale doit utiliser `ModalComponent` ou `v-dialog`, sinon `npm run audit:a11y` échoue.
+
+## 2026-10-17 — Actions : toujours un vrai `<button>`, jamais une icône ou un `<li>` cliquable
+
+**Contexte** : `@click` sur `<XMarkIcon>` (Heroicons rend `aria-hidden="true"` et ignore `role`/`aria-label`/`tabindex` posés dessus), sur un `<li>` ou une `div` de dépôt : inactivables au clavier et muets pour un lecteur d'écran.
+**Décision** : l'action est portée par `<button type="button">` avec un nom accessible (`aria-label` si le contenu est une icône) ; l'icône y est un enfant décoratif. L'audit statique signale tout `@click` sur une icône Heroicons ou sur `li/tr/td/p/svg/section/article`.
+**Alternative écartée** : ajouter `role="button" tabindex="0" @keydown` partout (réimplémente un bouton, fragile, et ne fonctionne pas sur les icônes Heroicons).
+**Conséquences** : le style des icônes passe sur le `<button>` parent ; les tests ciblent `button`.

@@ -293,6 +293,39 @@ describe('FlashcardsPage', () => {
     })
   })
 
+  describe('fenêtres de dialogue (RGAA 7.1, 12.x)', () => {
+    const dialog = (wrapper) => wrapper.find('[role="dialog"]')
+
+    it('la fenêtre système est un dialogue modal nommé par son titre', async () => {
+      const { wrapper } = mountPage()
+      await flushPromises()
+      await wrapper.find('[data-testid="create"]').trigger('click')
+      const d = dialog(wrapper)
+      expect(d.attributes('aria-modal')).toBe('true')
+      expect(wrapper.find(`#${d.attributes('aria-labelledby')}`).text()).toBe('Nouveau système Leitner')
+    })
+
+    it('Échap ferme la fenêtre système', async () => {
+      const { wrapper } = mountPage()
+      await flushPromises()
+      await wrapper.find('[data-testid="create"]').trigger('click')
+      await dialog(wrapper).trigger('keydown', { key: 'Escape' })
+      expect(dialog(wrapper).exists()).toBe(false)
+    })
+
+    it('la fenêtre de planification est un dialogue modal nommé et se ferme avec Échap', async () => {
+      const { wrapper } = mountPage()
+      await flushPromises()
+      const plan = systemRow(wrapper, 'Anglais').findAll('button').find((b) => b.text().includes('Planifier'))
+      await plan.trigger('click')
+      const d = dialog(wrapper)
+      expect(d.attributes('aria-modal')).toBe('true')
+      expect(wrapper.find(`#${d.attributes('aria-labelledby')}`).text()).toBe('Planifier une session')
+      await d.trigger('keydown', { key: 'Escape' })
+      expect(dialog(wrapper).exists()).toBe(false)
+    })
+  })
+
   describe('modification d’un système', () => {
     async function openEdit(wrapper, name) {
       await systemRow(wrapper, name).find('[data-testid="edit"]').trigger('click')

@@ -1,4 +1,5 @@
 <script setup>
+import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, computed, onMounted } from 'vue'
 import { mindmapApi } from '@/helpers/mindmap/mindmapApi'
 import { useToast } from 'vue-toastification'
@@ -163,10 +164,10 @@ onMounted(fetchDiagrams)
 
     <template #modals>
       <!-- Modal créer -->
-      <div v-if="showCreateModal" class="modal-overlay" @mousedown.self="showCreateModal = false">
+      <div v-if="showCreateModal" class="modal-overlay" @mousedown.self="showCreateModal = false" v-dialog="() => { showCreateModal = false }" role="dialog" aria-modal="true" aria-labelledby="mindmap-create-modal-title">
         <div class="modal-panel">
           <button aria-label="Fermer" @click="showCreateModal = false" class="modal-close">&times;</button>
-          <h2 class="modal-title">Nouvelle carte mentale</h2>
+          <h2 id="mindmap-create-modal-title" class="modal-title">Nouvelle carte mentale</h2>
           <form @submit.prevent="confirmCreate">
             <div class="mb-4">
               <label class="form-label">Nom</label>
@@ -196,10 +197,10 @@ onMounted(fetchDiagrams)
       </div>
 
       <!-- Modal renommer -->
-      <div v-if="showRenameModal" class="modal-overlay" @mousedown.self="showRenameModal = false">
+      <div v-if="showRenameModal" class="modal-overlay" @mousedown.self="showRenameModal = false" v-dialog="() => { showRenameModal = false }" role="dialog" aria-modal="true" aria-labelledby="mindmap-rename-modal-title">
         <div class="modal-panel">
           <button aria-label="Fermer" @click="showRenameModal = false" class="modal-close">&times;</button>
-          <h2 class="modal-title">Modifier la carte</h2>
+          <h2 id="mindmap-rename-modal-title" class="modal-title">Modifier la carte</h2>
           <form @submit.prevent="confirmRename">
             <div class="mb-4">
               <label class="form-label">Nom</label>

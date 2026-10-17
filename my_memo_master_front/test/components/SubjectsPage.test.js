@@ -128,9 +128,43 @@ describe('SubjectsPage', () => {
     it('les étiquettes s’affichent avec la couleur du tag et un texte lisible', async () => {
       const { wrapper } = mountPage()
       await flushPromises()
-      const tag = wrapper.findAll('span').find((s) => s.text() === 'cours')
+      const tag = wrapper.findAll('span.rounded-full').find((s) => s.text() === 'cours')
       expect(tag.element.style.backgroundColor).toBe('rgb(17, 34, 51)')
       expect(tag.element.style.color).not.toBe('')
+    })
+  })
+
+  describe('accessibilité clavier (RGAA 7.1, 12.x)', () => {
+    it('chaque en-tête d’accordéon annonce son état et désigne le panneau qu’il commande', async () => {
+      const { wrapper } = mountPage()
+      await flushPromises()
+      const buttons = groupButtons(wrapper)
+      expect(buttons.map((b) => b.attributes('aria-expanded'))).toEqual(['true', 'false', 'true', 'true'])
+      buttons.forEach((b) => {
+        const panelId = b.attributes('aria-controls')
+        expect(panelId).toMatch(/^subject-panel-/)
+        if (b.attributes('aria-expanded') === 'true') expect(wrapper.find(`#${panelId}`).exists()).toBe(true)
+      })
+    })
+
+    it('replier met à jour aria-expanded', async () => {
+      const { wrapper } = mountPage()
+      await flushPromises()
+      await groupButtons(wrapper)[0].trigger('click')
+      expect(groupButtons(wrapper)[0].attributes('aria-expanded')).toBe('false')
+    })
+
+    it('chaque contenu est un vrai bouton (atteignable au clavier), le <li> lui-même n’est pas cliquable', async () => {
+      const { wrapper } = mountPage()
+      await flushPromises()
+      const items = wrapper.findAll('li')
+      expect(items.length).toBeGreaterThan(0)
+      items.forEach((li) => {
+        const btn = li.find('button')
+        expect(btn.exists()).toBe(true)
+        expect(btn.attributes('type')).toBe('button')
+        expect(btn.text().length).toBeGreaterThan(0)
+      })
     })
   })
 
@@ -138,21 +172,21 @@ describe('SubjectsPage', () => {
     it('une carte mentale ouvre la page des cartes mentales', async () => {
       const { wrapper } = mountPage()
       await flushPromises()
-      await wrapper.findAll('li').find((li) => li.text().includes('Cinématique')).trigger('click')
+      await wrapper.findAll('li button').find((b) => b.text().includes('Cinématique')).trigger('click')
       expect(mockPush).toHaveBeenCalledWith({ name: 'mindmaps' })
     })
 
     it('un système de Leitner ouvre sa page de cartes', async () => {
       const { wrapper } = mountPage()
       await flushPromises()
-      await wrapper.findAll('li').find((li) => li.text().includes('Atomes')).trigger('click')
+      await wrapper.findAll('li button').find((b) => b.text().includes('Atomes')).trigger('click')
       expect(mockPush).toHaveBeenCalledWith({ name: 'flashcards.cards', params: { systemId: 20 } })
     })
 
     it('un exercice ouvre son détail', async () => {
       const { wrapper } = mountPage()
       await flushPromises()
-      await wrapper.findAll('li').find((li) => li.text().includes('Contrôle 1')).trigger('click')
+      await wrapper.findAll('li button').find((b) => b.text().includes('Contrôle 1')).trigger('click')
       expect(mockPush).toHaveBeenCalledWith({ name: 'exercise-detail', params: { id: 30 } })
     })
   })

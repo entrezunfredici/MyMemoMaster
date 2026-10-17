@@ -75,10 +75,10 @@
       <!-- Modal créer / modifier système -->
       <!-- @mousedown.self (pas @click) : ferme dès l'appui hors du panneau, sans casser
            la sélection de texte qui se termine (relâchement) hors du panneau. -->
-      <div v-if="showModal" class="modal-overlay" @mousedown.self="closeModal">
+      <div v-if="showModal" class="modal-overlay" @mousedown.self="closeModal" v-dialog="closeModal" role="dialog" aria-modal="true" aria-labelledby="flashcards-system-modal-title">
         <div class="modal-panel">
           <button @click="closeModal" class="modal-close" title="Fermer">&times;</button>
-          <h2 class="modal-title">
+          <h2 id="flashcards-system-modal-title" class="modal-title">
             {{ editingId ? 'Modifier le système' : 'Nouveau système Leitner' }}
           </h2>
           <form @submit.prevent="submitForm">
@@ -128,10 +128,10 @@
       </div>
 
       <!-- Modal planification de session -->
-      <div v-if="showPlanModal" class="modal-overlay" @mousedown.self="closePlanModal">
+      <div v-if="showPlanModal" class="modal-overlay" @mousedown.self="closePlanModal" v-dialog="closePlanModal" role="dialog" aria-modal="true" aria-labelledby="flashcards-plan-modal-title">
         <div class="modal-panel">
           <button aria-label="Fermer" @click="closePlanModal" class="modal-close">&times;</button>
-          <h2 class="modal-title" style="margin-bottom: 0.25rem">Planifier une session</h2>
+          <h2 id="flashcards-plan-modal-title" class="modal-title" style="margin-bottom: 0.25rem">Planifier une session</h2>
           <p class="text-sm text-gray-500 mb-6">Système : <span class="font-semibold text-primary">{{ planningSystem?.name }}</span></p>
           <form @submit.prevent="submitPlanForm">
             <div class="form-group">
@@ -168,6 +168,7 @@
 </template>
 
 <script setup>
+import { dialogDirective as vDialog } from '@/directives/dialog'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MenuItem from '@/components/MenuItemComponent.vue'
