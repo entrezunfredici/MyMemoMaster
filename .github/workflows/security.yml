@@ -150,13 +150,18 @@ jobs:
       # du code, donc toujours à jour). -S : mode sûr, requêtes + règles PASSIVES uniquement (aucune
       # attaque active). Sans jeton, la plupart des routes répondent 401 : on contrôle ici les en-têtes,
       # les messages d'erreur et la configuration, pas la logique métier protégée.
-      # -O : la spécification déclare http://localhost/api/v1, joignable car --network host.
+      # La spécification déclare http://localhost/api/v1, joignable depuis le conteneur car --network host.
       - name: Generate OpenAPI specification
         run: docker compose --env-file .env.ci --profile dev exec -T api node -e "process.stdout.write(JSON.stringify(require('swagger-jsdoc')(require('./config/swagger.config.js'))))" > zap-reports/openapi.json
 
       - name: ZAP API scan (passif)
         run: |
-          docker run --rm --network host -v "$PWD/.zap:/zap/wrk/config:ro" -v "$PWD/zap-reports:/zap/wrk/out:rw"             ghcr.io/zaproxy/zaproxy:2.17.0 zap-api-scan.py             -t /zap/wrk/out/openapi.json -f openapi             -c config/rules.tsv             -r out/zap-api.html -J out/zap-api.json -w out/zap-api.md             -S -I
+          docker run --rm --network host -v "$PWD/.zap:/zap/wrk/config:ro" -v "$PWD/zap-reports:/zap/wrk/out:rw" \
+            ghcr.io/zaproxy/zaproxy:2.17.0 zap-api-scan.py \
+            -t /zap/wrk/out/openapi.json -f openapi \
+            -c config/rules.tsv \
+            -r out/zap-api.html -J out/zap-api.json -w out/zap-api.md \
+            -S -I
 
       - name: Upload ZAP reports
         if: always()
