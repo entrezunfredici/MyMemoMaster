@@ -1,600 +1,111 @@
 <template>
   <div class="calendar-page">
-
-    <!-- Main -->
     <main class="cal-main">
       <header class="cal-header">
-        <div class="view-toggle">
-          <button :class="{ active: view === 'year' }" @click="view = 'year'">Année</button>
-          <button :class="{ active: view === 'month' }" @click="view = 'month'">Mois</button>
+        <div class="view-toggle" role="group" aria-label="Affichage du calendrier">
+          <button type="button" :class="{ active: view === 'year' }" :aria-pressed="view === 'year'" @click="view = 'year'">Année</button>
+          <button type="button" :class="{ active: view === 'month' }" :aria-pressed="view === 'month'" @click="view = 'month'">Mois</button>
         </div>
-        <button class="add-btn" @click="openCreateModal()" title="Nouvelle séance de révision">+</button>
+        <button
+          type="button"
+          class="add-btn"
+          aria-label="Nouvelle séance de révision"
+          title="Nouvelle séance de révision"
+          @click="openCreate()"
+        >+</button>
       </header>
 
-      <div class="cal-content">
-        <!-- ────────── VUE ANNUELLE ────────── -->
-        <template v-if="view === 'year'">
-          <div class="year-toolbar">
-            <div class="year-nav">
-              <button class="icon-btn" @click="currentYear--">&#8592;</button>
-              <span class="year-label">{{ currentYear }}</span>
-              <button class="icon-btn" @click="currentYear++">&#8594;</button>
-            </div>
-          </div>
+      <div class="cal-body">
+        <div class="cal-content">
+          <CalendarYearView
+            v-if="view === 'year'"
+            :year="currentYear"
+            :is-today="isToday"
+            :has-event="hasEvent"
+            @update:year="currentYear = $event"
+            @go-to-month="goToMonth"
+          />
 
-          <div class="year-grid">
-            <!-- RGAA 7.x — pattern bouton ARIA (un <button> natif est invalide ici : contient h3 + grille) -->
-            <div
-              v-for="(m, idx) in MONTHS"
-              :key="idx"
-              class="month-block"
-              role="button"
-              tabindex="0"
-              :aria-label="`Afficher le mois de ${m}`"
-              @click="goToMonth(idx)"
-              @keydown.enter.prevent="goToMonth(idx)"
-              @keydown.space.prevent="goToMonth(idx)"
-            >
-              <h3>{{ m.toUpperCase() }}</h3>
-              <div class="mini-grid">
-                <span v-for="d in DAYS_SHORT" :key="d" class="mini-label">{{ d[0] }}</span>
-                <span v-for="_ in getFirstDay(currentYear, idx)" :key="'e' + _" class="mini-cell" />
-                <span
-                  v-for="day in getDaysInMonth(currentYear, idx)"
-                  :key="day"
-                  class="mini-cell"
-                  :class="{
-                    today: isToday(currentYear, idx, day),
-                    'has-event': hasEvent(currentYear, idx, day)
-                  }"
-                  >{{ day }}</span
-                >
-              </div>
-            </div>
-            <!-- Cellule année en bas à droite -->
-            <div class="year-number-cell" style="grid-column: span 3">
-              <span class="year-number">{{ currentYear }}</span>
-            </div>
-          </div>
-        </template>
+          <CalendarMonthView
+            v-else
+            :year="currentYear"
+            :month="currentMonth"
+            :trailing-days="trailingDays"
+            :is-today="isToday"
+            :is-weekend="isWeekend"
+            :is-selected="isSelected"
+            :get-events="getEvents"
+            @prev-month="prevMonth"
+            @next-month="nextMonth"
+            @select-day="selectDay"
+          />
+        </div>
 
-        <!-- ────────── VUE MENSUELLE ────────── -->
-        <template v-else>
-          <div class="month-nav">
-            <button class="icon-btn" @click="prevMonth">&#8592;</button>
-            <h2>{{ MONTHS[currentMonth] }}</h2>
-            <button class="icon-btn" @click="nextMonth">&#8594;</button>
-          </div>
-
-          <div class="month-grid">
-            <div v-for="d in DAYS_SHORT" :key="d" class="month-day-label">{{ d }}</div>
-
-            <!-- Jours du mois précédent -->
-            <div
-              v-for="i in getFirstDay(currentYear, currentMonth)"
-              :key="'prev' + i"
-              class="month-day-cell other-month"
-            >
-              <div class="day-num">
-                {{
-                  getDaysInMonth(currentYear, currentMonth - 1) -
-                  getFirstDay(currentYear, currentMonth) +
-                  i
-                }}
-              </div>
-            </div>
-
-            <!-- Jours du mois courant -->
-            <div
-              v-for="day in getDaysInMonth(currentYear, currentMonth)"
-              :key="day"
-              class="month-day-cell"
-              :class="{
-                today: isToday(currentYear, currentMonth, day),
-                weekend: isWeekend(currentYear, currentMonth, day)
-              }"
-              role="button"
-              tabindex="0"
-              :aria-label="`Créer une séance le ${day} ${MONTHS[currentMonth]}`"
-              @click="openCreateModal(currentYear, currentMonth, day)"
-              @keydown.enter.prevent="openCreateModal(currentYear, currentMonth, day)"
-              @keydown.space.prevent="openCreateModal(currentYear, currentMonth, day)"
-            >
-              <div class="day-num">{{ day }}</div>
-              <div
-                v-for="(ev, ei) in getEvents(currentYear, currentMonth, day)"
-                :key="ei"
-                class="event-pill"
-                :class="`event-pill--${ev.type}`"
-                role="button"
-                tabindex="0"
-                :aria-label="`Détail de ${ev.label}`"
-                @click.stop="openDetail(ev)"
-                @keydown.enter.stop.prevent="openDetail(ev)"
-              >
-                {{ ev.label }}
-              </div>
-            </div>
-
-            <!-- Jours du mois suivant -->
-            <div v-for="i in trailingDays" :key="'next' + i" class="month-day-cell other-month">
-              <div class="day-num">{{ i }}</div>
-            </div>
-          </div>
-        </template>
+        <CalendarDetailPanel
+          :day="selectedDay"
+          :get-events="getEvents"
+          @close="closePanel"
+          @open-event="selectedEvent = $event"
+          @create="openCreate"
+        />
       </div>
     </main>
 
-    <!-- ────────── Modale création séance ────────── -->
-    <Transition
-      enter-active-class="transition ease-out duration-150"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div v-if="showCreateModal" class="detail-overlay" @click.self="showCreateModal = false">
-        <div class="detail-modal">
-          <div class="detail-modal__header">
-            <div class="detail-modal__meta">
-              <span class="detail-modal__badge detail-modal__badge--revision">Révision</span>
-              <h3 class="detail-modal__title">Nouvelle séance</h3>
-            </div>
-            <button class="detail-modal__close" @click="showCreateModal = false">
-              <XMarkIcon class="size-5" />
-            </button>
-          </div>
+    <CalendarAgenda :loading="loading" />
 
-          <form class="create-form" @submit.prevent="submitCreate">
-            <div class="create-form__field">
-              <label>Nom <span class="required">*</span></label>
-              <input aria-label="Nom de la séance" v-model="createForm.name" type="text" placeholder="Ex: Maths — Chapitre 3" maxlength="150" required />
-            </div>
-
-            <div class="create-form__row">
-              <div class="create-form__field">
-                <label>Date <span class="required">*</span></label>
-                <input aria-label="Date de la séance" v-model="createForm.date" type="date" required />
-              </div>
-            </div>
-
-            <div class="create-form__row">
-              <div class="create-form__field">
-                <label>Début <span class="required">*</span></label>
-                <input aria-label="Heure de début" v-model="createForm.startTime" type="time" required />
-              </div>
-              <div class="create-form__field">
-                <label>Fin <span class="required">*</span></label>
-                <input aria-label="Heure de fin" v-model="createForm.endTime" type="time" required />
-              </div>
-            </div>
-
-            <div class="create-form__field">
-              <label for="create-session-system">Système de Leitner lié</label>
-              <select id="create-session-system" v-model="createForm.idSystem" @change="onSystemChange">
-                <option :value="null">Aucun</option>
-                <option v-for="sys in leitnerStore.systems" :key="sys.idSystem" :value="sys.idSystem">
-                  {{ sys.name }}
-                </option>
-              </select>
-            </div>
-
-            <div class="create-form__field">
-              <label>Description</label>
-              <textarea aria-label="Notes optionnelles" v-model="createForm.description" placeholder="Notes optionnelles…" rows="2" maxlength="1000" />
-            </div>
-
-            <div class="create-form__actions">
-              <button type="button" class="btn-cancel" @click="showCreateModal = false">Annuler</button>
-              <button type="submit" class="btn-submit" :disabled="creating">
-                {{ creating ? 'Création…' : 'Créer la séance' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- ────────── Modale détail événement ────────── -->
-    <Transition
-      enter-active-class="transition ease-out duration-150"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div v-if="selectedEvent" class="detail-overlay" @click.self="selectedEvent = null">
-        <div class="detail-modal">
-          <!-- En-tête -->
-          <div class="detail-modal__header">
-            <div class="detail-modal__meta">
-              <span class="detail-modal__badge" :class="`detail-modal__badge--${selectedEvent.type}`">
-                {{ typeLabel(selectedEvent.type) }}
-              </span>
-              <h3 class="detail-modal__title">{{ selectedEvent.label }}</h3>
-            </div>
-            <button class="detail-modal__close" @click="selectedEvent = null">
-              <XMarkIcon class="size-5" />
-            </button>
-          </div>
-
-          <!-- Détail d'une séance de révision : horaires, système lié, lancement -->
-          <div v-if="selectedEvent.type === 'revision' && selectedEvent.session" class="detail-modal__body">
-            <p class="detail-modal__info">
-              {{ formatSessionDate(selectedEvent.session) }}
-            </p>
-            <p v-if="selectedEvent.session.leitnerSystem" class="detail-modal__info">
-              Système de Leitner lié : <strong>{{ selectedEvent.session.leitnerSystem.name }}</strong>
-            </p>
-            <p v-else class="detail-modal__info">Aucun système de Leitner lié.</p>
-            <button
-              v-if="selectedEvent.session.leitnerSystem"
-              type="button"
-              class="btn-submit"
-              @click="launchSession(selectedEvent.session.leitnerSystem.idSystem)"
-            >
-              Lancer la session
-            </button>
-          </div>
-
-          <!-- Rappels (deadline et revision_session uniquement) -->
-          <div v-if="selectedEvent.type !== 'calendar'" class="detail-modal__body">
-            <p class="detail-modal__section-title">Rappels</p>
-            <ReminderWidget
-              :entity-type="reminderEntityType(selectedEvent.type)"
-              :entity-id="selectedEvent.id"
-            />
-          </div>
-          <div v-else class="detail-modal__body">
-            <p class="detail-modal__info">Les rappels ne sont pas disponibles pour les événements de calendrier.</p>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- ────────── Agenda latéral ────────── -->
-    <aside class="cal-agenda">
-      <!-- Onglets Agenda / To-do -->
-      <div class="sidebar-tabs">
-        <button
-          class="sidebar-tab"
-          :class="{ active: sidebarTab === 'agenda' }"
-          @click="sidebarTab = 'agenda'"
-        >Agenda</button>
-        <button
-          class="sidebar-tab"
-          :class="{ active: sidebarTab === 'todo' }"
-          @click="sidebarTab = 'todo'"
-        >To-do</button>
-      </div>
-
-      <!-- Contenu To-do -->
-      <template v-if="sidebarTab === 'todo'">
-        <TodoWidget />
-      </template>
-
-      <!-- Contenu Agenda -->
-      <template v-else>
-
-      <!-- En retard -->
-      <div v-if="!loading && planningStore.priorities.overdue.length > 0" class="agenda-section">
-        <h4 class="agenda-title agenda-title--overdue">En retard</h4>
-        <div
-          v-for="item in planningStore.priorities.overdue"
-          :key="String(item.id || item.systemId) + item.type"
-          class="agenda-item agenda-item--overdue"
-        >
-          <span class="agenda-badge agenda-badge--overdue">-{{ item.daysOverdue }}j</span>
-          <span class="agenda-name">{{ item.name }}</span>
-        </div>
-      </div>
-
-      <!-- Aujourd'hui -->
-      <div class="agenda-section">
-        <h4 class="agenda-title">Aujourd'hui</h4>
-        <div v-if="loading" class="agenda-loading">
-          <span class="agenda-spinner" />
-        </div>
-        <template v-else-if="planningStore.priorities.today.length > 0">
-          <div
-            v-for="item in planningStore.priorities.today"
-            :key="String(item.id || item.systemId) + item.type"
-            class="agenda-item"
-            :class="agendaItemClass(item.type)"
-          >
-            <span class="agenda-time">{{ itemTime(item) }}</span>
-            <span class="agenda-name">
-              {{ item.name }}{{ item.type === 'leitner' ? ` (${item.cardsDue})` : '' }}
-            </span>
-          </div>
-        </template>
-        <p v-else class="agenda-empty">Rien aujourd'hui</p>
-      </div>
-
-      <!-- À venir -->
-      <div class="agenda-section">
-        <h4 class="agenda-title">À venir</h4>
-        <div v-if="loading" class="agenda-loading">
-          <span class="agenda-spinner" />
-        </div>
-        <template v-else-if="planningStore.priorities.upcoming.length > 0">
-          <div
-            v-for="item in planningStore.priorities.upcoming"
-            :key="String(item.id || item.systemId) + item.type"
-            class="agenda-item"
-            :class="agendaItemClass(item.type)"
-          >
-            <span class="agenda-badge">+{{ item.daysUntil }}j</span>
-            <span class="agenda-name">{{ item.name }}</span>
-          </div>
-        </template>
-        <p v-else class="agenda-empty">Aucun élément</p>
-      </div>
-
-      <!-- Légende -->
-      <div class="agenda-section agenda-legend">
-        <h4 class="agenda-title">Légende</h4>
-        <div class="legend-item">
-          <span class="legend-dot legend-dot--calendar" />
-          <span>Événement</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-dot legend-dot--deadline" />
-          <span>Échéance</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-dot legend-dot--revision" />
-          <span>Révision</span>
-        </div>
-      </div>
-
-      </template>
-    </aside>
+    <CalendarCreateModal :open="showCreate" :day="createDay" @close="showCreate = false" @created="refreshSessions" />
+    <CalendarEventModal :event="selectedEvent" @close="selectedEvent = null" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { XMarkIcon } from '@heroicons/vue/24/outline'
-import { useCalendarEventStore } from '@/stores/calendarEvents'
-import { useRevisionSessionStore } from '@/stores/revisionSessions'
-import { useDeadlineStore } from '@/stores/deadlines'
-import { usePlanningStore } from '@/stores/planning'
-import { useGuidedTourStore } from '@/stores/guidedTour'
-import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
-import ReminderWidget from '@/components/ReminderWidget.vue'
-import TodoWidget from '@/components/TodoWidget.vue'
+// Page Calendrier : vues année / mois, panneau du jour sélectionné, agenda latéral et fenêtres de
+// création de séance et de détail d'un événement. L'état et les données sont dans useCalendar.
+import { ref, onMounted } from 'vue'
+import { useCalendar } from '@/composables/useCalendar'
+import CalendarYearView from '@/components/calendar/CalendarYearComponent.vue'
+import CalendarMonthView from '@/components/calendar/CalendarMonthComponent.vue'
+import CalendarDetailPanel from '@/components/calendar/CalendarDetailPanelComponent.vue'
+import CalendarAgenda from '@/components/calendar/CalendarAgendaComponent.vue'
+import CalendarCreateModal from '@/components/calendar/CalendarCreateModalComponent.vue'
+import CalendarEventModal from '@/components/calendar/CalendarEventModalComponent.vue'
+import '@/components/calendar/calendar.css'
 
-/* ── Stores ── */
-const calendarStore = useCalendarEventStore()
-const revisionStore = useRevisionSessionStore()
-const deadlineStore = useDeadlineStore()
-const planningStore = usePlanningStore()
-const guidedTourStore = useGuidedTourStore()
-const leitnerStore = useLeitnerSystemStore()
-const router = useRouter()
+const {
+  view,
+  currentYear,
+  currentMonth,
+  selectedDay,
+  loading,
+  trailingDays,
+  load,
+  refreshSessions,
+  isToday,
+  isWeekend,
+  isSelected,
+  hasEvent,
+  getEvents,
+  selectDay,
+  closePanel,
+  prevMonth,
+  nextMonth,
+  goToMonth,
+} = useCalendar()
 
-/* ── Constantes ── */
-const MONTHS = [
-  'Janvier',
-  'Février',
-  'Mars',
-  'Avril',
-  'Mai',
-  'Juin',
-  'Juillet',
-  'Août',
-  'Septembre',
-  'Octobre',
-  'Novembre',
-  'Décembre'
-]
-const DAYS_SHORT = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
+const selectedEvent = ref(null) // événement dont la fiche est ouverte
+const showCreate = ref(false)
+const createDay = ref(null) // jour proposé pour la nouvelle séance ({ y, m, d }) ou null
 
-/* ── État ── */
-const today = new Date()
-const view = ref('month')
-const sidebarTab = ref('agenda')
-const currentYear = ref(today.getFullYear())
-const currentMonth = ref(today.getMonth())
-const loading = ref(false)
-const selectedEvent = ref(null)
-
-/* ── Création séance ── */
-const showCreateModal = ref(false)
-const creating = ref(false)
-const createForm = ref({ name: '', date: '', startTime: '', endTime: '', description: '', idSystem: null })
-
-// Pré-remplit le nom de la séance avec celui du système choisi, tant que l'utilisateur n'a rien saisi
-function onSystemChange() {
-  const sys = leitnerStore.systems.find((s) => s.idSystem === createForm.value.idSystem)
-  if (sys && !createForm.value.name.trim()) createForm.value.name = sys.name
+// Depuis le bouton « + » (aucun jour) ou depuis le panneau d'un jour.
+function openCreate(day = null) {
+  createDay.value = day
+  showCreate.value = true
 }
 
-function openCreateModal(y, m, d) {
-  // Parcours guidé : le système de Leitner créé à l'étape 2 est pré-sélectionné
-  const tourSystem = guidedTourStore.active ? guidedTourStore.links.leitnerSystemId : null
-  createForm.value = {
-    idSystem: tourSystem,
-    name: leitnerStore.systems.find((s) => s.idSystem === tourSystem)?.name || '',
-    date: y != null ? `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '',
-    startTime: '',
-    endTime: '',
-    description: '',
-  }
-  showCreateModal.value = true
-}
-
-async function submitCreate() {
-  creating.value = true
-  const payload = {
-    name: createForm.value.name,
-    date: createForm.value.date,
-    startTime: createForm.value.startTime,
-    endTime: createForm.value.endTime,
-    ...(createForm.value.description ? { description: createForm.value.description } : {}),
-    ...(createForm.value.idSystem ? { idSystem: createForm.value.idSystem } : {}),
-  }
-  const ok = await revisionStore.createSession(payload)
-  creating.value = false
-  if (ok) {
-    const created = revisionStore.sessions[revisionStore.sessions.length - 1]
-    guidedTourStore.recordLinks({ revisionSessionId: created?.id ?? -1 })
-    showCreateModal.value = false
-    revisionStore.fetchSessions()
-    planningStore.fetchPriorities()
-  }
-}
-
-/* ── Chargement ── */
-onMounted(async () => {
-  loading.value = true
-  await Promise.all([
-    calendarStore.fetchEvents(),
-    revisionStore.fetchSessions(),
-    leitnerStore.fetchSystems(),
-    deadlineStore.fetchDeadlines(),
-    planningStore.fetchPriorities(),
-  ])
-  loading.value = false
-})
-
-/* ── Conversion date API (mois 1-indexé) → clé interne (mois 0-indexé) ── */
-function parseDateToKey(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return `${y}-${String(m - 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-}
-
-/* ── Dictionnaire calculé depuis les stores ── */
-const allEvents = computed(() => {
-  const dict = {}
-  const add = (key, entry) => {
-    if (!dict[key]) dict[key] = []
-    dict[key].push(entry)
-  }
-
-  calendarStore.events.forEach((ev) => {
-    ev.occurrences?.forEach((occ) => {
-      add(parseDateToKey(occ.date), { label: ev.name, type: 'calendar', id: ev.id })
-    })
-  })
-
-  deadlineStore.deadlines.forEach((dl) => {
-    add(parseDateToKey(dl.dueDate), { label: dl.name, type: 'deadline', id: dl.id })
-  })
-
-  revisionStore.sessions.forEach((rs) => {
-    add(parseDateToKey(rs.date), { label: rs.name, type: 'revision', id: rs.id, session: rs })
-  })
-
-  return dict
-})
-
-/* ── Helpers planning ── */
-function agendaItemClass(type) {
-  if (type === 'deadline') return 'agenda-item--deadline'
-  if (type === 'revision_session') return 'agenda-item--revision'
-  if (type === 'leitner') return 'agenda-item--leitner'
-  return ''
-}
-
-function itemTime(item) {
-  if (item.startTime) return item.startTime.slice(0, 5)
-  if (item.dueTime) return item.dueTime.slice(0, 5)
-  return ''
-}
-
-/* ── Helpers ── */
-function getDaysInMonth(y, m) {
-  return new Date(y, (((m % 12) + 12) % 12) + 1, 0).getDate()
-}
-
-function getFirstDay(y, m) {
-  const d = new Date(y, m, 1).getDay()
-  return d === 0 ? 6 : d - 1 // Lundi = 0
-}
-
-function isToday(y, m, d) {
-  return y === today.getFullYear() && m === today.getMonth() && d === today.getDate()
-}
-
-function isWeekend(y, m, d) {
-  const dow = (getFirstDay(y, m) + d - 1) % 7
-  return dow >= 5
-}
-
-function eventKey(y, m, d) {
-  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-}
-
-function hasEvent(y, m, d) {
-  return !!allEvents.value[eventKey(y, m, d)]?.length
-}
-
-function getEvents(y, m, d) {
-  return allEvents.value[eventKey(y, m, d)] || []
-}
-
-/* ── Modale détail ── */
-function openDetail(ev) {
-  selectedEvent.value = ev
-}
-
-function formatSessionDate(session) {
-  const [y, m, d] = session.date.split('-').map(Number)
-  const hours = [session.startTime, session.endTime].filter(Boolean).map((t) => t.slice(0, 5))
-  const when = `${d} ${MONTHS[m - 1]} ${y}`
-  return hours.length ? `${when} · ${hours.join(' – ')}` : when
-}
-
-function launchSession(idSystem) {
-  router.push({ name: 'flashcardssession', params: { systemId: idSystem } })
-}
-
-function typeLabel(type) {
-  if (type === 'deadline') return 'Échéance'
-  if (type === 'revision') return 'Révision'
-  return 'Événement'
-}
-
-function reminderEntityType(type) {
-  return type === 'revision' ? 'revision_session' : type
-}
-
-/* ── Navigation ── */
-function prevMonth() {
-  if (currentMonth.value === 0) {
-    currentMonth.value = 11
-    currentYear.value--
-  } else currentMonth.value--
-}
-
-function nextMonth() {
-  if (currentMonth.value === 11) {
-    currentMonth.value = 0
-    currentYear.value++
-  } else currentMonth.value++
-}
-
-function goToMonth(idx) {
-  currentMonth.value = idx
-  view.value = 'month'
-}
-
-/* ── Jours de remplissage fin de mois ── */
-const trailingDays = computed(() => {
-  const total =
-    getFirstDay(currentYear.value, currentMonth.value) +
-    getDaysInMonth(currentYear.value, currentMonth.value)
-  return (7 - (total % 7)) % 7
-})
+onMounted(load)
 </script>
 
 <style scoped>
-/* ── Layout ── */
 .calendar-page {
   display: flex;
   height: 100vh;
@@ -606,13 +117,11 @@ const trailingDays = computed(() => {
   border-radius: 16px;
 }
 
-/* ── Main ── */
 .cal-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 0;
 }
 
 .cal-header {
@@ -622,13 +131,6 @@ const trailingDays = computed(() => {
   padding: 18px 24px 12px;
   background: rgb(var(--white));
   border-bottom: 0.5px solid var(--slate-200);
-}
-
-.cal-header h1 {
-  font-size: 22px;
-  font-weight: 500;
-  color: rgb(var(--accent));
-  margin: 0;
 }
 
 .view-toggle {
@@ -657,700 +159,24 @@ const trailingDays = computed(() => {
   color: rgb(var(--white));
 }
 
+.cal-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
 .cal-content {
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
-}
-
-/* ── Vue annuelle ── */
-.year-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.year-nav {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.year-label {
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.year-number-cell {
-  display: flex;
-  align-items: flex-end;
-  justify-content: end;
-  padding: 12px;
-  background: none;
-}
-
-.year-number {
-  font-size: 140px;
-  font-weight: 600;
-  color: rgb(var(--accent));
-  line-height: 1;
-  letter-spacing: -4px;
-}
-
-.icon-btn {
-  width: 30px;
-  height: 30px;
-  border: 0.5px solid var(--slate-200);
-  border-radius: 8px;
-  background: rgb(var(--white));
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--slate-500);
-  font-size: 14px;
-  transition: background 0.15s;
-}
-
-.icon-btn:hover {
-  background: var(--slate-100);
-}
-
-.year-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.month-block {
-  background: rgb(var(--white));
-  border: 0.5px solid var(--slate-200);
-  border-radius: 12px;
-  padding: 12px;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-
-.month-block:hover {
-  border-color: rgb(var(--accent));
-}
-
-.month-block h3 {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--slate-500);
-  margin: 0 0 8px;
-  letter-spacing: 0.5px;
-}
-
-.mini-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 1px;
-}
-
-.mini-label {
-  font-size: 9px;
-  color: var(--slate-500);
-  text-align: center;
-  padding: 1px 0;
-}
-
-.mini-cell {
-  font-size: 9px;
-  text-align: center;
-  padding: 2px 1px;
-  border-radius: 3px;
-  color: var(--slate-700);
-}
-
-.mini-cell.today {
-  background: rgb(var(--accent));
-  color: rgb(var(--white));
-  border-radius: 3px;
-}
-
-.mini-cell.has-event {
-  background: rgb(var(--accent) / 0.12);
-  color: rgb(var(--accent));
-}
-
-/* ── Vue mensuelle ── */
-.month-nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.month-nav h2 {
-  font-size: 18px;
-  font-weight: 500;
-  margin: 0;
-  color: rgb(var(--accent));
-  min-width: 120px;
-}
-
-/* CHOIX: minmax(0, 1fr) plutôt que 1fr — 1fr a un minimum = contenu (min-content), un libellé
-   d'événement en nowrap élargissait sa colonne et poussait les jours suivants hors écran */
-.month-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  border: 0.5px solid var(--slate-200);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--slate-200);
-  gap: 0.5px;
-}
-
-.month-day-label {
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  padding: 8px 4px;
-  background: var(--slate-50);
-  color: var(--slate-500);
-}
-
-.month-day-cell {
   min-width: 0;
-  min-height: 90px;
-  padding: 8px;
-  background: rgb(var(--white));
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.month-day-cell.other-month {
-  background: var(--slate-50);
-}
-.month-day-cell.other-month .day-num {
-  color: var(--slate-500);
-}
-.month-day-cell.weekend {
-  background: var(--surface-tint);
-}
-
-.day-num {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--slate-700);
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.month-day-cell.today .day-num {
-  background: rgb(var(--accent));
-  color: rgb(var(--white));
-}
-
-/* Pills d'événements colorées par type */
-.event-pill {
-  font-size: 11px;
-  border-radius: 4px;
-  padding: 2px 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 500;
-}
-
-.event-pill--calendar {
-  background: rgb(var(--accent) / 0.1);
-  color: rgb(var(--accent));
-}
-
-.event-pill--deadline {
-  background: rgb(var(--red-500-rgb) / 0.1);
-  color: var(--red-700);
-}
-
-.event-pill--revision {
-  background: rgb(var(--green-600-rgb) / 0.1);
-  color: var(--green-800);
-}
-
-/* ── Onglets sidebar ── */
-.sidebar-tabs {
-  display: flex;
-  border-bottom: 0.5px solid var(--slate-200);
-  flex-shrink: 0;
-}
-
-.sidebar-tab {
-  flex: 1;
-  padding: 10px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--slate-500);
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: color 0.15s;
-  border-bottom: 2px solid transparent;
-}
-
-.sidebar-tab.active {
-  color: rgb(var(--accent));
-  border-bottom-color: rgb(var(--accent));
-}
-
-/* ── Agenda latéral ── */
-.cal-agenda {
-  width: 220px;
-  flex-shrink: 0;
-  background: rgb(var(--white));
-  border-left: 0.5px solid var(--slate-200);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.agenda-section {
-  padding: 14px 14px 12px;
-  border-bottom: 0.5px solid var(--slate-100);
-}
-
-.agenda-legend {
-  margin-top: auto;
-  border-bottom: none;
-}
-
-.agenda-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--slate-500);
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
-  margin: 0 0 10px;
-}
-
-.agenda-empty {
-  font-size: 12px;
-  color: var(--slate-500);
-  margin: 0;
-}
-
-.agenda-loading {
-  display: flex;
-  justify-content: center;
-  padding: 6px 0;
-}
-
-.agenda-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--slate-200);
-  border-top-color: rgb(var(--accent));
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.agenda-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 5px 0;
-  border-top: 0.5px solid var(--slate-50);
-}
-
-.agenda-item:first-of-type {
-  border-top: none;
-}
-
-.agenda-time {
-  font-size: 11px;
-  color: var(--slate-500);
-  flex-shrink: 0;
-  min-width: 34px;
-  padding-top: 1px;
-}
-
-.agenda-name {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.3;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.agenda-item--revision .agenda-name {
-  color: var(--green-800);
-}
-
-.agenda-item--deadline .agenda-name {
-  color: rgb(var(--danger));
-}
-
-.agenda-item--leitner .agenda-name {
-  color: var(--violet-600);
-}
-
-.agenda-item--overdue .agenda-name {
-  color: rgb(var(--danger));
-  font-weight: 600;
-}
-
-.agenda-title--overdue {
-  color: rgb(var(--danger));
-}
-
-.agenda-badge {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--slate-500);
-  flex-shrink: 0;
-  min-width: 26px;
-  padding-top: 1px;
-}
-
-.agenda-badge--overdue {
-  color: rgb(var(--danger));
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-}
-
-.legend-item span:last-child {
-  font-size: 12px;
-  color: var(--slate-500);
-}
-
-.legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.legend-dot--calendar {
-  background: rgb(var(--accent));
-}
-
-.legend-dot--deadline {
-  background: rgb(var(--danger));
-}
-
-.legend-dot--revision {
-  background: var(--green-600);
-}
-
-/* ── Modale détail ── */
-.detail-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgb(var(--slate-900-rgb) / 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 16px;
-}
-
-.detail-modal {
-  background: rgb(var(--white));
-  border-radius: 16px;
-  width: 100%;
-  max-width: 420px;
-  box-shadow: 0 20px 60px rgb(var(--black) / 0.18);
-  overflow: hidden;
-}
-
-.detail-modal__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 18px 14px;
-  border-bottom: 0.5px solid var(--slate-100);
-}
-
-.detail-modal__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.detail-modal__badge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 2px 8px;
-  border-radius: 99px;
-}
-
-.detail-modal__badge--deadline {
-  background: rgb(var(--red-500-rgb) / 0.12);
-  color: var(--red-700);
-}
-
-.detail-modal__badge--revision {
-  background: rgb(var(--green-600-rgb) / 0.12);
-  color: var(--green-800);
-}
-
-.detail-modal__badge--calendar {
-  background: rgb(var(--accent) / 0.1);
-  color: rgb(var(--accent));
-}
-
-.detail-modal__title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--slate-900);
-  margin: 0;
-  line-height: 1.3;
-}
-
-.detail-modal__close {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--slate-500);
-  padding: 2px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  transition: color 0.15s;
-}
-
-.detail-modal__close:hover {
-  color: var(--slate-900);
-}
-
-.detail-modal__body {
-  padding: 16px 18px 20px;
-}
-
-.detail-modal__section-title {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--slate-500);
-  margin: 0 0 12px;
-}
-
-.detail-modal__info {
-  font-size: 13px;
-  color: var(--slate-500);
-  margin: 0;
-}
-
-/* pills cliquables */
-.event-pill {
-  cursor: pointer;
-}
-
-.event-pill:hover {
-  filter: brightness(0.92);
-}
-
-/* ── Bouton + ── */
-.add-btn {
-  margin-left: 12px;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: rgb(var(--accent));
-  color: rgb(var(--white));
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-
-.add-btn:hover {
-  background: rgb(var(--accent-dark));
-}
-
-/* ── Cellule jour cliquable ── */
-.month-day-cell {
-  cursor: pointer;
-}
-
-.month-day-cell:hover {
-  background: var(--surface-tint-strong);
-}
-
-/* ── Formulaire création ── */
-.create-form {
-  padding: 16px 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.create-form__row {
-  display: flex;
-  gap: 12px;
-}
-
-.create-form__row .create-form__field {
-  flex: 1;
-}
-
-.create-form__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.create-form__field label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--slate-500);
-}
-
-.required {
-  color: rgb(var(--danger));
-}
-
-.create-form__field input,
-.create-form__field textarea {
-  border: 1px solid var(--slate-200);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--slate-900);
-  background: var(--slate-50);
-  outline: none;
-  transition: border-color 0.15s;
-  font-family: inherit;
-  resize: none;
-}
-
-.create-form__field input:focus,
-.create-form__field textarea:focus {
-  border-color: rgb(var(--accent));
-  background: rgb(var(--white));
-}
-
-.create-form__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.btn-cancel {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--slate-200);
-  background: rgb(var(--white));
-  color: var(--slate-500);
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-cancel:hover {
-  background: var(--slate-100);
-}
-
-.btn-submit {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  background: rgb(var(--accent));
-  color: rgb(var(--white));
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-submit:hover:not(:disabled) {
-  background: rgb(var(--accent-dark));
-}
-
-.btn-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* ── Responsive ── */
-@media (max-width: 900px) {
-  .year-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .year-number {
-    font-size: 32px;
-  }
-  .cal-agenda {
-    display: none;
-  }
 }
 
 @media (max-width: 600px) {
-  .year-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  /* Vue mensuelle : 7 colonnes sur ~360 px → cellules compactes */
-  .month-day-cell {
-    min-height: 64px;
-    padding: 4px 2px;
-    gap: 2px;
-  }
-  .month-day-label {
-    padding: 6px 0;
-    font-size: 11px;
-  }
-  .day-num {
-    width: 22px;
-    height: 22px;
-    font-size: 12px;
-  }
-  .event-pill {
-    font-size: 10px;
-    padding: 1px 3px;
-  }
-  .month-nav {
-    gap: 8px;
-  }
-  .month-nav h2 {
-    min-width: 0;
-    flex: 1;
+  .cal-header {
+    padding: 12px;
   }
   .cal-content {
-    padding: 12px 12px;
-  }
-  .cal-header {
     padding: 12px;
   }
 }
