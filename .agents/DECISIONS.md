@@ -5121,3 +5121,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : (1) `gradeWithoutModel` renvoie `strategy: 'algebraic'` avec un message propre quand seule l'équivalence algébrique a joué ; (2) une réponse de 1–2 mots alphabétiques est exemptée des avertissements de brièveté et de vocabulaire (sauf oui/non/vrai/faux) ; (3) le score moyen compte chaque carte corrigée, QCM = 1 ou 0 ; (4) les options de QCM sont mélangées côté front, une seule fois par carte, en conservant l'indice d'origine comme valeur soumise.
 **Alternative écartée** : mélanger côté API (l'API compare un indice : il faudrait renvoyer et stocker la permutation) ; mélanger à chaque rendu (l'ordre changerait après correction) ; abaisser les seuils de longueur pour tous les cas (laisserait passer les phrases trop vagues).
 **Conséquences** : l'API est inchangée pour les QCM ; la stratégie `algebraic` est une nouvelle valeur visible par les consommateurs de `strategy` ; les tests d'équivalence algébrique attendent désormais `'algebraic'`.
+
+
+## 2026-10-17 — Tests de pages : doublures des composants de mise en page, stores simulés
+
+**Contexte** : 17 pages et 5 stores sans test ; plusieurs pages (`FlashcardsPage`, `ClassroomPlateformeView`, `AdminPage`) orchestrent des stores et des fenêtres modales.
+**Décision** : les pages sont montées avec `createTestingPinia({ stubActions: true })` (actions des stores espionnées, comportement utile rejoué par `mockImplementation` quand la page lit l'état écrit par l'action) ; les composants de mise en page (`ItemListLayout`, `MenuItem`, sélecteurs) sont remplacés par des doublures minimales, ceux qui n'ont pas de logique propre (`ToggleButton`, `ButtonComponent`) restent réels. `vue-router` est mocké avec `importOriginal` pour garder `createRouter` quand un store importe le routeur.
+**Alternative écartée** : tests de bout en bout par page (lents, déjà couverts par Playwright pour l'accessibilité) ; mocks complets de `vue-router` sans `importOriginal` (cassent l'import de `@/router` par le store `auth`).
+**Conséquences** : les tests vérifient le contrat page ↔ stores (appels, arguments, états affichés) sans dépendre du détail des composants enfants ; une icône Heroicons ne porte pas `role`/`aria-label` — toute action doit être un vrai `<button>`.

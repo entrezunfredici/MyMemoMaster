@@ -13218,3 +13218,20 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Tests** : API +tests `Semantic` (exact/algébrique) et `AnswerQuality` (terme) ; front +5 `shuffle`, +8 QCM/score moyen dans `FlashcardsSessionPage` ; ESLint et audits RGAA / couleurs / Tailwind verts.
 **Hypothèses** : « Newton » et « Mer Rouge » sont considérées comme des réponses valides par construction ; les avertissements restent actifs pour les réponses ≥ 3 mots.
 **Dette** : aucune nouvelle.
+
+
+## [2026-10-17] [ADD] Tests des pages et stores qui n'en avaient pas (branche `dev_fix_session_feedback`)
+
+**Contexte** : dette technique « 23 pages sans test dédié, 9 stores sans test ». Après recomptage : 17 pages et 5 stores réellement sans aucun test (les autres étaient couverts par des tests de composants ou d'autres fichiers).
+**Fait** :
+- Stores (5 fichiers, `test/stores/`) : `fields`, `roles`, `leitnerBoxes`, `responses`, `etablissement` — chaque action en succès, statut inattendu, erreur réseau ; effets sur l'état (liste, courant, statistiques, contenu) et notifications.
+- Pages (`test/components/`) : `StaticPages` (Account, Community, Onboarding, Credits), `TodoPage`, `MindmapsPage`, `ForgotPasswordPage`, `ResetPasswordPage`, `VerifyEmailPage`, `HomePage`, `CreateTestPage`, `TutorialsPage`, `SubjectsPage`, `FlashcardsPage`, `ClassroomPlateformeView`, `AdminPage`, `SettingsPage`.
+- Contrôle par mutation : en cassant volontairement deux comportements (pluriel des cartes, statut 201 de la réinitialisation), les tests concernés échouent.
+**Correction trouvée par les tests (RGAA)** : `CreateTestPage.vue` — les icônes « retirer l'image » et « supprimer la question » étaient des `<XMarkIcon>` cliquables : Heroicons les rend `aria-hidden="true"` et ignore `role`/`aria-label`, donc ni clavier ni lecteur d'écran ne pouvaient les activer. Elles sont désormais dans de vrais `<button type="button">` nommés (« Retirer l'image », « Supprimer la question … »), même rendu visuel. Test axe Playwright de `/create-test` vert.
+**Constats consignés, non corrigés** :
+- `store roles` : les actions n'ont aucune valeur de retour (les `return` sont dans des `.then`) ; les tests décrivent l'état et les notifications observables.
+- `AdminPage` et `ClassroomPlateformeView` sont deux copies quasi identiques (liste, détail, audit, contenu, gérant) : à factoriser.
+- `SubjectsPage` : lignes de résultats `<li @click>` sans clavier ni rôle, boutons d'accordéon sans `aria-expanded` (RGAA 7.1 / 12.x) ; `FlashcardsPage` et `SettingsPage` : modales sans `role="dialog"`.
+- `SubjectsPage` écrit « 0 contenus » (règle `!== 1`) ; l'usage français serait « 0 contenu ».
+- `TutorialsPage` affiche des données codées en dur (page provisoire).
+**Tests** : front 98 fichiers verts (+19), ESLint, audits RGAA / couleurs / Tailwind, build.
