@@ -330,7 +330,7 @@
                           <p class="text-sm font-semibold text-dark">{{ sub.name }}</p>
                           <p class="text-xs text-dark/60">{{ sub.originalName }} · {{ formatFileSize(sub.fileSize) }} · {{ formatDate(sub.submittedAt) }}</p>
                         </div>
-                        <button v-if="sub.fileKey" @click.stop="downloadSubmission(sub.fileKey)"
+                        <button v-if="sub.fileKey" @click.stop="downloadFile(sub.fileKey, { newTab: true })"
                           class="text-xs text-primary underline shrink-0 ml-3">
                           Télécharger
                         </button>
@@ -592,9 +592,8 @@ import { useKpiConsentStore } from '@/stores/kpiConsent'
 import { useClassGroupSubmissionStore } from '@/stores/classGroupSubmissions'
 import { useInvitationStore } from '@/stores/invitations'
 import { useRole } from '@/composables/useRole'
+import { useStoredFile } from '@/composables/useStoredFile'
 import StudentDetailComponent from '@/components/StudentDetailComponent.vue'
-import { api } from '@/helpers/api'
-import { notif } from '@/helpers/notif'
 
 const { isAdminEtablissement } = useRole()
 const classGroupStore = useClassGroupStore()
@@ -829,41 +828,7 @@ async function toggleRenduSection(sectionId) {
   await submissionStore.fetchStatus(selectedId.value, sectionId)
 }
 
-async function downloadSubmission(fileKey) {
-  if (!fileKey) { notif.notify('Aucun fichier associé.', 'error'); return }
-  try {
-    const resp = await api.get('storage/presign', { key: fileKey, disposition: 'attachment' })
-    if (resp?.status === 200 && resp.data?.url) {
-      const a = document.createElement('a')
-      a.href = resp.data.url
-      a.target = '_blank'
-      a.rel = 'noopener'
-      a.click()
-    } else {
-      notif.notify('Impossible de télécharger le fichier.', 'error')
-    }
-  } catch {
-    notif.notify('Impossible de télécharger le fichier.', 'error')
-  }
-}
-
-async function openFile(fileKey) {
-  if (!fileKey) { notif.notify('Aucun fichier associé.', 'error'); return }
-  const newWindow = window.open('', '_blank')
-  if (!newWindow) { notif.notify('Popup bloqué — autorisez les popups pour ce site.', 'error'); return }
-  try {
-    const resp = await api.get('storage/presign', { key: fileKey })
-    if (resp?.status === 200 && resp.data?.url) {
-      newWindow.location.href = resp.data.url
-    } else {
-      newWindow.close()
-      notif.notify("Impossible d'ouvrir le fichier.", 'error')
-    }
-  } catch {
-    newWindow.close()
-    notif.notify("Impossible d'ouvrir le fichier.", 'error')
-  }
-}
+const { openFile, downloadFile } = useStoredFile()
 
 function formatDate(value) {
   if (!value) return ''

@@ -98,10 +98,9 @@ describe('ProfilePage', () => {
 
   // ── saveProfile() ──────────────────────────────────────────────────────────
 
-  it('saveProfile — succès — notifie success et met à jour authStore.user', async () => {
-    const updatedUser = { ...mockUser, name: 'Durand' }
-    mockPut.mockResolvedValueOnce({ status: 200, data: updatedUser })
-
+  // La requête et les notifications vivent dans le store (voir test/stores/auth.profile.store.test.js) ;
+  // la page ne porte que le contrat : quelles données elle transmet, et ce qu'elle fait du résultat.
+  it('saveProfile — transmet nom et email saisis au store', async () => {
     const wrapper = mountProfile()
     await flushPromises()
 
@@ -109,34 +108,22 @@ describe('ProfilePage', () => {
     await wrapper.findAll('form')[0].trigger('submit')
     await flushPromises()
 
-    expect(mockPut).toHaveBeenCalledWith('users/1', { name: 'Durand', email: 'dupont@test.fr' })
-    expect(mockNotify).toHaveBeenCalledWith('Profil mis à jour avec succès.', 'success')
     const authStore = useAuthStore()
-    expect(authStore.user.name).toBe('Durand')
+    expect(authStore.updateProfile).toHaveBeenCalledWith({ name: 'Durand', email: 'dupont@test.fr' })
   })
 
-  it('saveProfile — erreur API — notifie le message du serveur', async () => {
-    mockPut.mockResolvedValueOnce({ status: 400, data: { message: 'Email déjà utilisé.' } })
-
+  it('saveProfile — le bouton est désactivé pendant l\'enregistrement puis réactivé', async () => {
+    let release
     const wrapper = mountProfile()
     await flushPromises()
+    const authStore = useAuthStore()
+    authStore.updateProfile.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
 
     await wrapper.findAll('form')[0].trigger('submit')
+    expect(wrapper.findAll('form')[0].find('button[type="submit"]').attributes('disabled')).toBeDefined()
+    release(true)
     await flushPromises()
-
-    expect(mockNotify).toHaveBeenCalledWith('Email déjà utilisé.', 'error')
-  })
-
-  it('saveProfile — réponse absente — notifie erreur générique', async () => {
-    mockPut.mockResolvedValueOnce(undefined)
-
-    const wrapper = mountProfile()
-    await flushPromises()
-
-    await wrapper.findAll('form')[0].trigger('submit')
-    await flushPromises()
-
-    expect(mockNotify).toHaveBeenCalledWith('Erreur lors de la mise à jour.', 'error')
+    expect(wrapper.findAll('form')[0].find('button[type="submit"]').attributes('disabled')).toBeUndefined()
   })
 
   // ── changePassword() ───────────────────────────────────────────────────────
@@ -165,41 +152,48 @@ describe('ProfilePage', () => {
     expect(mockPut).not.toHaveBeenCalled()
   })
 
-  it('changePassword — succès — notifie success et réinitialise le formulaire', async () => {
-    mockPut.mockResolvedValueOnce({ status: 200, data: { message: 'Mot de passe modifié.' } })
-
-    const wrapper = mountProfile()
-    await flushPromises()
-
+  async function submitPasswordForm(wrapper) {
     await wrapper.find('#old-password').setValue('OldPassword1!')
     await wrapper.find('#new-password').setValue('NewPassword1!')
     await wrapper.find('#confirm-password').setValue('NewPassword1!')
     await wrapper.findAll('form')[1].trigger('submit')
     await flushPromises()
+  }
 
-    expect(mockPut).toHaveBeenCalledWith('users/1/change-password', {
-      id: 1,
+  it('changePassword — transmet ancien et nouveau mot de passe au store', async () => {
+    const wrapper = mountProfile()
+    await flushPromises()
+    useAuthStore().changePassword.mockResolvedValueOnce(true)
+
+    await submitPasswordForm(wrapper)
+
+    expect(useAuthStore().changePassword).toHaveBeenCalledWith({
       oldPassword: 'OldPassword1!',
       newPassword: 'NewPassword1!',
     })
-    expect(mockNotify).toHaveBeenCalledWith('Mot de passe modifié avec succès.', 'success')
-    expect(wrapper.find('#old-password').element.value).toBe('')
-    expect(wrapper.find('#new-password').element.value).toBe('')
   })
 
-  it('changePassword — erreur API — notifie le message du serveur', async () => {
-    mockPut.mockResolvedValueOnce({ status: 401, data: { message: 'Mot de passe incorrect.' } })
-
+  it('changePassword — succès — réinitialise le formulaire', async () => {
     const wrapper = mountProfile()
     await flushPromises()
+    useAuthStore().changePassword.mockResolvedValueOnce(true)
 
-    await wrapper.find('#old-password').setValue('WrongOldPass1!')
-    await wrapper.find('#new-password').setValue('NewPassword1!')
-    await wrapper.find('#confirm-password').setValue('NewPassword1!')
-    await wrapper.findAll('form')[1].trigger('submit')
+    await submitPasswordForm(wrapper)
+
+    expect(wrapper.find('#old-password').element.value).toBe('')
+    expect(wrapper.find('#new-password').element.value).toBe('')
+    expect(wrapper.find('#confirm-password').element.value).toBe('')
+  })
+
+  it('changePassword — échec — conserve la saisie pour permettre de corriger', async () => {
+    const wrapper = mountProfile()
     await flushPromises()
+    useAuthStore().changePassword.mockResolvedValueOnce(false)
 
-    expect(mockNotify).toHaveBeenCalledWith('Mot de passe incorrect.', 'error')
+    await submitPasswordForm(wrapper)
+
+    expect(wrapper.find('#old-password').element.value).toBe('OldPassword1!')
+    expect(wrapper.find('#new-password').element.value).toBe('NewPassword1!')
   })
 
   // ── Déconnexion ────────────────────────────────────────────────────────────

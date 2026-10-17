@@ -34,11 +34,12 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '@/helpers/api'
+import { useAuthStore } from '@/stores/auth'
 import { notif } from '@/helpers/notif'
 import AuthFormLayout from '@/components/AuthFormLayout.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const email = ref('')
 const submitting = ref(false)
 const errorMessage = ref('')
@@ -47,16 +48,13 @@ async function submit() {
   errorMessage.value = ''
   submitting.value = true
   try {
-    const resp = await api.post('users/forgot-password', { email: email.value.trim() })
-    if (!resp || resp.status !== 200) {
-      errorMessage.value = resp?.data?.message || 'Erreur lors de l\'envoi.'
+    const result = await authStore.requestPasswordReset(email.value.trim())
+    if (!result.ok) {
+      errorMessage.value = result.message
       return
     }
     notif.notify('Code envoyé ! Vérifiez votre email.', 'success')
     router.push({ path: '/reset-password', query: { email: email.value.trim() } })
-  } catch {
-    // Erreur réseau / serveur injoignable : sans ce message, l'utilisateur ne voyait aucun retour.
-    errorMessage.value = 'Impossible de contacter le serveur. Réessayez dans un instant.'
   } finally {
     submitting.value = false
   }

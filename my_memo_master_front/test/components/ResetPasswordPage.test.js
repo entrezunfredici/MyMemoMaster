@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import ResetPasswordPage from '@/pages/ResetPasswordPage.vue'
 
 const { mockPost, mockNotify, mockPush, route } = vi.hoisted(() => ({
@@ -10,10 +11,11 @@ const { mockPost, mockNotify, mockPush, route } = vi.hoisted(() => ({
 }))
 vi.mock('@/helpers/api', () => ({ api: { post: mockPost } }))
 vi.mock('@/helpers/notif', () => ({ notif: { notify: mockNotify } }))
+vi.mock('@/router', () => ({ default: { push: vi.fn() } }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mockPush }), useRoute: () => route }))
 
 const mountPage = () =>
-  mount(ResetPasswordPage, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' }, AuthFormLayout: { template: '<div><slot /></div>' } } } })
+  mount(ResetPasswordPage, { global: { plugins: [createPinia()], stubs: { RouterLink: { template: '<a><slot /></a>' }, AuthFormLayout: { template: '<div><slot /></div>' } } } })
 
 const fill = async (wrapper, code = '123456', password = 'Motdepasse1X') => {
   await wrapper.find('#rp-code').setValue(code)

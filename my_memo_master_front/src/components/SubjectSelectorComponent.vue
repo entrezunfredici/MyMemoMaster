@@ -49,8 +49,6 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useSubjectStore } from '@/stores/subjects'
-import { api } from '@/helpers/api'
-import { notif } from '@/helpers/notif'
 
 const props = defineProps({
   modelValue: { default: null },
@@ -90,16 +88,11 @@ async function create() {
   if (!name || creating.value) return
   creating.value = true
   try {
-    const resp = await api.post('subjects', { name })
-    if (!resp || resp.status !== 201) {
-      notif.notify(resp?.data?.message || 'Erreur lors de la création du sujet.', 'error')
-      return
-    }
+    const created = await subjectStore.createSubject(name)
+    if (!created) return
     await subjectStore.fetchSubjects()
-    emit('update:modelValue', resp.data.subjectId)
+    emit('update:modelValue', created.subjectId)
     cancel()
-  } catch {
-    notif.notify('Erreur lors de la création du sujet.', 'error')
   } finally {
     creating.value = false
   }

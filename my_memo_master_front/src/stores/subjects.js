@@ -39,6 +39,23 @@ export const useSubjectStore = defineStore('subjects', {
       }
     },
 
+    // Création à partir d'un simple nom (sélecteur de sujet) : renvoie le sujet créé, ou `false` après
+    // avoir notifié l'erreur. Ne passe pas par `this.subject` (état du formulaire d'édition) ni ne
+    // recharge la liste : l'appelant décide.
+    async createSubject(name) {
+      try {
+        const resp = await api.post('subjects', { name })
+        if (!resp || resp.status !== 201) {
+          notif.notify(resp?.data?.message || 'Erreur lors de la création du sujet.', 'error')
+          return false
+        }
+        return resp.data
+      } catch {
+        notif.notify('Erreur lors de la création du sujet.', 'error')
+        return false
+      }
+    },
+
     async addSubject() {
       try {
         const resp = await api.post('subjects', this.subject)

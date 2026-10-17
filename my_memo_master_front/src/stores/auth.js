@@ -187,6 +187,59 @@ export const useAuthStore = defineStore('auth', {
       return true
     },
 
+    // ── Pages « mot de passe oublié » / « nouveau mot de passe » / profil ──────────────────────────
+    // Ces trois pages appelaient `api` directement. Les actions ci-dessous portent la requête et renvoient
+    // un résultat exploitable ({ ok, message }) : ces pages affichent l'erreur dans le formulaire, pas dans
+    // une notification, donc le store ne notifie pas pour elles.
+    async requestPasswordReset(email) {
+      try {
+        const resp = await api.post('users/forgot-password', { email })
+        if (!resp || resp.status !== 200) {
+          return { ok: false, message: resp?.data?.message || "Erreur lors de l'envoi." }
+        }
+        return { ok: true }
+      } catch {
+        return { ok: false, message: 'Impossible de contacter le serveur. Réessayez dans un instant.' }
+      }
+    },
+
+    async resetPasswordWithCode({ email, code, newPassword }) {
+      try {
+        const resp = await api.post('users/reset-password', { email, code, newPassword })
+        if (!resp || resp.status !== 201) {
+          return { ok: false, message: resp?.data?.message || 'Code invalide ou expiré.' }
+        }
+        return { ok: true }
+      } catch {
+        return { ok: false, message: 'Impossible de contacter le serveur. Réessayez dans un instant.' }
+      }
+    },
+
+    async updateProfile({ name, email }) {
+      const resp = await api.put(`users/${this.user.userId}`, { name, email })
+      if (!resp || resp.status !== 200) {
+        notif.notify(resp?.data?.message || 'Erreur lors de la mise à jour.', 'error')
+        return false
+      }
+      this.user = { ...this.user, ...resp.data }
+      notif.notify('Profil mis à jour avec succès.', 'success')
+      return true
+    },
+
+    async changePassword({ oldPassword, newPassword }) {
+      const resp = await api.put(`users/${this.user.userId}/change-password`, {
+        id: this.user.userId,
+        oldPassword,
+        newPassword,
+      })
+      if (!resp || resp.status !== 200) {
+        notif.notify(resp?.data?.message || 'Erreur lors du changement de mot de passe.', 'error')
+        return false
+      }
+      notif.notify('Mot de passe modifié avec succès.', 'success')
+      return true
+    },
+
     async resendVerificationEmail(email) {
       const resp = await api.post('users/resend-verification', { email })
       if (!resp || resp.status !== 200) {
