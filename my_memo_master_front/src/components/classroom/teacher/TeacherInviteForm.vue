@@ -17,10 +17,12 @@
 // Invitation d'un étudiant par email. Extrait de pages/ClassroomEnseignantView.vue.
 import { reactive } from 'vue'
 import { useInvitationStore } from '@/stores/invitations'
+import { useClassGroupStore } from '@/stores/classGroups'
 
 const props = defineProps({ groupId: { type: Number, required: true } })
 
 const invitationStore = useInvitationStore()
+const classGroupStore = useClassGroupStore()
 const inviteForm = reactive({ targetEmail: '', role: 'student', message: '', error: false })
 
 async function submitInvite() {
@@ -33,6 +35,9 @@ async function submitInvite() {
   if (ok) {
     inviteForm.targetEmail = ''
     await invitationStore.fetchByGroup(props.groupId)
+    // Un compte existant est ajouté DIRECTEMENT au groupe (pas d'invitation en attente) : sans rechargement de la
+    // fiche du groupe, « Membres (n) » restait périmé jusqu'au rechargement de la page.
+    await classGroupStore.fetchGroupById(props.groupId)
   }
 }
 </script>

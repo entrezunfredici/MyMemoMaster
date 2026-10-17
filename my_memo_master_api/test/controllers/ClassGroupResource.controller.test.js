@@ -130,6 +130,49 @@ describe('ClassGroupResource Controller', () => {
       expect(service.create).toHaveBeenCalledTimes(1)
     })
 
+    it('201 — les champs du fichier téléversé sont transmis au service (et non jetés)', async () => {
+      service.create.mockResolvedValue(mockResource)
+      const file = { fileKey: 'uploads/1/1700000000-abc.pdf', mimeType: 'application/pdf', originalName: 'cours.pdf', fileSize: 2048 }
+
+      const res = await request(app)
+        .post(`${BASE}/class-groups/1/resources`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ ...validBody, ...file })
+
+      expect(res.status).toBe(201)
+      expect(service.create).toHaveBeenCalledWith('1', 1, expect.objectContaining(file))
+    })
+
+    it('400 — la clé de fichier désigne le téléversement d’un AUTRE utilisateur', async () => {
+      const res = await request(app)
+        .post(`${BASE}/class-groups/1/resources`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ ...validBody, fileKey: 'uploads/2/1700000000-abc.pdf', mimeType: 'application/pdf', originalName: 'x.pdf', fileSize: 1 })
+
+      expect(res.status).toBe(400)
+      expect(res.body.message).toMatch(/téléversé par vous/)
+      expect(service.create).not.toHaveBeenCalled()
+    })
+
+    it('400 — la clé de fichier tente de sortir du dossier (..)', async () => {
+      const res = await request(app)
+        .post(`${BASE}/class-groups/1/resources`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ ...validBody, fileKey: 'uploads/1/../2/secret.pdf' })
+
+      expect(res.status).toBe(400)
+      expect(service.create).not.toHaveBeenCalled()
+    })
+
+    it('201 — sans fichier (lien seul) : aucune clé exigée', async () => {
+      service.create.mockResolvedValue(mockResource)
+      const res = await request(app)
+        .post(`${BASE}/class-groups/1/resources`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ ...validBody, url: 'https://exemple.fr/doc' })
+      expect(res.status).toBe(201)
+    })
+
     it('400 — title manquant', async () => {
       const res = await request(app)
         .post(`${BASE}/class-groups/1/resources`)
@@ -189,6 +232,26 @@ describe('ClassGroupResource Controller', () => {
   })
 
   // ── PUT /class-groups/:id/resources/:resourceId ───────────────────────────────
+
+  describe('PUT — clé de fichier fournie par le client', () => {
+    it('400 — la clé désigne le téléversement d’un autre utilisateur', async () => {
+      const res = await request(app)
+        .put(`${BASE}/class-groups/1/resources/5`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ fileKey: 'uploads/2/autre.pdf' })
+      expect(res.status).toBe(400)
+      expect(service.update).not.toHaveBeenCalled()
+    })
+
+    it('200 — la clé de l’utilisateur lui-même est acceptée', async () => {
+      service.update.mockResolvedValue(mockResource)
+      const res = await request(app)
+        .put(`${BASE}/class-groups/1/resources/5`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ fileKey: 'uploads/1/mien.pdf' })
+      expect(res.status).toBe(200)
+    })
+  })
 
   describe('PUT /class-groups/:id/resources/:resourceId', () => {
     it('200 — ressource mise à jour', async () => {

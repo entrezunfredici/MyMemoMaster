@@ -4,12 +4,14 @@
     <div class="flex items-start justify-between gap-4 mb-4">
       <h5 class="text-2xl font-semibold tracking-tight text-heading leading-8">{{ title }}</h5>
       <div class="flex gap-2 flex-shrink-0">
+        <!-- RGAA 6.1 / 11.9 : le nom accessible cite l'élément (« Modifier Algèbre »), sinon une liste de cartes
+         annonce N fois « Modifier » sans dire lequel. -->
         <button
           v-if="onEdit"
           @click="onEdit"
           class="hover:bg-gray-100 text-gray-600 font-bold py-1 px-2 rounded transition duration-200 border border-gray-300 hover:scale-110"
-          aria-label="Modifier"
-          title="Modifier"
+          :aria-label="`Modifier ${title}`"
+          :title="`Modifier ${title}`"
         >
           ✎
         </button>
@@ -17,8 +19,8 @@
           v-if="onDelete"
           @click="onDelete"
           class="hover:bg-red-50 text-gray-600 font-bold py-1 px-2 rounded transition duration-200 border border-gray-300 hover:scale-110"
-          aria-label="Supprimer"
-          title="Supprimer"
+          :aria-label="`Supprimer ${title}`"
+          :title="`Supprimer ${title}`"
         >
           ✕
         </button>

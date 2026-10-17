@@ -51,7 +51,7 @@ const stores = () => ({
   submission: useClassGroupSubmissionStore(),
   test: useTestStore(),
 })
-const cards = (w) => w.findAll('[role="button"]').filter((e) => /MP2I|L3|Autre/.test(e.text()) && e.text().includes('membres'))
+const cards = (w) => w.findAll('[role="button"]').filter((e) => /MP2I|L3|Autre/.test(e.text()) && e.text().includes('membre'))
 
 beforeEach(() => {
   vi.clearAllMocks()

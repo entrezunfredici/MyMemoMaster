@@ -1,9 +1,11 @@
+import { parseCalendarDate } from '@/helpers/dates'
+
 // Formatage et libellés des vues « Classe » (enseignant) : fonctions pures, extraites de
 // pages/ClassroomEnseignantView.vue sans changement de comportement.
 
 export function formatDate(value) {
   if (!value) return ''
-  return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return parseCalendarDate(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 /** Date et heure, pour les journaux et les listes d'administration ; « — » quand la valeur est absente. */

@@ -1,5 +1,6 @@
 const ClassGroupResourceService = require('../services/ClassGroupResource.service')
 const logger = require('../helpers/logger')
+const { isUserUploadKey } = require('../helpers/storageKeys')
 
 exports.findAll = async (req, res) => {
   try {
@@ -14,8 +15,17 @@ exports.findAll = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { title, type, description, url } = req.body
-    const result = await ClassGroupResourceService.create(req.params.id, req.user.id, { title, type, description, url })
+    // BUG CORRIGÉ: seuls title/type/description/url étaient retenus, les champs du fichier téléversé (fileKey,
+    // mimeType, originalName, fileSize) — pourtant validés — étaient jetés : toute ressource sortait avec des
+    // champs de fichier à null, donc sans bouton « Ouvrir » côté interface.
+    const { title, type, description, url, fileKey, mimeType, originalName, fileSize } = req.body
+    // La clé vient du client : elle doit désigner un fichier que CET utilisateur a téléversé, pas celui d'autrui.
+    if (fileKey && !isUserUploadKey(fileKey, req.user.id)) {
+      return res.status(400).json({ message: 'Fichier invalide : il doit avoir été téléversé par vous.' })
+    }
+    const result = await ClassGroupResourceService.create(req.params.id, req.user.id, {
+      title, type, description, url, fileKey, mimeType, originalName, fileSize
+    })
     if (result === false) return res.status(403).json({ message: 'Accès refusé. Seuls les enseignants et admins peuvent partager des ressources.' })
     res.status(201).json({ message: 'Ressource partagée.', data: result })
   } catch (error) {
@@ -26,6 +36,9 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    if (req.body.fileKey && !isUserUploadKey(req.body.fileKey, req.user.id)) {
+      return res.status(400).json({ message: 'Fichier invalide : il doit avoir été téléversé par vous.' })
+    }
     const result = await ClassGroupResourceService.update(req.params.id, req.params.resourceId, req.user.id, req.body)
     if (result === false) return res.status(403).json({ message: 'Accès refusé.' })
     if (result === null) return res.status(404).json({ message: 'Ressource introuvable.' })

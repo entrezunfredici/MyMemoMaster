@@ -20,7 +20,7 @@
       <div v-if="ev.occurrences?.length" class="mt-2 flex flex-wrap gap-1">
         <span v-for="occ in ev.occurrences.slice(0, 5)" :key="occ.id"
           class="rounded-full bg-gray px-2 py-0.5 text-xs text-dark/70">
-          {{ formatDateTime(occ.date) }} {{ occ.startTime?.slice(0,5) }}
+          {{ formatDate(occ.date) }} {{ occ.startTime?.slice(0,5) }}
         </span>
         <span v-if="ev.occurrences.length > 5" class="text-xs text-dark/40">+{{ ev.occurrences.length - 5 }}</span>
       </div>
@@ -31,7 +31,7 @@
 <script setup>
 // Créneaux déjà planifiés pour le groupe (suppression incluse). Extrait de pages/ClassroomEtablissementView.vue.
 import { useCalendarEventStore } from '@/stores/calendarEvents'
-import { formatDateTime } from '@/helpers/classroomFormat'
+import { formatDate } from '@/helpers/classroomFormat'
 
 const props = defineProps({
   groupId: { type: Number, required: true },

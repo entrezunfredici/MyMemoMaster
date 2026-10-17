@@ -60,7 +60,8 @@ describe('TeacherGroupPicker', () => {
     const text = wrapper.text()
     expect(text).toContain('MP2I A')
     expect(text).toContain('2 membres')
-    expect(text).toContain('0 membres') // groupe sans liste de membres
+    expect(text).toContain('0 membre') // accord français : 0 au singulier
+    expect(text).not.toContain('0 membres')
   })
 
   it('la carte sélectionnée est mise en évidence', () => {
@@ -78,6 +79,12 @@ describe('TeacherGroupPicker', () => {
     await card.trigger('keydown', { key: 'Enter' })
     await card.trigger('keydown', { key: ' ' })
     expect(wrapper.emitted('select')).toEqual([[2], [2], [2]])
+  })
+
+  it('« 1 membre » au singulier', () => {
+    const { wrapper } = mountPanel(TeacherGroupPicker, { props: { groups: [{ id: 3, name: 'Solo', level: 'L1', members: [{}] }], selectedId: null } })
+    expect(wrapper.text()).toContain('1 membre')
+    expect(wrapper.text()).not.toContain('1 membres')
   })
 
   it('aucun groupe : message', () => {
@@ -581,6 +588,24 @@ describe('TeacherInviteForm', () => {
     await btn(wrapper, "Envoyer l'invitation").trigger('click')
     expect(wrapper.text()).toContain("L'email est requis.")
     expect(useInvitationStore().invite).not.toHaveBeenCalled()
+  })
+
+  it('succès : la fiche du groupe est rechargée (un compte existant est ajouté DIRECTEMENT aux membres)', async () => {
+    const { wrapper } = mountForm()
+    useInvitationStore().invite.mockResolvedValue(true)
+    await wrapper.find('input[aria-label="Email"]').setValue('existant@x.fr')
+    await btn(wrapper, "Envoyer l'invitation").trigger('click')
+    await flushPromises()
+    expect(useClassGroupStore().fetchGroupById).toHaveBeenCalledWith(GROUP_ID)
+  })
+
+  it('échec : la fiche du groupe n’est pas rechargée', async () => {
+    const { wrapper } = mountForm()
+    useInvitationStore().invite.mockResolvedValue(false)
+    await wrapper.find('input[aria-label="Email"]').setValue('a@x.fr')
+    await btn(wrapper, "Envoyer l'invitation").trigger('click')
+    await flushPromises()
+    expect(useClassGroupStore().fetchGroupById).not.toHaveBeenCalled()
   })
 
   it('succès : invitation étudiante, message de confirmation, champ vidé, liste rechargée', async () => {

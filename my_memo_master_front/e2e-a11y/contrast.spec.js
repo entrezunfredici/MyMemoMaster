@@ -11,7 +11,7 @@
  * vers /auth faute de session).
  *
  * ATTENTION : « la page n'appelle pas l'API » ne se lit pas sur la page seule.
- * /tutorials n'appelle rien lui-même (ses données sont codées en dur) mais
+ * /tutorials charge ses données par un store, et en plus
  * monte SubjectFilterComponent, qui fait `subjectStore.fetchSubjects()` dans
  * son `onMounted`. Le critère porte sur l'ARBRE DE COMPOSANTS, pas sur le
  * fichier de la page. D'où l'attente de disparition des toasts ci-dessous.

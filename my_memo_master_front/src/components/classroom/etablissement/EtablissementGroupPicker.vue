@@ -47,7 +47,7 @@
           </div>
           <button aria-label="Supprimer le groupe" @click.stop="confirmDeleteGroup(g)" class="text-secondary hover:text-secondary/70 text-lg leading-none">×</button>
         </div>
-        <p class="mt-2 text-xs text-dark/60">{{ g.members?.length ?? 0 }} membres</p>
+        <p class="mt-2 text-xs text-dark/60">{{ g.members?.length ?? 0 }} {{ plural(g.members?.length ?? 0, 'membre') }}</p>
       </div>
       <p v-if="groups.length === 0" class="text-sm text-dark/60">Aucun groupe. Créez-en un.</p>
     </div>
@@ -57,6 +57,7 @@
 <script setup>
 // Bandeau des groupes classes : liste (sélection), création et suppression.
 // Extrait de pages/ClassroomEtablissementView.vue ; la page décide de la sélection après une suppression.
+import { plural } from '@/helpers/plural'
 import { ref, reactive } from 'vue'
 import { useClassGroupStore } from '@/stores/classGroups'
 

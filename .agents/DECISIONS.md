@@ -5192,3 +5192,18 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : la page ne filtre rien localement ; sujet et « tips » sont des paramètres de l'URL, relus pour interroger l'API (une seule clé texte surveillée, pour ne recharger que sur un vrai changement) ; 100 tutoriels par page, sans pagination d'interface (le volume attendu est faible).
 **Alternative écartée** : tout charger puis filtrer en local (inutile avec un filtrage serveur disponible, et la pagination de l'API ne serait plus respectée) ; garder l'état des filtres dans le composant (perdu au rechargement, non partageable par lien).
 **Conséquences** : une URL de tutoriels filtrés se partage ; si le catalogue dépasse 100 entrées, il faudra ajouter une pagination d'interface (le store transmet déjà `page`).
+
+
+## 2026-10-17 — Bordure par défaut des champs : spécificité (0,0,1) via `input:where([type="text"])`
+
+**Contexte** : la règle globale des champs texte était invalide (variables de canaux RGB sans `rgb()`), donc sans effet, et par ailleurs trop spécifique (0,1,1) pour laisser passer les classes utilitaires.
+**Décision** : bordure par défaut `2px solid var(--gray-500)` avec `input:where([type="text"]), textarea` ; focus en contour + bordure `rgb(var(--primary))`.
+**Alternative écartée** : `:where(input[type="text"], textarea)` (spécificité 0) — **testé et rejeté** : à égalité avec le reset de Tailwind (`*`), la règle arrivée avant lui dans la feuille perdait ; `!important` (rendrait les classes inopérantes) ; remplacer la règle globale par une classe sur chaque champ (des dizaines de fichiers pour un défaut de base).
+**Conséquences** : tout champ texte sans bordure explicite en reçoit une conforme (3:1) ; les composants et classes (`.form-input`, `border-…`) gardent la main ; le comportement est verrouillé par des tests de styles calculés (un navigateur est indispensable : ni jsdom ni l'audit statique ne calculent les styles).
+
+## 2026-10-17 — Une clé de fichier reçue du client doit appartenir à l'utilisateur
+
+**Contexte** : en transmettant enfin `fileKey` à la création d'une ressource, on stocke une valeur choisie par le client, plus tard convertie en lien de téléchargement signé.
+**Décision** : `isUserUploadKey(fileKey, userId)` (préfixe `uploads/<userId>/`, segments sûrs) exigée à la création et à la modification ; sinon 400.
+**Alternative écartée** : faire confiance à la clé (un enseignant pourrait publier le fichier d'un autre utilisateur, ou sortir du dossier avec `..`).
+**Conséquences** : le contrat front/API ne change pas (la clé vient de `/storage/upload`) ; seules les clés qui ne sont pas les siennes sont refusées.

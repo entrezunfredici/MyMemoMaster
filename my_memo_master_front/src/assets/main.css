@@ -20,23 +20,37 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 input[type="checkbox"] {
-  accent-color: var(--primary);
-  color: var(--primary);
+  /* --primary est un triplet de canaux (« 30 59 161 »), pas une couleur : il faut l'envelopper dans rgb(). */
+  accent-color: rgb(var(--primary));
+  color: rgb(var(--primary));
   scale: 1.3;
 }
 
 input[type="text"],
 textarea {
   padding: 0.75rem;
-  border: 2px solid var(--gray);
+}
+
+/* BUG CORRIGÉ: `border: 2px solid var(--gray)` était INVALIDE (--gray est un triplet de canaux RGB, pas une
+   couleur) : les champs texte n'avaient aucune bordure (0px), et la règle l'emportait sur les classes
+   utilitaires (border-gray-500…). Bordure par défaut à 3:1 minimum (RGAA 3.2, limite d'un champ).
+   SPÉCIFICITÉ CHOISIE: `input:where([type="text"])` et `textarea` valent (0,0,1) : au-dessus du reset de
+   Tailwind (`*`, 0,0,0 — un `:where()` seul, à 0, perdait contre lui) mais sous toute classe (0,1,0) : les
+   classes utilitaires et les composants (.form-input…) restent prioritaires. */
+input:where([type="text"]),
+textarea {
+  border: 2px solid var(--gray-500);
 }
 
 textarea {
   height: 100px;
 }
 
+/* Focus visible (RGAA 10.7) : la règle d'origine supprimait l'outline et posait une bordure invalide
+   (var(--primary) sans rgb()), donc plus aucun indicateur. Bordure ET contour de la couleur principale. */
 input[type="text"]:focus,
 textarea:focus {
-  outline: none;
-  border: 2px solid var(--primary);
+  outline: 2px solid rgb(var(--primary));
+  outline-offset: 1px;
+  border: 2px solid rgb(var(--primary));
 }

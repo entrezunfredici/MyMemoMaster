@@ -205,7 +205,8 @@ describe('EtablissementGroupPicker', () => {
     expect(text).toContain('MP2I A')
     expect(text).toContain('MP2I-A')
     expect(text).toContain('2 membres')
-    expect(text).toContain('0 membres')
+    expect(text).toContain('0 membre')
+    expect(text).not.toContain('0 membres')
   })
 
   it('aucun groupe : invite à en créer', () => {
@@ -423,6 +424,13 @@ describe('EtablissementEventList', () => {
     expect(text).toContain('0 séance(s)')
     expect(text).toContain('+2')
     expect(w.findAll('.rounded-full.bg-gray')).toHaveLength(5)
+  })
+
+  it('les séances affichent le JOUR seul, sans heure parasite ni décalage de fuseau', () => {
+    const w = mountList([{ id: 7, name: 'Maths', type: 'cours', occurrences: [{ id: 1, date: '2026-11-20', startTime: '10:00:00' }] }])
+    const text = w.text().replace(/\s+/g, ' ')
+    expect(text).toMatch(/20 nov\.? 2026 10:00/)
+    expect(text).not.toMatch(/01:00/)
   })
 
   it('suppression : supprime puis recharge les créneaux du groupe', async () => {

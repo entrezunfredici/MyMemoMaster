@@ -1,3 +1,5 @@
+import { parseCalendarDate } from '@/helpers/dates'
+
 // Logique pure du quiz d'un exercice (page de détail) : état de réponse de chaque question, formatage de la
 // correction et de la note. Extrait de pages/ExerciseDetailPage.vue sans changement de comportement.
 
@@ -155,5 +157,5 @@ export function formatResultDate(isoDate) {
 /** Date d'échéance courte. */
 export function formatDeadlineDate(dueDate) {
   if (!dueDate) return '—'
-  return new Date(dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return parseCalendarDate(dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
