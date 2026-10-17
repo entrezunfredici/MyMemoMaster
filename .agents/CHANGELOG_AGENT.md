@@ -13235,3 +13235,27 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 - `SubjectsPage` écrit « 0 contenus » (règle `!== 1`) ; l'usage français serait « 0 contenu ».
 - `TutorialsPage` affiche des données codées en dur (page provisoire).
 **Tests** : front 98 fichiers verts (+19), ESLint, audits RGAA / couleurs / Tailwind, build.
+
+
+## [2026-10-17] [ADD] Sécurité dans le CI : SAST, secrets, DAST + en-têtes de sécurité du front (branche `dev_devops_security`)
+
+**Contexte** : le CI ne couvrait que `npm audit` (OWASP A06). Aucune analyse du code, des secrets ni de l'application en fonctionnement.
+**Fait** :
+- `.github/workflows/security.yml` (déclenché sur main / staging / dev / `*devops*`, sur pull request, chaque lundi 05:17 UTC et à la demande) :
+  - **SAST — CodeQL** (`javascript-typescript` + `actions`, suite `security-extended`), configuration `.github/codeql/codeql-config.yml` (tests, mocks, e2e, `dist`, `node_modules` exclus). Résultats : onglet Security › Code scanning.
+  - **Secrets — gitleaks v8.30.1** sur tout l'historique (`fetch-depth: 0`, `--redact`). Constat au premier passage : 0 fuite sur 907 commits.
+  - **DAST — OWASP ZAP 2.17.0** sur la pile Docker (`.env.ci`) : *baseline* de l'application web via Traefik, puis scan passif (`-S`) de l'API depuis sa spécification OpenAPI générée à la volée (121 chemins). Seules les règles listées FAIL dans `.zap/rules.tsv` (CSP, anti-clickjacking, nosniff, fuite de version serveur, `X-Powered-By`, Permissions-Policy, drapeaux de cookies) font échouer le job ; le reste est un avertissement lisible dans le rapport HTML (artefact `zap-reports`).
+- **Correction trouvée par le DAST (A05)** : l'nginx du front ne posait aucun en-tête de sécurité. `my_memo_master_front/nginx-security-headers.conf` (inclus dans chaque `location`, copié par le `Dockerfile`) ajoute CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS ; `server_tokens off` masque la version de nginx.
+**Vérifié** : 0 violation de CSP en chargeant 7 pages dans Chromium sur l'image nginx ; ZAP : 5 FAIL avant correction → 0 FAIL après (le contrôle échoue bien sur l'ancienne image).
+**Bilan du premier passage CodeQL (50 alertes ouvertes)** et traitement :
+- *Corrigé* — `notify_ci.yml` (**critique**, `actions/code-injection`) : `BRANCH_NAME=${{ github.event.workflow_run.head_branch }}` insérait un nom de branche, choisi par celui qui pousse, dans le shell d'un job qui détient `DISCORD_LOG` ; le nom passe désormais par l'environnement et le JSON est construit par `jq`. `permissions: {}` ajouté (et `contents: read` à `uptime.yml`).
+- *Corrigé* — `sanitize.middleware.js` (code de la session précédente) : expressions quadratiques (ReDoS) sur de longues suites d'« = », d'espaces, de `<!--` ou `<?` non fermés — le middleware s'applique à tous les corps, jusqu'à 100 Mo pour les cartes mentales ; remplacées par des formes sans ambiguïté + recherche linéaire par `indexOf`. Clé `__proto__` : `Object.defineProperty` au lieu d'une affectation (injection de propriété).
+- *Corrigé* — `formulaNotation.js` : `\s*` autour de groupes paresseux (ReDoS ; l'ancienne expression ne terminait pas en 200 s sur 100 000 espaces).
+- *Corrigé* — journaux (`js/log-injection`, 20 alertes) : en production le format JSON échappait déjà les sauts de ligne ; le format texte (dev) les neutralise désormais dans `helpers/logger.js`. CodeQL ne voit pas ce correctif central et peut garder ces alertes ouvertes : à fermer comme « utilisé dans les tests / corrigé ailleurs ».
+- *Corrigé* (trouvé par la CI, pas par CodeQL) — `ForgotPasswordPage` / `ResetPasswordPage` : pas de `catch` → une erreur réseau devenait une exception non gérée sans message ; un message s'affiche désormais.
+- *Acceptées, à fermer dans l'onglet Security avec justification* : `/api/v1/health` sans rate limiting (volontaire, sonde K8s — voir `app.js`) ; `logout` / `VerifyEmailPage` « user-controlled-bypass » (le jeton fourni par l'utilisateur ne peut révoquer que sa propre session ; le lien d'e-mail est le mode d'emploi prévu) ; `cd.yml` `code-injection` / `untrusted-checkout` (le déclencheur est filtré sur `main`, `staging`, `dev` : `head_branch` ne peut pas être hostile) ; `actions/unpinned-tag` (actions référencées par tag de version et non par SHA : chantier distinct, à traiter avec Dependabot).
+**Hypothèses / limites** :
+- La CSP autorise `connect-src https: wss:` car l'URL de l'API est injectée à l'exécution (`window.__APP_CONFIG__`) et varie par environnement ; elle ne peut pas être figée dans nginx. `COOP`/`COEP` sont volontairement absents (`window.open()` dans les vues classe).
+- Les pages authentifiées n'ont pas été rejouées sous CSP en local (pas de session) ; le job `e2e_and_load` (main / staging) les parcourt via cette image nginx.
+- Le scan de l'API est non authentifié : il vérifie en-têtes, erreurs et configuration, pas la logique d'autorisation (couverte par les tests d'intégration).
+**Dette / à faire côté GitHub (réglages du dépôt, non modifiables par le code)** : activer *Secret scanning* + *Push protection* et *Dependabot security updates* (désactivés aujourd'hui, gratuits sur dépôt public) ; exiger le statut `Security` dans la protection de branche si l'on veut bloquer les fusions.

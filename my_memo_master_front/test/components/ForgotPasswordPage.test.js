@@ -75,12 +75,12 @@ describe('ForgotPasswordPage', () => {
     expect(button.attributes('disabled')).toBeUndefined()
   })
 
-  it('le bouton se réactive aussi après une exception réseau (finally)', async () => {
+  it('erreur réseau - message visible, pas de redirection, bouton réactivé', async () => {
     mockPost.mockRejectedValueOnce(new Error('KO'))
     const wrapper = mountPage()
-    await wrapper.find('#fp-email').setValue('a@b.fr')
-    await wrapper.find('form').trigger('submit').catch(() => {})
-    await flushPromises().catch(() => {})
+    await submit(wrapper, 'a@b.fr')
+    expect(wrapper.find('p.text-red-600').text()).toContain('Impossible de contacter le serveur')
+    expect(mockPush).not.toHaveBeenCalled()
     expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeUndefined()
   })
 })

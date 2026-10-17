@@ -81,6 +81,15 @@ describe('ResetPasswordPage', () => {
     expect(wrapper.find('p.text-red-600').text()).toBe('Code invalide ou expiré.')
   })
 
+  it('erreur réseau - message visible, pas de redirection, bouton réactivé', async () => {
+    mockPost.mockRejectedValueOnce(new Error('KO'))
+    const wrapper = mountPage()
+    await fill(wrapper)
+    expect(wrapper.find('p.text-red-600').text()).toContain('Impossible de contacter le serveur')
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeUndefined()
+  })
+
   it('bouton désactivé pendant l’envoi', async () => {
     let release
     mockPost.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
