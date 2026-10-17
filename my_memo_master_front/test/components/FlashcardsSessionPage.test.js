@@ -458,23 +458,37 @@ describe('FlashcardsSessionPage', () => {
 
   // ── Quitter la session ────────────────────────────────────────────────────
 
-  it('bouton Retour + confirmation — redirige vers /flashcards', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('« Retour » ouvre la modale commune (jamais window.confirm) ; rien ne part avant la réponse', async () => {
+    const nativeConfirm = vi.spyOn(window, 'confirm')
     const wrapper = mountSession()
     await flushPromises()
 
     await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+
+    expect(nativeConfirm).not.toHaveBeenCalled()
+    const dialog = wrapper.find('[role="dialog"]')
+    expect(dialog.attributes('aria-label')).toBe('Quitter la session')
+    expect(dialog.text()).toContain('la session en cours sera perdue')
+    expect(mockRouterPush).not.toHaveBeenCalled()
+  })
+
+  it('bouton Retour + confirmation — redirige vers /flashcards', async () => {
+        const wrapper = mountSession()
+    await flushPromises()
+
+    await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await wrapper.find('.btn-modal-danger').trigger('click')
     await flushPromises()
 
     expect(mockRouterPush).toHaveBeenCalledWith('/flashcards')
   })
 
   it('bouton Retour + annulation — reste sur la page', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
-    const wrapper = mountSession()
+        const wrapper = mountSession()
     await flushPromises()
 
     await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await wrapper.find('.btn-modal-cancel').trigger('click')
 
     expect(mockRouterPush).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Quelle est la capitale de la France ?')
@@ -485,8 +499,7 @@ describe('FlashcardsSessionPage', () => {
   // seule une session menée à son terme comptait. Revenu sur demande explicite
   // de l'utilisateur : le temps déjà passé doit être journalisé.
   it('quitte après avoir corrigé au moins une carte — journalise une session partielle (nb de cartes réellement corrigées, pas le total dû)', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const wrapper = mountSession([mockCard, mockCard2])
+        const wrapper = mountSession([mockCard, mockCard2])
     await flushPromises()
 
     const cardStore = useLeitnerCardStore()
@@ -502,6 +515,7 @@ describe('FlashcardsSessionPage', () => {
     await flushPromises()
 
     await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await wrapper.find('.btn-modal-danger').trigger('click')
     await flushPromises()
 
     expect(reviewSessionStore.logSession).toHaveBeenCalledWith(1, 1, expect.any(Number), false)
@@ -509,13 +523,13 @@ describe('FlashcardsSessionPage', () => {
   })
 
   it('quitte sans avoir corrigé aucune carte — ne journalise rien (rien à mesurer)', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const wrapper = mountSession([mockCard, mockCard2])
+        const wrapper = mountSession([mockCard, mockCard2])
     await flushPromises()
 
     const reviewSessionStore = useLeitnerReviewSessionStore()
 
     await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await wrapper.find('.btn-modal-danger').trigger('click')
     await flushPromises()
 
     expect(reviewSessionStore.logSession).not.toHaveBeenCalled()
@@ -523,8 +537,7 @@ describe('FlashcardsSessionPage', () => {
   })
 
   it('quitte + annule la confirmation — ne journalise rien (session pas réellement quittée)', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
-    const wrapper = mountSession([mockCard, mockCard2])
+        const wrapper = mountSession([mockCard, mockCard2])
     await flushPromises()
 
     const cardStore = useLeitnerCardStore()
@@ -539,6 +552,7 @@ describe('FlashcardsSessionPage', () => {
     await flushPromises()
 
     await wrapper.findAll('button').find(b => b.text().includes('Retour'))?.trigger('click')
+    await wrapper.find('.btn-modal-cancel').trigger('click')
     await flushPromises()
 
     expect(reviewSessionStore.logSession).not.toHaveBeenCalled()

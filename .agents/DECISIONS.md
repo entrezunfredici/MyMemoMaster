@@ -5207,3 +5207,18 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `isUserUploadKey(fileKey, userId)` (préfixe `uploads/<userId>/`, segments sûrs) exigée à la création et à la modification ; sinon 400.
 **Alternative écartée** : faire confiance à la clé (un enseignant pourrait publier le fichier d'un autre utilisateur, ou sortir du dossier avec `..`).
 **Conséquences** : le contrat front/API ne change pas (la clé vient de `/storage/upload`) ; seules les clés qui ne sont pas les siennes sont refusées.
+
+
+## 2026-10-17 — Fichier téléversé puis enregistrement refusé : nettoyage côté front
+
+**Contexte** : remise et ressource se font en deux appels (`storage/upload`, puis création) ; un refus du second laissait un fichier orphelin sur le stockage (réel, y compris en dev).
+**Décision** : le store supprime lui-même le fichier téléversé quand l'étape suivante échoue (réponse non conforme ou exception), via la route existante `DELETE storage/file` ; échec du nettoyage ignoré.
+**Alternative écartée** : inverser l'ordre (impossible : l'enregistrement a besoin de la clé du fichier) ; nettoyage côté API (il faudrait que l'API sache quels fichiers sont « en attente » — table ou tâche de balayage pour un cas rare) ; ne rien faire.
+**Conséquences** : pas de nouvelle route ni de dépendance ; si le navigateur est fermé entre les deux appels, un orphelin peut subsister (un balayage périodique des clés non référencées serait la vraie parade — non fait).
+
+## 2026-10-17 — Zone cliquable qui contient un contrôle : deux boutons frères
+
+**Contexte** : des lignes `role="button"` contenaient un bouton « Supprimer » ou un détail interactif (RGAA 7.1 : contrôle interactif imbriqué, annonce incohérente, focus piégé).
+**Décision** : la zone de sélection/dépliage est un vrai `<button>` (contenu en `span`), les actions secondaires sont des frères, jamais des descendants ; le détail déplié vit hors du bouton.
+**Alternative écartée** : garder `role="button"` en bloquant la propagation (`@click.stop`) — corrige le clic, pas l'arbre d'accessibilité.
+**Conséquences** : clavier natif, `aria-expanded`/`aria-pressed` portés par le bouton ; les cartes simples sans contrôle interne (`TeacherGroupPicker`, `StudentGroupPicker`) gardent `role="button"`.

@@ -7,8 +7,10 @@ import { notif } from '@/helpers/notif'
  * mentale liée), ses boîtes, ses cartes avec leur réponse de référence, et les suppressions.
  *
  * @param {number} systemId
+ * @param {(title: string, message: string, action: Function) => void} askConfirm - demande de confirmation
+ *   (modale commune, voir useConfirmAction) : la suppression ne part qu'après « Confirmer »
  */
-export function useFlashcardsCards(systemId) {
+export function useFlashcardsCards(systemId, askConfirm) {
   const loading = ref(true)
   const systemName = ref('')
   const allCards = ref([])
@@ -72,9 +74,10 @@ export function useFlashcardsCards(systemId) {
     loading.value = false
   }
 
-  const deleteCard = async (card) => {
-    if (!confirm(`Supprimer cette carte ?\n"${card.question?.statement}"`)) return
+  const deleteCard = (card) =>
+    askConfirm('Supprimer la carte', `Supprimer la carte « ${card.question?.statement} » ? Cette action est irréversible.`, () => removeCard(card))
 
+  const removeCard = async (card) => {
     const resp = await flashcardsApi.deleteCard(card.idCard)
     if (!resp || resp.status !== 200) {
       notif.notify(resp?.data?.message || 'Erreur lors de la suppression.', 'error')
@@ -85,8 +88,14 @@ export function useFlashcardsCards(systemId) {
     allCards.value = allCards.value.filter((c) => c.idCard !== card.idCard)
   }
 
-  const deleteBox = async (box) => {
-    if (!confirm(`Supprimer la boîte niveau ${box.level} ? Les cartes qu'elle contient resteront mais n'auront plus de boîte.`)) return
+  const deleteBox = (box) =>
+    askConfirm(
+      'Supprimer la boîte',
+      `Supprimer la boîte niveau ${box.level} ? Les cartes qu'elle contient resteront mais n'auront plus de boîte.`,
+      () => removeBox(box),
+    )
+
+  const removeBox = async (box) => {
     const resp = await flashcardsApi.deleteBox(box.idBox)
     if (!resp || resp.status !== 200) {
       notif.notify(resp?.data?.message || 'Erreur lors de la suppression.', 'error')

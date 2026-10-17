@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
+import { discardUploadedFile } from '@/helpers/storageCleanup'
 
 export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions', {
   state: () => ({
@@ -68,6 +69,7 @@ export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions',
 
     async uploadAndSubmit(groupId, sectionId, file) {
       this.uploading = true
+      let uploadedKey = null
       try {
         const form = new FormData()
         form.append('file', file)
@@ -77,6 +79,7 @@ export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions',
           return false
         }
         const { url, key, mimetype, size } = uploadResp.data
+        uploadedKey = key
         const submitResp = await api.post(`class-groups/${groupId}/sections/${sectionId}/submissions`, {
           url,
           fileKey: key,
@@ -85,6 +88,7 @@ export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions',
           fileSize: size,
         })
         if (submitResp?.status !== 200) {
+          await discardUploadedFile(uploadedKey)
           notif.notify(submitResp?.data?.message || 'Erreur lors de la soumission.', 'error')
           return false
         }
@@ -92,6 +96,7 @@ export const useClassGroupSubmissionStore = defineStore('classGroupSubmissions',
         notif.notify('Rendu soumis avec succès.', 'success')
         return true
       } catch {
+        await discardUploadedFile(uploadedKey)
         notif.notify('Erreur lors de la soumission du rendu.', 'error')
         return false
       } finally {

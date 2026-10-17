@@ -7,6 +7,8 @@ import MenuItem from '@/components/MenuItemComponent.vue'
 import ItemListLayout from '@/components/ItemListLayout.vue'
 import TagSelectorComponent from '@/components/TagSelectorComponent.vue'
 import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 import { useTagStore } from '@/stores/tags'
 
 const props = defineProps({
@@ -14,6 +16,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['open', 'create'])
 const toast = useToast()
+const { confirmModal, askConfirm, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 const tagStore = useTagStore()
 
 // ── Liste ─────────────────────────────────────────────────────────────────────
@@ -102,8 +105,10 @@ const confirmRename = async () => {
 }
 
 // ── Supprimer ──────────────────────────────────────────────────────────────────
-const confirmDelete = async (diagram) => {
-  if (!confirm(`Supprimer la carte "${diagram.mmName}" ? Cette action est irréversible.`)) return
+const confirmDelete = (diagram) =>
+  askConfirm('Supprimer la carte', `Supprimer la carte « ${diagram.mmName} » ? Cette action est irréversible.`, () => deleteDiagram(diagram))
+
+const deleteDiagram = async (diagram) => {
   try {
     const response = await mindmapApi.deleteDiagram(diagram.idMindMap)
     // CHOIX: `api.del` retourne `undefined` quand le serveur répond 204 (no content) —
@@ -230,6 +235,7 @@ onMounted(fetchDiagrams)
       </div>
     </template>
   </ItemListLayout>
+  <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
 </template>
 
 <style scoped>

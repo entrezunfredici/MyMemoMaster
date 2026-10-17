@@ -109,6 +109,13 @@ describe('ExerciseDetailPage', () => {
     expect(wrapper.text()).not.toContain('Chargement...')
   })
 
+  it('charge l’exercice, ses résultats et ses échéances UNE seule fois chacun (aucun GET /tests/:id en double)', async () => {
+    const { testStore, testResultStore } = mountPage()
+    await flushPromises()
+    expect(testStore.fetchTestById).toHaveBeenCalledTimes(1)
+    expect(testResultStore.fetchByTest).toHaveBeenCalledTimes(1)
+  })
+
   it('affiche "introuvable" et notifie si fetchTestById retourne false', async () => {
     const { wrapper } = mountPage({ testData: null, fetchOk: false })
     await flushPromises()

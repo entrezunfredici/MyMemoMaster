@@ -41,14 +41,11 @@
       <div v-if="analytics.students.length > 0" class="space-y-2">
         <p class="text-sm font-medium text-dark/80">Étudiants ({{ analytics.students.length }})</p>
         <div v-for="s in analytics.students" :key="s.userId"
-          role="button"
-          tabindex="0"
-          :aria-expanded="!!expandedAnalyticsStudents[s.userId]"
-          :class="['rounded-xl border transition cursor-pointer', expandedAnalyticsStudents[s.userId] ? 'border-primary bg-light/50' : 'border-gray']"
-          @click="toggleStudentAndLoadKpis(s.userId)"
-          @keydown.enter.prevent="toggleStudentAndLoadKpis(s.userId)"
-          @keydown.space.prevent="toggleStudentAndLoadKpis(s.userId)">
-          <div class="flex items-center justify-between px-3 py-2">
+          :class="['rounded-xl border transition', expandedAnalyticsStudents[s.userId] ? 'border-primary bg-light/50' : 'border-gray']">
+          <!-- L'en-tête est le bouton ; le détail déplié est HORS du bouton (contenu interactif non imbriqué) -->
+          <button type="button" class="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left"
+            :aria-expanded="!!expandedAnalyticsStudents[s.userId]"
+            @click="toggleStudentAndLoadKpis(s.userId)">
             <div class="flex items-center gap-2">
               <span :class="['rounded-full px-2 py-0.5 text-xs font-semibold', s.atRisk ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success']">
                 {{ s.atRisk ? '⚠ Risque' : '✓ OK' }}
@@ -68,7 +65,7 @@
                 {{ s.avgScore !== null ? s.avgScore + ' %' : '—' }}
               </span>
             </div>
-          </div>
+          </button>
           <StudentDetailComponent v-if="expandedAnalyticsStudents[s.userId]" :student="s" />
           <!-- Panneau KPI personnels partagés — S-02.07 -->
           <TeacherStudentKpi

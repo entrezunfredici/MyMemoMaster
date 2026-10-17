@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
+import { discardUploadedFile } from '@/helpers/storageCleanup'
 
 export const useClassGroupResourceStore = defineStore('classGroupResources', {
   state: () => ({
@@ -32,6 +33,7 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
 
     async uploadAndCreate(groupId, file, metadata) {
       this.uploading = true
+      let uploadedKey = null
       try {
         const form = new FormData()
         form.append('file', file)
@@ -41,6 +43,7 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
           return false
         }
         const { url, key, mimetype, size } = uploadResp.data
+        uploadedKey = key
         const createResp = await api.post(`class-groups/${groupId}/resources`, {
           ...metadata,
           url,
@@ -50,6 +53,7 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
           fileSize: size,
         })
         if (createResp?.status !== 201) {
+          await discardUploadedFile(uploadedKey)
           notif.notify(createResp?.data?.message || 'Erreur lors de la création de la ressource.', 'error')
           return false
         }
@@ -58,6 +62,7 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
         notif.notify('Ressource ajoutée.', 'success')
         return createResp.data.data
       } catch {
+        await discardUploadedFile(uploadedKey)
         notif.notify("Erreur lors de l'upload de la ressource.", 'error')
         return false
       } finally {

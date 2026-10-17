@@ -217,11 +217,20 @@ describe('EtablissementGroupPicker', () => {
 
   it('sélection au clic et au clavier, carte active mise en évidence', async () => {
     const w = mountPicker()
-    const cards = w.findAll('[role="button"][tabindex="0"]')
-    expect(cards[0].classes()).toContain('border-primary')
+    const cards = w.findAll('button[aria-pressed]')
+    expect(cards.map((c) => c.attributes('aria-pressed'))).toEqual(['true', 'false'])
+    expect(cards[0].element.parentElement.className).toContain('border-primary')
+    expect(cards[1].element.parentElement.className).not.toContain('border-primary')
     await cards[1].trigger('click')
-    await cards[1].trigger('keydown', { key: 'Enter' })
-    expect(w.emitted('select')).toEqual([[2], [2]])
+    expect(w.emitted('select')).toEqual([[2]])
+  })
+
+  it('la sélection et la suppression sont deux boutons frères (aucun contrôle imbriqué — RGAA 7.1)', () => {
+    const w = mountPicker()
+    expect(w.findAll('[role="button"]')).toHaveLength(0)
+    expect(w.findAll('button button')).toHaveLength(0)
+    expect(w.findAll('button[aria-label^="Supprimer le groupe "]').map((b) => b.attributes('aria-label')))
+      .toEqual(['Supprimer le groupe MP2I A', 'Supprimer le groupe L3'])
   })
 
   describe('création', () => {
@@ -242,12 +251,27 @@ describe('EtablissementGroupPicker', () => {
       expect(useClassGroupStore().createGroup).not.toHaveBeenCalled()
     })
 
+    it('chaque champ a un <label> visible relié (pas seulement un placeholder) — RGAA 11.1', async () => {
+      const w = mountPicker()
+      await btn(w, '+ Nouvelle classe').trigger('click')
+      const labels = w.findAll('label').map((l) => [l.attributes('for'), l.text()])
+      expect(labels).toEqual([
+        ['create-group-name', 'Nom *'],
+        ['create-group-code', 'Code'],
+        ['create-group-level', 'Niveau'],
+        ['create-group-description', 'Description'],
+      ])
+      labels.forEach(([id]) => expect(w.find('#' + id).exists()).toBe(true))
+      expect(w.find('#create-group-name').attributes('aria-required')).toBe('true')
+      expect(w.find('#create-group-code').attributes('aria-required')).toBeUndefined()
+    })
+
     it('crée avec valeurs nettoyées (vides -> null), ferme et vide', async () => {
       const w = mountPicker()
       useClassGroupStore().createGroup.mockResolvedValue({ id: 9 })
       await btn(w, '+ Nouvelle classe').trigger('click')
-      await w.find('input[aria-label="Nom"]').setValue('  Nouvelle ')
-      await w.find('input[aria-label="Niveau (ex: Prépa)"]').setValue('L1')
+      await w.find('#create-group-name').setValue('  Nouvelle ')
+      await w.find('#create-group-level').setValue('L1')
       await btn(w, 'Créer').trigger('click')
       await flushPromises()
       expect(useClassGroupStore().createGroup).toHaveBeenCalledWith({ name: 'Nouvelle', code: null, level: 'L1', description: null })
@@ -258,10 +282,10 @@ describe('EtablissementGroupPicker', () => {
       const w = mountPicker()
       useClassGroupStore().createGroup.mockResolvedValue(null)
       await btn(w, '+ Nouvelle classe').trigger('click')
-      await w.find('input[aria-label="Nom"]').setValue('X')
+      await w.find('#create-group-name').setValue('X')
       await btn(w, 'Créer').trigger('click')
       await flushPromises()
-      expect(w.find('input[aria-label="Nom"]').element.value).toBe('X')
+      expect(w.find('#create-group-name').element.value).toBe('X')
     })
   })
 
@@ -269,7 +293,7 @@ describe('EtablissementGroupPicker', () => {
     it('demande confirmation nominative, puis l’action confirmée émet « deleted » avec l’identifiant', async () => {
       const w = mountPicker()
       useClassGroupStore().deleteGroup.mockResolvedValue(true)
-      await w.findAll('button[aria-label="Supprimer le groupe"]')[1].trigger('click')
+      await w.findAll('button[aria-label^="Supprimer le groupe "]')[1].trigger('click')
       expect(ask.mock.calls[0][0]).toBe('Supprimer le groupe')
       expect(ask.mock.calls[0][1]).toBe('Supprimer le groupe « L3 » ? Cette action est irréversible.')
       expect(useClassGroupStore().deleteGroup).not.toHaveBeenCalled()
@@ -280,14 +304,14 @@ describe('EtablissementGroupPicker', () => {
 
     it('le clic de suppression ne sélectionne pas le groupe', async () => {
       const w = mountPicker()
-      await w.findAll('button[aria-label="Supprimer le groupe"]')[0].trigger('click')
+      await w.findAll('button[aria-label^="Supprimer le groupe "]')[0].trigger('click')
       expect(w.emitted('select')).toBeUndefined()
     })
 
     it('suppression en échec : pas d’événement « deleted »', async () => {
       const w = mountPicker()
       useClassGroupStore().deleteGroup.mockResolvedValue(false)
-      await w.findAll('button[aria-label="Supprimer le groupe"]')[0].trigger('click')
+      await w.findAll('button[aria-label^="Supprimer le groupe "]')[0].trigger('click')
       await ask.mock.calls[0][2]()
       expect(w.emitted('deleted')).toBeUndefined()
     })

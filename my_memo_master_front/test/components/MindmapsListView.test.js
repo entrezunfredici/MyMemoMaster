@@ -74,7 +74,7 @@ const mountListView = (props = {}) =>
 describe('MindmapsListView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'confirm')
     mockGet.mockResolvedValue({ data: diagrams })
     mockPut.mockResolvedValue({ status: 200 })
     mockDel.mockResolvedValue({ status: 204 })
@@ -192,6 +192,7 @@ describe('MindmapsListView', () => {
     const wrapper = mountListView()
     await flushPromises()
     await wrapper.findAll('.delete-btn')[0].trigger('click')
+    await wrapper.find('.btn-modal-danger').trigger('click')
     await flushPromises()
     expect(mockDel).toHaveBeenCalledWith('diagrammes/1')
     expect(wrapper.findAll('.item-title')).toHaveLength(1)
@@ -205,6 +206,7 @@ describe('MindmapsListView', () => {
     const wrapper = mountListView()
     await flushPromises()
     await wrapper.findAll('.delete-btn')[0].trigger('click')
+    await wrapper.find('.btn-modal-danger').trigger('click')
     await flushPromises()
     expect(mockToast.success).toHaveBeenCalledWith('Carte supprimée.')
     expect(mockToast.warning).not.toHaveBeenCalled()
@@ -212,11 +214,22 @@ describe('MindmapsListView', () => {
     expect(wrapper.findAll('.item-title')[0].text()).toBe('Carte Physique')
   })
 
-  it('ne supprime pas si window.confirm retourne false', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+  it('la confirmation est la modale commune, nominative (jamais window.confirm)', async () => {
+    const nativeConfirm = vi.spyOn(window, 'confirm')
     const wrapper = mountListView()
     await flushPromises()
     await wrapper.findAll('.delete-btn')[0].trigger('click')
+    expect(nativeConfirm).not.toHaveBeenCalled()
+    const dialog = wrapper.find('[role="dialog"][aria-label="Supprimer la carte"]')
+    expect(dialog.text()).toContain('Carte Maths')
+    expect(mockDel).not.toHaveBeenCalled()
+  })
+
+  it('« Annuler » ne supprime rien', async () => {
+    const wrapper = mountListView()
+    await flushPromises()
+    await wrapper.findAll('.delete-btn')[0].trigger('click')
+    await wrapper.find('.btn-modal-cancel').trigger('click')
     expect(mockDel).not.toHaveBeenCalled()
     expect(wrapper.findAll('.item-title')).toHaveLength(2)
   })

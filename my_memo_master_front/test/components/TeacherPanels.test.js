@@ -235,6 +235,16 @@ describe('TeacherAnalyticsPanel', () => {
     expect(wrapper.findAll('[aria-expanded]')[0].attributes('aria-expanded')).toBe('true')
   })
 
+  it('l’en-tête d’un étudiant est un vrai <button> ; le détail déplié est hors du bouton (RGAA 7.1)', async () => {
+    const { wrapper } = await mountAnalytics()
+    expect(wrapper.findAll('[role="button"]')).toHaveLength(0)
+    const row = wrapper.findAll('[aria-expanded]')[0]
+    expect(row.element.tagName).toBe('BUTTON')
+    expect(row.attributes('type')).toBe('button')
+    await row.trigger('click')
+    wrapper.findAll('[aria-expanded]').forEach((b) => expect(b.findAll('button, a, input, select')).toHaveLength(0))
+  })
+
   it('replier ne redemande pas les KPI', async () => {
     const { wrapper } = await mountAnalytics()
     await wrapper.findAll('[aria-expanded]')[0].trigger('click')
@@ -295,14 +305,27 @@ describe('TeacherSectionsPanel', () => {
     expect(ask.mock.calls[0][1]).toContain('supprime aussi les soumissions déjà reçues')
   })
 
-  it('seule une section de type rendu se déplie (clavier compris) et charge ses soumissions', async () => {
+  it('un rendu se déplie par un vrai <button> (clavier natif), « Supprimer » en est le frère et non un descendant', async () => {
     const { wrapper } = mountSections({ status: STATUS })
-    const headers = wrapper.findAll('.rounded-xl.border > div:first-child')
-    expect(headers[0].attributes('role')).toBeUndefined()
-    expect(headers[1].attributes('role')).toBe('button')
+    const headers = wrapper.findAll('.rounded-xl.border > div:first-child > :first-child')
+    expect(headers[0].element.tagName).toBe('DIV')
+    expect(headers[0].attributes('aria-expanded')).toBeUndefined()
+    expect(headers[1].element.tagName).toBe('BUTTON')
+    expect(headers[1].attributes('aria-expanded')).toBe('false')
+    wrapper.findAll('.rounded-xl.border > div:first-child').forEach((row) => {
+      expect(row.findAll('button button')).toHaveLength(0)
+      expect(row.findAll('[role="button"]')).toHaveLength(0)
+      expect(row.find(':scope > button:last-child').text()).toBe('Supprimer')
+    })
+  })
+
+  it('seule une section de type rendu se déplie et charge ses soumissions', async () => {
+    const { wrapper } = mountSections({ status: STATUS })
+    const headers = wrapper.findAll('.rounded-xl.border > div:first-child > :first-child')
     await headers[0].trigger('click')
     expect(useClassGroupSubmissionStore().fetchStatus).not.toHaveBeenCalled()
-    await headers[1].trigger('keydown', { key: 'Enter' })
+    await headers[1].trigger('click')
+    expect(headers[1].attributes('aria-expanded')).toBe('true')
     expect(useClassGroupSubmissionStore().fetchStatus).toHaveBeenCalledWith(GROUP_ID, 2)
     expect(wrapper.text()).toContain('Rendus reçus')
     expect(wrapper.text()).toContain('1 rendu(s)')
@@ -312,7 +335,7 @@ describe('TeacherSectionsPanel', () => {
 
   it('replier ne recharge pas, redéplier recharge', async () => {
     const { wrapper } = mountSections({ status: STATUS })
-    const header = () => wrapper.findAll('.rounded-xl.border > div:first-child')[1]
+    const header = () => wrapper.findAll('.rounded-xl.border > div:first-child > :first-child')[1]
     await header().trigger('click')
     await header().trigger('click')
     expect(wrapper.text()).not.toContain('Rendus reçus')
@@ -322,20 +345,20 @@ describe('TeacherSectionsPanel', () => {
 
   it('« Chargement des rendus… » tant que le statut n’est pas arrivé', async () => {
     const { wrapper } = mountSections()
-    await wrapper.findAll('.rounded-xl.border > div:first-child')[1].trigger('click')
+    await wrapper.findAll('.rounded-xl.border > div:first-child > :first-child')[1].trigger('click')
     expect(wrapper.text()).toContain('Chargement des rendus')
   })
 
   it('télécharger un rendu : nouvel onglet', async () => {
     const { wrapper } = mountSections({ status: STATUS })
-    await wrapper.findAll('.rounded-xl.border > div:first-child')[1].trigger('click')
+    await wrapper.findAll('.rounded-xl.border > div:first-child > :first-child')[1].trigger('click')
     await btn(wrapper, 'Télécharger').trigger('click')
     expect(mockDownloadFile).toHaveBeenCalledWith('k', { newTab: true })
   })
 
   it('une nouvelle sélection de groupe referme les rendus dépliés', async () => {
     const { wrapper } = mountSections({ status: STATUS })
-    await wrapper.findAll('.rounded-xl.border > div:first-child')[1].trigger('click')
+    await wrapper.findAll('.rounded-xl.border > div:first-child > :first-child')[1].trigger('click')
     expect(wrapper.text()).toContain('Rendus reçus')
     await wrapper.setProps({ refreshToken: 1 })
     expect(wrapper.text()).not.toContain('Rendus reçus')

@@ -166,6 +166,8 @@
       </div>
     </section>
 
+
+    <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
   </div>
 </template>
 
@@ -181,8 +183,11 @@ import { useLeitnerSystemStore } from '@/stores/leitnerSystems'
 import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useLeitnerReviewSessionStore } from '@/stores/leitnerReviewSessions'
 import { shuffledIndices } from '@/helpers/shuffle'
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 
 const router = useRouter()
+const { confirmModal, askConfirm, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 const route = useRoute()
 const cardStore = useLeitnerCardStore()
 const systemStore = useLeitnerSystemStore()
@@ -332,11 +337,9 @@ const nextStep = () => {
   }
 }
 
-const confirmExit = () => {
-  const confirmed = window.confirm('⚠️ Attention : la session en cours sera perdue. Voulez-vous vraiment quitter ?')
-  if (confirmed) {
+const confirmExit = () =>
+  askConfirm('Quitter la session', 'Attention : la session en cours sera perdue. Voulez-vous vraiment quitter ?', () => {
     logSessionProgress(false)
     router.push('/flashcards')
-  }
-}
+  })
 </script>

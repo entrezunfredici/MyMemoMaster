@@ -7,30 +7,29 @@
       <div v-for="s in sectionStore.sections" :key="s.id"
         class="rounded-xl border border-gray overflow-hidden">
         <!-- En-tête de la section -->
-        <div
-          :role="s.type === 'rendu' ? 'button' : undefined"
-          :tabindex="s.type === 'rendu' ? 0 : undefined"
-          :class="['px-4 py-3 flex items-center justify-between', s.type === 'rendu' ? 'cursor-pointer hover:bg-light/60 transition' : '']"
-          @click="s.type === 'rendu' && toggleRenduSection(s.id)"
-          @keydown.enter.prevent="s.type === 'rendu' && toggleRenduSection(s.id)"
-          @keydown.space.prevent="s.type === 'rendu' && toggleRenduSection(s.id)">
-          <div>
-            <div class="flex items-center gap-2">
-              <span :class="s.type === 'rendu' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'"
-                class="rounded-full px-2 py-0.5 text-xs font-semibold uppercase">
-                {{ s.type === 'rendu' ? 'Rendu' : 'Section' }}
+        <!-- Un rendu se déplie par un vrai bouton ; « Supprimer » en est le frère, jamais un descendant -->
+        <div class="flex items-center justify-between">
+          <component :is="s.type === 'rendu' ? 'button' : 'div'"
+            :type="s.type === 'rendu' ? 'button' : undefined"
+            :aria-expanded="s.type === 'rendu' ? !!expandedRenduSections[s.id] : undefined"
+            :class="['flex flex-1 items-center justify-between gap-3 px-4 py-3 text-left', s.type === 'rendu' ? 'cursor-pointer hover:bg-light/60 transition' : '']"
+            @click="s.type === 'rendu' && toggleRenduSection(s.id)">
+            <span class="block">
+              <span class="flex items-center gap-2">
+                <span :class="s.type === 'rendu' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'"
+                  class="rounded-full px-2 py-0.5 text-xs font-semibold uppercase">
+                  {{ s.type === 'rendu' ? 'Rendu' : 'Section' }}
+                </span>
+                <span class="text-sm font-semibold text-dark">{{ s.title }}</span>
               </span>
-              <p class="text-sm font-semibold text-dark">{{ s.title }}</p>
-            </div>
-            <p class="text-xs text-dark/60 mt-0.5">{{ s.description }}</p>
-            <p v-if="s.dueDate" class="text-xs text-dark/60">Date cible : {{ formatDate(s.dueDate) }}</p>
-          </div>
-          <div class="flex items-center gap-3 shrink-0">
-            <span v-if="s.type === 'rendu'" class="text-xs text-primary select-none">
+              <span class="mt-0.5 block text-xs text-dark/60">{{ s.description }}</span>
+              <span v-if="s.dueDate" class="block text-xs text-dark/60">Date cible : {{ formatDate(s.dueDate) }}</span>
+            </span>
+            <span v-if="s.type === 'rendu'" class="shrink-0 text-xs text-primary select-none">
               {{ expandedRenduSections[s.id] ? '▲' : '▼ Voir rendus' }}
             </span>
-            <button @click.stop="confirmDeleteSection(s)" class="text-xs text-secondary hover:underline">Supprimer</button>
-          </div>
+          </component>
+          <button type="button" @click="confirmDeleteSection(s)" class="shrink-0 px-4 text-xs text-secondary hover:underline">Supprimer</button>
         </div>
         <!-- Rendus étudiants (uniquement pour type=rendu) -->
         <div v-if="s.type === 'rendu' && expandedRenduSections[s.id]"

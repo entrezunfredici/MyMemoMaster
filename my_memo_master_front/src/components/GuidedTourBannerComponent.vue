@@ -2,10 +2,13 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGuidedTourStore } from '@/stores/guidedTour'
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 
 const route = useRoute()
 const router = useRouter()
 const tourStore = useGuidedTourStore()
+const { confirmModal, askConfirm, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 
 const step = computed(() => tourStore.currentStep)
 const stepNumber = computed(() => tourStore.stepIndex + 1)
@@ -53,10 +56,8 @@ const closeRecap = () => {
   router.push({ name: 'home' })
 }
 
-const handleQuit = () => {
-  if (!confirm('Quitter le parcours guidé ? Votre progression sera perdue.')) return
-  tourStore.quit()
-}
+const handleQuit = () =>
+  askConfirm('Quitter le parcours guidé', 'Quitter le parcours guidé ? Votre progression sera perdue.', () => tourStore.quit())
 </script>
 
 <template>
@@ -150,6 +151,8 @@ const handleQuit = () => {
       </button>
     </div>
   </div>
+
+  <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
 </template>
 
 <style scoped>

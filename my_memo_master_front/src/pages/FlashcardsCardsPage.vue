@@ -70,6 +70,8 @@
 
     </template>
 
+    <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
+
     <FlashcardCardModal ref="cardModal" :system-id="systemId" :mind-map-json="mindMapJson" :reload="reload" />
     <FlashcardBoxModal ref="boxModal" :system-id="systemId" :boxes="systemBoxes" :reload="reload" />
 
@@ -110,12 +112,15 @@ import FlashcardBoxModal from '@/components/flashcards/FlashcardBoxModalComponen
 import AiGenerateCardsModal from '@/components/AiGenerateCardsModalComponent.vue'
 import AiGenerationProgressModal from '@/components/AiGenerationProgressModalComponent.vue'
 import AiValidationScreen from '@/components/AiValidationScreenComponent.vue'
+import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import { provideConfirmAction } from '@/composables/useConfirmAction'
 import { useFlashcardsCards } from '@/composables/useFlashcardsCards'
 import { useAiCardFlow } from '@/composables/useAiCardFlow'
 
 const router = useRouter()
 const route = useRoute()
 const systemId = Number(route.params.systemId)
+const { confirmModal, askConfirm, closeConfirmModal, runConfirmedAction } = provideConfirmAction()
 
 const {
   loading,
@@ -129,7 +134,7 @@ const {
   reload,
   deleteCard,
   deleteBox,
-} = useFlashcardsCards(systemId)
+} = useFlashcardsCards(systemId, askConfirm)
 
 const {
   aiCardGenerationStore,

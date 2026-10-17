@@ -188,6 +188,62 @@ describe('useClassGroupSubmissionStore', () => {
       expect(store.mySubmissions[10]).toBeUndefined()
     })
 
+    it('refus après upload — le fichier téléversé est supprimé du stockage (pas d’orphelin)', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockResolvedValueOnce({ status: 400, data: { message: 'Refusé.' } })
+      mockDel.mockResolvedValueOnce({ status: 200, data: {} })
+
+      const store = useClassGroupSubmissionStore()
+      const file = new File(['content'], 'f.pdf', { type: 'application/pdf' })
+      const result = await store.uploadAndSubmit(1, 10, file)
+
+      expect(result).toBe(false)
+      expect(mockDel).toHaveBeenCalledTimes(1)
+      expect(mockDel).toHaveBeenCalledWith('storage/file?key=' + encodeURIComponent(UPLOAD_RESP.key))
+    })
+
+    it('exception après upload — le fichier téléversé est aussi supprimé', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockRejectedValueOnce(new Error('Network'))
+      mockDel.mockResolvedValueOnce({ status: 200, data: {} })
+
+      const store = useClassGroupSubmissionStore()
+      const file = new File(['content'], 'f.pdf', { type: 'application/pdf' })
+      expect(await store.uploadAndSubmit(1, 10, file)).toBe(false)
+      expect(mockDel).toHaveBeenCalledWith('storage/file?key=' + encodeURIComponent(UPLOAD_RESP.key))
+    })
+
+    it('échec du nettoyage — silencieux, le résultat reste false', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockResolvedValueOnce({ status: 400, data: { message: 'Refusé.' } })
+      mockDel.mockRejectedValueOnce(new Error('S3 down'))
+
+      const store = useClassGroupSubmissionStore()
+      const file = new File(['content'], 'f.pdf', { type: 'application/pdf' })
+      expect(await store.uploadAndSubmit(1, 10, file)).toBe(false)
+    })
+
+    it('upload refusé — rien à nettoyer', async () => {
+      mockPost.mockResolvedValueOnce({ status: 500, data: { message: 'S3 error' } })
+      const store = useClassGroupSubmissionStore()
+      const file = new File(['content'], 'f.pdf', { type: 'application/pdf' })
+      await store.uploadAndSubmit(1, 10, file)
+      expect(mockDel).not.toHaveBeenCalled()
+    })
+
+    it('succès — aucune suppression', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockResolvedValueOnce({ status: 200, data: { data: {} } })
+      const store = useClassGroupSubmissionStore()
+      const file = new File(['content'], 'f.pdf', { type: 'application/pdf' })
+      await store.uploadAndSubmit(1, 10, file)
+      expect(mockDel).not.toHaveBeenCalled()
+    })
+
     it('erreur réseau — retourne false, uploading repassé à false', async () => {
       mockPost.mockRejectedValueOnce(new Error('Network'))
 

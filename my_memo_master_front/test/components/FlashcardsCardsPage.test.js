@@ -109,7 +109,7 @@ describe('FlashcardsCardsPage', () => {
     mockApi.post.mockResolvedValue({ status: 201, data: {} })
     mockApi.put.mockResolvedValue({ status: 200, data: {} })
     mockApi.del.mockResolvedValue({ status: 200, data: {} })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'confirm')
   })
   afterEach(() => {
     wrapper?.unmount()
@@ -201,18 +201,29 @@ describe('FlashcardsCardsPage', () => {
 
   // ── Suppression ─────────────────────────────────────────────────────────────
   describe('suppression d’une carte', () => {
-    it('refus de la confirmation : rien n’est envoyé', async () => {
-      window.confirm.mockReturnValue(false)
+    it('la confirmation est la modale commune (jamais window.confirm), nominative', async () => {
       await mountPage()
       await cardRows()[0].find('[title="Supprimer"]').trigger('click')
+      expect(window.confirm).not.toHaveBeenCalled()
+      const dialog = wrapper.find('[role="dialog"]')
+      expect(dialog.attributes('aria-label')).toBe('Supprimer la carte')
+      expect(dialog.text()).toContain("Loi d'Ohm")
       expect(mockApi.del).not.toHaveBeenCalled()
+    })
+
+    it('« Annuler » : rien n’est envoyé, la modale se ferme', async () => {
+      await mountPage()
+      await cardRows()[0].find('[title="Supprimer"]').trigger('click')
+      await wrapper.find('.btn-modal-cancel').trigger('click')
+      expect(mockApi.del).not.toHaveBeenCalled()
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     })
 
     it('confirmée : la carte est supprimée côté serveur et retirée de la liste', async () => {
       await mountPage()
       await cardRows()[0].find('[title="Supprimer"]').trigger('click')
+      await wrapper.find('.btn-modal-danger').trigger('click')
       await flushPromises()
-      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Loi d'Ohm ?"))
       expect(mockApi.del).toHaveBeenCalledWith('leitnercards/1')
       expect(mockNotify).toHaveBeenCalledWith('Carte supprimée.', 'success')
       expect(cardRows()).toHaveLength(1)
@@ -222,6 +233,7 @@ describe('FlashcardsCardsPage', () => {
       mockApi.del.mockResolvedValue({ status: 403, data: { message: 'Interdit' } })
       await mountPage()
       await cardRows()[0].find('[title="Supprimer"]').trigger('click')
+      await wrapper.find('.btn-modal-danger').trigger('click')
       await flushPromises()
       expect(mockNotify).toHaveBeenCalledWith('Interdit', 'error')
       expect(cardRows()).toHaveLength(2)
@@ -280,8 +292,10 @@ describe('FlashcardsCardsPage', () => {
     it('suppression confirmée : DELETE, boîte retirée de l’affichage', async () => {
       await mountPage()
       await wrapper.findAll('[title="Supprimer"]')[0].trigger('click') // 1re boîte (B1)
+      expect(wrapper.find('[role="dialog"]').text()).toContain('niveau 1')
+      expect(mockApi.del).not.toHaveBeenCalled()
+      await wrapper.find('.btn-modal-danger').trigger('click')
       await flushPromises()
-      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('niveau 1'))
       expect(mockApi.del).toHaveBeenCalledWith('leitnerboxes/10')
       expect(mockNotify).toHaveBeenCalledWith('Boîte supprimée.', 'success')
       expect(wrapper.text()).not.toContain('B1')
@@ -291,6 +305,7 @@ describe('FlashcardsCardsPage', () => {
       mockApi.del.mockResolvedValue({ status: 409, data: { message: 'Boîte utilisée' } })
       await mountPage()
       await wrapper.findAll('[title="Supprimer"]')[0].trigger('click')
+      await wrapper.find('.btn-modal-danger').trigger('click')
       await flushPromises()
       expect(mockNotify).toHaveBeenCalledWith('Boîte utilisée', 'error')
       expect(wrapper.text()).toContain('B1')
