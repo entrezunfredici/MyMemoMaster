@@ -120,6 +120,18 @@ describe('PaletteModal', () => {
     expect(modal.querySelector('.interp-modal__dialog--narrow')).not.toBeNull()
   })
 
+  it('Échap ferme la modale ; une autre touche non ; l’écouteur est retiré au démontage', () => {
+    const onClose = vi.fn()
+    const wrapper = mountModal({ onClose })
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    expect(onClose).not.toHaveBeenCalled()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('le bouton de fermeture (nommé) et le voile émettent « close »', async () => {
     const wrapper = mountModal({ closeLabel: 'Ignorer' })
     document.body.querySelector('button[aria-label="Ignorer"]').click()

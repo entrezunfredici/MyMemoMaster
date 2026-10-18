@@ -5,6 +5,8 @@
     class="mindmap-node__inline-input mindmap-node__inline-input--content"
     v-model="localContent"
     @blur="commitContent"
+    @keydown.ctrl.enter.prevent="commitContent"
+    @keydown.meta.enter.prevent="commitContent"
     @keydown.escape.prevent="cancelEdit"
     @click.stop
     @pointerdown.stop
@@ -22,7 +24,8 @@
 </template>
 
 <script setup>
-// Corps de texte d'un item de carte, modifiable en place (double-clic). Extrait de MindMapNode.vue.
+// Corps de texte d'un item de carte, modifiable en place (double-clic). Entrée ajoute une ligne (champ sur
+// plusieurs lignes) ; Ctrl/Cmd + Entrée valide, comme un clic à côté. Extrait de MindMapNode.vue.
 import { computed, ref, nextTick } from 'vue';
 import { themeHex } from '@/helpers/themeColors';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';

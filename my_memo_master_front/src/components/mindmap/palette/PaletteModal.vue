@@ -14,6 +14,8 @@
 </template>
 
 <script setup>
+import { onBeforeUnmount, onMounted } from 'vue';
+
 // Coquille des modales de la palette (voile, boîte, en-tête avec fermeture), téléportée dans <body>.
 // Extraite de MindMapPalette.vue : sert à l'interpréteur de formules et à la proposition de grandeurs.
 defineProps({
@@ -24,6 +26,13 @@ defineProps({
   narrow: { type: Boolean, default: false },
 });
 const emit = defineEmits(['close']);
+
+// Échap ferme la modale (RGAA 7.1 : une fenêtre modale se ferme au clavier).
+const onKeydown = (event) => {
+  if (event.key === 'Escape') emit('close');
+};
+onMounted(() => window.addEventListener('keydown', onKeydown));
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 </script>
 
 <style scoped>

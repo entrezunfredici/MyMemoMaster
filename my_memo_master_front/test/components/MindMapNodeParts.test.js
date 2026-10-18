@@ -114,6 +114,21 @@ describe('corps de texte (NodeTextBody)', () => {
     expect(store.updateNode).not.toHaveBeenCalled()
   })
 
+  it('Ctrl + Entrée et Cmd + Entrée valident le contenu ; Entrée seule n’enregistre rien (nouvelle ligne)', async () => {
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+      const { wrapper, store } = mountNode()
+      await wrapper.find('.mindmap-node__body').trigger('dblclick')
+      const area = wrapper.find('textarea[aria-label="Contenu du nœud"]')
+      await area.setValue('Validé au clavier')
+      await area.trigger('keydown', { key: 'Enter' })
+      expect(store.updateNode).not.toHaveBeenCalled()
+      expect(wrapper.find('textarea').exists()).toBe(true)
+      await area.trigger('keydown', { key: 'Enter', ...modifier })
+      expect(store.updateNode).toHaveBeenCalledWith('n1', { content: 'Validé au clavier' })
+      expect(wrapper.find('textarea').exists()).toBe(false)
+    }
+  })
+
   it('Échap annule', async () => {
     const { wrapper, store } = mountNode()
     await editContent(wrapper, 'Abandonné', 'escape')
@@ -148,20 +163,30 @@ describe('image (NodeImage)', () => {
     expect(store.updateNode).toHaveBeenCalledWith('n1', { content: 'data:image/png;base64,AAA' })
   })
 
-  it('un fichier qui n’est pas une image est ignoré', async () => {
+  it('un fichier qui n’est pas une image est refusé avec un message, sans téléversement', async () => {
     const { wrapper, store } = mountNode(imageNode())
     await drop(wrapper, { type: 'text/plain' })
     await flushPromises()
     expect(upload).not.toHaveBeenCalled()
     expect(store.updateNode).not.toHaveBeenCalled()
+    expect(notify).toHaveBeenCalledWith("Ce fichier n'est pas une image.", 'error')
   })
 
-  it('image trop volumineuse : refus silencieux (le message vient de l’import)', async () => {
+  it('image trop volumineuse : le message indique la taille maximale', async () => {
     upload.mockRejectedValueOnce(Object.assign(new Error('x'), { code: 'IMAGE_TOO_LARGE' }))
-    const { wrapper } = mountNode(imageNode())
+    const { wrapper, store } = mountNode(imageNode())
     await drop(wrapper, { type: 'image/png' })
     await flushPromises()
+    expect(notify).toHaveBeenCalledWith("L'image est trop lourde (5 Mo maximum).", 'error')
+    expect(store.updateNode).not.toHaveBeenCalled()
+  })
+
+  it('un dépôt sans fichier est ignoré sans message', async () => {
+    const { wrapper } = mountNode(imageNode())
+    await wrapper.find('.mindmap-node__image').trigger('drop', { dataTransfer: { files: [] } })
+    await flushPromises()
     expect(notify).not.toHaveBeenCalled()
+    expect(upload).not.toHaveBeenCalled()
   })
 
   it('autre échec de téléversement : l’utilisateur est prévenu', async () => {

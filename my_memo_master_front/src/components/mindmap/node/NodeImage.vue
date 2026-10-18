@@ -18,7 +18,7 @@
 // Extrait de MindMapNode.vue.
 import { computed, ref } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { uploadMindmapImage } from '@/helpers/mindmap/mindmapImage';
+import { MAX_IMAGE_SIZE, uploadMindmapImage } from '@/helpers/mindmap/mindmapImage';
 import { notif } from '@/helpers/notif';
 
 const props = defineProps({
@@ -53,11 +53,18 @@ const handleImageLoad = (event) => {
 const handleImageDrop = async (event) => {
   isDragOver.value = false;
   const file = event.dataTransfer?.files?.[0];
-  if (!file || !file.type.startsWith('image/')) return;
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    notif.notify("Ce fichier n'est pas une image.", 'error');
+    return;
+  }
   try {
     store.updateNode(props.node.id, { content: await uploadMindmapImage(file) });
   } catch (error) {
-    if (error.code === 'IMAGE_TOO_LARGE') return;
+    if (error.code === 'IMAGE_TOO_LARGE') {
+      notif.notify(`L'image est trop lourde (${MAX_IMAGE_SIZE / (1024 * 1024)} Mo maximum).`, 'error');
+      return;
+    }
     notif.notify("L'image n'a pas pu être téléchargée.", 'error');
   }
 };
