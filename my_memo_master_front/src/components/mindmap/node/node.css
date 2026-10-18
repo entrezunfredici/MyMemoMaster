@@ -1,0 +1,210 @@
+/* Styles d'un item de carte mentale (MindMapNode.vue et ses sous-composants de components/mindmap/node/).
+   Feuille globale, mais chaque sélecteur descend de `.mindmap-node` (l'élément racine <g>) : même
+   spécificité que l'ancien <style scoped> de MindMapNode.vue (les règles de la racine répètent `.mindmap-node`
+   pour compenser l'attribut `[data-v-…]` que le scoped ajoutait), et utilisable par les sous-composants. */
+
+.mindmap-node .mindmap-node__quantity {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--blue-100);
+  cursor: text;
+}
+.mindmap-node .mindmap-node__quantity-editor {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--blue-100);
+}
+.mindmap-node .mindmap-node__quantity-input {
+  min-width: 0;
+  flex: 1;
+  text-align: center;
+}
+.mindmap-node .mindmap-node__quantity {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.mindmap-node .mindmap-node__quantity-label {
+  cursor: text;
+  min-width: 1ch;
+}
+.mindmap-node .mindmap-node__quantity-value {
+  width: 5.5em;
+  min-width: 0;
+  text-align: center;
+}
+.mindmap-node .mindmap-node__quantity-computed {
+  font-variant-numeric: tabular-nums;
+}
+.mindmap-node .mindmap-node__quantity--result {
+  font-weight: 700;
+}
+.mindmap-node .mindmap-node__calc-error {
+  font-size: 11px;
+  color: var(--mindmap-error-text);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mindmap-node .mindmap-node__quantity-sep {
+  font-weight: 700;
+}
+.mindmap-node .mindmap-node__quantity--badge {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.mindmap-node.mindmap-node {
+  cursor: pointer;
+  filter: drop-shadow(0 3px 8px rgb(var(--slate-900-rgb) / 0.28));
+  transition: filter 0.2s ease;
+}
+
+.mindmap-node.mindmap-node:hover {
+  filter: drop-shadow(0 6px 18px rgb(var(--slate-900-rgb) / 0.38));
+}
+
+.mindmap-node.mindmap-node--selected {
+  filter: drop-shadow(0 0 6px rgb(var(--sky-400-rgb) / 1)) drop-shadow(0 0 20px rgb(var(--sky-400-rgb) / 0.6));
+}
+
+.mindmap-node .mindmap-node__content {
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  /* Texte long : défilement dans le nœud plutôt que coupé net */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.mindmap-node .mindmap-node__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-100);
+  line-height: 1.25;
+  word-break: break-word;
+  cursor: text;
+  letter-spacing: 0.01em;
+}
+
+.mindmap-node .mindmap-node__body {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--blue-100);
+  word-break: break-word;
+  white-space: pre-wrap;
+  cursor: text;
+  flex: 1;
+}
+
+.mindmap-node .mindmap-node__placeholder {
+  /* 0,8 et non 0,4 : l'invite doit rester lisible (RGAA 3.2) maintenant que cette règle s'applique */
+  opacity: 0.8;
+  font-style: italic;
+  font-size: 11px;
+}
+
+.mindmap-node .mindmap-node__formula {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.mindmap-node .mindmap-node__formula .katex-display { margin: 0; }
+.mindmap-node .mindmap-node__formula .katex { font-size: 1rem; }
+
+.mindmap-node .mindmap-node__image {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.mindmap-node .mindmap-node__image--drag {
+  border: 2px dashed var(--sky-400);
+  border-radius: 6px;
+  background: rgb(var(--sky-400-rgb) / 0.08);
+}
+
+.mindmap-node .mindmap-node__image img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.mindmap-node .mindmap-node__image-placeholder {
+  font-size: 11px;
+  color: var(--blue-200);
+  text-align: center;
+  opacity: 0.85;
+}
+
+.mindmap-node .mindmap-node__collapse {
+  cursor: pointer;
+}
+
+.mindmap-node .mindmap-node__add {
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mindmap-node.mindmap-node:hover .mindmap-node__add,
+.mindmap-node .mindmap-node__add--active {
+  opacity: 1;
+}
+
+.mindmap-node .mindmap-node__add circle {
+  fill: var(--sky-400);
+  stroke: var(--slate-900);
+  stroke-width: 1;
+}
+
+.mindmap-node .mindmap-node__add:hover circle {
+  fill: var(--sky-500);
+}
+
+.mindmap-node .mindmap-node__inline-input {
+  width: 100%;
+  background: rgb(var(--white) / 0.12);
+  border: 1.5px solid rgb(var(--sky-400-rgb) / 0.7);
+  border-radius: 6px;
+  color: var(--slate-100);
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  resize: none;
+  box-sizing: border-box;
+  padding: 3px 6px;
+}
+
+.mindmap-node .mindmap-node__inline-input:focus {
+  background: rgb(var(--white) / 0.18);
+  border-color: var(--sky-400);
+  box-shadow: 0 0 0 2px rgb(var(--sky-400-rgb) / 0.3);
+}
+
+.mindmap-node .mindmap-node__inline-input--title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  min-height: 26px;
+}
+
+.mindmap-node .mindmap-node__inline-input--content {
+  font-size: 13px;
+  line-height: 1.4;
+  flex: 1;
+  min-height: 36px;
+}

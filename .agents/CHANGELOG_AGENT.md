@@ -13427,3 +13427,11 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Preuve** : copie temporaire de l'ancienne palette comparée à la nouvelle sur 16 états × (HTML, appels de store après un clic/saisie sur chaque contrôle, validation de l'interpréteur puis de la proposition de grandeurs) : identique, sauf le doublon « Couleur du texte » supprimé volontairement ; une mutation volontaire (libellé) fait échouer 32 comparaisons sur 33 ; échafaudage supprimé.
 **Tests** : +23 (`PaletteFormulaAndStyle.test.js` : style du texte, modale, proposition de grandeurs, un seul sélecteur de couleur, fermeture de l'interpréteur à la désélection, « Effacer ») ; front 129 fichiers / 2140 tests, ESLint, audits RGAA / couleurs / Tailwind à 0, build.
 **Reste** : `MindMapNode.vue` (625) et `stores/mindmapBuilder.js` (504).
+
+
+## [2026-10-18] [REF] MindMapNode découpé : 625 -> 171 lignes (branche `dev_front_small_fixes2`)
+
+**Fait** : `components/mindmap/node/` : `NodeTitle`, `NodeTextBody`, `NodeImage`, `NodeQuantity`, `node.css` ; `composables/useMindMapNodeEditing.js`. L'item garde le rendu par type, les boutons repli/ajout et le `pointerdown`. Voir DECISIONS (2026-10-18).
+**Preuve** : copie temporaire de l'ancien item comparée au nouveau sur 21 états × 32 gestes (double-clics, saisies, Entrée/Échap/blur, focusout de la grandeur, clics, Maj+clic, dépôts d'image réussi/refusé/échec, chargement d'image) : HTML, appels de store, événements et notifications identiques ; deux mutations volontaires détectées (21/21 et 1/21 en échec) après ajout de cas manquants ; CSS comparé règle par règle avec le compilateur Vue (35 règles : déclarations, spécificité, ordre identiques). Limite : le comparateur n'alimentait pas le getter `calculations` (non surchargeable via `initialState`) ; les chemins de calcul sont couverts par les tests unitaires ci-dessous.
+**Tests** : +32 (`MindMapNodeParts.test.js` : titre, corps, image, grandeur et calcul, création d'enfants, édition en cours, `useNodeEditing`) ; front 130 fichiers / 2172 tests, ESLint, audits RGAA / couleurs / Tailwind à 0, build.
+**Reste** : `stores/mindmapBuilder.js` (504).

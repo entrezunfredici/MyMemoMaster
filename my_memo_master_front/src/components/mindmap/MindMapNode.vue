@@ -21,38 +21,9 @@
     <!-- Contenu HTML -->
     <foreignObject :x="-width / 2 + 12" :y="-height / 2 + 10" :width="width - 24" :height="height - 20">
       <div class="mindmap-node__content">
-        <!-- Titre -->
-        <input aria-label="Titre du nœud"
-          v-if="editingField === 'label'"
-          ref="labelInputRef"
-          class="mindmap-node__inline-input mindmap-node__inline-input--title"
-          v-model="localLabel"
-          @blur="commitLabel"
-          @keydown.enter.prevent="commitLabel"
-          @keydown.escape.prevent="cancelEdit"
-          @click.stop
-          @pointerdown.stop
-        />
-        <div
-          v-else
-          class="mindmap-node__title"
-          @dblclick.stop="startEditLabel"
-        >{{ node.label }}</div>
+        <NodeTitle :node="node" />
 
-        <!-- Image -->
-        <div
-          v-if="isImageNode"
-          class="mindmap-node__image"
-          :class="{ 'mindmap-node__image--drag': isDragOver }"
-          @dragover.prevent.stop="isDragOver = true"
-          @dragleave.stop="isDragOver = false"
-          @drop.prevent.stop="handleImageDrop"
-        >
-          <img v-if="imageSrc" :src="imageSrc" :alt="node.label" @load="handleImageLoad" />
-          <span v-else class="mindmap-node__image-placeholder">
-            {{ isDragOver ? 'Déposer ici' : 'Glissez une image ici' }}
-          </span>
-        </div>
+        <NodeImage v-if="isImageNode" :node="node" :width="width" :height="height" />
         <!-- Graphique : formule y = f(x) tracée dans un repère, convertible en formule -->
         <MindMapGraph
           v-else-if="isGraphNode"
@@ -73,90 +44,9 @@
         </div>
         <!-- Grandeur (rôle principal) : rendue par la ligne de grandeur ci-dessous -->
         <template v-else-if="isQuantityNode" />
-        <!-- Texte inline -->
-        <template v-else>
-          <textarea aria-label="Contenu du nœud"
-            v-if="editingField === 'content'"
-            ref="contentInputRef"
-            class="mindmap-node__inline-input mindmap-node__inline-input--content"
-            v-model="localContent"
-            @blur="commitContent"
-            @keydown.escape.prevent="cancelEdit"
-            @click.stop
-            @pointerdown.stop
-          />
-          <div
-            v-else
-            class="mindmap-node__body"
-            :style="bodyStyle"
-            @dblclick.stop="startEditContent"
-          >
-            <!-- Texte de l'utilisateur : interpolation Vue (échappée), jamais du HTML -->
-            <template v-if="displayContent">{{ displayContent }}</template>
-            <span v-else class="mindmap-node__placeholder">Double-clic pour ajouter…</span>
-          </div>
-        </template>
-        <!-- Grandeur (rôle principal ou supplémentaire) : valeur éditable directement,
-             double-clic sur le symbole ou l'unité pour les modifier -->
-        <div
-          v-if="hasQuantityKind && editingField !== 'quantity'"
-          class="mindmap-node__quantity"
-          :class="{ 'mindmap-node__quantity--badge': !isQuantityNode }"
-        >
-          <span class="mindmap-node__quantity-label" title="Double-clic pour modifier" @dblclick.stop="startEditQuantity">{{ quantitySymbol || 'symbole' }}</span>
-          <span class="mindmap-node__quantity-sep">=</span>
-          <span v-if="ownCalculation?.ok" class="mindmap-node__quantity-computed" :title="'Calculé : ' + ownCalculationText">{{ ownCalculation.value }}</span>
-          <input v-else aria-label="Valeur de la grandeur"
-            class="mindmap-node__inline-input mindmap-node__quantity-value"
-            type="number"
-            step="any"
-            placeholder="valeur"
-            :value="quantityValue"
-            @change="commitQuantityValue"
-            @keydown.enter.prevent="$event.target.blur()"
-            @click.stop
-            @pointerdown.stop
-            @dblclick.stop
-          />
-          <span class="mindmap-node__quantity-label" title="Double-clic pour modifier" @dblclick.stop="startEditQuantity">{{ ownCalculation?.ok ? ownCalculation.unit : quantityUnit || 'unité' }}</span>
-        </div>
-        <!-- Édition du symbole et de l'unité -->
-        <div
-          v-if="editingField === 'quantity'"
-          ref="quantityEditorRef"
-          class="mindmap-node__quantity-editor"
-          @focusout="onQuantityFocusOut"
-          @click.stop
-          @pointerdown.stop
-        >
-          <input aria-label="Symbole de la grandeur"
-            ref="quantitySymbolRef"
-            class="mindmap-node__inline-input mindmap-node__quantity-input"
-            v-model="localQuantity.symbol"
-            maxlength="12"
-            placeholder="m"
-            @keydown.enter.prevent="commitQuantity"
-            @keydown.escape.prevent="cancelEdit"
-          />
-          <input aria-label="Unité de la grandeur"
-            class="mindmap-node__inline-input mindmap-node__quantity-input"
-            v-model="localQuantity.unit"
-            maxlength="16"
-            placeholder="kg"
-            @keydown.enter.prevent="commitQuantity"
-            @keydown.escape.prevent="cancelEdit"
-          />
-        </div>
-        <!-- Résultat du calcul d'une formule reliée à des grandeurs -->
-        <div
-          v-if="calculation?.ok && !hasQuantityKind"
-          class="mindmap-node__quantity mindmap-node__quantity--badge mindmap-node__quantity--result"
-        >{{ calculationText }}</div>
-        <div
-          v-else-if="calculation && !calculation.ok"
-          class="mindmap-node__calc-error"
-          :title="calculation.error"
-        >⚠ {{ calculation.error }}</div>
+        <NodeTextBody v-else :node="node" />
+
+        <NodeQuantity :node="node" />
       </div>
     </foreignObject>
 
@@ -197,16 +87,19 @@
 </template>
 
 <script setup>
+import './node/node.css';
 import { mindmapColors, themeHex, readableTextColor } from '@/helpers/themeColors';
-import { computed, ref, nextTick } from 'vue';
+import { computed } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
+import { provideNodeEditing } from '@/composables/useMindMapNodeEditing';
 import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
-import { createQuantity, hasKind, hasFormulaContent, isGraphNode as isGraphItem } from '@/helpers/mindmap/mindmapItems';
+import { hasFormulaContent, isGraphNode as isGraphItem } from '@/helpers/mindmap/mindmapItems';
 import MindMapGraph from './MindMapGraph.vue';
-import { formatCalculation } from '@/helpers/mindmap/mindmapCalc';
+import NodeTitle from './node/NodeTitle.vue';
+import NodeImage from './node/NodeImage.vue';
+import NodeTextBody from './node/NodeTextBody.vue';
+import NodeQuantity from './node/NodeQuantity.vue';
 import { renderMathMultiline } from '@/components/interpreter/interpreter.js';
-import { uploadMindmapImage } from '@/helpers/mindmap/mindmapImage';
-import { notif } from '@/helpers/notif';
 
 // Couleur de corps de texte par défaut d'un item (lue dans base.css : --blue-100).
 const BODY_TEXT = themeHex('--blue-100');
@@ -219,6 +112,8 @@ const props = defineProps({
 
 const emit = defineEmits(['node-pointerdown', 'toggle-collapse']);
 const store = useMindMapBuilderStore();
+// Champ en cours d'édition (titre, contenu ou grandeur), partagé avec les sous-composants.
+const editingField = provideNodeEditing();
 
 const width = computed(() => props.node.style?.width || 220);
 const height = computed(() => props.node.style?.height || 120);
@@ -242,159 +137,24 @@ const isGraphNode = computed(() => isGraphItem(props.node));
 // Hauteur réservée au titre au-dessus du graphique (ligne + espacement).
 const GRAPH_TITLE_HEIGHT = 28;
 const isQuantityNode = computed(() => props.node.type === 'quantity');
-const hasQuantityKind = computed(() => hasKind(props.node, 'quantity'));
-const quantity = computed(() => createQuantity(props.node.quantity));
-const quantitySymbol = computed(() => quantity.value.symbol);
-const quantityUnit = computed(() => quantity.value.unit);
-const quantityValue = computed(() => quantity.value.value ?? '');
-// Résultat de la formule portée par cet item (null si elle n'est reliée à aucune grandeur).
-const calculation = computed(() => store.calculations?.[props.node.id] || null);
-const calculationText = computed(() => formatCalculation(calculation.value));
-// Formule qui est aussi une grandeur : sa valeur et son unité viennent du calcul.
-const ownCalculation = computed(() => (hasQuantityKind.value && calculation.value?.ok ? calculation.value : null));
-const ownCalculationText = computed(() => formatCalculation(ownCalculation.value));
-const imageSrc = computed(() => (isImageNode.value ? props.node.content || '' : ''));
 const formulaHtml = computed(() =>
   isFormulaNode.value && props.node.content ? renderMathMultiline(props.node.content) : ''
 );
-const displayContent = computed(() => {
-  if (!props.node.content || isImageNode.value || isFormulaNode.value || isGraphNode.value || isQuantityNode.value) return '';
-  // Cartes existantes : le nœud racine dupliquait son titre dans son contenu
-  if (props.node.id === store.map.subjectNodeId && props.node.content === props.node.label) return '';
-  return props.node.content;
-});
-const bodyStyle = computed(() => {
-  const rawSize = Number.parseInt(props.node.style?.fontSize, 10);
-  const fontSize = Number.isFinite(rawSize) ? rawSize : 13;
-  return {
-    color: props.node.style?.textColor || BODY_TEXT,
-    fontSize: `${fontSize}px`,
-    fontWeight: props.node.style?.fontWeight || 'normal',
-    fontStyle: props.node.style?.fontStyle || 'normal',
-    textDecoration: props.node.style?.textDecoration || 'none',
-  };
-});
 
-// ── Édition inline ────────────────────────────────────────────────────────────
-const editingField = ref(null);
-const localLabel = ref('');
-const localContent = ref('');
-const labelInputRef = ref(null);
-const contentInputRef = ref(null);
-
-const startEditLabel = () => {
-  localLabel.value = props.node.label;
-  editingField.value = 'label';
-  nextTick(() => {
-    labelInputRef.value?.focus();
-    labelInputRef.value?.select();
+const addChildNode = () => {
+  const type = store.nodeType || 'text';
+  store.addNode({
+    label: getNodeLabel(type),
+    type,
+    parentId: props.node.id,
+    content: type === 'text' ? undefined : '',
   });
-};
-
-const startEditContent = () => {
-  if (isImageNode.value || isFormulaNode.value || isGraphNode.value) return;
-  localContent.value = props.node.content || '';
-  editingField.value = 'content';
-  nextTick(() => {
-    contentInputRef.value?.focus();
-    contentInputRef.value?.select();
-  });
-};
-
-const localQuantity = ref({ symbol: '', unit: '' });
-const quantityEditorRef = ref(null);
-const quantitySymbolRef = ref(null);
-
-const startEditQuantity = () => {
-  localQuantity.value = { symbol: quantity.value.symbol, unit: quantity.value.unit };
-  editingField.value = 'quantity';
-  nextTick(() => {
-    quantitySymbolRef.value?.focus();
-    quantitySymbolRef.value?.select();
-  });
-};
-
-const commitQuantity = () => {
-  if (editingField.value !== 'quantity') return;
-  store.updateNodeQuantity(props.node.id, { symbol: localQuantity.value.symbol, unit: localQuantity.value.unit });
-  editingField.value = null;
-};
-
-// La valeur s'édite directement sur l'item (sans double-clic).
-const commitQuantityValue = (event) => {
-  store.updateNodeQuantity(props.node.id, { value: event.target.value });
-};
-
-// Valide quand le focus quitte l'ensemble des trois champs (pas entre deux champs).
-const onQuantityFocusOut = (event) => {
-  if (quantityEditorRef.value?.contains(event.relatedTarget)) return;
-  commitQuantity();
-};
-
-const commitLabel = () => {
-  if (editingField.value !== 'label') return;
-  const trimmed = localLabel.value.trim();
-  if (trimmed && trimmed !== props.node.label) {
-    store.updateNode(props.node.id, { label: trimmed });
-  }
-  editingField.value = null;
-};
-
-const commitContent = () => {
-  if (editingField.value !== 'content') return;
-  if (localContent.value !== props.node.content) {
-    store.updateNode(props.node.id, { content: localContent.value });
-  }
-  editingField.value = null;
-};
-
-const cancelEdit = () => {
-  editingField.value = null;
-};
-
-// ── Redimensionnement automatique selon les proportions de l'image ────────────
-const handleImageLoad = (event) => {
-  const img = event.target;
-  const naturalW = img.naturalWidth;
-  const naturalH = img.naturalHeight;
-  if (!naturalW || !naturalH) return;
-
-  const TITLE_H = 30;
-  const targetW = Math.max(180, Math.min(400, width.value));
-  const imgAreaW = targetW - 24;
-  const imgH = Math.round(imgAreaW * naturalH / naturalW);
-  const targetH = Math.max(120, TITLE_H + imgH + 20);
-
-  if (Math.abs(targetH - height.value) > 2 || Math.abs(targetW - width.value) > 2) {
-    store.updateNodeStyle(props.node.id, { width: targetW, height: targetH });
-  }
-};
-
-// ── Drag & drop image ─────────────────────────────────────────────────────────
-const isDragOver = ref(false);
-
-const handleImageDrop = async (event) => {
-  isDragOver.value = false;
-  const file = event.dataTransfer?.files?.[0];
-  if (!file || !file.type.startsWith('image/')) return;
-  try {
-    store.updateNode(props.node.id, { content: await uploadMindmapImage(file) });
-  } catch (error) {
-    if (error.code === 'IMAGE_TOO_LARGE') return;
-    notif.notify("L'image n'a pas pu être téléchargée.", 'error');
-  }
 };
 
 const handlePointerDown = (event) => {
   if (editingField.value) return;
   if (event.shiftKey) {
-    const type = store.nodeType || 'text';
-    store.addNode({
-      label: getNodeLabel(type),
-      type,
-      parentId: props.node.id,
-      content: type === 'text' ? undefined : '',
-    });
+    addChildNode();
     return;
   }
   emit('node-pointerdown', { event, node: props.node });
@@ -406,220 +166,6 @@ const toggleCollapse = () => {
 
 const createChildNode = () => {
   if (!props.node?.id) return;
-  const type = store.nodeType || 'text';
-  store.addNode({
-    label: getNodeLabel(type),
-    type,
-    parentId: props.node.id,
-    content: type === 'text' ? undefined : '',
-  });
+  addChildNode();
 };
 </script>
-
-<style scoped>
-.mindmap-node__quantity {
-  font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-  color: var(--blue-100);
-  cursor: text;
-}
-.mindmap-node__quantity-editor {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--blue-100);
-}
-.mindmap-node__quantity-input {
-  min-width: 0;
-  flex: 1;
-  text-align: center;
-}
-.mindmap-node__quantity {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-.mindmap-node__quantity-label {
-  cursor: text;
-  min-width: 1ch;
-}
-.mindmap-node__quantity-value {
-  width: 5.5em;
-  min-width: 0;
-  text-align: center;
-}
-.mindmap-node__quantity-computed {
-  font-variant-numeric: tabular-nums;
-}
-.mindmap-node__quantity--result {
-  font-weight: 700;
-}
-.mindmap-node__calc-error {
-  font-size: 11px;
-  color: var(--mindmap-error-text);
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mindmap-node__quantity-sep {
-  font-weight: 700;
-}
-.mindmap-node__quantity--badge {
-  font-size: 12px;
-  opacity: 0.85;
-}
-.mindmap-node {
-  cursor: pointer;
-  filter: drop-shadow(0 3px 8px rgb(var(--slate-900-rgb) / 0.28));
-  transition: filter 0.2s ease;
-}
-
-.mindmap-node:hover {
-  filter: drop-shadow(0 6px 18px rgb(var(--slate-900-rgb) / 0.38));
-}
-
-.mindmap-node--selected {
-  filter: drop-shadow(0 0 6px rgb(var(--sky-400-rgb) / 1)) drop-shadow(0 0 20px rgb(var(--sky-400-rgb) / 0.6));
-}
-
-.mindmap-node__content {
-  font-family: 'Inter', sans-serif;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  height: 100%;
-  /* Texte long : défilement dans le nœud plutôt que coupé net */
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.mindmap-node__title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--slate-100);
-  line-height: 1.25;
-  word-break: break-word;
-  cursor: text;
-  letter-spacing: 0.01em;
-}
-
-.mindmap-node__body {
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--blue-100);
-  word-break: break-word;
-  white-space: pre-wrap;
-  cursor: text;
-  flex: 1;
-}
-
-.mindmap-node__placeholder {
-  /* 0,8 et non 0,4 : l'invite doit rester lisible (RGAA 3.2) maintenant que cette règle s'applique */
-  opacity: 0.8;
-  font-style: italic;
-  font-size: 11px;
-}
-
-.mindmap-node__formula {
-  width: 100%;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.mindmap-node__formula :deep(.katex-display) { margin: 0; }
-.mindmap-node__formula :deep(.katex) { font-size: 1rem; }
-
-.mindmap-node__image {
-  width: 100%;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-}
-
-.mindmap-node__image--drag {
-  border: 2px dashed var(--sky-400);
-  border-radius: 6px;
-  background: rgb(var(--sky-400-rgb) / 0.08);
-}
-
-.mindmap-node__image img {
-  max-width: 100%;
-  max-height: 100%;
-  border-radius: 6px;
-  object-fit: contain;
-}
-
-.mindmap-node__image-placeholder {
-  font-size: 11px;
-  color: var(--blue-200);
-  text-align: center;
-  opacity: 0.85;
-}
-
-.mindmap-node__collapse {
-  cursor: pointer;
-}
-
-.mindmap-node__add {
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.mindmap-node:hover .mindmap-node__add,
-.mindmap-node__add--active {
-  opacity: 1;
-}
-
-.mindmap-node__add circle {
-  fill: var(--sky-400);
-  stroke: var(--slate-900);
-  stroke-width: 1;
-}
-
-.mindmap-node__add:hover circle {
-  fill: var(--sky-500);
-}
-
-.mindmap-node__inline-input {
-  width: 100%;
-  background: rgb(var(--white) / 0.12);
-  border: 1.5px solid rgb(var(--sky-400-rgb) / 0.7);
-  border-radius: 6px;
-  color: var(--slate-100);
-  font-family: 'Inter', sans-serif;
-  outline: none;
-  resize: none;
-  box-sizing: border-box;
-  padding: 3px 6px;
-}
-
-.mindmap-node__inline-input:focus {
-  background: rgb(var(--white) / 0.18);
-  border-color: var(--sky-400);
-  box-shadow: 0 0 0 2px rgb(var(--sky-400-rgb) / 0.3);
-}
-
-.mindmap-node__inline-input--title {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  min-height: 26px;
-}
-
-.mindmap-node__inline-input--content {
-  font-size: 13px;
-  line-height: 1.4;
-  flex: 1;
-  min-height: 36px;
-}
-</style>
