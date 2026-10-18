@@ -42,6 +42,7 @@ describe('StudentGroupPicker', () => {
     expect(cards.map((c) => c.find('.text-lg').text())).toEqual(['MP2I A', 'L3'])
     expect(cards[1].classes()).toContain('border-primary')
     expect(cards[0].classes()).toContain('border-gray')
+    expect(cards.map((c) => c.attributes('aria-pressed'))).toEqual(['false', 'true']) // état exposé hors couleur (RGAA)
   })
 
   it('clic, Entrée et Espace émettent « select » (RGAA 7.1)', async () => {

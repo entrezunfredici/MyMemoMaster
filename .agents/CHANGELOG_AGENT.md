@@ -13409,3 +13409,13 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Non touché volontairement** : les `formatDate` de `StudentDetailComponent`, `TodoWidget` et `KpiPage` produisent des formats courts différents (sans année, jour/mois) ; ce ne sont pas des doublons de `classroomFormat.formatDate`.
 **Reste** : dépôt de rendu / téléchargement côté enseignant à tester avec un vrai compte étudiant ; fichiers de l'éditeur de carte à découper.
 **Tests** : 34 verts sur les deux modales IA ; ESLint propre sur les fichiers modifiés.
+
+
+## [2026-10-18] [IMP] RGAA : contrôles imbriqués restants et état « sélectionné » exposé (branche `dev_front_small_fixes2`)
+
+**Contexte** : audit du reliquat RGAA. Les lignes étudiants / rendus de `TeacherAnalyticsPanel` et `TeacherSectionsPanel` ne contiennent plus de `role="button"` (corrigé avant) ; l'audit `audit:a11y --strict` est à 0.
+**Fait** :
+- `TeacherResourceForm` : la zone de dépôt n'est plus un `role="button"` qui contenait le bouton « Retirer » (RGAA 7.1, contrôle imbriqué). « Parcourez » et « Retirer » sont de vrais `<button type="button">` frères, comme dans `StudentRenduCard`.
+- `aria-pressed` sur les cartes de `StudentGroupPicker`, `TeacherGroupPicker` et sur les onglets de `SubjectFilterComponent` : la sélection n'était signalée que par la couleur de bordure.
+**Tests** : `TeacherPanels` (zone sans rôle, bouton « parcourez » qui ouvre le sélecteur, « Retirer » hors `role="button"`, `aria-pressed` du sélecteur de groupe) et `StudentPanels` ; front 128 fichiers / 2117 tests, ESLint, `audit:a11y` à 0.
+**Non traité (action humaine)** : revue visuelle des 50 bordures `border-gray-500` ; test au lecteur d'écran (NVDA/VoiceOver) ; variable de dépôt `A11Y_BASE_URLS` (absente, il faut l'URL d'un site déployé à auditer) pour `a11y-live.yml`.

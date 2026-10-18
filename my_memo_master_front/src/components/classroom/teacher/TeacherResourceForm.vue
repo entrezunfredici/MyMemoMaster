@@ -10,30 +10,25 @@
       <option value="autre">Autre</option>
     </select>
 
-    <!-- Zone drag & drop -->
+    <!-- Zone drag & drop. RGAA 7.1 : la zone ne répond au glisser-déposer qu'à la souris ; « choisir un fichier »
+         et « Retirer » sont de vrais boutons frères (plus de bouton imbriqué dans un role="button"). -->
     <div
-      role="button"
-      tabindex="0"
-      aria-label="Déposer ou choisir un fichier"
       @dragover.prevent="resourceForm.dragOver = true"
       @dragleave.prevent="resourceForm.dragOver = false"
       @drop.prevent="onFileDrop"
-      @click="$refs.fileInput.click()"
-      @keydown.enter.prevent="$refs.fileInput.click()"
-      @keydown.space.prevent="$refs.fileInput.click()"
       :class="[
-        'cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition',
+        'rounded-xl border-2 border-dashed px-4 py-6 text-center transition',
         resourceForm.dragOver ? 'border-primary bg-primary/5' : 'border-gray hover:border-primary/50'
       ]">
       <div v-if="resourceForm.file">
         <p class="text-sm font-semibold text-dark">{{ resourceForm.file.name }}</p>
         <p class="text-xs text-dark/60 mt-0.5">{{ formatFileSize(resourceForm.file.size) }}</p>
-        <button @click.stop="resourceForm.file = null" class="mt-1 text-xs text-secondary hover:underline">Retirer</button>
+        <button type="button" @click="resourceForm.file = null" class="mt-1 text-xs text-secondary hover:underline">Retirer</button>
       </div>
-      <div v-else>
-        <p class="text-sm text-dark/60">Glissez un fichier ici ou <span class="text-primary underline">parcourez</span></p>
-        <p class="text-xs text-dark/40 mt-1">PDF, Word, PowerPoint, Excel — max 10 Mo</p>
-      </div>
+      <button v-else type="button" class="w-full cursor-pointer" @click="fileInput?.click()">
+        <span class="block text-sm text-dark/60">Glissez un fichier ici ou <span class="text-primary underline">parcourez</span></span>
+        <span class="block text-xs text-dark/40 mt-1">PDF, Word, PowerPoint, Excel — max 10 Mo</span>
+      </button>
     </div>
     <input aria-label="Choisir un fichier à partager" ref="fileInput" type="file"
       accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*"
@@ -50,13 +45,14 @@
 
 <script setup>
 // Formulaire de partage d'un document (glisser-déposer ou sélection). Extrait de pages/ClassroomEnseignantView.vue.
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useClassGroupResourceStore } from '@/stores/classGroupResources'
 import { formatFileSize } from '@/helpers/classroomFormat'
 
 const props = defineProps({ groupId: { type: Number, required: true } })
 
 const resourceStore = useClassGroupResourceStore()
+const fileInput = ref(null)
 const resourceForm = reactive({ title: '', type: 'cours', file: null, dragOver: false, error: '' })
 
 async function submitResource() {

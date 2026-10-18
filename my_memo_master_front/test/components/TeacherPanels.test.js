@@ -69,6 +69,9 @@ describe('TeacherGroupPicker', () => {
     const cards = wrapper.findAll('[role="button"]')
     expect(cards[0].classes()).toContain('border-gray')
     expect(cards[1].classes()).toContain('border-primary')
+    // RGAA 7.1 : l'état sélectionné est aussi exposé aux lecteurs d'écran, pas seulement par la couleur
+    expect(cards[0].attributes('aria-pressed')).toBe('false')
+    expect(cards[1].attributes('aria-pressed')).toBe('true')
   })
 
   it('clic, Entrée et Espace émettent « select » avec l’identifiant (RGAA 7.1)', async () => {
@@ -479,7 +482,7 @@ describe('TeacherResourceForm', () => {
 
   it('glisser-déposer : le survol est signalé puis le fichier retenu', async () => {
     const { wrapper } = mountForm()
-    const zone = wrapper.find('[role="button"]')
+    const zone = wrapper.find('.border-dashed')
     await zone.trigger('dragover')
     expect(zone.classes()).toContain('border-primary')
     await zone.trigger('drop', { dataTransfer: { files: [file] } })
@@ -489,16 +492,27 @@ describe('TeacherResourceForm', () => {
 
   it('« Retirer » écarte le fichier choisi sans ouvrir le sélecteur', async () => {
     const { wrapper } = mountForm()
-    await wrapper.find('[role="button"]').trigger('drop', { dataTransfer: { files: [file] } })
+    await wrapper.find('.border-dashed').trigger('drop', { dataTransfer: { files: [file] } })
     await btn(wrapper, 'Retirer').trigger('click')
     expect(wrapper.text()).toContain('Glissez un fichier ici')
   })
 
-  it('zone de dépôt accessible : nommée et atteignable au clavier', () => {
+  it('zone de dépôt accessible : aucun contrôle imbriqué, « parcourez » est un vrai bouton (RGAA 7.1)', async () => {
     const { wrapper } = mountForm()
-    const zone = wrapper.find('[role="button"]')
-    expect(zone.attributes('aria-label')).toBe('Déposer ou choisir un fichier')
-    expect(zone.attributes('tabindex')).toBe('0')
+    expect(wrapper.find('.border-dashed').attributes('role')).toBeUndefined()
+    expect(wrapper.find('[role="button"] button').exists()).toBe(false)
+    const browse = wrapper.find('.border-dashed button')
+    expect(browse.attributes('type')).toBe('button')
+    const click = vi.spyOn(wrapper.find('input[type="file"]').element, 'click')
+    await browse.trigger('click')
+    expect(click).toHaveBeenCalledOnce()
+  })
+
+  it('fichier choisi : « Retirer » est un bouton à part entière, la zone n’est plus un bouton', async () => {
+    const { wrapper } = mountForm()
+    await wrapper.find('.border-dashed').trigger('drop', { dataTransfer: { files: [file] } })
+    expect(wrapper.find('[role="button"]').exists()).toBe(false)
+    expect(btn(wrapper, 'Retirer').exists()).toBe(true)
   })
 
   it('envoi en cours : bouton désactivé et libellé adapté', () => {

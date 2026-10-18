@@ -4,6 +4,7 @@
       v-for="g in groups" :key="g.id"
       role="button"
       tabindex="0"
+      :aria-pressed="selectedId === g.id"
       @click="emit('select', g.id)"
       @keydown.enter.prevent="emit('select', g.id)"
       @keydown.space.prevent="emit('select', g.id)"
