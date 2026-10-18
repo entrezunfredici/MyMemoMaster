@@ -1,4 +1,4 @@
-const { Role } = require('../../models/index')
+const { Role, User } = require('../../models/index')
 const RoleService = require('../../services/Role.service')
 
 jest.mock('../../models/index', () => ({
@@ -8,7 +8,8 @@ jest.mock('../../models/index', () => ({
     create: jest.fn(),
     update: jest.fn(),
     destroy: jest.fn()
-  }
+  },
+  User: { count: jest.fn() }
 }))
 
 describe('RoleService', () => {
@@ -47,5 +48,22 @@ describe('RoleService', () => {
 
     expect(Role.create).toHaveBeenCalledWith({ name: 'Utilisateur' })
     expect(role).toEqual(mockRole)
+  })
+
+  test.each([1, 2, 3, 4, 5, '3'])('isSystemRole — %s est un rôle système', (id) => {
+    expect(RoleService.isSystemRole(id)).toBe(true)
+  })
+
+  test.each([0, 6, 10, '10', null, undefined, 'abc'])('isSystemRole — %s n’est pas un rôle système', (id) => {
+    expect(RoleService.isSystemRole(id)).toBe(false)
+  })
+
+  test('countUsers — compte les comptes portant le rôle', async () => {
+    User.count.mockResolvedValue(4)
+
+    const count = await RoleService.countUsers(10)
+
+    expect(User.count).toHaveBeenCalledWith({ where: { roleId: 10 } })
+    expect(count).toBe(4)
   })
 })

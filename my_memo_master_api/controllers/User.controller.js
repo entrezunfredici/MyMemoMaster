@@ -276,9 +276,31 @@ exports.changePassword = async (req, res) => {
   }
 }
 
+// Un administrateur ne peut pas se retirer lui-même le rôle d'administrateur plateforme (rôle 1) :
+// sinon plus personne ne pourrait administrer.
+const isOwnAdminDemotion = (req, newRoleId) =>
+  Number(req.params.id) === Number(req.user.id) && Number(newRoleId) !== 1
+
+const isValidRoleId = (roleId) => roleId !== null && roleId !== '' && roleId !== undefined && Number.isInteger(Number(roleId))
+
+const OWN_ROLE_MESSAGE = "Vous ne pouvez pas retirer votre propre rôle d'administrateur."
+
+exports.search = async (req, res) => {
+  try {
+    const { search, roleId, page, limit } = req.query
+    const data = await userService.search({ search, roleId, page, limit })
+    res.status(200).send({ message: 'Comptes récupérés.', data })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la récupération des comptes.' })
+  }
+}
+
 exports.addRole = async (req, res) => {
   const { roleId } = req.body
   try {
+    if (!isValidRoleId(roleId)) return res.status(400).send({ message: 'Le rôle est requis.' })
+    if (isOwnAdminDemotion(req, roleId)) return res.status(403).send({ message: OWN_ROLE_MESSAGE })
     await userService.setRole(req.params.id, roleId, req.user.id)
     res.status(200).send({ message: 'Rôle ajouté avec succès.' })
   } catch (error) {
@@ -290,6 +312,8 @@ exports.addRole = async (req, res) => {
 exports.updateRole = async (req, res) => {
   try {
     const { roleId } = req.body
+    if (!isValidRoleId(roleId)) return res.status(400).send({ message: 'Le rôle est requis.' })
+    if (isOwnAdminDemotion(req, roleId)) return res.status(403).send({ message: OWN_ROLE_MESSAGE })
     await userService.setRole(req.params.id, roleId, req.user.id)
     res.status(200).send({ message: 'Rôle mis à jour avec succès.' })
   } catch (error) {
@@ -300,6 +324,9 @@ exports.updateRole = async (req, res) => {
 
 exports.removeRole = async (req, res) => {
   try {
+    if (Number(req.params.id) === Number(req.user.id)) {
+      return res.status(403).send({ message: OWN_ROLE_MESSAGE })
+    }
     await userService.deleteRole(req.params.id, req.user.id)
     res.status(200).send({ message: 'Rôle supprimé avec succès.' })
   } catch (error) {

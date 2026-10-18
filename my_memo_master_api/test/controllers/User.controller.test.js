@@ -24,6 +24,7 @@ jest.mock('../../helpers/sendEmail', () => jest.fn())
 
 jest.mock('../../services/User.service', () => ({
   findByEmail: jest.fn(),
+  search: jest.fn(),
   create: jest.fn(),
   isRegistrationOpen: jest.fn().mockResolvedValue(true),
   findOne: jest.fn(),
@@ -624,6 +625,49 @@ describe('User Controller', () => {
     })
   })
 
+  // ── GET /users (administration) ────────────────────────────────────────────
+  describe('GET /users', () => {
+    const PAGE = { users: [{ userId: 2, name: 'Alice', email: 'a@x.fr', roleId: 2, isActive: true }], total: 1, page: 1, limit: 20 }
+
+    it('200 — renvoie la page de comptes et transmet les filtres', async () => {
+      userService.search.mockResolvedValue(PAGE)
+
+      const res = await request(app)
+        .get('/api/v1/users?search=ali&roleId=2&page=3&limit=10')
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.data).toEqual(PAGE)
+      expect(userService.search).toHaveBeenCalledWith({ search: 'ali', roleId: '2', page: '3', limit: '10' })
+    })
+
+    it('200 — sans filtre', async () => {
+      userService.search.mockResolvedValue(PAGE)
+      const res = await request(app).get('/api/v1/users').set('Authorization', `Bearer ${makeToken()}`)
+      expect(res.status).toBe(200)
+      expect(userService.search).toHaveBeenCalledWith({ search: undefined, roleId: undefined, page: undefined, limit: undefined })
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app).get('/api/v1/users')
+      expect(res.status).toBe(401)
+    })
+
+    it.each([2, 3, 4, 5])('403 — rôle %i non autorisé', async (roleId) => {
+      User.findByPk.mockResolvedValueOnce({ roleId })
+      const res = await request(app).get('/api/v1/users').set('Authorization', `Bearer ${makeToken()}`)
+      expect(res.status).toBe(403)
+      expect(userService.search).not.toHaveBeenCalled()
+    })
+
+    it('500 — le service échoue', async () => {
+      userService.search.mockRejectedValue(new Error('DB error'))
+      const res = await request(app).get('/api/v1/users').set('Authorization', `Bearer ${makeToken()}`)
+      expect(res.status).toBe(500)
+      expect(res.body.message).toBe('Erreur lors de la récupération des comptes.')
+    })
+  })
+
   // ── POST /users/:id/role ───────────────────────────────────────────────────
   describe('POST /users/:id/role', () => {
     it("200 — assigne un rôle à l'utilisateur (admin)", async () => {
@@ -696,6 +740,48 @@ describe('User Controller', () => {
     it('401 — pas de token', async () => {
       const res = await request(app).put('/api/v1/users/2/role').send({ roleId: 3 })
       expect(res.status).toBe(401)
+    })
+  })
+
+  // ── Garde-fous sur les rôles de compte ─────────────────────────────────────
+  describe('rôle de compte — garde-fous', () => {
+    const asAdmin = (req) => req.set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+
+    it.each([['post'], ['put']])('%s /users/:id/role — 400 sans rôle valide', async (method) => {
+      for (const body of [{}, { roleId: '' }, { roleId: null }, { roleId: 'abc' }, { roleId: 1.5 }]) {
+        const res = await asAdmin(request(app)[method]('/api/v1/users/2/role')).send(body)
+        expect(res.status).toBe(400)
+        expect(res.body.message).toBe('Le rôle est requis.')
+      }
+      expect(userService.setRole).not.toHaveBeenCalled()
+    })
+
+    it.each([['post'], ['put']])('%s /users/:id/role — 403 : un administrateur ne peut pas quitter son propre rôle', async (method) => {
+      const res = await asAdmin(request(app)[method]('/api/v1/users/1/role')).send({ roleId: 2 })
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBe("Vous ne pouvez pas retirer votre propre rôle d'administrateur.")
+      expect(userService.setRole).not.toHaveBeenCalled()
+    })
+
+    it('PUT /users/:id/role — se réattribuer le rôle administrateur reste permis', async () => {
+      userService.setRole.mockResolvedValue()
+      const res = await asAdmin(request(app).put('/api/v1/users/1/role')).send({ roleId: 1 })
+      expect(res.status).toBe(200)
+      expect(userService.setRole).toHaveBeenCalledWith('1', 1, 1)
+    })
+
+    it('PUT /users/:id/role — changer le rôle d’un autre compte reste permis', async () => {
+      userService.setRole.mockResolvedValue()
+      const res = await asAdmin(request(app).put('/api/v1/users/2/role')).send({ roleId: 4 })
+      expect(res.status).toBe(200)
+      expect(userService.setRole).toHaveBeenCalledWith('2', 4, 1)
+    })
+
+    it('DELETE /users/:id/role — 403 sur son propre compte', async () => {
+      const res = await asAdmin(request(app).delete('/api/v1/users/1/role'))
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBe("Vous ne pouvez pas retirer votre propre rôle d'administrateur.")
+      expect(userService.deleteRole).not.toHaveBeenCalled()
     })
   })
 

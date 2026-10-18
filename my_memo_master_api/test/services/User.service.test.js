@@ -7,8 +7,10 @@ jest.mock('../../helpers/tokenBlacklist', () => ({
 }))
 
 jest.mock('../../models/index', () => ({
+  instance: { getDialect: jest.fn(() => 'sqlite') },
   User: {
     findAll: jest.fn(),
+    findAndCountAll: jest.fn(),
     findOne: jest.fn(),
     findByPk: jest.fn(),
     create: jest.fn(),
@@ -36,7 +38,8 @@ jest.mock('../../models/index', () => ({
   }
 }))
 
-const { User, Role, UserOnboardingState, Invitation, Etablissement } = require('../../models/index')
+const { User, Role, UserOnboardingState, Invitation, Etablissement, instance } = require('../../models/index')
+const { Op } = require('sequelize')
 const bcrypt = require('bcryptjs')
 const UserService = require('../../services/User.service')
 
@@ -63,6 +66,70 @@ describe('UserService', () => {
         { userId: 1, name: 'User 1' },
         { id: 2, name: 'User 2' }
       ])
+    })
+  })
+
+  describe('search', () => {
+    const ROWS = [{ userId: 2, name: 'Alice' }]
+    const lastCall = () => User.findAndCountAll.mock.calls.at(-1)[0]
+
+    beforeEach(() => {
+      User.findAndCountAll.mockResolvedValue({ rows: ROWS, count: 41 })
+      instance.getDialect.mockReturnValue('sqlite')
+    })
+
+    it('renvoie la page, le total et ne sélectionne que des champs d’affichage', async () => {
+      const result = await UserService.search()
+
+      expect(result).toEqual({ users: ROWS, total: 41, page: 1, limit: 20 })
+      expect(lastCall().attributes).toEqual(['userId', 'name', 'email', 'roleId', 'isActive', 'hasValidatedEmail', 'createdAt', 'lastLogin'])
+      expect(lastCall().attributes).not.toContain('password')
+      expect(lastCall().where).toEqual({})
+      expect(lastCall().order).toEqual([['name', 'ASC'], ['userId', 'ASC']])
+    })
+
+    it('le texte est cherché dans le nom ou l’e-mail, sans espaces autour', async () => {
+      await UserService.search({ search: '  ali  ' })
+      expect(lastCall().where[Op.or]).toEqual([
+        { name: { [Op.like]: '%ali%' } },
+        { email: { [Op.like]: '%ali%' } }
+      ])
+    })
+
+    it('PostgreSQL : recherche insensible à la casse (iLike)', async () => {
+      instance.getDialect.mockReturnValue('postgres')
+      await UserService.search({ search: 'ali' })
+      expect(lastCall().where[Op.or][0]).toEqual({ name: { [Op.iLike]: '%ali%' } })
+    })
+
+    it('texte vide ou blanc : aucun filtre ; texte tronqué à 100 caractères', async () => {
+      await UserService.search({ search: '   ' })
+      expect(lastCall().where).toEqual({})
+      await UserService.search({ search: 'x'.repeat(150) })
+      expect(lastCall().where[Op.or][0].name[Op.like]).toBe(`%${'x'.repeat(100)}%`)
+    })
+
+    it('filtre par rôle (chaîne ou nombre), y compris 0 ; vide = pas de filtre', async () => {
+      await UserService.search({ roleId: '4' })
+      expect(lastCall().where.roleId).toBe(4)
+      await UserService.search({ roleId: 0 })
+      expect(lastCall().where.roleId).toBe(0)
+      await UserService.search({ roleId: '' })
+      expect(lastCall().where).not.toHaveProperty('roleId')
+    })
+
+    it.each([
+      [{ page: 3, limit: 10 }, 20, 10, 3],
+      [{ page: '2', limit: '50' }, 50, 50, 2],
+      [{ limit: 1000 }, 0, 100, 1],
+      [{ limit: 0 }, 0, 20, 1],
+      [{ page: 0 }, 0, 20, 1],
+      [{ page: -4, limit: -2 }, 0, 1, 1],
+      [{ page: 'abc', limit: 'abc' }, 0, 20, 1]
+    ])('pagination %j : offset %i, taille %i, page %i', async (input, offset, limit, page) => {
+      const result = await UserService.search(input)
+      expect(lastCall()).toMatchObject({ offset, limit })
+      expect(result).toMatchObject({ page, limit })
     })
   })
 

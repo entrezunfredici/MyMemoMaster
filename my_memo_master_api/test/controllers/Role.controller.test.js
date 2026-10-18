@@ -26,7 +26,9 @@ jest.mock('../../services/Role.service', () => ({
   findOne: jest.fn(),
   create: jest.fn(),
   update: jest.fn(),
-  delete: jest.fn()
+  delete: jest.fn(),
+  isSystemRole: jest.fn((id) => [1, 2, 3, 4, 5].includes(Number(id))),
+  countUsers: jest.fn()
 }))
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -47,6 +49,7 @@ describe('Role Controller', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     User.findByPk.mockResolvedValue({ roleId: 1 })
+    roleService.countUsers.mockResolvedValue(0)
   })
 
   // ── GET /roles ─────────────────────────────────────────────────────────────
@@ -198,10 +201,10 @@ describe('Role Controller', () => {
   // ── PUT /roles/:id ─────────────────────────────────────────────────────────
   describe('PUT /roles/:id', () => {
     it('200 — met à jour le rôle', async () => {
-      roleService.update.mockResolvedValue({ roleId: 1, name: 'Super Admin' })
+      roleService.update.mockResolvedValue({ roleId: 10, name: 'Super Admin' })
 
       const res = await request(app)
-        .put(`${BASE}/roles/1`)
+        .put(`${BASE}/roles/10`)
         .set('Authorization', `Bearer ${makeToken()}`)
         .send({ name: 'Super Admin' })
 
@@ -217,6 +220,17 @@ describe('Role Controller', () => {
         .send({ name: 'Super Admin' })
 
       expect(res.status).toBe(404)
+    })
+
+    it.each([1, 2, 3, 4, 5])('403 — le rôle système %i ne peut pas être renommé', async (id) => {
+      const res = await request(app)
+        .put(`${BASE}/roles/${id}`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+        .send({ name: 'Autre nom' })
+
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBe('Les rôles système ne peuvent pas être renommés.')
+      expect(roleService.update).not.toHaveBeenCalled()
     })
 
     it('400 — name trop court', async () => {
@@ -250,16 +264,42 @@ describe('Role Controller', () => {
   // ── DELETE /roles/:id ──────────────────────────────────────────────────────
   describe('DELETE /roles/:id', () => {
     it('204 — supprime le rôle', async () => {
+      roleService.findOne.mockResolvedValue({ roleId: 10, name: 'Invité' })
       roleService.delete.mockResolvedValue(true)
 
       const res = await request(app)
-        .delete(`${BASE}/roles/1`)
+        .delete(`${BASE}/roles/10`)
         .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(204)
     })
 
+    it.each([1, 2, 3, 4, 5])('403 — le rôle système %i ne peut pas être supprimé', async (id) => {
+      const res = await request(app)
+        .delete(`${BASE}/roles/${id}`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(403)
+      expect(res.body.message).toBe('Les rôles système ne peuvent pas être supprimés.')
+      expect(roleService.delete).not.toHaveBeenCalled()
+    })
+
+    it.each([[1, 'ce compte'], [3, 'ces comptes']])('409 — rôle attribué à %i compte(s) : suppression refusée (la suppression en cascade effacerait les comptes)', async (holders, wording) => {
+      roleService.findOne.mockResolvedValue({ roleId: 10, name: 'Invité' })
+      roleService.countUsers.mockResolvedValue(holders)
+
+      const res = await request(app)
+        .delete(`${BASE}/roles/10`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+
+      expect(res.status).toBe(409)
+      expect(res.body.message).toContain(`attribué à ${holders} compte`)
+      expect(res.body.message).toContain(wording)
+      expect(roleService.delete).not.toHaveBeenCalled()
+    })
+
     it('404 — rôle introuvable', async () => {
+      roleService.findOne.mockResolvedValue(null)
       roleService.delete.mockResolvedValue(null)
 
       const res = await request(app)
@@ -286,10 +326,11 @@ describe('Role Controller', () => {
     })
 
     it('500 — le service échoue', async () => {
+      roleService.findOne.mockResolvedValue({ roleId: 10 })
       roleService.delete.mockRejectedValue(new Error('DB error'))
 
       const res = await request(app)
-        .delete(`${BASE}/roles/1`)
+        .delete(`${BASE}/roles/10`)
         .set('Authorization', `Bearer ${makeToken()}`)
 
       expect(res.status).toBe(500)

@@ -277,6 +277,49 @@ router.post('/logout', userValidators.refreshToken, validate, user.logout)
 
 /**
  * @swagger
+ * /users:
+ *   get:
+ *     summary: Rechercher des comptes (administrateur plateforme)
+ *     description: Liste paginée, sans mot de passe ni jeton. Réservée au rôle 1.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Texte cherché dans le nom ou l'e-mail
+ *       - in: query
+ *         name: roleId
+ *         schema:
+ *           type: integer
+ *         description: Filtrer par rôle
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           maximum: 100
+ *     responses:
+ *       200:
+ *         description: "Comptes récupérés ({ users, total, page, limit })."
+ *       401:
+ *         description: Non authentifié ou compte désactivé.
+ *       403:
+ *         description: Accès refusé.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.get('/', authMiddleware, requireRole(1), user.search)
+
+/**
+ * @swagger
  * /users/{id}:
  *   get:
  *     summary: Récupérer un utilisateur par son ID

@@ -1,4 +1,5 @@
-const { User, Role, UserOnboardingState, Invitation, ClassGroupUsers, Etablissement } = require('../models/index')
+const { User, Role, UserOnboardingState, Invitation, ClassGroupUsers, Etablissement, instance: sequelize } = require('../models/index')
+const { Op } = require('sequelize')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const logger = require('../helpers/logger')
@@ -13,6 +14,37 @@ class UserService {
       const { password, ...userWithoutPassword } = user?.dataValues || user
       return userWithoutPassword
     })
+  }
+
+  /**
+   * Recherche paginée de comptes (administration plateforme). Ne renvoie que des champs d'affichage :
+   * jamais le mot de passe, les codes ni les jetons.
+   *
+   * @param {object} [filters]
+   * @param {string} [filters.search] - Texte cherché dans le nom ou l'e-mail (insensible à la casse)
+   * @param {number} [filters.roleId] - Ne garder que les comptes de ce rôle
+   * @param {number} [filters.page=1] - Page (à partir de 1)
+   * @param {number} [filters.limit=20] - Taille de page (1 à 100)
+   * @returns {Promise<{ users: object[], total: number, page: number, limit: number }>}
+   */
+  async search({ search, roleId, page = 1, limit = 20 } = {}) {
+    // Op.like est insensible à la casse sur SQLite (dev) mais pas sur PostgreSQL (prod) : iLike sur PostgreSQL.
+    const likeOp = sequelize.getDialect() === 'postgres' ? Op.iLike : Op.like
+    const safeLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20))
+    const safePage = Math.max(1, Number.parseInt(page, 10) || 1)
+    const where = {}
+    const term = typeof search === 'string' ? search.trim().slice(0, 100) : ''
+    if (term) where[Op.or] = [{ name: { [likeOp]: `%${term}%` } }, { email: { [likeOp]: `%${term}%` } }]
+    if (roleId !== undefined && roleId !== null && roleId !== '') where.roleId = Number.parseInt(roleId, 10)
+
+    const { rows, count } = await User.findAndCountAll({
+      where,
+      attributes: ['userId', 'name', 'email', 'roleId', 'isActive', 'hasValidatedEmail', 'createdAt', 'lastLogin'],
+      order: [['name', 'ASC'], ['userId', 'ASC']],
+      limit: safeLimit,
+      offset: (safePage - 1) * safeLimit
+    })
+    return { users: rows, total: count, page: safePage, limit: safeLimit }
   }
 
   async findByEmail(email) {

@@ -46,6 +46,9 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    if (roleService.isSystemRole(req.params.id)) {
+      return res.status(403).send({ message: 'Les rôles système ne peuvent pas être renommés.' })
+    }
     const updatedRole = await roleService.update(req.params.id, req.body)
     if (!updatedRole) {
       res.status(404).send({
@@ -64,6 +67,19 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
   try {
+    if (roleService.isSystemRole(req.params.id)) {
+      return res.status(403).send({ message: 'Les rôles système ne peuvent pas être supprimés.' })
+    }
+    // Le rôle est lié aux comptes en ON DELETE CASCADE : sans cette vérification, supprimer un rôle
+    // supprimerait tous les comptes qui le portent.
+    if (await roleService.findOne(req.params.id)) {
+      const holders = await roleService.countUsers(req.params.id)
+      if (holders > 0) {
+        return res.status(409).send({
+          message: `Ce rôle est attribué à ${holders} compte${holders > 1 ? 's' : ''} : retirez-le d'abord de ${holders > 1 ? 'ces comptes' : 'ce compte'}.`
+        })
+      }
+    }
     const deleted = await roleService.delete(req.params.id)
     if (!deleted) {
       res.status(404).send({
