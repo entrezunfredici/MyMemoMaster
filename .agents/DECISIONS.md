@@ -5222,3 +5222,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : la zone de sélection/dépliage est un vrai `<button>` (contenu en `span`), les actions secondaires sont des frères, jamais des descendants ; le détail déplié vit hors du bouton.
 **Alternative écartée** : garder `role="button"` en bloquant la propagation (`@click.stop`) — corrige le clic, pas l'arbre d'accessibilité.
 **Conséquences** : clavier natif, `aria-expanded`/`aria-pressed` portés par le bouton ; les cartes simples sans contrôle interne (`TeacherGroupPicker`, `StudentGroupPicker`) gardent `role="button"`.
+
+
+## 2026-10-18 — Palette de carte : sections-composants, modale commune, état de formule dans un composable
+
+**Contexte** : `MindMapPalette.vue` (635 lignes) mêlait six sections, l'état de saisie de formule, deux modales téléportées et leur CSS.
+**Décision** : la palette n'assemble plus que des sections (`PaletteCreate`, `PaletteNodeOptions`, `PaletteLinkOptions`, `PaletteZones`) qui lisent le store ; la saisie de formule (contenu édité, interpréteur, proposition de grandeurs) vit dans `composables/usePaletteFormula.js` ; les deux modales partagent la coquille `PaletteModal` (voile, boîte, croix nommée, `role="dialog"` si un `titleId` est fourni) ; le style du texte est `PaletteTextStyle`. `palette.css` reste global (sélecteurs préfixés `.palette`), les sections sont des enfants directs de `.palette`.
+**Alternative écartée** : un composable unique pour tout l'état de la palette — masque les dépendances entre sections ; passer l'état de formule par props/événements entre sections — l'état est partagé par trop de gestes (activer un rôle ouvre l'interpréteur).
+**Conséquences** : rendu et appels de store vérifiés identiques à l'ancienne palette sur 16 états (comparaison temporaire, supprimée), sauf un écart voulu : un texte portant aussi le rôle « Formule » n'affiche plus **deux** sélecteurs « Couleur du texte » (doublon, RGAA 11.1). Désélectionner referme l'interpréteur (`onBeforeUnmount`), comme avant.

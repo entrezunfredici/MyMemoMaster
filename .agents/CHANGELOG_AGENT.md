@@ -13419,3 +13419,11 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 - `aria-pressed` sur les cartes de `StudentGroupPicker`, `TeacherGroupPicker` et sur les onglets de `SubjectFilterComponent` : la sélection n'était signalée que par la couleur de bordure.
 **Tests** : `TeacherPanels` (zone sans rôle, bouton « parcourez » qui ouvre le sélecteur, « Retirer » hors `role="button"`, `aria-pressed` du sélecteur de groupe) et `StudentPanels` ; front 128 fichiers / 2117 tests, ESLint, `audit:a11y` à 0.
 **Non traité (action humaine)** : revue visuelle des 50 bordures `border-gray-500` ; test au lecteur d'écran (NVDA/VoiceOver) ; variable de dépôt `A11Y_BASE_URLS` (absente, il faut l'URL d'un site déployé à auditer) pour `a11y-live.yml`.
+
+
+## [2026-10-18] [REF] MindMapPalette découpée : 635 -> 31 lignes (branche `dev_front_small_fixes2`)
+
+**Fait** : `MindMapPalette.vue` n'assemble plus que les sections ; nouveaux : `palette/PaletteCreate`, `PaletteNodeOptions` (237), `PaletteLinkOptions`, `PaletteZones`, `PaletteTextStyle`, `PaletteModal`, `PaletteVariablePrompt`, `composables/usePaletteFormula.js`. Voir DECISIONS (2026-10-18).
+**Preuve** : copie temporaire de l'ancienne palette comparée à la nouvelle sur 16 états × (HTML, appels de store après un clic/saisie sur chaque contrôle, validation de l'interpréteur puis de la proposition de grandeurs) : identique, sauf le doublon « Couleur du texte » supprimé volontairement ; une mutation volontaire (libellé) fait échouer 32 comparaisons sur 33 ; échafaudage supprimé.
+**Tests** : +23 (`PaletteFormulaAndStyle.test.js` : style du texte, modale, proposition de grandeurs, un seul sélecteur de couleur, fermeture de l'interpréteur à la désélection, « Effacer ») ; front 129 fichiers / 2140 tests, ESLint, audits RGAA / couleurs / Tailwind à 0, build.
+**Reste** : `MindMapNode.vue` (625) et `stores/mindmapBuilder.js` (504).
