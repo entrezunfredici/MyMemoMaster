@@ -156,6 +156,13 @@ describe('AiGenerateCardsModalComponent', () => {
       expect(submitBtn(wrapper).attributes('disabled')).toBeDefined()
     })
 
+    it('PDF de moins de 1 Mo : taille affichée en Ko et non « 0.2 Mo »', async () => {
+      const { wrapper } = mountModal()
+      await choosePdfSource(wrapper)
+      await selectFile(wrapper, pdf('petit.pdf', 'application/pdf', 200 * 1024))
+      expect(wrapper.text()).toContain('petit.pdf (200 Ko)')
+    })
+
     it('fichier trop gros (> 10 Mo) : erreur', async () => {
       const { wrapper } = mountModal()
       await choosePdfSource(wrapper)

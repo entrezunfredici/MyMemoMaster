@@ -121,6 +121,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import ModalComponent from '@/components/ModalComponent.vue'
+import { formatFileSize } from '@/helpers/classroomFormat'
 
 // Vue 1 de diagrams/generation_ia_exercices_ui.md (§5) — modal de configuration (source, matière,
 // nombre et type de questions). Calqué sur AiGenerateCardsModalComponent.vue (C-01.08), avec 5
@@ -172,10 +173,6 @@ const canSubmit = computed(() => {
   if (source.value === 'text') return sourceText.value.trim().length > 0
   return Boolean(pdfFile.value) && !fileError.value
 })
-
-function formatFileSize(bytes) {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
-}
 
 function validateAndSetFile(file) {
   fileError.value = ''

@@ -117,6 +117,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import ModalComponent from '@/components/ModalComponent.vue'
+import { formatFileSize } from '@/helpers/classroomFormat'
 import { useAiCardGenerationStore } from '@/stores/aiCardGeneration'
 
 // Vue 1 de diagrams/generation_ia_ui.md (§4) — modal de configuration (source, matière, nombre et
@@ -154,10 +155,6 @@ const canSubmit = computed(() => {
   if (source.value === 'text') return sourceText.value.trim().length > 0
   return Boolean(pdfFile.value) && !fileError.value
 })
-
-function formatFileSize(bytes) {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
-}
 
 function validateAndSetFile(file) {
   fileError.value = ''

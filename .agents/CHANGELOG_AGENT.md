@@ -13400,3 +13400,12 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 - **Double `GET /tests/:id`** : non reproductible depuis le code (un seul appel, à l'ouverture de la page détail). Seule cause plausible : le rejeu automatique après un 401 (jeton expiré → refresh → rejeu), voulu. Test de non-régression « une seule fois » ajouté.
 **Reste** : dépôt de rendu / téléchargement côté enseignant à tester avec un vrai compte étudiant (impossible avec le compte admin).
 **Tests** : front 128 fichiers / 2114 tests, ESLint (`src`, `test`), audits RGAA / couleurs / Tailwind à 0, build, Playwright 43 verts.
+
+
+## [2026-10-18] [IMP] Petits défauts : reliquat de formatage (branche `dev_front_small_fixes2`)
+
+**Contexte** : audit des « petits défauts » listés le 2026-10-17. Presque tous étaient déjà traités par le commit `464ddfb` (tutoriels branchés sur l'API, store `roles`, pluriels « 0 contenus », 5 composants testés, doublons `ClassroomEtudiant/Etablissement`). Vérifié dans le code : seul restait `formatFileSize` copié dans les deux modales de génération IA.
+**Fait** : `AiGenerateCardsModalComponent` et `AiGenerateExercisesModalComponent` utilisent `formatFileSize` de `helpers/classroomFormat.js` (un PDF de 200 Ko s'affichait « 0.2 Mo », il affiche « 200 Ko »). +1 test.
+**Non touché volontairement** : les `formatDate` de `StudentDetailComponent`, `TodoWidget` et `KpiPage` produisent des formats courts différents (sans année, jour/mois) ; ce ne sont pas des doublons de `classroomFormat.formatDate`.
+**Reste** : dépôt de rendu / téléchargement côté enseignant à tester avec un vrai compte étudiant ; fichiers de l'éditeur de carte à découper.
+**Tests** : 34 verts sur les deux modales IA ; ESLint propre sur les fichiers modifiés.
