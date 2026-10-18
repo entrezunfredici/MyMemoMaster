@@ -35,7 +35,16 @@ describe('useAuditLogStore', () => {
     const store = useAuditLogStore()
     await store.fetchLogs({ entityType: 'User', entityId: '12', actorId: 0 })
     expect(mockGet).toHaveBeenLastCalledWith('audit-logs', { entityType: 'User', entityId: '12', actorId: 0 })
-    await store.fetchLogs({ entityType: '', entityId: '', actorId: null })
+    await store.fetchLogs({ entityType: '', entityId: '', actorId: null, action: '', limit: '' })
+    expect(mockGet).toHaveBeenLastCalledWith('audit-logs', {})
+  })
+
+  it('transmet le texte d’action (sans espaces) et la limite ; une action blanche est ignorée', async () => {
+    mockGet.mockResolvedValue({ status: 200, data: { data: [] } })
+    const store = useAuditLogStore()
+    await store.fetchLogs({ action: '  ROLE ', limit: 250 })
+    expect(mockGet).toHaveBeenLastCalledWith('audit-logs', { action: 'ROLE', limit: 250 })
+    await store.fetchLogs({ action: '   ', limit: undefined })
     expect(mockGet).toHaveBeenLastCalledWith('audit-logs', {})
   })
 

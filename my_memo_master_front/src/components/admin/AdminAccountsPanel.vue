@@ -59,6 +59,15 @@
                     class="rounded-lg bg-secondary/10 px-2 py-1 text-xs text-secondary hover:bg-secondary/20 transition">
                     Retirer le rôle
                   </button>
+                  <!-- L'API refuse d'agir sur un autre administrateur plateforme : pas de bouton qui échouerait -->
+                  <button v-if="user.roleId !== 1 && user.isActive" type="button" :aria-label="`Désactiver le compte de ${user.name}`" @click="askDeactivate(user)"
+                    class="rounded-lg bg-secondary/10 px-2 py-1 text-xs text-secondary hover:bg-secondary/20 transition">
+                    Désactiver
+                  </button>
+                  <button v-else-if="user.roleId !== 1" type="button" :aria-label="`Réactiver le compte de ${user.name}`" @click="userStore.activate(user.userId)"
+                    class="rounded-lg bg-success/10 px-2 py-1 text-xs text-success hover:bg-success/20 transition">
+                    Réactiver
+                  </button>
                 </div>
               </td>
             </tr>
@@ -94,7 +103,7 @@
 </template>
 
 <script setup>
-// Comptes de la plateforme : recherche paginée, changement et retrait du rôle. L'administrateur ne peut pas
+// Comptes de la plateforme : recherche paginée, changement et retrait du rôle, désactivation / réactivation. L'administrateur ne peut pas
 // modifier son propre compte ici (l'API le refuse aussi : sinon plus personne ne pourrait administrer).
 // La page fournit la modale de confirmation (provideConfirmAction).
 import { computed, onMounted, reactive } from 'vue'
@@ -152,6 +161,14 @@ function askRemoveRole(user) {
     'Retirer le rôle de ce compte ?',
     `Le compte de ${user.name} n’aura plus aucun rôle et perdra l’accès aux fonctions réservées.`,
     () => userStore.removeRole(user.userId),
+  )
+}
+
+function askDeactivate(user) {
+  askConfirm(
+    'Désactiver ce compte ?',
+    `Le compte de ${user.name} sera déconnecté immédiatement et ne pourra plus se connecter. Vous pourrez le réactiver.`,
+    () => userStore.deactivate(user.userId),
   )
 }
 

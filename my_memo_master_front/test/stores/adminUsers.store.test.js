@@ -2,14 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAdminUserStore } from '@/stores/adminUsers'
 
-const { mockGet, mockPut, mockDel, mockNotify } = vi.hoisted(() => ({
+const { mockGet, mockPut, mockPatch, mockDel, mockNotify } = vi.hoisted(() => ({
   mockGet: vi.fn(),
+  mockPatch: vi.fn(),
   mockPut: vi.fn(),
   mockDel: vi.fn(),
   mockNotify: vi.fn(),
 }))
 
-vi.mock('@/helpers/api', () => ({ api: { get: mockGet, put: mockPut, del: mockDel } }))
+vi.mock('@/helpers/api', () => ({ api: { get: mockGet, put: mockPut, patch: mockPatch, del: mockDel } }))
 vi.mock('@/helpers/notif', () => ({ notif: { notify: mockNotify } }))
 
 const PAGE = {
@@ -151,6 +152,60 @@ describe('useAdminUserStore', () => {
       mockDel.mockRejectedValueOnce(new Error('boom'))
       expect(await useAdminUserStore().removeRole(3)).toBe(false)
       expect(mockNotify).toHaveBeenLastCalledWith('Une erreur est survenue : Error: boom', 'error')
+    })
+  })
+
+  describe('activate / deactivate', () => {
+    const loaded = () => {
+      const store = useAdminUserStore()
+      store.users = [
+        { userId: 2, name: 'Alice', roleId: 2, isActive: true },
+        { userId: 3, name: 'Bob', roleId: 3, isActive: false },
+      ]
+      return store
+    }
+
+    it('deactivate — PATCH, compte marqué désactivé, les autres inchangés', async () => {
+      mockPatch.mockResolvedValueOnce({ status: 200, data: { message: 'Compte désactivé.' } })
+      const store = loaded()
+      expect(await store.deactivate(2)).toBe(true)
+      expect(mockPatch).toHaveBeenCalledWith('users/2/deactivate')
+      expect(store.users.map((u) => u.isActive)).toEqual([false, false])
+      expect(mockNotify).toHaveBeenCalledWith('Compte désactivé.', 'success')
+    })
+
+    it('activate — PATCH, compte marqué actif', async () => {
+      mockPatch.mockResolvedValueOnce({ status: 200, data: {} })
+      const store = loaded()
+      expect(await store.activate(3)).toBe(true)
+      expect(mockPatch).toHaveBeenCalledWith('users/3/activate')
+      expect(store.users.map((u) => u.isActive)).toEqual([true, true])
+      expect(mockNotify).toHaveBeenCalledWith('Compte réactivé.', 'success')
+    })
+
+    it.each([['deactivate', 2, true], ['activate', 3, false]])('%s — refus de l’API : message notifié, état inchangé', async (method, id, before) => {
+      mockPatch.mockResolvedValueOnce({ status: 403, data: { message: 'Accès refusé.' } })
+      const store = loaded()
+      expect(await store[method](id)).toBe(false)
+      expect(mockNotify).toHaveBeenCalledWith('Accès refusé.', 'error')
+      expect(store.users.find((u) => u.userId === id).isActive).toBe(before)
+    })
+
+    it('réponse absente — message par défaut selon l’action ; exception — notifiée', async () => {
+      mockPatch.mockResolvedValueOnce(undefined)
+      expect(await loaded().deactivate(2)).toBe(false)
+      expect(mockNotify).toHaveBeenLastCalledWith('Erreur lors de la désactivation du compte.', 'error')
+      mockPatch.mockResolvedValueOnce(undefined)
+      expect(await loaded().activate(3)).toBe(false)
+      expect(mockNotify).toHaveBeenLastCalledWith("Erreur lors de l'activation du compte.", 'error')
+      mockPatch.mockRejectedValueOnce(new Error('boom'))
+      expect(await loaded().deactivate(2)).toBe(false)
+      expect(mockNotify).toHaveBeenLastCalledWith('Une erreur est survenue : Error: boom', 'error')
+    })
+
+    it('compte absent de la page — succès sans erreur', async () => {
+      mockPatch.mockResolvedValueOnce({ status: 200, data: {} })
+      expect(await loaded().deactivate(99)).toBe(true)
     })
   })
 })

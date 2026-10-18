@@ -3,8 +3,8 @@ const logger = require('../helpers/logger')
 
 exports.findAll = async (req, res) => {
   try {
-    const { actorId, entityType, entityId } = req.query
-    const data = await AuditLogService.findAll({ actorId, entityType, entityId })
+    const { actorId, entityType, entityId, action, limit } = req.query
+    const data = await AuditLogService.findAll({ actorId, entityType, entityId, action, limit })
     res.status(200).json({ message: 'Journaux récupérés.', data })
   } catch (error) {
     logger.error(error?.message || error)

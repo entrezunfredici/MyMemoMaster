@@ -1,6 +1,6 @@
 # À faire — Page d'administration de la plateforme
 
-**Statut** : LIVRÉE le 2026-10-18 (branche `dev_front_admin`) — page `/admin` : rôles, comptes, journal d'audit global. Ce document reste comme cahier des charges ; voir `.agents/CHANGELOG_AGENT.md` et `DECISIONS.md` (2026-10-18) pour le réalisé. Écarts : le journal global filtre côté serveur par type d'entité / identifiant d'entité / auteur (l'API n'a ni filtre `action` ni `limit`, plafond fixe de 500) et par action côté page ; `GET /users` a dû être créé.
+**Statut** : LIVRÉE le 2026-10-18 (branche `dev_front_admin`) — page `/admin` : rôles, comptes, journal d'audit global. Ce document reste comme cahier des charges ; voir `.agents/CHANGELOG_AGENT.md` et `DECISIONS.md` (2026-10-18) pour le réalisé. Compléments livrés ensuite : filtres `action` et `limit` ajoutés à `GET /audit-logs`, désactivation / réactivation des comptes depuis la page. `GET /users` a dû être créé.
 **Public** : administrateur plateforme uniquement (`roleId = 1`).
 
 ## Pourquoi

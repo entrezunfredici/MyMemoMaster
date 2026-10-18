@@ -2,8 +2,7 @@
   <section aria-labelledby="admin-audit-title" class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-4">
     <h2 id="admin-audit-title" class="text-lg font-semibold text-dark">Journal d’audit</h2>
     <p class="text-sm text-dark/70">
-      Les 500 actions sensibles les plus récentes de toute la plateforme. Le type, l’identifiant d’entité et l’auteur
-      filtrent le journal côté serveur ; l’action filtre les entrées affichées.
+      Les actions sensibles de toute la plateforme, les plus récentes d’abord (500 au plus).
     </p>
 
     <form class="flex flex-wrap items-end gap-2" @submit.prevent="reload">
@@ -27,8 +26,15 @@
       </div>
       <div class="flex flex-col gap-1">
         <label for="admin-audit-action" class="text-sm font-medium text-dark">Action</label>
-        <input id="admin-audit-action" v-model="actionFilter" type="text" placeholder="ex. ROLE"
+        <input id="admin-audit-action" v-model="filters.action" type="text" placeholder="ex. ROLE"
           class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label for="admin-audit-limit" class="text-sm font-medium text-dark">Nombre d’entrées</label>
+        <select id="admin-audit-limit" v-model="filters.limit"
+          class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm bg-white">
+          <option v-for="n in LIMITS" :key="n" :value="n">{{ n }}</option>
+        </select>
       </div>
       <button type="submit"
         class="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
@@ -37,7 +43,7 @@
     </form>
 
     <p v-if="auditStore.loading" class="text-sm text-dark/70" role="status">Chargement…</p>
-    <p v-else-if="shownLogs.length === 0" class="text-sm text-dark/70" role="status">Aucune entrée.</p>
+    <p v-else-if="auditStore.logs.length === 0" class="text-sm text-dark/70" role="status">Aucune entrée.</p>
     <div v-else class="overflow-x-auto max-h-[32rem] overflow-y-auto">
       <table class="w-full text-sm">
         <caption class="sr-only">Journal d’audit de la plateforme</caption>
@@ -51,7 +57,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="log in shownLogs" :key="log.id" class="border-b border-gray/50 align-top">
+          <tr v-for="log in auditStore.logs" :key="log.id" class="border-b border-gray/50 align-top">
             <td class="py-2 pr-4 text-dark/70 whitespace-nowrap">{{ formatDateTime(log.createdAt) }}</td>
             <td class="py-2 pr-4">
               <span class="font-medium text-dark">{{ auditActionLabel(log.action) }}</span>
@@ -68,22 +74,18 @@
 </template>
 
 <script setup>
-// Journal d'audit global : filtres serveur (type, entité, auteur) et filtre d'action sur les entrées chargées.
-import { computed, onMounted, reactive, ref } from 'vue'
+// Journal d'audit global : filtres serveur (type, entité, auteur, action) et nombre d'entrées.
+import { onMounted, reactive } from 'vue'
 import { useAuditLogStore } from '@/stores/auditLogs'
 import { formatDateTime } from '@/helpers/classroomFormat'
 import { AUDIT_ENTITY_TYPES, auditActionLabel, auditEntityLabel } from '@/helpers/adminLabels'
 
 const auditStore = useAuditLogStore()
 
-const filters = reactive({ entityType: '', entityId: '', actorId: '' })
-const actionFilter = ref('')
+// Tailles proposées (l'API plafonne à 500).
+const LIMITS = [50, 100, 250, 500]
 
-const shownLogs = computed(() => {
-  const term = actionFilter.value.trim().toLowerCase()
-  if (!term) return auditStore.logs
-  return auditStore.logs.filter((log) => log.action.toLowerCase().includes(term))
-})
+const filters = reactive({ entityType: '', entityId: '', actorId: '', action: '', limit: 100 })
 
 const reload = () => auditStore.fetchLogs({ ...filters })
 

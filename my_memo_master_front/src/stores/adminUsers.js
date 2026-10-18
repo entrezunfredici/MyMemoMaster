@@ -69,6 +69,44 @@ export const useAdminUserStore = defineStore('adminUsers', {
     },
 
     /**
+     * Réactive un compte désactivé.
+     *
+     * @param {number} userId - Compte concerné
+     * @returns {Promise<boolean>} true si le compte est réactivé.
+     */
+    async activate(userId) {
+      return this.setActive(userId, true)
+    },
+
+    /**
+     * Désactive un compte : il est déconnecté tout de suite et ne peut plus se connecter.
+     *
+     * @param {number} userId - Compte concerné
+     * @returns {Promise<boolean>} true si le compte est désactivé.
+     */
+    async deactivate(userId) {
+      return this.setActive(userId, false)
+    },
+
+    async setActive(userId, active) {
+      const verb = active ? 'activate' : 'deactivate'
+      try {
+        const resp = await api.patch(`users/${userId}/${verb}`)
+        if (resp?.status !== 200) {
+          notif.notify(resp?.data?.message || (active ? "Erreur lors de l'activation du compte." : 'Erreur lors de la désactivation du compte.'), 'error')
+          return false
+        }
+        const user = this.users.find((item) => item.userId === userId)
+        if (user) user.isActive = active
+        notif.notify(active ? 'Compte réactivé.' : 'Compte désactivé.', 'success')
+        return true
+      } catch (error) {
+        notif.notify(`Une erreur est survenue : ${error}`, 'error')
+        return false
+      }
+    },
+
+    /**
      * Retire son rôle à un compte.
      *
      * @param {number} userId - Compte concerné

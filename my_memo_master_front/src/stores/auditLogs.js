@@ -2,9 +2,8 @@ import { defineStore } from 'pinia'
 import { api } from '@/helpers/api'
 import { notif } from '@/helpers/notif'
 
-// Journal d'audit global de la plateforme (réservé à l'administrateur plateforme). L'API renvoie au plus
-// les 500 entrées les plus récentes ; seuls le type d'entité, l'identifiant d'entité et l'auteur se filtrent
-// côté serveur (l'action se filtre côté page, sur ces entrées).
+// Journal d'audit global de la plateforme (réservé à l'administrateur plateforme). L'API renvoie les entrées
+// les plus récentes d'abord (500 au plus) et filtre par type d'entité, identifiant d'entité, auteur et action.
 export const useAuditLogStore = defineStore('auditLogs', {
   state: () => ({
     logs: [],
@@ -14,14 +13,16 @@ export const useAuditLogStore = defineStore('auditLogs', {
     /**
      * Charge les entrées du journal.
      *
-     * @param {{ entityType?: string, entityId?: (number|string), actorId?: (number|string) }} [filters] - Filtres ; un filtre vide est ignoré.
+     * @param {{ entityType?: string, entityId?: (number|string), actorId?: (number|string), action?: string, limit?: (number|string) }} [filters] - Filtres ; un filtre vide est ignoré.
      * @returns {Promise<boolean>} true si le journal est chargé.
      */
-    async fetchLogs({ entityType, entityId, actorId } = {}) {
+    async fetchLogs({ entityType, entityId, actorId, action, limit } = {}) {
       const params = {}
       if (entityType) params.entityType = entityType
       if (entityId !== undefined && entityId !== null && entityId !== '') params.entityId = entityId
       if (actorId !== undefined && actorId !== null && actorId !== '') params.actorId = actorId
+      if (action?.trim()) params.action = action.trim()
+      if (limit !== undefined && limit !== null && limit !== '') params.limit = limit
       this.loading = true
       try {
         const resp = await api.get('audit-logs', params)

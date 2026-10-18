@@ -221,8 +221,8 @@ describe('AdminAccountsPanel', () => {
     const [me, alice, bob] = rows(wrapper)
     expect(me.text()).toContain('Votre compte')
     expect(me.findAll('button')).toHaveLength(0)
-    expect(alice.findAll('button').map((b) => b.attributes('aria-label'))).toEqual(['Changer le rôle de Alice', 'Retirer le rôle de Alice'])
-    expect(bob.findAll('button').map((b) => b.attributes('aria-label'))).toEqual(['Changer le rôle de Bob'])
+    expect(alice.findAll('button').map((b) => b.attributes('aria-label'))).toEqual(['Changer le rôle de Alice', 'Retirer le rôle de Alice', 'Désactiver le compte de Alice'])
+    expect(bob.findAll('button').map((b) => b.attributes('aria-label'))).toEqual(['Changer le rôle de Bob', 'Réactiver le compte de Bob'])
   })
 
   it('états : chargement, liste vide', () => {
@@ -305,6 +305,42 @@ describe('AdminAccountsPanel', () => {
     expect(userStore.removeRole).toHaveBeenCalledWith(2)
   })
 
+  it('désactiver : visible sur un compte actif non administrateur, avec confirmation puis appel', async () => {
+    const { wrapper, userStore, ask } = mountAccounts()
+    const alice = rows(wrapper)[1]
+    await alice.find('button[aria-label="Désactiver le compte de Alice"]').trigger('click')
+    expect(userStore.deactivate).not.toHaveBeenCalled()
+    const [title, message, action] = ask.mock.calls[0]
+    expect(title).toBe('Désactiver ce compte ?')
+    expect(message).toContain('Alice')
+    expect(message).toContain('déconnecté immédiatement')
+    await action()
+    expect(userStore.deactivate).toHaveBeenCalledWith(2)
+  })
+
+  it('réactiver : visible sur un compte désactivé, sans confirmation', async () => {
+    const { wrapper, userStore, ask } = mountAccounts()
+    const bob = rows(wrapper)[2]
+    expect(bob.find('button[aria-label^="Désactiver"]').exists()).toBe(false)
+    await bob.find('button[aria-label="Réactiver le compte de Bob"]').trigger('click')
+    expect(userStore.activate).toHaveBeenCalledWith(3)
+    expect(ask).not.toHaveBeenCalled()
+  })
+
+  it('un autre administrateur plateforme : ni désactiver ni réactiver (l’API le refuserait)', () => {
+    const { wrapper } = mountAccounts({
+      users: [
+        { userId: 1, name: 'Moi', email: 'm@x.fr', roleId: 1, isActive: true },
+        { userId: 7, name: 'Autre Admin', email: 'o@x.fr', roleId: 1, isActive: true },
+        { userId: 8, name: 'Autre Admin 2', email: 'o2@x.fr', roleId: 1, isActive: false },
+      ],
+    })
+    for (const row of rows(wrapper).slice(1)) {
+      expect(row.find('button[aria-label^="Désactiver"]').exists()).toBe(false)
+      expect(row.find('button[aria-label^="Réactiver"]').exists()).toBe(false)
+    }
+  })
+
   it('identifiant de session sous la clé « id » : le compte est aussi reconnu', () => {
     const pinia = createTestingPinia({
       createSpy: vi.fn,
@@ -329,7 +365,7 @@ describe('AdminAuditPanel', () => {
 
   it('charge le journal à l’ouverture, sans filtre', () => {
     const { store } = mountAudit()
-    expect(store.fetchLogs).toHaveBeenCalledWith({ entityType: '', entityId: '', actorId: '' })
+    expect(store.fetchLogs).toHaveBeenCalledWith({ entityType: '', entityId: '', actorId: '', action: '', limit: 100 })
   })
 
   it('tableau accessible ; actions et entités traduites, code brut conservé, auteur et détails', () => {
@@ -352,29 +388,30 @@ describe('AdminAuditPanel', () => {
   it('champs avec libellés visibles', () => {
     const { wrapper } = mountAudit()
     const labels = wrapper.findAll('label').map((l) => l.text())
-    expect(labels).toEqual(['Type d’entité', 'Identifiant d’entité', 'Identifiant de l’auteur', 'Action'])
+    expect(labels).toEqual(['Type d’entité', 'Identifiant d’entité', 'Identifiant de l’auteur', 'Action', 'Nombre d’entrées'])
     for (const label of wrapper.findAll('label')) expect(wrapper.find(`#${label.attributes('for')}`).exists()).toBe(true)
   })
 
-  it('filtrer : transmet type, entité et auteur au serveur', async () => {
+  it('filtrer : transmet type, entité, auteur, action et nombre d’entrées au serveur', async () => {
     const { wrapper, store } = mountAudit()
     store.fetchLogs.mockClear()
     await wrapper.find('#admin-audit-type').setValue('User')
     await wrapper.find('#admin-audit-entity').setValue('12')
     await wrapper.find('#admin-audit-actor').setValue('1')
+    await wrapper.find('#admin-audit-action').setValue('ROLE')
+    await wrapper.find('#admin-audit-limit').setValue(250)
     await wrapper.find('form').trigger('submit')
-    expect(store.fetchLogs).toHaveBeenCalledWith({ entityType: 'User', entityId: 12, actorId: 1 })
+    expect(store.fetchLogs).toHaveBeenCalledWith({ entityType: 'User', entityId: 12, actorId: 1, action: 'ROLE', limit: 250 })
   })
 
-  it('le filtre d’action s’applique tout de suite aux entrées chargées, sans appel serveur', async () => {
+  it('le nombre d’entrées propose 50, 100, 250 et 500 (100 par défaut) ; rien n’est filtré avant de valider', async () => {
     const { wrapper, store } = mountAudit()
+    expect(wrapper.findAll('#admin-audit-limit option').map((o) => o.text())).toEqual(['50', '100', '250', '500'])
+    expect(wrapper.find('#admin-audit-limit').element.value).toBe('100')
     store.fetchLogs.mockClear()
-    await wrapper.find('#admin-audit-action').setValue('  role ')
-    expect(rows(wrapper)).toHaveLength(1)
-    expect(rows(wrapper)[0].text()).toContain('USER_ROLE_CHANGED')
     await wrapper.find('#admin-audit-action').setValue('zzz')
-    expect(wrapper.text()).toContain('Aucune entrée.')
     expect(store.fetchLogs).not.toHaveBeenCalled()
+    expect(rows(wrapper)).toHaveLength(LOGS.length)
   })
 
   it('états : chargement, journal vide', () => {

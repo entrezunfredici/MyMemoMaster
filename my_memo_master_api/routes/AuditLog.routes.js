@@ -29,6 +29,18 @@ const router = express.Router()
  *         schema:
  *           type: integer
  *         description: Filtrer par ID d'entité
+ *       - in: query
+ *         name: action
+ *         schema:
+ *           type: string
+ *         description: Texte contenu dans le code d'action (ex. ROLE), insensible à la casse
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 500
+ *           maximum: 500
+ *         description: Nombre maximum d'entrées (les plus récentes d'abord)
  *     responses:
  *       200:
  *         description: Journaux récupérés.
