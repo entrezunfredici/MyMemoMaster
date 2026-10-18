@@ -162,6 +162,25 @@ describe('Router guard — beforeEach', () => {
     router.removeRoute('test-admin-panel')
   })
 
+  it.each([2, 3, 4, 5])('la route /admin est refusée au rôle %i et renvoie vers /', async (roleId) => {
+    loginAs({ roleId })
+    await router.push('/admin')
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('la route /admin est ouverte à l’administrateur plateforme (rôle 1)', async () => {
+    loginAs({ roleId: 1 })
+    await router.push('/admin')
+    expect(router.currentRoute.value.path).toBe('/admin')
+    expect(router.currentRoute.value.name).toBe('admin')
+  })
+
+  it('la route /admin n’est pas accessible sans être connecté', async () => {
+    logout()
+    await router.push('/admin')
+    expect(router.currentRoute.value.path).not.toBe('/admin')
+  })
+
   it('meta.roles: [1, 4] + roleId=4 (Admin établissement) → navigation acceptée', async () => {
     loginAs({ roleId: 4 })
     router.addRoute({

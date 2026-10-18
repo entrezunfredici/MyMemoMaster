@@ -41,6 +41,7 @@ const PAGES = [
   { path: '/profile', label: 'Profil' },
   { path: '/settings', label: 'Réglages' },
   { path: '/classroom', label: 'Classe' },
+  { path: '/admin', label: 'Administration' },
   { path: '/kpi', label: 'Indicateurs' },
   { path: '/subjects', label: 'Contenus par sujet' },
   { path: '/account', label: 'Compte' },

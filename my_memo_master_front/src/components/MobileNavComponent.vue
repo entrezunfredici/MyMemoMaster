@@ -81,10 +81,8 @@ const primaryItems = [
 
 const moreItems = computed(() => [
   { to: '/classroom', label: 'Classe', icon: ClassroomIcon, tour: 'classroom', match: 'classroom' },
-  // TODO: ce lien reprend le comportement existant (même cible que « Classe ») ; à pointer vers /admin quand la
-  // page d'administration existera — voir docs/A_FAIRE_PAGE_ADMINISTRATION.md
   ...(isAdminPlateforme.value
-    ? [{ to: '/classroom', label: 'Administration', icon: ShieldCheckIcon, exact: 'classroom-admin' }]
+    ? [{ to: '/admin', label: 'Administration', icon: ShieldCheckIcon, exact: 'admin' }]
     : []),
   { to: '/calendar', label: 'Calendrier & rappels', icon: CalendarIcon, tour: 'calendar', match: 'calendar' },
   { to: '/todo', label: 'To-do', icon: CheckCircleIcon, tour: 'todo', exact: 'todo' },

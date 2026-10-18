@@ -17,10 +17,14 @@ vi.mock('vue-router', async (importOriginal) => {
 
 const RouterLinkStub = { template: '<a><slot /></a>' }
 
-const mountApp = () =>
+const mountApp = (roleId = null) =>
   mount(App, {
     global: {
-      plugins: [createTestingPinia({ createSpy: vi.fn, stubActions: true })],
+      plugins: [createTestingPinia({
+        createSpy: vi.fn,
+        stubActions: true,
+        initialState: roleId === null ? {} : { auth: { user: { userId: 1, roleId } } },
+      })],
       stubs: {
         RouterLink: RouterLinkStub,
         RouterView: true,
@@ -52,5 +56,11 @@ describe('App — navigation principale (RGAA 6.2)', () => {
     const navLinks = wrapper.find('aside nav').findAll('a')
     const classroomLink = navLinks.find((l) => l.attributes('aria-label') === 'Classe')
     expect(classroomLink).toBeTruthy()
+  })
+
+  it('« Administration » n’apparaît que pour l’administrateur plateforme', () => {
+    const labels = (roleId) => mountApp(roleId).find('aside nav').findAll('a').map((l) => l.attributes('aria-label'))
+    expect(labels(1)).toContain('Administration')
+    for (const roleId of [2, 3, 4, 5, null]) expect(labels(roleId)).not.toContain('Administration')
   })
 })

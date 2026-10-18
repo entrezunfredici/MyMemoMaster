@@ -146,6 +146,16 @@ const routes = [
     }
   },
   {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('../pages/AdminPage.vue'),
+    meta: {
+      title: 'Administration',
+      private: true,
+      roles: [1]
+    }
+  },
+  {
     path: '/kpi',
     name: 'kpi',
     component: () => import('../pages/KpiPage.vue'),

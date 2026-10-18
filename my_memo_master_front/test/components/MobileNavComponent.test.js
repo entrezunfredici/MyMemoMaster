@@ -62,7 +62,24 @@ describe('MobileNav — barre du bas', () => {
     await wrapper.find('[data-testid="mobile-nav-more"]').trigger('click')
     const labels = [...sheet().querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))
     expect(labels).toContain('Administration')
+    const admin = [...sheet().querySelectorAll('a')].find((a) => a.getAttribute('aria-label') === 'Administration')
+    expect(admin.getAttribute('href')).toBe('/admin')
     wrapper.unmount()
+  })
+
+  it('l’entrée Administration n’est active que sur la page /admin (pas sur la page Classe)', async () => {
+    isAdmin.value = true
+    routeState.value = { name: 'classroom', fullPath: '/classroom' }
+    const wrapper = mountNav()
+    await wrapper.find('[data-testid="mobile-nav-more"]').trigger('click')
+    const active = () => [...sheet().querySelectorAll('.mobile-sheet__item--active')].map((a) => a.getAttribute('aria-label'))
+    expect(active()).toEqual(['Classe'])
+    wrapper.unmount()
+    routeState.value = { name: 'admin', fullPath: '/admin' }
+    const onAdmin = mountNav()
+    await onAdmin.find('[data-testid="mobile-nav-more"]').trigger('click')
+    expect(active()).toEqual(['Administration'])
+    onAdmin.unmount()
   })
 
   it('Échap ferme la feuille', async () => {

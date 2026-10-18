@@ -30,6 +30,10 @@ import ReminderWidget from '@/components/ReminderWidget.vue'
 import FormulaHelperComponent from '@/components/FormulaHelperComponent.vue'
 import StudentDetailComponent from '@/components/StudentDetailComponent.vue'
 import KpiAlertWidgetComponent from '@/components/KpiAlertWidgetComponent.vue'
+import AdminRolesPanel from '@/components/admin/AdminRolesPanel.vue'
+import AdminAccountsPanel from '@/components/admin/AdminAccountsPanel.vue'
+import AdminAuditPanel from '@/components/admin/AdminAuditPanel.vue'
+import { CONFIRM_ACTION_KEY } from '@/composables/useConfirmAction'
 
 // Composants sans route dans leur template : pas besoin du mock vue-router.
 // GuidedTourBannerComponent et SubjectFilterComponent lisent route/router — mockés
@@ -386,6 +390,73 @@ describe('Accessibilité (axe-core)', () => {
         stubs: { RouterLink: { template: '<a href="/kpi"><slot /></a>' } }
       },
       attachTo: document.body
+    })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  // Pages d'administration, avec des données : tableaux (légende, en-têtes), champs libellés, fenêtres.
+  const ADMIN_ROLES = [
+    { roleId: 1, name: 'Admin plateforme' },
+    { roleId: 2, name: 'Étudiant' },
+    { roleId: 10, name: 'Invité' }
+  ]
+  const mountAdmin = (component, initialState) =>
+    mount(component, {
+      global: {
+        plugins: [createTestingPinia({ stubActions: true, initialState })],
+        provide: { [CONFIRM_ACTION_KEY]: () => {} }
+      },
+      attachTo: document.body
+    })
+
+  it('AdminRolesPanel - liste de rôles - aucune violation axe', async () => {
+    wrapper = mountAdmin(AdminRolesPanel, { roles: { roles: ADMIN_ROLES, role: {} } })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('AdminRolesPanel - fenêtre de renommage ouverte - aucune violation axe', async () => {
+    wrapper = mountAdmin(AdminRolesPanel, { roles: { roles: ADMIN_ROLES, role: {} } })
+    await wrapper.findAll('button').find((b) => b.text() === 'Renommer').trigger('click')
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('AdminAccountsPanel - tableau paginé - aucune violation axe', async () => {
+    wrapper = mountAdmin(AdminAccountsPanel, {
+      adminUsers: {
+        users: [
+          { userId: 1, name: 'Moi', email: 'moi@x.fr', roleId: 1, isActive: true, lastLogin: null },
+          { userId: 2, name: 'Alice', email: 'a@x.fr', roleId: 2, isActive: true, lastLogin: '2026-10-17T09:30:00Z' },
+          { userId: 3, name: 'Bob', email: 'b@x.fr', roleId: null, isActive: false, lastLogin: null }
+        ],
+        total: 45,
+        page: 2,
+        limit: 20
+      },
+      roles: { roles: ADMIN_ROLES, role: {} },
+      auth: { user: { userId: 1 } }
+    })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('AdminAccountsPanel - fenêtre de changement de rôle ouverte - aucune violation axe', async () => {
+    wrapper = mountAdmin(AdminAccountsPanel, {
+      adminUsers: { users: [{ userId: 2, name: 'Alice', email: 'a@x.fr', roleId: 2, isActive: true, lastLogin: null }], total: 1, page: 1, limit: 20 },
+      roles: { roles: ADMIN_ROLES, role: {} },
+      auth: { user: { userId: 1 } }
+    })
+    await wrapper.findAll('button').find((b) => b.text() === 'Changer le rôle').trigger('click')
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('AdminAuditPanel - journal rempli - aucune violation axe', async () => {
+    wrapper = mountAdmin(AdminAuditPanel, {
+      auditLogs: {
+        loading: false,
+        logs: [
+          { id: 1, action: 'USER_ROLE_CHANGED', entityType: 'User', entityId: 2, actor: { name: 'Admin' }, metadata: { roleId: 3 }, createdAt: '2026-10-17T09:30:00Z' },
+          { id: 2, action: 'USER_INVITED', entityType: 'Invitation', entityId: null, actor: null, metadata: null, createdAt: '2026-10-16T08:00:00Z' }
+        ]
+      }
     })
     expect(await runAxe(wrapper.element)).toEqual([])
   })
