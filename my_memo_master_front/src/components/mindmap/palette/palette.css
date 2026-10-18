@@ -131,7 +131,10 @@
   border-color: var(--blue-300);
 }
 
-.palette .palette__mode-btn--active {
+/* L'état actif doit aussi résister au survol : `.palette .x:hover` (0,3,0) l'emportait sur `.palette .x--active`
+   (0,2,0), et le bouton qu'on vient de cliquer devenait blanc sur fond clair. */
+.palette .palette__mode-btn--active,
+.palette .palette__mode-btn--active:hover {
   background: var(--slate-900);
   border-color: var(--slate-900);
   color: var(--slate-100);
@@ -235,7 +238,9 @@
 }
 
 .palette .palette__shape-btn--active,
-.palette .palette__kind-btn--active {
+.palette .palette__kind-btn--active,
+.palette .palette__shape-btn--active:hover,
+.palette .palette__kind-btn--active:hover {
   background: var(--blue-900);
   border-color: var(--blue-900);
   color: rgb(var(--white));

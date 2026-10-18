@@ -32,6 +32,7 @@
             class="form-input"
             required
           />
+          <p v-if="intervalPreview" class="text-xs text-gray-600 mt-1" aria-live="polite">Soit {{ intervalPreview }}</p>
         </div>
         <div class="form-group--lg">
           <label class="form-label">Couleur</label>
@@ -63,7 +64,9 @@
 import { dialogDirective as vDialog } from '@/directives/dialog'
 // Fenêtre d'ajout / modification d'une boîte de Leitner. Se pilote depuis la page avec
 // `openAdd()` / `openEdit(box)` (via une référence de composant) ; la logique est dans useBoxForm.
+import { computed } from 'vue'
 import { useBoxForm } from '@/composables/useBoxForm'
+import { formatDuration } from '@/helpers/functions'
 
 const props = defineProps({
   systemId: { type: Number, required: true },
@@ -78,6 +81,9 @@ const { showModal, submitting, formError, editingBox, boxForm, openAdd, openEdit
   getBoxes: () => props.boxes,
   reload: () => props.reload(),
 })
+
+// Équivalent lisible de l'intervalle saisi en secondes (86400 -> « 1 j »), pour qu'on ne le confonde pas avec l'unité affichée dans la liste.
+const intervalPreview = computed(() => formatDuration(boxForm.intervall))
 
 defineExpose({ openAdd, openEdit })
 </script>

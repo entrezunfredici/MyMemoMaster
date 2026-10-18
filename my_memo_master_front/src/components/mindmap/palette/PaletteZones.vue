@@ -21,6 +21,19 @@
         <button class="palette__zone-chip" @click="assignZone(null)">Aucune</button>
       </div>
     </div>
+    <!-- Taille des zones : saisie au clavier, en plus de la poignée du plateau (glisser à la souris) -->
+    <div v-if="zones.length" class="palette__field" role="group" aria-label="Taille des zones">
+      <label class="palette__label">Taille des zones (largeur × hauteur)</label>
+      <div v-for="zone in zones" :key="zone.id" class="palette__field palette__field--row">
+        <span class="palette__label">{{ zone.name }}</span>
+        <input :aria-label="`Largeur de la zone ${zone.name}`" type="number" class="palette__number"
+          :min="ZONE_SIZE.minWidth" :max="ZONE_SIZE.max" step="20"
+          :value="zone.layout?.width ?? 360" @change="resizeZone(zone, 'width', $event.target.value)" />
+        <input :aria-label="`Hauteur de la zone ${zone.name}`" type="number" class="palette__number"
+          :min="ZONE_SIZE.minHeight" :max="ZONE_SIZE.max" step="20"
+          :value="zone.layout?.height ?? 240" @change="resizeZone(zone, 'height', $event.target.value)" />
+      </div>
+    </div>
   </section>
 </template>
 
@@ -37,6 +50,17 @@ const selectedNodeZone = computed(() => selectedNode.value?.zoneId || null);
 const zones = computed(() => store.map.zones || []);
 const zoneName = ref('Zone');
 const zoneColor = ref(mindmapColors.zone);
+
+// Bornes de la taille d'une zone (mêmes minimums que la poignée du plateau).
+const ZONE_SIZE = { minWidth: 120, minHeight: 80, max: 2000 };
+
+const resizeZone = (zone, dimension, value) => {
+  const numeric = Number.parseInt(value, 10);
+  const min = dimension === 'width' ? ZONE_SIZE.minWidth : ZONE_SIZE.minHeight;
+  const current = zone.layout?.[dimension] ?? (dimension === 'width' ? 360 : 240);
+  const next = Number.isFinite(numeric) ? Math.min(ZONE_SIZE.max, Math.max(min, numeric)) : current;
+  store.updateZone(zone.id, { layout: { [dimension]: next } });
+};
 
 const createZone = () => {
   store.addZone({ name: zoneName.value.trim() || 'Zone', color: zoneColor.value });

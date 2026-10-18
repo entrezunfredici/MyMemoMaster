@@ -316,9 +316,17 @@ export function sanitizeForUnits(text) {
         .replace(/\\[a-zA-Z]+/g, ' ');  // commandes latex restantes (grec, matrices…) -> ignorées
 }
 
-export function checkUnitHomogeneity(expression) {
+/**
+ * Contrôle d'homogénéité détaillé : erreur éventuelle et nombre de lignes réellement jugées (deux segments
+ * ou plus dont la dimension est connue).
+ *
+ * @param {string} expression - Formule (texte ou LaTeX)
+ * @returns {{ error: (string|null), judged: number, blank: boolean }}
+ */
+function analyseUnitHomogeneity(expression) {
   const src = sanitizeForUnits(expression).replace(/\r/g, '');
   const lines = src.split('\n').map(l => l.trim()).filter(Boolean);
+  let judged = 0;
 
   for (const line of lines) {
     // Plusieurs segments séparés par '=' doivent avoir même signature.
@@ -326,6 +334,7 @@ export function checkUnitHomogeneity(expression) {
     // sont indéterminés : on s'abstient de les juger plutôt que d'inventer une erreur.
     const segments = line.split('=').map(s => s.trim()).filter(Boolean);
     let ref = null;
+    let compared = 0;
 
     try {
       for (const seg of segments) {
@@ -333,17 +342,38 @@ export function checkUnitHomogeneity(expression) {
         const { sig } = parseExpr(toks, 0);
         if (!isDeterminate(sig)) continue;
         ref = ref || sig;
+        compared += 1;
         if (!equalSig(ref, sig)) {
-          return `Erreur d’homogénéité : "${line}"  (${sigToStr(ref)} ≠ ${sigToStr(sig)})`;
+          return { error: `Erreur d’homogénéité : "${line}"  (${sigToStr(ref)} ≠ ${sigToStr(sig)})`, judged, blank: false };
         }
       }
+      if (compared >= 2) judged += 1;
     } catch (e) {
       if (e?.type === 'addition') {
-        return `Addition non homogène dans "${line}"  (${sigToStr(e.left)} ≠ ${sigToStr(e.right)})`;
+        return { error: `Addition non homogène dans "${line}"  (${sigToStr(e.left)} ≠ ${sigToStr(e.right)})`, judged, blank: false };
       }
-      return `Expression invalide pour le contrôle d’unités : "${line}".`;
+      return { error: `Expression invalide pour le contrôle d’unités : "${line}".`, judged, blank: false };
     }
   }
 
-  return null; // OK
+  return { error: null, judged, blank: lines.length === 0 };
+}
+
+export function checkUnitHomogeneity(expression) {
+  return analyseUnitHomogeneity(expression).error; // null = OK ou injugeable
+}
+
+/**
+ * Verdict affichable du contrôle d'homogénéité.
+ *
+ * @param {string} expression - Formule (texte ou LaTeX)
+ * @returns {{ status: ('empty'|'error'|'ok'|'unknown'), message: string }} `ok` : la formule a été jugée homogène ;
+ *   `unknown` : rien n'a pu être jugé (variables sans unité déclarée) ; `error` : message de l'écart.
+ */
+export function unitHomogeneityStatus(expression) {
+  const { error, judged, blank } = analyseUnitHomogeneity(expression);
+  if (error) return { status: 'error', message: error };
+  if (blank) return { status: 'empty', message: '' };
+  if (judged > 0) return { status: 'ok', message: 'Formule homogène en unités.' };
+  return { status: 'unknown', message: 'Homogénéité non vérifiable : aucune unité déclarée sur les variables.' };
 }

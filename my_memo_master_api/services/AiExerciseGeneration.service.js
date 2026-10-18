@@ -312,6 +312,24 @@ ${SCHEMA_DESCRIPTION}`
   }
 
   /**
+   * Contrôle de variété du mode « mixed » : un lot d'au moins 4 éléments ne doit pas être d'un seul type
+   * (constaté : 8 questions ouvertes et aucun QCM). Ce n'est pas une erreur de schéma : l'appelant tente un
+   * retry, puis conserve la sortie valide si le retry ne la corrige pas.
+   *
+   * @param { questions: object[] } payload - Payload déjà validé
+   * @param {string} [questionType] - Type demandé
+   * @returns {string|null} Description du manque, ou null si le lot convient
+   */
+  checkMixedVariety(payload, questionType = 'mixed') {
+    if (questionType !== 'mixed') return null
+    const items = payload.questions
+    if (items.length < 4) return null
+    const types = [...new Set(items.map((item) => item.type))]
+    if (types.length >= 2) return null
+    return `le mode « mixed » demandait au moins deux types de questions différents (des "mcq" dès qu'une notion s'y prête), mais seul le type "${types[0]}" a été produit.`
+  }
+
+  /**
    * Filet de sécurité applicatif (même stratégie que AiCardGeneration.service.js#applyDedupeSafetyNet,
    * C-01.10) : retire les questions en doublon d'un payload validé — un doublon peut survenir entre
    * deux questions du même type ou de types différents (règle 2 du prompt système, propre au mode
@@ -508,24 +526,41 @@ ${SCHEMA_DESCRIPTION}`
 
     const first = await callAndTrackUsage(messages)
     const firstResult = this.parseAndValidate(first.content, questionCount, questionType)
-    if (firstResult.valid) {
+    // Sortie conforme au schéma mais sans la variété demandée en mode « mixed » (constaté : 8 questions
+    // ouvertes et aucun QCM) : un retry tente de la corriger ; s'il échoue, la 1re sortie, valide, est
+    // conservée plutôt que de tout perdre.
+    const varietyIssue = firstResult.valid ? this.checkMixedVariety(firstResult.payload, questionType) : null
+    if (firstResult.valid && !varietyIssue) {
       return { ...this.applyDedupeSafetyNet(firstResult.payload), usage: usageWithModel() }
     }
 
-    logger.warn(`[AiExerciseGeneration] Sortie non conforme (1er essai) : ${firstResult.errors.join(' ; ')}`)
+    logger.warn(`[AiExerciseGeneration] Sortie non conforme (1er essai) : ${firstResult.valid ? varietyIssue : firstResult.errors.join(' ; ')}`)
 
     messages.push({ role: 'assistant', content: first.content })
     messages.push({
       role: 'user',
-      content:
-        `Ta réponse précédente n'est pas conforme au schéma attendu : ${firstResult.errors.join(' ; ')}. ` +
-        'Renvoie uniquement un objet JSON strictement conforme au schéma fourni, sans aucun texte autour.'
+      content: firstResult.valid
+        ? `Ta réponse respecte le schéma mais pas la consigne de variété : ${varietyIssue} ` +
+          'Renvoie le lot complet, corrigé, en objet JSON strictement conforme au schéma fourni, sans aucun texte autour.'
+        : `Ta réponse précédente n'est pas conforme au schéma attendu : ${firstResult.errors.join(' ; ')}. ` +
+          'Renvoie uniquement un objet JSON strictement conforme au schéma fourni, sans aucun texte autour.'
     })
 
-    const second = await callAndTrackUsage(messages)
+    let second
+    try {
+      second = await callAndTrackUsage(messages)
+    } catch (error) {
+      if (!firstResult.valid) throw error
+      logger.warn(`[AiExerciseGeneration] Retry de variété en échec (${error.message}) : 1re sortie conservée.`)
+      return { ...this.applyDedupeSafetyNet(firstResult.payload), usage: usageWithModel() }
+    }
     const secondResult = this.parseAndValidate(second.content, questionCount, questionType)
     if (secondResult.valid) {
       return { ...this.applyDedupeSafetyNet(secondResult.payload), usage: usageWithModel() }
+    }
+    if (firstResult.valid) {
+      logger.warn(`[AiExerciseGeneration] Retry de variété non conforme : 1re sortie conservée.`)
+      return { ...this.applyDedupeSafetyNet(firstResult.payload), usage: usageWithModel() }
     }
 
     logger.error(`[AiExerciseGeneration] Sortie non conforme après retry : ${secondResult.errors.join(' ; ')}`)

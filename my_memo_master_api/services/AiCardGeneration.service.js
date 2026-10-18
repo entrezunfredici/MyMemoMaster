@@ -298,6 +298,24 @@ ${SCHEMA_DESCRIPTION}`
   }
 
   /**
+   * Contrôle de variété du mode « mixed » : un lot d'au moins 4 éléments ne doit pas être d'un seul type
+   * (constaté : 8 questions ouvertes et aucun QCM). Ce n'est pas une erreur de schéma : l'appelant tente un
+   * retry, puis conserve la sortie valide si le retry ne la corrige pas.
+   *
+   * @param { cards: object[] } payload - Payload déjà validé
+   * @param {string} [cardType] - Type demandé
+   * @returns {string|null} Description du manque, ou null si le lot convient
+   */
+  checkMixedVariety(payload, cardType = 'mixed') {
+    if (cardType !== 'mixed') return null
+    const items = payload.cards
+    if (items.length < 4) return null
+    const types = new Set(items.map((item) => item.type))
+    if (types.has('open') && types.has('mcq')) return null
+    return `le mode mixte demandait des cartes ouvertes ET des QCM, mais seul le type "${[...types][0]}" a été produit.`
+  }
+
+  /**
    * Filet de sécurité applicatif (C-01.10, suite à l'écart trouvé par le protocole de qualité —
    * docs/RAPPORT_QUALITE_GENERATION_IA.md §4) : retire les cartes en doublon d'un payload validé,
    * indépendamment de la discipline du modèle sur la règle 7 du prompt système. N'agit qu'après
@@ -510,24 +528,41 @@ ${SCHEMA_DESCRIPTION}`
 
     const first = await callAndTrackUsage(messages)
     const firstResult = this.parseAndValidate(first.content, cardCount, cardType)
-    if (firstResult.valid) {
+    // Sortie conforme au schéma mais sans la variété demandée en mode « mixed » (constaté : 8 questions
+    // ouvertes et aucun QCM) : un retry tente de la corriger ; s'il échoue, la 1re sortie, valide, est
+    // conservée plutôt que de tout perdre.
+    const varietyIssue = firstResult.valid ? this.checkMixedVariety(firstResult.payload, cardType) : null
+    if (firstResult.valid && !varietyIssue) {
       return { ...this.applyDedupeSafetyNet(firstResult.payload), usage: usageWithModel() }
     }
 
-    logger.warn(`[AiCardGeneration] Sortie non conforme (1er essai) : ${firstResult.errors.join(' ; ')}`)
+    logger.warn(`[AiCardGeneration] Sortie non conforme (1er essai) : ${firstResult.valid ? varietyIssue : firstResult.errors.join(' ; ')}`)
 
     messages.push({ role: 'assistant', content: first.content })
     messages.push({
       role: 'user',
-      content:
-        `Ta réponse précédente n'est pas conforme au schéma attendu : ${firstResult.errors.join(' ; ')}. ` +
-        'Renvoie uniquement un objet JSON strictement conforme au schéma fourni, sans aucun texte autour.'
+      content: firstResult.valid
+        ? `Ta réponse respecte le schéma mais pas la consigne de variété : ${varietyIssue} ` +
+          'Renvoie le lot complet, corrigé, en objet JSON strictement conforme au schéma fourni, sans aucun texte autour.'
+        : `Ta réponse précédente n'est pas conforme au schéma attendu : ${firstResult.errors.join(' ; ')}. ` +
+          'Renvoie uniquement un objet JSON strictement conforme au schéma fourni, sans aucun texte autour.'
     })
 
-    const second = await callAndTrackUsage(messages)
+    let second
+    try {
+      second = await callAndTrackUsage(messages)
+    } catch (error) {
+      if (!firstResult.valid) throw error
+      logger.warn(`[AiCardGeneration] Retry de variété en échec (${error.message}) : 1re sortie conservée.`)
+      return { ...this.applyDedupeSafetyNet(firstResult.payload), usage: usageWithModel() }
+    }
     const secondResult = this.parseAndValidate(second.content, cardCount, cardType)
     if (secondResult.valid) {
       return { ...this.applyDedupeSafetyNet(secondResult.payload), usage: usageWithModel() }
+    }
+    if (firstResult.valid) {
+      logger.warn(`[AiCardGeneration] Retry de variété non conforme : 1re sortie conservée.`)
+      return { ...this.applyDedupeSafetyNet(firstResult.payload), usage: usageWithModel() }
     }
 
     logger.error(`[AiCardGeneration] Sortie non conforme après retry : ${secondResult.errors.join(' ; ')}`)

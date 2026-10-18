@@ -19,6 +19,7 @@
           :key="zone.id"
           :zone="zone"
           @zone-pointerdown="onZonePointerDown"
+          @zone-resize-start="onZoneResizeStart"
         />
 
         <MindMapLink
@@ -45,6 +46,14 @@
         />
       </g>
     </svg>
+
+    <!-- Commandes de zoom visibles (Ctrl/⌘ + molette reste disponible) -->
+    <div class="mindmap-board__zoom" role="group" aria-label="Zoom du canevas" @pointerdown.stop>
+      <button type="button" aria-label="Zoom avant" :disabled="zoom >= MAX_ZOOM" @click="zoomBy(ZOOM_STEP)">+</button>
+      <span class="mindmap-board__zoom-level" role="status" aria-label="Niveau de zoom">{{ Math.round(zoom * 100) }} %</span>
+      <button type="button" aria-label="Zoom arrière" :disabled="zoom <= MIN_ZOOM" @click="zoomBy(-ZOOM_STEP)">−</button>
+      <button type="button" aria-label="Réinitialiser le zoom et recentrer" @click="resetView">⟲</button>
+    </div>
   </div>
 </template>
 
@@ -224,6 +233,16 @@ const onNodePointerDown = ({ event, node }) => {
   };
 };
 
+// Redimensionnement d'une zone : l'angle haut-gauche reste fixe, la poignée bas-droite suit le pointeur.
+const ZONE_MIN_SIZE = { width: 120, height: 80 };
+const resizingZone = ref(null);
+
+const onZoneResizeStart = ({ event, zone }) => {
+  const { x = 0, y = 0, width = 320, height = 240 } = zone.layout || {};
+  resizingZone.value = { id: zone.id, left: x - width / 2, top: y - height / 2 };
+  svgRef.value?.setPointerCapture?.(event.pointerId);
+};
+
 const onZonePointerDown = ({ event, zone }) => {
   draggingZoneId.value = zone.id;
   const coords = toBoardCoords(event);
@@ -289,6 +308,12 @@ const onPointerMove = (event) => {
     const x = coords.x - dragOffset.value.x;
     const y = coords.y - dragOffset.value.y;
     store.moveNode(draggingNodeId.value, x, y);
+  } else if (resizingZone.value) {
+    const { id, left, top } = resizingZone.value;
+    const coords = toBoardCoords(event);
+    const width = Math.max(ZONE_MIN_SIZE.width, coords.x - left);
+    const height = Math.max(ZONE_MIN_SIZE.height, coords.y - top);
+    store.updateZone(id, { layout: { x: left + width / 2, y: top + height / 2, width, height } });
   } else if (draggingZoneId.value) {
     const coords = toBoardCoords(event);
     const x = coords.x - zoneDragOffset.value.x;
@@ -307,7 +332,7 @@ const onPointerMove = (event) => {
 };
 
 const onPointerUp = (event) => {
-  if (draggingNodeId.value || draggingZoneId.value) {
+  if (draggingNodeId.value || draggingZoneId.value || resizingZone.value) {
     svgRef.value?.releasePointerCapture?.(event.pointerId);
   }
 
@@ -317,6 +342,7 @@ const onPointerUp = (event) => {
 
   draggingNodeId.value = null;
   draggingZoneId.value = null;
+  resizingZone.value = null;
   pendingDragNodeId.value = null;
   pendingDragPointerId.value = null;
   isPanning.value = false;
@@ -330,24 +356,84 @@ const onWheel = (event) => {
   event.preventDefault();
   const rect = svgRef.value?.getBoundingClientRect();
   if (!rect) return;
-  const wheelDelta = event.deltaY > 0 ? -0.1 : 0.1;
-  const newZoom = Math.min(3, Math.max(0.4, zoom.value + wheelDelta));
-  if (newZoom === zoom.value) return;
+  zoomAt(zoom.value + (event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP), event.clientX - rect.left, event.clientY - rect.top);
+};
 
-  const pointerX = event.clientX - rect.left;
-  const pointerY = event.clientY - rect.top;
+// Zoom centré sur un point de l'écran : le point du plan situé sous (pointerX, pointerY) ne bouge pas.
+const MIN_ZOOM = 0.4;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.1;
+
+const zoomAt = (target, pointerX, pointerY) => {
+  const newZoom = Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, target)) * 100) / 100;
+  if (newZoom === zoom.value) return;
   const boardX = (pointerX - pan.value.x) / zoom.value;
   const boardY = (pointerY - pan.value.y) / zoom.value;
-
   zoom.value = newZoom;
   pan.value = {
     x: pointerX - boardX * newZoom,
     y: pointerY - boardY * newZoom,
   };
 };
+
+// Boutons : zoom autour du centre du canevas.
+const zoomBy = (delta) => {
+  const rect = svgRef.value?.getBoundingClientRect();
+  if (!rect) return;
+  zoomAt(zoom.value + delta, rect.width / 2, rect.height / 2);
+};
+
+const resetView = () => {
+  zoom.value = 1;
+  centerOnSubject();
+};
 </script>
 
 <style scoped>
+.mindmap-board__zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--slate-200);
+  background: rgb(var(--white));
+  box-shadow: 0 2px 8px rgb(var(--slate-900-rgb) / 0.12);
+}
+
+.mindmap-board__zoom button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  background: var(--slate-50);
+  color: var(--slate-900);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mindmap-board__zoom button:hover:not(:disabled) {
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+}
+
+.mindmap-board__zoom button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mindmap-board__zoom-level {
+  min-width: 3.5em;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-900);
+}
+
 .mindmap-board {
   width: 100%;
   height: 100%;

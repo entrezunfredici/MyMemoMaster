@@ -540,4 +540,111 @@ describe('AiCardGenerationService', () => {
       expect(secondCallBody.messages[3].content).toContain('type demandé "mcq"')
     })
   })
+
+  describe('AiCardGenerationService — variété du mode « mixed »', () => {
+    const distinct = (base, n, prefix) => Array.from({ length: n }, (_, i) => ({ ...base, statement: `${prefix} n°${i + 1} : une notion différente ?`, sourceExcerpt: `Extrait n°${i + 1}` }))
+    const params = { sourceText: 'Un texte source.', cardCount: 8, cardType: 'mixed' }
+
+    beforeEach(() => {
+      process.env.MISTRAL_API_KEY = 'test-key'
+    })
+
+    it('checkMixedVariety — hors mode mixte ou moins de 4 éléments : aucun reproche', () => {
+      const only = { cards: distinct(VALID_OPEN_CARD, 8, 'Q') }
+      expect(AiCardGenerationService.checkMixedVariety(only, 'open')).toBeNull()
+      expect(AiCardGenerationService.checkMixedVariety({ cards: distinct(VALID_OPEN_CARD, 3, 'Q') }, 'mixed')).toBeNull()
+      expect(AiCardGenerationService.checkMixedVariety(only)).not.toBeNull()
+    })
+
+    it('checkMixedVariety — un lot d’un seul type est signalé, un lot varié non', () => {
+      expect(AiCardGenerationService.checkMixedVariety({ cards: distinct(VALID_OPEN_CARD, 4, 'Q') }, 'mixed')).toContain('seul le type "open" a été produit')
+      const varied = { cards: [...distinct(VALID_OPEN_CARD, 2, 'O'), ...distinct(VALID_MCQ_CARD, 2, 'M')] }
+      expect(AiCardGenerationService.checkMixedVariety(varied, 'mixed')).toBeNull()
+    })
+
+    it('1er essai varié : un seul appel modèle', async () => {
+      const items = [...distinct(VALID_OPEN_CARD, 4, 'O'), ...distinct(VALID_MCQ_CARD, 4, 'M')]
+      const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(mockFetchResponse({ cards: items, warning: null }))
+
+      const result = await AiCardGenerationService.generateCards(params)
+
+      expect(result.cards).toHaveLength(8)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('1er essai sans variété puis 2e varié : retry avec la consigne, résultat du 2e essai, usage cumulé', async () => {
+      const mono = distinct(VALID_OPEN_CARD, 8, 'O')
+      const varied = [...distinct(VALID_OPEN_CARD, 4, 'O2'), ...distinct(VALID_MCQ_CARD, 4, 'M2')]
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(mockFetchResponse({ cards: mono, warning: null }))
+        .mockResolvedValueOnce(mockFetchResponse({ cards: varied, warning: null }))
+
+      const result = await AiCardGenerationService.generateCards(params)
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(result.cards.map((item) => item.type)).toContain('mcq')
+      expect(result.usage).toEqual({ model: 'mistral-small-latest', promptTokens: 200, completionTokens: 100 })
+      const retryMessages = JSON.parse(fetchMock.mock.calls[1][1].body).messages
+      expect(retryMessages.at(-1).content).toContain('pas la consigne de variété')
+      expect(retryMessages.at(-1).content).toContain('seul le type "open" a été produit')
+    })
+
+    it('le retry ne corrige pas la variété : la sortie du retry (valide) est retournée', async () => {
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(mockFetchResponse({ cards: distinct(VALID_OPEN_CARD, 8, 'A'), warning: null }))
+        .mockResolvedValueOnce(mockFetchResponse({ cards: distinct(VALID_OPEN_CARD, 7, 'B'), warning: null }))
+
+      const result = await AiCardGenerationService.generateCards(params)
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(result.cards).toHaveLength(7)
+    })
+
+    it('le retry est non conforme : la 1re sortie, valide mais monotone, est conservée (rien n’est perdu)', async () => {
+      const first = distinct(VALID_OPEN_CARD, 8, 'A')
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(mockFetchResponse({ cards: first, warning: null }))
+        .mockResolvedValueOnce(mockFetchResponse({ cards: 'pas un tableau' }))
+
+      const result = await AiCardGenerationService.generateCards(params)
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(result.cards).toHaveLength(8)
+    })
+
+    it('le retry échoue en réseau : la 1re sortie valide est conservée', async () => {
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(mockFetchResponse({ cards: distinct(VALID_OPEN_CARD, 5, 'A'), warning: null }))
+        .mockRejectedValueOnce(new Error('réseau'))
+
+      const result = await AiCardGenerationService.generateCards({ ...params, cardCount: 5 })
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(result.cards).toHaveLength(5)
+    })
+
+    it('pas de retry (donc pas de jetons en plus) quand le lot est petit, même monotone', async () => {
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(mockFetchResponse({ cards: distinct(VALID_OPEN_CARD, 3, 'A'), warning: null }))
+
+      await AiCardGenerationService.generateCards({ ...params, cardCount: 3 })
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('pas de retry de variété quand un type précis est demandé', async () => {
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(mockFetchResponse({ cards: distinct(VALID_OPEN_CARD, 6, 'A'), warning: null }))
+
+      await AiCardGenerationService.generateCards({ ...params, cardCount: 6, cardType: 'open' })
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+  })
 })

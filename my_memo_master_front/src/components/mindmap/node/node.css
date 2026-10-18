@@ -114,13 +114,16 @@
   font-size: 11px;
 }
 
+/* `overflow: auto` et `safe center` : une formule plus grande que l'item défile au lieu d'être coupée
+   (avec `center` seul, le côté gauche d'une formule trop large devenait inatteignable). */
 .mindmap-node .mindmap-node__formula {
   width: 100%;
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  align-items: safe center;
+  justify-content: safe center;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
 .mindmap-node .mindmap-node__formula .katex-display { margin: 0; }

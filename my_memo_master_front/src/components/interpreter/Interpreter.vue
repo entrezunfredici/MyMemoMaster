@@ -89,9 +89,15 @@
       }"
       v-html="renderedContent"
     />
-    <div v-if="unitsError" class="interpreter__units-error">
-      {{ unitsError }}
+    <div v-if="unitsVerdict.status === 'error'" class="interpreter__units-error" role="alert">
+      {{ unitsVerdict.message }}
     </div>
+    <div v-else-if="unitsVerdict.status === 'ok'" class="interpreter__units-ok" role="status">
+      ✔ {{ unitsVerdict.message }}
+    </div>
+    <p v-else-if="unitsVerdict.status === 'unknown'" class="interpreter__units-unknown" role="status">
+      {{ unitsVerdict.message }}
+    </p>
     <p class="interpreter__hint">
       Vérification d'homogénéité : déclarez l'unité d'une variable avec <code>P[Pa] = F[N] / S[m^2]</code> —
       sans déclaration, les formules symboliques ne sont pas jugées.
@@ -106,7 +112,7 @@
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { renderMathMultiline, toLatex, addMatrixColumn, addMatrixRow, bindVirtualKeyboard } from './interpreter.js'
 import { isMobile } from '@/helpers/functions'
-import { checkUnitHomogeneity } from './units.js'
+import { unitHomogeneityStatus } from './units.js'
 import { PALETTE_TABS } from './palette.js'
 
 const props = defineProps({
@@ -188,7 +194,9 @@ onMounted(async () => {
     })
     mathliveReady.value = true
     syncMathfieldFromRaw(userInput.value)
-  } catch {
+  } catch (error) {
+    // Échec toléré (la zone brute reste utilisable) mais tracé : sans cela, « Éditeur visuel indisponible » ne se diagnostique pas.
+    console.warn('MathLive n’a pas pu être chargé :', error)
     mathliveReady.value = false
   }
 })
@@ -208,7 +216,7 @@ const syncMathfieldFromRaw = (value) => {
 
 // Le vérificateur convertit le LaTeX de l'éditeur en syntaxe plate (latexToPlain)
 // et s'abstient sur ce qu'il ne sait pas juger (variables sans annotation Var[unité])
-const unitsError = computed(() => checkUnitHomogeneity(userInput.value))
+const unitsVerdict = computed(() => unitHomogeneityStatus(userInput.value))
 const renderedContent = computed(() => renderMathMultiline(userInput.value))
 
 const MATRIX_TRANSFORMS = { addColumnAfter: addMatrixColumn, addRowAfter: addMatrixRow }
@@ -403,6 +411,22 @@ const apply = () => {
 .interpreter__preview {
   min-height: 80px; border: 1px solid var(--slate-200); border-radius: 12px; padding: 16px;
   background: rgb(var(--white)); font-size: 16px; color: var(--slate-900);
+}
+
+.interpreter__units-ok {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--green-200);
+  background: var(--green-50);
+  color: var(--green-800);
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.interpreter__units-unknown {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--slate-600);
 }
 
 .interpreter__units-error {

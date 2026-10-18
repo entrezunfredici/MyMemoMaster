@@ -14,11 +14,19 @@ const GREEK = {
   μ: 'mu', ρ: 'rho', σ: 'sigma', τ: 'tau', φ: 'phi', ω: 'omega', Δ: 'Delta', Ω: 'Omega',
 };
 
-// Forme comparable d'un symbole : « E_{c} », « E_c » et « Ec » sont identiques, « ρ » = « \rho ».
+// Décorations d'un symbole : \vec{v}, \overrightarrow{OP}, \hat{u}… désignent la même grandeur que « v », « OP », « u ».
+const DECORATIONS = ['vec', 'overrightarrow', 'widevec', 'hat', 'bar', 'overline', 'mathbf', 'boldsymbol', 'mathrm', 'dot', 'ddot', 'tilde'];
+const DECORATION_RE = new RegExp(`\\\\(?:${DECORATIONS.join('|')})(?![A-Za-z])`, 'g');
+
+// Forme comparable d'un symbole : « E_{c} », « E_c » et « Ec » sont identiques, « ρ » = « \rho », « \vec{v} » = « v ».
 const normalizeSymbol = (symbol) =>
   String(symbol ?? '')
+    .replace(DECORATION_RE, '')
     .replace(/[αβγδελμρστφωΔΩ]/g, (ch) => GREEK[ch])
     .replace(/[\\_{}\s]/g, '');
+
+// Un titre qui ressemble à un symbole (« m », « v_0 », « \rho ») sert de symbole à une grandeur qui n'en a pas.
+const SYMBOL_LIKE = /^\\?[A-Za-zΑ-Ωα-ω]{1,6}(_\{?[A-Za-z0-9]{1,4}\}?)?$/;
 
 const isFormulaNode = (node) => getNodeKinds(node).some((kind) => kind === 'formula' || kind === 'function');
 
@@ -56,6 +64,20 @@ const tokenize = (source, knownSymbols) => {
       if (cmd === 'div') { tokens.push({ t: 'op', v: '/' }); continue; }
       if (cmd === 'frac' || cmd === 'sqrt') { tokens.push({ t: 'fn', v: cmd }); continue; }
       if (cmd === 'pi') { tokens.push({ t: 'num', v: Math.PI }); continue; }
+      // Annotation de texte (« \text{ en N} ») : ignorée avec son groupe, ce ne sont pas des variables.
+      if (cmd === 'text') {
+        if (source[i] === '{') readGroup();
+        continue;
+      }
+      // Décoration (\vec{v}, \overrightarrow{OP}) : le groupe entier est UN symbole, pas une suite de lettres.
+      if (DECORATIONS.includes(cmd)) {
+        if (source[i] === '{') {
+          let name = readGroup();
+          if (source[i] === '_') { i++; name += '_' + readGroup(); }
+          tokens.push({ t: 'id', v: normalizeSymbol(name) });
+        }
+        continue;
+      }
       let name = cmd;
       if (source[i] === '_') { i++; name += '_' + readGroup(); }
       tokens.push({ t: 'id', v: normalizeSymbol(name) });
@@ -83,6 +105,13 @@ const tokenize = (source, knownSymbols) => {
         pos += matched.len;
       }
       continue;
+    }
+    // Unité entre crochets (« m [kg] ») : annotation ignorée. Un crochet qui ne contient pas une unité
+    // (« [a+b] ») reste un regroupement.
+    if (ch === '[') {
+      const end = source.indexOf(']', i);
+      const inner = end === -1 ? '' : source.slice(i + 1, end).trim();
+      if (inner && parseUnit(inner)) { i = end + 1; continue; }
     }
     if ('+-*/^()={}[]'.includes(ch)) { tokens.push({ t: 'op', v: ch }); i++; continue; }
     if (ch === '×' || ch === '·') { tokens.push({ t: 'op', v: '*' }); i++; continue; }
@@ -236,6 +265,7 @@ const collectSources = (map, id) => {
     const neighbor = map.nodes[nid];
     if (!isQuantitySource(neighbor)) continue;
     let key = normalizeSymbol(neighbor.quantity?.symbol);
+    if (!key && !isFormulaNode(neighbor) && SYMBOL_LIKE.test(String(neighbor.label ?? '').trim())) key = normalizeSymbol(neighbor.label);
     if (!key && isFormulaNode(neighbor)) key = normalizeSymbol(splitEquation(toLatex(neighbor.content || '')).symbol);
     if (key && !sources.has(key)) sources.set(key, neighbor);
   }
