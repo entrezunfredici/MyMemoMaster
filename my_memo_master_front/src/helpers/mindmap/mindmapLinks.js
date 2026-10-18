@@ -142,7 +142,56 @@ const computeLinkGeometry = (shape, source, target) => {
   };
 };
 
+// Étiquette d'une branche : « 2. Calcul » (rang de lecture + libellé du type), vide sans type.
+const linkLabelText = (typeLabel, type, readingRank) => {
+  const label = typeLabel || type || '';
+  if (!label) return '';
+  return readingRank ? `${readingRank}. ${label}` : label;
+};
+
+// Largeur de la pastille d'une étiquette (police 12 px en gras : ~7,6 px par caractère + marges).
+const linkLabelWidth = (text) => Math.max(48, Math.ceil(text.length * 7.6) + 20);
+
+const LABEL_HEIGHT = 22;
+const LABEL_STEP = LABEL_HEIGHT + 4;
+const LABEL_MARGIN = 4;
+const LABEL_MAX_TRIES = 40;
+
+/**
+ * Écarte verticalement les étiquettes de branche qui se chevauchent (deux branches au milieu voisin).
+ * Chaque étiquette garde sa place si elle est libre, sinon elle est décalée vers le haut puis vers le bas
+ * par pas d'une hauteur d'étiquette, jusqu'à trouver une place libre.
+ *
+ * @param {{ id: string, x: number, y: number, width: number }[]} items - Étiquettes (centre et largeur), dans l'ordre de priorité.
+ * @returns {Object<string, number>} Décalage vertical à ajouter à y, par identifiant (0 = en place).
+ */
+const layoutLinkLabels = (items) => {
+  const placed = [];
+  const offsets = {};
+  for (const item of items) {
+    const box = (offset) => ({
+      x1: item.x - item.width / 2 - LABEL_MARGIN,
+      x2: item.x + item.width / 2 + LABEL_MARGIN,
+      y1: item.y + offset - LABEL_HEIGHT / 2,
+      y2: item.y + offset + LABEL_HEIGHT / 2,
+    });
+    const free = (candidate) =>
+      placed.every((other) => candidate.x2 <= other.x1 || candidate.x1 >= other.x2 || candidate.y2 <= other.y1 || candidate.y1 >= other.y2);
+    let offset = 0;
+    for (let attempt = 1; attempt <= LABEL_MAX_TRIES && !free(box(offset)); attempt += 1) {
+      const rank = Math.ceil(attempt / 2);
+      offset = (attempt % 2 === 1 ? -1 : 1) * rank * LABEL_STEP;
+    }
+    placed.push(box(offset));
+    offsets[item.id] = offset;
+  }
+  return offsets;
+};
+
 export {
+  linkLabelText,
+  linkLabelWidth,
+  layoutLinkLabels,
   DEFAULT_LINK_TYPE,
   LINK_DIRECTIONS,
   LINK_SHAPES,

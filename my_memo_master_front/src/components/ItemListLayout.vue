@@ -25,11 +25,13 @@
 
     <!-- Filtre sujet -->
     <div class="mb-6">
-      <div class="flex gap-3 flex-wrap items-center mb-2">
-        <label class="text-sm font-semibold text-heading">Filtrer par sujet :</label>
+      <div class="flex gap-3 flex-wrap items-center mb-2" role="group" aria-labelledby="item-list-subject-filter">
+        <span id="item-list-subject-filter" class="text-sm font-semibold text-heading">Filtrer par sujet :</span>
         <button
           v-for="subject in subjects"
           :key="subject.subjectId"
+          type="button"
+          :aria-pressed="selectedSubjectId === subject.subjectId"
           @click="toggleSubject(subject.subjectId)"
           :class="[
             'px-3 py-1.5 rounded-lg font-semibold transition duration-200 border-2 text-sm',
@@ -42,6 +44,7 @@
         </button>
         <button
           v-if="selectedSubjectId"
+          type="button"
           @click="$emit('update:selectedSubjectId', null)"
           class="px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-100 text-red-700 border-2 border-red-300 hover:bg-red-200"
         >
@@ -50,14 +53,14 @@
       </div>
       <p class="text-sm text-gray-600">
         <strong>{{ filteredCount }}</strong>
-        {{ itemLabel }}<span v-if="filteredCount !== 1">s</span>
-        trouvé<span v-if="filteredCount !== 1">s</span>
+        {{ plural(filteredCount, itemLabel, pluralLabel) }}
+        {{ feminine ? plural(filteredCount, 'trouvée', 'trouvées') : plural(filteredCount, 'trouvé', 'trouvés') }}
       </p>
     </div>
 
     <!-- Chargement -->
     <div v-if="loading" class="text-center text-gray-light py-10">
-      Chargement des {{ itemLabel }}s…
+      Chargement des {{ pluralLabel }}…
     </div>
 
     <!-- Grille -->
@@ -77,6 +80,9 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { plural } from '@/helpers/plural'
+
 const props = defineProps({
   search:           { type: String,  required: true },
   selectedSubjectId:{ type: Number,  default: null },
@@ -86,10 +92,16 @@ const props = defineProps({
   searchPlaceholder:{ type: String,  default: 'Rechercher…' },
   createLabel:      { type: String,  default: '+ Créer' },
   itemLabel:        { type: String,  default: 'élément' },
+  // Pluriel quand ce n'est pas « singulier + s » (« carte mentale » -> « cartes mentales »)
+  itemLabelPlural:  { type: String,  default: '' },
+  // Genre féminin : « trouvée(s) » au lieu de « trouvé(s) »
+  feminine:         { type: Boolean, default: false },
   emptyMessage:     { type: String,  default: 'Aucun élément trouvé.' },
 })
 
 const emit = defineEmits(['update:search', 'update:selectedSubjectId', 'create'])
+
+const pluralLabel = computed(() => props.itemLabelPlural || `${props.itemLabel}s`)
 
 function toggleSubject(subjectId) {
   emit('update:selectedSubjectId', props.selectedSubjectId === subjectId ? null : subjectId)

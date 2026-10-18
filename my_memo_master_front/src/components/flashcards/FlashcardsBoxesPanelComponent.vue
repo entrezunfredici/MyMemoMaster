@@ -18,8 +18,8 @@
         ></span>
         <span class="font-semibold text-primary">B{{ box.level }}</span>
         <span class="text-gray-500" :title="`${box.intervall} s`">{{ formatDuration(box.intervall) || `${box.intervall} s` }}</span>
-        <button @click="$emit('edit', box)" class="text-gray-500 hover:text-primary" title="Modifier">✎</button>
-        <button @click="$emit('delete', box)" class="text-gray-500 hover:text-red-600" title="Supprimer">✕</button>
+        <button type="button" @click="$emit('edit', box)" class="text-gray-500 hover:text-primary" title="Modifier" :aria-label="`Modifier la boîte B${box.level}`">✎</button>
+        <button type="button" @click="$emit('delete', box)" class="text-gray-500 hover:text-red-600" title="Supprimer" :aria-label="`Supprimer la boîte B${box.level}`">✕</button>
       </div>
       <p v-if="boxes.length === 0" class="text-gray-500 text-sm italic">Aucune boîte — ajoutez-en une pour commencer.</p>
     </div>

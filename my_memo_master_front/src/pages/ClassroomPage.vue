@@ -27,9 +27,9 @@
 
     <!-- Sélection de vue -->
     <!-- CHOIX: flex-wrap — quatre boutons de vue ne tiennent pas sur une ligne en 360-412 px (la page s'élargissait) -->
-    <div v-if="isAdmin" class="flex flex-wrap items-center gap-2">
-      <span class="text-sm text-dark/70 whitespace-nowrap">Vue :</span>
-      <button v-for="v in availableViews" :key="v.key"
+    <div v-if="isAdmin" class="flex flex-wrap items-center gap-2" role="group" aria-labelledby="classroom-view-label">
+      <span id="classroom-view-label" class="text-sm text-dark/70 whitespace-nowrap">Vue :</span>
+      <button v-for="v in availableViews" :key="v.key" type="button" :aria-pressed="activeView === v.key"
         @click="activeView = v.key"
         :class="[activeView === v.key ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm font-medium transition']">
         {{ v.label }}

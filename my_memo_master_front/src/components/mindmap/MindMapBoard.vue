@@ -30,6 +30,7 @@
           :selected="store.selectedLinkId === link.id"
           :type-label="getBranchTypeLabel(store.map.branchTypes, link.type)"
           :reading-rank="readingRanks[link.id] || null"
+          :label-offset="labelOffsets[link.id] || 0"
           @link-pointerdown="onLinkPointerDown"
         />
 
@@ -53,7 +54,7 @@ import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
 import MindMapNode from './MindMapNode.vue';
 import MindMapLink from './MindMapLink.vue';
-import { getBranchTypeLabel, getOutgoingLinks } from '@/helpers/mindmap/mindmapLinks';
+import { computeLinkGeometry, getBranchTypeLabel, getOutgoingLinks, layoutLinkLabels, linkLabelText, linkLabelWidth } from '@/helpers/mindmap/mindmapLinks';
 import MindMapZone from './MindMapZone.vue';
 
 const store = useMindMapBuilderStore();
@@ -126,6 +127,21 @@ const visibleLinks = computed(() =>
     visibleNodeIds.value.includes(link.from) && visibleNodeIds.value.includes(link.to)
   )
 );
+
+// Décalage vertical des étiquettes de branche qui se chevauchent (deux branches au milieu voisin).
+const labelOffsets = computed(() => {
+  const items = [];
+  for (const link of visibleLinks.value) {
+    const source = store.map.nodes[link.from];
+    const target = store.map.nodes[link.to];
+    if (!source || !target) continue;
+    const text = linkLabelText(getBranchTypeLabel(store.map.branchTypes, link.type), link.type, readingRanks.value[link.id] || null);
+    if (!text) continue;
+    const { mid } = computeLinkGeometry(link.style?.shape || 'curve', source, target);
+    items.push({ id: link.id, x: mid.x, y: mid.y - 20, width: linkLabelWidth(text) });
+  }
+  return layoutLinkLabels(items);
+});
 
 const centerOnSubject = () => {
   const node = store.map.nodes[store.map.subjectNodeId];

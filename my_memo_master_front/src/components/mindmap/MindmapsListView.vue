@@ -138,6 +138,8 @@ onMounted(fetchDiagrams)
     search-placeholder="Rechercher une carte mentale..."
     create-label="+ Nouvelle carte"
     item-label="carte mentale"
+    item-label-plural="cartes mentales"
+    feminine
     empty-message="Aucune carte mentale trouvée. Créez-en une !"
     @create="openCreateModal"
   >

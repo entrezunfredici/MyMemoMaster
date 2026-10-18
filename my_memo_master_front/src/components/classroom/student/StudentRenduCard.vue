@@ -41,11 +41,11 @@
         <div v-if="pendingFile">
           <p class="text-sm font-semibold text-dark">{{ pendingFile.name }}</p>
           <p class="text-xs text-dark/60 mt-0.5">{{ formatFileSize(pendingFile.size) }}</p>
-          <button @click.stop="pendingFile = null" class="mt-1 text-xs text-secondary hover:underline">Retirer</button>
+          <button type="button" :aria-label="`Retirer le fichier ${pendingFile.name}`" @click.stop="removePendingFile" class="mt-1 text-xs text-secondary hover:underline">Retirer</button>
         </div>
         <!-- RGAA 7.1 : la zone ne répond au glisser-déposer qu'à la souris ; l'action « choisir un fichier »
              est portée par un vrai bouton, atteignable et activable au clavier. -->
-        <button v-else type="button" class="w-full cursor-pointer" @click="fileInput?.click()">
+        <button v-else ref="browseButton" type="button" class="w-full cursor-pointer" @click="fileInput?.click()">
           <span class="block text-sm text-dark/60">Glissez votre rendu ici ou <span class="text-secondary underline">parcourez</span></span>
           <span class="block text-xs text-dark/40 mt-1">PDF, Word, Image — max 10 Mo</span>
         </button>
@@ -68,7 +68,7 @@
 <script setup>
 // Un rendu à remettre : statut de la soumission, dépôt d'un fichier (glisser-déposer ou bouton), remise, retrait.
 // Extrait de pages/ClassroomEtudiantView.vue ; le fichier en attente est relié à la page parente par v-model.
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useClassGroupSubmissionStore } from '@/stores/classGroupSubmissions'
 import { useStoredFile } from '@/composables/useStoredFile'
 import { formatDate, formatFileSize, isUrgent } from '@/helpers/classroomFormat'
@@ -89,6 +89,13 @@ const mySubmission = computed(() => submissionStore.mySubmissions[props.rendu.id
 const pendingFile = defineModel('pendingFile', { default: null })
 const dragOver = ref(false)
 const fileInput = ref(null)
+const browseButton = ref(null)
+
+// Retirer le fichier supprime le bouton qui avait le focus : on le rend à « parcourez ».
+function removePendingFile() {
+  pendingFile.value = null
+  nextTick(() => browseButton.value?.focus())
+}
 
 function onDrop(event) {
   dragOver.value = false

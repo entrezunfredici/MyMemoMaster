@@ -18,14 +18,18 @@
           </div>
           <div class="flex gap-2 flex-shrink-0">
             <button
+              type="button"
               @click="$emit('edit', card)"
               class="hover:bg-gray-100 text-gray-600 py-1 px-2 rounded border border-gray-300 transition"
               title="Modifier"
+              :aria-label="`Modifier la carte ${cardTitle(card)}`"
             >✎</button>
             <button
+              type="button"
               @click="$emit('delete', card)"
               class="hover:bg-red-50 text-gray-600 py-1 px-2 rounded border border-gray-300 transition"
               title="Supprimer"
+              :aria-label="`Supprimer la carte ${cardTitle(card)}`"
             >✕</button>
           </div>
         </div>
@@ -45,4 +49,12 @@ defineProps({
   empty: { type: Boolean, default: false },
 })
 defineEmits(['edit', 'delete'])
+
+// Nom accessible d'une carte dans « Modifier la carte … » : sa question, raccourcie (sinon la liste annonce N
+// fois « Supprimer » sans dire laquelle).
+const cardTitle = (card) => {
+  const statement = (card.question?.statement || '').replace(/\s+/g, ' ').trim()
+  if (!statement) return `n° ${card.idCard}`
+  return `« ${statement.length > 60 ? `${statement.slice(0, 57)}…` : statement} »`
+}
 </script>

@@ -13,13 +13,14 @@
   <div
     v-else
     class="mindmap-node__title"
+    :style="titleStyle"
     @dblclick.stop="startEditLabel"
   >{{ node.label }}</div>
 </template>
 
 <script setup>
 // Titre d'un item de carte, modifiable en place (double-clic). Extrait de MindMapNode.vue.
-import { ref, nextTick } from 'vue';
+import { computed, ref, nextTick } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
 import { useNodeEditing } from '@/composables/useMindMapNodeEditing';
 
@@ -29,6 +30,19 @@ const props = defineProps({
 
 const store = useMindMapBuilderStore();
 const editingField = useNodeEditing();
+
+// Le titre suit le style du nœud : couleur, italique, souligné, et taille du texte + 2 px (15 px pour 13 px).
+// Il reste toujours en gras : c'est ce qui le distingue du corps (la bascule « G » ne concerne que le corps).
+const titleStyle = computed(() => {
+  const style = props.node.style || {};
+  const size = Number.parseInt(style.fontSize, 10);
+  return {
+    ...(style.textColor ? { color: style.textColor } : {}),
+    fontSize: `${(Number.isFinite(size) ? size : 13) + 2}px`,
+    fontStyle: style.fontStyle || 'normal',
+    textDecoration: style.textDecoration || 'none',
+  };
+});
 
 const localLabel = ref('');
 const labelInputRef = ref(null);

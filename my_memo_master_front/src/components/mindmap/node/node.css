@@ -23,6 +23,7 @@
 }
 .mindmap-node .mindmap-node__quantity {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -31,8 +32,11 @@
   cursor: text;
   min-width: 1ch;
 }
-.mindmap-node .mindmap-node__quantity-value {
+/* Deux classes sur l'élément : sinon `.mindmap-node__inline-input { width: 100% }`, déclarée plus bas à
+   spécificité égale, l'emportait et le champ de valeur repoussait l'unité hors du nœud. */
+.mindmap-node .mindmap-node__inline-input.mindmap-node__quantity-value {
   width: 5.5em;
+  flex: 0 0 auto;
   min-width: 0;
   text-align: center;
 }

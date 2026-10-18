@@ -35,7 +35,7 @@
       class="mindmap-link__middle"
     />
     <!-- Type de la branche, au-dessus -->
-    <g v-if="linkLabel" :transform="labelTransform" class="mindmap-link__label">
+    <g v-if="linkLabel" :transform="labelTransform" class="mindmap-link__label" data-testid="link-label">
       <rect
         :x="-labelWidth / 2"
         y="-12"
@@ -57,7 +57,7 @@
 <script setup>
 import { mindmapColors } from '@/helpers/themeColors';
 import { computed } from 'vue';
-import { computeLinkGeometry } from '@/helpers/mindmap/mindmapLinks';
+import { computeLinkGeometry, linkLabelText, linkLabelWidth } from '@/helpers/mindmap/mindmapLinks';
 
 const props = defineProps({
   link: { type: Object, required: true },
@@ -68,6 +68,8 @@ const props = defineProps({
   typeLabel: { type: String, default: '' },
   // Rang de lecture (1, 2…) quand l'item source a plusieurs branches sortantes, sinon null.
   readingRank: { type: Number, default: null },
+  // Décalage vertical de l'étiquette, calculé par le plateau pour éviter le chevauchement avec les voisines.
+  labelOffset: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['link-pointerdown']);
@@ -79,14 +81,10 @@ const geometry = computed(() =>
   computeLinkGeometry(props.link.style?.shape || 'curve', props.source, props.target)
 );
 
-const linkLabel = computed(() => {
-  const label = props.typeLabel || props.link.type || '';
-  if (!label) return '';
-  return props.readingRank ? `${props.readingRank}. ${label}` : label;
-});
-const labelWidth = computed(() => Math.max(48, linkLabel.value.length * 7 + 18));
-// Le type est affiché au-dessus du milieu de la branche.
-const labelTransform = computed(() => `translate(${geometry.value.mid.x}, ${geometry.value.mid.y - 20})`);
+const linkLabel = computed(() => linkLabelText(props.typeLabel, props.link.type, props.readingRank));
+const labelWidth = computed(() => linkLabelWidth(linkLabel.value));
+// Le type est affiché au-dessus du milieu de la branche, décalé si une autre étiquette occupe la place.
+const labelTransform = computed(() => `translate(${geometry.value.mid.x}, ${geometry.value.mid.y - 20 + props.labelOffset})`);
 
 const handlePointerDown = (event) => {
   emit('link-pointerdown', { event, link: props.link });
@@ -103,8 +101,12 @@ const handlePointerDown = (event) => {
   cursor: pointer;
 }
 
-.mindmap-link__label,
 .mindmap-link__middle {
   pointer-events: none;
+}
+
+/* Cliquer sur l'étiquette sélectionne la branche, comme le trait (le pointerdown remonte au <g> de la branche). */
+.mindmap-link__label {
+  cursor: pointer;
 }
 </style>
