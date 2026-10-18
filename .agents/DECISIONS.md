@@ -5238,3 +5238,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : un sous-composant par zone (`node/NodeTitle`, `NodeTextBody`, `NodeImage`, `NodeQuantity`) ; le champ en édition est un `ref` fourni par `provideNodeEditing()` et lu par `useNodeEditing()` (composable `useMindMapNodeEditing.js`) ; le CSS passe dans `node/node.css`, global, chaque sélecteur descendant de `.mindmap-node` (les règles de la racine répètent la classe pour garder la spécificité qu'avait `[data-v-…]`).
 **Alternative écartée** : props `editing` + événements `start`/`stop` — l'état n'est mis à jour qu'au rendu suivant, une validation par Entrée suivie d'un `blur` synchrone pouvait enregistrer deux fois ; garder tout le CSS en `:deep()` dans l'item — l'item restait à 340 lignes.
 **Conséquences** : un sous-composant d'item doit être rendu dans un `MindMapNode` (erreur explicite sinon) ; équivalence du CSS vérifiée règle par règle (déclarations, spécificité, ordre) par script avec le compilateur Vue sur l'ancien bloc `<style scoped>`.
+
+
+## 2026-10-18 — Store `mindmapBuilder` : groupes d'actions étalés dans `actions`, construction d'un item dans un helper pur
+
+**Contexte** : le store (504 lignes) mêlait état, sélection, création d'item (calcul de placement), zones, branches, modification d'item et synchronisation des flashcards ; 40 fichiers l'utilisent via `useMindMapBuilderStore`.
+**Décision** : l'API publique ne change pas (un seul store, mêmes actions et getters). Les zones, branches, modifications d'item et flashcards liées sont des objets d'actions dans `stores/mindmapBuilderActions/` étalés dans `actions` (`this` = le store) ; la construction d'un item (parent, placement en spirale d'or, héritage de style, grandeur, graphique) est `buildNewNode(map, options)` dans `helpers/mindmap/mindmapNodeFactory.js`, pur et testé sans pinia.
+**Alternative écartée** : plusieurs stores Pinia (un par groupe) — chaque composant et chaque test devrait en connaître plusieurs et les actions se croisent (`addNode` → `addLink` → `touch`) ; un store « setup » à composables — réécrit tout le style du store pour un gain nul ici.
+**Conséquences** : le dossier est nommé `mindmapBuilderActions/` (et non `mindmapBuilder/`) pour ne pas être ambigu avec `mindmapBuilder.js` à la résolution `@/stores/mindmapBuilder`.

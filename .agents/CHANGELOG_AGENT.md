@@ -13435,3 +13435,11 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Preuve** : copie temporaire de l'ancien item comparée au nouveau sur 21 états × 32 gestes (double-clics, saisies, Entrée/Échap/blur, focusout de la grandeur, clics, Maj+clic, dépôts d'image réussi/refusé/échec, chargement d'image) : HTML, appels de store, événements et notifications identiques ; deux mutations volontaires détectées (21/21 et 1/21 en échec) après ajout de cas manquants ; CSS comparé règle par règle avec le compilateur Vue (35 règles : déclarations, spécificité, ordre identiques). Limite : le comparateur n'alimentait pas le getter `calculations` (non surchargeable via `initialState`) ; les chemins de calcul sont couverts par les tests unitaires ci-dessous.
 **Tests** : +32 (`MindMapNodeParts.test.js` : titre, corps, image, grandeur et calcul, création d'enfants, édition en cours, `useNodeEditing`) ; front 130 fichiers / 2172 tests, ESLint, audits RGAA / couleurs / Tailwind à 0, build.
 **Reste** : `stores/mindmapBuilder.js` (504).
+
+
+## [2026-10-18] [REF] Store mindmapBuilder découpé : 504 -> 207 lignes (branche `dev_front_small_fixes2`)
+
+**Fait** : `stores/mindmapBuilderActions/{zoneActions,linkActions,nodeActions,cardActions}.js` (étalés dans `actions`) ; `helpers/mindmap/mindmapNodeFactory.js` (`buildNewNode`, `ensureGraphNodeSize`). Aucune modification de l'API du store. Voir DECISIONS (2026-10-18).
+**Preuve** : copie temporaire de l'ancien store comparée au nouveau sur 90 opérations enchaînées (toutes les actions, cas limites, nœuds/zones/branches inconnus, synchro des flashcards avec succès/échec) : état complet, getters et valeurs de retour identiques après chaque opération ; mêmes noms d'actions/getters ; 5 mutations volontaires dont 4 détectées (la 5ᵉ, borne haute de `moveLink`, est équivalente : `splice` hors bornes ajoute en fin) après ajout de cas manquants ; échafaudage supprimé.
+**Tests** : +31 (`mindmapBuilderActions.test.js` : zones — jusque-là sans test —, branches, flashcards liées, modification d'item ; `mindmapNodeFactory.test.js`) ; front 132 fichiers, ESLint, audit RGAA à 0, build.
+**Reste (gros fichiers)** : plus aucun fichier de pages/composants/stores au-dessus de 460 lignes (`Interpreter.vue` 460, `SettingsPage` 407, `KpiPage` 405).
