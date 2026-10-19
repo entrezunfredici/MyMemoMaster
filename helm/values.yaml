@@ -51,17 +51,13 @@ config:
   PG_POOL_ACQUIRE: "30000"
   PG_POOL_IDLE: "10000"
   REDIS_PORT: "6379"
-  # Relais SMTP Brevo. Domaine authentifié (brevo-code + DKIM brevo1/brevo2 + DMARC).
-  # SMTP_USER est un login dédié Brevo (…@smtp-brevo.com), PAS l'email du compte ;
-  # SMTP_PASS est la clé SMTP « xsmtpsib-… », pas une clé API v3 « xkeysib-… ».
-  # Hostinger reste l'hébergeur des MX pour la RÉCEPTION sur support@.
-  SMTP_HOST: smtp-relay.brevo.com
-  SMTP_PORT: "587"
-  SMTP_SECURE: "false"
-  # Aligné sur l'expéditeur vérifié dans Brevo (« support », DKIM + DMARC validés).
-  # Le domaine étant authentifié, un noreply@my-memo-master.com fonctionnerait aussi
-  # (vérifié par un envoi réel le 2026-08-27) ; on garde support@ pour que les
-  # réponses des utilisateurs arrivent dans une boîte réellement relevée.
+  # SMTP Hostinger (boîte support@, port 465 en SSL implicite : SMTP_SECURE doit être "true").
+  # SMTP_USER / SMTP_PASS (mot de passe de la boîte) sont dans le secret K8s, hors chart.
+  # Ancien relais Brevo abandonné le 2026-10-19 (compte inaccessible, filtrage par IP).
+  SMTP_HOST: smtp.hostinger.com
+  SMTP_PORT: "465"
+  SMTP_SECURE: "true"
+  # Expéditeur = la boîte authentifiée, pour que les réponses arrivent dans une boîte relevée.
   EMAIL_FROM: support@my-memo-master.com
   API_PUBLIC_URL: ""        # défini dans values-{env}.yaml
   CORS_ORIGIN: ""           # défini dans values-{env}.yaml
