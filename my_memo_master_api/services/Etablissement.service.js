@@ -333,16 +333,26 @@ class EtablissementService {
       defaults: { invitedByUserId: requesterId, targetUserId: null, classGroupId: null }
     })
 
-    if (created) {
-      try {
-        await sendEmail(
-          `Invitation à gérer l'établissement "${etab.name}" sur MyMemoMaster`,
-          `Bonjour,\n\nVous avez été invité à devenir gestionnaire de l'établissement "${etab.name}" sur MyMemoMaster.\n\nCréez votre compte sur ${frontUrl}/register en utilisant l'adresse email ${normalizedEmail}.\n\nVos droits d'administration seront automatiquement activés lors de votre inscription.\n\nCe message a été envoyé par l'équipe MyMemoMaster.`,
-          normalizedEmail
-        )
-      } catch (emailError) {
-        logger.warn(`Invitation gérant créée mais email non envoyé à ${normalizedEmail} : ${emailError?.message}`)
-      }
+    // Renvoi à chaque demande (y compris si l'invitation existe déjà) : sans cela, un envoi qui a échoué
+    // ne pourrait jamais être retenté. L'appelant est un administrateur, pas de risque d'emballement.
+    let emailSent = false
+    try {
+      await sendEmail(
+        `Invitation à gérer l'établissement "${etab.name}" sur MyMemoMaster`,
+        `Bonjour,
+
+Vous avez été invité à devenir gestionnaire de l'établissement "${etab.name}" sur MyMemoMaster.
+
+Créez votre compte sur ${frontUrl}/register en utilisant l'adresse email ${normalizedEmail}.
+
+Vos droits d'administration seront automatiquement activés lors de votre inscription.
+
+Ce message a été envoyé par l'équipe MyMemoMaster.`,
+        normalizedEmail
+      )
+      emailSent = true
+    } catch (emailError) {
+      logger.warn(`Invitation gérant ${created ? 'créée' : 'existante'} mais email non envoyé à ${normalizedEmail} : ${emailError?.message}`)
     }
 
     try {
@@ -353,7 +363,7 @@ class EtablissementService {
       logger.warn(`Audit log échoué (ADMIN_ETABLISSEMENT_INVITED): ${auditErr.message}`)
     }
 
-    return { directlyAssigned: false, email: normalizedEmail }
+    return { directlyAssigned: false, email: normalizedEmail, emailSent }
   }
 
   _emptyStats() {

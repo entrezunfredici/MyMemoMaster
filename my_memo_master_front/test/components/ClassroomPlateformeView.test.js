@@ -392,12 +392,23 @@ describe('ClassroomPlateformeView', () => {
 
       it('compte introuvable - affiche l’invitation envoyée', async () => {
         const { wrapper, store } = mountPage()
-        store.assignAdmin.mockResolvedValue({ directlyAssigned: false, email: 'inconnu@x.fr' })
+        store.assignAdmin.mockResolvedValue({ directlyAssigned: false, email: 'inconnu@x.fr', emailSent: true })
         await openGerant(wrapper)
         await wrapper.find('input[aria-label="Email du gérant"]').setValue('inconnu@x.fr')
         await button(wrapper, 'Assigner').trigger('click')
         await flushPromises()
         expect(wrapper.text()).toContain("Aucun compte trouvé — un email d'invitation a été envoyé à inconnu@x.fr.")
+      })
+
+      it('compte introuvable et email non parti - affiche l’échec d’envoi, pas « envoyé »', async () => {
+        const { wrapper, store } = mountPage()
+        store.assignAdmin.mockResolvedValue({ directlyAssigned: false, email: 'inconnu@x.fr', emailSent: false })
+        await openGerant(wrapper)
+        await wrapper.find('input[aria-label="Email du gérant"]').setValue('inconnu@x.fr')
+        await button(wrapper, 'Assigner').trigger('click')
+        await flushPromises()
+        expect(wrapper.text()).toContain("l'email n'a pas pu être envoyé à inconnu@x.fr")
+        expect(wrapper.text()).not.toContain("un email d'invitation a été envoyé")
       })
 
       it('échec - message d’erreur et saisie conservée', async () => {

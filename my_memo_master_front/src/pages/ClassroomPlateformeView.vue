@@ -367,7 +367,11 @@ async function submitAssignAdmin() {
   if (result) {
     gerantForm.email = ''
     if (!result.directlyAssigned) {
-      gerantForm.success = `Aucun compte trouvé — un email d'invitation a été envoyé à ${result.email}.`
+      if (result.emailSent === false) {
+        gerantForm.error = `Aucun compte trouvé. L'invitation est enregistrée mais l'email n'a pas pu être envoyé à ${result.email}. Réessayez plus tard ou prévenez l'administrateur technique.`
+      } else {
+        gerantForm.success = `Aucun compte trouvé — un email d'invitation a été envoyé à ${result.email}.`
+      }
     }
   } else {
     gerantForm.error = "Erreur lors de l'assignation. Vérifiez l'email et réessayez."

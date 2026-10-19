@@ -272,14 +272,31 @@ describe('Etablissement.controller', () => {
       req.body = { email: 'nouveau@exemple.fr' }
       EtablissementService.assignAdmin.mockResolvedValue({
         directlyAssigned: false,
-        email: 'nouveau@exemple.fr'
+        email: 'nouveau@exemple.fr',
+        emailSent: true
       })
 
       await assignAdmin(req, res)
 
       expect(res.status).toHaveBeenCalledWith(200)
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        message: expect.stringContaining('invitation')
+        message: expect.stringContaining('email d\'invitation a été envoyé')
+      }))
+    })
+
+    it('précise que l\'email n\'a pas pu être envoyé si l\'envoi échoue', async () => {
+      req.body = { email: 'nouveau@exemple.fr' }
+      EtablissementService.assignAdmin.mockResolvedValue({
+        directlyAssigned: false,
+        email: 'nouveau@exemple.fr',
+        emailSent: false
+      })
+
+      await assignAdmin(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(200)
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('n\'a pas pu être envoyé')
       }))
     })
 

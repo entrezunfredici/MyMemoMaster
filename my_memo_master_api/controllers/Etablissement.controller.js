@@ -146,7 +146,9 @@ exports.assignAdmin = async (req, res) => {
       return res.status(200).json({ message: 'Gérant assigné avec succès.', data: result })
     }
     return res.status(200).json({
-      message: `Aucun compte trouvé pour ${result.email}. Un email d'invitation a été envoyé.`,
+      message: result.emailSent
+        ? `Aucun compte trouvé pour ${result.email}. Un email d'invitation a été envoyé.`
+        : `Aucun compte trouvé pour ${result.email}. L'invitation est enregistrée mais l'email n'a pas pu être envoyé.`,
       data: result
     })
   } catch (error) {

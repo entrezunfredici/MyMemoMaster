@@ -300,6 +300,15 @@ describe('useEtablissementStore', () => {
       expect(mockNotify).toHaveBeenCalledWith('Invitation envoyée.', 'info')
     })
 
+    it('invitation dont l\'email n\'est pas parti - notification « error »', async () => {
+      mockPost.mockResolvedValueOnce({
+        status: 200,
+        data: { message: 'Email non envoyé.', data: { directlyAssigned: false, emailSent: false } },
+      })
+      await useEtablissementStore().assignAdmin(1, 'a@b.fr')
+      expect(mockNotify).toHaveBeenCalledWith('Email non envoyé.', 'error')
+    })
+
     it('erreur - false et message par défaut', async () => {
       mockPost.mockResolvedValueOnce(ko(null))
       expect(await useEtablissementStore().assignAdmin(1, 'a@b.fr')).toBe(false)

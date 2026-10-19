@@ -148,7 +148,8 @@ export const useEtablissementStore = defineStore('etablissement', {
         if (idx !== -1) this.list[idx] = data.etab
         if (this.current?.id === etablissementId) this.current = data.etab
       }
-      notif.notify(resp.data.message, data.directlyAssigned ? 'success' : 'info')
+      const notifType = data.directlyAssigned ? 'success' : data.emailSent === false ? 'error' : 'info'
+      notif.notify(resp.data.message, notifType)
       return data
     },
 

@@ -518,17 +518,30 @@ describe('EtablissementService', () => {
       )
       expect(sendEmail).toHaveBeenCalled()
       expect(result.directlyAssigned).toBe(false)
+      expect(result.emailSent).toBe(true)
       expect(result.email).toBe('nouveau@exemple.fr')
     })
 
-    it('ne renvoie pas d\'email si l\'invitation existe déjà (created=false)', async () => {
+    it('renvoie l\'email même si l\'invitation existe déjà (created=false)', async () => {
       User.findOne.mockResolvedValue(null)
       Invitation.findOrCreate.mockResolvedValue([mockInvitation, false])
 
       const result = await EtablissementService.assignAdmin(1, 'nouveau@exemple.fr', 1)
 
-      expect(sendEmail).not.toHaveBeenCalled()
+      expect(sendEmail).toHaveBeenCalled()
       expect(result.directlyAssigned).toBe(false)
+      expect(result.emailSent).toBe(true)
+    })
+
+    it('signale emailSent=false si l\'envoi échoue, sans lever d\'erreur', async () => {
+      User.findOne.mockResolvedValue(null)
+      Invitation.findOrCreate.mockResolvedValue([mockInvitation, true])
+      sendEmail.mockRejectedValueOnce(new Error('SMTP indisponible'))
+
+      const result = await EtablissementService.assignAdmin(1, 'nouveau@exemple.fr', 1)
+
+      expect(result.directlyAssigned).toBe(false)
+      expect(result.emailSent).toBe(false)
     })
   })
 
