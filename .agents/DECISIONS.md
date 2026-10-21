@@ -5262,3 +5262,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : (1) `toLatex` réécrit les commandes MathLive (`\differentialD`→`\mathrm{d}`, etc.) : une seule normalisation pour le rendu et le calcul ; (2) `tokenize` retire le « d » / `\mathrm{d}` / `\partial` de tête quand numérateur et dénominateur d'une `\frac` en portent tous deux un.
 **Alternative écartée** : ignorer toute lettre « d » — casserait les formules où d est une distance (`v = d / t`) ; mettre en liste noire « differentialD » seulement — le « d » seul resterait proposé.
 **Conséquences** : une dérivée est évaluée comme un rapport de grandeurs (cohérent pour les unités : m/s) ; pas de calcul différentiel.
+
+
+## 2026-10-21 — Systèmes d'équations dans les formules de carte : variables lues, calcul refusé
+
+**Contexte** : un système `\begin{cases}…\end{cases}` était lu comme une seule équation au premier « = » ; les mots `cases`/`end`/`prime` devenaient des grandeurs.
+**Décision** : `splitEquation` reconnaît les environnements `cases/aligned/align/gathered/split/array` et renvoie une équation par ligne ; `missingVariables` réunit les membres de droite ; `computeFormula` refuse explicitement un système. Les primes (`x'`, `x^{\prime}`) sont un suffixe du symbole.
+**Alternative écartée** : calculer chaque ligne — le résultat d'une formule est unique (`computeFormula`, `computeAllFormulas`, grandeur réceptrice) ; supporter N résultats demande de revoir ce contrat.
+**Conséquences** : un système se relie à ses grandeurs d'entrée mais n'affiche pas de résultat.

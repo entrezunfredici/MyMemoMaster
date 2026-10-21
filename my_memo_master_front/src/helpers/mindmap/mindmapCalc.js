@@ -9,6 +9,9 @@ import { parseUnit, formatDim, addDim, scaleDim, sameDim, isDimensionless, ZERO 
 
 class CalcError extends Error {}
 
+// Prime d'une grandeur (x', x^{\prime}, x^\prime) : fait partie du symbole (x' est une autre grandeur que x).
+const PRIME_RE = /\^\{\\prime\}|\^\\prime(?![A-Za-z])|'/g;
+
 const GREEK = {
   α: 'alpha', β: 'beta', γ: 'gamma', δ: 'delta', ε: 'epsilon', θ: 'theta', λ: 'lambda',
   μ: 'mu', ρ: 'rho', σ: 'sigma', τ: 'tau', φ: 'phi', ω: 'omega', Δ: 'Delta', Ω: 'Omega',
@@ -88,6 +91,17 @@ const tokenize = (rawSource, knownSymbols) => {
     return source[i++] ?? '';
   };
 
+  // Primes qui suivent un symbole : « ' », « ^{\prime} », « ^\prime » → « ' » par prime.
+  const readPrimes = () => {
+    let primes = '';
+    for (;;) {
+      const m = /^(?:'|\^\{\\prime\}|\^\\prime(?![A-Za-z]))/.exec(source.slice(i));
+      if (!m) return primes;
+      primes += "'";
+      i += m[0].length;
+    }
+  };
+
   while (i < source.length) {
     const ch = source[i];
     if (/\s/.test(ch)) { i++; continue; }
@@ -116,6 +130,7 @@ const tokenize = (rawSource, knownSymbols) => {
         if (source[i] === '{') {
           let name = readGroup();
           if (source[i] === '_') { i++; name += '_' + readGroup(); }
+          name += readPrimes();
           tokens.push({ t: 'id', v: normalizeSymbol(name) });
         }
         continue;
@@ -131,6 +146,7 @@ const tokenize = (rawSource, knownSymbols) => {
       i += run.length;
       let sub = '';
       if (source[i] === '_') { i++; sub = '_' + readGroup(); }
+      sub += readPrimes();
       let pos = 0;
       while (pos < run.length) {
         let matched = null;
@@ -269,8 +285,20 @@ const evaluate = (tokens, resolve) => {
 
 // ── Formule d'un item ──────────────────────────────────────────────────────────────
 
+// Système d'équations (\begin{cases} x' = x - vt \\ t' = t \end{cases}, aligned, align…) : une ligne
+// par équation. Retourne null si la formule n'est pas un système.
+const SYSTEM_RE = /^\s*\\begin\{(cases|aligned|align\*?|gathered|split|array)\}(?:\{[^{}]*\})?([\s\S]*?)\\end\{\1\}\s*$/;
+const splitSystem = (latex) => {
+  const match = SYSTEM_RE.exec(latex);
+  if (!match) return null;
+  return match[2].split(/\\\\/).map((line) => line.replace(/&/g, '').trim()).filter(Boolean);
+};
+
 // Sépare « E = ½ M V² » en { symbol: 'E', body: '½ M V²' } au premier « = » hors groupe.
+// Un système d'équations n'a ni symbole ni corps unique : il retourne { symbol: '', body: '', equations }.
 const splitEquation = (latex) => {
+  const equations = splitSystem(latex);
+  if (equations) return { symbol: '', body: '', equations };
   let depth = 0;
   for (let i = 0; i < latex.length; i++) {
     const ch = latex[i];
@@ -278,7 +306,7 @@ const splitEquation = (latex) => {
     else if (ch === '}' || ch === ')') depth--;
     else if (ch === '=' && depth === 0) {
       return {
-        symbol: latex.slice(0, i).replace(/\\(left|right)/g, '').replace(DECORATION_RE, '').replace(/[{}\\]/g, '').trim(),
+        symbol: latex.slice(0, i).replace(/\\(left|right)/g, '').replace(DECORATION_RE, '').replace(PRIME_RE, "'").replace(/[{}\\]/g, '').trim(),
         body: latex.slice(i + 1),
       };
     }
@@ -352,7 +380,8 @@ const computeFormula = (map, id, visiting = new Set(), cache = new Map()) => {
   try {
     const latex = normalizeLatexShorthand(toLatex(node.content || ''));
     if (!latex) throw new CalcError('Formule vide');
-    const { symbol, body } = splitEquation(latex);
+    const { symbol, body, equations } = splitEquation(latex);
+    if (equations) throw new CalcError('Système d’équations : le calcul porte sur une seule équation à la fois');
 
     const sources = collectSources(map, id);
 
@@ -415,9 +444,12 @@ const missingVariables = (map, id) => {
   const node = map?.nodes?.[id];
   if (!node || !isFormulaNode(node) || !node.content) return [];
   try {
-    const { body } = splitEquation(normalizeLatexShorthand(toLatex(node.content)));
+    const { body, equations } = splitEquation(normalizeLatexShorthand(toLatex(node.content)));
     const known = collectSources(map, id);
-    const names = tokenize(body, new Set(known.keys())).filter((token) => token.t === 'id').map((token) => token.v);
+    // Système : les variables sont celles des membres de droite de toutes les équations.
+    const bodies = equations ? equations.map((line) => splitEquation(line).body) : [body];
+    const names = bodies.flatMap((text) => tokenize(text, new Set(known.keys())))
+      .filter((token) => token.t === 'id').map((token) => token.v);
     return [...new Set(names)].filter((name) => !known.has(name));
   } catch (error) {
     if (error instanceof CalcError) return [];

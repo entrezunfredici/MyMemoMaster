@@ -13505,3 +13505,13 @@ ho »). Le cas « m relié mais non reconnu » vient d'un titre « m » avec sym
 **Complément (même jour)** : `\mathrm{d}` suivi d'un symbole hors fraction (`\int f \mathrm{d}x`) n'est plus une variable ; le symbole du résultat `ec{v}(t)` s'affiche « v(t) » (décorations retirées) et `resultKey` ignore l'argument `(t)`, donc la grandeur « v » reçoit le résultat.
 **Dette** : le rendu du bouton vecteur dépend des polices installées (non vérifié sur Android) ; `\int` n'est pas évalué (ses symboles restent proposés).
 **Tests** : +9 (mindmapCalcNotation, interpreterLatex) ; front 141 fichiers / 2407 tests verts, ESLint propre sur les fichiers touchés.
+
+
+## [2026-10-21] [FIX] Grandeurs d'une formule : systèmes d'équations (`cases`, `aligned`) et primes
+
+**Contexte** : « Transformations de Galilée » (`\begin{cases} x' = x - vt \ t' = t \end{cases}`) faisait proposer « cases », « end », « prime », c, a, s, e… comme grandeurs.
+**Fichiers modifiés** : `helpers/mindmap/mindmapCalc.js` (`splitSystem`, `splitEquation` renvoie `equations` pour un système ; `readPrimes` : `x'`, `x^{\prime}`, `x^\prime` font partie du symbole), `test/helpers/mindmapCalcNotation.test.js` (+4).
+**Utilisable** : le dialogue « Créer les grandeurs » ne propose que les variables des membres de droite (x, v, t pour Galilée). `cases`, `aligned`, `align`, `gathered`, `split`, `array` sont reconnus, `&` ignoré.
+**Hypothèses** : les grandeurs calculées (x', t') ne sont pas proposées à la création ; un système n'est pas évalué (erreur claire « Système d'équations : le calcul porte sur une seule équation à la fois »).
+**Dette** : pas de calcul des systèmes (une grandeur par ligne) ; `\int` reste proposé comme variable.
+**Tests** : front 141 fichiers / 2411 tests, ESLint propre.

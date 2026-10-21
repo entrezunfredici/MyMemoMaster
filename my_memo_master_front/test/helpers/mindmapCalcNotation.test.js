@@ -41,6 +41,24 @@ describe('variables manquantes — notation LaTeX', () => {
     expect(r.value).toBe(5)
   })
 
+  it('un système (cases) : variables des membres de droite, ni « cases », « end » ni « prime »', () => {
+    expect(missing(String.raw`\begin{cases}x^{\prime}=x-vt\\t^{\prime}=t\end{cases}`)).toEqual(['x', 'v', 't'])
+  })
+
+  it('un système aligned avec & et des primes', () => {
+    expect(missing(String.raw`\begin{aligned}x'&=x-vt\\t'&=t\end{aligned}`)).toEqual(['x', 'v', 't'])
+  })
+
+  it('une prime fait partie du symbole : x prime est une autre grandeur que x', () => {
+    expect(missing(String.raw`E=m x^{\prime}`)).toEqual(['m', "x'"])
+  })
+
+  it('un système n\'est pas calculé, avec un message clair', () => {
+    const r = result(String.raw`\begin{cases}a=b\\c=d\end{cases}`, [{ symbol: 'b', value: 1 }])
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/Système d’équations/)
+  })
+
   it('un « d » qui n\'est pas une différentielle reste une variable', () => {
     expect(missing(String.raw`v=\frac{d}{t}`)).toEqual(['d', 't'])
   })
