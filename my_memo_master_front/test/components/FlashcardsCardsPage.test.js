@@ -736,6 +736,48 @@ describe('FlashcardsCardsPage', () => {
   })
 
   // ── Génération par IA ───────────────────────────────────────────────────────
+  // ── Parcours guidé : étape « système de Leitner + première carte » ───────────
+  describe('parcours guidé', () => {
+    const tour = (links = {}, active = true) => ({ guidedTour: { active, links: { leitnerSystemId: 5, flashcardId: null, ...links } } })
+
+    it('des cartes déjà présentes (ex. générées par IA) dans le système du parcours valident l’étape', async () => {
+      await mountPage(tour())
+      expect(useGuidedTourStore().recordLinks).toHaveBeenCalledWith({ flashcardId: 1 })
+    })
+
+    it('après la validation d’un brouillon IA, la première carte est enregistrée', async () => {
+      routes['leitnercards/leitnerboxes/10'] = ok([])
+      routes['leitnercards/leitnerboxes/11'] = ok([])
+      await mountPage(tour())
+      const store = useAiCardGenerationStore()
+      store.generate.mockResolvedValue(true)
+      store.lastBatch = { id: 77 }
+      expect(useGuidedTourStore().recordLinks).not.toHaveBeenCalled()
+      await button('✨ Générer par IA').trigger('click')
+      wrapper.findComponent({ name: 'AiGenerateCardsModal' }).vm.$emit('submit', { count: 5 })
+      await flushPromises()
+      routes['leitnercards/leitnerboxes/10'] = ok([structuredClone(OPEN_CARD)])
+      wrapper.findComponent({ name: 'AiValidationScreen' }).vm.$emit('validated')
+      await flushPromises()
+      expect(useGuidedTourStore().recordLinks).toHaveBeenCalledWith({ flashcardId: 1 })
+    })
+
+    it('un système vide n’enregistre rien', async () => {
+      routes['leitnercards/leitnerboxes/10'] = ok([])
+      routes['leitnercards/leitnerboxes/11'] = ok([])
+      await mountPage(tour())
+      expect(useGuidedTourStore().recordLinks).not.toHaveBeenCalled()
+    })
+
+    it('un autre système que celui du parcours, ou un parcours inactif, n’enregistre rien', async () => {
+      await mountPage(tour({ leitnerSystemId: 9 }))
+      expect(useGuidedTourStore().recordLinks).not.toHaveBeenCalled()
+      wrapper.unmount()
+      await mountPage(tour({}, false))
+      expect(useGuidedTourStore().recordLinks).not.toHaveBeenCalled()
+    })
+  })
+
   describe('génération par IA', () => {
     it('« ✨ Générer par IA » réinitialise le flux et ouvre la configuration avec le sujet du système', async () => {
       await mountPage()

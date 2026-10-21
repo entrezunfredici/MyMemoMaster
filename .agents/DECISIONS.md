@@ -5270,3 +5270,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `splitEquation` reconnaît les environnements `cases/aligned/align/gathered/split/array` et renvoie une équation par ligne ; `missingVariables` réunit les membres de droite ; `computeFormula` refuse explicitement un système. Les primes (`x'`, `x^{\prime}`) sont un suffixe du symbole.
 **Alternative écartée** : calculer chaque ligne — le résultat d'une formule est unique (`computeFormula`, `computeAllFormulas`, grandeur réceptrice) ; supporter N résultats demande de revoir ce contrat.
 **Conséquences** : un système se relie à ses grandeurs d'entrée mais n'affiche pas de résultat.
+
+
+## 2026-10-21 — Parcours guidé : l'étape se valide sur l'état réel (cartes présentes), pas sur le seul chemin de création manuelle
+
+**Contexte** : `flashcardId` n'était enregistré que par le formulaire manuel ; les cartes issues de la génération IA (promues par l'écran de révision) ne le déclenchaient pas.
+**Décision** : la page des cartes vérifie l'état après chaque chargement (montage, validation d'un brouillon IA) et enregistre la première carte du système du parcours.
+**Alternative écartée** : ajouter un `recordLinks` dans chaque chemin de création (manuel, IA, import) — un nouveau chemin d'ajout recréerait le bug.
+**Conséquences** : des cartes préexistantes dans le système du parcours valident aussi l'étape.

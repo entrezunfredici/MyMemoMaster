@@ -13515,3 +13515,12 @@ ho »). Le cas « m relié mais non reconnu » vient d'un titre « m » avec sym
 **Hypothèses** : les grandeurs calculées (x', t') ne sont pas proposées à la création ; un système n'est pas évalué (erreur claire « Système d'équations : le calcul porte sur une seule équation à la fois »).
 **Dette** : pas de calcul des systèmes (une grandeur par ligne) ; `\int` reste proposé comme variable.
 **Tests** : front 141 fichiers / 2411 tests, ESLint propre.
+
+
+## [2026-10-21] [FIX] Parcours guidé : l'étape « Leitner » ne se validait pas avec des cartes générées par IA
+
+**Contexte** : système créé, cartes ajoutées (génération IA), mais « Étape suivante » restait grisé. Seul `useCardForm` (création manuelle) enregistrait `flashcardId` dans le parcours.
+**Fichiers modifiés** : `pages/FlashcardsCardsPage.vue` (`recordTourCards` : au chargement et après validation d'un brouillon IA, enregistre la première carte si le parcours est actif et que le système est celui du parcours), `test/components/FlashcardsCardsPage.test.js` (+4).
+**Hypothèses** : seul le système créé pendant le parcours (`links.leitnerSystemId`) compte ; l'étape se valide aussi si des cartes y existent déjà.
+**Dette** : même risque possible pour l'étape « exercice » (questions générées par IA : `testId` n'est enregistré qu'à la création de l'exercice, donc probablement non concerné — non vérifié) ; le correctif est vérifié par tests, pas dans le navigateur.
+**Tests** : page des cartes 64 tests verts, ESLint propre (suite complète non relancée).

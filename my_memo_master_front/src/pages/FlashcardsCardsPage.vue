@@ -116,7 +116,9 @@ import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
 import { provideConfirmAction } from '@/composables/useConfirmAction'
 import { useFlashcardsCards } from '@/composables/useFlashcardsCards'
 import { useAiCardFlow } from '@/composables/useAiCardFlow'
+import { useGuidedTourStore } from '@/stores/guidedTour'
 
+const guidedTourStore = useGuidedTourStore()
 const router = useRouter()
 const route = useRoute()
 const systemId = Number(route.params.systemId)
@@ -153,8 +155,17 @@ const {
 const cardModal = ref(null)
 const boxModal = ref(null)
 
+// Parcours guidé : l'étape « système de Leitner » attend une première carte. Seule la création manuelle
+// (useCardForm) l'enregistrait : les cartes générées par IA, ou déjà présentes, laissaient « Étape
+// suivante » grisé. On valide donc dès que le système du parcours contient au moins une carte.
+const recordTourCards = () => {
+  if (!guidedTourStore.active || guidedTourStore.links.leitnerSystemId !== systemId) return
+  if (allCards.value.length) guidedTourStore.recordLinks({ flashcardId: allCards.value[0].idCard ?? -1 })
+}
+
 onMounted(async () => {
   await loadCards()
+  recordTourCards()
   loading.value = false
   // Bandeau de reprise (C-01.09) — best-effort, ne bloque pas l'affichage de la page si ça échoue
   aiCardGenerationStore.fetchPendingBatches()
@@ -167,6 +178,7 @@ const handleValidated = async () => {
   aiValidationBatch.value = null
   loading.value = true
   await Promise.all([loadCards(), aiCardGenerationStore.fetchPendingBatches()])
+  recordTourCards()
   loading.value = false
 }
 </script>
