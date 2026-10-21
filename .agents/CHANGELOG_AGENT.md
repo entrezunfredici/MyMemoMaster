@@ -13485,7 +13485,8 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 **Corrigé** :
 - *Boutons actifs illisibles (mode Zone, forme, « Aussi »)* : cause trouvée — `.palette .x:hover` (spécificité 0,3,0) battait `.palette .x--active` (0,2,0), donc le bouton qu'on vient de cliquer (curseur dessus) devenait blanc sur fond clair. Mon diagnostic du matin (« non confirmé ») était faux : j'avais compté une égalité de spécificité. Corrigé et verrouillé par un test Playwright (`mindmap-active-buttons.spec.js`, échoue avec l'ancien CSS).
 - *Dialogue « Créer les grandeurs »* : `ec{v}`, `\overrightarrow{OP}`, `\hat…` désignent maintenant UNE variable (« v », « OP ») ; `	ext{…}` et une unité entre crochets (`[kg]`) ne créent plus de variables. `normalizeSymbol` ignore les décorations (symbole « ec{v} » = « v »).
-- *« m » non reconnue* : une grandeur sans symbole saisi prend son titre comme symbole quand il ressemble à un symbole (« m », « v_0 », « ho »). Le cas « m relié mais non reconnu » vient d'un titre « m » avec symbole vide.
+- *« m » non reconnue* : une grandeur sans symbole saisi prend son titre comme symbole quand il ressemble à un symbole (« m », « v_0 », « 
+ho »). Le cas « m relié mais non reconnu » vient d'un titre « m » avec symbole vide.
 - *Homogénéité sans verdict* : l'interpréteur n'affichait que les erreurs. Il affiche maintenant « ✔ Formule homogène en unités. » (une ligne jugée avec au moins deux segments d'unité connue), l'erreur détaillée, ou « non vérifiable : aucune unité déclarée ».
 - *Zones non redimensionnables* : poignée dans l'angle bas-droite (angle haut-gauche fixe, minimum 120 × 80) et, au clavier, largeur/hauteur par zone dans la palette (12–2000).
 - *Pas de zoom* : le zoom existait (Ctrl/⌘ + molette) mais n'était pas découvrable ; commandes + / − / ⟲ avec niveau annoncé, bornes 40–300 %.
@@ -13494,3 +13495,13 @@ Même étape que pour l'API, côté `my_memo_master_front/` : `axios` 1.0.0–1.
 - *Intervalle des boîtes* : la saisie est bien en secondes ; la liste affiche une durée lisible (86400 s -> « 1 j »). Ajout, sous le champ, de « Soit 1 j » en direct pour lever la confusion.
 **Non corrigé / non reproduit** : (1) la vue ou la page qui se décale à la création/sélection d'un nœud — non reproduit, le recentrage n'a lieu que si le nouveau nœud est hors de la zone visible (`revealNodeIfOffscreen`) ; (2) « Éditeur visuel indisponible » — l'échec du chargement de MathLive était avalé sans trace ; il est maintenant journalisé (`console.warn`) pour diagnostiquer ; en environnement de test jsdom l'import ne fournit pas `MathfieldElement`, cause non établie en navigateur ; (3) doublons de génération IA reformulés : le filet de sécurité ne compare que l'énoncé exact.
 **Tests** : API 2462 -> 2480 ; front 2344 -> 2397 ; ESLint, audits RGAA / couleurs / Tailwind à 0, build, Playwright 46 verts.
+
+
+## [2026-10-21] [FIX] Interpréteur : bouton vecteur, notation des dérivées (`\differentialD`, « d » opérateur)
+
+**Fichiers modifiés** : `components/interpreter/Interpreter.vue` (police des boutons de palette : repli sur des polices mathématiques pour la flèche combinante du bouton vecteur, qui s'affichait en carré) ; `components/interpreter/interpreter.js` (`toLatex` : `\differentialD`, `\differentialE`/`\exponentialE`, `\imaginaryI/J`, commandes MathLive inconnues de KaTeX, rendues en rouge, deviennent `\mathrm{d|e|i|j}`) ; `helpers/mindmap/mindmapCalc.js` (`stripDifferentials`, appliquée au début de `tokenize`).
+**Utilisable** : `\vec{v}(t)=\frac{d\vec{OP}}{\differentialD t}` s'affiche sans erreur ; le dialogue « Créer les grandeurs » ne propose plus que « OP » et « t » (plus « d » ni « differentialD »). Idem pour `\frac{\mathrm{d}x}{\mathrm{d}t}` et `\frac{\partial f}{\partial t}`.
+**Hypothèses** : le « d » n'est retiré que dans une fraction dont le numérateur ET le dénominateur commencent par d / `\mathrm{d}` / `\partial` suivi d'un symbole ; `\frac{d}{t}` garde « d » comme variable. Une dérivée se calcule donc comme un rapport (OP / t).
+**Complément (même jour)** : `\mathrm{d}` suivi d'un symbole hors fraction (`\int f \mathrm{d}x`) n'est plus une variable ; le symbole du résultat `ec{v}(t)` s'affiche « v(t) » (décorations retirées) et `resultKey` ignore l'argument `(t)`, donc la grandeur « v » reçoit le résultat.
+**Dette** : le rendu du bouton vecteur dépend des polices installées (non vérifié sur Android) ; `\int` n'est pas évalué (ses symboles restent proposés).
+**Tests** : +9 (mindmapCalcNotation, interpreterLatex) ; front 141 fichiers / 2407 tests verts, ESLint propre sur les fichiers touchés.

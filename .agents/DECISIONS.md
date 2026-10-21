@@ -5254,3 +5254,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : (1) `GET /users` réservée au rôle 1 : recherche nom/e-mail (insensible à la casse, `iLike` sous PostgreSQL), filtre par rôle, pagination (20 par page, 100 max), uniquement des champs d'affichage (jamais mot de passe, codes ni jetons). (2) Garde-fous côté API, avec messages en français : rôle système → 403 (renommer, supprimer) ; rôle encore attribué → 409 à la suppression ; un administrateur ne peut pas changer ni retirer son propre rôle (403) ; `roleId` manquant ou non entier → 400 (il donnait un 500). (3) Le front les reflète (aucun bouton sur un rôle système ni sur son propre compte) mais ne s'y fie pas.
 **Alternative écartée** : garde-fous côté front seulement — un client qui contourne l'écran supprimerait des comptes en cascade ; changer l'`ON DELETE CASCADE` du modèle — migration lourde, hors périmètre ; on neutralise le danger au point d'entrée.
 **Conséquences** : contrat API étendu (nouvelle route, nouveaux codes 400/403/409 sur des routes réservées au rôle 1, aucun changement pour les autres rôles) ; le journal global ne filtre côté serveur que par type d'entité, identifiant d'entité et auteur (pas d'`action` ni de `limit` côté API, plafond fixe de 500) : l'action se filtre côté page sur les entrées chargées.
+
+
+## 2026-10-21 — Différentielles : « d » traité comme opérateur dans les fractions de dérivée
+
+**Contexte** : MathLive produit `\differentialD` (inconnu de KaTeX, rendu en rouge) et `\frac{d\vec{OP}}{\differentialD t}` faisait proposer les grandeurs « d », « OP », « differentialD », « t ».
+**Décision** : (1) `toLatex` réécrit les commandes MathLive (`\differentialD`→`\mathrm{d}`, etc.) : une seule normalisation pour le rendu et le calcul ; (2) `tokenize` retire le « d » / `\mathrm{d}` / `\partial` de tête quand numérateur et dénominateur d'une `\frac` en portent tous deux un.
+**Alternative écartée** : ignorer toute lettre « d » — casserait les formules où d est une distance (`v = d / t`) ; mettre en liste noire « differentialD » seulement — le « d » seul resterait proposé.
+**Conséquences** : une dérivée est évaluée comme un rapport de grandeurs (cohérent pour les unités : m/s) ; pas de calcul différentiel.

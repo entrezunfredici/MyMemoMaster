@@ -197,3 +197,18 @@ describe('bindVirtualKeyboard', () => {
     expect(keyboard.show).not.toHaveBeenCalled()
   })
 })
+
+// Commandes propres à MathLive : KaTeX les ignorait et les rendait en rouge (\differentialD).
+describe('toLatex — commandes MathLive', () => {
+  it('la commande MathLive « differentialD » devient un d droit', () => {
+    expect(toLatex(String.raw`\frac{d\vec{OP}}{\differentialD t}`)).toBe(String.raw`\frac{d\vec{OP}}{\mathrm{d}t}`)
+  })
+
+  it('e et i droits : exponentialE, imaginaryI', () => {
+    expect(toLatex(String.raw`\exponentialE^{\imaginaryI\pi}`)).toBe(String.raw`\mathrm{e}^{\mathrm{i}\pi}`)
+  })
+
+  it('le rendu ne contient plus d\'erreur KaTeX', () => {
+    expect(renderMath(String.raw`\frac{d\vec{OP}}{\differentialD t}`)).not.toContain('katex-error')
+  })
+})

@@ -390,6 +390,9 @@ const apply = () => {
   color: var(--blue-700);
   font-size: 15px;
   font-weight: 600;
+  /* Police de l'appli d'abord ; les polices mathématiques fournissent les signes combinants
+     (flèche du vecteur U+20D7…) absents de la police de l'appli, sinon carré « tofu ». */
+  font-family: 'Roboto', 'Cambria Math', 'STIX Two Math', 'Noto Sans Math', 'Segoe UI Symbol', 'Apple Symbols', sans-serif;
   cursor: pointer;
   transition: background 0.15s ease;
 }

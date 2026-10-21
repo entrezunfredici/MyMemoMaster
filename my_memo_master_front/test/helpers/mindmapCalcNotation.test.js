@@ -18,6 +18,33 @@ const missing = (content) => missingVariables(mapOf(content), 'f')
 const result = (content, quantities) => computeAllFormulas(mapOf(content, quantities)).f
 
 describe('variables manquantes — notation LaTeX', () => {
+  it('une dérivée de vecteur ne propose que OP et t (d est un opérateur)', () => {
+    expect(missing(String.raw`\vec{v}\left(t\right)=\frac{d\vec{OP}}{\differentialD t}`)).toEqual(['OP', 't'])
+  })
+
+  it('dérivées en d droit ou en ∂ : pas de variable « d »', () => {
+    expect(missing(String.raw`v=\frac{\mathrm{d}x}{\mathrm{d}t}`)).toEqual(['x', 't'])
+    expect(missing(String.raw`g=\frac{\partial f}{\partial t}`)).toEqual(['f', 't'])
+  })
+
+  it('une intégrale \\int f \\mathrm{d}x : le d droit n\'est pas une variable', () => {
+    const names = missing(String.raw`W=\int f \mathrm{d}x`)
+    expect(names).toEqual(expect.arrayContaining(['f', 'x']))
+    expect(names).not.toContain('d')
+  })
+
+  it('le symbole du résultat \\vec{v}(t) est « v(t) » et la grandeur « v » le reçoit', () => {
+    const r = result(String.raw`\vec{v}\left(t\right)=\frac{d\vec{OP}}{\differentialD t}`, [
+      { symbol: 'OP', value: 10, unit: 'm' }, { symbol: 't', value: 2, unit: 's' },
+    ])
+    expect(r.symbol).toBe('v(t)')
+    expect(r.value).toBe(5)
+  })
+
+  it('un « d » qui n\'est pas une différentielle reste une variable', () => {
+    expect(missing(String.raw`v=\frac{d}{t}`)).toEqual(['d', 't'])
+  })
+
   it('une formule simple : une variable par lettre inconnue', () => {
     expect(missing('p = m v')).toEqual(['m', 'v'])
   })

@@ -30,9 +30,51 @@ const SYMBOL_LIKE = /^\\?[A-Za-zΑ-Ωα-ω]{1,6}(_\{?[A-Za-z0-9]{1,4}\}?)?$/;
 
 const isFormulaNode = (node) => getNodeKinds(node).some((kind) => kind === 'formula' || kind === 'function');
 
+// ── Différentielles ─────────────────────────────────────────────────────────────
+
+// Le « d » d'une dérivée (\frac{d\vec{OP}}{dt}, \frac{\mathrm{d}x}{\mathrm{d}t}, \frac{\partial f}{\partial t})
+// est un opérateur, pas une grandeur : on le retire, la formule se calcule comme un rapport (OP / t).
+const DIFFERENTIAL = String.raw`(?:\\mathrm\{d\}|\\partial|d)`;
+const DIFFERENTIAL_HEAD_RE = new RegExp(`^\\s*${DIFFERENTIAL}\\s*(?=\\\\|\\{|[A-Za-z])`);
+
+// Lit un groupe {…} (accolades imbriquées) à partir de `start` ; retourne l'index après l'accolade fermante.
+const groupEnd = (text, start) => {
+  if (text[start] !== '{') return -1;
+  let depth = 0;
+  for (let j = start; j < text.length; j++) {
+    if (text[j] === '{') depth++;
+    else if (text[j] === '}' && --depth === 0) return j + 1;
+  }
+  return -1;
+};
+
+const stripDifferentials = (source) => {
+  let out = '';
+  let i = 0;
+  while (i < source.length) {
+    if (source.startsWith('\\frac', i) && source[i + 5] === '{') {
+      const numEnd = groupEnd(source, i + 5);
+      const denEnd = numEnd === -1 ? -1 : groupEnd(source, numEnd);
+      if (denEnd !== -1) {
+        const num = source.slice(i + 6, numEnd - 1);
+        const den = source.slice(numEnd + 1, denEnd - 1);
+        if (DIFFERENTIAL_HEAD_RE.test(num) && DIFFERENTIAL_HEAD_RE.test(den)) {
+          out += `\\frac{${stripDifferentials(num.replace(DIFFERENTIAL_HEAD_RE, ''))}}{${stripDifferentials(den.replace(DIFFERENTIAL_HEAD_RE, ''))}}`;
+          i = denEnd;
+          continue;
+        }
+      }
+    }
+    out += source[i++];
+  }
+  // « \int f \mathrm{d}x » : le d droit suivi d'un symbole est lui aussi une différentielle.
+  return out.replace(/\\mathrm\{d\}(?=\s*(?:\\|[A-Za-z]))/g, '');
+};
+
 // ── Lexer ───────────────────────────────────────────────────────────────────────
 
-const tokenize = (source, knownSymbols) => {
+const tokenize = (rawSource, knownSymbols) => {
+  const source = stripDifferentials(rawSource);
   const tokens = [];
   let i = 0;
   const readGroup = () => {
@@ -236,7 +278,7 @@ const splitEquation = (latex) => {
     else if (ch === '}' || ch === ')') depth--;
     else if (ch === '=' && depth === 0) {
       return {
-        symbol: latex.slice(0, i).replace(/\\(left|right)/g, '').replace(/[{}\\]/g, '').trim(),
+        symbol: latex.slice(0, i).replace(/\\(left|right)/g, '').replace(DECORATION_RE, '').replace(/[{}\\]/g, '').trim(),
         body: latex.slice(i + 1),
       };
     }
@@ -276,7 +318,9 @@ const collectSources = (map, id) => {
 // une formule à la grandeur qui reçoit son résultat (« v »).
 const resultKey = (formulaNode) => {
   try {
-    return normalizeSymbol(splitEquation(normalizeLatexShorthand(toLatex(formulaNode.content || ''))).symbol).toLowerCase();
+    // « v(t) = … » produit la grandeur « v » : l'argument entre parenthèses n'en fait pas partie.
+    const { symbol } = splitEquation(normalizeLatexShorthand(toLatex(formulaNode.content || '')));
+    return normalizeSymbol(symbol.replace(/\(.*\)$/, '')).toLowerCase();
   } catch {
     return '';
   }

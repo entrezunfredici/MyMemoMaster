@@ -90,6 +90,13 @@ export function toLatex(src) {
     return inner
   })
 
+  // Commandes propres à MathLive (d, e, i droits), inconnues de KaTeX qui les rendait en rouge
+  s = s
+    .replace(/\\differentialD(?![A-Za-z])\s?/g, '\\mathrm{d}')
+    .replace(/\\(?:differentialE|exponentialE)(?![A-Za-z])\s?/g, '\\mathrm{e}')
+    .replace(/\\imaginaryI(?![A-Za-z])\s?/g, '\\mathrm{i}')
+    .replace(/\\imaginaryJ(?![A-Za-z])\s?/g, '\\mathrm{j}')
+
   // Ensembles ℕ ℤ ℚ ℝ ℂ → \mathbb{N} ...
   s = s
     .replace(/ℕ/g, '\\mathbb{N}')
