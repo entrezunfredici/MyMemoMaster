@@ -19,6 +19,17 @@ FROM node:22-bookworm-slim AS production
 # entrypoint.sh exécute npm/npx au démarrage du conteneur (pas seulement au build) — même correctif
 # CVE que le stage deps, sur cette image indépendante.
 RUN npm install -g npm@latest
+# Client PostgreSQL 17 (pg_dump / pg_restore) pour les sauvegardes lancées par l'API (Backup.service.js).
+# CHOIX: dépôt officiel PGDG plutôt que le paquet Debian bookworm
+# RAISON: bookworm n'embarque que le client 15 ; pg_dump refuse de sauvegarder un serveur plus récent que lui
+#         (la base tourne en postgres:17). Les outils de téléchargement sont purgés dans la même couche.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
+    && apt-get purge -y curl gnupg && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules

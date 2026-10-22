@@ -28,3 +28,4 @@ cours_exemples/
 
 # Sauvegardes locales (jamais committées)
 /backups-local/
+/my_memo_master_api/backups-local/

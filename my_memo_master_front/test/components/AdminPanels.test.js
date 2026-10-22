@@ -444,7 +444,7 @@ describe('AdminPage', () => {
     const { wrapper } = mountPage()
     const pressed = () => wrapper.findAll('[role="group"] button').map((b) => [b.text(), b.attributes('aria-pressed')])
     expect(wrapper.find('#admin-roles-title').exists()).toBe(true)
-    expect(pressed()).toEqual([['Rôles', 'true'], ['Comptes', 'false'], ['Journal d’audit', 'false']])
+    expect(pressed()).toEqual([['Rôles', 'true'], ['Comptes', 'false'], ['Journal d’audit', 'false'], ['Sauvegardes', 'false']])
     await btn(wrapper, 'Comptes').trigger('click')
     expect(wrapper.find('#admin-accounts-title').exists()).toBe(true)
     expect(wrapper.find('#admin-roles-title').exists()).toBe(false)
@@ -452,6 +452,9 @@ describe('AdminPage', () => {
     await btn(wrapper, 'Journal d’audit').trigger('click')
     expect(wrapper.find('#admin-audit-title').exists()).toBe(true)
     expect(wrapper.find('#admin-accounts-title').exists()).toBe(false)
+    await btn(wrapper, 'Sauvegardes').trigger('click')
+    expect(wrapper.find('#admin-backups-title').exists()).toBe(true)
+    expect(wrapper.find('#admin-audit-title').exists()).toBe(false)
   })
 
   it('les rôles ne sont chargés qu’une fois à l’ouverture de la page', () => {

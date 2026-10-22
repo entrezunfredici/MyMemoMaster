@@ -51,3 +51,40 @@ export function auditActionLabel(action) {
 export function auditEntityLabel(entityType) {
   return AUDIT_ENTITY_TYPES.find((type) => type.value === entityType)?.label ?? entityType
 }
+
+const BACKUP_STATUS_LABELS = { running: 'En cours', success: 'Réussie', failed: 'Échouée' }
+const BACKUP_TRIGGER_LABELS = { auto: 'Automatique', manual: 'Manuelle' }
+
+/**
+ * Libellé lisible du résultat d'une sauvegarde ; la valeur brute quand elle n'est pas connue.
+ *
+ * @param {string} status - running | success | failed
+ * @returns {string} Libellé affichable
+ */
+export function backupStatusLabel(status) {
+  return BACKUP_STATUS_LABELS[status] ?? status
+}
+
+/**
+ * Libellé lisible de l'origine d'une sauvegarde ; la valeur brute quand elle n'est pas connue.
+ *
+ * @param {string} trigger - auto | manual
+ * @returns {string} Libellé affichable
+ */
+export function backupTriggerLabel(trigger) {
+  return BACKUP_TRIGGER_LABELS[trigger] ?? trigger
+}
+
+/**
+ * Durée lisible (« 850 ms », « 12 s », « 2 min 05 s ») ; « — » quand elle est absente.
+ *
+ * @param {number|null|undefined} ms - Durée en millisecondes
+ * @returns {string} Durée affichable
+ */
+export function formatDuration(ms) {
+  if (ms === null || ms === undefined) return '—'
+  if (ms < 1000) return `${ms} ms`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds} s`
+  return `${Math.floor(seconds / 60)} min ${String(seconds % 60).padStart(2, '0')} s`
+}
