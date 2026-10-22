@@ -6,6 +6,11 @@ export default defineConfig({
   plugins: [
     vue({
       template: {
+        // CHOIX: pas de transformation des URL d'assets des templates dans les tests
+        // RAISON: vitest 5 résout <img src="/logo/…"> en file:///logo/… (chemin invalide) au lieu du dossier
+        //         public/ ; en jsdom aucune image n'est chargée, la transformation ne sert à rien. Le build
+        //         de production (vite.config.js) garde le comportement par défaut.
+        transformAssetUrls: false,
         compilerOptions: {
           // <math-field> est le web component MathLive, pas un composant Vue
           isCustomElement: (tag) => tag === 'math-field',
