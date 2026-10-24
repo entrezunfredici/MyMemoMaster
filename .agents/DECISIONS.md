@@ -5285,3 +5285,10 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Alternative écartée** : garder le CronJob et lui faire notifier l'API (le bouton manuel demanderait un accès à l'API Kubernetes et ne marcherait pas en docker-compose, et un Job qui ne démarre jamais resterait invisible) ; un verrou `pg_advisory_lock` (lié à une connexion du pool, fragile) ; BullMQ (Redis ne sert qu'aux rappels).
 **Conséquences** : l'image de l'API grossit (~20 Mo) ; le CronJob Helm reste actif en double tant qu'il n'est pas désactivé (même préfixe S3, rétention commune, aucune collision de clés) ; l'issue d'une réussite est loguée en `logger.warn` car le logger de production ne laisse passer que `warn` et plus : sans cela, seuls les échecs seraient visibles dans les logs du pod.
 
+
+
+### [2026-10-24] Correctifs de sécurité API via `npm audit fix` (lockfile seul)
+**Contexte** : de nouveaux advisories font échouer l'audit bloquant de la CI.
+**Décision** : `npm audit fix` met à jour les versions transitives dans le lockfile, sans toucher aux plages de `package.json` ; lockfile front régénéré pour retrouver la cohérence avec `package.json`.
+**Alternative écartée** : assouplir le seuil d'audit de la CI (masquerait de vraies vulnérabilités).
+**Conséquences** : aucune dépendance ajoutée ; mises à jour de patch/mineures uniquement.

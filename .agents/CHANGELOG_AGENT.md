@@ -13538,3 +13538,12 @@ ho »). Le cas « m relié mais non reconnu » vient d'un titre « m » avec sym
 **Dette** : (1) **le CronJob Helm et le service docker-compose `backup` sont toujours actifs** : deux sauvegardes par jour tant qu'on ne met pas `backup.enabled: false` dans `helm/values-*.yaml` ; non fait volontairement, à décider après recette ; (2) recette réelle faite (image construite, pg_dump 17.11, dump -> S3, rétention, échec, créneau unique) ; l'email d'alerte reste non testé avec le vrai SMTP ; (3) un pod arrêté à l'heure du cron saute la sauvegarde du jour (pas de rattrapage) ; (4) pas de test d'intégration de la contrainte d'unicité `slot` (simulée).
 **Tests** : API +28 (service + controller ; suite complète 124 fichiers, 2510 tests verts), front +21 (panneau, store, onglet) ; ESLint, audits RGAA / couleurs / Tailwind à 0.
 
+
+
+## [2026-10-24] [FIX] CI : lockfile front désynchronisé et audit API (OWASP A06)
+
+**Contexte** : la CI de `dev` échouait : `npm ci` front (picomatch 2.3.2 du lock vs 4.0.7 requis) et `npm audit --audit-level=high` API (body-parser, multer, undici, nodemailer, fast-uri, ip-address).
+**Fichiers modifiés** : `my_memo_master_front/package-lock.json` (régénéré), `my_memo_master_api/package-lock.json` (`npm audit fix`, sans changement de `package.json`).
+**Utilisable** : `npm ci` front passe ; `npm audit` API = 0 vulnérabilité.
+**Dette** : l'audit front (devDependencies, 7 modérées via @capacitor/cli/xcode/uuid) n'est pas bloquant (CI : `--omit=dev --audit-level=high`).
+**Tests** : API 124 fichiers / 2510 tests verts (un échec isolé de 2 tests vu une fois, non reproduit).
