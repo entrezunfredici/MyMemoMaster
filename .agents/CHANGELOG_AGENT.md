@@ -13547,3 +13547,6 @@ ho »). Le cas « m relié mais non reconnu » vient d'un titre « m » avec sym
 **Utilisable** : `npm ci` front passe ; `npm audit` API = 0 vulnérabilité.
 **Dette** : l'audit front (devDependencies, 7 modérées via @capacitor/cli/xcode/uuid) n'est pas bloquant (CI : `--omit=dev --audit-level=high`).
 **Tests** : API 124 fichiers / 2510 tests verts (un échec isolé de 2 tests vu une fois, non reproduit).
+
+**Complément (même jour)** : le lockfile régénéré a fait monter axe-core 4.13 -> 4.14, dont la règle `label-content-name-mismatch` fait échouer `e2e-a11y/calendar.spec.js` (WCAG 2.5.3 : les `aria-label` des cases du calendrier et des mois de la vue année ne contiennent pas le texte visible). `axe-core` et `@axe-core/playwright` sont donc épinglés à `4.13.0` (exact) dans `package.json`.
+**Dette** : corriger les libellés du calendrier (`CalendarMonthComponent.vue`, `CalendarYearComponent.vue`) pour que le nom accessible contienne le texte visible, puis retirer l'épinglage.

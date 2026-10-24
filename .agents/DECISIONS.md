@@ -5292,3 +5292,9 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `npm audit fix` met à jour les versions transitives dans le lockfile, sans toucher aux plages de `package.json` ; lockfile front régénéré pour retrouver la cohérence avec `package.json`.
 **Alternative écartée** : assouplir le seuil d'audit de la CI (masquerait de vraies vulnérabilités).
 **Conséquences** : aucune dépendance ajoutée ; mises à jour de patch/mineures uniquement.
+
+### [2026-10-24] axe-core épinglé à 4.13.0 (dette d'accessibilité du calendrier)
+**Contexte** : axe-core 4.14 signale `label-content-name-mismatch` sur le calendrier (vraie non-conformité WCAG 2.5.3, auparavant non détectée).
+**Décision** : épingler `axe-core` et `@axe-core/playwright` à 4.13.0 pour garder la CI verte sans masquer la règle ; la correction des libellés est une dette suivie.
+**Alternative écartée** : désactiver la règle dans l'audit (la violation resterait invisible) ; refonte des aria-label dans ce correctif de CI (hors périmètre).
+**Conséquences** : à lever dès que le calendrier est corrigé.
