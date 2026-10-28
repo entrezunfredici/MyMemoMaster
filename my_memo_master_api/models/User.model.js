@@ -65,6 +65,24 @@ module.exports = (instance) => {
         allowNull: false,
         defaultValue: true
       },
+      twoFactorEnabled: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+      },
+      twoFactorCode: {
+        type: DataTypes.STRING(64),
+        allowNull: true
+      },
+      twoFactorCodeExpiresAt: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      twoFactorCodeAttempts: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+      },
       lastLogin: {
         type: DataTypes.DATE,
         allowNull: true

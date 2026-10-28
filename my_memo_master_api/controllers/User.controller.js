@@ -6,6 +6,48 @@ const sendEmail = require('../helpers/sendEmail')
 const getFrontUrl = require('../helpers/frontUrl')
 const logger = require('../helpers/logger')
 const tokenBlacklist = require('../helpers/tokenBlacklist')
+const {
+  isTwoFactorMandatory,
+  isTwoFactorRequired,
+  signChallengeToken,
+  verifyChallengeToken
+} = require('../helpers/twoFactor')
+
+/**
+ * Ouvre une session : jeton d'accès, refresh token (stocké haché) et date de dernière connexion.
+ *
+ * @param {number} userId - ID de l'utilisateur authentifié
+ * @returns {Promise<{ token: string, refreshToken: string }>}
+ */
+const issueSession = async (userId) => {
+  const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '15m'
+  const token = jwt.sign({ id: userId }, process.env.AUTH_JWT_SECRET, { expiresIn })
+
+  const refreshToken = crypto.randomBytes(64).toString('hex')
+  const refreshTokenDays = parseInt(process.env.AUTH_REFRESH_TOKEN_EXPIRES_DAYS || '7', 10)
+  const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenDays * 24 * 60 * 60 * 1000)
+  await userService.setRefreshToken(userId, refreshToken, refreshTokenExpiresAt)
+
+  await userService.updateLoginDate(userId)
+  return { token, refreshToken }
+}
+
+/**
+ * Envoie par email le code de connexion. Ne fait rien si un code vient d'être émis (délai de 1 min).
+ *
+ * @param {{ userId: number, name: string, email: string }} user - Compte qui se connecte
+ * @returns {Promise<boolean>} true si un email a été envoyé
+ */
+const sendTwoFactorCode = async (user) => {
+  const code = await userService.setTwoFactorCode(user.userId)
+  if (!code) return false
+  await sendEmail(
+    'Code de connexion - MyMemoMaster',
+    `Bonjour ${user.name},\n\nVotre code de connexion est :\n\n${code}\n\nIl est valable 10 minutes.\n\nSi vous n'êtes pas à l'origine de cette connexion, changez votre mot de passe sans attendre.`,
+    user.email
+  )
+  return true
+}
 
 exports.register = async (req, res) => {
   let newUser = null
@@ -78,20 +120,93 @@ exports.login = async (req, res) => {
       return res.status(403).send({ message: 'Votre compte a été désactivé. Contactez un administrateur.' })
     }
 
-    const expiresIn = process.env.AUTH_JWT_EXPIRES_IN || '15m'
-    const token = jwt.sign({ id: user.userId }, process.env.AUTH_JWT_SECRET, { expiresIn })
+    if (isTwoFactorRequired(user)) {
+      // Mot de passe valide mais aucune session émise : le code reçu par email doit encore être saisi
+      await sendTwoFactorCode(user)
+      return res.status(200).send({
+        twoFactorRequired: true,
+        challengeToken: signChallengeToken(user.userId),
+        message: 'Un code de vérification vous a été envoyé par email.'
+      })
+    }
 
-    const refreshToken = crypto.randomBytes(64).toString('hex')
-    const refreshTokenDays = parseInt(process.env.AUTH_REFRESH_TOKEN_EXPIRES_DAYS || '7', 10)
-    const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenDays * 24 * 60 * 60 * 1000)
-    await userService.setRefreshToken(user.userId, refreshToken, refreshTokenExpiresAt)
-
-    await userService.updateLoginDate(user.userId)
-
-    res.status(200).send({ token, refreshToken })
+    res.status(200).send(await issueSession(user.userId))
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).send({ message: 'Erreur lors de la connexion.' })
+  }
+}
+
+exports.verifyTwoFactor = async (req, res) => {
+  try {
+    const { challengeToken, code } = req.body
+    const userId = verifyChallengeToken(challengeToken)
+    if (!userId) {
+      return res.status(401).send({ message: 'Vérification expirée. Reconnectez-vous.', challengeExpired: true })
+    }
+
+    const user = await userService.findOne(userId)
+    if (!user || user.isActive === false) {
+      logger.warn(`Connexion refusée (double authentification) — compte introuvable ou désactivé : ${userId} (IP ${req.ip})`)
+      return res.status(403).send({ message: 'Accès refusé.' })
+    }
+
+    if (!(await userService.verifyTwoFactorCode(userId, code))) {
+      logger.warn(`Échec de double authentification — code invalide pour l'utilisateur ${userId} (IP ${req.ip})`)
+      return res.status(401).send({ message: 'Code invalide ou expiré.' })
+    }
+
+    res.status(200).send(await issueSession(userId))
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la vérification du code.' })
+  }
+}
+
+exports.resendTwoFactor = async (req, res) => {
+  try {
+    const userId = verifyChallengeToken(req.body.challengeToken)
+    if (!userId) {
+      return res.status(401).send({ message: 'Vérification expirée. Reconnectez-vous.', challengeExpired: true })
+    }
+
+    const user = await userService.findOne(userId)
+    if (!user || user.isActive === false) return res.status(403).send({ message: 'Accès refusé.' })
+
+    if (!(await sendTwoFactorCode(user))) {
+      return res.status(429).send({ message: 'Un code vient d\'être envoyé. Patientez une minute avant d\'en demander un nouveau.' })
+    }
+    res.status(200).send({ message: 'Un nouveau code vous a été envoyé par email.' })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: "Erreur lors de l'envoi du code." })
+  }
+}
+
+exports.setTwoFactor = async (req, res) => {
+  try {
+    const { enabled, password } = req.body
+    const user = await userService.findOne(req.user.id)
+    if (!user) return res.status(404).send({ message: 'Utilisateur introuvable.' })
+
+    if (!(await userService.verifyPassword(user.userId, password))) {
+      logger.warn(`Modification de la double authentification refusée — mot de passe invalide pour l'utilisateur ${user.userId} (IP ${req.ip})`)
+      return res.status(401).send({ message: 'Mot de passe incorrect.' })
+    }
+
+    if (!enabled && isTwoFactorMandatory(user)) {
+      return res.status(403).send({ message: 'La double authentification est obligatoire pour les administrateurs.' })
+    }
+
+    await userService.setTwoFactorEnabled(user.userId, enabled)
+    logger.info(`Double authentification ${enabled ? 'activée' : 'désactivée'} pour l'utilisateur ${user.userId}`)
+    res.status(200).send({
+      message: enabled ? 'Double authentification activée.' : 'Double authentification désactivée.',
+      twoFactorEnabled: Boolean(enabled)
+    })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).send({ message: 'Erreur lors de la modification de la double authentification.' })
   }
 }
 

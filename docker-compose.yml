@@ -178,6 +178,8 @@ services:
       E2E_TEACHER_PASSWORD: ${E2E_TEACHER_PASSWORD:-}
       MAX_USERS: ${MAX_USERS:-}
       RATE_LIMIT_DISABLED: ${RATE_LIMIT_DISABLED:-false}
+      # Double authentification : ne pas poser à true hors stack jetable (CI). Ignoré si NODE_ENV=production.
+      TWO_FACTOR_DISABLED: ${TWO_FACTOR_DISABLED:-false}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET: ${S3_BUCKET:-}

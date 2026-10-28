@@ -234,4 +234,51 @@ describe('ProfilePage', () => {
     const authStore = useAuthStore()
     expect(authStore.deleteAccount).toHaveBeenCalledOnce()
   })
+
+  // ── Double authentification ────────────────────────────────────────────────
+
+  describe('double authentification', () => {
+    const card = (w) => w.find('[data-testid="two-factor-card"]')
+
+    it('utilisateur standard sans 2FA - affiche « désactivée » et le bouton d’activation', async () => {
+      const wrapper = mountProfile()
+      await flushPromises()
+      expect(card(wrapper).text()).toContain('désactivée')
+      expect(card(wrapper).find('button').text()).toBe('Activer la double authentification')
+    })
+
+    it('2FA activée - affiche « activée » et le bouton de désactivation', async () => {
+      const wrapper = mountProfile({ ...mockUser, twoFactorEnabled: true })
+      await flushPromises()
+      expect(card(wrapper).text()).toContain('activée')
+      expect(card(wrapper).find('button').text()).toBe('Désactiver la double authentification')
+    })
+
+    it('envoie enabled: true avec le mot de passe saisi', async () => {
+      const wrapper = mountProfile()
+      await flushPromises()
+      await card(wrapper).find('#two-factor-password').setValue('Password1!')
+      await card(wrapper).find('form').trigger('submit')
+      await flushPromises()
+
+      expect(useAuthStore().setTwoFactorEnabled).toHaveBeenCalledWith({ enabled: true, password: 'Password1!' })
+    })
+
+    it('2FA activée - envoie enabled: false', async () => {
+      const wrapper = mountProfile({ ...mockUser, twoFactorEnabled: true })
+      await flushPromises()
+      await card(wrapper).find('#two-factor-password').setValue('Password1!')
+      await card(wrapper).find('form').trigger('submit')
+      await flushPromises()
+
+      expect(useAuthStore().setTwoFactorEnabled).toHaveBeenCalledWith({ enabled: false, password: 'Password1!' })
+    })
+
+    it('administrateur - explique que la 2FA est obligatoire et n’affiche aucun formulaire', async () => {
+      const wrapper = mountProfile({ ...mockUser, roleId: 1, twoFactorRequired: true })
+      await flushPromises()
+      expect(card(wrapper).text()).toContain('Obligatoire')
+      expect(card(wrapper).find('form').exists()).toBe(false)
+    })
+  })
 })

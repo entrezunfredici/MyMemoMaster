@@ -54,6 +54,8 @@ export const useAuthStore = defineStore('auth', {
     token: null,
     refreshToken: null,
     user: {},
+    // Jeton remis après un mot de passe valide quand une 2FA est exigée ; non persisté (voir `persist.paths`)
+    twoFactorChallenge: null,
   }),
 
   actions: {
@@ -143,8 +145,21 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
 
-      this.token = resp.data.token
-      this.refreshToken = resp.data.refreshToken ?? null
+      // Mot de passe valide mais un code reçu par email reste à saisir : aucune session n'est ouverte
+      if (resp.data?.twoFactorRequired) {
+        this.twoFactorChallenge = resp.data.challengeToken
+        notif.notify(resp.data.message || 'Un code de vérification vous a été envoyé par email.', 'info')
+        return 'twoFactor'
+      }
+
+      await this.startSession(resp.data, redirect)
+      return true
+    },
+
+    async startSession({ token, refreshToken }, redirect) {
+      this.twoFactorChallenge = null
+      this.token = token
+      this.refreshToken = refreshToken ?? null
       this.authenticated = true
 
       // Décoder le JWT pour récupérer l'userId, puis charger le profil complet
@@ -159,7 +174,54 @@ export const useAuthStore = defineStore('auth', {
       if (redirect) {
         router.push(redirect)
       }
+    },
 
+    // ── Double authentification par email ────────────────────────────────────────────────────────
+    /**
+     * Termine la connexion avec le code reçu par email.
+     *
+     * @returns {Promise<true|false|'expired'>} 'expired' : le défi n'est plus valable, il faut se reconnecter
+     */
+    async verifyTwoFactor(code, redirect) {
+      const resp = await api.post('users/login/2fa', { challengeToken: this.twoFactorChallenge, code })
+
+      if (!resp || resp.status !== 200) {
+        if (resp?.data?.challengeExpired) {
+          this.twoFactorChallenge = null
+          notif.notify(extractApiError(resp), 'error')
+          return 'expired'
+        }
+        notif.notify(extractApiError(resp, 'Code invalide ou expiré.'), 'error')
+        return false
+      }
+
+      await this.startSession(resp.data, redirect)
+      return true
+    },
+
+    async resendTwoFactorCode() {
+      const resp = await api.post('users/login/2fa/resend', { challengeToken: this.twoFactorChallenge })
+      if (!resp || resp.status !== 200) {
+        if (resp?.data?.challengeExpired) this.twoFactorChallenge = null
+        notif.notify(extractApiError(resp, "Erreur lors de l'envoi du code."), 'error')
+        return false
+      }
+      notif.notify(resp.data?.message || 'Un nouveau code vous a été envoyé par email.', 'success')
+      return true
+    },
+
+    cancelTwoFactor() {
+      this.twoFactorChallenge = null
+    },
+
+    async setTwoFactorEnabled({ enabled, password }) {
+      const resp = await api.put('users/two-factor', { enabled, password })
+      if (!resp || resp.status !== 200) {
+        notif.notify(extractApiError(resp, 'Erreur lors de la modification de la double authentification.'), 'error')
+        return false
+      }
+      this.user = { ...this.user, twoFactorEnabled: resp.data.twoFactorEnabled }
+      notif.notify(resp.data.message, 'success')
       return true
     },
 
@@ -343,6 +405,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = {}
       this.token = null
       this.refreshToken = null
+      this.twoFactorChallenge = null
 
       // Le parcours guidé ne doit pas survivre à un changement d'utilisateur
       useGuidedTourStore().reset()

@@ -34,6 +34,23 @@ exports.register = [
 
 exports.login = [emailRules, body('password').notEmpty().withMessage('Mot de passe requis')]
 
+const challengeTokenRules = body('challengeToken').isString().notEmpty().withMessage('Jeton de vérification requis')
+
+exports.verifyTwoFactor = [
+  challengeTokenRules,
+  body('code')
+    .trim()
+    .matches(/^\d{6}$/)
+    .withMessage('Code invalide')
+]
+
+exports.resendTwoFactor = [challengeTokenRules]
+
+exports.setTwoFactor = [
+  body('enabled').isBoolean().withMessage('Le champ enabled doit être un booléen').toBoolean(),
+  body('password').notEmpty().withMessage('Mot de passe requis')
+]
+
 exports.forgotPassword = [emailRules]
 
 exports.resetPassword = [

@@ -24,6 +24,7 @@ Avant toute chose, lis dans cet ordre :
 
 - Lis `CONVENTIONS.md` avant toute implémentation.
 - Si une information manque pour réaliser la tâche, **pose une question avant de coder** — ne fais pas d'hypothèse silencieuse.
+- Pour toute vérification en **préprod ou en prod** (pods, base, sauvegardes, secrets), utilise le **nouveau cluster `pck-uuvuwp7`** — l'ancien `pck-dkoyol2` est éteint. Procédure et règles : section « Accès aux environnements » de `CONVENTIONS.md`.
 - Si la tâche implique de modifier une interface publique (fonction exportée, endpoint, schéma de modèle), **signale-le explicitement** et attends validation avant de continuer.
 
 ### Tickets en séquence — audit obligatoire avant implémentation

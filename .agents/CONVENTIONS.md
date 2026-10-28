@@ -173,6 +173,36 @@ router.get("/", authMiddleware, entity.findAll);
 
 ---
 
+## Accès aux environnements (préprod / prod) — cluster Kubernetes
+
+**Toute vérification en préprod ou en prod (état des pods, comptes en base, sauvegardes, secrets, logs) se fait sur le NOUVEAU cluster `pck-uuvuwp7`.** L'ancien cluster `pck-dkoyol2` (kubeconfig d'août 2026, serveur `83.166.143.133:31159`) est éteint : c'est le contexte actif par défaut de la machine de dev, mais il ne répond plus (timeouts) — ne pas conclure que « le cluster est injoignable » avant d'avoir essayé le nouveau.
+
+| Élément | Valeur |
+|---------|--------|
+| Kubeconfig à utiliser | `k8s/kubeconfig/pck-uuvuwp7-kubeconfig` (dossier ignoré par git : fichier local, à demander si absent) |
+| Serveur | `https://83.166.143.133:31464` |
+| Namespaces | `mymemomaster` (prod, préfixe `mmm-prod-`) · `mymemomaster-preprod` (préprod, préfixe `mmm-preprod-`) |
+| Base de données | pod `mmm-prod-postgres-0` / `mmm-preprod-postgres-0` ; `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"` lancé via `kubectl exec` (les variables sont déjà dans le pod) |
+| Secrets | `mmm-prod-secrets` / `mmm-preprod-secrets` |
+| Sauvegardes | CronJob `mmm-<env>-backup` (03:00 UTC) + table `BackupRun` de l'API (voir `Backup.service.js`) |
+
+Commande type (toujours passer `--kubeconfig` explicitement plutôt que de modifier le contexte actif) :
+
+```bash
+K="kubectl --kubeconfig k8s/kubeconfig/pck-uuvuwp7-kubeconfig --request-timeout=20s"
+$K get ns
+$K -n mymemomaster-preprod exec mmm-preprod-postgres-0 -- sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT ..."'
+```
+
+Règles :
+- **Lecture seule d'abord** : état des lieux (`get`, `logs`, `SELECT`) avant toute écriture ; une modification de donnée ou de secret en prod/préprod exige l'accord explicite de l'utilisateur pour cette modification précise.
+- Ne jamais afficher un mot de passe, un hash, un jeton ou une clé : ne lire que la clé de secret nécessaire (`-o jsonpath='{.data.CLE}'`) et seulement si elle n'est pas sensible (ex. `ADMIN_SEED_EMAIL`).
+- Les erreurs `metrics.k8s.io ... unable to handle the request` de `kubectl` sont sans conséquence (metrics-server) ; filtrer avec `grep -v metrics.k8s.io`.
+- Un changement de schéma (migration Sequelize) doit être joué sur ces bases au déploiement (`k8s/helm-migrate.*`) : sans cela l'API lit des colonnes absentes.
+- Mettre ce tableau à jour si le cluster change de nouveau.
+
+---
+
 ## Codes HTTP utilisés
 
 | Cas | Code |

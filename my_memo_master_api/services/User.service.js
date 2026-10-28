@@ -5,6 +5,11 @@ const crypto = require('crypto')
 const logger = require('../helpers/logger')
 const AuditLogService = require('./AuditLog.service')
 const tokenBlacklist = require('../helpers/tokenBlacklist')
+const { isTwoFactorMandatory } = require('../helpers/twoFactor')
+
+const TWO_FACTOR_CODE_TTL_MS = 10 * 60 * 1000
+const TWO_FACTOR_RESEND_COOLDOWN_MS = 60 * 1000
+const MAX_TWO_FACTOR_CODE_ATTEMPTS = 5
 
 class UserService {
   async findAll() {
@@ -61,8 +66,10 @@ class UserService {
     const user = await User.findByPk(userId)
     if (!user) return null
     // eslint-disable-next-line no-unused-vars
-    const { password, ...userWithoutPassword } = user?.dataValues || user
-    return userWithoutPassword
+    const { password, twoFactorCode, twoFactorCodeExpiresAt, twoFactorCodeAttempts, ...userWithoutPassword } =
+      user?.dataValues || user
+    // twoFactorRequired : le front masque l'interrupteur pour les rôles qui ne peuvent pas s'en passer
+    return { ...userWithoutPassword, twoFactorRequired: isTwoFactorMandatory(userWithoutPassword) }
   }
 
   /**
@@ -296,6 +303,86 @@ class UserService {
   async clearAllCodes(userId) {
     await this.clearValidEmailCode(userId)
     await this.clearResetPasswordCode(userId)
+    await this.clearTwoFactorCode(userId)
+  }
+
+  /**
+   * Génère le code de connexion à 6 chiffres (double authentification par email), stocke son hash bcrypt
+   * et retourne le code brut. Refuse d'en émettre un nouveau tant que le précédent a moins d'une minute
+   * (anti-spam de la boîte mail de l'utilisateur).
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @returns {Promise<string|null>} Code brut à envoyer par email, ou null si un code vient d'être émis
+   */
+  async setTwoFactorCode(userId) {
+    const user = await User.findByPk(userId, { attributes: ['userId', 'twoFactorCodeExpiresAt'] })
+    const issuedAt = user?.twoFactorCodeExpiresAt
+      ? user.twoFactorCodeExpiresAt.getTime() - TWO_FACTOR_CODE_TTL_MS
+      : 0
+    if (Date.now() - issuedAt < TWO_FACTOR_RESEND_COOLDOWN_MS) return null
+
+    // CHOIX: même schéma que le code de réinitialisation (OTP 6 chiffres + hash bcrypt + 5 essais max)
+    // RAISON: un code à 6 chiffres n'est pas brute-forçable en ligne avec 5 essais, 10 min d'expiration
+    // et le rate limiting authLimiter sur la route de vérification.
+    const code = crypto.randomInt(100000, 1000000).toString()
+    const hash = await bcrypt.hash(code, 10)
+    await User.update(
+      {
+        twoFactorCode: hash,
+        twoFactorCodeExpiresAt: new Date(Date.now() + TWO_FACTOR_CODE_TTL_MS),
+        twoFactorCodeAttempts: 0
+      },
+      { where: { userId } }
+    )
+    return code
+  }
+
+  /**
+   * Vérifie le code de connexion (comparaison bcrypt + expiration + essais limités).
+   * Le code est invalidé après un succès (usage unique), après expiration ou après 5 essais infructueux.
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @param {string} code - Code à 6 chiffres reçu par email
+   * @returns {Promise<boolean>} true si le code est valide et non expiré
+   */
+  async verifyTwoFactorCode(userId, code) {
+    const user = await User.findByPk(userId)
+    if (!user) return false
+
+    const isUsable =
+      user.twoFactorCode && user.twoFactorCodeExpiresAt && user.twoFactorCodeExpiresAt > new Date()
+    if (!isUsable) {
+      await this.clearTwoFactorCode(userId)
+      return false
+    }
+
+    const matches = await bcrypt.compare(String(code), user.twoFactorCode)
+    const attempts = (user.twoFactorCodeAttempts || 0) + 1
+
+    if (matches || attempts >= MAX_TWO_FACTOR_CODE_ATTEMPTS) {
+      await this.clearTwoFactorCode(userId)
+    } else {
+      await User.update({ twoFactorCodeAttempts: attempts }, { where: { userId } })
+    }
+    return matches
+  }
+
+  async clearTwoFactorCode(userId) {
+    await User.update(
+      { twoFactorCode: null, twoFactorCodeExpiresAt: null, twoFactorCodeAttempts: 0 },
+      { where: { userId } }
+    )
+  }
+
+  /**
+   * Active ou désactive volontairement la double authentification d'un compte.
+   *
+   * @param {number} userId - ID de l'utilisateur
+   * @param {boolean} enabled - Nouvel état
+   */
+  async setTwoFactorEnabled(userId, enabled) {
+    await User.update({ twoFactorEnabled: Boolean(enabled) }, { where: { userId } })
+    if (!enabled) await this.clearTwoFactorCode(userId)
   }
 
   /**

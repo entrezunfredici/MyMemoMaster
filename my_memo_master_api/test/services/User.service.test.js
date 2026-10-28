@@ -168,7 +168,30 @@ describe('UserService', () => {
       const user = await UserService.findOne(1)
 
       expect(User.findByPk).toHaveBeenCalledWith(1)
-      expect(user).toEqual({ userId: 1, name: 'User 1' })
+      expect(user).toEqual({ userId: 1, name: 'User 1', twoFactorRequired: false })
+    })
+
+    it('ne renvoie jamais le code de double authentification ni ses compteurs', async () => {
+      User.findByPk.mockResolvedValue({
+        userId: 1,
+        roleId: 2,
+        twoFactorEnabled: true,
+        twoFactorCode: 'hash',
+        twoFactorCodeExpiresAt: new Date(),
+        twoFactorCodeAttempts: 2
+      })
+
+      const user = await UserService.findOne(1)
+
+      expect(user).toEqual({ userId: 1, roleId: 2, twoFactorEnabled: true, twoFactorRequired: false })
+    })
+
+    it('marque twoFactorRequired pour un administrateur', async () => {
+      User.findByPk.mockResolvedValue({ userId: 1, roleId: 1, twoFactorEnabled: false })
+
+      const user = await UserService.findOne(1)
+
+      expect(user.twoFactorRequired).toBe(true)
     })
 
     it('should return null if no user is found', async () => {
@@ -317,7 +340,7 @@ describe('UserService', () => {
       const user = await UserService.update(1, { name: 'Updated User' })
 
       expect(User.update).toHaveBeenCalledWith({ name: 'Updated User' }, { where: { userId: 1 } })
-      expect(user).toEqual({ userId: 1, name: 'Updated User' })
+      expect(user).toEqual({ userId: 1, name: 'Updated User', twoFactorRequired: false })
     })
   })
 
@@ -446,7 +469,139 @@ describe('UserService', () => {
 
       expect(Role.findByPk).toHaveBeenCalledWith(1)
       expect(User.update).toHaveBeenCalledWith({ roleId: 1 }, { where: { userId: 1 } })
-      expect(user).toEqual({ userId: 1, name: 'User 1', roleId: 1 })
+      expect(user).toEqual({ userId: 1, name: 'User 1', roleId: 1, twoFactorRequired: true })
+    })
+  })
+
+  // ── Double authentification par email ──────────────────────────────────────
+
+  describe('setTwoFactorCode', () => {
+    it('stocke un hash bcrypt (jamais le code en clair) valable 10 minutes et remet les essais à 0', async () => {
+      User.findByPk.mockResolvedValue({ userId: 1, twoFactorCodeExpiresAt: null })
+      User.update.mockResolvedValue([1])
+
+      const code = await UserService.setTwoFactorCode(1)
+
+      expect(code).toMatch(/^\d{6}$/)
+      const [fields, opts] = User.update.mock.calls[0]
+      expect(fields.twoFactorCode).not.toBe(code)
+      expect(await bcrypt.compare(code, fields.twoFactorCode)).toBe(true)
+      expect(fields.twoFactorCodeAttempts).toBe(0)
+      const ttl = fields.twoFactorCodeExpiresAt.getTime() - Date.now()
+      expect(ttl).toBeGreaterThan(9 * 60 * 1000)
+      expect(ttl).toBeLessThanOrEqual(10 * 60 * 1000)
+      expect(opts).toEqual({ where: { userId: 1 } })
+    })
+
+    it('retourne null sans rien écrire si un code a été émis il y a moins d\'une minute', async () => {
+      // code émis il y a 5 s : il expire dans 10 min - 5 s
+      User.findByPk.mockResolvedValue({ userId: 1, twoFactorCodeExpiresAt: new Date(Date.now() + 10 * 60 * 1000 - 5000) })
+
+      const code = await UserService.setTwoFactorCode(1)
+
+      expect(code).toBeNull()
+      expect(User.update).not.toHaveBeenCalled()
+    })
+
+    it('émet un nouveau code si le précédent a plus d\'une minute', async () => {
+      User.findByPk.mockResolvedValue({ userId: 1, twoFactorCodeExpiresAt: new Date(Date.now() + 5 * 60 * 1000) })
+      User.update.mockResolvedValue([1])
+
+      const code = await UserService.setTwoFactorCode(1)
+
+      expect(code).toMatch(/^\d{6}$/)
+    })
+  })
+
+  describe('verifyTwoFactorCode', () => {
+    const CODE = '123456'
+    const future = () => new Date(Date.now() + 5 * 60 * 1000)
+
+    it('retourne true si le code est bon, puis l\'invalide (usage unique)', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        twoFactorCode: bcrypt.hashSync(CODE, 4),
+        twoFactorCodeExpiresAt: future(),
+        twoFactorCodeAttempts: 0
+      })
+
+      expect(await UserService.verifyTwoFactorCode(1, CODE)).toBe(true)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.twoFactorCode).toBeNull()
+      expect(fields.twoFactorCodeExpiresAt).toBeNull()
+    })
+
+    it('retourne false pour un mauvais code et incrémente les essais sans invalider le code', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        twoFactorCode: bcrypt.hashSync(CODE, 4),
+        twoFactorCodeExpiresAt: future(),
+        twoFactorCodeAttempts: 1
+      })
+
+      expect(await UserService.verifyTwoFactorCode(1, '654321')).toBe(false)
+      const [fields] = User.update.mock.calls[0]
+      expect(fields.twoFactorCodeAttempts).toBe(2)
+      expect(fields.twoFactorCode).toBeUndefined()
+    })
+
+    it('invalide le code au 5e essai infructueux', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        twoFactorCode: bcrypt.hashSync(CODE, 4),
+        twoFactorCodeExpiresAt: future(),
+        twoFactorCodeAttempts: 4
+      })
+
+      expect(await UserService.verifyTwoFactorCode(1, '654321')).toBe(false)
+      expect(User.update.mock.calls[0][0].twoFactorCode).toBeNull()
+    })
+
+    it('retourne false pour un code expiré', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({
+        twoFactorCode: bcrypt.hashSync(CODE, 4),
+        twoFactorCodeExpiresAt: new Date(Date.now() - 1000),
+        twoFactorCodeAttempts: 0
+      })
+
+      expect(await UserService.verifyTwoFactorCode(1, CODE)).toBe(false)
+    })
+
+    it('retourne false s\'il n\'y a aucun code en attente', async () => {
+      User.update.mockResolvedValue([1])
+      User.findByPk.mockResolvedValue({ twoFactorCode: null, twoFactorCodeExpiresAt: null, twoFactorCodeAttempts: 0 })
+
+      expect(await UserService.verifyTwoFactorCode(1, CODE)).toBe(false)
+    })
+
+    it('retourne false si l\'utilisateur n\'existe pas', async () => {
+      User.findByPk.mockResolvedValue(null)
+
+      expect(await UserService.verifyTwoFactorCode(99, CODE)).toBe(false)
+    })
+  })
+
+  describe('setTwoFactorEnabled', () => {
+    it('activation - met le booléen à true sans toucher au code', async () => {
+      User.update.mockResolvedValue([1])
+
+      await UserService.setTwoFactorEnabled(1, true)
+
+      expect(User.update).toHaveBeenCalledTimes(1)
+      expect(User.update).toHaveBeenCalledWith({ twoFactorEnabled: true }, { where: { userId: 1 } })
+    })
+
+    it('désactivation - met le booléen à false et efface le code en attente', async () => {
+      User.update.mockResolvedValue([1])
+
+      await UserService.setTwoFactorEnabled(1, false)
+
+      expect(User.update).toHaveBeenCalledWith({ twoFactorEnabled: false }, { where: { userId: 1 } })
+      expect(User.update).toHaveBeenCalledWith(
+        { twoFactorCode: null, twoFactorCodeExpiresAt: null, twoFactorCodeAttempts: 0 },
+        { where: { userId: 1 } }
+      )
     })
   })
 

@@ -43,7 +43,10 @@ jest.mock('../../services/User.service', () => ({
   setActive: jest.fn(),
   verifyValidEmailCode: jest.fn(),
   verifyResetPasswordCode: jest.fn(),
-  setEmailValidated: jest.fn().mockResolvedValue(true)
+  setEmailValidated: jest.fn().mockResolvedValue(true),
+  setTwoFactorCode: jest.fn(),
+  verifyTwoFactorCode: jest.fn(),
+  setTwoFactorEnabled: jest.fn()
 }))
 
 jest.mock('../../services/Role.service', () => ({ findOne: jest.fn() }))
@@ -268,6 +271,266 @@ describe('User Controller', () => {
         .send({ email: 'bad-email', password: 'Password123' })
 
       expect(res.status).toBe(400)
+    })
+  })
+
+  // ── Double authentification par email ──────────────────────────────────────
+  describe('POST /users/login — double authentification', () => {
+    const login = () =>
+      request(app).post('/api/v1/users/login').send({ email: 'bob@example.com', password: 'Password123' })
+
+    beforeEach(() => {
+      userService.verifyPassword.mockResolvedValue(true)
+      userService.setRefreshToken.mockResolvedValue()
+      userService.updateLoginDate.mockResolvedValue()
+      userService.setTwoFactorCode.mockResolvedValue('654321')
+    })
+
+    it('200 — utilisateur ayant activé la 2FA : envoie le code par email et ne renvoie aucune session', async () => {
+      userService.findByEmail.mockResolvedValue({
+        userId: 1, name: 'Bob', email: 'bob@example.com', roleId: 2, hasValidatedEmail: true, twoFactorEnabled: true
+      })
+
+      const res = await login()
+
+      expect(res.status).toBe(200)
+      expect(res.body.twoFactorRequired).toBe(true)
+      expect(res.body.challengeToken).toBeDefined()
+      expect(res.body.token).toBeUndefined()
+      expect(res.body.refreshToken).toBeUndefined()
+      expect(userService.setRefreshToken).not.toHaveBeenCalled()
+      expect(sendEmail).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('654321'), 'bob@example.com')
+    })
+
+    it.each([1, 4])('200 — administrateur (rôle %i) sans activation volontaire : 2FA exigée', async (roleId) => {
+      userService.findByEmail.mockResolvedValue({
+        userId: 1, name: 'Admin', email: 'admin@example.com', roleId, hasValidatedEmail: true, twoFactorEnabled: false
+      })
+
+      const res = await login()
+
+      expect(res.body.twoFactorRequired).toBe(true)
+      expect(res.body.token).toBeUndefined()
+    })
+
+    it('200 — utilisateur standard sans 2FA : session ouverte directement', async () => {
+      userService.findByEmail.mockResolvedValue({
+        userId: 1, name: 'Bob', email: 'bob@example.com', roleId: 2, hasValidatedEmail: true, twoFactorEnabled: false
+      })
+
+      const res = await login()
+
+      expect(res.body.token).toBeDefined()
+      expect(res.body.twoFactorRequired).toBeUndefined()
+      expect(sendEmail).not.toHaveBeenCalled()
+    })
+
+    it('200 — code déjà envoyé il y a moins d\'une minute : défi renvoyé sans second email', async () => {
+      userService.setTwoFactorCode.mockResolvedValue(null)
+      userService.findByEmail.mockResolvedValue({
+        userId: 1, name: 'Bob', email: 'bob@example.com', roleId: 2, hasValidatedEmail: true, twoFactorEnabled: true
+      })
+
+      const res = await login()
+
+      expect(res.body.twoFactorRequired).toBe(true)
+      expect(sendEmail).not.toHaveBeenCalled()
+    })
+
+    it('401 — mauvais mot de passe : aucun code n\'est envoyé', async () => {
+      userService.findByEmail.mockResolvedValue({ userId: 1, roleId: 1, twoFactorEnabled: true })
+      userService.verifyPassword.mockResolvedValue(false)
+
+      const res = await login()
+
+      expect(res.status).toBe(401)
+      expect(sendEmail).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('POST /users/login/2fa', () => {
+    const { signChallengeToken } = require('../../helpers/twoFactor')
+    const verify = (body) => request(app).post('/api/v1/users/login/2fa').send(body)
+
+    beforeEach(() => {
+      userService.findOne.mockResolvedValue({ userId: 1, isActive: true })
+      userService.setRefreshToken.mockResolvedValue()
+      userService.updateLoginDate.mockResolvedValue()
+    })
+
+    it('200 — bon code : ouvre la session', async () => {
+      userService.verifyTwoFactorCode.mockResolvedValue(true)
+
+      const res = await verify({ challengeToken: signChallengeToken(1), code: '123456' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.token).toBeDefined()
+      expect(res.body.refreshToken).toBeDefined()
+      expect(userService.verifyTwoFactorCode).toHaveBeenCalledWith(1, '123456')
+      expect(userService.updateLoginDate).toHaveBeenCalledWith(1)
+    })
+
+    it('401 — mauvais code', async () => {
+      userService.verifyTwoFactorCode.mockResolvedValue(false)
+
+      const res = await verify({ challengeToken: signChallengeToken(1), code: '000000' })
+
+      expect(res.status).toBe(401)
+      expect(res.body.token).toBeUndefined()
+      expect(userService.setRefreshToken).not.toHaveBeenCalled()
+    })
+
+    it('401 — jeton de défi invalide', async () => {
+      const res = await verify({ challengeToken: 'faux', code: '123456' })
+
+      expect(res.status).toBe(401)
+      expect(userService.verifyTwoFactorCode).not.toHaveBeenCalled()
+    })
+
+    it('401 — un jeton d\'accès ne peut pas servir de jeton de défi', async () => {
+      const res = await verify({ challengeToken: makeToken({ id: 1 }), code: '123456' })
+
+      expect(res.status).toBe(401)
+    })
+
+    it('403 — compte désactivé entre-temps', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, isActive: false })
+      userService.verifyTwoFactorCode.mockResolvedValue(true)
+
+      const res = await verify({ challengeToken: signChallengeToken(1), code: '123456' })
+
+      expect(res.status).toBe(403)
+      expect(userService.verifyTwoFactorCode).not.toHaveBeenCalled()
+    })
+
+    it('400 — code qui n\'a pas 6 chiffres', async () => {
+      const res = await verify({ challengeToken: signChallengeToken(1), code: '12ab' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('400 — jeton de défi manquant', async () => {
+      const res = await verify({ code: '123456' })
+
+      expect(res.status).toBe(400)
+    })
+  })
+
+  describe('POST /users/login/2fa/resend', () => {
+    const { signChallengeToken } = require('../../helpers/twoFactor')
+    const resend = (body) => request(app).post('/api/v1/users/login/2fa/resend').send(body)
+
+    beforeEach(() => {
+      userService.findOne.mockResolvedValue({ userId: 1, name: 'Bob', email: 'bob@example.com', isActive: true })
+    })
+
+    it('200 — renvoie un code par email', async () => {
+      userService.setTwoFactorCode.mockResolvedValue('111222')
+
+      const res = await resend({ challengeToken: signChallengeToken(1) })
+
+      expect(res.status).toBe(200)
+      expect(sendEmail).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('111222'), 'bob@example.com')
+    })
+
+    it('429 — un code vient d\'être envoyé', async () => {
+      userService.setTwoFactorCode.mockResolvedValue(null)
+
+      const res = await resend({ challengeToken: signChallengeToken(1) })
+
+      expect(res.status).toBe(429)
+      expect(sendEmail).not.toHaveBeenCalled()
+    })
+
+    it('401 — jeton de défi invalide', async () => {
+      const res = await resend({ challengeToken: 'faux' })
+
+      expect(res.status).toBe(401)
+      expect(sendEmail).not.toHaveBeenCalled()
+    })
+
+    it('403 — compte désactivé', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, isActive: false })
+
+      const res = await resend({ challengeToken: signChallengeToken(1) })
+
+      expect(res.status).toBe(403)
+    })
+  })
+
+  describe('PUT /users/two-factor', () => {
+    const put = (body, token = makeToken({ id: 1 })) =>
+      request(app).put('/api/v1/users/two-factor').set('Authorization', `Bearer ${token}`).send(body)
+
+    beforeEach(() => {
+      userService.verifyPassword.mockResolvedValue(true)
+      userService.setTwoFactorEnabled.mockResolvedValue()
+    })
+
+    it('200 — un utilisateur standard active la 2FA', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, roleId: 2 })
+
+      const res = await put({ enabled: true, password: 'Password123' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.twoFactorEnabled).toBe(true)
+      expect(userService.setTwoFactorEnabled).toHaveBeenCalledWith(1, true)
+    })
+
+    it('200 — un utilisateur standard désactive la 2FA', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, roleId: 2, twoFactorEnabled: true })
+
+      const res = await put({ enabled: false, password: 'Password123' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.twoFactorEnabled).toBe(false)
+      expect(userService.setTwoFactorEnabled).toHaveBeenCalledWith(1, false)
+    })
+
+    it('200 — la chaîne "false" est bien traitée comme un booléen faux', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, roleId: 2 })
+
+      const res = await put({ enabled: 'false', password: 'Password123' })
+
+      expect(res.status).toBe(200)
+      expect(userService.setTwoFactorEnabled).toHaveBeenCalledWith(1, false)
+    })
+
+    it.each([1, 4])('403 — un administrateur (rôle %i) ne peut pas la désactiver', async (roleId) => {
+      userService.findOne.mockResolvedValue({ userId: 1, roleId })
+
+      const res = await put({ enabled: false, password: 'Password123' })
+
+      expect(res.status).toBe(403)
+      expect(userService.setTwoFactorEnabled).not.toHaveBeenCalled()
+    })
+
+    it('401 — mot de passe incorrect', async () => {
+      userService.findOne.mockResolvedValue({ userId: 1, roleId: 2 })
+      userService.verifyPassword.mockResolvedValue(false)
+
+      const res = await put({ enabled: true, password: 'Mauvais1!' })
+
+      expect(res.status).toBe(401)
+      expect(userService.setTwoFactorEnabled).not.toHaveBeenCalled()
+    })
+
+    it('400 — enabled non booléen', async () => {
+      const res = await put({ enabled: 'peut-être', password: 'Password123' })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('400 — mot de passe manquant', async () => {
+      const res = await put({ enabled: true })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('401 — sans authentification', async () => {
+      const res = await request(app).put('/api/v1/users/two-factor').send({ enabled: true, password: 'x' })
+
+      expect(res.status).toBe(401)
     })
   })
 

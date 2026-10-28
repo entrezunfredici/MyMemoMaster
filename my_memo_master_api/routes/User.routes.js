@@ -104,6 +104,66 @@ router.post('/login', authLimiter, userValidators.login, validate, user.login)
 
 /**
  * @swagger
+ * /users/login/2fa:
+ *   post:
+ *     summary: Terminer la connexion avec le code reçu par email (double authentification)
+ *     description: Le challengeToken est celui renvoyé par /users/login quand twoFactorRequired vaut true.
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               challengeToken:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: Connexion réussie (token et refreshToken).
+ *       401:
+ *         description: Code invalide ou expiré, ou jeton de vérification expiré.
+ *       403:
+ *         description: Compte désactivé.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post('/login/2fa', authLimiter, userValidators.verifyTwoFactor, validate, user.verifyTwoFactor)
+
+/**
+ * @swagger
+ * /users/login/2fa/resend:
+ *   post:
+ *     summary: Renvoyer le code de double authentification par email
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               challengeToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Nouveau code envoyé.
+ *       401:
+ *         description: Jeton de vérification expiré.
+ *       429:
+ *         description: Un code a été envoyé il y a moins d'une minute.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post('/login/2fa/resend', authLimiter, userValidators.resendTwoFactor, validate, user.resendTwoFactor)
+
+/**
+ * @swagger
  * /users/verify-email:
  *   post:
  *     summary: Vérifier l'email d'un utilisateur
@@ -317,6 +377,39 @@ router.post('/logout', userValidators.refreshToken, validate, user.logout)
  *         description: Erreur serveur.
  */
 router.get('/', authMiddleware, requireRole(1), user.search)
+
+/**
+ * @swagger
+ * /users/two-factor:
+ *   put:
+ *     summary: Activer ou désactiver la double authentification par email
+ *     description: Confirmation par mot de passe. La désactivation est refusée aux administrateurs (rôles 1 et 4).
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               enabled:
+ *                 type: boolean
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Réglage enregistré.
+ *       401:
+ *         description: Mot de passe incorrect.
+ *       403:
+ *         description: Double authentification obligatoire pour ce rôle.
+ *       500:
+ *         description: Erreur serveur.
+ */
+// Déclarée avant PUT /:id, sinon « two-factor » serait pris pour un identifiant
+router.put('/two-factor', authMiddleware, userValidators.setTwoFactor, validate, user.setTwoFactor)
 
 /**
  * @swagger

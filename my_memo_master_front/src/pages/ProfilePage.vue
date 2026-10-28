@@ -88,6 +88,36 @@
       </form>
     </div>
 
+    <!-- Double authentification -->
+    <div class="profile__card" data-testid="two-factor-card">
+      <h2 class="profile__title">Double authentification</h2>
+      <p class="profile__hint">
+        À chaque connexion, un code à 6 chiffres est envoyé par email et doit être saisi après votre mot de passe.
+        Elle est activée par défaut ; vous pouvez la désactiver ici si vous le souhaitez.
+      </p>
+      <p v-if="authStore.user.twoFactorRequired" class="profile__status">
+        Obligatoire pour votre rôle d'administrateur : elle ne peut pas être désactivée.
+      </p>
+      <form v-else @submit.prevent="toggleTwoFactor" class="profile__form">
+        <p class="profile__status">
+          État : <strong>{{ twoFactorEnabled ? 'activée' : 'désactivée' }}</strong>
+        </p>
+        <div class="profile__field">
+          <label for="two-factor-password">Mot de passe (pour confirmer)</label>
+          <input
+            id="two-factor-password"
+            v-model="twoFactorPassword"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+        <button type="submit" class="profile__btn" :disabled="savingTwoFactor">
+          {{ twoFactorEnabled ? 'Désactiver la double authentification' : 'Activer la double authentification' }}
+        </button>
+      </form>
+    </div>
+
     <!-- Déconnexion -->
     <div class="profile__card profile__card--row">
       <div>
@@ -152,6 +182,10 @@ const security = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const savingPassword = ref(false)
 const passwordError = ref('')
 
+const twoFactorPassword = ref('')
+const savingTwoFactor = ref(false)
+const twoFactorEnabled = computed(() => Boolean(authStore.user?.twoFactorEnabled))
+
 const deleteConfirm = ref('')
 const deletingAccount = ref(false)
 
@@ -189,6 +223,17 @@ async function changePassword() {
   savingPassword.value = false
 
   if (ok) security.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+}
+
+async function toggleTwoFactor() {
+  savingTwoFactor.value = true
+  const ok = await authStore.setTwoFactorEnabled({
+    enabled: !twoFactorEnabled.value,
+    password: twoFactorPassword.value,
+  })
+  savingTwoFactor.value = false
+
+  if (ok) twoFactorPassword.value = ''
 }
 
 async function deleteAccount() {
@@ -323,6 +368,14 @@ async function deleteAccount() {
 .profile__error {
   font-size: 0.85rem;
   color: rgb(var(--danger));
+}
+
+.profile__hint,
+.profile__status {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  line-height: 1.5;
+  margin-bottom: 12px;
 }
 
 .profile__deconnect-label {
