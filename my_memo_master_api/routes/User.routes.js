@@ -1,10 +1,11 @@
 const express = require('express')
 const user = require('../controllers/User.controller.js')
+const userData = require('../controllers/UserData.controller.js')
 const authMiddleware = require('../middlewares/Auth.middleware.js')
 const requireRole = require('../middlewares/requireRole.middleware')
 const validate = require('../middlewares/validate.middleware.js')
 const userValidators = require('../validators/User.validators.js')
-const { authLimiter, registerLimiter } = require('../middlewares/rateLimit.middleware.js')
+const { authLimiter, registerLimiter, dataTransferLimiter } = require('../middlewares/rateLimit.middleware.js')
 
 const router = express.Router()
 
@@ -410,6 +411,70 @@ router.get('/', authMiddleware, requireRole(1), user.search)
  */
 // Déclarée avant PUT /:id, sinon « two-factor » serait pris pour un identifiant
 router.put('/two-factor', authMiddleware, userValidators.setTwoFactor, validate, user.setTwoFactor)
+
+/**
+ * @swagger
+ * /users/me/export:
+ *   get:
+ *     summary: Exporter toutes mes données (JSON)
+ *     description: Profil, systèmes Leitner (boîtes, cartes, réponses), cartes mentales, exercices et activité. Aucun secret n'est inclus.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Fichier JSON à télécharger.
+ *       404:
+ *         description: Utilisateur introuvable.
+ *       429:
+ *         description: Trop d'exports demandés.
+ *       500:
+ *         description: Erreur serveur.
+ */
+// Déclarées avant GET /:id, sinon « me » serait pris pour un identifiant
+router.get('/me/export', authMiddleware, dataTransferLimiter, userData.exportMyData)
+
+/**
+ * @swagger
+ * /users/me/import:
+ *   post:
+ *     summary: Importer un export MyMemoMaster
+ *     description: Crée de nouveaux systèmes Leitner et cartes mentales dans mon compte. Rien n'est écrasé ; le profil n'est jamais modifié.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               format:
+ *                 type: string
+ *                 example: mymemomaster-export
+ *               version:
+ *                 type: integer
+ *                 example: 1
+ *               leitnerSystems:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *               mindMaps:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       201:
+ *         description: Import terminé (bilan des éléments créés et ignorés).
+ *       400:
+ *         description: Fichier invalide.
+ *       429:
+ *         description: Trop d'imports demandés.
+ *       500:
+ *         description: Erreur serveur.
+ */
+router.post('/me/import', authMiddleware, dataTransferLimiter, userValidators.importData, validate, userData.importMyData)
 
 /**
  * @swagger

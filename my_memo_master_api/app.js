@@ -134,6 +134,8 @@ app.use(
 // lib/types/json.js) : ce middleware scopé au préfixe /api/v1/diagrammes "gagne" donc pour ces
 // routes, et le plafond global 10kb continue de s'appliquer inchangé à tout le reste de l'API.
 app.use('/api/v1/diagrammes', bodyParser.json({ limit: '100mb' }))
+// Import de données personnelles : fichier d'export complet (voir UserDataExport.service.js)
+app.use('/api/v1/users/me/import', bodyParser.json({ limit: '10mb' }))
 app.use(bodyParser.json({ limit: '10kb' }))
 
 // Sanitize HTML tags from all body string fields

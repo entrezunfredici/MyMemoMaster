@@ -82,3 +82,10 @@ exports.refreshToken = [
 ]
 
 exports.resendVerification = [emailRules]
+
+// Validation de l'enveloppe uniquement ; le contenu est contrôlé en détail par
+// UserDataExport.service.js#validateImportPayload (limites, types, tailles)
+exports.importData = [
+  body('format').equals('mymemomaster-export').withMessage("Ce fichier n'est pas un export MyMemoMaster"),
+  body('version').isInt({ min: 1 }).withMessage("Version d'export invalide")
+]

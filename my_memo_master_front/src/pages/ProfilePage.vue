@@ -118,6 +118,35 @@
       </form>
     </div>
 
+    <!-- Export / import des données -->
+    <div class="profile__card" data-testid="data-transfer-card">
+      <h2 class="profile__title">Mes données</h2>
+      <p class="profile__hint">
+        Téléchargez une copie de vos données (profil, flashcards, cartes mentales, exercices et activité) dans un
+        fichier JSON, ou importez un export précédent. L'import ajoute de nouveaux contenus : il n'écrase rien et ne
+        modifie ni votre profil ni votre mot de passe.
+      </p>
+      <button class="profile__btn" :disabled="exportingData" @click="exportData">
+        {{ exportingData ? 'Export en cours...' : 'Exporter mes données' }}
+      </button>
+      <div class="profile__form">
+        <div class="profile__field">
+          <label for="import-file">Fichier d'export à importer (.json)</label>
+          <input id="import-file" ref="importInput" type="file" accept="application/json,.json" />
+        </div>
+        <button class="profile__btn" :disabled="importingData" @click="importData">
+          {{ importingData ? 'Import en cours...' : 'Importer' }}
+        </button>
+        <p v-if="importSummary" class="profile__status" role="status" data-testid="import-summary">
+          {{ importSummary.systems }} système(s), {{ importSummary.cards }} carte(s) et
+          {{ importSummary.mindMaps }} carte(s) mentale(s) importé(s).
+        </p>
+        <ul v-if="importSummary?.skipped?.length" class="profile__hint">
+          <li v-for="item in importSummary.skipped" :key="item">{{ item }}</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- Déconnexion -->
     <div class="profile__card profile__card--row">
       <div>
@@ -162,6 +191,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { missingsElementsPassword } from '@/helpers/functions'
+import { notif } from '@/helpers/notif.js'
 
 const authStore = useAuthStore()
 
@@ -185,6 +215,11 @@ const passwordError = ref('')
 const twoFactorPassword = ref('')
 const savingTwoFactor = ref(false)
 const twoFactorEnabled = computed(() => Boolean(authStore.user?.twoFactorEnabled))
+
+const exportingData = ref(false)
+const importingData = ref(false)
+const importInput = ref(null)
+const importSummary = ref(null)
 
 const deleteConfirm = ref('')
 const deletingAccount = ref(false)
@@ -223,6 +258,27 @@ async function changePassword() {
   savingPassword.value = false
 
   if (ok) security.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+}
+
+async function exportData() {
+  exportingData.value = true
+  await authStore.exportMyData()
+  exportingData.value = false
+}
+
+async function importData() {
+  const file = importInput.value?.files?.[0]
+  if (!file) {
+    notif.notify('Choisissez un fichier à importer.', 'error')
+    return
+  }
+  importingData.value = true
+  const summary = await authStore.importMyData(file)
+  importingData.value = false
+  if (summary) {
+    importSummary.value = summary
+    importInput.value.value = ''
+  }
 }
 
 async function toggleTwoFactor() {

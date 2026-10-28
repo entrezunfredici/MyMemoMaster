@@ -118,4 +118,21 @@ const aiGenerationLimiter = rateLimit({
   legacyHeaders: false
 })
 
-module.exports = { authLimiter, registerLimiter, apiLimiter, aiGenerationLimiter }
+/**
+ * Limiteur dédié à l'export/import de données personnelles (GET/POST /users/me/export|import) :
+ * ces routes lisent ou écrivent des milliers de lignes par requête. Par userId, 5 par heure.
+ * Configurable via DATA_TRANSFER_RATE_MAX et DATA_TRANSFER_RATE_WINDOW_MS.
+ *
+ * @type {import("express-rate-limit").RateLimitRequestHandler}
+ */
+const dataTransferLimiter = rateLimit({
+  windowMs: parseInt(process.env.DATA_TRANSFER_RATE_WINDOW_MS, 10) || 60 * 60 * 1000,
+  max: parseInt(process.env.DATA_TRANSFER_RATE_MAX, 10) || 5,
+  keyGenerator: userKeyFromJwt,
+  skip: skipRateLimit,
+  message: { message: "Trop d'exports ou d'imports demandés, réessayez plus tard." },
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+module.exports = { authLimiter, registerLimiter, apiLimiter, aiGenerationLimiter, dataTransferLimiter }

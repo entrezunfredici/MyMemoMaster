@@ -225,6 +225,52 @@ export const useAuthStore = defineStore('auth', {
       return true
     },
 
+    /**
+     * Télécharge toutes les données de l'utilisateur dans un fichier JSON.
+     *
+     * @returns {Promise<boolean>} true si le fichier a été généré
+     */
+    async exportMyData() {
+      const resp = await api.getBlob('users/me/export')
+      if (!resp || resp.status !== 200) {
+        notif.notify("Erreur lors de l'export des données.", 'error')
+        return false
+      }
+      const url = URL.createObjectURL(resp.data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `mymemomaster-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      notif.notify('Export téléchargé.', 'success')
+      return true
+    },
+
+    /**
+     * Importe un fichier d'export MyMemoMaster dans le compte.
+     *
+     * @param {File} file - Fichier .json produit par exportMyData
+     * @returns {Promise<object|false>} Bilan de l'import, ou false en cas d'échec
+     */
+    async importMyData(file) {
+      let payload
+      try {
+        payload = JSON.parse(await file.text())
+      } catch {
+        notif.notify("Ce fichier n'est pas un JSON valide.", 'error')
+        return false
+      }
+      const resp = await api.post('users/me/import', payload)
+      if (!resp || resp.status !== 201) {
+        notif.notify(extractApiError(resp, "Erreur lors de l'import des données."), 'error')
+        return false
+      }
+      notif.notify(resp.data.message, 'success')
+      return resp.data.data
+    },
+
     async updateUser(notify = false) {
       const name = this.user.name?.trim() || null
 
