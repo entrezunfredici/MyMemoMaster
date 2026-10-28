@@ -87,7 +87,9 @@ services:
 
   traefik:
     profiles: ["dev"]
-    image: traefik:v2.10
+    # v2.11 (>= 2.11.31) négocie la version de l'API Docker : v2.10 parle l'API 1.24 et ne voit plus aucun
+    # conteneur sur un moteur Docker 29+ (minimum 1.40) — plus de routes, donc plus d'accès à l'API/front.
+    image: traefik:v2.11
     ports:
       - "80:80"
       - "8080:8080"
