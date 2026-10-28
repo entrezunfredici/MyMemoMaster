@@ -198,7 +198,7 @@ Règles :
 - **Lecture seule d'abord** : état des lieux (`get`, `logs`, `SELECT`) avant toute écriture ; une modification de donnée ou de secret en prod/préprod exige l'accord explicite de l'utilisateur pour cette modification précise.
 - Ne jamais afficher un mot de passe, un hash, un jeton ou une clé : ne lire que la clé de secret nécessaire (`-o jsonpath='{.data.CLE}'`) et seulement si elle n'est pas sensible (ex. `ADMIN_SEED_EMAIL`).
 - Les erreurs `metrics.k8s.io ... unable to handle the request` de `kubectl` sont sans conséquence (metrics-server) ; filtrer avec `grep -v metrics.k8s.io`.
-- Un changement de schéma (migration Sequelize) doit être joué sur ces bases au déploiement (`k8s/helm-migrate.*`) : sans cela l'API lit des colonnes absentes.
+- Les migrations Sequelize sont jouées **automatiquement** au démarrage de chaque pod de l'API (`my_memo_master_api/entrypoint.sh` : `npx sequelize-cli db:migrate`, puis seeders) : un déploiement les applique, rien à lancer à la main. En prod, `ENVIRONMENT=prod` désactive le `sync` Sequelize (`server.js`) : seules les migrations modifient le schéma. (`k8s/helm-migrate.*` sert uniquement à faire adopter des ressources existantes par Helm, pas à migrer la base.)
 - Mettre ce tableau à jour si le cluster change de nouveau.
 
 ---
