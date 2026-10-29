@@ -132,7 +132,7 @@ class UserDataExportService {
             {
               model: LeitnerCard,
               as: 'leitnerCards',
-              include: [{ model: Question, as: 'question', include: [{ model: Response, as: 'response' }] }]
+              include: [{ model: Question, as: 'question' }]
             }
           ]
         }
@@ -140,8 +140,13 @@ class UserDataExportService {
       order: [['idSystem', 'ASC']]
     })
 
-    return systems.map((raw) => {
-      const system = plain(raw)
+    const plainSystems = systems.map(plain)
+    const questionIds = plainSystems.flatMap((system) =>
+      (system.leitnerBoxes || []).flatMap((box) => (box.leitnerCards || []).map((card) => card.question?.idQuestion))
+    )
+    const responsesByQuestion = await this._loadResponses(questionIds)
+
+    return plainSystems.map((system) => {
       return {
         name: system.name,
         sujet: system.sujet,
@@ -160,10 +165,7 @@ class UserDataExportService {
                     type: card.question.type,
                     content: card.question.content,
                     questionPosition: card.question.questionPosition,
-                    responses: (card.question.response || []).map((r) => ({
-                      content: r.content,
-                      correction: r.correction
-                    }))
+                    responses: responsesByQuestion.get(card.question.idQuestion) || []
                   }
                 : null,
               reviewCount: card.review_count,
@@ -175,6 +177,21 @@ class UserDataExportService {
           }))
       }
     })
+  }
+
+  // CHOIX: requête dédiée sur Response plutôt que l'include `Question.response`
+  // RAISON: cette association est un hasOne (un seul objet) alors qu'une question peut avoir
+  // plusieurs réponses (QCM) : l'include en perdrait et ne renvoie pas un tableau
+  async _loadResponses(questionIds) {
+    const ids = [...new Set(questionIds.filter((id) => id != null))]
+    const byQuestion = new Map()
+    if (!ids.length) return byQuestion
+    const rows = await Response.findAll({ where: { idQuestion: ids }, order: [['idResponse', 'ASC']], raw: true })
+    for (const row of rows) {
+      if (!byQuestion.has(row.idQuestion)) byQuestion.set(row.idQuestion, [])
+      byQuestion.get(row.idQuestion).push({ content: row.content, correction: Boolean(row.correction) })
+    }
+    return byQuestion
   }
 
   async _findMindMaps(userId) {
@@ -202,11 +219,14 @@ class UserDataExportService {
       where: { userId },
       include: [
         { model: Subject, as: 'subject', attributes: ['name'] },
-        { model: Question, as: 'question', include: [{ model: Response, as: 'response' }], through: { attributes: [] } }
+        { model: Question, as: 'question', through: { attributes: [] } }
       ]
     })
-    return tests.map((raw) => {
-      const test = plain(raw)
+    const plainTests = tests.map(plain)
+    const responsesByQuestion = await this._loadResponses(
+      plainTests.flatMap((test) => (test.question || []).map((q) => q.idQuestion))
+    )
+    return plainTests.map((test) => {
       return {
         name: test.name,
         subject: test.subject?.name ?? null,
@@ -215,7 +235,7 @@ class UserDataExportService {
           statement: q.statement,
           type: q.type,
           content: q.content,
-          responses: (q.response || []).map((r) => ({ content: r.content, correction: r.correction }))
+          responses: responsesByQuestion.get(q.idQuestion) || []
         }))
       }
     })

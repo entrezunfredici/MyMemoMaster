@@ -7,7 +7,7 @@ jest.mock('../../models/index', () => ({
   LeitnerCard: { create: jest.fn() },
   CardSystem: { create: jest.fn() },
   Question: { create: jest.fn(), findAll: jest.fn() },
-  Response: { bulkCreate: jest.fn() },
+  Response: { bulkCreate: jest.fn(), findAll: jest.fn() },
   Diagramme: { findAll: jest.fn(), create: jest.fn() },
   Test: { findAll: jest.fn() },
   TestResult: { findAll: jest.fn() },
@@ -146,6 +146,40 @@ describe('UserDataExportService', () => {
       expect(data).toMatchObject({ format: 'mymemomaster-export', version: 1, profile: { userId: 1 } })
       expect(data.profile.password).toBeUndefined()
       expect(models.User.findByPk.mock.calls[0][1].attributes).not.toContain('password')
+    })
+
+    it('exportUserData - question à plusieurs réponses - exporte toutes les réponses', async () => {
+      models.User.findByPk.mockResolvedValue({ get: () => ({ userId: 1 }) })
+      // Question.response est un hasOne : l'include ne fournit jamais de tableau
+      const card = { question: { idQuestion: 5, statement: 'Q ?', type: 'mcq', content: null, questionPosition: 1 } }
+      models.LeitnerSystem.findAll.mockResolvedValue([
+        {
+          get: () => ({
+            name: 'Géo',
+            sujet: null,
+            subject: { name: 'Géographie' },
+            tags: [],
+            leitnerBoxes: [{ level: 1, intervall: 86400, color: 1, leitnerCards: [card] }]
+          })
+        }
+      ])
+      models.Response.findAll.mockResolvedValue([
+        { idQuestion: 5, content: 'A', correction: true },
+        { idQuestion: 5, content: 'B', correction: false }
+      ])
+      models.Diagramme.findAll.mockResolvedValue([])
+      models.Test.findAll.mockResolvedValue([])
+      for (const m of ['TestResult', 'LeitnerReviewSession', 'RevisionSession', 'Reminder', 'ClassGroupUsers']) {
+        models[m].findAll.mockResolvedValue([])
+      }
+
+      const data = await service.exportUserData(1)
+
+      expect(data.leitnerSystems[0].boxes[0].cards[0].question.responses).toEqual([
+        { content: 'A', correction: true },
+        { content: 'B', correction: false }
+      ])
+      expect(models.Response.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { idQuestion: [5] } }))
     })
   })
 })
