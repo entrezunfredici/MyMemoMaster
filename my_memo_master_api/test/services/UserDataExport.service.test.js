@@ -5,7 +5,6 @@ jest.mock('../../models/index', () => ({
   LeitnerSystem: { findAll: jest.fn(), create: jest.fn() },
   LeitnerBox: { create: jest.fn() },
   LeitnerCard: { create: jest.fn() },
-  CardSystem: { create: jest.fn() },
   Question: { create: jest.fn(), findAll: jest.fn() },
   Response: { bulkCreate: jest.fn(), findAll: jest.fn() },
   Diagramme: { findAll: jest.fn(), create: jest.fn() },

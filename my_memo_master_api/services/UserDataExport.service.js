@@ -6,7 +6,6 @@ const {
   LeitnerSystem,
   LeitnerBox,
   LeitnerCard,
-  CardSystem,
   Question,
   Response,
   Diagramme,
@@ -409,11 +408,14 @@ class UserDataExportService {
                 { transaction: t }
               )
             }
-            const leitnerCard = await LeitnerCard.create(
+            // CHOIX: pas d'écriture dans la table de jointure `cardSystems`
+            // RAISON: LeitnerCard.service#create ne l'alimente pas non plus (la carte appartient au
+            // système via sa boîte) ; son schéma diffère selon les bases (createdAt/updatedAt NOT NULL
+            // en dev issu de `sync`, absents des migrations) et l'insertion y échouait en 500
+            await LeitnerCard.create(
               { idQuestion: question.idQuestion, idBox: boxesByLevel.get(box.level).idBox },
               { transaction: t }
             )
-            await CardSystem.create({ idCard: leitnerCard.idCard, idSystem: system.idSystem }, { transaction: t })
             cardCount += 1
           }
         }
