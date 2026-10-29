@@ -48,7 +48,13 @@ describe('useAuthStore — export / import des données', () => {
 
   describe('importMyData', () => {
     it('201 - envoie le contenu du fichier et retourne le bilan', async () => {
-      const summary = { systems: 1, cards: 2, mindMaps: 0, skipped: [] }
+      const summary = {
+        created: { systems: 1, mindMaps: 0 },
+        merged: { systems: 0, mindMaps: 0 },
+        unchanged: { systems: 0, mindMaps: 0 },
+        added: { cards: 2, responses: 0, tags: 0, nodes: 0, links: 0, zones: 0 },
+        skipped: [],
+      }
       mockPost.mockResolvedValueOnce({ status: 201, data: { message: 'Import terminé avec succès.', data: summary } })
 
       const result = await useAuthStore().importMyData(makeFile('{"format":"mymemomaster-export","version":1}'))

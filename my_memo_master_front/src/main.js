@@ -17,6 +17,7 @@ import './tailwind.css'
 
 import App from './App.vue'
 import router from './router'
+import { useAuthStore } from './stores/auth'
 
 const app = createApp(App)
 
@@ -28,3 +29,6 @@ app.use(router)
 app.use(Toast)
 
 app.mount('#app')
+
+// Contrôle de session en arrière-plan : ne bloque pas l'affichage
+useAuthStore().checkSession()

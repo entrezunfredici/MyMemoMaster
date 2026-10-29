@@ -81,6 +81,43 @@ export const useAuthStore = defineStore('auth', {
       return true
     },
 
+    // CHOIX: contrôle de session au démarrage — la session persistée (token + authenticated) est
+    // revérifiée auprès de l'API, car le guard du router ne regarde que ces valeurs locales.
+    // RAISON: après une base recréée ou un compte supprimé, le JWT reste valide jusqu'à son expiration
+    // et l'utilisateur voyait un profil vide. Une coupure réseau ne déconnecte pas (session conservée).
+    /**
+     * Vérifie que la session persistée correspond à un compte existant ; sinon déconnecte.
+     *
+     * @returns {Promise<boolean>} true si la session est valide (ou invérifiable car hors-ligne), false si elle a été fermée
+     */
+    async checkSession() {
+      if (!this.authenticated && !this.token) return false
+
+      const userId = this.user?.userId ?? decodeJwtPayload(this.token)?.id
+      if (!this.token || !userId) {
+        this.logout(false)
+        return false
+      }
+
+      const resp = await api.get(`users/${userId}`)
+
+      // 401 : api.js a déjà fermé la session. Sinon undefined = API injoignable, on garde la session.
+      if (!resp) return this.authenticated
+
+      if (resp.status === 200) {
+        this.user = resp.data
+        return true
+      }
+
+      if ([403, 404].includes(resp.status)) {
+        this.logout(false)
+        notif.notify('Votre session n’est plus valide, veuillez vous reconnecter.', 'info')
+        return false
+      }
+
+      return true
+    },
+
     async updateUserInfos() {
       const { name, email } = this.user
       const resp = await api.put(`users/${this.user.userId}`, { name, email })

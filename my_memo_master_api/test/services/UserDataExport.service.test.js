@@ -6,7 +6,7 @@ jest.mock('../../models/index', () => ({
   LeitnerBox: { create: jest.fn() },
   LeitnerCard: { create: jest.fn() },
   Question: { create: jest.fn(), findAll: jest.fn() },
-  Response: { bulkCreate: jest.fn(), findAll: jest.fn() },
+  Response: { bulkCreate: jest.fn(), findAll: jest.fn(), create: jest.fn() },
   Diagramme: { findAll: jest.fn(), create: jest.fn() },
   Test: { findAll: jest.fn() },
   TestResult: { findAll: jest.fn() },
@@ -83,18 +83,41 @@ describe('UserDataExportService', () => {
       t = { commit: jest.fn(), rollback: jest.fn() }
       models.instance.transaction.mockResolvedValue(t)
       models.Subject.findOne.mockResolvedValue({ subjectId: 3 })
-      models.Tag.findOrCreate.mockResolvedValue([{ tagId: 1 }])
-      models.LeitnerSystem.create.mockResolvedValue({ idSystem: 10, setTags: jest.fn() })
+      models.Tag.findOrCreate.mockResolvedValue([{ tagId: 1, name: 'europe' }])
+      models.LeitnerSystem.findAll.mockResolvedValue([])
+      models.Diagramme.findAll.mockResolvedValue([])
+      models.Response.findAll.mockResolvedValue([])
+      models.LeitnerSystem.create.mockResolvedValue({ idSystem: 10, addTags: jest.fn() })
       models.LeitnerBox.create.mockResolvedValue({ idBox: 20 })
       models.Question.create.mockResolvedValue({ idQuestion: 30 })
       models.LeitnerCard.create.mockResolvedValue({ idCard: 40 })
-      models.Diagramme.create.mockResolvedValue({ setTags: jest.fn() })
+      models.Diagramme.create.mockResolvedValue({ addTags: jest.fn() })
     })
 
-    it('importUserData - export valide - crée le contenu pour l’utilisateur et commit', async () => {
-      const summary = await service.importUserData(7, validPayload())
+    // Système déjà présent, avec la question de validPayload() et sa réponse « Paris »
+    const existingSystem = () => ({
+      addTags: jest.fn(),
+      get: () => ({
+        idSystem: 10,
+        name: ' géo ',
+        subjectId: 3,
+        tags: [{ name: 'EUROPE' }],
+        leitnerBoxes: [
+          {
+            level: 1,
+            idBox: 20,
+            leitnerCards: [{ question: { idQuestion: 30, statement: 'capitale de la  france ?', type: 'open' } }]
+          }
+        ]
+      })
+    })
 
-      expect(summary).toEqual({ systems: 1, cards: 1, mindMaps: 1, skipped: [] })
+    it('importUserData - contenu inconnu - crée tout pour l’utilisateur et commit', async () => {
+      const report = await service.importUserData(7, validPayload())
+
+      expect(report.created).toEqual({ systems: 1, mindMaps: 1 })
+      expect(report.merged).toEqual({ systems: 0, mindMaps: 0 })
+      expect(report.added).toMatchObject({ cards: 1, responses: 0, tags: 1 })
       expect(models.LeitnerSystem.create).toHaveBeenCalledWith(
         expect.objectContaining({ idUser: 7, subjectId: 3 }),
         { transaction: t }
@@ -103,13 +126,97 @@ describe('UserDataExportService', () => {
       expect(t.commit).toHaveBeenCalled()
     })
 
+    it('importUserData - système strictement identique - ne crée ni ne modifie rien', async () => {
+      const system = existingSystem()
+      models.LeitnerSystem.findAll.mockResolvedValue([system])
+      models.Response.findAll.mockResolvedValue([{ idQuestion: 30, content: 'paris', correction: true }])
+
+      const report = await service.importUserData(7, validPayload())
+
+      expect(report.unchanged.systems).toBe(1)
+      expect(report.created.systems).toBe(0)
+      expect(report.merged.systems).toBe(0)
+      expect(models.LeitnerSystem.create).not.toHaveBeenCalled()
+      expect(models.Question.create).not.toHaveBeenCalled()
+      expect(models.Response.create).not.toHaveBeenCalled()
+      expect(system.addTags).not.toHaveBeenCalled()
+    })
+
+    it('importUserData - système existant avec réponse et carte en plus - les ajoute à l’existant', async () => {
+      const system = existingSystem()
+      models.LeitnerSystem.findAll.mockResolvedValue([system])
+      models.Response.findAll.mockResolvedValue([{ idQuestion: 30, content: 'Lyon', correction: false }])
+      const payload = validPayload()
+      payload.leitnerSystems[0].boxes[0].cards.push({ question: { statement: 'Fleuve ?', type: 'open', responses: [] } })
+      payload.leitnerSystems[0].tags = [{ name: 'europe' }, { name: 'nouveau' }]
+      models.Tag.findOrCreate.mockResolvedValueOnce([{ name: 'europe' }]).mockResolvedValueOnce([{ name: 'nouveau' }])
+
+      const report = await service.importUserData(7, payload)
+
+      expect(report.merged.systems).toBe(1)
+      expect(report.added).toMatchObject({ cards: 1, responses: 1, tags: 1 })
+      expect(models.Response.create).toHaveBeenCalledWith(
+        { content: 'Paris', correction: true, idQuestion: 30 },
+        { transaction: t }
+      )
+      expect(models.LeitnerSystem.create).not.toHaveBeenCalled()
+      expect(models.LeitnerCard.create).toHaveBeenCalledWith({ idQuestion: 30, idBox: 20 }, { transaction: t })
+      expect(system.addTags).toHaveBeenCalledWith([{ name: 'nouveau' }], { transaction: t })
+    })
+
+    it('importUserData - même carte deux fois dans le fichier - ne la crée qu’une fois', async () => {
+      const payload = validPayload()
+      payload.leitnerSystems[0].boxes[0].cards.push({
+        question: { statement: ' CAPITALE DE LA FRANCE ? ', type: 'open', responses: [] }
+      })
+
+      const report = await service.importUserData(7, payload)
+
+      expect(report.added.cards).toBe(1)
+      expect(models.Question.create).toHaveBeenCalledTimes(1)
+    })
+
     it('importUserData - matière introuvable - ignore la carte mentale et le signale', async () => {
       models.Subject.findOne.mockResolvedValue(null)
-      const summary = await service.importUserData(7, validPayload())
+      const report = await service.importUserData(7, validPayload())
 
-      expect(summary.mindMaps).toBe(0)
-      expect(summary.skipped).toHaveLength(1)
+      expect(report.created.mindMaps).toBe(0)
+      expect(report.skipped).toHaveLength(1)
       expect(models.Diagramme.create).not.toHaveBeenCalled()
+    })
+
+    it('importUserData - carte mentale existante avec un nœud en plus - l’ajoute sans toucher aux autres', async () => {
+      const update = jest.fn()
+      const base = { id: 'm1', subjectNodeId: 'r', nodes: { r: { id: 'r', label: 'Racine' } }, links: [], zones: [] }
+      models.Diagramme.findAll.mockResolvedValue([
+        { update, addTags: jest.fn(), get: () => ({ mmName: 'carte', subjectId: 3, mindMapJson: base, tags: [] }) }
+      ])
+      const payload = validPayload()
+      payload.mindMaps[0].name = 'Carte'
+      payload.mindMaps[0].mindMapJson = {
+        ...base,
+        nodes: { r: { id: 'r', label: 'MODIFIÉ' }, a: { id: 'a', label: 'A' } }
+      }
+
+      const report = await service.importUserData(7, payload)
+
+      expect(report.merged.mindMaps).toBe(1)
+      expect(report.added.nodes).toBe(1)
+      expect(models.Diagramme.create).not.toHaveBeenCalled()
+      const saved = update.mock.calls[0][0].mindMapJson
+      expect(saved.nodes.r.label).toBe('Racine')
+      expect(saved.nodes.a).toEqual({ id: 'a', label: 'A' })
+    })
+
+    it('importUserData - carte mentale homonyme sans origine commune - la crée à part', async () => {
+      const base = { id: 'm1', subjectNodeId: 'r', nodes: {}, links: [], zones: [] }
+      models.Diagramme.findAll.mockResolvedValue([
+        { update: jest.fn(), addTags: jest.fn(), get: () => ({ mmName: 'Carte', subjectId: 3, mindMapJson: base, tags: [] }) }
+      ])
+
+      const report = await service.importUserData(7, validPayload())
+
+      expect(report.created.mindMaps).toBe(1)
     })
 
     it('importUserData - fichier invalide - ne démarre aucune transaction', async () => {

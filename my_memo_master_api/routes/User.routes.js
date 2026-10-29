@@ -439,7 +439,7 @@ router.get('/me/export', authMiddleware, dataTransferLimiter, userData.exportMyD
  * /users/me/import:
  *   post:
  *     summary: Importer un export MyMemoMaster
- *     description: Crée de nouveaux systèmes Leitner et cartes mentales dans mon compte. Rien n'est écrasé ; le profil n'est jamais modifié.
+ *     description: Fusionne les systèmes Leitner et cartes mentales du fichier avec ceux de mon compte (identique = inchangé, éléments manquants = ajoutés, inconnu = créé). Rien n'est écrasé ni supprimé ; le profil n'est jamais modifié.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -466,7 +466,7 @@ router.get('/me/export', authMiddleware, dataTransferLimiter, userData.exportMyD
  *                   type: object
  *     responses:
  *       201:
- *         description: Import terminé (bilan des éléments créés et ignorés).
+ *         description: Import terminé (bilan des éléments créés, fusionnés, inchangés et ignorés).
  *       400:
  *         description: Fichier invalide.
  *       429:

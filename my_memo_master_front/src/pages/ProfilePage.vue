@@ -123,7 +123,8 @@
       <h2 class="profile__title">Mes données</h2>
       <p class="profile__hint">
         Téléchargez une copie de vos données (profil, flashcards, cartes mentales, exercices et activité) dans un
-        fichier JSON, ou importez un export précédent. L'import ajoute de nouveaux contenus : il n'écrase rien et ne
+        fichier JSON, ou importez un export précédent. L'import fusionne avec vos contenus : ce qui existe déjà à
+        l'identique est laissé tel quel, les éléments manquants sont ajoutés, et rien n'est écrasé ni supprimé. Il ne
         modifie ni votre profil ni votre mot de passe.
       </p>
       <button class="profile__btn" :disabled="exportingData" @click="exportData">
@@ -138,8 +139,7 @@
           {{ importingData ? 'Import en cours...' : 'Importer' }}
         </button>
         <p v-if="importSummary" class="profile__status" role="status" data-testid="import-summary">
-          {{ importSummary.systems }} système(s), {{ importSummary.cards }} carte(s) et
-          {{ importSummary.mindMaps }} carte(s) mentale(s) importé(s).
+          {{ importSummaryText }}
         </p>
         <ul v-if="importSummary?.skipped?.length" class="profile__hint">
           <li v-for="item in importSummary.skipped" :key="item">{{ item }}</li>
@@ -220,6 +220,31 @@ const exportingData = ref(false)
 const importingData = ref(false)
 const importInput = ref(null)
 const importSummary = ref(null)
+
+// Bilan de la fusion : ce qui a été créé, complété (fusionné) ou laissé tel quel (identique)
+const importSummaryText = computed(() => {
+  const s = importSummary.value
+  if (!s) return ''
+  const count = (key) => (s.created?.[key] ?? 0) + (s.merged?.[key] ?? 0) + (s.unchanged?.[key] ?? 0)
+  const parts = [
+    `${count('systems')} système(s) et ${count('mindMaps')} carte(s) mentale(s) analysé(s) :`,
+    `${s.created.systems + s.created.mindMaps} créé(s),`,
+    `${s.merged.systems + s.merged.mindMaps} complété(s),`,
+    `${s.unchanged.systems + s.unchanged.mindMaps} déjà identique(s) (laissé(s) tel(s) quel(s)).`,
+  ]
+  const added = [
+    [s.added.cards, 'carte(s)'],
+    [s.added.responses, 'réponse(s)'],
+    [s.added.tags, 'tag(s)'],
+    [s.added.nodes, 'nœud(s)'],
+    [s.added.links, 'branche(s)'],
+    [s.added.zones, 'zone(s)'],
+  ]
+    .filter(([n]) => n > 0)
+    .map(([n, label]) => `${n} ${label}`)
+  if (added.length) parts.push(`Ajouté : ${added.join(', ')}.`)
+  return parts.join(' ')
+})
 
 const deleteConfirm = ref('')
 const deletingAccount = ref(false)
