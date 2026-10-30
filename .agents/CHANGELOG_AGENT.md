@@ -20,6 +20,7 @@
 
 | Module | État | Dernière modif |
 |--------|------|----------------|
+| Publication Android (Play Console) | Premier `app-release.aab` signé produit le 2026-10-30 (test interne) — procédure dans l'entrée du 2026-10-30 ; clé de signature hors dépôt | 2026-10-30 |
 | Auth (register, login, reset password) | Stable — 2026-07-06 : migration validEmailCodeExpiresAt (bug prod), doublon email → 400, caractère spécial exigé, 403 loggués ; [ADD] 2026-08-15 : révocation JWT (A07-M1, `helpers/tokenBlacklist.js`), `verifyRefreshToken` rejette un compte désactivé ; [FIX] 2026-08-27 : `APP_FRONT_URL` (lien de vérification email) n'était transmise à aucun conteneur API — ajoutée à docker-compose.yml (`api`, `api_server`) et au `.env` ; hors Docker les liens partaient vers `http://localhost` ; [FIX] 2026-08-28 : un mail envoyé **depuis la prod** contenait encore `http://localhost` — `helpers/frontUrl.js` (chaîne de repli `APP_FRONT_URL` → `VITE_FRONT_URL` → `CORS_ORIGIN`, log d'erreur en production, plus jamais de localhost silencieux) remplace les 4 `process.env.APP_FRONT_URL \|\| 'http://localhost'` dupliqués ; [ADD] 2026-10-28 : double authentification par code email (optionnelle, obligatoire pour les rôles 1 et 4) ; [IMP] 2026-10-28 : activée par défaut pour tous, `TWO_FACTOR_DISABLED` pour la CI — voir entrées dédiées | 2026-10-28 |
 | User (CRUD, profil) | Stable — limite d'inscriptions configurable (MAX_USERS), GET /users/registration-status, front redirige vers /registration-full si complet ; [FIX] 2026-08-15 : MAX_USERS n'était transmis à aucun conteneur Docker ni à la ConfigMap Helm — ajoutée à docker-compose.yml (api, api_server) et helm/values.yaml ; [FIX] 2026-08-15 : `isRegistrationOpen` ne compte plus que les comptes actifs (désactiver un compte libère une place) ; [FIX] 2026-08-15 : `_processPendingEmailInvitations` transactionnel + révoque l'ancien gérant (garde-fous d'`assignAdmin` répliqués) ; [ADD] 2026-10-28 : export/import manuel des données personnelles (`GET /users/me/export`, `POST /users/me/import`, carte « Mes données » du profil) | 2026-10-28 |
 | Role | Stable — M-05.01 : requireRole(1) sur POST/PUT/DELETE, 5 rôles définis (seeders) | 2026-06-14 |
@@ -13616,3 +13617,25 @@ ho »). Le cas « m relié mais non reconnu » vient d'un titre « m » avec sym
 **Hypothèses** : le contrôle n'a lieu qu'au chargement de l'application, pas à chaque navigation (pas d'appel API supplémentaire par page).
 **Dette** : le guard du router reste purement local ; pendant la requête de contrôle (quelques ms) les pages privées s'affichent brièvement avec le profil persisté.
 **Tests** : front — 4 fichiers `auth.*` / 41 tests verts, ESLint propre.
+
+## [2026-10-30] [ADD] Procédure de publication Android (App Bundle pour la Play Console)
+
+**Contexte** : premier envoi vers Google Play (release de **tests internes**). Aucun code applicatif modifié : seuls des fichiers locaux non versionnés ont été créés. Capacitor 8 (`com.mymemomaster.app`), signature de release déjà branchée dans `android/app/build.gradle` (lit `android/keystore.properties`).
+**Fichiers créés (hors dépôt / ignorés par git)** : `C:\Users\supoe\mymemomaster-keys\mymemomaster-release.jks` (clé de signature, alias `mymemomaster`, RSA 2048, 10 000 jours, `CN=MyMemoMaster, C=FR`) et `keystore.properties.backup` (copie des identifiants) ; `my_memo_master_front/android/keystore.properties` ; `my_memo_master_front/android/local.properties` (`sdk.dir`, absent sur cette machine, `ANDROID_HOME` non défini).
+**Utilisable** : `app-release.aab` (≈ 17,5 Mo, signé) dans `my_memo_master_front/android/app/build/outputs/bundle/release/`. Procédure de rebuild :
+1. `cd my_memo_master_front && npm run build:mobile:prod` (`vite build --mode mobile` + `cap sync android`) ;
+2. **incrémenter `versionCode`** dans `android/app/build.gradle` (strictement croissant à chaque envoi, actuellement `1`) et ajuster `versionName` ;
+3. `cd android && ./gradlew bundleRelease` ;
+4. Play Console > Tests et publication > Tests internes > Créer une release > importer le `.aab`.
+Sans `keystore.properties`, Gradle produit un bundle **non signé** que la console refuse. Si `SDK location not found` : créer `android/local.properties` avec `sdk.dir=C\:/Users/<user>/AppData/Local/Android/Sdk`. `cap sync` a aussi modifié `android/app/capacitor.build.gradle` et `android/capacitor.settings.gradle` (régénérés, à relire avant de committer).
+**Hypothèses** : mots de passe keystore/clé identiques et générés aléatoirement (20 caractères) ; Play App Signing à activer dans la console (la clé locale devient une clé d'upload réinitialisable).
+**Dette** : (1) la clé et son mot de passe sont stockés ensemble en clair sur ce poste — à copier dans un gestionnaire de mots de passe / stockage chiffré ; (2) `minifyEnabled false` (bundle plus gros, pas d'obfuscation) ; (3) `targetSdk` non revérifié par rapport à l'exigence Google en vigueur ; (4) comptes développeur personnels récents : test fermé (12 testeurs / 14 jours) requis avant la production ; (5) politique de confidentialité, section « Sécurité des données » et captures d'écran à fournir pour la fiche.
+
+## [2026-10-30] [IMP] Renommage du package Android : `com.mymemomaster.app` -> `com.vocklor.mymemomaster`
+
+**Contexte** : demande de l'utilisateur, avant toute publication (rien n'avait été importé dans la Play Console avec l'ancien identifiant, donc renommage sans conséquence).
+**Fichiers modifiés** : `my_memo_master_front/capacitor.config.json` (`appId`), `android/app/build.gradle` (`namespace`, `applicationId`), `android/app/src/main/res/values/strings.xml` (`package_name`, `custom_url_scheme`), `MainActivity.java` déplacé vers `java/com/vocklor/mymemomaster/` (déclaration `package` mise à jour, ancien dossier supprimé), `docs/MOBILE_ANDROID.md`, `docs/mobile/FICHE_STORE.md`.
+**Utilisable** : `app-release.aab` reconstruit (23:29) avec le nouvel identifiant, signé par la même clé. Les anciennes mentions de `com.mymemomaster.app` plus haut dans ce journal sont historiques.
+**Hypothèses** : l'identifiant est **définitif** dès la création de l'app dans la Play Console ; aucun `assetlinks.json`, deep link ni service tiers (Firebase, OAuth Android) ne référençait l'ancien nom (recherche faite dans tout le dépôt).
+**Dette** : tout service ajouté plus tard (Firebase, connexion Google…) devra être déclaré avec `com.vocklor.mymemomaster`.
+

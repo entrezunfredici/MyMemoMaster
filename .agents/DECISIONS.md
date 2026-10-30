@@ -5335,3 +5335,16 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `authStore.checkSession()` est appelée une fois dans `main.js` après le montage ; elle charge `users/:id` et déconnecte sur 403/404. Les cas indéterminés (API injoignable, 5xx) conservent la session.
 **Alternative écartée** : vérification dans le guard à chaque navigation (un appel API par page, et bloque la navigation hors-ligne) ; attendre la vérification avant de monter l'app (écran blanc tant que l'API répond) ; décoder l'expiration du JWT seule (ne détecte pas un compte supprimé).
 **Conséquences** : un compte supprimé est détecté au plus tard au rechargement suivant ; hors-ligne, l'utilisateur garde l'accès aux données déjà persistées.
+
+## 2026-10-30 — Signature Android : clé hors dépôt, identifiants dans `keystore.properties` non versionné
+**Contexte** : première publication sur la Play Console ; un `.aab` doit être signé, et la clé ne doit jamais entrer dans git (la perdre bloque toute mise à jour).
+**Décision** : le `.jks` vit hors du dépôt (`C:\Users\supoe\mymemomaster-keys\`) ; `android/app/build.gradle` lit `android/keystore.properties` (ignoré par git, modèle `keystore.properties.example`). Mots de passe aléatoires, identité `CN=MyMemoMaster, C=FR` (non affichée aux utilisateurs). Play App Signing recommandé : la clé locale n'est qu'une clé d'upload.
+**Alternative écartée** : keystore dans le dépôt ou mots de passe en variables versionnées (fuite de la clé) ; signature uniquement via Android Studio (non reproductible en ligne de commande / CI).
+**Conséquences** : tout poste qui build une release doit disposer du `.jks` et de `keystore.properties` ; `local.properties` (`sdk.dir`) est propre à chaque poste ; sans clé sauvegardée ailleurs, la perte de ce poste oblige à demander une réinitialisation de la clé d'upload à Google.
+
+## 2026-10-30 — Identifiant d'application Android : `com.vocklor.mymemomaster`
+**Contexte** : l'identifiant initial `com.mymemomaster.app` (généré par `cap add android`) ne correspondait pas au domaine/marque de l'éditeur ; il devient immuable dès la première création dans la Play Console.
+**Décision** : `com.vocklor.mymemomaster` partout (Capacitor `appId`, Gradle `namespace` et `applicationId`, `strings.xml`, package Java de `MainActivity`).
+**Alternative écartée** : garder l'identifiant généré (impossible à changer après publication).
+**Conséquences** : ne plus jamais le modifier une fois l'app créée en console ; `namespace` et `applicationId` restent identiques.
+

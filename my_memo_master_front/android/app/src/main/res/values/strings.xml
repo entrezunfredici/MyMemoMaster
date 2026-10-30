@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">MyMemoMaster</string>
     <string name="title_activity_main">MyMemoMaster</string>
-    <string name="package_name">com.mymemomaster.app</string>
-    <string name="custom_url_scheme">com.mymemomaster.app</string>
+    <string name="package_name">com.vocklor.mymemomaster</string>
+    <string name="custom_url_scheme">com.vocklor.mymemomaster</string>
 </resources>

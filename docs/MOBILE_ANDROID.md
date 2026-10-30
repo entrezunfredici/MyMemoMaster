@@ -3,7 +3,7 @@
 L'application Android est le **front Vue embarqué tel quel dans une WebView** (Capacitor 8). Elle n'embarque ni API, ni base de
 données : elle appelle l'API de prod (`https://api.my-memo-master.com/api/v1`) et a donc besoin du réseau.
 
-- Identifiant : `com.mymemomaster.app` — nom affiché : `MyMemoMaster`
+- Identifiant : `com.vocklor.mymemomaster` — nom affiché : `MyMemoMaster`
 - Origine vue par l'API : `https://localhost` (WebView Capacitor, `androidScheme: https`)
 - Code : `my_memo_master_front/` (+ projet natif généré dans `my_memo_master_front/android/`)
 

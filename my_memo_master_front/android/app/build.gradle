@@ -10,10 +10,10 @@ if (keystorePropsFile.exists()) {
 }
 
 android {
-    namespace = "com.mymemomaster.app"
+    namespace = "com.vocklor.mymemomaster"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.mymemomaster.app"
+        applicationId "com.vocklor.mymemomaster"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

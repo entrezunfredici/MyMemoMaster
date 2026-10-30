@@ -1,4 +1,4 @@
-package com.mymemomaster.app;
+package com.vocklor.mymemomaster;
 
 import com.getcapacitor.BridgeActivity;
 
