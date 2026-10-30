@@ -5335,3 +5335,9 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `authStore.checkSession()` est appelée une fois dans `main.js` après le montage ; elle charge `users/:id` et déconnecte sur 403/404. Les cas indéterminés (API injoignable, 5xx) conservent la session.
 **Alternative écartée** : vérification dans le guard à chaque navigation (un appel API par page, et bloque la navigation hors-ligne) ; attendre la vérification avant de monter l'app (écran blanc tant que l'API répond) ; décoder l'expiration du JWT seule (ne détecte pas un compte supprimé).
 **Conséquences** : un compte supprimé est détecté au plus tard au rechargement suivant ; hors-ligne, l'utilisateur garde l'accès aux données déjà persistées.
+
+### [2026-10-30] Sessions simulées des audits e2e-a11y : contrat avec `checkSession`
+**Contexte** : `checkSession()` (2026-10-29) ferme toute session sans `userId` exploitable ; les specs Playwright simulent l'API et injectent la session dans `localStorage`.
+**Décision** : chaque session simulée porte `userId: 1` et le mock de `GET users/1` renvoie un profil. Le code applicatif n'est pas modifié.
+**Alternative écartée** : ignorer la vérification en mode test dans `main.js` (code de production adapté aux tests) ; ne pas vérifier la session quand le token est illisible (réintroduit le profil vide qui a motivé `checkSession`).
+**Conséquences** : tout nouveau spec e2e-a11y avec session simulée doit reprendre ce contrat (`userId` + réponse `users/1`), sinon la page redirige vers `/auth`.

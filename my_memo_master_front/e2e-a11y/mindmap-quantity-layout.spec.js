@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test'
 import { DIAGRAM } from './fixtures/mindmap.js'
 
-const SESSION = { token: 'a', refreshToken: 'a', authenticated: true, user: { id: 1, roleId: 1, firstName: 'A', lastName: 'B', email: 'a@x.test' } }
+const SESSION = { token: 'a', refreshToken: 'a', authenticated: true, user: { userId: 1, id: 1, roleId: 1, firstName: 'A', lastName: 'B', email: 'a@x.test' } }
 
 test('grandeur - le champ de valeur garde sa largeur et l’unité reste dans le nœud', async ({ page, baseURL }) => {
   await page.addInitScript((s) => localStorage.setItem('auth', JSON.stringify(s)), SESSION)
@@ -14,7 +14,8 @@ test('grandeur - le champ de valeur garde sa largeur et l’unité reste dans le
   await page.route((url) => url.origin !== origin && url.protocol.startsWith('http'), (route) => {
     const { pathname } = new URL(route.request().url())
     let body = []
-    if (/onboardingState/.test(pathname)) body = { tour_seen: true, checklist: {} }
+    if (/\/users\/1$/.test(pathname)) body = { userId: 1, id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' }
+    else if (/onboardingState/.test(pathname)) body = { tour_seen: true, checklist: {} }
     else if (/\/diagrammes\/?$/.test(pathname) && route.request().method() === 'GET') body = [DIAGRAM]
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
   })
