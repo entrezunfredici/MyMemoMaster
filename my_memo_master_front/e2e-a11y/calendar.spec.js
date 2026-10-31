@@ -15,13 +15,14 @@ const SESSION = {
   token: 'a11y-audit',
   refreshToken: 'a11y-audit',
   authenticated: true,
-  user: { id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' },
+  user: { userId: 1, id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' },
 }
 
 const now = new Date()
 const day = (d) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 
 const API = {
+  'users/1': { userId: 1, id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' },
   'calendar-events': { data: [{ id: 1, name: 'Cours de maths', occurrences: [{ date: day(9) }] }] },
   deadlines: { data: [{ id: 2, name: 'Devoir de physique', dueDate: day(9), dueTime: '18:30:00' }] },
   'revision-sessions': {

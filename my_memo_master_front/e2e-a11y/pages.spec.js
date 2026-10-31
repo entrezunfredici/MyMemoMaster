@@ -56,7 +56,7 @@ const SESSION = {
   token: 'a11y-audit',
   refreshToken: 'a11y-audit',
   authenticated: true,
-  user: { id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' },
+  user: { userId: 1, id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' },
 }
 
 for (const { path, label } of PAGES) {
@@ -67,7 +67,11 @@ for (const { path, label } of PAGES) {
     const origin = new URL(baseURL).origin
     await page.route(
       (url) => url.origin !== origin && url.protocol.startsWith('http'),
-      (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      (route) => {
+        // contrôle de session au démarrage (auth.checkSession) : GET users/1 doit renvoyer un profil
+        const isUser = /\/users\/1$/.test(new URL(route.request().url()).pathname)
+        return route.fulfill({ status: 200, contentType: 'application/json', body: isUser ? JSON.stringify(SESSION.user) : '[]' })
+      }
     )
 
     await page.goto(path)

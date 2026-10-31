@@ -18,7 +18,7 @@ const SESSION = {
   token: 'a11y-audit',
   refreshToken: 'a11y-audit',
   authenticated: true,
-  user: { id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' },
+  user: { userId: 1, id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' },
 }
 
 test.skip(!!process.env.A11Y_BASE_URL, 'API simulée : audit réservé à la version buildée locale')
@@ -32,7 +32,8 @@ test('éditeur de carte mentale - WCAG 2.1 A/AA et contraste des textes - tous l
       const { pathname } = new URL(route.request().url())
       let body = []
       // visite guidée déjà vue : son overlay bloquerait les clics (elle est auditée par pages.spec.js)
-      if (/onboardingState/.test(pathname)) body = { tour_seen: true, checklist: {} }
+      if (/\/users\/1$/.test(pathname)) body = { userId: 1, id: 1, roleId: 1, firstName: 'Audit', lastName: 'RGAA', email: 'audit@example.test' }
+      else if (/onboardingState/.test(pathname)) body = { tour_seen: true, checklist: {} }
       else if (/\/diagrammes\/?$/.test(pathname) && route.request().method() === 'GET') body = [DIAGRAM]
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
     }
