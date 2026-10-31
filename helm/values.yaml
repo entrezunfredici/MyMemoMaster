@@ -54,18 +54,26 @@ config:
   # Envoi d'emails : liste ordonnée de providers SMTP, le suivant prend le relais si le précédent échoue
   # (helpers/sendEmail.js). Chaque nom lit SMTP_<NOM>_HOST|PORT|SECURE ici et SMTP_<NOM>_USER|PASS dans
   # le secret K8s, hors chart. ATTENTION : poser ces clés dans le secret AVANT de déployer ce chart
-  # (k8s/smtp-providers-secrets.sh), sinon les deux providers échouent à l'authentification.
+  # (k8s/smtp-providers-secrets.sh), sinon le provider concerné échoue à l'authentification.
   # Pour revenir à un seul provider : vider SMTP_PROVIDERS (les SMTP_HOST/PORT/SECURE/USER/PASS
   # historiques ci-dessous reprennent alors la main).
-  SMTP_PROVIDERS: "hostinger,mailjet"
-  # Hostinger (boîte support@, port 465 en SSL implicite : SECURE doit être "true").
-  SMTP_HOSTINGER_HOST: smtp.hostinger.com
-  SMTP_HOSTINGER_PORT: "465"
-  SMTP_HOSTINGER_SECURE: "true"
+  # Depuis la migration des MX vers Infomaniak (2026-10-31), Infomaniak est le provider principal.
+  # Hostinger reste défini ci-dessous mais n'est plus dans la liste : le remettre (ex. "infomaniak,mailjet,
+  # hostinger") suffit à le réactiver, ses identifiants restent dans le secret.
+  SMTP_PROVIDERS: "infomaniak,mailjet"
+  # Infomaniak (boîte support@, port 587 STARTTLS : SECURE doit être "false"). USER = adresse complète,
+  # PASS = mot de passe de l'appareil « MyMemoMaster API » créé dans le Manager Infomaniak.
+  SMTP_INFOMANIAK_HOST: mail.infomaniak.com
+  SMTP_INFOMANIAK_PORT: "587"
+  SMTP_INFOMANIAK_SECURE: "false"
   # Mailjet (relais d'envoi, port 587 STARTTLS). USER = clé API, PASS = clé secrète. SPF/DKIM/DMARC validés.
   SMTP_MAILJET_HOST: in-v3.mailjet.com
   SMTP_MAILJET_PORT: "587"
   SMTP_MAILJET_SECURE: "false"
+  # Hostinger (ancienne boîte support@, port 465 en SSL implicite : SECURE doit être "true").
+  SMTP_HOSTINGER_HOST: smtp.hostinger.com
+  SMTP_HOSTINGER_PORT: "465"
+  SMTP_HOSTINGER_SECURE: "true"
   # Configuration historique à un seul provider (utilisée seulement si SMTP_PROVIDERS est vide).
   # SMTP_USER / SMTP_PASS (mot de passe de la boîte) sont dans le secret K8s, hors chart.
   # Ancien relais Brevo abandonné le 2026-10-19 (compte inaccessible, filtrage par IP).
