@@ -51,7 +51,22 @@ config:
   PG_POOL_ACQUIRE: "30000"
   PG_POOL_IDLE: "10000"
   REDIS_PORT: "6379"
-  # SMTP Hostinger (boîte support@, port 465 en SSL implicite : SMTP_SECURE doit être "true").
+  # Envoi d'emails : liste ordonnée de providers SMTP, le suivant prend le relais si le précédent échoue
+  # (helpers/sendEmail.js). Chaque nom lit SMTP_<NOM>_HOST|PORT|SECURE ici et SMTP_<NOM>_USER|PASS dans
+  # le secret K8s, hors chart. ATTENTION : poser ces clés dans le secret AVANT de déployer ce chart
+  # (k8s/smtp-providers-secrets.sh), sinon les deux providers échouent à l'authentification.
+  # Pour revenir à un seul provider : vider SMTP_PROVIDERS (les SMTP_HOST/PORT/SECURE/USER/PASS
+  # historiques ci-dessous reprennent alors la main).
+  SMTP_PROVIDERS: "hostinger,mailjet"
+  # Hostinger (boîte support@, port 465 en SSL implicite : SECURE doit être "true").
+  SMTP_HOSTINGER_HOST: smtp.hostinger.com
+  SMTP_HOSTINGER_PORT: "465"
+  SMTP_HOSTINGER_SECURE: "true"
+  # Mailjet (relais d'envoi, port 587 STARTTLS). USER = clé API, PASS = clé secrète. SPF/DKIM/DMARC validés.
+  SMTP_MAILJET_HOST: in-v3.mailjet.com
+  SMTP_MAILJET_PORT: "587"
+  SMTP_MAILJET_SECURE: "false"
+  # Configuration historique à un seul provider (utilisée seulement si SMTP_PROVIDERS est vide).
   # SMTP_USER / SMTP_PASS (mot de passe de la boîte) sont dans le secret K8s, hors chart.
   # Ancien relais Brevo abandonné le 2026-10-19 (compte inaccessible, filtrage par IP).
   SMTP_HOST: smtp.hostinger.com

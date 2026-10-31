@@ -92,6 +92,22 @@ sont dans la ConfigMap (`helm/values.yaml#config`), vides par défaut (le code a
 propres valeurs par défaut, voir `helpers/mistralConfig.js`/`helpers/aiQuotaConfig.js`) ; à surcharger
 dans `values-{env}.yaml` seulement si un réglage différent du défaut est voulu.
 
+**Envoi d'emails à plusieurs providers** (`SMTP_PROVIDERS` dans `helm/values.yaml`, voir
+`helpers/sendEmail.js`). Chaque provider listé (`hostinger,mailjet`) lit `SMTP_<NOM>_USER` et
+`SMTP_<NOM>_PASS` dans le Secret. À poser **avant** le premier `helm upgrade` qui contient
+`SMTP_PROVIDERS` : sans ces clés, les deux providers échouent à l'authentification et plus aucun email
+ne part. Le script copie `SMTP_USER`/`SMTP_PASS` vers Hostinger et ajoute les clés Mailjet, sans afficher
+de valeur :
+
+```sh
+export MAILJET_API_KEY=<clé_api_mailjet> MAILJET_SECRET_KEY=<clé_secrète_mailjet>
+DRY_RUN=1 bash k8s/smtp-providers-secrets.sh preprod   # simulation côté serveur
+bash k8s/smtp-providers-secrets.sh preprod             # puis prod
+```
+
+Retour arrière : vider `SMTP_PROVIDERS` dans le chart ; la configuration `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS`
+historique reprend la main. Les logs `[email] Échec d'envoi via …` signalent chaque basculement.
+
 ### 3.3 Déployer avec Helm
 
 ```sh
