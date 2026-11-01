@@ -27,7 +27,7 @@
       class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
       Ajouter l'échéance
     </button>
-    <p v-if="deadlineForm.error" class="text-xs text-secondary">{{ deadlineForm.error }}</p>
+    <p v-if="deadlineForm.error" class="text-xs text-red-700">{{ deadlineForm.error }}</p>
   </div>
 </template>
 

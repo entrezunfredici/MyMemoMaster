@@ -44,10 +44,10 @@ describe('useTeacherAnalytics', () => {
   // ── scoreTextClass ─────────────────────────────────────────────────────────
 
   describe('scoreTextClass', () => {
-    it('score >= 70 → text-success', () => {
+    it('score >= 70 → text-green-700', () => {
       const { scoreTextClass } = useTeacherAnalytics()
-      expect(scoreTextClass(70)).toBe('text-success')
-      expect(scoreTextClass(100)).toBe('text-success')
+      expect(scoreTextClass(70)).toBe('text-green-700')
+      expect(scoreTextClass(100)).toBe('text-green-700')
     })
 
     it('score 50–69 → text-dark', () => {
@@ -56,10 +56,10 @@ describe('useTeacherAnalytics', () => {
       expect(scoreTextClass(69)).toBe('text-dark')
     })
 
-    it('score < 50 → text-secondary', () => {
+    it('score < 50 → text-red-700', () => {
       const { scoreTextClass } = useTeacherAnalytics()
-      expect(scoreTextClass(49)).toBe('text-secondary')
-      expect(scoreTextClass(0)).toBe('text-secondary')
+      expect(scoreTextClass(49)).toBe('text-red-700')
+      expect(scoreTextClass(0)).toBe('text-red-700')
     })
   })
 

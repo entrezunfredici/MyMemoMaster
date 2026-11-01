@@ -7,32 +7,32 @@
         Actualiser
       </button>
     </div>
-    <div v-if="analyticsLoading" class="py-4 text-center text-sm text-dark/60">Chargement...</div>
+    <div v-if="analyticsLoading" class="py-4 text-center text-sm text-dark/70">Chargement...</div>
     <template v-else-if="analytics">
       <div class="grid grid-cols-3 gap-2 text-center">
         <div class="rounded-xl border border-gray bg-light p-3">
           <p class="text-2xl font-bold text-success">{{ analytics.activeStudentsCount }}</p>
-          <p class="mt-1 text-xs text-dark/60">Actifs (7j)</p>
+          <p class="mt-1 text-xs text-dark/70">Actifs (7j)</p>
         </div>
         <div :class="['rounded-xl border p-3', analytics.atRiskCount > 0 ? 'border-secondary/40 bg-secondary/5' : 'border-gray bg-light']">
           <p class="text-2xl font-bold" :class="analytics.atRiskCount > 0 ? 'text-secondary' : 'text-success'">{{ analytics.atRiskCount }}</p>
-          <p class="mt-1 text-xs text-dark/60">À risque</p>
+          <p class="mt-1 text-xs text-dark/70">À risque</p>
         </div>
         <div class="rounded-xl border border-gray bg-light p-3">
-          <p class="text-2xl font-bold" :class="currentWeekScore !== null ? scoreTextClass(currentWeekScore) : 'text-dark/40'">
+          <p class="text-2xl font-bold" :class="currentWeekScore !== null ? scoreTextClass(currentWeekScore) : 'text-dark/70'">
             {{ currentWeekScore !== null ? currentWeekScore + ' %' : '—' }}
           </p>
-          <p class="mt-1 text-xs text-dark/60">Score semaine</p>
+          <p class="mt-1 text-xs text-dark/70">Score semaine</p>
         </div>
       </div>
 
       <!-- Alertes décrochage -->
       <div v-if="atRiskStudents.length > 0" class="space-y-2">
-        <p class="text-sm font-medium text-secondary">Alertes décrochage ({{ atRiskStudents.length }})</p>
+        <p class="text-sm font-medium text-red-700">Alertes décrochage ({{ atRiskStudents.length }})</p>
         <div v-for="s in atRiskStudents" :key="s.userId" class="rounded-xl border border-secondary/30 bg-secondary/5 px-3 py-2">
           <p class="text-sm font-semibold text-dark">{{ s.name }}</p>
           <div class="mt-1 flex flex-wrap gap-1">
-            <span v-for="r in s.atRiskReasons" :key="r" class="rounded-full bg-secondary/10 px-2 py-0.5 text-xs text-secondary">{{ r }}</span>
+            <span v-for="r in s.atRiskReasons" :key="r" class="rounded-full bg-secondary/10 px-2 py-0.5 text-xs text-red-700">{{ r }}</span>
           </div>
         </div>
       </div>
@@ -47,7 +47,7 @@
             :aria-expanded="!!expandedAnalyticsStudents[s.userId]"
             @click="toggleStudentAndLoadKpis(s.userId)">
             <div class="flex items-center gap-2">
-              <span :class="['rounded-full px-2 py-0.5 text-xs font-semibold', s.atRisk ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success']">
+              <span :class="['rounded-full px-2 py-0.5 text-xs font-semibold', s.atRisk ? 'bg-secondary/10 text-red-700' : 'bg-success/10 text-green-700']">
                 {{ s.atRisk ? '⚠ Risque' : '✓ OK' }}
               </span>
               <span class="text-sm font-semibold text-dark">{{ s.name }}</span>
@@ -57,11 +57,11 @@
               <span v-if="s.userId in kpiConsentStore.studentKpis"
                 :class="[
                   'rounded-full px-2 py-0.5 text-xs font-semibold',
-                  kpiConsentStore.studentKpis[s.userId] ? 'bg-success/10 text-success' : 'bg-gray text-dark/40'
+                  kpiConsentStore.studentKpis[s.userId] ? 'bg-success/10 text-green-700' : 'bg-gray text-dark/70'
                 ]">
                 {{ kpiConsentStore.studentKpis[s.userId] ? 'KPI ✓' : 'KPI —' }}
               </span>
-              <span :class="['text-xs', s.avgScore !== null ? scoreTextClass(s.avgScore) : 'text-dark/40']">
+              <span :class="['text-xs', s.avgScore !== null ? scoreTextClass(s.avgScore) : 'text-dark/70']">
                 {{ s.avgScore !== null ? s.avgScore + ' %' : '—' }}
               </span>
             </div>
@@ -75,9 +75,9 @@
           />
         </div>
       </div>
-      <p v-else class="text-center text-sm text-dark/60">Aucun étudiant dans ce groupe.</p>
+      <p v-else class="text-center text-sm text-dark/70">Aucun étudiant dans ce groupe.</p>
     </template>
-    <p v-else class="text-center text-sm text-dark/60 py-4">Sélectionnez un groupe pour voir l'analyse.</p>
+    <p v-else class="text-center text-sm text-dark/70 py-4">Sélectionnez un groupe pour voir l'analyse.</p>
   </section>
 </template>
 

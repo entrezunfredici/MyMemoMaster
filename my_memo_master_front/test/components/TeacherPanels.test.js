@@ -654,7 +654,7 @@ describe('TeacherInviteForm', () => {
     expect(useInvitationStore().invite).toHaveBeenCalledWith(GROUP_ID, { targetEmail: 'nouveau@x.fr', role: 'student' })
     expect(useInvitationStore().fetchByGroup).toHaveBeenCalledWith(GROUP_ID)
     expect(wrapper.text()).toContain('Invitation envoyée.')
-    expect(wrapper.find('.text-success').exists()).toBe(true)
+    expect(wrapper.find('.text-green-700').exists()).toBe(true)
     expect(wrapper.find('input[aria-label="Email"]').element.value).toBe('')
   })
 
@@ -665,7 +665,7 @@ describe('TeacherInviteForm', () => {
     await btn(wrapper, "Envoyer l'invitation").trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain("Erreur lors de l'envoi.")
-    expect(wrapper.find('.text-secondary').exists()).toBe(true)
+    expect(wrapper.find('.text-red-700').exists()).toBe(true)
     expect(wrapper.find('input[aria-label="Email"]').element.value).toBe('a@x.fr')
   })
 })

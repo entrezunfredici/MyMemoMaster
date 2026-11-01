@@ -6,7 +6,7 @@
         class="rounded-xl border border-gray px-3 py-2 flex items-center justify-between text-sm">
         <div>
           <p class="font-semibold text-dark">{{ m.user?.name ?? `#${m.userId}` }}</p>
-          <p class="text-xs text-dark/60">{{ m.user?.email }}</p>
+          <p class="text-xs text-dark/70">{{ m.user?.email }}</p>
         </div>
         <div class="flex items-center gap-2">
           <select aria-label="Rôle du membre" :value="m.role" @change="changeRole(m.userId, $event.target.value)"
@@ -14,14 +14,14 @@
             <option value="student">Étudiant</option>
             <option value="teacher">Enseignant</option>
           </select>
-          <button aria-label="Retirer le membre" @click="classGroupStore.removeMember(group.id, m.userId)" class="text-secondary text-xs hover:underline">×</button>
+          <button aria-label="Retirer le membre" @click="classGroupStore.removeMember(group.id, m.userId)" class="text-red-700 text-xs hover:underline">×</button>
         </div>
       </div>
     </div>
 
     <!-- Invitations en attente -->
     <div v-if="invitationStore.groupInvitations.length > 0" class="pt-2 border-t border-gray space-y-1">
-      <p class="text-xs font-semibold text-dark/60 uppercase tracking-wide">En attente</p>
+      <p class="text-xs font-semibold text-dark/70 uppercase tracking-wide">En attente</p>
       <div v-for="inv in invitationStore.groupInvitations" :key="inv.id"
         class="rounded-xl border border-gray/50 px-3 py-2 flex items-center justify-between text-xs text-dark/70">
         <span>{{ inv.targetEmail }}</span>

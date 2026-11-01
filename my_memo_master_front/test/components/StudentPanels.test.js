@@ -172,7 +172,7 @@ describe('StudentRendus / StudentRenduCard', () => {
       const [urgent, calm] = cards(mountRendus())
       expect(urgent.classes()).toContain('border-secondary/50')
       expect(calm.classes()).not.toContain('border-secondary/50')
-      expect(urgent.find('.text-secondary.font-semibold').exists()).toBe(true)
+      expect(urgent.find('.text-red-700.font-semibold').exists()).toBe(true)
     })
 
     it('non soumis : « Non soumis », zone de dépôt avec bouton « parcourez » (RGAA 7.1)', () => {

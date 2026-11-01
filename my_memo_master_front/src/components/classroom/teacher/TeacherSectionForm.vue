@@ -7,7 +7,7 @@
       <button @click="sectionForm.type = 'section'"
         :class="[sectionForm.type === 'section' ? 'bg-primary text-light' : 'bg-light text-primary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm flex-1']">Section</button>
       <button @click="sectionForm.type = 'rendu'"
-        :class="[sectionForm.type === 'rendu' ? 'bg-secondary text-light' : 'bg-light text-secondary border-2 border-gray', 'rounded-lg px-3 py-2 text-sm flex-1']">Rendu</button>
+        :class="[sectionForm.type === 'rendu' ? 'bg-red-700 text-light' : 'bg-light text-red-700 border-2 border-gray', 'rounded-lg px-3 py-2 text-sm flex-1']">Rendu</button>
     </div>
     <input aria-label="Description" v-model="sectionForm.description" type="text" placeholder="Description"
       class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
@@ -16,7 +16,7 @@
       class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
       Créer
     </button>
-    <p v-if="sectionForm.error" class="text-xs text-secondary">{{ sectionForm.error }}</p>
+    <p v-if="sectionForm.error" class="text-xs text-red-700">{{ sectionForm.error }}</p>
   </div>
 </template>
 

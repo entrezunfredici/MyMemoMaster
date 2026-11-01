@@ -9,11 +9,11 @@
       @keydown.enter.prevent="emit('select', g.id)"
       @keydown.space.prevent="emit('select', g.id)"
       :class="[selectedId === g.id ? 'border-primary bg-light/70' : 'border-gray', 'min-w-[220px] cursor-pointer rounded-xl border-2 p-3 shadow-sm transition hover:-translate-y-0.5']">
-      <p class="text-xs text-dark/60 uppercase tracking-wide">{{ g.level }}</p>
+      <p class="text-xs text-dark/70 uppercase tracking-wide">{{ g.level }}</p>
       <p class="text-lg font-semibold text-primary">{{ g.name }}</p>
-      <p class="text-xs text-dark/60">{{ g.members?.length ?? 0 }} {{ plural(g.members?.length ?? 0, 'membre') }}</p>
+      <p class="text-xs text-dark/70">{{ g.members?.length ?? 0 }} {{ plural(g.members?.length ?? 0, 'membre') }}</p>
     </div>
-    <p v-if="groups.length === 0" class="text-sm text-dark/60">Aucun groupe.</p>
+    <p v-if="groups.length === 0" class="text-sm text-dark/70">Aucun groupe.</p>
   </div>
 </template>
 

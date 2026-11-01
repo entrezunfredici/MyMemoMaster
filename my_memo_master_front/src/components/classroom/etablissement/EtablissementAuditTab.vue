@@ -11,14 +11,14 @@
         Filtrer
       </button>
     </div>
-    <div v-if="etabStore.audit.length === 0" class="text-sm text-dark/60">Aucune entrée.</div>
+    <div v-if="etabStore.audit.length === 0" class="text-sm text-dark/70">Aucune entrée.</div>
     <div v-else class="space-y-1 max-h-96 overflow-y-auto">
       <div v-for="log in etabStore.audit" :key="log.id"
         class="rounded-lg border border-gray/50 px-3 py-2 text-xs flex items-center justify-between gap-2">
         <span class="font-mono text-primary font-semibold truncate">{{ log.action }}</span>
         <span class="text-dark/70">{{ log.entityType }} #{{ log.entityId ?? '—' }}</span>
         <span class="text-dark/50">{{ log.actor?.name ?? '—' }}</span>
-        <span class="text-dark/40 shrink-0">{{ formatDateTime(log.createdAt) }}</span>
+        <span class="text-dark/70 shrink-0">{{ formatDateTime(log.createdAt) }}</span>
       </div>
     </div>
   </div>

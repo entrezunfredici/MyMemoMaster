@@ -1,31 +1,31 @@
 <template>
   <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
     <h2 class="text-lg font-semibold text-dark">Gestion des comptes</h2>
-    <p class="text-xs text-dark/60">Membres du groupe sélectionné. Sélectionnez un groupe dans l'onglet Groupes.</p>
-    <div v-if="!group" class="text-sm text-dark/60">Aucun groupe sélectionné.</div>
+    <p class="text-xs text-dark/70">Membres du groupe sélectionné. Sélectionnez un groupe dans l'onglet Groupes.</p>
+    <div v-if="!group" class="text-sm text-dark/70">Aucun groupe sélectionné.</div>
     <div v-else class="space-y-2">
       <div v-for="m in group.members" :key="m.userId"
         class="rounded-xl border border-gray px-3 py-2 flex items-center justify-between text-sm">
         <div>
           <p class="font-semibold text-dark">{{ m.user?.name ?? `#${m.userId}` }}</p>
-          <p class="text-xs text-dark/60">{{ m.user?.email }}</p>
+          <p class="text-xs text-dark/70">{{ m.user?.email }}</p>
         </div>
         <div class="flex items-center gap-2">
-          <span :class="m.user?.isActive === false ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success'"
+          <span :class="m.user?.isActive === false ? 'bg-secondary/10 text-red-700' : 'bg-success/10 text-green-700'"
             class="rounded-full px-2 py-0.5 text-xs font-medium">
             {{ m.user?.isActive === false ? 'Inactif' : 'Actif' }}
           </span>
           <button v-if="m.user?.isActive !== false" @click="deactivate(m.userId)"
-            class="rounded-lg border border-secondary/40 px-2 py-1 text-xs text-secondary hover:bg-secondary/10 transition">
+            class="rounded-lg border border-secondary/40 px-2 py-1 text-xs text-red-700 hover:bg-secondary/10 transition">
             Désactiver
           </button>
           <button v-else @click="activate(m.userId)"
-            class="rounded-lg border border-success/40 px-2 py-1 text-xs text-success hover:bg-success/10 transition">
+            class="rounded-lg border border-success/40 px-2 py-1 text-xs text-green-700 hover:bg-success/10 transition">
             Activer
           </button>
         </div>
       </div>
-      <p v-if="!group.members?.length" class="text-xs text-dark/60">Aucun membre.</p>
+      <p v-if="!group.members?.length" class="text-xs text-dark/70">Aucun membre.</p>
     </div>
   </div>
 </template>

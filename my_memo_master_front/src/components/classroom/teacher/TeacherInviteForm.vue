@@ -7,7 +7,7 @@
       class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
       Envoyer l'invitation
     </button>
-    <p v-if="inviteForm.message" :class="inviteForm.error ? 'text-secondary' : 'text-success'" class="text-xs">
+    <p v-if="inviteForm.message" :class="inviteForm.error ? 'text-red-700' : 'text-green-700'" class="text-xs">
       {{ inviteForm.message }}
     </p>
   </div>

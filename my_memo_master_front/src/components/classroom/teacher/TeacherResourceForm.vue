@@ -22,12 +22,12 @@
       ]">
       <div v-if="resourceForm.file">
         <p class="text-sm font-semibold text-dark">{{ resourceForm.file.name }}</p>
-        <p class="text-xs text-dark/60 mt-0.5">{{ formatFileSize(resourceForm.file.size) }}</p>
-        <button type="button" :aria-label="`Retirer le fichier ${resourceForm.file.name}`" @click="removeFile" class="mt-1 text-xs text-secondary hover:underline">Retirer</button>
+        <p class="text-xs text-dark/70 mt-0.5">{{ formatFileSize(resourceForm.file.size) }}</p>
+        <button type="button" :aria-label="`Retirer le fichier ${resourceForm.file.name}`" @click="removeFile" class="mt-1 text-xs text-red-700 hover:underline">Retirer</button>
       </div>
       <button v-else ref="browseButton" type="button" class="w-full cursor-pointer" @click="fileInput?.click()">
-        <span class="block text-sm text-dark/60">Glissez un fichier ici ou <span class="text-primary underline">parcourez</span></span>
-        <span class="block text-xs text-dark/40 mt-1">PDF, Word, PowerPoint, Excel — max 10 Mo</span>
+        <span class="block text-sm text-dark/70">Glissez un fichier ici ou <span class="text-primary underline">parcourez</span></span>
+        <span class="block text-xs text-dark/70 mt-1">PDF, Word, PowerPoint, Excel — max 10 Mo</span>
       </button>
     </div>
     <input aria-label="Choisir un fichier à partager" ref="fileInput" type="file"
@@ -39,7 +39,7 @@
       :class="[resourceStore.uploading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/90', 'w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light transition']">
       {{ resourceStore.uploading ? 'Upload en cours...' : 'Partager' }}
     </button>
-    <p v-if="resourceForm.error" class="text-xs text-secondary">{{ resourceForm.error }}</p>
+    <p v-if="resourceForm.error" class="text-xs text-red-700">{{ resourceForm.error }}</p>
   </div>
 </template>
 

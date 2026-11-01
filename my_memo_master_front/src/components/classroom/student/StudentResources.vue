@@ -1,8 +1,8 @@
 <template>
   <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
     <h2 class="text-lg font-semibold text-dark">Documents partagés</h2>
-    <div v-if="loading" class="text-sm text-dark/60">Chargement...</div>
-    <div v-else-if="filteredResources.length === 0" class="text-sm text-dark/60">
+    <div v-if="loading" class="text-sm text-dark/70">Chargement...</div>
+    <div v-else-if="filteredResources.length === 0" class="text-sm text-dark/70">
       {{ search ? 'Aucune ressource correspondante.' : 'Aucun document partagé.' }}
     </div>
     <div v-else class="space-y-2">
@@ -12,16 +12,19 @@
           <span class="text-xl">{{ fileIcon(r.mimeType) }}</span>
           <div>
             <p class="text-sm font-semibold text-dark">{{ r.title }}</p>
-            <p class="text-xs text-dark/60">
+            <p class="text-xs text-dark/70">
               {{ resourceTypeLabel(r.type) }} · {{ r.creator?.name }}
               <span v-if="r.fileSize"> · {{ formatFileSize(r.fileSize) }}</span>
             </p>
           </div>
         </div>
-        <button v-if="r.fileKey" @click="downloadFile(r.fileKey)"
-          class="rounded-lg border border-primary px-3 py-1 text-xs text-primary hover:bg-primary hover:text-light transition">
-          Télécharger
-        </button>
+        <div class="flex items-center gap-3">
+          <ReportContentButton content-type="resource" :content-id="r.id" :content-title="r.title" :author-id="r.createdBy" />
+          <button v-if="r.fileKey" @click="downloadFile(r.fileKey)"
+            class="rounded-lg border border-primary px-3 py-1 text-xs text-primary hover:bg-primary hover:text-light transition">
+            Télécharger
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -32,6 +35,7 @@
 import { computed } from 'vue'
 import { useClassGroupResourceStore } from '@/stores/classGroupResources'
 import { useStoredFile } from '@/composables/useStoredFile'
+import ReportContentButton from '@/components/classroom/ReportContentButton.vue'
 import { fileIcon, formatFileSize, resourceTypeLabel } from '@/helpers/classroomFormat'
 
 const props = defineProps({

@@ -2,7 +2,7 @@
         <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
           <h2 class="text-lg font-semibold text-dark">Partage de mes KPI</h2>
 
-          <div v-if="kpiConsentStore.loading" class="text-sm text-dark/60">Chargement des partages…</div>
+          <div v-if="kpiConsentStore.loading" class="text-sm text-dark/70">Chargement des partages…</div>
 
           <template v-else>
             <!-- Consentements actifs pour ce groupe -->
@@ -12,19 +12,19 @@
                 class="rounded-xl border border-gray px-4 py-3 flex items-center justify-between">
                 <div>
                   <p class="text-sm font-semibold text-dark">{{ c.teacher?.name }}</p>
-                  <p class="text-xs text-dark/60">
+                  <p class="text-xs text-dark/70">
                     {{ c.classGroup?.name }} ·
                     {{ c.subject ? c.subject.name : 'Toutes matières' }} ·
                     {{ formatDate(c.grantedAt) }}
                   </p>
                 </div>
                 <button @click="openRevokeModal(c)"
-                  class="rounded-lg border border-secondary px-3 py-1 text-xs text-secondary hover:bg-secondary hover:text-light transition">
+                  class="rounded-lg border border-secondary px-3 py-1 text-xs text-red-700 hover:bg-red-700 hover:text-light transition">
                   Révoquer
                 </button>
               </div>
             </div>
-            <p v-else class="text-sm text-dark/60">
+            <p v-else class="text-sm text-dark/70">
               Vous n'avez autorisé aucun enseignant à consulter vos KPI personnels.
             </p>
 
@@ -34,10 +34,10 @@
                 {{ consentsForGroup.length ? 'Ajouter un accès' : 'Autoriser un enseignant' }}
               </p>
 
-              <p v-if="teachersInGroup.length === 0" class="text-sm text-dark/60">
+              <p v-if="teachersInGroup.length === 0" class="text-sm text-dark/70">
                 Aucun enseignant disponible dans ce groupe.
               </p>
-              <p v-else-if="availableTeachers.length === 0" class="text-sm text-dark/60">
+              <p v-else-if="availableTeachers.length === 0" class="text-sm text-dark/70">
                 Tous les enseignants de ce groupe ont déjà accès à vos KPI.
               </p>
               <template v-else>
@@ -58,7 +58,7 @@
                     :class="[
                       'rounded-lg px-4 py-2 text-sm font-semibold transition',
                       (!grantForm.teacherId || kpiConsentStore.granting)
-                        ? 'bg-gray text-dark/40 cursor-not-allowed'
+                        ? 'bg-gray text-dark/70 cursor-not-allowed'
                         : 'bg-primary text-light hover:bg-primary/90'
                     ]">
                     {{ kpiConsentStore.granting ? 'Envoi…' : "Accorder l'accès" }}

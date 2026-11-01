@@ -1,8 +1,8 @@
 <template>
   <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
     <h2 class="text-lg font-semibold text-dark">Rendus à remettre</h2>
-    <div v-if="loading" class="text-sm text-dark/60">Chargement...</div>
-    <div v-else-if="filteredRendus.length === 0" class="text-sm text-dark/60">
+    <div v-if="loading" class="text-sm text-dark/70">Chargement...</div>
+    <div v-else-if="filteredRendus.length === 0" class="text-sm text-dark/70">
       {{ search ? 'Aucun rendu correspondant.' : 'Aucun rendu à remettre.' }}
     </div>
     <div v-else class="space-y-3">

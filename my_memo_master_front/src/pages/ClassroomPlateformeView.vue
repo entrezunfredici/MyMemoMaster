@@ -20,7 +20,7 @@
           <input aria-label="Code (ex: ETAB01)" v-model="createForm.code" type="text" placeholder="Code (ex: ETAB01) *"
             class="rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
         </div>
-        <p v-if="createForm.error" class="text-xs text-secondary">{{ createForm.error }}</p>
+        <p v-if="createForm.error" class="text-xs text-red-700">{{ createForm.error }}</p>
         <div class="flex gap-2">
           <button @click="submitCreate"
             class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
@@ -34,13 +34,13 @@
       </div>
 
       <!-- Tableau établissements -->
-      <div v-if="etabStore.loading" class="text-sm text-dark/60">Chargement...</div>
-      <div v-else-if="etabStore.list.length === 0" class="text-sm text-dark/60">Aucun établissement.</div>
+      <div v-if="etabStore.loading" class="text-sm text-dark/70">Chargement...</div>
+      <div v-else-if="etabStore.list.length === 0" class="text-sm text-dark/70">Aucun établissement.</div>
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
           <caption class="sr-only">Liste des établissements</caption>
           <thead>
-            <tr class="border-b border-gray text-left text-xs text-dark/60 uppercase tracking-wide">
+            <tr class="border-b border-gray text-left text-xs text-dark/70 uppercase tracking-wide">
               <th scope="col" class="pb-2 pr-4">Nom</th>
               <th scope="col" class="pb-2 pr-4">Code</th>
               <th scope="col" class="pb-2 pr-4">Gérant</th>
@@ -66,7 +66,7 @@
                     Modifier
                   </button>
                   <button @click="confirmDelete(etab)"
-                    class="rounded-lg bg-secondary/10 px-2 py-1 text-xs text-secondary hover:bg-secondary/20 transition">
+                    class="rounded-lg bg-secondary/10 px-2 py-1 text-xs text-red-700 hover:bg-secondary/20 transition">
                     Supprimer
                   </button>
                 </div>
@@ -89,7 +89,7 @@
           <input aria-label="Code" v-model="editForm.code" type="text" placeholder="Code"
             class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
         </div>
-        <p v-if="editForm.error" class="text-xs text-secondary">{{ editForm.error }}</p>
+        <p v-if="editForm.error" class="text-xs text-red-700">{{ editForm.error }}</p>
         <div class="flex gap-2 justify-end">
           <button @click="editForm.visible = false"
             class="rounded-lg border border-gray px-4 py-2 text-sm hover:bg-light transition">
@@ -110,7 +110,7 @@
           {{ etabStore.current?.name ?? `Établissement #${selectedId}` }}
           <span class="ml-2 font-mono text-xs text-dark/50">{{ etabStore.current?.code }}</span>
         </h2>
-        <button aria-label="Fermer le détail" @click="selectedId = null" class="text-sm text-dark/40 hover:text-dark">✕</button>
+        <button aria-label="Fermer le détail" @click="selectedId = null" class="text-sm text-dark/70 hover:text-dark">✕</button>
       </div>
 
       <!-- Sous-onglets -->
@@ -119,7 +119,7 @@
           @click="activateDetailTab(tab.key)"
           :class="[detailTab === tab.key
             ? 'border-b-2 border-primary text-primary font-semibold'
-            : 'text-dark/60 hover:text-dark', 'pb-2 px-2 text-sm transition whitespace-nowrap']">
+            : 'text-dark/70 hover:text-dark', 'pb-2 px-2 text-sm transition whitespace-nowrap']">
           {{ tab.label }}
         </button>
       </div>
@@ -127,48 +127,48 @@
       <div class="p-4">
         <!-- Stats -->
         <div v-if="detailTab === 'stats'">
-          <div v-if="!etabStore.stats" class="text-sm text-dark/60">Chargement...</div>
+          <div v-if="!etabStore.stats" class="text-sm text-dark/70">Chargement...</div>
           <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-primary">{{ etabStore.stats.groupCount }}</p>
-              <p class="text-xs text-dark/60 mt-1">Groupes</p>
+              <p class="text-xs text-dark/70 mt-1">Groupes</p>
             </div>
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-primary">{{ etabStore.stats.totalMembers }}</p>
-              <p class="text-xs text-dark/60 mt-1">Membres</p>
+              <p class="text-xs text-dark/70 mt-1">Membres</p>
             </div>
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-success">{{ etabStore.stats.activeMembers }}</p>
-              <p class="text-xs text-dark/60 mt-1">Actifs</p>
+              <p class="text-xs text-dark/70 mt-1">Actifs</p>
             </div>
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-secondary">{{ etabStore.stats.pendingInvitations }}</p>
-              <p class="text-xs text-dark/60 mt-1">Invitations en attente</p>
+              <p class="text-xs text-dark/70 mt-1">Invitations en attente</p>
             </div>
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-dark">{{ etabStore.stats.validatedAccounts }}</p>
-              <p class="text-xs text-dark/60 mt-1">Emails vérifiés</p>
+              <p class="text-xs text-dark/70 mt-1">Emails vérifiés</p>
             </div>
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-dark">{{ etabStore.stats.roleBreakdown?.students ?? 0 }}</p>
-              <p class="text-xs text-dark/60 mt-1">Étudiants</p>
+              <p class="text-xs text-dark/70 mt-1">Étudiants</p>
             </div>
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-dark">{{ etabStore.stats.roleBreakdown?.teachers ?? 0 }}</p>
-              <p class="text-xs text-dark/60 mt-1">Enseignants</p>
+              <p class="text-xs text-dark/70 mt-1">Enseignants</p>
             </div>
             <div class="rounded-xl border border-gray p-3 text-center">
               <p class="text-2xl font-bold text-dark">{{ etabStore.stats.inactiveMembers }}</p>
-              <p class="text-xs text-dark/60 mt-1">Inactifs</p>
+              <p class="text-xs text-dark/70 mt-1">Inactifs</p>
             </div>
           </div>
           <div v-if="etabStore.stats?.recentActivity?.length" class="mt-4 space-y-2">
-            <p class="text-xs font-semibold text-dark/60 uppercase tracking-wide">Activité récente</p>
+            <p class="text-xs font-semibold text-dark/70 uppercase tracking-wide">Activité récente</p>
             <div v-for="log in etabStore.stats.recentActivity" :key="log.id"
               class="rounded-xl border border-gray/50 px-3 py-2 text-xs text-dark/70 flex items-center justify-between">
               <span class="font-mono text-primary">{{ log.action }}</span>
               <span>{{ log.actor?.name ?? '—' }}</span>
-              <span class="text-dark/40">{{ formatDateTime(log.createdAt) }}</span>
+              <span class="text-dark/70">{{ formatDateTime(log.createdAt) }}</span>
             </div>
           </div>
         </div>
@@ -187,14 +187,14 @@
               Filtrer
             </button>
           </div>
-          <div v-if="etabStore.audit.length === 0" class="text-sm text-dark/60">Aucune entrée.</div>
+          <div v-if="etabStore.audit.length === 0" class="text-sm text-dark/70">Aucune entrée.</div>
           <div v-else class="space-y-1 max-h-96 overflow-y-auto">
             <div v-for="log in etabStore.audit" :key="log.id"
               class="rounded-lg border border-gray/50 px-3 py-2 text-xs flex items-center justify-between gap-2">
               <span class="font-mono text-primary font-semibold min-w-0 truncate">{{ log.action }}</span>
               <span class="text-dark/70">{{ log.entityType }} #{{ log.entityId ?? '—' }}</span>
               <span class="text-dark/50">{{ log.actor?.name ?? '—' }}</span>
-              <span class="text-dark/40 shrink-0">{{ formatDateTime(log.createdAt) }}</span>
+              <span class="text-dark/70 shrink-0">{{ formatDateTime(log.createdAt) }}</span>
             </div>
           </div>
         </div>
@@ -207,17 +207,17 @@
               {{ etabStore.current.admin.name }}
               <span class="text-dark/50 font-normal ml-1">{{ etabStore.current.admin.email }}</span>
             </p>
-            <p v-else class="text-dark/40 italic">Aucun gérant assigné</p>
+            <p v-else class="text-dark/70 italic">Aucun gérant assigné</p>
           </div>
           <div class="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
             <p class="text-sm font-semibold text-dark">Assigner un gérant par email</p>
-            <p class="text-xs text-dark/60">
+            <p class="text-xs text-dark/70">
               L'utilisateur trouvé sera promu en "Admin établissement" et pourra créer et gérer les groupes classes de cet établissement.
             </p>
             <input aria-label="Email du gérant" v-model="gerantForm.email" type="email" placeholder="Email du gérant *"
               class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
-            <p v-if="gerantForm.error" class="text-xs text-secondary">{{ gerantForm.error }}</p>
-            <p v-if="gerantForm.success" class="text-xs text-success">{{ gerantForm.success }}</p>
+            <p v-if="gerantForm.error" class="text-xs text-red-700">{{ gerantForm.error }}</p>
+            <p v-if="gerantForm.success" class="text-xs text-green-700">{{ gerantForm.success }}</p>
             <div class="flex gap-2">
               <button @click="submitAssignAdmin" :disabled="gerantForm.loading"
                 class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition disabled:opacity-50">
@@ -233,7 +233,7 @@
 
         <!-- Modération contenu -->
         <div v-if="detailTab === 'content'" class="space-y-4">
-          <div v-if="!etabStore.content" class="text-sm text-dark/60">Chargement...</div>
+          <div v-if="!etabStore.content" class="text-sm text-dark/70">Chargement...</div>
           <template v-else>
             <div class="space-y-2">
               <p class="text-sm font-semibold text-dark">Ressources ({{ etabStore.content.resources?.length ?? 0 }})</p>
@@ -245,7 +245,7 @@
                   <p class="text-dark/50">{{ r.classGroup?.name }} · {{ r.type }} · {{ r.creator?.name }}</p>
                 </div>
                 <button @click="confirmDeleteContent('resource', r.id, r.title)"
-                  class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-secondary hover:bg-secondary/20 transition">
+                  class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-red-700 hover:bg-secondary/20 transition">
                   Supprimer
                 </button>
               </div>
@@ -260,7 +260,7 @@
                   <p class="text-dark/50">{{ s.classGroup?.name }} · {{ s.type }} · {{ s.creator?.name }}</p>
                 </div>
                 <button @click="confirmDeleteContent('section', s.id, s.title)"
-                  class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-secondary hover:bg-secondary/20 transition">
+                  class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-red-700 hover:bg-secondary/20 transition">
                   Supprimer
                 </button>
               </div>

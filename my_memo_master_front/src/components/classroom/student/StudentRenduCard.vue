@@ -4,27 +4,29 @@
     <div class="flex items-start justify-between gap-2">
       <div>
         <div class="flex items-center gap-2">
-          <span class="rounded-full bg-secondary/10 px-2 py-0.5 text-xs font-semibold text-secondary uppercase">Rendu</span>
+          <span class="rounded-full bg-secondary/10 px-2 py-0.5 text-xs font-semibold text-red-700 uppercase">Rendu</span>
           <p class="text-sm font-semibold text-dark">{{ rendu.title }}</p>
         </div>
-        <p v-if="rendu.description" class="mt-1 text-xs text-dark/60">{{ rendu.description }}</p>
-        <p v-if="rendu.dueDate" :class="['text-xs mt-0.5', isUrgent(rendu.dueDate) ? 'text-secondary font-semibold' : 'text-dark/60']">
+        <p v-if="rendu.description" class="mt-1 text-xs text-dark/70">{{ rendu.description }}</p>
+        <p v-if="rendu.dueDate" :class="['text-xs mt-0.5', isUrgent(rendu.dueDate) ? 'text-red-700 font-semibold' : 'text-dark/70']">
           Date limite : {{ formatDate(rendu.dueDate) }}
         </p>
+        <ReportContentButton class="mt-1 inline-block" content-type="section" :content-id="rendu.id"
+          :content-title="rendu.title" :author-id="rendu.createdBy" />
       </div>
 
       <!-- Statut soumission -->
       <div class="shrink-0 text-right">
         <div v-if="mySubmission">
-          <p class="text-xs text-success font-semibold">✓ Soumis</p>
-          <p class="text-xs text-dark/60">{{ mySubmission.originalName }}</p>
+          <p class="text-xs text-green-700 font-semibold">✓ Soumis</p>
+          <p class="text-xs text-dark/70">{{ mySubmission.originalName }}</p>
           <div class="flex gap-2 mt-1 justify-end">
             <button @click="openFile(mySubmission.fileKey)" class="text-xs text-primary underline">Voir</button>
             <button @click="downloadFile(mySubmission.fileKey)" class="text-xs text-primary underline">Télécharger</button>
-            <button @click="retireRendu" class="text-xs text-secondary underline">Retirer</button>
+            <button @click="retireRendu" class="text-xs text-red-700 underline">Retirer</button>
           </div>
         </div>
-        <span v-else class="text-xs text-dark/40">Non soumis</span>
+        <span v-else class="text-xs text-dark/70">Non soumis</span>
       </div>
     </div>
 
@@ -40,14 +42,14 @@
         ]">
         <div v-if="pendingFile">
           <p class="text-sm font-semibold text-dark">{{ pendingFile.name }}</p>
-          <p class="text-xs text-dark/60 mt-0.5">{{ formatFileSize(pendingFile.size) }}</p>
-          <button type="button" :aria-label="`Retirer le fichier ${pendingFile.name}`" @click.stop="removePendingFile" class="mt-1 text-xs text-secondary hover:underline">Retirer</button>
+          <p class="text-xs text-dark/70 mt-0.5">{{ formatFileSize(pendingFile.size) }}</p>
+          <button type="button" :aria-label="`Retirer le fichier ${pendingFile.name}`" @click.stop="removePendingFile" class="mt-1 text-xs text-red-700 hover:underline">Retirer</button>
         </div>
         <!-- RGAA 7.1 : la zone ne répond au glisser-déposer qu'à la souris ; l'action « choisir un fichier »
              est portée par un vrai bouton, atteignable et activable au clavier. -->
         <button v-else ref="browseButton" type="button" class="w-full cursor-pointer" @click="fileInput?.click()">
-          <span class="block text-sm text-dark/60">Glissez votre rendu ici ou <span class="text-secondary underline">parcourez</span></span>
-          <span class="block text-xs text-dark/40 mt-1">PDF, Word, Image — max 10 Mo</span>
+          <span class="block text-sm text-dark/70">Glissez votre rendu ici ou <span class="text-red-700 underline">parcourez</span></span>
+          <span class="block text-xs text-dark/70 mt-1">PDF, Word, Image — max 10 Mo</span>
         </button>
       </div>
       <input aria-label="Choisir un fichier à rendre" ref="fileInput" type="file"
@@ -72,6 +74,7 @@ import { computed, nextTick, ref } from 'vue'
 import { useClassGroupSubmissionStore } from '@/stores/classGroupSubmissions'
 import { useStoredFile } from '@/composables/useStoredFile'
 import { formatDate, formatFileSize, isUrgent } from '@/helpers/classroomFormat'
+import ReportContentButton from '@/components/classroom/ReportContentButton.vue'
 
 const props = defineProps({
   rendu: { type: Object, required: true },

@@ -1,16 +1,16 @@
 <template>
   <div class="border-t border-gray mx-3 pb-4">
     <div class="pt-3 space-y-3">
-      <p class="text-xs font-semibold text-dark/60 uppercase tracking-wide">KPI personnels partagés</p>
+      <p class="text-xs font-semibold text-dark/70 uppercase tracking-wide">KPI personnels partagés</p>
 
       <!-- Chargement -->
-      <p v-if="!loaded" class="text-sm text-dark/60 italic">
+      <p v-if="!loaded" class="text-sm text-dark/70 italic">
         Chargement des KPI…
       </p>
 
       <!-- Pas de consentement -->
       <div v-else-if="kpi === null"
-        class="rounded-xl border border-gray bg-light/40 px-4 py-3 text-sm text-dark/60 space-y-1">
+        class="rounded-xl border border-gray bg-light/40 px-4 py-3 text-sm text-dark/70 space-y-1">
         <p>Cet étudiant n'a pas encore partagé ses KPI personnels.</p>
         <p class="text-xs">Il peut vous accorder l'accès depuis l'onglet "Partage de mes KPI" dans sa vue étudiant.</p>
       </div>
@@ -23,19 +23,19 @@
             <p class="text-lg font-bold text-primary">
               {{ kpi.revision.streakDays }}<span class="text-xs font-normal"> j</span>
             </p>
-            <p class="text-xs text-dark/60 mt-0.5">Streak révision</p>
+            <p class="text-xs text-dark/70 mt-0.5">Streak révision</p>
           </div>
           <div class="rounded-xl bg-light border border-gray px-2 py-2">
             <p class="text-lg font-bold" :class="disciplineScoreClass(kpi.discipline.disciplineScore)">
               {{ kpi.discipline.disciplineScore }}<span class="text-xs font-normal"> %</span>
             </p>
-            <p class="text-xs text-dark/60 mt-0.5">Discipline 30j</p>
+            <p class="text-xs text-dark/70 mt-0.5">Discipline 30j</p>
           </div>
           <div class="rounded-xl bg-light border border-gray px-2 py-2">
             <p class="text-lg font-bold text-primary">
               {{ kpi.leitner.mastery }}<span class="text-xs font-normal"> %</span>
             </p>
-            <p class="text-xs text-dark/60 mt-0.5">Maîtrise Leitner</p>
+            <p class="text-xs text-dark/70 mt-0.5">Maîtrise Leitner</p>
           </div>
         </div>
 
@@ -43,24 +43,24 @@
         <div class="rounded-xl border border-gray px-3 py-2 space-y-2">
           <p class="text-xs font-semibold text-primary uppercase tracking-wide">Révision</p>
           <div class="grid grid-cols-3 gap-1 text-xs">
-            <span class="text-dark/60">Planifiées</span>
-            <span class="text-dark/60">Complétées</span>
-            <span class="text-dark/60">Taux</span>
+            <span class="text-dark/70">Planifiées</span>
+            <span class="text-dark/70">Complétées</span>
+            <span class="text-dark/70">Taux</span>
             <span class="font-semibold">{{ kpi.revision.totalPlanned }}</span>
             <span class="font-semibold">{{ kpi.revision.totalCompleted }}</span>
             <span class="font-semibold">{{ kpi.revision.completionRate }} %</span>
           </div>
           <div class="flex justify-between text-xs">
-            <span class="text-dark/60">30 jours (planifiées / complétées)</span>
+            <span class="text-dark/70">30 jours (planifiées / complétées)</span>
             <span class="font-semibold">{{ kpi.revision.sessionsLast30Days }} / {{ kpi.revision.completedLast30Days }}</span>
           </div>
-          <p class="text-xs text-dark/60">
+          <p class="text-xs text-dark/70">
             Streak : <span class="font-semibold text-dark">{{ kpi.revision.streakDays }} j</span>
             · Temps total : <span class="font-semibold text-dark">{{ formatMinutes(kpi.revision.totalMinutes) }}</span>
           </p>
           <!-- Activité hebdomadaire (mini-graphique barres) -->
           <div v-if="kpi.revision.weeklyActivity?.length" class="space-y-1">
-            <p class="text-xs text-dark/60">Activité / semaine (8 sem.)</p>
+            <p class="text-xs text-dark/70">Activité / semaine (8 sem.)</p>
             <div class="flex items-end gap-0.5 h-8">
               <div v-for="w in kpi.revision.weeklyActivity" :key="w.week"
                 class="flex-1 rounded-sm bg-primary/60 transition-all"
@@ -75,24 +75,24 @@
         <div class="rounded-xl border border-gray px-3 py-2 space-y-2">
           <p class="text-xs font-semibold text-primary uppercase tracking-wide">Exercices</p>
           <div class="grid grid-cols-4 gap-1 text-xs">
-            <span class="text-dark/60">Total</span>
-            <span class="text-dark/60">Moy.</span>
-            <span class="text-dark/60">Min / Max</span>
-            <span class="text-dark/60">Tendance</span>
+            <span class="text-dark/70">Total</span>
+            <span class="text-dark/70">Moy.</span>
+            <span class="text-dark/70">Min / Max</span>
+            <span class="text-dark/70">Tendance</span>
             <span class="font-semibold">{{ kpi.exercises.totalTests }}</span>
             <span class="font-semibold">{{ kpi.exercises.avgScore }} %</span>
             <span class="font-semibold">{{ kpi.exercises.minScore }} / {{ kpi.exercises.maxScore }} %</span>
-            <span :class="['font-semibold', kpi.exercises.recentTrend > 0 ? 'text-success' : kpi.exercises.recentTrend < 0 ? 'text-secondary' : '']">
+            <span :class="['font-semibold', kpi.exercises.recentTrend > 0 ? 'text-green-700' : kpi.exercises.recentTrend < 0 ? 'text-red-700' : '']">
               {{ kpi.exercises.recentTrend > 0 ? '+' : '' }}{{ kpi.exercises.recentTrend ?? '—' }} %
             </span>
           </div>
           <!-- Dernières évaluations -->
           <div v-if="kpi.exercises.scoreHistory?.length" class="space-y-0.5 pt-1">
-            <p class="text-xs text-dark/60">5 dernières évaluations</p>
+            <p class="text-xs text-dark/70">5 dernières évaluations</p>
             <div v-for="h in kpi.exercises.scoreHistory.slice(0, 5)" :key="h.date"
               class="flex justify-between text-xs">
               <span class="text-dark/70 truncate max-w-[120px]">{{ h.testName }}</span>
-              <span :class="['font-semibold', h.percentage >= 70 ? 'text-success' : h.percentage >= 50 ? 'text-primary' : 'text-secondary']">
+              <span :class="['font-semibold', h.percentage >= 70 ? 'text-green-700' : h.percentage >= 50 ? 'text-primary' : 'text-red-700']">
                 {{ h.percentage }} %
               </span>
             </div>
@@ -103,21 +103,21 @@
         <div class="rounded-xl border border-gray px-3 py-2 space-y-2">
           <p class="text-xs font-semibold text-primary uppercase tracking-wide">Leitner</p>
           <p class="text-xs">
-            <span class="text-dark/60">Cartes : </span><span class="font-semibold">{{ kpi.leitner.totalCards }}</span>
-            <span class="text-dark/60"> · Maîtrise : </span><span class="font-semibold">{{ kpi.leitner.mastery }} %</span>
-            <span class="text-dark/60"> · À réviser : </span><span class="font-semibold">{{ kpi.leitner.cardsDue }}</span>
-            <span class="text-dark/60"> · Succès : </span><span class="font-semibold">{{ kpi.leitner.globalSuccessRate }} %</span>
+            <span class="text-dark/70">Cartes : </span><span class="font-semibold">{{ kpi.leitner.totalCards }}</span>
+            <span class="text-dark/70"> · Maîtrise : </span><span class="font-semibold">{{ kpi.leitner.mastery }} %</span>
+            <span class="text-dark/70"> · À réviser : </span><span class="font-semibold">{{ kpi.leitner.cardsDue }}</span>
+            <span class="text-dark/70"> · Succès : </span><span class="font-semibold">{{ kpi.leitner.globalSuccessRate }} %</span>
           </p>
           <!-- Distribution par boîte -->
           <div v-if="kpi.leitner.totalCards > 0">
-            <p class="text-xs text-dark/60 mb-1">Distribution par boîte</p>
+            <p class="text-xs text-dark/70 mb-1">Distribution par boîte</p>
             <div class="flex gap-1 text-center">
               <div v-for="box in 5" :key="box" class="flex-1">
                 <div class="h-1.5 rounded-sm"
                   :class="box <= 2 ? 'bg-secondary/50' : box === 3 ? 'bg-primary/50' : 'bg-success/50'">
                 </div>
                 <p class="text-xs font-semibold text-dark/70 mt-0.5">{{ kpi.leitner.cardsByBox[box] ?? 0 }}</p>
-                <p class="text-xs text-dark/40">B{{ box }}</p>
+                <p class="text-xs text-dark/70">B{{ box }}</p>
               </div>
             </div>
           </div>
@@ -142,9 +142,9 @@
         <div class="rounded-xl border border-gray px-3 py-2 space-y-1">
           <p class="text-xs font-semibold text-primary uppercase tracking-wide">Discipline</p>
           <div class="grid grid-cols-2 gap-1 text-xs">
-            <span class="text-dark/60">Cette semaine (planifiées / complétées)</span>
+            <span class="text-dark/70">Cette semaine (planifiées / complétées)</span>
             <span class="font-semibold text-right">{{ kpi.discipline.plannedThisWeek }} / {{ kpi.discipline.completedThisWeek }}</span>
-            <span class="text-dark/60">Score 30 jours</span>
+            <span class="text-dark/70">Score 30 jours</span>
             <span :class="['font-semibold text-right', disciplineScoreClass(kpi.discipline.disciplineScore)]">
               {{ kpi.discipline.disciplineScore }} %
             </span>

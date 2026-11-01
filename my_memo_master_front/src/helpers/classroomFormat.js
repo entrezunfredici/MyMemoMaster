@@ -45,9 +45,9 @@ export function resourceTypeLabel(type) {
 
 /** Couleur du score de discipline (30 jours) : bon à partir de 70, moyen à partir de 40. */
 export function disciplineScoreClass(score) {
-  if (score >= 70) return 'text-success'
+  if (score >= 70) return 'text-green-700'
   if (score >= 40) return 'text-primary'
-  return 'text-secondary'
+  return 'text-red-700'
 }
 
 /** Normalise la hauteur d'une barre d'activité hebdomadaire (max 7 séances par semaine). */
@@ -78,6 +78,6 @@ export function eventTypeLabel(type) {
 
 /** Classes de la pastille d'un type d'événement : l'examen ressort en couleur secondaire. */
 export function eventTypeBadgeClass(type) {
-  if (type === 'examen') return 'rounded-full bg-secondary/10 px-2 py-1 text-xs text-secondary'
+  if (type === 'examen') return 'rounded-full bg-secondary/10 px-2 py-1 text-xs text-red-700'
   return 'rounded-full bg-primary/10 px-2 py-1 text-xs text-primary'
 }

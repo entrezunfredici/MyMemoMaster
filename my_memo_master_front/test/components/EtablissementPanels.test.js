@@ -506,7 +506,7 @@ describe('EtablissementInviteForm', () => {
     await btn(w, "Envoyer l'invitation").trigger('click')
     await flushPromises()
     expect(w.text()).toContain("Erreur lors de l'envoi.")
-    expect(w.find('.text-secondary').exists()).toBe(true)
+    expect(w.find('.text-red-700').exists()).toBe(true)
     expect(useInvitationStore().fetchByGroup).not.toHaveBeenCalled()
   })
 })

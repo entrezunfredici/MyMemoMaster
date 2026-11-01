@@ -82,7 +82,7 @@ describe('libellés', () => {
 })
 
 describe('disciplineScoreClass', () => {
-  it.each([[100, 'text-success'], [70, 'text-success'], [69, 'text-primary'], [40, 'text-primary'], [39, 'text-secondary'], [0, 'text-secondary']])(
+  it.each([[100, 'text-green-700'], [70, 'text-green-700'], [69, 'text-primary'], [40, 'text-primary'], [39, 'text-red-700'], [0, 'text-red-700']])(
     'score %i -> %s',
     (score, cls) => expect(disciplineScoreClass(score)).toBe(cls),
   )

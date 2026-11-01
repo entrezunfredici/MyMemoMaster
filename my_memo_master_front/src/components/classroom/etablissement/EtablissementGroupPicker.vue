@@ -25,7 +25,7 @@
         <button @click="showCreateGroup = false"
           class="rounded-lg border border-gray px-4 py-2 text-sm hover:bg-light transition">Annuler</button>
       </div>
-      <p v-if="createGroupForm.error" class="text-xs text-secondary">{{ createGroupForm.error }}</p>
+      <p v-if="createGroupForm.error" class="text-xs text-red-700">{{ createGroupForm.error }}</p>
     </div>
 
     <!-- Liste des groupes -->
@@ -35,15 +35,15 @@
         :class="[selectedId === g.id ? 'border-primary bg-light/70' : 'border-gray', 'relative min-w-[220px] rounded-xl border-2 shadow-sm transition hover:-translate-y-0.5']">
         <button type="button" :aria-pressed="selectedId === g.id" @click="emit('select', g.id)"
           class="block w-full rounded-xl p-3 pr-10 text-left">
-          <span class="block text-xs text-dark/60 uppercase tracking-wide">{{ g.level }}</span>
+          <span class="block text-xs text-dark/70 uppercase tracking-wide">{{ g.level }}</span>
           <span class="block text-lg font-semibold text-primary">{{ g.name }}</span>
-          <span class="block text-xs text-dark/60">{{ g.code }}</span>
-          <span class="mt-2 block text-xs text-dark/60">{{ g.members?.length ?? 0 }} {{ plural(g.members?.length ?? 0, 'membre') }}</span>
+          <span class="block text-xs text-dark/70">{{ g.code }}</span>
+          <span class="mt-2 block text-xs text-dark/70">{{ g.members?.length ?? 0 }} {{ plural(g.members?.length ?? 0, 'membre') }}</span>
         </button>
         <button type="button" :aria-label="`Supprimer le groupe ${g.name}`" @click="confirmDeleteGroup(g)"
-          class="absolute right-2 top-2 text-secondary hover:text-secondary/70 text-lg leading-none">×</button>
+          class="absolute right-2 top-2 text-red-700 hover:text-red-800 text-lg leading-none">×</button>
       </div>
-      <p v-if="groups.length === 0" class="text-sm text-dark/60">Aucun groupe. Créez-en un.</p>
+      <p v-if="groups.length === 0" class="text-sm text-dark/70">Aucun groupe. Créez-en un.</p>
     </div>
   </section>
 </template>

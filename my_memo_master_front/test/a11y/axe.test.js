@@ -33,6 +33,7 @@ import KpiAlertWidgetComponent from '@/components/KpiAlertWidgetComponent.vue'
 import AdminRolesPanel from '@/components/admin/AdminRolesPanel.vue'
 import AdminAccountsPanel from '@/components/admin/AdminAccountsPanel.vue'
 import AdminAuditPanel from '@/components/admin/AdminAuditPanel.vue'
+import ReportContentButton from '@/components/classroom/ReportContentButton.vue'
 import { CONFIRM_ACTION_KEY } from '@/composables/useConfirmAction'
 
 // Composants sans route dans leur template : pas besoin du mock vue-router.
@@ -459,5 +460,41 @@ describe('Accessibilité (axe-core)', () => {
       }
     })
     expect(await runAxe(wrapper.element)).toEqual([])
+  })
+})
+
+describe('Accessibilité (axe-core) — signalement de contenu', () => {
+  const mountReport = () =>
+    mount(ReportContentButton, {
+      props: { contentType: 'resource', contentId: 4, contentTitle: 'Cours Analyse', authorId: 99 },
+      global: {
+        plugins: [
+          createTestingPinia({
+            createSpy: vi.fn,
+            initialState: { auth: { user: { userId: 21, roleId: 2 }, authenticated: true } }
+          })
+        ]
+      },
+      attachTo: document.body
+    })
+
+  it('ReportContentButton - bouton seul - aucune violation axe', async () => {
+    wrapper = mountReport()
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('ReportContentButton - formulaire ouvert - aucune violation axe', async () => {
+    wrapper = mountReport()
+    await wrapper.get('button').trigger('click')
+    expect(await runAxe(document.body.querySelector('[role="dialog"]'))).toEqual([])
+  })
+
+  it('ReportContentButton - formulaire en erreur - aucune violation axe', async () => {
+    wrapper = mountReport()
+    await wrapper.get('button').trigger('click')
+    await wrapper.get('input[value="other"]').setValue()
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    expect(await runAxe(document.body.querySelector('[role="dialog"]'))).toEqual([])
   })
 })

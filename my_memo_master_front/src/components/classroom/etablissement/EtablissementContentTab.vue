@@ -1,7 +1,7 @@
 <template>
   <div class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-4">
     <h2 class="text-lg font-semibold text-dark">Modération du contenu</h2>
-    <div v-if="!etabStore.content" class="text-sm text-dark/60">Chargement...</div>
+    <div v-if="!etabStore.content" class="text-sm text-dark/70">Chargement...</div>
     <template v-else>
       <div class="space-y-2">
         <p class="text-sm font-semibold text-dark">Ressources ({{ etabStore.content.resources?.length ?? 0 }})</p>
@@ -13,7 +13,7 @@
             <p class="text-dark/50">{{ r.classGroup?.name }} · {{ r.type }} · {{ r.creator?.name }}</p>
           </div>
           <button @click="confirmDeleteContent('resource', r.id, r.title)"
-            class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-secondary hover:bg-secondary/20 transition">
+            class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-red-700 hover:bg-secondary/20 transition">
             Supprimer
           </button>
         </div>
@@ -28,7 +28,7 @@
             <p class="text-dark/50">{{ s.classGroup?.name }} · {{ s.type }} · {{ s.creator?.name }}</p>
           </div>
           <button @click="confirmDeleteContent('section', s.id, s.title)"
-            class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-secondary hover:bg-secondary/20 transition">
+            class="shrink-0 rounded-lg bg-secondary/10 px-2 py-1 text-red-700 hover:bg-secondary/20 transition">
             Supprimer
           </button>
         </div>

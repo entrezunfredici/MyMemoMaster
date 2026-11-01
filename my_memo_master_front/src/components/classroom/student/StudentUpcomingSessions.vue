@@ -1,14 +1,14 @@
 <template>
   <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
     <h2 class="text-lg font-semibold text-dark">Prochaines séances</h2>
-    <div v-if="loading" class="text-sm text-dark/60">Chargement...</div>
-    <div v-else-if="upcomingOccurrences.length === 0" class="text-sm text-dark/60">Aucune séance prévue.</div>
+    <div v-if="loading" class="text-sm text-dark/70">Chargement...</div>
+    <div v-else-if="upcomingOccurrences.length === 0" class="text-sm text-dark/70">Aucune séance prévue.</div>
     <div v-else class="space-y-2">
       <div v-for="occ in upcomingOccurrences" :key="occ.id"
         class="rounded-xl border border-gray px-4 py-3 flex items-center justify-between">
         <div>
           <p class="text-sm font-semibold text-dark">{{ occ.calendarEvent?.name }}</p>
-          <p class="text-xs text-dark/60">{{ formatDate(occ.date) }} · {{ occ.startTime?.slice(0,5) }} – {{ occ.endTime?.slice(0,5) }}</p>
+          <p class="text-xs text-dark/70">{{ formatDate(occ.date) }} · {{ occ.startTime?.slice(0,5) }} – {{ occ.endTime?.slice(0,5) }}</p>
         </div>
         <span :class="eventTypeBadgeClass(occ.calendarEvent?.type)">{{ eventTypeLabel(occ.calendarEvent?.type) }}</span>
       </div>

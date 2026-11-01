@@ -60,7 +60,7 @@ describe('StudentDetailComponent — informations de base', () => {
 
   it('affiche "—" si avgScore est null', () => {
     const w = mountDetail({ avgScore: null })
-    const scoreEl = w.find('.text-dark\\/40')
+    const scoreEl = w.find('.text-dark\\/70')
     expect(scoreEl.exists()).toBe(true)
   })
 })
@@ -68,9 +68,9 @@ describe('StudentDetailComponent — informations de base', () => {
 // ── Couleur du score ──────────────────────────────────────────────────────────
 
 describe('StudentDetailComponent — couleur du score moyen', () => {
-  it('score ≥ 70 → text-success', () => {
+  it('score ≥ 70 → text-green-700', () => {
     const w = mountDetail({ avgScore: 70 })
-    expect(w.html()).toContain('text-success')
+    expect(w.html()).toContain('text-green-700')
   })
 
   it('score entre 50 et 69 → text-dark', () => {
@@ -79,10 +79,10 @@ describe('StudentDetailComponent — couleur du score moyen', () => {
     expect(scoreSpan.classes()).toContain('text-dark')
   })
 
-  it('score < 50 → text-secondary', () => {
+  it('score < 50 → text-red-700', () => {
     const w = mountDetail({ avgScore: 40 })
     const scoreSpan = w.find('p:nth-child(3) span')
-    expect(scoreSpan.classes()).toContain('text-secondary')
+    expect(scoreSpan.classes()).toContain('text-red-700')
   })
 })
 
@@ -142,7 +142,7 @@ describe('StudentDetailComponent — historique des scores', () => {
         { score: 30, completedAt: '2026-05-20T00:00:00Z' },
       ]
     })
-    expect(w.html()).toContain('text-success')
-    expect(w.html()).toContain('text-secondary')
+    expect(w.html()).toContain('text-green-700')
+    expect(w.html()).toContain('text-red-700')
   })
 })

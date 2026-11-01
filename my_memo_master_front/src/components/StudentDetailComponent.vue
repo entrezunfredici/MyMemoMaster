@@ -1,5 +1,5 @@
 <template>
-  <div class="border-t border-gray/80 px-3 pb-3 pt-2 text-xs text-dark/60 space-y-3">
+  <div class="border-t border-gray/80 px-3 pb-3 pt-2 text-xs text-dark/70 space-y-3">
 
     <!-- Informations de base -->
     <div class="space-y-1">
@@ -8,14 +8,14 @@
         Dernière activité :
         <span v-if="student.lastActivityAt" class="text-dark/80">
           {{ formatDate(student.lastActivityAt) }}
-          <span class="text-dark/40">(il y a {{ student.daysInactive }}j)</span>
+          <span class="text-dark/70">(il y a {{ student.daysInactive }}j)</span>
         </span>
         <span v-else>aucune</span>
       </p>
       <p>
         Score moyen :
         <span
-          :class="student.avgScore !== null ? scoreTextClass(student.avgScore) : 'text-dark/40'"
+          :class="student.avgScore !== null ? scoreTextClass(student.avgScore) : 'text-dark/70'"
           class="font-semibold">
           {{ student.avgScore !== null ? student.avgScore + ' %' : '—' }}
         </span>
@@ -24,12 +24,12 @@
 
     <!-- Alertes décrochage -->
     <div v-if="student.atRisk && student.atRiskReasons.length">
-      <p class="font-medium text-secondary mb-1">Alertes :</p>
+      <p class="font-medium text-red-700 mb-1">Alertes :</p>
       <div class="flex flex-wrap gap-1">
         <span
           v-for="reason in student.atRiskReasons"
           :key="reason"
-          class="rounded-full bg-secondary/10 px-2 py-0.5 text-secondary">
+          class="rounded-full bg-secondary/10 px-2 py-0.5 text-red-700">
           {{ reason }}
         </span>
       </div>
@@ -44,10 +44,10 @@
           :key="i"
           class="rounded-xl border border-gray bg-light px-2 py-1 text-center min-w-[56px]">
           <p :class="['font-semibold', scoreTextClass(entry.score)]">{{ entry.score }} %</p>
-          <p class="text-dark/40 text-[10px]">{{ formatDate(entry.completedAt) }}</p>
+          <p class="text-dark/70 text-[10px]">{{ formatDate(entry.completedAt) }}</p>
         </div>
       </div>
-      <p v-else class="text-dark/40">Aucun exercice complété.</p>
+      <p v-else class="text-dark/70">Aucun exercice complété.</p>
     </div>
 
   </div>
@@ -59,9 +59,9 @@ defineProps({
 })
 
 function scoreTextClass(score) {
-  if (score >= 70) return 'text-success'
+  if (score >= 70) return 'text-green-700'
   if (score >= 50) return 'text-dark'
-  return 'text-secondary'
+  return 'text-red-700'
 }
 
 function formatDate(value) {

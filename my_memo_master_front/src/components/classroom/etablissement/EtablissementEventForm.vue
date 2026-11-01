@@ -42,11 +42,11 @@
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div>
-          <label class="text-xs text-dark/60">Début de période</label>
+          <label class="text-xs text-dark/70">Début de période</label>
           <input aria-label="Date de début" v-model="eventForm.startDate" type="date" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label class="text-xs text-dark/60">Fin de période</label>
+          <label class="text-xs text-dark/70">Fin de période</label>
           <input aria-label="Date de fin" v-model="eventForm.endDate" type="date" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
         </div>
       </div>
@@ -55,18 +55,18 @@
     <!-- Séance unique -->
     <template v-else>
       <div>
-        <label class="text-xs text-dark/60">Date</label>
+        <label class="text-xs text-dark/70">Date</label>
         <input aria-label="Date" v-model="eventForm.date" type="date" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
       </div>
     </template>
 
     <div class="grid grid-cols-2 gap-2">
       <div>
-        <label class="text-xs text-dark/60">Heure début</label>
+        <label class="text-xs text-dark/70">Heure début</label>
         <input aria-label="Heure de début" v-model="eventForm.startTime" type="time" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
       </div>
       <div>
-        <label class="text-xs text-dark/60">Heure fin</label>
+        <label class="text-xs text-dark/70">Heure fin</label>
         <input aria-label="Heure de fin" v-model="eventForm.endTime" type="time" class="w-full rounded-lg border-2 border-gray-500 px-3 py-2 text-sm" />
       </div>
     </div>
@@ -75,8 +75,8 @@
       class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-light hover:bg-primary/90 transition">
       Créer le créneau
     </button>
-    <p v-if="eventForm.error" class="text-xs text-secondary">{{ eventForm.error }}</p>
-    <p v-if="eventForm.success" class="text-xs text-success">{{ eventForm.success }}</p>
+    <p v-if="eventForm.error" class="text-xs text-red-700">{{ eventForm.error }}</p>
+    <p v-if="eventForm.success" class="text-xs text-green-700">{{ eventForm.success }}</p>
   </div>
 </template>
 

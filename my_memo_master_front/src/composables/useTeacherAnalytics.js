@@ -20,9 +20,9 @@ export function useTeacherAnalytics() {
   const atRiskStudents = computed(() => analytics.value?.students?.filter((s) => s.atRisk) ?? [])
 
   function scoreTextClass(score) {
-    if (score >= 70) return 'text-success'
+    if (score >= 70) return 'text-green-700'
     if (score >= 50) return 'text-dark'
-    return 'text-secondary'
+    return 'text-red-700'
   }
 
   function formatShortDate(dateStr) {

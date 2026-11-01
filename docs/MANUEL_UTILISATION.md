@@ -111,6 +111,7 @@ Page **Classroom** (`/classroom`) :
 - Rejoignez un groupe via l'**invitation** reçue par email.
 - Consultez les **sections** publiées par l'enseignant (cours, ressources à télécharger), les **échéances** (devoirs à rendre avec date limite) et déposez vos **rendus** (fichier).
 - Accordez ou retirez le partage de vos KPI à un enseignant du groupe.
+- **Signalez un contenu inapproprié** (section, rendu ou document partagé) avec le lien **Signaler** placé à côté du contenu : choisissez un motif (contenu illégal, harcèlement, droits d'auteur, spam, données personnelles ou autre, ce dernier exigeant une précision) et ajoutez au besoin un commentaire de 500 caractères au plus. Le signalement est confidentiel : l'auteur n'en connaît pas l'origine. Vous recevez un email quand la modération a statué. Vous ne pouvez pas signaler votre propre contenu, ni avoir plus d'un signalement ouvert sur le même contenu, ni envoyer plus de 10 signalements par 24 heures.
 
 ---
 

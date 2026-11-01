@@ -7,7 +7,7 @@
         @click="switchTab(tab.key)"
         :class="[activeTab === tab.key
           ? 'border-b-2 border-primary text-primary font-semibold'
-          : 'text-dark/60 hover:text-dark', 'pb-2 px-3 text-sm transition']">
+          : 'text-dark/70 hover:text-dark', 'pb-2 px-3 text-sm transition']">
         {{ tab.label }}
       </button>
     </div>

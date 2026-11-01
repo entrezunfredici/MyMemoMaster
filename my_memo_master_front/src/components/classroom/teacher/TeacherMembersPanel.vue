@@ -6,24 +6,24 @@
         class="rounded-xl border border-gray px-3 py-2 flex items-center justify-between text-sm">
         <div>
           <p class="font-semibold text-dark">{{ m.user?.name ?? `#${m.userId}` }}</p>
-          <p class="text-xs text-dark/60">{{ m.user?.email }}</p>
+          <p class="text-xs text-dark/70">{{ m.user?.email }}</p>
         </div>
         <div class="flex items-center gap-2">
-          <span :class="m.role === 'teacher' ? 'bg-primary/10 text-primary' : 'bg-gray text-dark/60'"
+          <span :class="m.role === 'teacher' ? 'bg-primary/10 text-primary' : 'bg-gray text-dark/70'"
             class="rounded-full px-2 py-0.5 text-xs font-semibold">
             {{ m.role === 'teacher' ? 'Enseignant' : 'Étudiant' }}
           </span>
           <button aria-label="Retirer le membre" v-if="m.role === 'student'"
             @click="confirmRemoveMember(m)"
-            class="text-secondary text-xs hover:underline">×</button>
+            class="text-red-700 text-xs hover:underline">×</button>
         </div>
       </div>
-      <p v-if="!group.members?.length" class="text-sm text-dark/60">Aucun membre.</p>
+      <p v-if="!group.members?.length" class="text-sm text-dark/70">Aucun membre.</p>
     </div>
 
     <!-- Invitations en attente -->
     <div v-if="invitationStore.groupInvitations.length > 0" class="pt-2 border-t border-gray space-y-1">
-      <p class="text-xs font-semibold text-dark/60 uppercase tracking-wide">En attente</p>
+      <p class="text-xs font-semibold text-dark/70 uppercase tracking-wide">En attente</p>
       <div v-for="inv in invitationStore.groupInvitations" :key="inv.id"
         class="rounded-xl border border-gray/50 px-3 py-2 flex items-center justify-between text-xs text-dark/70">
         <span>{{ inv.targetEmail }}</span>

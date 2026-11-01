@@ -7,18 +7,18 @@
       <div v-for="inv in pendingInvitations" :key="inv.id" class="flex items-center justify-between rounded-xl border border-gray bg-white px-4 py-3">
         <div>
           <p class="font-semibold text-dark">{{ inv.classGroup?.name ?? `Groupe #${inv.classGroupId}` }}</p>
-          <p class="text-xs text-dark/60">
+          <p class="text-xs text-dark/70">
             Rôle : {{ inv.role === 'teacher' ? 'Enseignant' : 'Étudiant' }} ·
             Invité par {{ inv.invitedBy?.name ?? '—' }}
           </p>
         </div>
         <div class="flex gap-2">
           <button @click="respond(inv.id, 'accepted')"
-            class="rounded-lg bg-success/10 px-3 py-1 text-sm font-semibold text-success hover:bg-success/20 transition">
+            class="rounded-lg bg-success/10 px-3 py-1 text-sm font-semibold text-green-700 hover:bg-success/20 transition">
             Accepter
           </button>
           <button @click="respond(inv.id, 'declined')"
-            class="rounded-lg bg-secondary/10 px-3 py-1 text-sm font-semibold text-secondary hover:bg-secondary/20 transition">
+            class="rounded-lg bg-secondary/10 px-3 py-1 text-sm font-semibold text-red-700 hover:bg-secondary/20 transition">
             Décliner
           </button>
         </div>
