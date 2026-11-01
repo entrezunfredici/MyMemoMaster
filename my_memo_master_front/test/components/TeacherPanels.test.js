@@ -542,6 +542,17 @@ describe('TeacherResourceList', () => {
     expect(wrapper.findAll('button').filter((b) => b.text() === 'Ouvrir')).toHaveLength(1)
   })
 
+  it('filtre par type, avec message si aucun document de ce type', async () => {
+    const { wrapper } = mountList()
+    await btn(wrapper, 'Cours (1)').trigger('click')
+    expect(wrapper.text()).toContain('Cours.pdf')
+    expect(wrapper.text()).not.toContain('Schéma')
+    await btn(wrapper, 'Sujet (0)').trigger('click')
+    expect(wrapper.text()).toContain('Aucun document de ce type.')
+    await btn(wrapper, 'Tous (2)').trigger('click')
+    expect(wrapper.text()).toContain('Schéma')
+  })
+
   it('« Ouvrir » ouvre le fichier', async () => {
     const { wrapper } = mountList()
     await btn(wrapper, 'Ouvrir').trigger('click')

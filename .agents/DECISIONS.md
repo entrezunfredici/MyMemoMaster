@@ -5414,3 +5414,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `ClassGroupResourceService.canAccessFile` (membre d'un groupe portant ce `fileKey`, rôles 1/4, ou auteur du téléversement) est appelé par `presignFile` avant le contrôle de modération. Un fichier sans ressource de groupe reste accessible (fichiers personnels, cartes mentales). Le refus est un 404 identique à « fichier introuvable ».
 **Alternative écartée** : 403 explicite (révèle l'existence du fichier) ; refuser tout fichier non rattaché à une ressource (casse les uploads personnels et les images de cartes mentales servis par la même route) ; ajouter `groupId` en paramètre de la route (le front et les liens existants changeraient, et le client choisirait le groupe contre lequel on vérifie).
 **Conséquences** : tout nouveau type de contenu de groupe qui stocke un `fileKey` doit être ajouté à ce contrôle ; une requête SQL de plus par `presign`.
+
+## [2026-11-01] Filtre par type de la bibliothèque de ressources : côté client
+
+**Contexte** : C-03.05. La bibliothèque de groupe devait pouvoir être parcourue par type de ressource.
+**Décision** : filtrer côté client (`filterResources` dans `helpers/classroomFormat.js`) la liste déjà chargée, avec un composant partagé `ResourceTypeFilter.vue` pour les vues étudiant et enseignant.
+**Alternative écartée** : paramètre `type` sur `GET /class-groups/:id/resources` : l'API renvoie déjà toute la liste sans pagination, un aller-retour réseau n'apporterait rien et le cache du store (TTL 5 min) serait à segmenter.
+**Conséquences** : à refaire côté API si la liste devient paginée ; l'état du filtre est local au composant.
+
