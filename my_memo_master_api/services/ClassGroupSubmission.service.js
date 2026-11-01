@@ -19,7 +19,7 @@ class ClassGroupSubmissionService {
   }
 
   async _sectionBelongsToGroup(sectionId, groupId) {
-    const section = await ClassGroupSection.findOne({ where: { id: sectionId, classGroupId: groupId, type: 'rendu' } })
+    const section = await ClassGroupSection.findOne({ where: { id: sectionId, classGroupId: groupId, type: 'rendu', hiddenAt: null } })
     return !!section
   }
 

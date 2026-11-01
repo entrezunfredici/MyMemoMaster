@@ -273,6 +273,15 @@ Préfixe `/api/v1`. Chaque route est dans `routes/ContentReport.routes.js` et do
 
 Codes de retour : 201 création · 400 validation ou auto-signalement · 403 contenu non visible · 404 introuvable ou hors périmètre · 409 doublon ou statut final · 429 limite atteinte.
 
+**Livré par S-07.02** (`routes/ContentReport.routes.js`, documenté dans Swagger sous le tag `ContentReport`). Précisions d'implémentation :
+
+- `GET /content-reports` renvoie `{ items, total, page, limit }` : une ligne par contenu signalé (`reportCount`, `reporterCount`, `priority`, `overdue`, `purgeAt`, `daysLeft`, `purgeImminent`). Statuts ouverts par défaut ; `status=hidden` trie par date de purge croissante. Filtres : `status`, `reason`, `contentType`, `etablissementId` (rôles 1 et 5), `page`, `limit` (100 maximum). Les signalements visant le contenu du demandeur n'y figurent pas.
+- Les actions s'appliquent à **tous** les signalements ouverts du même contenu. `decisionNote` (500 caractères maximum) est obligatoire pour `dismiss`, `hide` et `remove-content`.
+- Le rôle 5 ne peut signaler que ce qu'il voit : il n'est pas membre des groupes, donc `POST /content-reports` lui répond 403 sauf s'il est membre du groupe.
+- **Accusé de réception** : la réponse `201` de l'API en tient lieu ; il n'y a pas d'email de confirmation à la création. Le signalant reçoit un email à la clôture (rejeté, masqué ou supprimé) ; l'auteur reçoit un email à chaque masquage ou suppression par un modérateur (adresse de contact dans le texte). Les envois sont best effort : un échec est journalisé et ne bloque pas la décision.
+- **Contenu masqué** : filtré (`hiddenAt IS NULL`) dans `ClassGroupResource.findAll` et `ClassGroupSection.findAll` pour les membres, sauf l'auteur et les rôles 1 et 4. Le dépôt d'un rendu sur une section masquée est refusé. `GET /storage/presign` refuse (404) le fichier d'une ressource masquée, sauf à son auteur et aux rôles 1, 4 et 5.
+- **Tâche planifiée** : `jobs/contentModeration.cron.js`, 04h00 UTC (`CONTENT_MODERATION_CRON_ENABLED=false` pour la désactiver, `CONTENT_REPORT_RETENTION_DAYS` pour la rétention, 365 par défaut).
+
 ---
 
 ## 12. Audit trail

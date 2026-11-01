@@ -1,6 +1,7 @@
 const { Op } = require('sequelize')
 const { Etablissement, User, ClassGroup, ClassGroupUsers, Invitation, AuditLog, ClassGroupResource, ClassGroupSection } = require('../models/index')
 const AuditLogService = require('./AuditLog.service')
+const ContentReportService = require('./ContentReport.service')
 const sendEmail = require('../helpers/sendEmail')
 const getFrontUrl = require('../helpers/frontUrl')
 const logger = require('../helpers/logger')
@@ -265,6 +266,7 @@ class EtablissementService {
     if (!inEtab) return 'not_found'
 
     await item.destroy()
+    await ContentReportService.closeForDeletedContent(contentType, contentId)
 
     const action = contentType === 'resource' ? 'CONTENT_RESOURCE_REMOVED' : 'CONTENT_SECTION_REMOVED'
     const entityType = contentType === 'resource' ? 'ClassGroupResource' : 'ClassGroupSection'

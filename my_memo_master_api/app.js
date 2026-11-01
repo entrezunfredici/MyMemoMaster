@@ -50,6 +50,7 @@ const searchRoutes = require('./routes/Search.routes')
 const etablissementRoutes = require('./routes/Etablissement.routes')
 const auditLogRoutes = require('./routes/AuditLog.routes')
 const backupRoutes = require('./routes/Backup.routes')
+const contentReportRoutes = require('./routes/ContentReport.routes')
 const leitnerReviewSessionRoutes = require('./routes/LeitnerReviewSession.routes')
 const mindMapViewSessionRoutes = require('./routes/MindMapViewSession.routes')
 const aiGenerationBatchRoutes = require('./routes/AiGenerationBatch.routes')
@@ -59,6 +60,7 @@ const { startFifoCron } = require('./jobs/fifo.cron')
 const { startReminderWorker } = require('./jobs/reminder.worker')
 const { startKpiAlertCron } = require('./jobs/kpiAlert.cron')
 const { startBackupCron } = require('./jobs/backup.cron')
+const { startContentModerationCron } = require('./jobs/contentModeration.cron')
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') }) // .env is placed in the root directory of the project
 
@@ -204,6 +206,7 @@ searchRoutes(v1)
 etablissementRoutes(v1)
 auditLogRoutes(v1)
 backupRoutes(v1)
+contentReportRoutes(v1)
 aiGenerationBatchRoutes(v1)
 aiExerciseGenerationRoutes(v1)
 app.use('/api/v1', v1)
@@ -213,6 +216,7 @@ startFifoCron()
 startReminderWorker()
 startKpiAlertCron()
 startBackupCron()
+startContentModerationCron()
 
 // Si rien n'est trouvé
 app.use((_req, res) => {

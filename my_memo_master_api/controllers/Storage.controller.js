@@ -3,6 +3,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 const { s3Client, bucket, publicUrl } = require('../config/storage.config')
 const logger = require('../helpers/logger')
 const { isUploadKey, isUserUploadKey } = require('../helpers/storageKeys')
+const ContentReportService = require('../services/ContentReport.service')
 
 exports.upload = async (req, res) => {
   try {
@@ -52,6 +53,10 @@ exports.presignFile = async (req, res) => {
     return res.status(400).send({ message: 'Clé de fichier invalide.' })
   }
   try {
+    // Un fichier de ressource masquée par la modération n'est servi qu'à son auteur et aux rôles 1, 4 et 5.
+    if (!(await ContentReportService.canAccessFile(key, req.user.id))) {
+      return res.status(404).send({ message: 'Fichier introuvable.' })
+    }
     const filename = key.split('/').pop()
     const command = new GetObjectCommand({
       Bucket: bucket,

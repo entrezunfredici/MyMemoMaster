@@ -42,6 +42,18 @@ module.exports = (instance) => {
         type: DataTypes.DATEONLY,
         allowNull: true
       },
+      hiddenAt: {
+        type: DataTypes.DATE,
+        allowNull: true
+        // Masquage de modération : non nul = invisible des membres (voir ContentReport.service)
+      },
+      hiddenBy: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'User', key: 'userId' },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
+      },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,

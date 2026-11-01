@@ -1,4 +1,6 @@
+const { Op } = require('sequelize')
 const { ClassGroupSection, ClassGroupUsers, User } = require('../models/index')
+const ContentReportService = require('./ContentReport.service')
 
 class ClassGroupSectionService {
   async _canWrite(groupId, userId) {
@@ -20,10 +22,20 @@ class ClassGroupSectionService {
   async findAll(groupId, requesterId) {
     if (!(await this._isMember(groupId, requesterId))) return false
     return ClassGroupSection.findAll({
-      where: { classGroupId: groupId },
+      where: { classGroupId: groupId, ...(await this._hiddenFilter(requesterId)) },
       include: [{ model: User, as: 'creator', attributes: ['userId', 'name'] }],
       order: [['createdAt', 'ASC']]
     })
+  }
+
+  /**
+   * Filtre des contenus masqués par la modération : invisibles des membres, visibles de leur auteur
+   * et des rôles 1 et 4 (qui portent `hiddenAt` pour afficher un bandeau).
+   */
+  async _hiddenFilter(requesterId) {
+    const user = await User.findByPk(requesterId, { attributes: ['roleId'] })
+    if ([1, 4].includes(user?.roleId)) return {}
+    return { [Op.or]: [{ hiddenAt: null }, { createdBy: requesterId }] }
   }
 
   async create(groupId, requesterId, data) {
@@ -45,6 +57,7 @@ class ClassGroupSectionService {
     const section = await ClassGroupSection.findOne({ where: { id: sectionId, classGroupId: groupId } })
     if (!section) return null
     await section.destroy()
+    await ContentReportService.closeForDeletedContent('section', sectionId)
     return true
   }
 }
