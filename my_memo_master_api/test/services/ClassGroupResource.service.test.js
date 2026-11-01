@@ -226,4 +226,54 @@ describe('ClassGroupResourceService', () => {
       expect(result).toBeNull()
     })
   })
+
+  // ── canAccessFile ─────────────────────────────────────────────────────────────
+
+  describe('canAccessFile', () => {
+    const key = 'uploads/7/cours.pdf'
+
+    it('canAccessFile — fichier sans ressource de groupe — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([])
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
+      expect(User.findByPk).not.toHaveBeenCalled()
+    })
+
+    it('canAccessFile — membre du groupe — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValue({ role: 'student' })
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
+    })
+
+    it('canAccessFile — non-membre — retourne false', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValue(null)
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(false)
+    })
+
+    it('canAccessFile — admin non-membre — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+      User.findByPk.mockResolvedValue(adminUser)
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
+    })
+
+    it("canAccessFile — auteur du téléversement hors du groupe — retourne true", async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 7)).toBe(true)
+    })
+
+    it('canAccessFile — fichier partagé dans deux groupes, membre du second — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }, { classGroupId: 2 }])
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ role: 'student' })
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
+    })
+  })
 })

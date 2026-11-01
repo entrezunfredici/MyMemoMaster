@@ -3,6 +3,7 @@ const { DeleteObjectCommand } = require('@aws-sdk/client-s3')
 const { s3Client, bucket } = require('../config/storage.config')
 const { ClassGroupResource, ClassGroupUsers, User } = require('../models/index')
 const logger = require('../helpers/logger')
+const { isUserUploadKey } = require('../helpers/storageKeys')
 const ContentReportService = require('./ContentReport.service')
 
 class ClassGroupResourceService {
@@ -20,6 +21,21 @@ class ClassGroupResourceService {
     if ([1, 4].includes(user?.roleId)) return true
     const membership = await ClassGroupUsers.findOne({ where: { classGroupId: groupId, userId } })
     return !!membership
+  }
+
+  /**
+   * Un fichier rattaché à des ressources de groupe n'est lisible que par les membres d'un de ces
+   * groupes, les rôles 1 et 4, ou l'utilisateur qui l'a téléversé. Un fichier qui n'est lié à aucune
+   * ressource (upload personnel, carte mentale…) n'est pas concerné.
+   */
+  async canAccessFile(fileKey, userId) {
+    const resources = await ClassGroupResource.findAll({ where: { fileKey }, attributes: ['classGroupId'] })
+    if (!resources.length) return true
+    if (isUserUploadKey(fileKey, userId)) return true
+    for (const { classGroupId } of resources) {
+      if (await this._isMember(classGroupId, userId)) return true
+    }
+    return false
   }
 
   async findAll(groupId, requesterId) {
