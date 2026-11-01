@@ -38,6 +38,10 @@
             :class="[route?.name === 'admin' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ShieldCheckIcon class="size-8" />
           </router-link>
+          <router-link v-if="canModerate" to="/moderation" aria-label="Modération" title="Modération"
+            :class="[route?.name === 'moderation' ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
+            <ShieldExclamationIcon class="size-8" />
+          </router-link>
           <router-link to="/calendar" data-tour="calendar" aria-label="Calendrier & rappels"
             :class="[route?.name && route.name.includes('calendar') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']"
             title="Calendrier & rappels">
@@ -108,7 +112,7 @@ import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
 import ClassroomIcon from '@/icons/ClassroomIcon.vue'
 import KpiIcon from '@/icons/KpiIcon.vue'
-import { HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
+import { HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon, ShieldExclamationIcon } from '@heroicons/vue/24/outline'
 import { useRole } from '@/composables/useRole'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
@@ -121,7 +125,7 @@ import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 
 const route = useRoute()
-const { isAdminPlateforme } = useRole()
+const { isAdminPlateforme, canModerate } = useRole()
 
 const konamiSequence = [
   'ArrowUp',

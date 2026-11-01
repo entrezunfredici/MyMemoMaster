@@ -36,6 +36,11 @@ export function useRole() {
     [ROLE_IDS.ADMIN_PLATEFORME, ROLE_IDS.ADMIN_ETABLISSEMENT, ROLE_IDS.ENSEIGNANT].includes(roleId.value)
   )
 
+  // Traite les contenus signalés : admin plateforme (1), admin établissement (4) ou modérateur (5)
+  const canModerate = computed(() =>
+    [ROLE_IDS.ADMIN_PLATEFORME, ROLE_IDS.ADMIN_ETABLISSEMENT, ROLE_IDS.MODERATEUR].includes(roleId.value)
+  )
+
   /**
    * Vérifie si l'utilisateur a exactement l'un des rôles spécifiés.
    * @param {...number} ids
@@ -52,6 +57,7 @@ export function useRole() {
     isModerateur,
     isAdmin,
     canManageGroups,
+    canModerate,
     hasAnyRole,
     ROLE_IDS,
   }

@@ -121,6 +121,16 @@ describe('useRole — canManageGroups', () => {
   })
 })
 
+describe('useRole — canModerate', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it.each([[1, true], [4, true], [5, true], [2, false], [3, false]])('roleId=%i → canModerate=%s', (roleId, expected) => {
+    expect(setupRole(roleId).canModerate.value).toBe(expected)
+  })
+})
+
 describe('useRole — hasAnyRole()', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

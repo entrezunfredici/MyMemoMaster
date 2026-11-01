@@ -40,3 +40,77 @@ export function validateReport({ reason, comment }) {
   if (text.length > REPORT_COMMENT_MAX) return `Le commentaire ne peut pas dépasser ${REPORT_COMMENT_MAX} caractères.`
   return ''
 }
+
+// ── Interface modérateur ────────────────────────────────────────────────────────────────────────────────
+
+/** Longueur maximale du motif d'une décision de modération (identique à l'API). */
+export const DECISION_NOTE_MAX = 500
+
+/** Durée du masquage avant suppression automatique, en jours. */
+export const HIDE_DAYS = 30
+
+/** Libellés et styles des statuts d'un signalement (statuts ouverts : pending, in_review, hidden). */
+export const REPORT_STATUSES = {
+  pending: { label: 'En attente', badge: 'bg-gray-100 text-gray-800', open: true },
+  in_review: { label: 'En cours', badge: 'bg-blue-100 text-blue-800', open: true },
+  hidden: { label: 'Masqué', badge: 'bg-amber-100 text-amber-800', open: true },
+  dismissed: { label: 'Rejeté', badge: 'bg-green-100 text-green-800', open: false },
+  actioned: { label: 'Supprimé', badge: 'bg-red-100 text-red-800', open: false },
+}
+
+/** Libellés des types de contenu signalables. */
+export const CONTENT_TYPE_LABELS = { resource: 'Ressource', section: 'Section' }
+
+/**
+ * Libellé d'un motif de signalement.
+ *
+ * @param {string} reason - Code du motif
+ * @returns {string} Libellé, ou le code lui-même s'il est inconnu
+ */
+export function reasonLabel(reason) {
+  return REPORT_REASONS.find((r) => r.value === reason)?.label ?? reason
+}
+
+/**
+ * Libellé d'un statut de signalement.
+ *
+ * @param {string} status - Code du statut
+ * @returns {string} Libellé, ou le code lui-même s'il est inconnu
+ */
+export function statusLabel(status) {
+  return REPORT_STATUSES[status]?.label ?? status
+}
+
+/**
+ * Actions de modération proposées pour un dossier, selon son statut et le rôle du modérateur
+ * (mêmes règles que l'API : diagrams/moderation_rules.md §7).
+ *
+ * @param {{status: string, contentExists: boolean, authorActive: (boolean|null), roleId: number}} context
+ * @returns {{claim: boolean, dismiss: boolean, hide: boolean, restore: boolean, remove: boolean, suspend: boolean}}
+ */
+export function availableActions({ status, contentExists, authorActive, roleId }) {
+  const workable = status === 'pending' || status === 'in_review'
+  const open = REPORT_STATUSES[status]?.open === true
+  return {
+    claim: workable,
+    dismiss: workable,
+    hide: workable && contentExists,
+    restore: status === 'hidden' && contentExists,
+    remove: open,
+    // La suspension d'un compte est réservée aux rôles 1 et 4 ; inutile si le compte est déjà suspendu.
+    suspend: open && [1, 4].includes(roleId) && authorActive === true,
+  }
+}
+
+/**
+ * Valide le motif d'une décision de modération.
+ *
+ * @param {string} note
+ * @returns {string} Message d'erreur en français, chaîne vide si valide
+ */
+export function validateDecisionNote(note) {
+  const text = (note || '').trim()
+  if (!text) return 'Le motif de la décision est requis.'
+  if (text.length > DECISION_NOTE_MAX) return `Le motif ne peut pas dépasser ${DECISION_NOTE_MAX} caractères.`
+  return ''
+}

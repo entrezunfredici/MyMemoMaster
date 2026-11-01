@@ -133,6 +133,14 @@ Sur `/classroom`, la vue enseignant permet de :
 
 - **Gérant d'établissement** (vue dédiée sur `/classroom`) : création et gestion des **groupes classes** de son établissement, du **calendrier** des groupes (événements récurrents — un cours hebdomadaire sur un semestre se crée en une fois), invitations des enseignants et étudiants, consultation du **journal d'audit** des actions.
 - **Administrateur plateforme** (`/admin` via la vue plateforme) : création des **établissements**, désignation de leur gérant, supervision globale et journal d'audit.
+- **Modération** (administrateurs, gérants d'établissement et modérateurs — page **Modération** du menu, `/moderation`) : la **file de traitement** liste les contenus signalés, un par ligne, les plus urgents d'abord (priorité haute pour un motif illégal ou au moins 3 signalants). Filtrez par statut, motif ou type de contenu, puis cliquez sur **Examiner** pour voir le contenu, son auteur et chaque signalement avec son commentaire. Chaque décision exige un **motif**, qui est conservé :
+  - **Prendre en charge** : indique que vous traitez le dossier ;
+  - **Rejeter le signalement** : le contenu respecte les règles, il reste visible ;
+  - **Masquer 30 jours** : le contenu disparaît pour les membres du groupe (son auteur le voit encore) ; **Rétablir** le remet en ligne, sinon il est supprimé définitivement au bout de 30 jours ;
+  - **Supprimer définitivement** (confirmation demandée) : le contenu et son fichier sont effacés ;
+  - **Suspendre le compte de l'auteur** (administrateurs et gérants seulement, confirmation demandée) : le compte est désactivé sur toute la plateforme ; le dossier reste ouvert pour décider du contenu.
+
+  L'auteur reçoit un email motivé à chaque masquage, suppression ou suspension, et les signalants sont prévenus de l'issue. Vous ne pouvez pas traiter un signalement qui vise votre propre contenu. Un gérant d'établissement ne voit que les contenus des groupes de son établissement.
 
 ---
 

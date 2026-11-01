@@ -156,6 +156,16 @@ const routes = [
     }
   },
   {
+    path: '/moderation',
+    name: 'moderation',
+    component: () => import('../pages/ModerationPage.vue'),
+    meta: {
+      title: 'Modération',
+      private: true,
+      roles: [1, 4, 5]
+    }
+  },
+  {
     path: '/kpi',
     name: 'kpi',
     component: () => import('../pages/KpiPage.vue'),

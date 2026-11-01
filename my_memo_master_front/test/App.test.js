@@ -63,4 +63,10 @@ describe('App — navigation principale (RGAA 6.2)', () => {
     expect(labels(1)).toContain('Administration')
     for (const roleId of [2, 3, 4, 5, null]) expect(labels(roleId)).not.toContain('Administration')
   })
+
+  it('« Modération » n’apparaît que pour les rôles 1, 4 et 5', () => {
+    const labels = (roleId) => mountApp(roleId).find('aside nav').findAll('a').map((l) => l.attributes('aria-label'))
+    for (const roleId of [1, 4, 5]) expect(labels(roleId)).toContain('Modération')
+    for (const roleId of [2, 3, null]) expect(labels(roleId)).not.toContain('Modération')
+  })
 })

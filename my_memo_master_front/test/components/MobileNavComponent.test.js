@@ -5,12 +5,13 @@ import MobileNav from '@/components/MobileNavComponent.vue'
 
 const routeState = ref({ name: 'home', fullPath: '/' })
 const isAdmin = ref(false)
+const canModerate = ref(false)
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal()
   return { ...actual, useRoute: () => routeState.value }
 })
-vi.mock('@/composables/useRole', () => ({ useRole: () => ({ isAdminPlateforme: isAdmin }) }))
+vi.mock('@/composables/useRole', () => ({ useRole: () => ({ isAdminPlateforme: isAdmin, canModerate }) }))
 
 const RouterLinkStub = { props: ['to'], template: '<a :href="to"><slot /></a>' }
 
@@ -26,6 +27,7 @@ describe('MobileNav — barre du bas', () => {
   beforeEach(() => {
     routeState.value = { name: 'home', fullPath: '/' }
     isAdmin.value = false
+    canModerate.value = false
     document.body.innerHTML = ''
   })
 
@@ -53,6 +55,17 @@ describe('MobileNav — barre du bas', () => {
     await wrapper.find('[data-testid="mobile-nav-more"]').trigger('click')
     const labels = [...sheet().querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))
     expect(labels).toEqual(['Classe', 'Calendrier & rappels', 'To-do', 'Ma Progression', 'Profil', 'Réglages'])
+    wrapper.unmount()
+  })
+
+  it('un modérateur voit l’entrée Modération (vers /moderation), sans Administration', async () => {
+    canModerate.value = true
+    const wrapper = mountNav()
+    await wrapper.find('[data-testid="mobile-nav-more"]').trigger('click')
+    const links = [...sheet().querySelectorAll('a')]
+    const moderation = links.find((a) => a.getAttribute('aria-label') === 'Modération')
+    expect(moderation.getAttribute('href')).toBe('/moderation')
+    expect(links.map((a) => a.getAttribute('aria-label'))).not.toContain('Administration')
     wrapper.unmount()
   })
 

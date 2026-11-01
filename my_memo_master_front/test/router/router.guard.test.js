@@ -175,6 +175,18 @@ describe('Router guard — beforeEach', () => {
     expect(router.currentRoute.value.name).toBe('admin')
   })
 
+  it.each([2, 3])('la route /moderation est refusée au rôle %i et renvoie vers /', async (roleId) => {
+    loginAs({ roleId })
+    await router.push('/moderation')
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it.each([1, 4, 5])('la route /moderation est ouverte au rôle %i', async (roleId) => {
+    loginAs({ roleId })
+    await router.push('/moderation')
+    expect(router.currentRoute.value.name).toBe('moderation')
+  })
+
   it('la route /admin n’est pas accessible sans être connecté', async () => {
     logout()
     await router.push('/admin')

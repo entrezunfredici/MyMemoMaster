@@ -57,7 +57,7 @@
 <script setup>
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import { Bars3Icon, HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
+import { Bars3Icon, HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon, ShieldExclamationIcon } from '@heroicons/vue/24/outline'
 import ExercisesIcon from '@/icons/ExercisesIcon.vue'
 import FlashardIcon from '@/icons/FlashardIcon.vue'
 import MindmapIcon from '@/icons/MindmapIcon.vue'
@@ -68,7 +68,7 @@ import KpiIcon from '@/icons/KpiIcon.vue'
 import { useRole } from '@/composables/useRole'
 
 const route = useRoute()
-const { isAdminPlateforme } = useRole()
+const { isAdminPlateforme, canModerate } = useRole()
 const isOpen = ref(false)
 
 // `match` : sous-chaîne du nom de route qui marque l'entrée comme active ('' = égalité stricte sur `name`)
@@ -83,6 +83,9 @@ const moreItems = computed(() => [
   { to: '/classroom', label: 'Classe', icon: ClassroomIcon, tour: 'classroom', match: 'classroom' },
   ...(isAdminPlateforme.value
     ? [{ to: '/admin', label: 'Administration', icon: ShieldCheckIcon, exact: 'admin' }]
+    : []),
+  ...(canModerate.value
+    ? [{ to: '/moderation', label: 'Modération', icon: ShieldExclamationIcon, exact: 'moderation' }]
     : []),
   { to: '/calendar', label: 'Calendrier & rappels', icon: CalendarIcon, tour: 'calendar', match: 'calendar' },
   { to: '/todo', label: 'To-do', icon: CheckCircleIcon, tour: 'todo', exact: 'todo' },
