@@ -13751,3 +13751,11 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Utilisable** : changer la valeur dans la ConfigMap (ou `values-<env>.yaml` pour Helm) puis redémarrer le pod front suffit, sans rebuild de l'image. Vide ou absente : valeur par défaut.
 **Vérifié** : test de la page (4/4), ESLint propre. Manifestes non appliqués ni rendus (`helm template`, `kubectl`) : à vérifier au prochain déploiement.
 **Dette** : `.env.ci` et le `Dockerfile` (ARG de build) n'exposent pas la variable : inutile grâce au repli par défaut.
+
+## [2026-11-01] [IMP] Nouveau bundle Android (versionCode 2 / versionName 1.1)
+
+**Contexte** : rebuild du bundle pour embarquer les nouvelles fonctionnalités du front dans l'app mobile. Aucun code applicatif modifié.
+**Fichiers modifiés** : `my_memo_master_front/android/app/build.gradle` (`versionCode` 1 -> 2, `versionName` "1.0" -> "1.1") ; `android/app/src/main/assets/` régénéré par `cap sync`.
+**Utilisable** : `my_memo_master_front/android/app/build/outputs/bundle/release/app-release.aab` (≈ 17,5 Mo, signé, 2026-11-01 23:00), produit via la procédure du 2026-10-30. À importer dans la Play Console (nouvelle release).
+**Hypothèses** : le `.aab` de `versionCode` 1 est déjà ou sera remplacé ; `versionCode` doit être incrémenté à chaque nouvel envoi.
+**Dette** : bundle non testé sur appareil ; le back de prod doit exposer les endpoints des nouvelles fonctionnalités (déploiement API séparé).
