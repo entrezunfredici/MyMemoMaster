@@ -1,3 +1,4 @@
+const { Op } = require('sequelize')
 const { ClassGroupResource, ClassGroupUsers, User } = require('../../models/index')
 const ClassGroupResourceService = require('../../services/ClassGroupResource.service')
 
@@ -5,7 +6,8 @@ jest.mock('../../models/index', () => ({
   ClassGroupResource: {
     findAll: jest.fn(),
     findOne: jest.fn(),
-    create: jest.fn()
+    create: jest.fn(),
+    count: jest.fn()
   },
   ClassGroupUsers: {
     findOne: jest.fn()
@@ -194,6 +196,22 @@ describe('ClassGroupResourceService', () => {
       expect(s3Client.send).toHaveBeenCalled()
       expect(mockResource.destroy).toHaveBeenCalled()
       expect(result).toBe(true)
+    })
+
+    it('delete — fichier encore référencé par un autre groupe — conserve le fichier S3', async () => {
+      const { s3Client } = require('../../config/storage.config')
+      s3Client.send.mockClear()
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValue({ role: 'teacher' })
+      const mockResource = { id: 1, fileKey: 'uploads/2/file.pdf', destroy: jest.fn().mockResolvedValue(undefined) }
+      ClassGroupResource.findOne.mockResolvedValue(mockResource)
+      ClassGroupResource.count.mockResolvedValueOnce(1)
+
+      const result = await ClassGroupResourceService.delete(1, 1, 2)
+      expect(result).toBe(true)
+      expect(s3Client.send).not.toHaveBeenCalled()
+      expect(mockResource.destroy).toHaveBeenCalled()
+      expect(ClassGroupResource.count).toHaveBeenCalledWith({ where: { fileKey: 'uploads/2/file.pdf', id: { [Op.ne]: 1 } } })
     })
 
     it('delete — erreur S3 ignorée — supprime quand même en BDD', async () => {

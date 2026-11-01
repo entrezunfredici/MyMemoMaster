@@ -74,7 +74,12 @@ class ClassGroupResourceService {
     if (!(await this._canWrite(groupId, requesterId))) return false
     const resource = await ClassGroupResource.findOne({ where: { id: resourceId, classGroupId: groupId } })
     if (!resource) return null
-    if (resource.fileKey && bucket) {
+    // Un même fichier peut être partagé dans plusieurs groupes (une ressource par groupe) : il n'est
+    // retiré du stockage qu'avec la dernière ressource qui le référence.
+    const stillShared = resource.fileKey
+      ? await ClassGroupResource.count({ where: { fileKey: resource.fileKey, id: { [Op.ne]: resource.id } } })
+      : 0
+    if (resource.fileKey && bucket && !stillShared) {
       try {
         await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: resource.fileKey }))
       } catch (err) {

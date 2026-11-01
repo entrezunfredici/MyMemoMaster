@@ -5422,3 +5422,10 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Alternative écartée** : paramètre `type` sur `GET /class-groups/:id/resources` : l'API renvoie déjà toute la liste sans pagination, un aller-retour réseau n'apporterait rien et le cache du store (TTL 5 min) serait à segmenter.
 **Conséquences** : à refaire côté API si la liste devient paginée ; l'état du filtre est local au composant.
 
+## [2026-11-01] Partage d'un document vers plusieurs groupes : une ressource par groupe, un fichier partagé
+
+**Contexte** : C-03.06. Un enseignant doit pouvoir publier un document dans plusieurs de ses groupes en un envoi.
+**Décision** : téléverser le fichier une fois, créer une ressource par groupe avec la même `fileKey` (aucune migration), et ne supprimer le fichier S3 qu'avec la dernière ressource qui le référence (`ClassGroupResourceService.delete` et `ContentReportService._destroyContent`).
+**Alternative écartée** : (a) un téléversement par groupe : stockage et temps d'envoi multipliés ; (b) une table de liaison ressource↔groupes : migration et refonte des droits, de la modération et de la suppression, hors périmètre V2.
+**Conséquences** : le modèle reste « une ressource = un groupe », donc modération, droits et suppression restent par groupe ; la création multi-groupes côté client n'est pas atomique (voir dette dans le CHANGELOG).
+
