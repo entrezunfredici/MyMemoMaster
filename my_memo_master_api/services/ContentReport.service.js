@@ -14,6 +14,7 @@ const {
   AuditLog
 } = require('../models/index')
 const AuditLogService = require('./AuditLog.service')
+const UserService = require('./User.service')
 const sendEmail = require('../helpers/sendEmail')
 const logger = require('../helpers/logger')
 
@@ -212,6 +213,22 @@ class ContentReportService {
   }
 
   /**
+   * Prévient l'auteur de la suspension de son compte (article 17 du DSA : fait visé, motif, recours).
+   */
+  async _notifyAuthorSuspended(report) {
+    if (!report.authorId) return
+    const title = report.contentSnapshot?.title || 'sans titre'
+    const text = [
+      'Bonjour,',
+      '',
+      `Suite à un signalement (motif : ${REASON_LABELS[report.reason]}) portant sur ${CONTENT_LABELS[report.contentType]} « ${title} », votre compte MyMemoMaster a été suspendu par la modération.`,
+      '',
+      `Pour contester cette décision, écrivez-nous à ${CONTACT_EMAIL}.`
+    ].join('\n')
+    await this._send([report.authorId], 'MyMemoMaster — suspension de votre compte', () => text)
+  }
+
+  /**
    * Informe les signalants de la décision (article 16 du DSA), sans information sur l'auteur.
    */
   async _notifyReporters(reports, decision) {
@@ -392,7 +409,10 @@ class ContentReportService {
       ],
       order: [['createdAt', 'ASC']]
     })
-    return { data: { report, reports, content } }
+    const author = report.authorId
+      ? await User.findByPk(report.authorId, { attributes: ['userId', 'name', 'isActive'] })
+      : null
+    return { data: { report, reports, content, author } }
   }
 
   // ── Actions du modérateur ────────────────────────────────────────────────
@@ -522,6 +542,38 @@ class ContentReportService {
     })
     await this._notifyAuthor(report, 'actioned')
     await this._notifyReporters(siblings, 'actioned')
+    return { data: await ContentReport.findByPk(id) }
+  }
+
+  /**
+   * Suspend le compte de l'auteur du contenu signalé (rôles 1 et 4 uniquement), sans clore le dossier :
+   * le contenu reste à traiter (masquage ou retrait). Réutilise `UserService.setActive`, qui refuse
+   * l'auto-suspension et la suspension d'un admin plateforme par un autre, et révoque les jetons.
+   *
+   * @param {number} id
+   * @param {{id:number, roleId:number}} requester
+   * @param {string} decisionNote - Motif de la décision
+   * @returns {Promise<{data: object}|{error: string}>}
+   */
+  async suspendAuthor(id, requester, decisionNote) {
+    if (![1, 4].includes(requester.roleId)) return { error: 'target_forbidden' }
+    const loaded = await this._loadForAction(id, requester)
+    if (loaded.error) return loaded
+    const { report, content } = loaded
+    if (!OPEN_STATUSES.includes(report.status)) return { error: 'conflict' }
+
+    const authorId = content?.createdBy ?? report.authorId
+    const author = authorId ? await User.findByPk(authorId, { attributes: ['userId', 'isActive'] }) : null
+    if (!author) return { error: 'author_gone' }
+    if (author.isActive === false) return { error: 'already_suspended' }
+
+    const result = await UserService.setActive(authorId, false, requester.roleId, requester.id)
+    if (result === false || result === null) return { error: 'target_forbidden' }
+
+    await this._audit(requester.id, 'CONTENT_REPORT_AUTHOR_SUSPENDED', 'ContentReport', report.id, {
+      authorId, contentType: report.contentType, contentId: report.contentId, decisionNote
+    })
+    await this._notifyAuthorSuspended(report)
     return { data: await ContentReport.findByPk(id) }
   }
 

@@ -337,6 +337,86 @@ describe('Modération de contenu (test fonctionnel DB réelle)', () => {
     })
   })
 
+  describe('suspension du compte de l’auteur', () => {
+    const reportFor = async (resource) => {
+      const reporter = await newMember()
+      const res = await as('post', '/content-reports', reporter)
+        .send({ contentType: 'resource', contentId: resource.id, reason: 'harassment' })
+      return res.body.data.id
+    }
+
+    it('admin d’établissement — suspend l’auteur, le dossier reste ouvert, audit et email', async () => {
+      const author = await makeUser('Prof', 3)
+      await ClassGroupUsers.create({ classGroupId: group.id, userId: author.userId, role: 'teacher' })
+      const resource = await makeResource(group, author, 'Contenu abusif')
+      const id = await reportFor(resource)
+
+      expect((await as('patch', `/content-reports/${id}/suspend-author`, admin4).send({})).status).toBe(400)
+      const res = await as('patch', `/content-reports/${id}/suspend-author`, admin4).send({ decisionNote: 'Propos répétés' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.data.status).toBe('pending')
+      expect((await User.findByPk(author.userId)).isActive).toBe(false)
+      expect(await ClassGroupResource.findByPk(resource.id)).not.toBeNull()
+      const audit = await AuditLog.findAll({ where: { entityId: id } })
+      expect(audit.map((a) => a.action)).toContain('CONTENT_REPORT_AUTHOR_SUSPENDED')
+      expect((await AuditLog.findOne({ where: { action: 'USER_ACCOUNT_DEACTIVATED', entityId: author.userId } })).actorId).toBe(admin4.userId)
+      const mail = sendEmail.mock.calls.find((c) => c[2] === author.email)
+      expect(mail[0]).toContain('suspension')
+      expect(mail[1]).toContain('support@my-memo-master.com')
+
+      const detail = await as('get', `/content-reports/${id}`, moderator)
+      expect(detail.body.data.author).toMatchObject({ userId: author.userId, isActive: false })
+    })
+
+    it('suspendre deux fois — 409 ; modérateur (rôle 5) ou étudiant — 403', async () => {
+      const author = await makeUser('Prof', 3)
+      await ClassGroupUsers.create({ classGroupId: group.id, userId: author.userId, role: 'teacher' })
+      const id = await reportFor(await makeResource(group, author))
+
+      expect((await as('patch', `/content-reports/${id}/suspend-author`, moderator).send({ decisionNote: 'x' })).status).toBe(403)
+      expect((await as('patch', `/content-reports/${id}/suspend-author`, student).send({ decisionNote: 'x' })).status).toBe(403)
+      expect((await as('patch', `/content-reports/${id}/suspend-author`, admin4).send({ decisionNote: 'x' })).status).toBe(200)
+      expect((await as('patch', `/content-reports/${id}/suspend-author`, admin4).send({ decisionNote: 'x' })).status).toBe(409)
+    })
+
+    it('auteur admin plateforme suspendu par un autre admin plateforme — 403, compte inchangé', async () => {
+      const otherAdmin = await makeUser('AdminBis', 1)
+      await ClassGroupUsers.create({ classGroupId: group.id, userId: otherAdmin.userId, role: 'teacher' })
+      const id = await reportFor(await makeResource(group, otherAdmin))
+
+      const res = await as('patch', `/content-reports/${id}/suspend-author`, admin).send({ decisionNote: 'x' })
+
+      expect(res.status).toBe(403)
+      expect((await User.findByPk(otherAdmin.userId)).isActive).not.toBe(false)
+    })
+
+    it('dossier d’un autre établissement — 404 pour l’admin d’établissement', async () => {
+      const author = await makeUser('Prof', 3)
+      await ClassGroupUsers.create({ classGroupId: otherGroup.id, userId: author.userId, role: 'teacher' })
+      const resource = await makeResource(otherGroup, author)
+      const reporter = await makeUser('Membre', 2)
+      await ClassGroupUsers.create({ classGroupId: otherGroup.id, userId: reporter.userId, role: 'student' })
+      const created = await as('post', '/content-reports', reporter).send({ contentType: 'resource', contentId: resource.id, reason: 'spam' })
+
+      const res = await as('patch', `/content-reports/${created.body.data.id}/suspend-author`, admin4).send({ decisionNote: 'x' })
+
+      expect(res.status).toBe(404)
+      expect((await User.findByPk(author.userId)).isActive).not.toBe(false)
+    })
+
+    it('dossier clos — 409', async () => {
+      const author = await makeUser('Prof', 3)
+      await ClassGroupUsers.create({ classGroupId: group.id, userId: author.userId, role: 'teacher' })
+      const id = await reportFor(await makeResource(group, author))
+      await as('patch', `/content-reports/${id}/dismiss`, moderator).send({ decisionNote: 'Conforme' })
+
+      const res = await as('patch', `/content-reports/${id}/suspend-author`, admin4).send({ decisionNote: 'x' })
+
+      expect(res.status).toBe(409)
+    })
+  })
+
   describe('tâches planifiées', () => {
     it('purgeExpired — supprime à l’échéance, pas avant', async () => {
       const resource = await makeResource(group, teacher, 'À purger')

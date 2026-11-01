@@ -7,6 +7,7 @@ jest.mock('../../services/ContentReport.service', () => ({
   claim: jest.fn(),
   dismiss: jest.fn(),
   hide: jest.fn(),
+  suspendAuthor: jest.fn(),
   restore: jest.fn(),
   removeContent: jest.fn()
 }))
@@ -85,6 +86,24 @@ describe('ContentReport.controller', () => {
     })
   })
 
+  describe('suspendAuthor', () => {
+    it.each([
+      ['author_gone', 409],
+      ['already_suspended', 409],
+      ['target_forbidden', 403],
+      ['own_report', 403],
+      ['not_found', 404]
+    ])('suspendAuthor — erreur %s — répond %i avec un message en français', async (error, status) => {
+      ContentReportService.suspendAuthor.mockResolvedValue({ error })
+      const res = mockRes()
+
+      await controller.suspendAuthor(mockReq({ body: { decisionNote: 'Motif' } }), res)
+
+      expect(res.status).toHaveBeenCalledWith(status)
+      expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) })
+    })
+  })
+
   describe('findOne', () => {
     it('findOne — hors périmètre — répond 404', async () => {
       ContentReportService.findOne.mockResolvedValue({ error: 'not_found' })
@@ -110,6 +129,7 @@ describe('ContentReport.controller', () => {
     ['claim', 'Signalement pris en charge.', false],
     ['dismiss', 'Signalement rejeté.', true],
     ['hide', 'Contenu masqué pour 30 jours au maximum.', true],
+    ['suspendAuthor', "Compte de l'auteur suspendu.", true],
     ['restore', 'Contenu rétabli.', false],
     ['removeContent', 'Contenu supprimé définitivement.', true]
   ])('%s', (action, message, takesNote) => {

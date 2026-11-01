@@ -184,6 +184,34 @@ router.patch('/:id/restore', authMiddleware, moderators, validators.byId, valida
  */
 router.patch('/:id/remove-content', authMiddleware, moderators, validators.withDecision, validate, contentReport.removeContent)
 
+/**
+ * @swagger
+ * /content-reports/{id}/suspend-author:
+ *   patch:
+ *     summary: Suspendre le compte de l'auteur du contenu signalé (rôles 1 et 4)
+ *     description: Ne clôt pas le dossier ; le contenu reste à traiter. La réactivation passe par PATCH /users/{id}/activate.
+ *     tags: [ContentReport]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [decisionNote]
+ *             properties:
+ *               decisionNote: { type: string, maxLength: 500 }
+ *     responses:
+ *       200: { description: Compte suspendu, auteur prévenu par email. }
+ *       403: { description: Rôle insuffisant, signalement visant votre propre contenu ou compte non suspendable. }
+ *       404: { description: Introuvable ou hors périmètre. }
+ *       409: { description: Dossier clos, compte déjà suspendu ou auteur supprimé. }
+ */
+router.patch('/:id/suspend-author', authMiddleware, requireRole(1, 4), validators.withDecision, validate, contentReport.suspendAuthor)
+
 module.exports = (app) => {
   /**
    * @swagger

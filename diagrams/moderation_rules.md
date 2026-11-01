@@ -166,7 +166,7 @@ Le modérateur **choisit** entre masquage temporaire et retrait définitif.
 | **Masquer** | Contenu invisible des membres du groupe, statut → `hidden`, `purgeAt` = maintenant + 30 jours | 1, 4, 5 | **Oui, pendant 30 jours** |
 | **Restaurer** | Contenu de nouveau visible, `hidden` → `dismissed` | 1, 4, 5 | — |
 | **Retirer définitivement** | Suppression immédiate (service de S-04.06), statut → `actioned`, audit. Possible aussi depuis `hidden` | 1, 4, 5 | Non |
-| **Désactiver le compte de l'auteur** | Route existante `deactivate`, statut → `actioned` | 1, 4 | Oui (réactivation) |
+| **Suspendre le compte de l'auteur** | Désactive le compte (`UserService.setActive`), **sans clore le dossier** : le contenu reste à masquer ou retirer ; email motivé à l'auteur | 1, 4 | Oui (`PATCH /users/:id/activate`) |
 
 Règles du masquage :
 
@@ -270,6 +270,7 @@ Préfixe `/api/v1`. Chaque route est dans `routes/ContentReport.routes.js` et do
 | PATCH | `/content-reports/:id/hide` | `requireRole(1, 4, 5)` | Masquer 30 jours |
 | PATCH | `/content-reports/:id/restore` | `requireRole(1, 4, 5)` | Restaurer un contenu masqué |
 | PATCH | `/content-reports/:id/remove-content` | `requireRole(1, 4, 5)` | Retirer définitivement |
+| PATCH | `/content-reports/:id/suspend-author` | `requireRole(1, 4)` | Suspendre le compte de l'auteur |
 
 Codes de retour : 201 création · 400 validation ou auto-signalement · 403 contenu non visible · 404 introuvable ou hors périmètre · 409 doublon ou statut final · 429 limite atteinte.
 
@@ -297,6 +298,7 @@ Nouvelles actions pour `AuditLog` :
 | `CONTENT_REPORT_RESTORED` | Restauration d'un contenu masqué |
 | `CONTENT_REPORT_PURGED` | Suppression automatique à l'échéance |
 | `CONTENT_REPORT_ACTIONED` | Retrait définitif manuel |
+| `CONTENT_REPORT_AUTHOR_SUSPENDED` | Suspension du compte de l'auteur (la désactivation produit aussi `USER_ACCOUNT_DEACTIVATED`) |
 
 Les retraits continuent de produire `CONTENT_RESOURCE_REMOVED` / `CONTENT_SECTION_REMOVED` (S-04.06). L'audit reste non bloquant, comme en S-04.06.
 

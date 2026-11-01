@@ -10,6 +10,9 @@ const ERRORS = {
   duplicate: [409, 'Vous avez déjà un signalement en cours sur ce contenu.'],
   already_hidden: [409, 'Ce contenu est déjà masqué.'],
   conflict: [409, "Ce signalement ne peut pas recevoir cette action dans son état actuel."],
+  author_gone: [409, "Le compte de l'auteur n'existe plus."],
+  already_suspended: [409, "Le compte de l'auteur est déjà suspendu."],
+  target_forbidden: [403, 'Vous ne pouvez pas suspendre ce compte.'],
   rate_limited: [429, 'Limite de signalements atteinte (10 par 24 h). Réessayez plus tard.']
 }
 
@@ -90,6 +93,16 @@ exports.restore = async (req, res) => {
   } catch (error) {
     logger.error(error?.message || error)
     return res.status(500).json({ message: 'Erreur lors du rétablissement du contenu.' })
+  }
+}
+
+exports.suspendAuthor = async (req, res) => {
+  try {
+    const result = await ContentReportService.suspendAuthor(Number(req.params.id), requesterOf(req), req.body.decisionNote)
+    return reply(res, result, 200, "Compte de l'auteur suspendu.")
+  } catch (error) {
+    logger.error(error?.message || error)
+    return res.status(500).json({ message: "Erreur lors de la suspension du compte de l'auteur." })
   }
 }
 
