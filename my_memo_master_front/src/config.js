@@ -93,6 +93,11 @@ export const VITE_API_GOOGLE_AUTH_HEADER = pickString(
   'Authorization'
 );
 
+export const VITE_USAGE_RULES_URL = normalizeUrl(
+  runtimeCfg.USAGE_RULES_URL,
+  import.meta.env.VITE_USAGE_RULES_URL || 'https://my-memo-master.com/regles-usage'
+);
+
 //export const VITE_APP_NAME = import.meta.env.VITE_APP_NAME || 'MyMemoMaster';
 //export const VITE_APP_COMPANY_NAME = import.meta.env.VITE_APP_COMPANY_NAME || 'MyMemoMaster';
 //export const VITE_APP_AUTHOR_NAME = import.meta.env.VITE_APP_AUTHOR_NAME || "MyMemoMaster's team";

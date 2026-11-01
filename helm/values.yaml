@@ -88,6 +88,7 @@ config:
   APP_FRONT_URL: ""         # défini dans values-{env}.yaml
   VITE_API_URL: ""          # défini dans values-{env}.yaml
   VITE_FRONT_URL: ""        # défini dans values-{env}.yaml
+  VITE_USAGE_RULES_URL: ""  # défini dans values-{env}.yaml
   PGADMIN_DEFAULT_EMAIL: admin@my-memo-master.com
 
   # ── Stockage S3 (Infomaniak Swiss Backup) ────────────────────────────────

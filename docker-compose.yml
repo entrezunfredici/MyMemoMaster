@@ -472,7 +472,8 @@ services:
         cat <<EOF >/usr/share/nginx/html/config.js
         window.__APP_CONFIG__ = {
           API_URL: "${VITE_API_URL}",
-          FRONT_URL: "${VITE_FRONT_URL}"
+          FRONT_URL: "${VITE_FRONT_URL}",
+          USAGE_RULES_URL: "${VITE_USAGE_RULES_URL:-}"
         };
         EOF
         if ! grep -q '/config.js' /usr/share/nginx/html/index.html; then

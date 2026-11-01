@@ -24,6 +24,7 @@ config:
   APP_FRONT_URL: https://preprod.my-memo-master.com
   VITE_API_URL: https://preprod-api.my-memo-master.com/api/v1
   VITE_FRONT_URL: https://preprod.my-memo-master.com
+  VITE_USAGE_RULES_URL: https://my-memo-master.com/regles-usage
   S3_ENDPOINT: https://s3.swiss-backup04.infomaniak.com
   S3_BUCKET: default
   S3_KEY_PREFIX: preprod/

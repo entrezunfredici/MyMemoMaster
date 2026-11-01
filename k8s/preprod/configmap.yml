@@ -56,6 +56,7 @@ data:
   APP_FRONT_URL: "https://preprod.my-memo-master.com"
   VITE_API_URL: "https://preprod-api.my-memo-master.com/api/v1"
   VITE_FRONT_URL: "https://preprod.my-memo-master.com"
+  VITE_USAGE_RULES_URL: "https://my-memo-master.com/regles-usage"
 
   # ── PgAdmin ──────────────────────────────────────────────────────────────────
   PGADMIN_DEFAULT_EMAIL: "admin@my-memo-master.com"

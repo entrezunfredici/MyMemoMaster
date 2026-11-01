@@ -24,6 +24,7 @@ config:
   APP_FRONT_URL: https://app.my-memo-master.com
   VITE_API_URL: https://api.my-memo-master.com/api/v1
   VITE_FRONT_URL: https://app.my-memo-master.com
+  VITE_USAGE_RULES_URL: https://my-memo-master.com/regles-usage
   # Stockage objet Infomaniak (S3). Sans S3_BUCKET l'API écrit sur le disque du pod :
   # fichiers perdus à chaque redéploiement et non partagés entre les 2 réplicas (constaté
   # le 2026-10-12 : « S3_BUCKET non configuré »). Même bucket et mêmes clés que la preprod

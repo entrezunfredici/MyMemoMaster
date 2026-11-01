@@ -62,6 +62,30 @@
         <p v-if="fieldErrors.confirmPassword" class="text-red-600 text-xs mt-1">{{ fieldErrors.confirmPassword }}</p>
       </div>
 
+      <div class="mb-4">
+        <div class="flex items-start gap-3">
+          <input
+            id="register-accept-rules"
+            name="acceptRules"
+            type="checkbox"
+            v-model="acceptedRules"
+            required
+            :aria-invalid="fieldErrors.acceptedRules ? 'true' : 'false'"
+            class="mt-1 shrink-0"
+          >
+          <label for="register-accept-rules" class="text-gray-700 text-sm">
+            J'accepte les
+            <a
+              :href="VITE_USAGE_RULES_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="underline text-primary"
+            >conditions d'usage de l'application<span class="sr-only"> (s'ouvre dans un nouvel onglet)</span></a>
+          </label>
+        </div>
+        <p v-if="fieldErrors.acceptedRules" class="text-red-700 text-xs mt-1">{{ fieldErrors.acceptedRules }}</p>
+      </div>
+
       <div class="flex flex-col items-center m-2">
         <button
           type="submit"
@@ -88,6 +112,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { notif } from '@/helpers/notif.js'
 import AuthFormLayout from '@/components/AuthFormLayout.vue'
+import { VITE_USAGE_RULES_URL } from '@/config.js'
 
 const authStore = useAuthStore()
 const EMAIL_REGEX = /\S+@\S+\.\S+/
@@ -96,6 +121,7 @@ const name = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
+const acceptedRules = ref(false)
 const errorMessage = ref('')
 const submitting = ref(false)
 const fieldErrors = ref({})
@@ -115,7 +141,8 @@ const canSubmit = computed(() => {
     trimmedName.length >= 2 &&
     EMAIL_REGEX.test(trimmedEmail) &&
     !passwordStrengthError.value &&
-    password.value === confirmPassword.value
+    password.value === confirmPassword.value &&
+    acceptedRules.value
   )
 })
 
@@ -143,6 +170,11 @@ function collectValidationErrors() {
   if (p !== cp) {
     const message = 'Les mots de passe ne correspondent pas.'
     fe.confirmPassword = message
+    errors.push(message)
+  }
+  if (!acceptedRules.value) {
+    const message = "Vous devez accepter les conditions d'usage de l'application."
+    fe.acceptedRules = message
     errors.push(message)
   }
 
