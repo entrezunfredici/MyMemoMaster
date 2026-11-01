@@ -102,7 +102,12 @@ class ContentReportService {
    * Supprime un contenu et son fichier de stockage (échec du stockage journalisé, non bloquant).
    */
   async _destroyContent(contentType, content) {
-    if (contentType === 'resource' && content.fileKey && bucket) {
+    // Un même fichier peut être partagé dans plusieurs groupes : il reste tant qu'une autre ressource le référence.
+    const stillShared =
+      contentType === 'resource' && content.fileKey
+        ? await ClassGroupResource.count({ where: { fileKey: content.fileKey, id: { [Op.ne]: content.id } } })
+        : 0
+    if (contentType === 'resource' && content.fileKey && bucket && !stillShared) {
       try {
         await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: content.fileKey }))
       } catch (err) {

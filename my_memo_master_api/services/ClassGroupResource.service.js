@@ -3,6 +3,7 @@ const { DeleteObjectCommand } = require('@aws-sdk/client-s3')
 const { s3Client, bucket } = require('../config/storage.config')
 const { ClassGroupResource, ClassGroupUsers, User } = require('../models/index')
 const logger = require('../helpers/logger')
+const { isUserUploadKey } = require('../helpers/storageKeys')
 const ContentReportService = require('./ContentReport.service')
 
 class ClassGroupResourceService {
@@ -20,6 +21,21 @@ class ClassGroupResourceService {
     if ([1, 4].includes(user?.roleId)) return true
     const membership = await ClassGroupUsers.findOne({ where: { classGroupId: groupId, userId } })
     return !!membership
+  }
+
+  /**
+   * Un fichier rattaché à des ressources de groupe n'est lisible que par les membres d'un de ces
+   * groupes, les rôles 1 et 4, ou l'utilisateur qui l'a téléversé. Un fichier qui n'est lié à aucune
+   * ressource (upload personnel, carte mentale…) n'est pas concerné.
+   */
+  async canAccessFile(fileKey, userId) {
+    const resources = await ClassGroupResource.findAll({ where: { fileKey }, attributes: ['classGroupId'] })
+    if (!resources.length) return true
+    if (isUserUploadKey(fileKey, userId)) return true
+    for (const { classGroupId } of resources) {
+      if (await this._isMember(classGroupId, userId)) return true
+    }
+    return false
   }
 
   async findAll(groupId, requesterId) {
@@ -58,7 +74,12 @@ class ClassGroupResourceService {
     if (!(await this._canWrite(groupId, requesterId))) return false
     const resource = await ClassGroupResource.findOne({ where: { id: resourceId, classGroupId: groupId } })
     if (!resource) return null
-    if (resource.fileKey && bucket) {
+    // Un même fichier peut être partagé dans plusieurs groupes (une ressource par groupe) : il n'est
+    // retiré du stockage qu'avec la dernière ressource qui le référence.
+    const stillShared = resource.fileKey
+      ? await ClassGroupResource.count({ where: { fileKey: resource.fileKey, id: { [Op.ne]: resource.id } } })
+      : 0
+    if (resource.fileKey && bucket && !stillShared) {
       try {
         await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: resource.fileKey }))
       } catch (err) {

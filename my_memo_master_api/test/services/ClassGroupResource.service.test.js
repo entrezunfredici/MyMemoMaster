@@ -1,3 +1,4 @@
+const { Op } = require('sequelize')
 const { ClassGroupResource, ClassGroupUsers, User } = require('../../models/index')
 const ClassGroupResourceService = require('../../services/ClassGroupResource.service')
 
@@ -5,7 +6,8 @@ jest.mock('../../models/index', () => ({
   ClassGroupResource: {
     findAll: jest.fn(),
     findOne: jest.fn(),
-    create: jest.fn()
+    create: jest.fn(),
+    count: jest.fn()
   },
   ClassGroupUsers: {
     findOne: jest.fn()
@@ -196,6 +198,22 @@ describe('ClassGroupResourceService', () => {
       expect(result).toBe(true)
     })
 
+    it('delete — fichier encore référencé par un autre groupe — conserve le fichier S3', async () => {
+      const { s3Client } = require('../../config/storage.config')
+      s3Client.send.mockClear()
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValue({ role: 'teacher' })
+      const mockResource = { id: 1, fileKey: 'uploads/2/file.pdf', destroy: jest.fn().mockResolvedValue(undefined) }
+      ClassGroupResource.findOne.mockResolvedValue(mockResource)
+      ClassGroupResource.count.mockResolvedValueOnce(1)
+
+      const result = await ClassGroupResourceService.delete(1, 1, 2)
+      expect(result).toBe(true)
+      expect(s3Client.send).not.toHaveBeenCalled()
+      expect(mockResource.destroy).toHaveBeenCalled()
+      expect(ClassGroupResource.count).toHaveBeenCalledWith({ where: { fileKey: 'uploads/2/file.pdf', id: { [Op.ne]: 1 } } })
+    })
+
     it('delete — erreur S3 ignorée — supprime quand même en BDD', async () => {
       const { s3Client } = require('../../config/storage.config')
       User.findByPk.mockResolvedValue(studentUser)
@@ -224,6 +242,56 @@ describe('ClassGroupResourceService', () => {
 
       const result = await ClassGroupResourceService.delete(1, 99, 2)
       expect(result).toBeNull()
+    })
+  })
+
+  // ── canAccessFile ─────────────────────────────────────────────────────────────
+
+  describe('canAccessFile', () => {
+    const key = 'uploads/7/cours.pdf'
+
+    it('canAccessFile — fichier sans ressource de groupe — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([])
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
+      expect(User.findByPk).not.toHaveBeenCalled()
+    })
+
+    it('canAccessFile — membre du groupe — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValue({ role: 'student' })
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
+    })
+
+    it('canAccessFile — non-membre — retourne false', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValue(null)
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(false)
+    })
+
+    it('canAccessFile — admin non-membre — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+      User.findByPk.mockResolvedValue(adminUser)
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
+    })
+
+    it("canAccessFile — auteur du téléversement hors du groupe — retourne true", async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }])
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 7)).toBe(true)
+    })
+
+    it('canAccessFile — fichier partagé dans deux groupes, membre du second — retourne true', async () => {
+      ClassGroupResource.findAll.mockResolvedValue([{ classGroupId: 1 }, { classGroupId: 2 }])
+      User.findByPk.mockResolvedValue(studentUser)
+      ClassGroupUsers.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ role: 'student' })
+
+      expect(await ClassGroupResourceService.canAccessFile(key, 2)).toBe(true)
     })
   })
 })

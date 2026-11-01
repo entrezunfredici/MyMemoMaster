@@ -476,8 +476,49 @@ describe('TeacherResourceForm', () => {
     await wrapper.find('select[aria-label="Type de ressource"]').setValue('sujet')
     await btn(wrapper, 'Partager').trigger('click')
     await flushPromises()
-    expect(useClassGroupResourceStore().uploadAndCreate).toHaveBeenCalledWith(GROUP_ID, file, { title: 'Cours 1', type: 'sujet' })
+    expect(useClassGroupResourceStore().uploadAndCreate).toHaveBeenCalledWith(GROUP_ID, file, { title: 'Cours 1', type: 'sujet' }, [])
     expect(wrapper.text()).not.toContain('cours.pdf')
+  })
+
+  describe('partage vers plusieurs groupes', () => {
+    const teacher = (userId) => ({ userId, role: 'teacher' })
+    const state = (groups) => ({
+      classGroupResources: { resources: [], uploading: false },
+      auth: { user: { userId: 5 } },
+      classGroups: { groups },
+    })
+    const GROUPS = [
+      { id: GROUP_ID, name: 'MP2I A', members: [teacher(5)] },
+      { id: 8, name: 'MP2I B', members: [teacher(5)] },
+      { id: 9, name: 'L3 Maths', members: [{ userId: 5, role: 'student' }] },
+      { id: 10, name: 'Autre prof', members: [teacher(6)] },
+    ]
+    const mountMulti = (groups) => mountPanel(TeacherResourceForm, { props: { groupId: GROUP_ID }, state: state(groups) })
+
+    it('propose seulement les AUTRES groupes où l’utilisateur est enseignant', () => {
+      const { wrapper } = mountMulti(GROUPS)
+      const labels = wrapper.findAll('fieldset label').map((l) => l.text())
+      expect(labels).toEqual(['MP2I B'])
+    })
+
+    it('aucun choix de groupe quand il n’y a qu’un groupe', () => {
+      const { wrapper } = mountMulti([GROUPS[0]])
+      expect(wrapper.find('fieldset').exists()).toBe(false)
+    })
+
+    it('envoie les groupes cochés, puis décoche après succès', async () => {
+      const { wrapper } = mountMulti(GROUPS)
+      useClassGroupResourceStore().uploadAndCreate.mockResolvedValue(true)
+      const input = wrapper.find('input[type="file"]')
+      Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+      await input.trigger('change')
+      await wrapper.find('input[aria-label="Titre"]').setValue('Cours')
+      await wrapper.find('fieldset input[type="checkbox"]').setValue(true)
+      await btn(wrapper, 'Partager').trigger('click')
+      await flushPromises()
+      expect(useClassGroupResourceStore().uploadAndCreate).toHaveBeenCalledWith(GROUP_ID, file, { title: 'Cours', type: 'cours' }, [8])
+      expect(wrapper.find('fieldset input[type="checkbox"]').element.checked).toBe(false)
+    })
   })
 
   it('glisser-déposer : le survol est signalé puis le fichier retenu', async () => {
@@ -540,6 +581,17 @@ describe('TeacherResourceList', () => {
     expect(text).toContain('📕')
     expect(text).toContain('Cours · 2 Ko')
     expect(wrapper.findAll('button').filter((b) => b.text() === 'Ouvrir')).toHaveLength(1)
+  })
+
+  it('filtre par type, avec message si aucun document de ce type', async () => {
+    const { wrapper } = mountList()
+    await btn(wrapper, 'Cours (1)').trigger('click')
+    expect(wrapper.text()).toContain('Cours.pdf')
+    expect(wrapper.text()).not.toContain('Schéma')
+    await btn(wrapper, 'Sujet (0)').trigger('click')
+    expect(wrapper.text()).toContain('Aucun document de ce type.')
+    await btn(wrapper, 'Tous (2)').trigger('click')
+    expect(wrapper.text()).toContain('Schéma')
   })
 
   it('« Ouvrir » ouvre le fichier', async () => {

@@ -5414,3 +5414,30 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `VITE_USAGE_RULES_URL` dans les ConfigMaps / values Helm, écrite dans `window.__APP_CONFIG__.USAGE_RULES_URL` par le démarrage du pod front (mécanisme déjà utilisé pour `API_URL`), lue via `src/config.js` avec repli sur `import.meta.env` puis sur l'URL officielle.
 **Alternative écartée** : variable de build (ARG Dockerfile) : imposerait un rebuild d'image par environnement.
 **Conséquences** : toute nouvelle variable runtime du front doit être ajoutée aux quatre générateurs de `config.js` (deux déploiements k8s, chart Helm, docker-compose).
+
+### [2026-11-01] C-03.03 — Clôture rétroactive : l'API ressources de groupe existante est validée, pas réécrite
+**Contexte** : le ticket C-03.03 demande de livrer l'API de partage de ressources dans un groupe. L'audit montre qu'elle existe déjà (routes, service, validators, tests) depuis C-03.01 / S-03.08, avec contrôle d'accès à deux niveaux et nettoyage S3.
+**Décision** : ne modifier aucun code ; documenter le ticket comme vérification rétroactive après exécution des 49 tests, et consigner les écarts restants comme dette plutôt que de les corriger sous un ticket dont le périmètre est déjà livré.
+**Alternative écartée** : réécrire ou étendre l'API pour « marquer » la livraison (risque de régression sans valeur utilisateur) ; ajouter un contrôle d'appartenance du `fileKey` au groupe dans ce ticket (changement de comportement hors périmètre, à décider séparément).
+**Conséquences** : C-03.03 est considéré terminé ; les points de dette (appartenance du `fileKey`, pas de changement de fichier en `update`, pas de pagination) restent à planifier si le besoin apparaît.
+
+### [2026-11-01] C-03.04 — Contrôle d'accès au fichier d'une ressource de groupe dans `presignFile`, refus en 404
+**Contexte** : la liste des ressources était filtrée par appartenance au groupe, mais l'URL signée du fichier ne l'était pas : la seule protection était le secret de la clé.
+**Décision** : `ClassGroupResourceService.canAccessFile` (membre d'un groupe portant ce `fileKey`, rôles 1/4, ou auteur du téléversement) est appelé par `presignFile` avant le contrôle de modération. Un fichier sans ressource de groupe reste accessible (fichiers personnels, cartes mentales). Le refus est un 404 identique à « fichier introuvable ».
+**Alternative écartée** : 403 explicite (révèle l'existence du fichier) ; refuser tout fichier non rattaché à une ressource (casse les uploads personnels et les images de cartes mentales servis par la même route) ; ajouter `groupId` en paramètre de la route (le front et les liens existants changeraient, et le client choisirait le groupe contre lequel on vérifie).
+**Conséquences** : tout nouveau type de contenu de groupe qui stocke un `fileKey` doit être ajouté à ce contrôle ; une requête SQL de plus par `presign`.
+
+## [2026-11-01] Filtre par type de la bibliothèque de ressources : côté client
+
+**Contexte** : C-03.05. La bibliothèque de groupe devait pouvoir être parcourue par type de ressource.
+**Décision** : filtrer côté client (`filterResources` dans `helpers/classroomFormat.js`) la liste déjà chargée, avec un composant partagé `ResourceTypeFilter.vue` pour les vues étudiant et enseignant.
+**Alternative écartée** : paramètre `type` sur `GET /class-groups/:id/resources` : l'API renvoie déjà toute la liste sans pagination, un aller-retour réseau n'apporterait rien et le cache du store (TTL 5 min) serait à segmenter.
+**Conséquences** : à refaire côté API si la liste devient paginée ; l'état du filtre est local au composant.
+
+## [2026-11-01] Partage d'un document vers plusieurs groupes : une ressource par groupe, un fichier partagé
+
+**Contexte** : C-03.06. Un enseignant doit pouvoir publier un document dans plusieurs de ses groupes en un envoi.
+**Décision** : téléverser le fichier une fois, créer une ressource par groupe avec la même `fileKey` (aucune migration), et ne supprimer le fichier S3 qu'avec la dernière ressource qui le référence (`ClassGroupResourceService.delete` et `ContentReportService._destroyContent`).
+**Alternative écartée** : (a) un téléversement par groupe : stockage et temps d'envoi multipliés ; (b) une table de liaison ressource↔groupes : migration et refonte des droits, de la modération et de la suppression, hors périmètre V2.
+**Conséquences** : le modèle reste « une ressource = un groupe », donc modération, droits et suppression restent par groupe ; la création multi-groupes côté client n'est pas atomique (voir dette dans le CHANGELOG).
+
