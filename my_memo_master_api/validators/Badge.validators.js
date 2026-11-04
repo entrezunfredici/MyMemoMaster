@@ -1,6 +1,14 @@
-const { body } = require('express-validator')
+const { body, param } = require('express-validator')
 
 const MAX_CODES_PER_REQUEST = 50
+
+exports.setSubjects = [
+  param('code').isString().isLength({ min: 1, max: 40 }).withMessage('Le code du badge est invalide.'),
+  body('subjectIds')
+    .isArray({ max: 100 })
+    .withMessage('subjectIds doit être un tableau (vide pour un badge global).'),
+  body('subjectIds.*').isInt({ min: 1 }).withMessage('Chaque matière doit être un entier positif.')
+]
 
 exports.markSeen = [
   body('codes')

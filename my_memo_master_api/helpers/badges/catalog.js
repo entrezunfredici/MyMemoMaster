@@ -37,6 +37,29 @@ const CATALOG = [
   { code: 'fiveSubjects', category: 'exploration', rarity: 'rare', icon: '🎯', label: 'Polyvalent', description: 'Étudier 5 matières différentes', target: 5, events: [...EXERCISE, ...LEITNER], value: (s) => s.distinctSubjects }
 ]
 
+// Badges dont le critère se calcule sur l'activité par matière (exercices, Leitner) : seuls ceux-là
+// peuvent être liés à des matières (table BadgeSubject). Les badges fondés sur les jours d'activité
+// (séries, régularité) ou sur le nombre de matières ne se découpent pas par matière.
+//
+// Pour ces mêmes badges, `contributors` nomme la mesure (de Badge.service#computeStats) qui liste les
+// matières dont l'activité a permis l'obtention. Elle est enregistrée à l'obtention (UserBadge.context)
+// et décide de la visibilité pour un enseignant : un badge n'est montré que s'il a été obtenu avec
+// une matière consentie.
+const CONTRIBUTORS = {
+  firstExercise: 'subjectsAllExercises',
+  tenTests: 'subjectsPrivateExercises',
+  fiftyTests: 'subjectsPrivateExercises',
+  perfectScore: 'subjectsPerfectScores',
+  firstLeitner: 'subjectsLeitnerSessions',
+  hundredCards: 'subjectsLeitnerSessions',
+  thousandCards: 'subjectsLeitnerSessions',
+  leitnerMastery: 'subjectsMastered'
+}
+CATALOG.forEach((badge) => {
+  badge.scopable = badge.code in CONTRIBUTORS
+  badge.contributors = (stats) => (badge.scopable ? stats[CONTRIBUTORS[badge.code]] : [])
+})
+
 const CATALOG_BY_CODE = new Map(CATALOG.map((badge) => [badge.code, badge]))
 
 // Niveaux selon le nombre de badges obtenus (propositions non calibrées, §7).

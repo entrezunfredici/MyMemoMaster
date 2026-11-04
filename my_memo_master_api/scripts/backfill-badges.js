@@ -1,7 +1,8 @@
 /**
  * Rattrapage des badges (C-06) : reconstruit les jours d'activité depuis l'historique réel
  * (exercices, sessions Leitner, cartes mentales) puis attribue les badges déjà mérités,
- * marqués « vus » pour ne pas déclencher une rafale d'animations au déploiement.
+ * marqués « vus » pour ne pas déclencher une rafale d'animations au déploiement, et renseigne les
+ * matières d'obtention des badges obtenus avant leur enregistrement (visibilité enseignant).
  * Idempotent : rejouable sans doublon.
  *
  * Usage :
@@ -19,9 +20,9 @@ async function main() {
   const users = await User.findAll({ where: onlyId ? { userId: onlyId } : {}, attributes: ['userId'], raw: true })
   let awardedTotal = 0
   for (const { userId } of users) {
-    const { activityDaysAdded, awarded } = await badgeService.backfill(userId)
+    const { activityDaysAdded, awarded, subjectsRepaired } = await badgeService.backfill(userId)
     awardedTotal += awarded.length
-    console.log(`[backfill-badges] user ${userId} : ${activityDaysAdded} jour(s) d'activité, ${awarded.length} badge(s) (${awarded.join(', ')})`)
+    console.log(`[backfill-badges] user ${userId} : ${activityDaysAdded} jour(s) d'activité, ${awarded.length} badge(s) (${awarded.join(', ')}), ${subjectsRepaired} badge(s) à matières renseignées`)
   }
   console.log(`[backfill-badges] ${users.length} utilisateur(s), ${awardedTotal} badge(s) attribué(s).`)
 }

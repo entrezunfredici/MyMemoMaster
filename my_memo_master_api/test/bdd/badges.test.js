@@ -301,13 +301,13 @@ describe('Badges — noyau de gamification', () => {
       expect((await UserBadge.findAll({ where: { userId: user.userId } })).every((b) => b.seenAt !== null)).toBe(true)
 
       const second = await badgeService.backfill(user.userId)
-      expect(second).toEqual({ activityDaysAdded: 0, awarded: [] })
+      expect(second).toEqual({ activityDaysAdded: 0, awarded: [], subjectsRepaired: 0 })
     })
 
     it('backfill - créneau planifié coché sans pratique - n\'ouvre aucun jour d\'activité', async () => {
       const user = await createUser()
       const result = await badgeService.backfill(user.userId)
-      expect(result).toEqual({ activityDaysAdded: 0, awarded: [] })
+      expect(result).toEqual({ activityDaysAdded: 0, awarded: [], subjectsRepaired: 0 })
     })
   })
 
@@ -323,6 +323,40 @@ describe('Badges — noyau de gamification', () => {
       expect(streak3).toMatchObject({ id: 'streak3', code: 'streak3', unlocked: true, earned: true, icon: expect.any(String), label: 'Premier élan' })
       expect(streak3.earnedAt).not.toBeNull()
       expect(badges.find((b) => b.id === 'streak7').unlocked).toBe(false)
+    })
+
+    it('listForKpi - consentement global - chaque badge obtenu porte les noms de ses matières d\'obtention', async () => {
+      const user = await createUser()
+      const subject = await createSubject('Latin')
+      await createResult(user.userId, subject, { score: 1, total: 4 })
+      await emit('exercise.submitted', { userId: user.userId })
+
+      const badges = await badgeService.listForKpi(user.userId)
+
+      expect(badges.find((b) => b.id === 'firstExercise').earnedSubjects).toEqual([{ subjectId: subject.subjectId, name: 'Latin' }])
+      // badge sans matière (série) ou non obtenu : liste vide, jamais absente
+      expect(badges.find((b) => b.id === 'streak7').earnedSubjects).toEqual([])
+    })
+
+    it('withSubjectNames - aucun badge avec matière - ne fait aucune requête sur les matières', async () => {
+      const { Subject: SubjectModel } = require('../../models')
+      const spy = jest.spyOn(SubjectModel, 'findAll')
+
+      const result = await badgeService.withSubjectNames([{ code: 'streak3', earnedSubjectIds: [] }])
+
+      expect(spy).not.toHaveBeenCalled()
+      expect(result[0].earnedSubjects).toEqual([])
+      spy.mockRestore()
+    })
+
+    it('contributors - chaque badge restreignable - renvoie un tableau, les autres une liste vide', () => {
+      const { CATALOG } = require('../../helpers/badges/catalog')
+      const stats = badgeService.computeStats({ dates: [], testResults: [], leitnerSessions: [], systems: [] })
+      CATALOG.forEach((badge) => {
+        const subjects = badge.contributors(stats)
+        expect(Array.isArray(subjects)).toBe(true)
+        if (!badge.scopable) expect(subjects).toEqual([])
+      })
     })
 
     it("listForKpi - compte antérieur au déploiement - rattrapé une fois depuis l'historique", async () => {
@@ -414,6 +448,250 @@ describe('Badges — noyau de gamification', () => {
         .send({ idMindMap: map.idMindMap, durationSeconds: 60 })
 
       expect(await UserActivityDay.count({ where: { userId: user.userId } })).toBe(1)
+    })
+  })
+
+  describe('badges liés à des matières (many-to-many)', () => {
+    const { BadgeSubject } = require('../../models')
+    let studentToken
+    let adminToken
+    let maths
+    let physique
+
+    beforeAll(async () => {
+      const studentRole = await Role.create({ name: 'Élève lié' })
+      const student = await User.create({
+        name: 'Élève lié',
+        email: 'scoped-student@test.fr',
+        password: await bcrypt.hash('Test1234!', 10),
+        roleId: studentRole.roleId,
+        hasValidatedEmail: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      studentToken = makeToken(student.userId)
+      adminToken = makeToken((await createUser()).userId)
+      maths = await createSubject('Maths liées')
+      physique = await createSubject('Physique liée')
+    })
+
+    afterEach(async () => {
+      await BadgeSubject.destroy({ where: {} })
+    })
+
+    const put = (token, code, body) =>
+      request(app).put(`${BASE}/badges/${code}/subjects`).set('Authorization', `Bearer ${token}`).send(body)
+
+    it('PUT /badges/:code/subjects - non administrateur - 403', async () => {
+      const res = await put(studentToken, 'firstExercise', { subjectIds: [maths.subjectId] })
+      expect(res.status).toBe(403)
+    })
+
+    it('PUT /badges/:code/subjects - badge inconnu - 404', async () => {
+      const res = await put(adminToken, 'nexistepas', { subjectIds: [] })
+      expect(res.status).toBe(404)
+    })
+
+    it('PUT /badges/:code/subjects - badge de série (non restreignable) - 400', async () => {
+      const res = await put(adminToken, 'streak7', { subjectIds: [maths.subjectId] })
+      expect(res.status).toBe(400)
+      expect(res.body.message).toMatch(/matières/)
+    })
+
+    it('PUT /badges/:code/subjects - matière inconnue - 400', async () => {
+      const res = await put(adminToken, 'firstExercise', { subjectIds: [999999] })
+      expect(res.status).toBe(400)
+    })
+
+    it.each([[{}], [{ subjectIds: 'maths' }], [{ subjectIds: ['a'] }], [{ subjectIds: [0] }]])(
+      'PUT /badges/:code/subjects - corps invalide %j - 400',
+      async (body) => {
+        const res = await put(adminToken, 'firstExercise', body)
+        expect(res.status).toBe(400)
+      }
+    )
+
+    it('PUT /badges/:code/subjects - plusieurs matières puis remplacement - many-to-many mis à jour', async () => {
+      const first = await put(adminToken, 'tenTests', { subjectIds: [maths.subjectId, physique.subjectId, maths.subjectId] })
+      expect(first.status).toBe(200)
+      expect(first.body.subjectIds).toEqual([maths.subjectId, physique.subjectId])
+
+      // un même badge pour plusieurs matières, et une matière pour plusieurs badges
+      await put(adminToken, 'perfectScore', { subjectIds: [maths.subjectId] })
+      expect(await BadgeSubject.count({ where: { subjectId: maths.subjectId } })).toBe(2)
+
+      await put(adminToken, 'tenTests', { subjectIds: [physique.subjectId] })
+      const list = await request(app).get(`${BASE}/badges`).set('Authorization', `Bearer ${studentToken}`)
+      expect(list.body.find((b) => b.code === 'tenTests').linkedSubjectIds).toEqual([physique.subjectId])
+
+      await put(adminToken, 'tenTests', { subjectIds: [] })
+      expect(await BadgeSubject.count({ where: { badgeCode: 'tenTests' } })).toBe(0)
+    })
+
+    it('GET /badges - badge restreignable - expose scopable et les matières liées (linkedSubjectIds)', async () => {
+      await put(adminToken, 'firstExercise', { subjectIds: [maths.subjectId] })
+      const res = await request(app).get(`${BASE}/badges`).set('Authorization', `Bearer ${studentToken}`)
+      expect(res.body.find((b) => b.code === 'firstExercise')).toMatchObject({ scopable: true, linkedSubjectIds: [maths.subjectId] })
+      expect(res.body.find((b) => b.code === 'streak7')).toMatchObject({ scopable: false, linkedSubjectIds: [] })
+    })
+
+    it('handle - badge lié à Maths - un exercice de Physique ne le débloque pas, un exercice de Maths oui', async () => {
+      const user = await createUser()
+      await BadgeSubject.create({ badgeCode: 'firstExercise', subjectId: maths.subjectId })
+
+      await createResult(user.userId, physique, { score: 1, total: 4 })
+      expect(await emit('exercise.submitted', { userId: user.userId })).toEqual([])
+
+      await createResult(user.userId, maths, { score: 1, total: 4 })
+      expect(await emit('exercise.submitted', { userId: user.userId })).toEqual(['firstExercise'])
+    })
+
+    it('handle - badge lié à deux matières - le total cumule les deux et ignore les autres', async () => {
+      const user = await createUser()
+      const autre = await createSubject('Autre')
+      await BadgeSubject.bulkCreate([
+        { badgeCode: 'tenTests', subjectId: maths.subjectId },
+        { badgeCode: 'tenTests', subjectId: physique.subjectId }
+      ])
+      for (let i = 0; i < 4; i++) await createResult(user.userId, maths, { score: 1, total: 4 })
+      for (let i = 0; i < 4; i++) await createResult(user.userId, physique, { score: 1, total: 4 })
+      for (let i = 0; i < 5; i++) await createResult(user.userId, autre, { score: 1, total: 4 })
+
+      expect(await emit('exercise.submitted', { userId: user.userId })).not.toContain('tenTests')
+
+      await createResult(user.userId, physique, { score: 1, total: 4 })
+      await createResult(user.userId, maths, { score: 1, total: 4 })
+      expect(await emit('exercise.submitted', { userId: user.userId })).toContain('tenTests')
+    })
+
+    it('list - badge lié non obtenu - la progression ne compte que les matières liées', async () => {
+      const user = await createUser()
+      await BadgeSubject.create({ badgeCode: 'tenTests', subjectId: maths.subjectId })
+      for (let i = 0; i < 3; i++) await createResult(user.userId, maths, { score: 1, total: 4 })
+      for (let i = 0; i < 6; i++) await createResult(user.userId, physique, { score: 1, total: 4 })
+
+      const badge = (await badgeService.list(user.userId)).find((b) => b.code === 'tenTests')
+
+      expect(badge.progress).toEqual({ current: 3, target: 10 })
+    })
+
+    it('handle - obtention - enregistre les matières avec lesquelles le badge a été obtenu', async () => {
+      const user = await createUser()
+      await createResult(user.userId, maths, { score: 3, total: 3 })
+      await createResult(user.userId, physique, { score: 1, total: 4 })
+
+      await emit('exercise.submitted', { userId: user.userId })
+
+      const byCode = Object.fromEntries((await badgeService.list(user.userId)).map((b) => [b.code, b]))
+      expect(byCode.firstExercise.earnedSubjectIds).toEqual([maths.subjectId, physique.subjectId].sort((a, b) => a - b))
+      // 100 % uniquement en Maths : la Physique n'a pas contribué à ce badge
+      expect(byCode.perfectScore.earnedSubjectIds).toEqual([maths.subjectId])
+    })
+
+    it('listForSubjects - badge obtenu avec Maths - visible avec le consentement Maths, sans lien administrateur', async () => {
+      const user = await createUser()
+      await createResult(user.userId, maths, { score: 3, total: 3 })
+      await emit('exercise.submitted', { userId: user.userId })
+
+      const visible = await badgeService.listForSubjects(user.userId, [maths.subjectId])
+
+      expect(visible.map((b) => b.id).sort()).toEqual(['firstExercise', 'perfectScore'])
+      expect(visible.every((b) => b.unlocked === true)).toBe(true)
+    })
+
+    it('listForSubjects - badge obtenu avec Physique seulement - invisible avec le consentement Maths', async () => {
+      const user = await createUser()
+      await createResult(user.userId, physique, { score: 3, total: 3 })
+      await emit('exercise.submitted', { userId: user.userId })
+
+      expect(await badgeService.listForSubjects(user.userId, [maths.subjectId])).toEqual([])
+    })
+
+    it('listForSubjects - badge obtenu avec deux matières - visible avec une seule consentie, sans révéler l\'autre', async () => {
+      const user = await createUser()
+      await createResult(user.userId, maths, { score: 1, total: 4 })
+      await createResult(user.userId, physique, { score: 1, total: 4 })
+      await emit('exercise.submitted', { userId: user.userId })
+
+      const visible = await badgeService.listForSubjects(user.userId, [maths.subjectId])
+
+      const first = visible.find((b) => b.id === 'firstExercise')
+      expect(first.earnedSubjectIds).toEqual([maths.subjectId])
+    })
+
+    it('listForSubjects - lien administrateur sans contribution - ne rend pas le badge visible', async () => {
+      const user = await createUser()
+      await BadgeSubject.create({ badgeCode: 'firstExercise', subjectId: maths.subjectId })
+      await UserBadge.create({ userId: user.userId, badgeCode: 'firstExercise', context: { value: 1, subjectIds: [physique.subjectId] } })
+
+      expect(await badgeService.listForSubjects(user.userId, [maths.subjectId])).toEqual([])
+    })
+
+    it('listForSubjects - badge sans matière (série) ou obtenu avant l\'enregistrement des matières - jamais montré', async () => {
+      const user = await createUser()
+      await UserBadge.bulkCreate([
+        { userId: user.userId, badgeCode: 'streak3', context: { value: 3, subjectIds: [] } },
+        { userId: user.userId, badgeCode: 'firstExercise', context: { value: 1 } },
+        { userId: user.userId, badgeCode: 'tenTests' }
+      ])
+
+      expect(await badgeService.listForSubjects(user.userId, [maths.subjectId])).toEqual([])
+    })
+
+    it('listForSubjects - badge visible - renvoie le nom des matières consenties pour l\'affichage enseignant', async () => {
+      const user = await createUser()
+      await createResult(user.userId, maths, { score: 1, total: 4 })
+      await createResult(user.userId, physique, { score: 1, total: 4 })
+      await emit('exercise.submitted', { userId: user.userId })
+
+      const visible = await badgeService.listForSubjects(user.userId, [maths.subjectId])
+
+      expect(visible.find((b) => b.id === 'firstExercise').earnedSubjects).toEqual([{ subjectId: maths.subjectId, name: 'Maths liées' }])
+    })
+
+    it('repairEarnedSubjects - badge obtenu sans matières enregistrées - reconstruit depuis l\'activité', async () => {
+      const user = await createUser()
+      await createResult(user.userId, maths, { score: 3, total: 3 })
+      await UserBadge.bulkCreate([
+        { userId: user.userId, badgeCode: 'firstExercise', context: { value: 1 } },
+        { userId: user.userId, badgeCode: 'perfectScore' },
+        { userId: user.userId, badgeCode: 'streak3', context: { value: 3 } }
+      ])
+      expect(await badgeService.listForSubjects(user.userId, [maths.subjectId])).toEqual([])
+
+      expect(await badgeService.repairEarnedSubjects(user.userId)).toBe(3)
+
+      const visible = await badgeService.listForSubjects(user.userId, [maths.subjectId])
+      expect(visible.map((b) => b.id).sort()).toEqual(['firstExercise', 'perfectScore'])
+      const streak = await UserBadge.findOne({ where: { userId: user.userId, badgeCode: 'streak3' } })
+      expect(streak.context).toEqual({ value: 3, subjectIds: [] })
+    })
+
+    it('repairEarnedSubjects - rejoué - ne modifie rien la seconde fois', async () => {
+      const user = await createUser()
+      await createResult(user.userId, maths, { score: 1, total: 4 })
+      await UserBadge.create({ userId: user.userId, badgeCode: 'firstExercise' })
+
+      expect(await badgeService.repairEarnedSubjects(user.userId)).toBe(1)
+      expect(await badgeService.repairEarnedSubjects(user.userId)).toBe(0)
+    })
+
+    it('backfill - badge ancien sans matières - les renseigne', async () => {
+      const user = await createUser()
+      await createResult(user.userId, maths, { score: 1, total: 4 })
+      await UserBadge.create({ userId: user.userId, badgeCode: 'firstExercise' })
+
+      const result = await badgeService.backfill(user.userId)
+
+      expect(result.subjectsRepaired).toBeGreaterThanOrEqual(1)
+      expect(await badgeService.listForSubjects(user.userId, [maths.subjectId])).toHaveLength(1)
+    })
+
+    it('listForSubjects - badge lié non obtenu - non montré', async () => {
+      const user = await createUser()
+      await BadgeSubject.create({ badgeCode: 'firstExercise', subjectId: maths.subjectId })
+
+      expect(await badgeService.listForSubjects(user.userId, [maths.subjectId])).toEqual([])
     })
   })
 })

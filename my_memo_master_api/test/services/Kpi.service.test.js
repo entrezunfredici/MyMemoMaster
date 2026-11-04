@@ -2,7 +2,10 @@ const dayjs = require('dayjs')
 const kpiService = require('../../services/Kpi.service')
 const badgeService = require('../../services/Badge.service')
 
-jest.mock('../../services/Badge.service', () => ({ listForKpi: jest.fn().mockResolvedValue([]) }))
+jest.mock('../../services/Badge.service', () => ({
+  listForKpi: jest.fn().mockResolvedValue([]),
+  listForSubjects: jest.fn().mockResolvedValue([])
+}))
 
 jest.mock('../../models', () => ({
   RevisionSession: { findAll: jest.fn() },
@@ -45,14 +48,6 @@ const box = (level, cards) => ({ level, leitnerCards: cards })
 
 const leitnerSystem = (boxes, subject = { subjectId: 1, name: 'Maths' }) =>
   ({ leitnerBoxes: boxes, subject })
-
-const emptyKpiInput = (overrides = {}) => ({
-  revisionKpi: { streakDays: 0, completedLast30Days: 0 },
-  exercisesKpi: { totalTests: 0, scoreHistory: [] },
-  leitnerKpi: { mastery: 0 },
-  subjectsKpi: { totalUnique: 0 },
-  ...overrides
-})
 
 describe('KpiService', () => {
   beforeEach(() => jest.clearAllMocks())
@@ -166,10 +161,9 @@ describe('KpiService', () => {
       const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
 
       expect(kpis.revision.totalMinutes).toBe(3)
-      // Badges de la vue filtrée : toujours calculés sur les données consenties, jamais lus
-      // dans UserBadge (qui reflète l'activité sur toutes les matières).
+      // Badges de la vue filtrée : uniquement ceux liés aux matières consenties
       expect(badgeService.listForKpi).not.toHaveBeenCalled()
-      expect(kpis.badges).toHaveLength(7)
+      expect(badgeService.listForSubjects).toHaveBeenCalledWith(1, [1])
       // Le filtre par matière consentie doit être répercuté sur la requête Leitner
       // (via le système rattaché) et sur la requête cartes mentales (via la carte
       // rattachée), pas seulement sur les exercices.
@@ -524,82 +518,6 @@ describe('KpiService', () => {
       const r = kpiService._computeDiscipline(sessions)
 
       expect(r.disciplineScore).toBe(100) // 1/1 = 100%
-    })
-  })
-
-  // ─── _computeBadges ───────────────────────────────────────────────────────────
-
-  describe('_computeBadges', () => {
-    it('retourne exactement 7 badges', () => {
-      expect(kpiService._computeBadges(emptyKpiInput())).toHaveLength(7)
-    })
-
-    it('streak7 — débloqué si streakDays >= 7', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 7, completedLast30Days: 0 } }))
-      expect(badges.find((b) => b.id === 'streak7').unlocked).toBe(true)
-    })
-
-    it('streak7 — verrouillé si streakDays < 7', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput())
-      expect(badges.find((b) => b.id === 'streak7').unlocked).toBe(false)
-    })
-
-    it('streak30 — débloqué si streakDays >= 30', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 30, completedLast30Days: 0 } }))
-      expect(badges.find((b) => b.id === 'streak30').unlocked).toBe(true)
-    })
-
-    it('perfectScore — débloqué si un score à 100% dans l\'historique', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 2, scoreHistory: [{ percentage: 80 }, { percentage: 100 }] }
-      }))
-      expect(badges.find((b) => b.id === 'perfectScore').unlocked).toBe(true)
-    })
-
-    it('perfectScore — verrouillé si aucun score à 100%', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 2, scoreHistory: [{ percentage: 80 }, { percentage: 90 }] }
-      }))
-      expect(badges.find((b) => b.id === 'perfectScore').unlocked).toBe(false)
-    })
-
-    it('tenTests — débloqué si totalTests >= 10', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 10, scoreHistory: [] }
-      }))
-      expect(badges.find((b) => b.id === 'tenTests').unlocked).toBe(true)
-    })
-
-    it('tenTests — verrouillé si totalTests < 10', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 9, scoreHistory: [] }
-      }))
-      expect(badges.find((b) => b.id === 'tenTests').unlocked).toBe(false)
-    })
-
-    it('fiveSubjects — débloqué si totalUnique >= 5', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ subjectsKpi: { totalUnique: 5 } }))
-      expect(badges.find((b) => b.id === 'fiveSubjects').unlocked).toBe(true)
-    })
-
-    it('leitnerMastery — débloqué si mastery >= 50', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ leitnerKpi: { mastery: 50 } }))
-      expect(badges.find((b) => b.id === 'leitnerMastery').unlocked).toBe(true)
-    })
-
-    it('leitnerMastery — verrouillé si mastery < 50', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ leitnerKpi: { mastery: 49 } }))
-      expect(badges.find((b) => b.id === 'leitnerMastery').unlocked).toBe(false)
-    })
-
-    it('regular — débloqué si completedLast30Days >= 20', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 0, completedLast30Days: 20 } }))
-      expect(badges.find((b) => b.id === 'regular').unlocked).toBe(true)
-    })
-
-    it('regular — verrouillé si completedLast30Days < 20', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 0, completedLast30Days: 19 } }))
-      expect(badges.find((b) => b.id === 'regular').unlocked).toBe(false)
     })
   })
 })

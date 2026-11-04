@@ -68,6 +68,22 @@ export function disciplineScoreClass(score) {
   return 'text-red-700'
 }
 
+/** Noms des matières avec lesquelles un badge a été obtenu (« Maths, Physique »), vide si inconnues. */
+export function badgeSubjectNames(badge) {
+  return (badge?.earnedSubjects || [])
+    .map((subject) => subject.name)
+    .filter(Boolean)
+    .join(', ')
+}
+
+/** Infobulle d'un badge : sa description, suivie des matières d'obtention quand elles sont connues. */
+export function badgeTitle(badge) {
+  const subjects = badgeSubjectNames(badge)
+  const description = badge?.description || ''
+  if (!subjects) return description
+  return description ? `${description} (obtenu en : ${subjects})` : `Obtenu en : ${subjects}`
+}
+
 /** Normalise la hauteur d'une barre d'activité hebdomadaire (max 7 séances par semaine). */
 export function weeklyBarHeight(count) {
   if (!count) return '3px'

@@ -34,6 +34,7 @@ import AdminRolesPanel from '@/components/admin/AdminRolesPanel.vue'
 import AdminAccountsPanel from '@/components/admin/AdminAccountsPanel.vue'
 import AdminAuditPanel from '@/components/admin/AdminAuditPanel.vue'
 import ReportContentButton from '@/components/classroom/ReportContentButton.vue'
+import TeacherStudentKpi from '@/components/classroom/teacher/TeacherStudentKpi.vue'
 import { CONFIRM_ACTION_KEY } from '@/composables/useConfirmAction'
 
 // Composants sans route dans leur template : pas besoin du mock vue-router.
@@ -496,5 +497,25 @@ describe('Accessibilité (axe-core) — signalement de contenu', () => {
     await wrapper.get('form').trigger('submit')
     expect(wrapper.find('[role="alert"]').exists()).toBe(true)
     expect(await runAxe(document.body.querySelector('[role="dialog"]'))).toEqual([])
+  })
+})
+
+describe('Accessibilité (axe-core) — KPI étudiant côté enseignant', () => {
+  const kpi = {
+    revision: { streakDays: 4, totalPlanned: 10, totalCompleted: 7, completionRate: 70, sessionsLast30Days: 8, completedLast30Days: 6, totalMinutes: 135, weeklyActivity: [{ week: 'S40', count: 3 }] },
+    exercises: { totalTests: 5, avgScore: 74, minScore: 40, maxScore: 95, recentTrend: 6, scoreHistory: [{ date: 'a', testName: 'DS 1', percentage: 80 }] },
+    leitner: { totalCards: 42, mastery: 66, cardsDue: 9, globalSuccessRate: 71, cardsByBox: { 1: 10, 3: 12 } },
+    subjects: { list: [{ subjectId: 1, name: 'Maths', systems: 2, tests: 0 }] },
+    discipline: { plannedThisWeek: 5, completedThisWeek: 3, disciplineScore: 55 },
+    badges: [
+      { id: 'tenTests', unlocked: true, icon: '📚', label: '10 exercices', description: '10 séries', earnedSubjects: [{ subjectId: 1, name: 'Maths' }, { subjectId: 2, name: 'Physique' }] },
+      { id: 'streak3', unlocked: true, icon: '✨', label: 'Premier élan', description: '3 jours de suite', earnedSubjects: [] }
+    ]
+  }
+
+  it('TeacherStudentKpi - badges avec et sans matières d\'obtention - aucune violation axe', async () => {
+    wrapper = mount(TeacherStudentKpi, { props: { loaded: true, kpi }, attachTo: document.body })
+    expect(wrapper.text()).toContain('Maths, Physique')
+    expect(await runAxe(wrapper.element)).toEqual([])
   })
 })

@@ -86,7 +86,7 @@
 | Tests fonctionnels Deadline + Reminder (front) | Stable — M-03.10 : 19 tests TodoWidget + 33 tests NotificationBellComponent (Vitest) | 2026-06-13 |
 | Tests fonctionnels ProfilePage (front) | Stable — M-05.10 : 17 tests Vitest (rendu, saveProfile, changePassword, logout, deleteAccount) | 2026-06-17 |
 | Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
-| Gamification / badges (C-06) | Défini (analyse, 2026-11-03) — `diagrams/gamification_badges.md` : critères, niveaux, modèle `UserBadge`, moteur event-driven, API, profil, animation, banque d'idées ; **aucun code** ; les 7 badges existants de `Kpi.service#_computeBadges` restent calculés à la volée, non persistés | 2026-11-03 |
+| Gamification / badges (C-06) | Maquettes UI du profil gamifié livrées (C-06.02, 2026-11-04, `diagrams/profil_gamifie_ui.md`, aucun code front) ; Défini (analyse, 2026-11-03) — `diagrams/gamification_badges.md` : critères, niveaux, modèle `UserBadge`, moteur event-driven, API, profil, animation, banque d'idées ; **aucun code** ; les 7 badges existants de `Kpi.service#_computeBadges` restent calculés à la volée, non persistés | 2026-11-03 |
 | Alertes KPI (UserKpiAlertSettings) | Stable — KPI-02 : digest quotidien 18h, 3 triggers, canaux in-app/email/push-futur, paramètres par utilisateur | 2026-06-23 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00b.07 : audit OWASP complet, 12 vulns traitées (H1–H4 corrigées), rapport SECURITY_AUDIT_OWASP.md | 2026-06-23 |
 | Storage (upload S3, mindmap local) | Stable — M-00b.07 H3 : clé S3 inclut userId (uploads/{userId}/…), vérification préfixe à la suppression | 2026-06-23 |
@@ -13833,3 +13833,45 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Vérifié** : suite API complète 136 suites / 2 777 tests verts ; ESLint propre ; `KpiPage` et `TeacherPanels` côté front (95 tests) verts. Pas de rendu navigateur.
 **Changement de comportement** : un badge obtenu ne se perd plus ; critères de série et de régularité fondés sur la pratique réelle ; 7 → 14 badges affichés dans le KPI personnel.
 **Dette** : vue enseignant sous consentement par matière encore sur les 7 anciens critères (deux logiques) ; visibilité enseignant à redéfinir ; le rattrapage paresseux refait 3 requêtes à chaque lecture pour un utilisateur sans historique.
+
+## [2026-11-04] [ADD] C-06 — Badges liés aux matières (many-to-many) (Back-end)
+
+**Contexte** : proposition de l'utilisateur pour résoudre la confidentialité de la vue enseignant. Réponses données : critère restreint aux matières liées ; visibilité si au moins une matière liée est consentie.
+**Fichiers créés** : `migrations/20261104000002-create-badgesubject.js` · `models/BadgeSubject.model.js`.
+**Fichiers modifiés** : `models/index.js` · `helpers/badges/catalog.js` (drapeau `scopable`) · `services/Badge.service.js` (`loadRaw`/`computeStats`/`measure` par matière, `loadLinks`, `listForSubjects`, `setSubjects`) · `services/Kpi.service.js` (`getPersonalKpisForSubjects` lit `listForSubjects`, `_computeBadges` marquée `TODO`) · `controllers/Badge.controller.js`, `routes/Badge.routes.js`, `validators/Badge.validators.js` (`PUT /badges/:code/subjects`, rôle 1) · `test/bdd/badges.test.js` (+16) · `test/services/Kpi.service.test.js` · `diagrams/gamification_badges.md` (§19).
+**Utilisable** : `PUT /badges/:code/subjects` ; `GET /badges` expose `scopable` et `subjectIds` ; l'évaluation, la progression et la vue enseignant par matières tiennent compte des liens.
+**Vérifié** : suite API complète 136 suites / 2 793 tests verts ; ESLint propre ; migration montée, descendue, doublon refusé sur SQLite. Non vérifié : migration sous PostgreSQL, rendu navigateur.
+**Changement de comportement** : sous consentement par matières, l'enseignant ne voit plus les 7 anciens badges calculés mais uniquement les badges obtenus et liés à une matière consentie ; tant qu'aucun lien n'existe, aucun.
+**Dette / à faire** : (1) aucun lien par défaut — à configurer par un administrateur, ou à seeder après décision sur le rattachement initial ; (2) pas d'interface d'administration ; (3) `_computeBadges` et ses tests à supprimer après validation ; (4) les jours d'activité ne sont pas rattachés à une matière ; (5) export/import des liens non traité.
+
+## [2026-11-04] [IMP] C-06 — Visibilité par matières d'obtention et suppression de l'ancien calcul (Back-end)
+
+**Fichiers modifiés** : `helpers/badges/catalog.js` (`contributors`) · `services/Badge.service.js` (mesure des matières contributrices, enregistrées dans `UserBadge.context.subjectIds`, `listForSubjects` sur ces matières, `linkedSubjectIds`/`earnedSubjectIds`) · `services/Kpi.service.js` (**suppression de `_computeBadges`**) · `routes/Badge.routes.js` (description) · `test/bdd/badges.test.js` (6 tests de visibilité réécrits ou ajoutés) · `test/services/Kpi.service.test.js` (**suppression du bloc `_computeBadges` et du helper `emptyKpiInput`**, sur autorisation explicite) · `diagrams/gamification_badges.md` (§19).
+**Utilisable** : sous consentement par matières, l'enseignant voit les badges obtenus avec une matière consentie, qu'un lien existe ou non ; aucun lien par défaut.
+**Vérifié** : suite API complète 136 suites / 2 784 tests verts (le total baisse du nombre de tests supprimés) ; ESLint propre. Non vérifié : rendu navigateur, PostgreSQL.
+**Dette** : (1) un badge global cumulatif peut exprimer un total incluant des matières non consenties ; (2) badges obtenus avant l'enregistrement des matières : invisibles sous consentement par matières ; (3) `TeacherStudentKpi.vue` n'affiche que `unlocked`, non adapté aux nouveaux champs ; (4) pas d'interface d'administration des liens.
+
+## [2026-11-04] [IMP] C-06 — Réparation des anciens badges et affichage enseignant des matières (Back + Front)
+
+**Fichiers modifiés (API)** : `services/Badge.service.js` (`repairEarnedSubjects`, appelée par `backfill` qui renvoie aussi `subjectsRepaired` ; `listForSubjects` ajoute `earnedSubjects: [{ subjectId, name }]`) · `scripts/backfill-badges.js` · `test/bdd/badges.test.js` (+5).
+**Fichiers modifiés (front)** : `src/helpers/classroomFormat.js` (`badgeSubjectNames`, `badgeTitle`) · `src/components/classroom/teacher/TeacherStudentKpi.vue` (noms des matières sous chaque badge, infobulle « obtenu en : … ») · `test/helpers/classroomFormat.test.js` (+8) · `test/components/TeacherPanels.test.js` (+2).
+**Utilisable** : sous consentement par matières, l'enseignant voit chaque badge avec les matières consenties qui l'ont fait obtenir ; `npm run badges:backfill` répare les anciens badges.
+**Vérifié** : API 136 suites / 2 788 tests verts ; front 155 fichiers / 2 641 tests verts ; ESLint propre (API et fichiers front modifiés) ; `audit:colors`, `audit:tailwind`, `audit:a11y` à zéro. Non vérifié : rendu navigateur, `test:a11y` (Playwright), PostgreSQL.
+**Dette** : (1) matières reconstruites approximatives pour les anciens badges ; (2) avec un consentement global, l'enseignant voit les badges sans leurs matières (non chargées dans `listForKpi`) ; (3) pas de test d'accessibilité axe dédié à la nouvelle ligne de matières (texte en `text-dark/70`, seuil minimal du projet).
+
+## [2026-11-04] [IMP] C-06 — Matières d'obtention sous consentement global et tests complémentaires
+
+**Fichiers modifiés** : `services/Badge.service.js` (`withSubjectNames`, utilisée par `listForSubjects` et `listForKpi`) · `test/bdd/badges.test.js` (+3 : noms des matières sous consentement global, aucune requête inutile, cohérence de `contributors` avec `computeStats` pour tout le catalogue) · `test/a11y/axe.test.js` (+1 : `TeacherStudentKpi` avec badges à matières, aucune violation axe).
+**Vérifié** : API 136 suites / 2 791 tests verts ; front 155 fichiers / 2 642 tests verts ; ESLint propre ; `audit:a11y` à zéro. Non vérifié : `test:a11y` Playwright (contraste réel de la ligne de matières), rendu navigateur, PostgreSQL.
+**Dette** : le contraste réel de la ligne de matières (`text-dark/70`) n'est vérifié que par la règle du projet, pas par un rendu Chromium ; pas de test e2e du parcours enseignant avec badges.
+
+## [2026-11-04] C-06.02 — Maquettes UI profil gamifié (Analyse)
+
+**Feature list ID** : C-06 | **ID source planning** : C-06.02 | **Version** : V2 | **User stories** : Extension usage
+**Contexte** : tâche de maquettage, au format des précédentes (`diagrams/*_ui.md`, wireframes ASCII). Le noyau back-end de C-06.01 étant livré, la maquette s'appuie sur des données réelles (`GET /badges`, `/badges/me/summary`, `/kpi/my`). Audit préalable : `ProfilePage.vue` est une page de compte déjà dense (499 lignes), `KpiPage.vue` n'a que des pastilles de badges.
+**Fichiers créés** : `diagrams/profil_gamifie_ui.md` — emplacement, vue d'ensemble, bandeau niveau/série, vitrine et titre, grille de badges (3 états, rareté par libellé et forme), détail d'un badge, calendrier d'activité, réglages de gamification, états (compte neuf, série cassée, mode zen, chargement, erreur, filtre vide), correspondance données/API, composants et store à créer, responsive, accessibilité, parcours, hors périmètre.
+**Fichiers modifiés** : `.agents/DECISIONS.md` (1 entrée), `.agents/CHANGELOG_AGENT.md`.
+**Utilisable** : référence pour les tickets d'implémentation du front (page `/profile/badges`, composants `components/badges/`, store `badges.js`). Aucun code, test ou migration ajouté.
+**Vérifié** : variables de palette (`gray`, `blue`, `purple`), composants `ToggleButton` et `LoaderComponent`, routes et champs d'API cités existent dans le code.
+**Hypothèses** : page dédiée `/profile/badges` plutôt qu'une section de `ProfilePage.vue` ; vitrine de 3 badges ; calendrier de 12 semaines à une teinte ; « prochains badges » par plus forte progression relative.
+**Dette / à valider** : (1) écarts d'API E1 à E3 (titre et vitrine, lecture des jours d'activité, réglages de gamification) : routes et préférences à créer, à valider avant implémentation ; (2) prototype interactif `docs/prototype/` et ses captures non mis à jour ; (3) modale d'animation d'obtention hors de ce ticket ; (4) maquette non relue visuellement dans un navigateur (wireframes ASCII). Le planning CSV du ticket (« TBD → TBD ») n'a pas été renseigné.

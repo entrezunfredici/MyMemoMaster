@@ -254,7 +254,7 @@ Contraintes : routes protégées par `Auth.middleware.js`, validation `Badge.val
 
 ## 11. Profil gamifié
 
-Section « Mes badges » du profil (`ProfilePage.vue`) et lien depuis `KpiPage.vue` :
+Maquettes détaillées : `diagrams/profil_gamifie_ui.md` (C-06.02) — page dédiée `/profile/badges`, carte de synthèse sur `ProfilePage.vue` et lien depuis `KpiPage.vue` :
 
 - En-tête : niveau, jauge « n / total badges », série actuelle et meilleure série.
 - Grille par catégorie (§6.1–6.6) : badge obtenu (couleur, date), badge verrouillé (grisé, progression `4 / 7`), secret (« ??? »).
@@ -439,8 +439,36 @@ Garde-fou commun : toute idée comparant des élèves entre eux, introduisant un
 
 **Codé (back-end, lot 1)** : tables `UserActivityDay` et `UserBadge` (migration `20261104000001`), calcul de série avec jour de grâce (`helpers/badges/streak.js`), catalogue de 14 badges (`helpers/badges/catalog.js` : `streak3/7/30/100`, `regular`, `firstExercise`, `tenTests`, `fiftyTests`, `perfectScore`, `firstLeitner`, `hundredCards`, `thousandCards`, `leitnerMastery`, `fiveSubjects`), moteur (`Badge.service.js`, `badgeEvents.js`), émission depuis `Test.service#submitAnswers`, `LeitnerReviewSession.service#create` et `MindMapViewSession.service#create` (≥ 60 s), API `GET /badges`, `GET /badges/me/recent`, `GET /badges/me/summary`, `PATCH /badges/me/seen`, rattrapage `npm run badges:backfill`.
 
-**Fusion `kpis.badges` / `UserBadge` (2026-11-04)** : `getMyKpis` lit `UserBadge` (format historique conservé, enrichi) avec rattrapage paresseux des comptes existants ; la vue filtrée par consentement de matières (`getPersonalKpisForSubjects`) garde `_computeBadges` pour ne pas exposer d'activité hors consentement.
+**Fusion `kpis.badges` / `UserBadge` (2026-11-04)** : `getMyKpis` lit `UserBadge` (format historique conservé, enrichi) avec rattrapage paresseux des comptes existants ; la vue filtrée par consentement de matières (`getPersonalKpisForSubjects`) montre les badges obtenus avec une matière consentie (§19) ; l'ancien calcul `_computeBadges` est supprimé.
 
 **Pas encore codé** : front (profil, animation), visibilité enseignant (`PATCH /users/me/badge-visibility`), badges du catalogue hors lot 1 (`progress`, `retry`, `comeback`, `box5`, `cleanSweep`, exploration/création, groupes, secrets), job quotidien (inutile tant qu'aucun badge ne dépend de l'absence d'activité), export des badges dans `UserDataExport`, objectif quotidien, gel de série et autres idées A à G décidées.
 
 **Écarts avec la définition** : (1) la meilleure série (et non la série courante) déclenche l'obtention, pour qu'un rattrapage n'efface pas une série passée ; la progression affichée est donc la meilleure série ; (2) les sessions Leitner partielles comptent comme pratique (leur `cardsReviewed` est ≥ 1 et correspond à des cartes réellement corrigées) ; (3) l'émission est attendue (`await`) mais ne lève jamais : quelques requêtes de plus sur la réponse des trois actions.
+
+---
+
+## 19. Badges liés à des matières (many-to-many) — décidé et codé le 2026-11-04
+
+**Principe** : un badge peut être lié à zéro, une ou plusieurs matières ; une matière peut porter plusieurs badges. La relation est portée par la table `BadgeSubject (badgeCode, subjectId)`, unique sur le couple. Les badges vivent en code (`catalog.js`) : le lien utilise donc leur `badgeCode` stable, sans clé étrangère côté badge. Les matières sont communes à tous les utilisateurs (la table `Subject` n'a pas de propriétaire), le lien est donc global.
+
+| Cas | Comportement |
+|---|---|
+| Badge sans matière liée | Badge **global** : critère calculé sur toute l'activité |
+| Badge lié à une ou plusieurs matières | Le critère **ne compte que l'activité de ces matières** (somme sur l'ensemble des matières liées) |
+| Visibilité enseignant, consentement global | Tous les badges, comme avant |
+| Visibilité enseignant, consentement par matières | Badges **obtenus avec au moins une matière consentie** : les matières dont l'activité a permis l'obtention sont enregistrées dans `UserBadge.context.subjectIds` au moment de l'obtention. Le lien administrateur n'intervient pas dans la visibilité. Seules les matières consenties sont renvoyées |
+| Délier ou relier un badge | Les badges déjà obtenus restent acquis ; seuls les critères futurs changent |
+
+**Badges restreignables** (`scopable`) : ceux dont le critère se mesure par matière — `firstExercise`, `tenTests`, `fiftyTests`, `perfectScore`, `firstLeitner`, `hundredCards`, `thousandCards`, `leitnerMastery`. Les badges de série et de régularité (`streak*`, `regular`) reposent sur les jours d'activité, qui ne sont pas rattachés à une matière, et `fiveSubjects` compte justement les matières : ils ne peuvent pas être liés (refus 400).
+
+**API** : `PUT /badges/:code/subjects` (rôle 1) avec `{ subjectIds: [] }` remplace les liens (liste vide = badge global) ; 404 badge inconnu, 400 badge non restreignable, matière inconnue ou corps invalide. `GET /badges` expose `scopable`, `linkedSubjectIds` (liens) et `earnedSubjectIds` (matières d'obtention).
+
+**Visibilité par matière d'obtention (décision du 2026-11-04)** : le lien administrateur ne décide pas de ce qu'un enseignant peut voir. À l'obtention, le moteur enregistre les matières dont l'activité a contribué au badge (`contributors` dans le catalogue) : par exemple `perfectScore` ne retient que les matières où un 100 % a été obtenu, `leitnerMastery` que les systèmes réellement maîtrisés. Sous consentement par matières, l'enseignant voit un badge obtenu s'il a été obtenu avec **au moins une** matière consentie ; il ne reçoit que les matières consenties. Un badge sans matière (séries, régularité, `fiveSubjects`) n'est jamais montré dans ce cas. Les badges obtenus avant cet enregistrement n'ont pas de matières : `npm run badges:backfill` (méthode `repairEarnedSubjects`) les reconstruit depuis l'activité actuelle ; tant qu'il n'est pas passé, ils restent invisibles sous consentement par matières. Une migration SQL n'a pas été retenue (voir DECISIONS). Côté enseignant, la vue des KPI d'un étudiant affiche les noms des matières d'obtention sous chaque badge (`earnedSubjects`), que le consentement soit global ou par matières ; sous consentement par matières, seules les matières consenties sont listées.
+
+**Lien et visibilité sont deux choses distinctes** : le lien restreint ce qui est *compté* ; les matières d'obtention déterminent ce qui est *montré*. Un badge global (non lié) obtenu avec Maths et Physique est donc visible avec le seul consentement Maths, mais ne révèle que Maths dans la réponse. Le total qu'il exprime (par exemple 10 exercices) peut en revanche inclure la Physique : lier le badge aux seules matières voulues supprime cet effet.
+
+**Évolutions possibles grâce au many-to-many** : badges de filière (plusieurs matières), badges de matière (une seule), regroupements par thème, badges de chapitre si une entité chapitre apparaît.
+
+**Aucun lien par défaut (décidé)** : les badges restent globaux tant qu'un administrateur ne les lie pas, et les badges non liables ne le seront jamais. La visibilité par matière d'obtention rend ce choix sans conséquence pour la confidentialité.
+
+**Limites connues** : (1) un badge global peut exprimer un total incluant des matières non consenties (voir ci-dessus) ; (2) pas d'interface d'administration (API seule) ; (3) les jours d'activité ne sont pas rattachés à une matière, d'où l'exclusion des badges de série ; (4) la lecture des liens ajoute une requête à chaque évaluation.

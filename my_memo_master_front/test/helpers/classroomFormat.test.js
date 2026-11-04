@@ -14,6 +14,8 @@ import {
   isUrgent,
   eventTypeLabel,
   eventTypeBadgeClass,
+  badgeSubjectNames,
+  badgeTitle,
 } from '@/helpers/classroomFormat'
 
 describe('formatDate', () => {
@@ -151,5 +153,34 @@ describe('bibliothèque de ressources : effectifs et filtre', () => {
     expect(filterResources(R, { search: 'SUJET' })).toHaveLength(1)
     expect(filterResources(R, { type: 'cours', search: 'alg' }).map((r) => r.title)).toEqual(['Algèbre'])
     expect(filterResources(R, { type: 'autre' })).toEqual([])
+  })
+})
+
+describe('badgeSubjectNames', () => {
+  it('plusieurs matières -> noms séparés par des virgules', () => {
+    const badge = { earnedSubjects: [{ subjectId: 1, name: 'Maths' }, { subjectId: 2, name: 'Physique' }] }
+    expect(badgeSubjectNames(badge)).toBe('Maths, Physique')
+  })
+  it('nom manquant ignoré', () => {
+    expect(badgeSubjectNames({ earnedSubjects: [{ subjectId: 1, name: null }, { subjectId: 2, name: 'Maths' }] })).toBe('Maths')
+  })
+  it.each([[undefined], [null], [{}], [{ earnedSubjects: [] }]])('sans matière (%j) -> chaîne vide', (badge) => {
+    expect(badgeSubjectNames(badge)).toBe('')
+  })
+})
+
+describe('badgeTitle', () => {
+  it('description + matières d\'obtention', () => {
+    const badge = { description: '10 séries', earnedSubjects: [{ subjectId: 1, name: 'Maths' }] }
+    expect(badgeTitle(badge)).toBe('10 séries (obtenu en : Maths)')
+  })
+  it('sans description -> seulement les matières', () => {
+    expect(badgeTitle({ earnedSubjects: [{ subjectId: 1, name: 'Maths' }] })).toBe('Obtenu en : Maths')
+  })
+  it('sans matière -> la description seule', () => {
+    expect(badgeTitle({ description: '7 j' })).toBe('7 j')
+  })
+  it('rien du tout -> chaîne vide', () => {
+    expect(badgeTitle(undefined)).toBe('')
   })
 })

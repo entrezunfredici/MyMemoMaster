@@ -31,6 +31,20 @@ exports.markSeen = async (req, res) => {
   }
 }
 
+const SET_SUBJECTS_STATUS = { BADGE_NOT_FOUND: 404, BADGE_NOT_SCOPABLE: 400, SUBJECT_NOT_FOUND: 400 }
+
+exports.setSubjects = async (req, res) => {
+  try {
+    const subjectIds = await badgeService.setSubjects(req.params.code, req.body.subjectIds)
+    res.status(200).json({ message: 'Matières du badge mises à jour.', subjectIds })
+  } catch (error) {
+    const status = SET_SUBJECTS_STATUS[error?.code]
+    if (status) return res.status(status).json({ message: error.message })
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la mise à jour des matières du badge.' })
+  }
+}
+
 exports.summary = async (req, res) => {
   try {
     const data = await badgeService.summary(req.user.id)
