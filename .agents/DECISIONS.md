@@ -5441,3 +5441,45 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Alternative écartée** : (a) un téléversement par groupe : stockage et temps d'envoi multipliés ; (b) une table de liaison ressource↔groupes : migration et refonte des droits, de la modération et de la suppression, hors périmètre V2.
 **Conséquences** : le modèle reste « une ressource = un groupe », donc modération, droits et suppression restent par groupe ; la création multi-groupes côté client n'est pas atomique (voir dette dans le CHANGELOG).
 
+
+## [2026-11-03] C-06.01 — Badges persistés, pilotés par événements, fondés sur la pratique réelle
+
+**Contexte** : les 7 badges actuels sont recalculés à chaque lecture du KPI (`_computeBadges`) : sans date d'obtention, impossibles à notifier ou animer, réversibles (une série cassée « retire » le badge), et la série repose sur des créneaux planifiés cochés à la main.
+**Décision** : persister l'obtention dans une table `UserBadge` (unicité `(userId, badgeCode)`), garder le catalogue en code (`helpers/badges/catalog.js`, codes stables), attribuer par un moteur événementiel en mémoire alimenté par les services sources (best effort, jamais bloquant) plus un job quotidien pour les critères de temps ; la série et la régularité reposent sur des « jours d'activité » issus de la pratique réelle journalisée. Niveau = nombre de badges obtenus, sans points. Visibilité enseignant des badges désactivée par défaut. Détail : `diagrams/gamification_badges.md`.
+**Alternative écartée** : (a) calcul à la volée conservé : rien à notifier ni dater ; (b) points d'expérience : système de points complexe, hors périmètre, pousse au volume ; (c) table de définitions en base : migration et édition sans bénéfice en V2 ; (d) file BullMQ : volume faible, complexité inutile pour l'instant ; (e) classements : hors périmètre.
+**Conséquences** : `kpis.badges` garde sa forme mais change de source (validation requise avant implémentation) ; trois badges existants changent de critère ; chaque service source doit émettre son événement ; un rattrapage est nécessaire au déploiement ; la table devient une donnée personnelle (suppression de compte, export). Seuils non calibrés, à confirmer.
+
+## [2026-11-04] C-06 — Idées A1 à A7 (motivation quotidienne) adoptées
+
+**Contexte** : la banque d'idées de `diagrams/gamification_badges.md` §17 listait sept idées de motivation quotidienne, dont trois à arbitrer (A3, A5, A7).
+**Décision** : les sept sont retenues (objectif quotidien, série visible, gel de série, défi du jour, défis hebdomadaires, récapitulatif de la semaine, rappel de série menacée). Le gel coexiste avec le jour de grâce, reste gagné et non achetable ; le rappel reste opt-in. Rien n'est codé.
+**Alternative écartée** : ne garder que le jour de grâce (plus simple, mais moins de leviers d'habitude).
+**Conséquences** : le moteur devra gérer un état (objectif du jour, stock de gels, défis) en plus des badges ; périmètre des tickets C-06 à élargir.
+
+## [2026-11-04] C-06 — Idées B1 à B6 (progression et maîtrise) adoptées
+
+**Contexte** : la banque d'idées (§17) proposait six idées de progression. Vérification du code : B2 (carte de maîtrise) existe déjà au niveau du nœud — un nœud lié à une flashcard prend la couleur de sa boîte Leitner et un niveau de maîtrise (`PaletteCardLink.vue`, `cardActions.syncCardMasteries`, `mindmap.js`).
+**Décision** : B1 à B6 retenues, rien codé. B2 est réduite à ce qui manque : la vue agrégée (% de couverture par carte mentale ou matière).
+**Alternative écartée** : refaire B2 depuis zéro (doublon de l'existant).
+**Conséquences** : B1 (niveau par matière), B2 agrégée et B4 (jalons) partagent le même calcul de maîtrise par matière, à définir une seule fois.
+
+## [2026-11-04] C-06 — Idées C, D, E, F, G : arbitrage
+
+**Contexte** : suite de l'arbitrage de la banque d'idées (`diagrams/gamification_badges.md` §17), après A (toutes) et B (toutes).
+**Décision** : retenues : C1, C5, F1 à F6, F8, G2, G4. Second temps (bonnes idées, décisions à prendre avant : C2, C3, C4, G1, G3). Plus tard : C6, toute la famille D, toute la famille E, F7. Rien de tout cela n'est codé.
+**Alternative écartée** : tout engager d'un coup (périmètre V2 trop large) ; refuser les idées de coopération et d'enseignant (elles restent notées pour plus tard).
+**Conséquences** : le périmètre C-06 s'élargit nettement (objectif quotidien, gel, défis, quêtes, mode sprint, cartes « boss », calendrier d'activité, titre, vitrine, mode zen). G3 ajouterait une dépendance (`@capacitor/haptics`) à signaler avant tout choix.
+
+## [2026-11-04] C-06 — Noyau back-end : événements en ligne, création idempotente par contrainte d'unicité, série par la meilleure valeur
+
+**Contexte** : implémentation du noyau (jour d'activité, moteur, `UserBadge`, API, rattrapage). Les tests ont montré que `findOrCreate` échoue quand deux évaluations concurrentes s'exécutent sur SQLite (« cannot commit - no transaction is active ») et laisse l'utilisateur sans badge.
+**Décision** : (1) `create` puis capture de `UniqueConstraintError` plutôt que `findOrCreate`, l'unicité en base garantissant l'idempotence ; (2) l'émission d'événement est attendue (`await`) mais ne lève jamais (`badgeEvents.emit`), pour des tests déterministes et une réponse cohérente ; (3) l'obtention d'un badge de série est déclenchée par la **meilleure** série, pas la série courante, pour qu'un rattrapage sur l'historique ne perde pas une série passée ; (4) `kpis.badges` et `_computeBadges` ne sont pas modifiés (interface publique, validation requise) ; (5) rattrapage marqué « vu » pour éviter une rafale d'animations au déploiement.
+**Alternative écartée** : tâche non attendue (`setImmediate`) — réponse plus rapide mais état incertain en test et risque de perte à l'arrêt du processus ; transaction explicite par évaluation — inutile avec la contrainte d'unicité.
+**Conséquences** : trois actions (soumission d'exercice, session Leitner, consultation ≥ 60 s) exécutent quelques requêtes de plus ; la progression affichée d'un badge de série est la meilleure série ; deux sources de vérité des badges coexistent (`UserBadge` et `_computeBadges`) jusqu'à la bascule validée.
+
+## [2026-11-04] C-06 — `kpis.badges` fusionné avec `UserBadge` côté étudiant, pas côté vue filtrée
+
+**Contexte** : deux sources de badges coexistaient (`UserBadge`, persistée, et `Kpi.service#_computeBadges`, recalculée). L'utilisateur autorise la fusion « si pertinent ». `KpiConsent.service` appelle `getMyKpis` (consentement global) ou `getPersonalKpisForSubjects` (consentement par matière).
+**Décision** : `getMyKpis` lit `badgeService.listForKpi` (format historique `id/label/description/icon/unlocked` conservé, enrichi de `code`, `rarity`, `category`, `earnedAt`, `progress`). `getPersonalKpisForSubjects` garde `_computeBadges` : `UserBadge` reflète l'activité de toutes les matières, la lire exposerait à l'enseignant ce qui vient de matières non consenties. Un compte sans aucune donnée de gamification est rattrapé une fois, silencieusement, à la première lecture (`listForKpi`), pour que les badges d'avant le déploiement ne disparaissent pas.
+**Alternative écartée** : (a) fusion totale : fuite de données hors consentement ; (b) garder deux sources pour tous : doublon et badges incohérents entre profil et KPI ; (c) rattrapage uniquement par script : trou visible entre le déploiement et son exécution.
+**Conséquences** : le front n'a pas à changer (mêmes champs) ; la liste passe de 7 à 14 badges ; `streak7`, `streak30` et `regular` reposent désormais sur la pratique réelle ; la vue enseignant sous consentement par matière garde les 7 anciens critères tant que la visibilité enseignant n'est pas redéfinie ; `getMyKpis` (aussi appelé par le digest d'alertes) exécute quelques requêtes de plus.

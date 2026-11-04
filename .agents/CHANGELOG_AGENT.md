@@ -86,6 +86,7 @@
 | Tests fonctionnels Deadline + Reminder (front) | Stable — M-03.10 : 19 tests TodoWidget + 33 tests NotificationBellComponent (Vitest) | 2026-06-13 |
 | Tests fonctionnels ProfilePage (front) | Stable — M-05.10 : 17 tests Vitest (rendu, saveProfile, changePassword, logout, deleteAccount) | 2026-06-17 |
 | Revue de code & merge (M-02) | Stable — lint corrigé, 453 tests back + 41 front verts, merge prêt dans `dev` | 2026-06-10 |
+| Gamification / badges (C-06) | Défini (analyse, 2026-11-03) — `diagrams/gamification_badges.md` : critères, niveaux, modèle `UserBadge`, moteur event-driven, API, profil, animation, banque d'idées ; **aucun code** ; les 7 badges existants de `Kpi.service#_computeBadges` restent calculés à la volée, non persistés | 2026-11-03 |
 | Alertes KPI (UserKpiAlertSettings) | Stable — KPI-02 : digest quotidien 18h, 3 triggers, canaux in-app/email/push-futur, paramètres par utilisateur | 2026-06-23 |
 | Sécurité fonctionnelle (CORS, rate limit) | Stable — M-00b.07 : audit OWASP complet, 12 vulns traitées (H1–H4 corrigées), rapport SECURITY_AUDIT_OWASP.md | 2026-06-23 |
 | Storage (upload S3, mindmap local) | Stable — M-00b.07 H3 : clé S3 inclut userId (uploads/{userId}/…), vérification préfixe à la suppression | 2026-06-23 |
@@ -13798,3 +13799,37 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Hypothèses** : seuls les groupes où l'utilisateur est membre enseignant sont proposés (les rôles 1/4 peuvent écrire partout côté API mais n'ont pas de liste dédiée) ; la clé de stockage est partagée entre groupes (le contrôle d'accès `canAccessFile` l'admettait déjà : accès pour les membres de n'importe lequel).
 **Dette / non couvert** : (1) création séquentielle, non atomique : un échec partiel laisse les ressources déjà créées (avertissement, pas de retour arrière) ; (2) un fichier encore partagé n'est pas supprimé au départ de l'auteur ; la purge d'un fichier orphelin dépend de la dernière suppression ; (3) le masquage agit par ressource, mais `ContentReportService.canAccessFile` bloque le fichier pour les non-auteurs dès qu'UNE copie est masquée : les autres groupes perdent aussi l'accès au fichier tant que la copie reste masquée (comportement restrictif, sûr, non corrigé) ; (4) pas d'ajout a posteriori d'un document existant à un autre groupe.
 
+
+## [2026-11-03] C-06.01 — Définition système badges (critères) (Analyse)
+
+**Feature list ID** : C-06 | **ID source planning** : C-06.01 | **Version** : V2 | **User stories** : Extension usage
+**Contexte** : tâche d'analyse. L'audit montre que 7 badges existent déjà (`KpiService._computeBadges`), recalculés à chaque lecture du KPI : pas de table, pas de date d'obtention, un badge de série se « perd » quand la série retombe, et la série compte les créneaux planifiés cochés (`RevisionSession.isDone`), pas la pratique réelle. Ils sont visibles des enseignants via le consentement KPI.
+**Fichiers créés** : `diagrams/gamification_badges.md` — principes, événements sources, règles communes (jour d'activité, série, jour de grâce), catalogue (7 repris dont 3 changent de critère, ~25 nouveaux, 6 catégories), niveaux sans points, table `UserBadge`, moteur event-driven, API `/badges`, profil, animation (a11y, `prefers-reduced-motion`), vie privée, anti-triche, tests, hors périmètre, décisions à valider (§16), banque d'idées (§17, 7 familles, ~40 idées classées ✅/🟡/⛔).
+**Fichiers modifiés** : `.agents/DECISIONS.md` (1 entrée), `.agents/CHANGELOG_AGENT.md`.
+**Utilisable** : référence pour les tickets d'implémentation C-06 (découpage proposé §16 : modèle + catalogue, moteur, API, profil, animation, tests). Aucun code, migration ni test ajouté ou modifié.
+**Hypothèses** : seuils et paliers de niveau sont des propositions non calibrées sur des données de production ; fuseau du « jour d'activité » = serveur (aucun fuseau utilisateur stocké) ; visibilité enseignant désactivée par défaut (retire une information visible aujourd'hui).
+**Dette / à valider** : (1) interface publique : `kpis.badges` conservé mais alimenté depuis `UserBadge`, avec changement de critère de `streak7`, `streak30`, `regular` — validation requise avant implémentation ; (2) sort des badges déjà « débloqués » au déploiement (rattrapage `badges:backfill`) ; (3) `UserActivityDay` à décider pour éviter de parcourir trois tables ; (4) les idées du §17 ne sont pas engagées. Le planning CSV du ticket (« TBD → TBD ») n'a pas été renseigné.
+
+**Mise à jour 2026-11-04** : idées A1 à A7 adoptées (non codées), voir DECISIONS.md et `diagrams/gamification_badges.md` §17.
+
+**Mise à jour 2026-11-04 (2)** : idées B1 à B6 adoptées (non codées) ; B2 déjà livrée au niveau du nœud, reste la couverture agrégée.
+
+## [2026-11-04] [ADD] C-06 — Noyau gamification (Back-end)
+
+**Feature list ID** : C-06 | **Version** : V2 | **Périmètre** : jour d'activité, moteur event-driven, `UserBadge`, API badges, rattrapage (front non fait).
+**Contexte** : le §16 de `diagrams/gamification_badges.md` n'était pas entièrement validé ; le noyau a été codé sur les propositions de travail, à la demande de l'utilisateur. `kpis.badges` n'est volontairement pas modifié.
+**Fichiers créés** : `migrations/20261104000001-create-useractivityday-and-userbadge.js` · `models/UserActivityDay.model.js`, `models/UserBadge.model.js` · `helpers/badges/streak.js`, `catalog.js`, `badgeEvents.js` · `services/Badge.service.js`, `services/UserActivityDay.service.js` · `controllers/Badge.controller.js` · `routes/Badge.routes.js` · `validators/Badge.validators.js` · `scripts/backfill-badges.js` · `test/helpers/badgeStreak.test.js` (17) · `test/bdd/badges.test.js` (29, SQLite réelle).
+**Fichiers modifiés** : `models/index.js`, `app.js`, `package.json` (script `badges:backfill`), `services/Test.service.js` (`submitAnswers`), `services/LeitnerReviewSession.service.js` (`create`), `services/MindMapViewSession.service.js` (`create`, ≥ 60 s) — une ligne d'émission chacun.
+**Utilisable** : `GET /badges`, `GET /badges/me/recent`, `GET /badges/me/summary`, `PATCH /badges/me/seen` (Swagger, tag `Badge`). 14 badges (régularité, exercices, Leitner, exploration). Série avec jour de grâce, jours d'activité issus de la pratique réelle uniquement. `npm run badges:backfill [userId]` rejouable.
+**Vérifié** : suite API complète 136 suites / 2 772 tests verts ; ESLint propre sur les fichiers touchés ; migration montée et descendue sur SQLite, doublon `(userId, badgeCode)` refusé. Non vérifié : migration sous PostgreSQL (à rejouer en préprod), aucune requête réelle sur la prod.
+**Hypothèses** : seuils et niveaux non calibrés ; fuseau serveur pour le « jour d'activité » ; sessions Leitner partielles comptées comme pratique.
+**Dette / non couvert** : (1) front (profil, animation, `KpiPage`) ; (2) bascule de `kpis.badges` vers `UserBadge` (interface publique, validation requise ; trois badges changent de critère) ; (3) visibilité enseignant et réglage « zen » ; (4) export/import des badges dans `UserDataExport` ; (5) badges hors lot 1 et idées A à G décidées ; (6) lecture de `loadStats` à chaque événement (plusieurs requêtes, dont tous les systèmes Leitner avec leurs cartes) — à optimiser si la latence des trois actions augmente ; (7) rattrapage à lancer au déploiement ; (8) pas de métrique Prometheus des badges.
+
+## [2026-11-04] [IMP] C-06 — Fusion de `kpis.badges` et `UserBadge` (Back-end)
+
+**Contexte** : l'utilisateur autorise la fusion si elle est pertinente ; elle l'est côté étudiant, pas pour la vue filtrée par consentement (voir DECISIONS).
+**Fichiers modifiés** : `services/Badge.service.js` (+`listForKpi`, rattrapage paresseux) · `services/Kpi.service.js` (`getMyKpis` lit `UserBadge` ; `_computeBadges` conservé pour `getPersonalKpisForSubjects`) · `test/services/Kpi.service.test.js` (mock du service de badges, +1 test, assertion de la vue filtrée) · `test/bdd/badges.test.js` (+4 tests : format historique, rattrapage paresseux, utilisateur neuf, `GET /kpi/my`) · `diagrams/gamification_badges.md`.
+**Utilisable** : `GET /kpi/my` renvoie 14 badges persistés (même forme + `earnedAt`, `progress`, `rarity`, `category`, `code`) ; `KpiPage.vue` et `TeacherStudentKpi.vue` fonctionnent sans modification.
+**Vérifié** : suite API complète 136 suites / 2 777 tests verts ; ESLint propre ; `KpiPage` et `TeacherPanels` côté front (95 tests) verts. Pas de rendu navigateur.
+**Changement de comportement** : un badge obtenu ne se perd plus ; critères de série et de régularité fondés sur la pratique réelle ; 7 → 14 badges affichés dans le KPI personnel.
+**Dette** : vue enseignant sous consentement par matière encore sur les 7 anciens critères (deux logiques) ; visibilité enseignant à redéfinir ; le rattrapage paresseux refait 3 requêtes à chaque lecture pour un utilisateur sans historique.

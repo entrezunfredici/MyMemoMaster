@@ -2,6 +2,7 @@ const dayjs = require('dayjs')
 const { RevisionSession, TestResult, Test, Subject, LeitnerSystem, LeitnerBox, LeitnerCard, ClassGroup } = require('../models')
 const leitnerReviewSessionService = require('./LeitnerReviewSession.service')
 const mindMapViewSessionService = require('./MindMapViewSession.service')
+const badgeService = require('./Badge.service')
 
 /**
  * Retourne le lundi de la semaine (ISO) contenant la date donnée.
@@ -71,7 +72,10 @@ class KpiService {
     const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
     const disciplineKpi = this._computeDiscipline(sessions)
     const pedagogicalKpi = this._computePedagogical(groupTestResults)
-    const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
+    // CHOIX: badges lus depuis UserBadge (obtention persistée, C-06) plutôt que recalculés ici
+    // RAISON: un badge obtenu ne se perd plus, a une date et alimente l'animation ; _computeBadges
+    // reste utilisé par getPersonalKpisForSubjects, dont les badges doivent respecter le filtre de matières.
+    const badges = await badgeService.listForKpi(userId)
 
     return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, pedagogical: pedagogicalKpi, badges }
   }

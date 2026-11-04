@@ -1,5 +1,8 @@
 const dayjs = require('dayjs')
 const kpiService = require('../../services/Kpi.service')
+const badgeService = require('../../services/Badge.service')
+
+jest.mock('../../services/Badge.service', () => ({ listForKpi: jest.fn().mockResolvedValue([]) }))
 
 jest.mock('../../models', () => ({
   RevisionSession: { findAll: jest.fn() },
@@ -72,7 +75,22 @@ describe('KpiService', () => {
       expect(kpis).toHaveProperty('subjects')
       expect(kpis).toHaveProperty('discipline')
       expect(kpis).toHaveProperty('badges')
-      expect(kpis.badges).toHaveLength(7)
+      expect(kpis.badges).toEqual([])
+    })
+
+    it('lit les badges depuis le service de badges (obtention persistée)', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
+      const persisted = [{ id: 'streak7', code: 'streak7', unlocked: true }]
+      badgeService.listForKpi.mockResolvedValueOnce(persisted)
+
+      const kpis = await kpiService.getMyKpis(7)
+
+      expect(badgeService.listForKpi).toHaveBeenCalledWith(7)
+      expect(kpis.badges).toBe(persisted)
     })
 
     it('appelle chaque modèle avec le bon userId', async () => {
@@ -148,6 +166,10 @@ describe('KpiService', () => {
       const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
 
       expect(kpis.revision.totalMinutes).toBe(3)
+      // Badges de la vue filtrée : toujours calculés sur les données consenties, jamais lus
+      // dans UserBadge (qui reflète l'activité sur toutes les matières).
+      expect(badgeService.listForKpi).not.toHaveBeenCalled()
+      expect(kpis.badges).toHaveLength(7)
       // Le filtre par matière consentie doit être répercuté sur la requête Leitner
       // (via le système rattaché) et sur la requête cartes mentales (via la carte
       // rattachée), pas seulement sur les exercices.
