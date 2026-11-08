@@ -16,6 +16,8 @@ const {
   Reminder,
   ClassGroupUsers,
   ClassGroup,
+  UserBadge,
+  UserActivityDay,
   instance
 } = require('../models/index')
 const logger = require('../helpers/logger')
@@ -84,7 +86,18 @@ class UserDataExportService {
     })
     if (!user) return null
 
-    const [leitnerSystems, mindMaps, tests, testResults, reviewSessions, revisionSessions, reminders, memberships] =
+    const [
+      leitnerSystems,
+      mindMaps,
+      tests,
+      testResults,
+      reviewSessions,
+      revisionSessions,
+      reminders,
+      memberships,
+      badges,
+      activityDays
+    ] =
       await Promise.all([
         this._findLeitnerSystems(userId),
         this._findMindMaps(userId),
@@ -96,7 +109,15 @@ class UserDataExportService {
         ClassGroupUsers.findAll({
           where: { userId },
           include: [{ model: ClassGroup, as: 'classGroup', attributes: ['name'] }]
-        })
+        }),
+        // CHOIX: `context` (audit interne du moteur, identifiants de matières) n'est pas exporté
+        UserBadge.findAll({
+          where: { userId },
+          attributes: ['badgeCode', 'earnedAt', 'seenAt'],
+          order: [['earnedAt', 'ASC']],
+          raw: true
+        }),
+        UserActivityDay.findAll({ where: { userId }, attributes: ['date'], order: [['date', 'ASC']], raw: true })
       ])
 
     return {
@@ -114,6 +135,9 @@ class UserDataExportService {
         leitnerReviewSessions: reviewSessions,
         revisionSessions,
         reminders,
+        // Gamification : exportée pour information, non réimportée (recalculée depuis la pratique réelle)
+        badges,
+        activityDays: activityDays.map((row) => row.date),
         classGroups: memberships.map((m) => ({ name: m.classGroup?.name ?? null, role: m.role }))
       }
     }

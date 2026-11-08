@@ -104,6 +104,18 @@
         </p>
       </div>
     </form>
+
+    <OAuthButtonsComponent intro="Ou inscrivez-vous avec :">
+      <p class="text-gray-700 text-xs text-center mt-2">
+        En continuant, vous acceptez les
+        <a
+          :href="VITE_USAGE_RULES_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="underline text-primary"
+        >conditions d'usage de l'application<span class="sr-only"> (s'ouvre dans un nouvel onglet)</span></a>.
+      </p>
+    </OAuthButtonsComponent>
   </AuthFormLayout>
 </template>
 
@@ -112,6 +124,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { notif } from '@/helpers/notif.js'
 import AuthFormLayout from '@/components/AuthFormLayout.vue'
+import OAuthButtonsComponent from '@/components/OAuthButtonsComponent.vue'
 import { VITE_USAGE_RULES_URL } from '@/config.js'
 
 const authStore = useAuthStore()

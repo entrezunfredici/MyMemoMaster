@@ -57,6 +57,7 @@ models.BadgeSubject = require('./BadgeSubject.model')(instance)
 models.AiGenerationBatch = require('./AiGenerationBatch.model')(instance)
 models.AiGeneratedCard = require('./AiGeneratedCard.model')(instance)
 models.AiUsageLog = require('./AiUsageLog.model')(instance)
+models.UserOAuthAccount = require('./UserOAuthAccount.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

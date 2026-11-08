@@ -56,6 +56,8 @@ export const useAuthStore = defineStore('auth', {
     user: {},
     // Jeton remis après un mot de passe valide quand une 2FA est exigée ; non persisté (voir `persist.paths`)
     twoFactorChallenge: null,
+    // Fournisseurs OAuth activés côté API (Google, GitHub, Microsoft) ; non persisté
+    oauthProviders: [],
   }),
 
   actions: {
@@ -211,6 +213,80 @@ export const useAuthStore = defineStore('auth', {
       if (redirect) {
         router.push(redirect)
       }
+    },
+
+    // ── Connexion OAuth (Google, GitHub, Microsoft) ──────────────────────────────────────────────
+    /**
+     * Charge les fournisseurs OAuth activés. Un échec laisse simplement la liste vide :
+     * la connexion par mot de passe reste disponible.
+     */
+    async loadOAuthProviders() {
+      const resp = await api.get('users/oauth/providers')
+      const providers = resp?.data?.providers
+      this.oauthProviders = resp?.status === 200 && Array.isArray(providers) ? providers : []
+    },
+
+    /**
+     * Redirige le navigateur vers le fournisseur. Le `state` signé par l'API est gardé en
+     * sessionStorage pour être comparé au retour (protection CSRF).
+     *
+     * @param {string} provider - google, github ou microsoft
+     * @returns {Promise<boolean>} false si la redirection n'a pas pu démarrer
+     */
+    async startOAuth(provider) {
+      const resp = await api.get(`users/oauth/${provider}/authorize-url`)
+      if (!resp || resp.status !== 200 || !resp.data?.url || !resp.data?.state) {
+        notif.notify(extractApiError(resp, 'Connexion indisponible pour le moment.'), 'error')
+        return false
+      }
+      try {
+        sessionStorage.setItem('oauthState', resp.data.state)
+      } catch {
+        notif.notify('Votre navigateur bloque le stockage nécessaire à cette connexion.', 'error')
+        return false
+      }
+      window.location.assign(resp.data.url)
+      return true
+    },
+
+    /**
+     * Termine la connexion au retour du fournisseur : contrôle le `state`, échange le code via l'API
+     * puis ouvre la session (ou démarre la double authentification pour les administrateurs).
+     *
+     * @param {string} provider - google, github ou microsoft
+     * @param {string} code - Code d'autorisation reçu dans l'URL de retour
+     * @param {string} state - `state` reçu dans l'URL de retour
+     * @param {string} [redirect] - Destination après connexion
+     * @returns {Promise<true|false|'twoFactor'>}
+     */
+    async completeOAuth(provider, code, state, redirect) {
+      let expectedState = null
+      try {
+        expectedState = sessionStorage.getItem('oauthState')
+        sessionStorage.removeItem('oauthState')
+      } catch {
+        expectedState = null
+      }
+      if (!code || !state || !expectedState || state !== expectedState) {
+        notif.notify('La demande de connexion est invalide ou a expiré. Veuillez réessayer.', 'error')
+        return false
+      }
+
+      const resp = await api.post(`users/oauth/${provider}/login`, { code, state })
+      if (!resp || resp.status !== 200) {
+        notif.notify(extractApiError(resp, 'Erreur lors de la connexion.'), 'error')
+        return false
+      }
+
+      if (resp.data?.twoFactorRequired) {
+        this.twoFactorChallenge = resp.data.challengeToken
+        notif.notify(resp.data.message || 'Un code de vérification vous a été envoyé par email.', 'info')
+        router.push('/auth')
+        return 'twoFactor'
+      }
+
+      await this.startSession(resp.data, redirect)
+      return true
     },
 
     // ── Double authentification par email ────────────────────────────────────────────────────────

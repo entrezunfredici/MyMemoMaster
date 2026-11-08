@@ -194,6 +194,16 @@ const routes = [
     }
   },
   {
+    // Retour de redirection du fournisseur OAuth (URI à déclarer chez Google, GitHub, Microsoft)
+    path: '/oauth/callback/:provider',
+    name: 'oauth-callback',
+    component: () => import('../pages/login/OAuthCallbackPage.vue'),
+    meta: {
+      title: 'Connexion en cours',
+      private: false
+    }
+  },
+  {
     path: '/forgot-password',
     name: 'forgot-password',
     component: () => import('../pages/ForgotPasswordPage.vue'),

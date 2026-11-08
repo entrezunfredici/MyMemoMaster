@@ -20,6 +20,7 @@ import AxeBuilder from '@axe-core/playwright'
 const PAGES = [
   { path: '/', label: 'Accueil' },
   { path: '/auth', label: 'Connexion' },
+  { path: '/oauth/callback/google', label: 'Retour connexion OAuth' },
   { path: '/forgot-password', label: 'Mot de passe oublié' },
   { path: '/reset-password', label: 'Réinitialiser le mot de passe' },
   { path: '/verify-email', label: 'Vérification e-mail' },
