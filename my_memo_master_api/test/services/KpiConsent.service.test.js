@@ -23,9 +23,14 @@ jest.mock('../../services/Kpi.service', () => ({
   getPersonalKpisForSubjects: jest.fn()
 }))
 
+jest.mock('../../services/GamificationProfile.service', () => ({
+  areBadgesVisibleToTeachers: jest.fn().mockResolvedValue(true)
+}))
+
 jest.mock('../../helpers/logger', () => ({ error: jest.fn(), warn: jest.fn(), info: jest.fn() }))
 
 const KpiService = require('../../services/Kpi.service')
+const gamificationProfileService = require('../../services/GamificationProfile.service')
 
 describe('KpiConsentService', () => {
   beforeEach(() => jest.clearAllMocks())
@@ -192,6 +197,29 @@ describe('KpiConsentService', () => {
       expect(KpiService.getMyKpis).toHaveBeenCalledWith(2)
       expect(KpiService.getPersonalKpisForSubjects).not.toHaveBeenCalled()
       expect(result).toEqual(mockKpis)
+    })
+
+    it('consentement global — badges non partagés par l’étudiant — badges masqués, le reste intact', async () => {
+      ClassGroupUsers.findOne.mockResolvedValue({ role: 'teacher' })
+      KpiConsent.findAll.mockResolvedValue([{ id: 1, subjectId: null }])
+      const mockKpis = { revision: { a: 1 }, badges: [{ id: 'streak7', unlocked: true }] }
+      KpiService.getMyKpis.mockResolvedValue(mockKpis)
+      gamificationProfileService.areBadgesVisibleToTeachers.mockResolvedValueOnce(false)
+
+      const result = await KpiConsentService.getStudentKpis(3, 2, 1)
+
+      expect(gamificationProfileService.areBadgesVisibleToTeachers).toHaveBeenCalledWith(2)
+      expect(result).toEqual({ revision: { a: 1 }, badges: [] })
+      expect(mockKpis.badges).toHaveLength(1)
+    })
+
+    it('consentement global — badges partagés — badges conservés', async () => {
+      ClassGroupUsers.findOne.mockResolvedValue({ role: 'teacher' })
+      KpiConsent.findAll.mockResolvedValue([{ id: 1, subjectId: null }])
+      const mockKpis = { badges: [{ id: 'streak7', unlocked: true }] }
+      KpiService.getMyKpis.mockResolvedValue(mockKpis)
+
+      expect(await KpiConsentService.getStudentKpis(3, 2, 1)).toEqual(mockKpis)
     })
 
     it('consentements filtrés par matières — retourne KPI filtrés via getPersonalKpisForSubjects', async () => {

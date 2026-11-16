@@ -38,11 +38,15 @@ const PROVIDER_IDS = Object.keys(PROVIDERS)
  *   authorizeUrl?: string, tokenUrl?: string }|null} null si le fournisseur est inconnu
  */
 const getProvider = (id) => {
-  if (!Object.prototype.hasOwnProperty.call(PROVIDERS, id)) return null
-  const def = PROVIDERS[id]
+  // CHOIX: l'identifiant renvoyé vient de la liste de confiance (PROVIDER_IDS), jamais de l'argument reçu
+  // RAISON: `id` provient de l'URL ; les conditions `provider.id === 'google'` et les journaux ne doivent
+  // dépendre que d'une valeur que le serveur maîtrise (CodeQL js/user-controlled-bypass).
+  const key = PROVIDER_IDS.find((known) => known === id)
+  if (!key) return null
+  const def = PROVIDERS[key]
   const resolve = (value) => (typeof value === 'function' ? value() : value)
   return {
-    id,
+    id: key,
     label: def.label,
     clientId: (process.env[def.clientIdEnv] || '').trim(),
     clientSecret: (process.env[def.clientSecretEnv] || '').trim(),

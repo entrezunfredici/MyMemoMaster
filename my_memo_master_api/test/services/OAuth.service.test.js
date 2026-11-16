@@ -1,6 +1,6 @@
 jest.mock('../../models/index', () => ({
   User: { findOne: jest.fn(), findByPk: jest.fn() },
-  UserOAuthAccount: { findOne: jest.fn(), create: jest.fn() }
+  UserOAuthAccount: { findOne: jest.fn(), create: jest.fn(), destroy: jest.fn() }
 }))
 jest.mock('../../services/User.service', () => ({
   create: jest.fn(),
@@ -253,6 +253,30 @@ describe('OAuth.service', () => {
       expect(existing.hasValidatedEmail).toBe(true)
       expect(existing.refreshToken).toBeNull()
       expect(existing.save).toHaveBeenCalled()
+    })
+
+    test('findOrCreateUser - compte jamais vérifié repris - anciennes identités OAuth supprimées avant la nouvelle liaison', async () => {
+      UserOAuthAccount.findOne.mockResolvedValue(null)
+      const order = []
+      UserOAuthAccount.destroy.mockImplementation(async () => order.push('destroy'))
+      UserOAuthAccount.create.mockImplementation(async () => order.push('create'))
+      const existing = { userId: 4, isActive: true, hasValidatedEmail: false, password: 'x', save: jest.fn(), dataValues: { userId: 4, isActive: true } }
+      User.findOne.mockResolvedValue(existing)
+
+      await oauthService.findOrCreateUser('google', profile)
+
+      expect(UserOAuthAccount.destroy).toHaveBeenCalledWith({ where: { userId: 4 } })
+      expect(order).toEqual(['destroy', 'create'])
+    })
+
+    test('findOrCreateUser - compte déjà vérifié - identités OAuth conservées', async () => {
+      UserOAuthAccount.findOne.mockResolvedValue(null)
+      UserOAuthAccount.destroy.mockClear()
+      User.findOne.mockResolvedValue({ userId: 5, isActive: true, hasValidatedEmail: true, dataValues: { userId: 5, isActive: true } })
+
+      await oauthService.findOrCreateUser('google', profile)
+
+      expect(UserOAuthAccount.destroy).not.toHaveBeenCalled()
     })
 
     test('findOrCreateUser - email non prouvé (Microsoft) sur un compte existant - lève une erreur 409', async () => {

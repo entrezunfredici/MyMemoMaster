@@ -4,6 +4,11 @@ import { notif } from '@/helpers/notif'
 
 const TTL = 60 * 1000
 
+// CHOIX: compteur de « session » capturé au début de chaque requête et comparé à la réponse
+// RAISON: une réponse arrivée après un changement de compte (déconnexion → connexion d'un autre utilisateur)
+// ne doit jamais remplir le store du nouveau compte avec les données de l'ancien.
+let generation = 0
+
 export const useBadgesStore = defineStore('badges', {
   state: () => ({
     badges: [],
@@ -28,6 +33,16 @@ export const useBadgesStore = defineStore('badges', {
 
   actions: {
     /**
+     * Vide tout l'état et invalide les requêtes en cours : à appeler quand le compte connecté change
+     * (déconnexion). Sans cela, le cache de 60 s montrerait au compte suivant les badges, le titre et
+     * le mode zen du précédent.
+     */
+    reset() {
+      generation += 1
+      this.$reset()
+    },
+
+    /**
      * Charge catalogue et résumé en parallèle. Cache court (60 s) pour les cartes de synthèse
      * (profil, accueil) qui le partagent avec la page complète.
      *
@@ -36,10 +51,12 @@ export const useBadgesStore = defineStore('badges', {
      */
     async fetchAll(force = false) {
       if (!force && this._fetchedAt && Date.now() - this._fetchedAt < TTL) return true
+      const gen = generation
       this.loading = true
       this.error = false
       try {
         const [listResp, summaryResp] = await Promise.all([badgesApi.list(), badgesApi.summary()])
+        if (gen !== generation) return false
         if (listResp?.status !== 200 || summaryResp?.status !== 200) {
           this.error = true
           return false
@@ -49,10 +66,10 @@ export const useBadgesStore = defineStore('badges', {
         this._fetchedAt = Date.now()
         return true
       } catch {
-        this.error = true
+        if (gen === generation) this.error = true
         return false
       } finally {
-        this.loading = false
+        if (gen === generation) this.loading = false
       }
     },
 
@@ -65,8 +82,10 @@ export const useBadgesStore = defineStore('badges', {
     async markAllSeen() {
       const codes = this.unseenCodes
       if (codes.length === 0) return true
+      const gen = generation
       try {
         const resp = await badgesApi.markSeen(codes)
+        if (gen !== generation) return false
         if (resp?.status !== 200) {
           notif.notify(resp?.data?.message || 'Erreur lors de la mise à jour des badges.', 'error')
           return false
@@ -89,9 +108,11 @@ export const useBadgesStore = defineStore('badges', {
      */
     async fetchSettings(force = false) {
       if (!force && this._settingsFetchedAt && Date.now() - this._settingsFetchedAt < TTL) return true
+      const gen = generation
       this.settingsPending = !this.settings
       try {
         const resp = await badgesApi.settings()
+        if (gen !== generation) return false
         if (resp?.status !== 200) return false
         this.settings = resp.data
         this._settingsFetchedAt = Date.now()
@@ -99,14 +120,16 @@ export const useBadgesStore = defineStore('badges', {
       } catch {
         return false
       } finally {
-        this.settingsPending = false
+        if (gen === generation) this.settingsPending = false
       }
     },
 
     /** @returns {Promise<boolean>} */
     async fetchProfile() {
+      const gen = generation
       try {
         const resp = await badgesApi.profile()
+        if (gen !== generation) return false
         if (resp?.status !== 200) return false
         this.profile = { titleCode: resp.data.titleCode ?? null, showcaseCodes: resp.data.showcaseCodes ?? [] }
         this.profileLoaded = true
@@ -121,8 +144,10 @@ export const useBadgesStore = defineStore('badges', {
      * @returns {Promise<boolean>}
      */
     async fetchActivity(weeks = 12) {
+      const gen = generation
       try {
         const resp = await badgesApi.activity(weeks)
+        if (gen !== generation) return false
         if (resp?.status !== 200) return false
         this.activity = resp.data
         return true
@@ -149,8 +174,10 @@ export const useBadgesStore = defineStore('badges', {
      * @returns {Promise<boolean>}
      */
     async saveProfile(data) {
+      const gen = generation
       try {
         const resp = await badgesApi.saveProfile(data)
+        if (gen !== generation) return false
         if (resp?.status !== 200) {
           notif.notify(resp?.data?.message || "Erreur lors de l'enregistrement.", 'error')
           return false
@@ -171,8 +198,10 @@ export const useBadgesStore = defineStore('badges', {
      * @returns {Promise<boolean>}
      */
     async updateSettings(patch) {
+      const gen = generation
       try {
         const resp = await badgesApi.updateSettings(patch)
+        if (gen !== generation) return false
         if (resp?.status !== 200) {
           notif.notify(resp?.data?.message || "Erreur lors de l'enregistrement du réglage.", 'error')
           return false

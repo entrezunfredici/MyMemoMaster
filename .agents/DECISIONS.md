@@ -5568,3 +5568,16 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : lancer `npx vitest` depuis PowerShell dans `C:\dev\...` (lettre de lecteur en majuscule). Aucun changement de configuration.
 **Alternative écartée** : forcer la casse dans `vitest.config.js` (contourne un défaut d'environnement local, la CI Linux n'est pas concernée).
 **Conséquences** : un échec massif « no tests / reading 'config' » en local n'est pas une régression du code.
+
+
+## [2026-11-16] Sécurité de la PR #42 : identifiant de fournisseur de confiance, journaux nettoyés, exception gitleaks ciblée, cache des badges lié au compte
+
+**Contexte** : CodeQL signalait un contournement piloté par l'utilisateur (le fournisseur OAuth venait du paramètre d'URL) et deux injections dans les logs ; gitleaks signalait les identifiants clients OAuth des configmaps k8s ; la revue automatique relevait deux défauts de la gamification (visibilité enseignant, cache entre comptes).
+**Décision** :
+- `getProvider` renvoie un `id` pris dans `PROVIDER_IDS` (liste du serveur), jamais l'argument reçu ; toute valeur externe écrite dans un log passe par `helpers/sanitizeLog.js` (retours à la ligne et caractères de contrôle remplacés, 200 caractères maximum).
+- Reprendre un compte non vérifié supprime ses identités OAuth existantes avant de créer la nouvelle liaison.
+- Le réglage « Montrer mes badges à mes enseignants » est appliqué à la frontière d'accès enseignant (`KpiConsent.getStudentKpis`) pour le consentement global, comme `getPersonalKpisForSubjects` le fait pour le consentement par matières.
+- `.gitleaks.toml` : exception limitée aux clés `OAUTH_*_CLIENT_ID` dans `k8s/(prod|preprod)/configmap.yml` (chemin et clé doivent correspondre), règles par défaut conservées. Un `client_id` OAuth est public par conception ; les secrets restent dans le Secret k8s.
+- Store des badges : action `reset()` appelée par `auth.logout`, et compteur de « session » capturé par chaque requête pour ignorer une réponse arrivée après un changement de compte.
+**Alternative écartée** : réécrire l'historique git pour retirer les client_id (inutile, ils ne sont pas secrets, et coûteux sur une branche partagée) ; filtrer les badges dans `getMyKpis` (il sert aussi à l'étudiant, qui voit toujours les siens) ; clé de cache par utilisateur (laisse les données de l'ancien compte en mémoire).
+**Conséquences** : un enseignant avec consentement global ne voit plus les badges d'un étudiant qui n'a pas activé le partage. Toute nouvelle écriture de log avec une valeur externe doit utiliser `sanitizeLog`.

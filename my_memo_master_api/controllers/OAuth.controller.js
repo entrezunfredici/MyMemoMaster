@@ -1,5 +1,6 @@
 const oauthService = require('../services/OAuth.service')
 const logger = require('../helpers/logger')
+const sanitizeLog = require('../helpers/sanitizeLog')
 const { issueSession, sendTwoFactorCode } = require('../helpers/authSession')
 const { isTwoFactorMandatory, signChallengeToken } = require('../helpers/twoFactor')
 
@@ -50,7 +51,7 @@ exports.login = async (req, res) => {
     res.status(200).send(await issueSession(user.userId))
   } catch (error) {
     if (error?.name === 'OAuthError') {
-      logger.warn(`Échec de connexion OAuth (${req.params.provider}) : ${error.message} (IP ${req.ip})`)
+      logger.warn(`Échec de connexion OAuth (${sanitizeLog(req.params.provider)}) : ${sanitizeLog(error.message)} (IP ${sanitizeLog(req.ip)})`)
     }
     respondError(res, error, 'Erreur lors de la connexion.')
   }

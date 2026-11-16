@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs')
 const { User, UserOAuthAccount } = require('../models/index')
 const userService = require('./User.service')
 const logger = require('../helpers/logger')
+const sanitizeLog = require('../helpers/sanitizeLog')
 const getFrontUrl = require('../helpers/frontUrl')
 const { PROVIDER_IDS, getProvider } = require('../config/oauth.config')
 
@@ -277,8 +278,9 @@ class OAuthService {
     const existing = await User.findOne({ where: { email } })
     if (existing) {
       if (!profile.emailVerified) {
-        const safeProviderId = String(providerId).replace(/[\r\n]/g, '')
-        logger.warn(`Connexion OAuth ${safeProviderId} refusée — email non prouvé pour un compte existant : ${email}`)
+        logger.warn(
+          `Connexion OAuth ${sanitizeLog(providerId)} refusée — email non prouvé pour un compte existant : ${sanitizeLog(email)}`
+        )
         throw new OAuthError(
           'Un compte existe déjà avec cette adresse email. Connectez-vous avec votre mot de passe.',
           409
@@ -315,9 +317,13 @@ class OAuthService {
    * aléatoire et ses sessions sont révoquées, pour qu'une personne ayant pré-enregistré l'adresse d'un tiers
    * (pré-détournement) ne garde aucun accès une fois le vrai propriétaire connecté via OAuth.
    *
+   * Les identités OAuth déjà reliées au compte sont supprimées : sinon la personne qui l'avait pré-créé
+   * via un autre fournisseur pourrait s'y reconnecter ensuite.
+   *
    * @param {object} user - Instance Sequelize du compte
    */
   async _claimUnverifiedAccount(user) {
+    await UserOAuthAccount.destroy({ where: { userId: user.userId } })
     user.password = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
     user.hasValidatedEmail = true
     user.validEmailCode = null
