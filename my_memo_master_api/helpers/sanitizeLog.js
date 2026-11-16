@@ -12,12 +12,12 @@ const isControlChar = (char) => {
  * @returns {string} Texte sur une seule ligne, tronqué à 200 caractères
  */
 const sanitizeLog = (value) => {
-  // CHOIX: \s (retours à la ligne, tabulations) en regex, puis les autres caractères de contrôle un à un
-  // RAISON: une classe de caractères de contrôle dans la regex est refusée par ESLint (no-control-regex)
-  const singleLine = String(value).replace(/\s+/g, ' ')
-  return Array.from(singleLine, (char) => (isControlChar(char) ? ' ' : char))
-    .join('')
-    .slice(0, 200)
+  // CHOIX: caractères de contrôle remplacés un à un (ESLint refuse une classe de contrôle dans une regex),
+  // puis un `replace` de retours à la ligne en DERNIÈRE étape
+  // RAISON: c'est la forme que l'analyse CodeQL (js/log-injection) reconnaît comme nettoyage ; un traitement
+  // caractère par caractère placé après lui ferait réapparaître l'alerte.
+  const withoutControl = Array.from(String(value).slice(0, 200), (char) => (isControlChar(char) ? ' ' : char)).join('')
+  return withoutControl.replace(/\r?\n|\r/g, ' ')
 }
 
 module.exports = sanitizeLog

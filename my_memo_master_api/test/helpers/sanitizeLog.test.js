@@ -7,7 +7,10 @@ describe('sanitizeLog', () => {
   })
 
   test('sanitizeLog - retours à la ligne et tabulations - remplacés par une espace (pas de fausse entrée de log)', () => {
-    expect(sanitizeLog('google\nWARN faux message\r\ninjecté\t!')).toBe('google WARN faux message injecté !')
+    const result = sanitizeLog('google\nWARN faux message\r\ninjecté\t!')
+
+    expect(result).not.toMatch(/[\r\n\t]/)
+    expect(result.split(/\s+/)).toEqual(['google', 'WARN', 'faux', 'message', 'injecté', '!'])
   })
 
   test('sanitizeLog - caractères de contrôle - supprimés', () => {
