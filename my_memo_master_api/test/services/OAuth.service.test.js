@@ -300,13 +300,23 @@ describe('OAuth.service', () => {
       expect(UserOAuthAccount.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 9, provider: 'google' }))
     })
 
-    test('findOrCreateUser - nouvel email non prouvé - compte créé avec hasValidatedEmail à false', async () => {
+    test('findOrCreateUser - nouvel email non prouvé (Microsoft) - refusé en 403, aucun compte créé', async () => {
       UserOAuthAccount.findOne.mockResolvedValue(null)
       User.findOne.mockResolvedValue(null)
-      userService.create.mockResolvedValue({ userId: 10 })
-      User.findByPk.mockResolvedValue({ userId: 10, isActive: true, dataValues: { userId: 10, isActive: true } })
-      await oauthService.findOrCreateUser('microsoft', { ...profile, emailVerified: false })
-      expect(userService.create.mock.calls[0][0].hasValidatedEmail).toBe(false)
+      userService.create.mockClear()
+      UserOAuthAccount.create.mockClear()
+      await expect(
+        oauthService.findOrCreateUser('microsoft', { ...profile, emailVerified: false })
+      ).rejects.toMatchObject({ status: 403 })
+      expect(userService.create).not.toHaveBeenCalled()
+      expect(UserOAuthAccount.create).not.toHaveBeenCalled()
+    })
+
+    test('findOrCreateUser - Microsoft déjà lié - connexion toujours possible sans email prouvé', async () => {
+      UserOAuthAccount.findOne.mockResolvedValue({ userId: 12 })
+      User.findByPk.mockResolvedValue({ userId: 12, isActive: true, dataValues: { userId: 12, isActive: true } })
+      const user = await oauthService.findOrCreateUser('microsoft', { ...profile, emailVerified: false })
+      expect(user).toEqual({ userId: 12, isActive: true })
     })
 
     test('findOrCreateUser - nom absent - utilise la partie locale de l’email', async () => {

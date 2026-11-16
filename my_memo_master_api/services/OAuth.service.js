@@ -242,7 +242,7 @@ class OAuthService {
    * @param {string} providerId - Fournisseur de l'identité
    * @param {{ providerUserId: string, email: string|null, emailVerified: boolean, name: string|null }} profile
    * @returns {Promise<object>} Le compte (sans mot de passe)
-   * @throws {OAuthError} 400 sans email, 403 compte désactivé ou inscriptions fermées,
+   * @throws {OAuthError} 400 sans email, 403 compte désactivé, inscriptions fermées ou email non prouvé (création refusée),
    *   409 email déjà pris par un compte que le fournisseur ne permet pas de prouver
    */
   async findOrCreateUser(providerId, profile) {
@@ -289,6 +289,19 @@ class OAuthService {
       if (!existing.hasValidatedEmail) await this._claimUnverifiedAccount(existing)
       await UserOAuthAccount.create({ userId: existing.userId, provider: providerId, providerUserId: profile.providerUserId, email })
       return existing
+    }
+
+    // CHOIX: pas de création de compte sans email prouvé par le fournisseur (Microsoft aujourd'hui)
+    // RAISON: sinon un tenant Entra déclarant l'adresse d'un tiers obtiendrait une session et pourrait
+    // consommer les invitations de classe destinées à cette adresse.
+    if (!profile.emailVerified) {
+      logger.warn(
+        `Inscription OAuth ${sanitizeLog(providerId)} refusée — email non prouvé : ${sanitizeLog(email)}`
+      )
+      throw new OAuthError(
+        "Votre fournisseur ne prouve pas cette adresse email. Créez un compte avec votre email et un mot de passe.",
+        403
+      )
     }
 
     const name = (profile.name || email.split('@')[0]).trim().slice(0, 50).padEnd(2, '_')

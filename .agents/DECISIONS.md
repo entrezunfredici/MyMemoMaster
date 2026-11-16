@@ -5581,3 +5581,11 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 - Store des badges : action `reset()` appelée par `auth.logout`, et compteur de « session » capturé par chaque requête pour ignorer une réponse arrivée après un changement de compte.
 **Alternative écartée** : réécrire l'historique git pour retirer les client_id (inutile, ils ne sont pas secrets, et coûteux sur une branche partagée) ; filtrer les badges dans `getMyKpis` (il sert aussi à l'étudiant, qui voit toujours les siens) ; clé de cache par utilisateur (laisse les données de l'ancien compte en mémoire).
 **Conséquences** : un enseignant avec consentement global ne voit plus les badges d'un étudiant qui n'a pas activé le partage. Toute nouvelle écriture de log avec une valeur externe doit utiliser `sanitizeLog`.
+
+
+## [2026-11-16] OAuth : pas de création de compte sans email prouvé par le fournisseur
+
+**Contexte** : Microsoft renvoie toujours `emailVerified: false` (l'attribut email d'un tenant Entra est modifiable par son administrateur). Le compte était pourtant créé et une session ouverte : il pouvait accepter les invitations de classe en attente destinées à l'adresse déclarée (remarque de revue Codex P1 sur la PR #42).
+**Décision** : `OAuthService._linkOrCreate` refuse (403, message en français) toute création de compte quand `profile.emailVerified` est faux. Les identités déjà liées se reconnectent normalement ; le refus 409 sur un compte existant est inchangé ; Google et GitHub (email prouvé) ne changent pas.
+**Alternative écartée** : (B) e-mail de vérification avant la première session, plus long à construire (envoi, écran) ; (C) lire la revendication optionnelle Entra `xms_edov` pour considérer l'email comme prouvé quand le domaine est vérifié, impossible à tester sans tenant réel. Ces deux pistes restent possibles plus tard.
+**Conséquences** : plus aucune inscription neuve via Microsoft, qui reste utilisable pour un compte déjà lié. Les nouveaux utilisateurs Microsoft doivent s'inscrire par email et mot de passe.

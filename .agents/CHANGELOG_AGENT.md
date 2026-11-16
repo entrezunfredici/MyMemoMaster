@@ -13934,4 +13934,13 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Fichiers modifiés** : `config/oauth.config.js` (`getProvider` renvoie l'identifiant de la liste de confiance, plus l'argument reçu) · `services/OAuth.service.js` (journaux nettoyés ; `_claimUnverifiedAccount` supprime les identités OAuth du compte repris) · `controllers/OAuth.controller.js` (journal nettoyé) · `services/KpiConsent.service.js` (réglage de visibilité des badges appliqué aussi au consentement global) · `test/services/OAuth.service.test.js`, `KpiConsent.service.test.js` · front : `stores/badges.js` (action `reset`, compteur de session pour ignorer les réponses tardives) · `stores/auth.js` (`logout` vide le store des badges).
 **Corrigé** : js/user-controlled-bypass (OAuth.service) · js/log-injection (OAuth.controller, OAuth.service) · badges visibles d'un étudiant par un enseignant en consentement global malgré le réglage désactivé · cache des badges et du mode zen conservé d'un compte à l'autre pendant 60 s · compte non vérifié repris par un tiers qui gardait une identité OAuth liée.
 **Vérifié** : API 140 suites / 2 867 tests verts, ESLint propre ; front : suites `stores` et badges vertes (674 tests), ESLint propre.
-**Non corrigé (décision produit)** : OAuth Microsoft crée un compte avec un email non prouvé (`hasValidatedEmail: false`) et délivre quand même une session ; ce compte peut accepter des invitations de classe en attente destinées à cette adresse (`UserService.create`). À trancher : vérification d'email avant la première session, ou refus de Microsoft sans email vérifié.
+**Corrigé ensuite (voir entrée suivante)** : OAuth Microsoft crée un compte avec un email non prouvé (`hasValidatedEmail: false`) et délivre quand même une session ; ce compte peut accepter des invitations de classe en attente destinées à cette adresse (`UserService.create`). À trancher : vérification d'email avant la première session, ou refus de Microsoft sans email vérifié.
+
+
+## [2026-11-16] [FIX] OAuth — création de compte refusée sans email prouvé
+
+**Fichiers modifiés** : `my_memo_master_api/services/OAuth.service.js` (`_linkOrCreate` : 403 si `emailVerified` faux, journal nettoyé) · `test/services/OAuth.service.test.js` (le test « compte créé avec hasValidatedEmail à false » devient « refusé en 403, aucun compte créé » ; ajout : Microsoft déjà lié se reconnecte).
+**Utilisable** : Google et GitHub inchangés ; Microsoft sert à la connexion d'un compte déjà lié, plus à l'inscription.
+**Vérifié** : suites services + controllers API : 44 suites / 1 015 tests verts, ESLint propre.
+**Hypothèse** : le front affiche le message d'erreur renvoyé par l'API ; pas vérifié que l'écran d'inscription propose une alternative visible.
+**Dette** : option B (vérification par e-mail) ou C (`xms_edov`) pour rouvrir l'inscription Microsoft.
