@@ -28,6 +28,10 @@
           <dt class="font-semibold">Obtenu le</dt>
           <dd>{{ earnedDate }}</dd>
         </div>
+        <div v-if="badge.earned && subjectNames">
+          <dt class="font-semibold">Obtenu avec</dt>
+          <dd data-testid="earned-subjects">{{ subjectNames }}</dd>
+        </div>
       </dl>
       <div v-if="badge.earned && profileAvailable" class="mt-4 flex flex-wrap gap-3">
         <button type="button" class="px-3 py-1 rounded border-2 border-primary text-primary" @click="emit('toggle-title', badge)">
@@ -51,7 +55,7 @@
 import { computed } from 'vue'
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import BadgeProgress from '@/components/badges/BadgeProgress.vue'
-import { MAX_SHOWCASE, formatEarnedDate, rarityMeta } from '@/helpers/badges'
+import { MAX_SHOWCASE, earnedSubjectNames, formatEarnedDate, rarityMeta } from '@/helpers/badges'
 
 const props = defineProps({
   badge: { type: Object, required: true },
@@ -65,6 +69,7 @@ const emit = defineEmits(['close', 'toggle-title', 'toggle-showcase'])
 
 const rarity = computed(() => rarityMeta(props.badge.rarity))
 const earnedDate = computed(() => formatEarnedDate(props.badge.earnedAt))
+const subjectNames = computed(() => earnedSubjectNames(props.badge))
 
 function close() {
   emit('close')

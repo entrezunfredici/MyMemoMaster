@@ -55,7 +55,7 @@
 
         <ActivityCalendar v-if="store.activity" :activity="store.activity" />
 
-        <GamificationSettings v-if="store.settings" :settings="store.settings" @change="store.updateSettings($event)" />
+        <GamificationSettings v-if="store.settings" :settings="store.settings" @change="(patch, done) => store.updateSettings(patch).then(done)" />
       </template>
     </template>
 

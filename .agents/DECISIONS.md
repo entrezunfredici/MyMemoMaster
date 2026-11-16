@@ -5589,3 +5589,16 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `OAuthService._linkOrCreate` refuse (403, message en français) toute création de compte quand `profile.emailVerified` est faux. Les identités déjà liées se reconnectent normalement ; le refus 409 sur un compte existant est inchangé ; Google et GitHub (email prouvé) ne changent pas.
 **Alternative écartée** : (B) e-mail de vérification avant la première session, plus long à construire (envoi, écran) ; (C) lire la revendication optionnelle Entra `xms_edov` pour considérer l'email comme prouvé quand le domaine est vérifié, impossible à tester sans tenant réel. Ces deux pistes restent possibles plus tard.
 **Conséquences** : plus aucune inscription neuve via Microsoft, qui reste utilisable pour un compte déjà lié. Les nouveaux utilisateurs Microsoft doivent s'inscrire par email et mot de passe.
+
+
+## [2026-11-16] Gamification : rappel de série, objectif quotidien, modale d'obtention, titre enseignant
+
+**Contexte** : les réglages (rappel de série, objectifs, animations) étaient enregistrés sans effet ; le titre n'était pas montré aux enseignants ; « Obtenu avec » manquait dans le détail.
+**Décision** :
+- **Rappel de série** : un cron (18h30) crée un `Reminder` `entityType: 'streak_reminder'`, `channel: 'in_app'`, affiché par la cloche existante, comme le digest KPI. Seuil : série d'au moins 2 jours, pratique hier, rien aujourd'hui, rappel activé et mode zen coupé. Un seul rappel par utilisateur et par jour (contrôle sur `reminderAt`). Aucun e-mail.
+- **Objectif quotidien** : `GET /badges/me/daily-goal` calcule la progression à la demande depuis `LeitnerReviewSession` et `TestResult` ; rien n'est stocké. L'anneau cumule les objectifs actifs, chacun plafonné à sa cible.
+- **Modale d'obtention** : le front réutilise `GET /badges/me/recent` et `PATCH /badges/me/seen`, déjà présents côté API. Elle n'est ni chargée ni marquée « vue » si les animations sont coupées ou si le mode zen est actif : les badges gardent leur pastille « Nouveau ». Vérification au chargement et à chaque changement de page, espacée de 30 s.
+- **Titre enseignant** : clé `title` ajoutée aux KPI vus par un enseignant. Avec le consentement global, le titre suit le réglage de partage des badges ; avec un consentement par matières, il n'est montré que si son badge est lui-même visible (sinon il révélerait une matière non consentie).
+- **« Obtenu avec »** : `GET /badges` ajoute `earnedSubjects` (noms), via `withSubjectNames` déjà utilisé pour les KPI. Ajout seulement, aucune clé retirée.
+**Alternative écartée** : e-mail de rappel (spam, consentement distinct, rien dans le réglage qui le promette) ; colonne de cache pour l'objectif quotidien (donnée dérivée, deux sources de vérité) ; sondage temps réel ou WebSocket pour la modale (coût disproportionné pour une annonce différée d'une page) ; montrer le titre à l'enseignant indépendamment du badge (fuite d'une matière non consentie).
+**Conséquences** : le rappel et la vérification de la modale dépendent de l'heure du serveur, pas du fuseau de l'utilisateur. Un nouveau type de `Reminder` (`streak_reminder`, 15 caractères sur 20 autorisés) est à connaître de tout code qui trie les rappels. Aucune migration.
