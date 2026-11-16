@@ -38,6 +38,9 @@ import TeacherStudentKpi from '@/components/classroom/teacher/TeacherStudentKpi.
 import BadgeGrid from '@/components/badges/BadgeGrid.vue'
 import BadgeLevelHeader from '@/components/badges/BadgeLevelHeader.vue'
 import BadgeDetailModal from '@/components/badges/BadgeDetailModal.vue'
+import BadgeShowcase from '@/components/badges/BadgeShowcase.vue'
+import ActivityCalendar from '@/components/badges/ActivityCalendar.vue'
+import GamificationSettings from '@/components/badges/GamificationSettings.vue'
 import { CONFIRM_ACTION_KEY } from '@/composables/useConfirmAction'
 
 // Composants sans route dans leur template : pas besoin du mock vue-router.
@@ -548,6 +551,41 @@ describe('Badges (C-06) - rendu rempli', () => {
 
   it('BadgeDetailModal - badge en cours - aucune violation axe', async () => {
     wrapper = mount(BadgeDetailModal, { props: { badge: badges[1] }, attachTo: document.body })
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('BadgeDetailModal - badge obtenu avec actions titre et vitrine - aucune violation axe', async () => {
+    wrapper = mount(BadgeDetailModal, { props: { badge: badges[0], profileAvailable: true, showcaseFull: true }, attachTo: document.body })
+    expect(wrapper.text()).toContain('Choisir comme titre')
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('BadgeLevelHeader - avec sélecteur de titre - aucune violation axe', async () => {
+    const summary = { level: { name: 'Apprenti', next: { name: 'Confirmé', min: 10 } }, earnedCount: 7, totalCount: 14, streakCurrent: 3, streakBest: 21 }
+    wrapper = mount(BadgeLevelHeader, { props: { summary, profileAvailable: true, earnedBadges: [badges[0]], titleCode: 'streak7' }, attachTo: document.body })
+    expect(wrapper.find('select').exists()).toBe(true)
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('BadgeShowcase - lecture puis modification - aucune violation axe', async () => {
+    wrapper = mount(BadgeShowcase, { props: { badges, codes: ['streak7'] }, attachTo: document.body })
+    expect(await runAxe(wrapper.element)).toEqual([])
+    await wrapper.findAll('button').find((b) => b.text() === 'Modifier').trigger('click')
+    expect(wrapper.find('form').exists()).toBe(true)
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('ActivityCalendar - 3 semaines avec jours actifs - aucune violation axe', async () => {
+    const activity = { from: '2026-11-02', to: '2026-11-16', today: '2026-11-16', weeks: 3, activeDates: ['2026-11-02', '2026-11-16'], activeDaysLast30: 2, streakCurrent: 1 }
+    wrapper = mount(ActivityCalendar, { props: { activity }, attachTo: document.body })
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('GamificationSettings - objectifs et interrupteurs - aucune violation axe', async () => {
+    const settings = { dailyGoalCards: 10, dailyGoalExercises: 0, streakReminderEnabled: false, badgesVisibleToTeachers: false, animationsEnabled: true, zenMode: false }
+    wrapper = mount(GamificationSettings, { props: { settings }, attachTo: document.body })
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(4)
     expect(await runAxe(wrapper.element)).toEqual([])
   })
 })

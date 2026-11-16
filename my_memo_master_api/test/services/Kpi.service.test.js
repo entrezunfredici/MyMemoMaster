@@ -1,10 +1,15 @@
 const dayjs = require('dayjs')
 const kpiService = require('../../services/Kpi.service')
 const badgeService = require('../../services/Badge.service')
+const gamificationProfileService = require('../../services/GamificationProfile.service')
 
 jest.mock('../../services/Badge.service', () => ({
   listForKpi: jest.fn().mockResolvedValue([]),
   listForSubjects: jest.fn().mockResolvedValue([])
+}))
+
+jest.mock('../../services/GamificationProfile.service', () => ({
+  areBadgesVisibleToTeachers: jest.fn().mockResolvedValue(true)
 }))
 
 jest.mock('../../models', () => ({
@@ -175,6 +180,21 @@ describe('KpiService', () => {
         where: { userId: 1 },
         include: [expect.objectContaining({ where: { subjectId: [1] } })]
       }))
+    })
+
+    it('getPersonalKpisForSubjects - badges non partagés avec les enseignants - aucun badge renvoyé', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
+      badgeService.listForSubjects.mockClear()
+      gamificationProfileService.areBadgesVisibleToTeachers.mockResolvedValueOnce(false)
+
+      const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
+
+      expect(kpis.badges).toEqual([])
+      expect(badgeService.listForSubjects).not.toHaveBeenCalled()
     })
   })
 

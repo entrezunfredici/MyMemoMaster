@@ -17,6 +17,7 @@ jest.mock('../../models/index', () => ({
   ClassGroup: {},
   UserBadge: { findAll: jest.fn() },
   UserActivityDay: { findAll: jest.fn() },
+  UserGamificationSettings: { findOne: jest.fn() },
   instance: { transaction: jest.fn() }
 }))
 jest.mock('../../helpers/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }))
@@ -307,6 +308,20 @@ describe('UserDataExportService', () => {
       expect(data.activity.badges).toEqual([{ badgeCode: 'streak7', earnedAt, seenAt: null }])
       expect(data.activity.activityDays).toEqual(['2026-11-01', '2026-11-02'])
       expect(models.UserBadge.findAll.mock.calls[0][0].attributes).not.toContain('context')
+    })
+
+    it('exportUserData - réglages de gamification - exportés sans identifiants, null si jamais modifiés', async () => {
+      models.Diagramme.findAll.mockResolvedValue([])
+      models.Test.findAll.mockResolvedValue([])
+      for (const m of ['TestResult', 'LeitnerReviewSession', 'RevisionSession', 'Reminder', 'ClassGroupUsers', 'UserBadge', 'UserActivityDay']) {
+        models[m].findAll.mockResolvedValue([])
+      }
+      const settings = { titleCode: 'streak7', showcaseCodes: ['streak7'], zenMode: false }
+      models.UserGamificationSettings.findOne.mockResolvedValueOnce(settings)
+
+      expect((await service.exportUserData(1)).activity.gamificationSettings).toEqual(settings)
+      expect(models.UserGamificationSettings.findOne.mock.calls[0][0].attributes).toEqual({ exclude: ['id', 'userId'] })
+      expect((await service.exportUserData(1)).activity.gamificationSettings).toBeNull()
     })
   })
 })

@@ -3,6 +3,7 @@ const { RevisionSession, TestResult, Test, Subject, LeitnerSystem, LeitnerBox, L
 const leitnerReviewSessionService = require('./LeitnerReviewSession.service')
 const mindMapViewSessionService = require('./MindMapViewSession.service')
 const badgeService = require('./Badge.service')
+const gamificationProfileService = require('./GamificationProfile.service')
 
 /**
  * Retourne le lundi de la semaine (ISO) contenant la date donnée.
@@ -139,7 +140,10 @@ class KpiService {
     // CHOIX: seuls les badges liés à une matière consentie (BadgeSubject) sont montrés
     // RAISON: UserBadge reflète l'activité de toutes les matières ; le lien badge ↔ matières
     // (many-to-many) décide de ce qu'un enseignant a le droit de voir.
-    const badges = await badgeService.listForSubjects(userId, subjectIds)
+    // CHOIX: réglage « Montrer mes badges à mes enseignants » en plus du consentement par matière
+    // RAISON: l'étudiant garde la main sur ses badges (désactivé par défaut) ; le consentement KPI ne suffit pas.
+    const badgesShared = await gamificationProfileService.areBadgesVisibleToTeachers(userId)
+    const badges = badgesShared ? await badgeService.listForSubjects(userId, subjectIds) : []
 
     return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, badges }
   }

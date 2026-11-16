@@ -18,6 +18,7 @@ const {
   ClassGroup,
   UserBadge,
   UserActivityDay,
+  UserGamificationSettings,
   instance
 } = require('../models/index')
 const logger = require('../helpers/logger')
@@ -96,7 +97,8 @@ class UserDataExportService {
       reminders,
       memberships,
       badges,
-      activityDays
+      activityDays,
+      gamificationSettings
     ] =
       await Promise.all([
         this._findLeitnerSystems(userId),
@@ -117,7 +119,8 @@ class UserDataExportService {
           order: [['earnedAt', 'ASC']],
           raw: true
         }),
-        UserActivityDay.findAll({ where: { userId }, attributes: ['date'], order: [['date', 'ASC']], raw: true })
+        UserActivityDay.findAll({ where: { userId }, attributes: ['date'], order: [['date', 'ASC']], raw: true }),
+        UserGamificationSettings.findOne({ where: { userId }, attributes: { exclude: ['id', 'userId'] }, raw: true })
       ])
 
     return {
@@ -138,6 +141,7 @@ class UserDataExportService {
         // Gamification : exportée pour information, non réimportée (recalculée depuis la pratique réelle)
         badges,
         activityDays: activityDays.map((row) => row.date),
+        gamificationSettings: gamificationSettings || null,
         classGroups: memberships.map((m) => ({ name: m.classGroup?.name ?? null, role: m.role }))
       }
     }

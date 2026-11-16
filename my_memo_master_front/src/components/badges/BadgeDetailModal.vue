@@ -29,6 +29,20 @@
           <dd>{{ earnedDate }}</dd>
         </div>
       </dl>
+      <div v-if="badge.earned && profileAvailable" class="mt-4 flex flex-wrap gap-3">
+        <button type="button" class="px-3 py-1 rounded border-2 border-primary text-primary" @click="emit('toggle-title', badge)">
+          {{ isTitle ? 'Retirer le titre' : 'Choisir comme titre' }}
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1 rounded border-2 border-primary text-primary disabled:border-gray-500 disabled:text-gray-700"
+          :disabled="!inShowcase && showcaseFull"
+          @click="emit('toggle-showcase', badge)"
+        >
+          {{ inShowcase ? 'Retirer de ma vitrine' : 'Ajouter à ma vitrine' }}
+        </button>
+        <p v-if="!inShowcase && showcaseFull" class="w-full text-sm text-dark/70">{{ MAX_SHOWCASE }} badges maximum dans la vitrine.</p>
+      </div>
     </div>
   </div>
 </template>
@@ -37,12 +51,17 @@
 import { computed } from 'vue'
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import BadgeProgress from '@/components/badges/BadgeProgress.vue'
-import { formatEarnedDate, rarityMeta } from '@/helpers/badges'
+import { MAX_SHOWCASE, formatEarnedDate, rarityMeta } from '@/helpers/badges'
 
 const props = defineProps({
   badge: { type: Object, required: true },
+  // Actions titre / vitrine : proposées si l'API de profil est disponible et le badge obtenu
+  profileAvailable: { type: Boolean, default: false },
+  isTitle: { type: Boolean, default: false },
+  inShowcase: { type: Boolean, default: false },
+  showcaseFull: { type: Boolean, default: false },
 })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'toggle-title', 'toggle-showcase'])
 
 const rarity = computed(() => rarityMeta(props.badge.rarity))
 const earnedDate = computed(() => formatEarnedDate(props.badge.earnedAt))

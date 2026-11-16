@@ -182,3 +182,128 @@ export function streakMessage(summary) {
   if (best > 0) return `Ta série est repartie à 0. Ta meilleure série reste de ${best} jour${best > 1 ? 's' : ''} : une nouvelle commence dès ta prochaine pratique.`
   return "Ta première pratique d'aujourd'hui lance ta série."
 }
+
+export const MAX_SHOWCASE = 3
+
+/**
+ * Badges de la vitrine, dans l'ordre choisi ; un code absent du catalogue ou non obtenu est ignoré.
+ *
+ * @param {object[]} badges
+ * @param {string[]} [codes]
+ * @returns {object[]}
+ */
+export function showcaseBadges(badges, codes) {
+  const byCode = new Map((badges || []).map((badge) => [badge.code, badge]))
+  return (codes || []).map((code) => byCode.get(code)).filter((badge) => badge?.earned)
+}
+
+/**
+ * Badge choisi comme titre, ou null (aucun titre, code inconnu ou badge non obtenu).
+ *
+ * @param {object[]} badges
+ * @param {string|null} [code]
+ * @returns {object|null}
+ */
+export function titleBadge(badges, code) {
+  if (!code) return null
+  const badge = (badges || []).find((entry) => entry.code === code)
+  return badge?.earned ? badge : null
+}
+
+/**
+ * Ajoute ou retire un code de la vitrine, sans dépasser le maximum (ajout ignoré au-delà).
+ *
+ * @param {string[]} codes
+ * @param {string} code
+ * @param {number} [max]
+ * @returns {string[]} nouvelle liste
+ */
+export function toggleShowcaseCode(codes, code, max = MAX_SHOWCASE) {
+  const list = codes || []
+  if (list.includes(code)) return list.filter((entry) => entry !== code)
+  return list.length >= max ? [...list] : [...list, code]
+}
+
+function parseDay(date) {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function formatDay(date) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+// Numéro de semaine ISO 8601 du jour donné
+function isoWeek(date) {
+  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  target.setUTCDate(target.getUTCDate() + 4 - (target.getUTCDay() || 7))
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1))
+  return Math.ceil(((target - yearStart) / 86400000 + 1) / 7)
+}
+
+/**
+ * Nom accessible d'une case du calendrier (« mercredi 4 novembre : activité »).
+ *
+ * @param {string} date - YYYY-MM-DD
+ * @param {boolean} active
+ * @returns {string}
+ */
+export function calendarDayLabel(date, active) {
+  const text = parseDay(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  return `${text} : ${active ? 'activité' : "pas d'activité"}`
+}
+
+/**
+ * Grille du calendrier d'activité : une entrée par semaine (lundi → dimanche), du lundi de `from`
+ * jusqu'à la semaine de `to`. Les jours après `to` sont marqués `future` (cases vides, non lues).
+ *
+ * @param {{ from: string, to: string, today?: string, activeDates?: string[] }} activity - réponse de GET /badges/me/activity
+ * @returns {{ week: number, days: { date: string, active: boolean, isToday: boolean, future: boolean, label: string }[] }[]}
+ */
+export function buildCalendar(activity) {
+  if (!activity?.from || !activity?.to) return []
+  const active = new Set(activity.activeDates || [])
+  const today = activity.today || activity.to
+  const start = parseDay(activity.from)
+  const end = parseDay(activity.to)
+  const weeks = []
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 7)) {
+    const days = []
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(cursor)
+      day.setDate(cursor.getDate() + i)
+      const date = formatDay(day)
+      const isActive = active.has(date)
+      days.push({ date, active: isActive, isToday: date === today, future: day > end, label: calendarDayLabel(date, isActive) })
+    }
+    weeks.push({ week: isoWeek(cursor), days })
+  }
+  return weeks
+}
+
+/**
+ * Résumé textuel du calendrier (alternative à la grille, lue par les lecteurs d'écran).
+ *
+ * @param {{ activeDaysLast30?: number, streakCurrent?: number }} activity
+ * @returns {string}
+ */
+export function activitySummary(activity) {
+  const days = activity?.activeDaysLast30 ?? 0
+  const streak = activity?.streakCurrent ?? 0
+  const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`
+  return `${plural(days, 'jour')} ${days > 1 ? 'actifs' : 'actif'} sur les 30 derniers jours, série de ${plural(streak, 'jour')}.`
+}
+
+/**
+ * Normalise une saisie d'objectif quotidien : entier entre 0 et `max` (0 = désactivé).
+ *
+ * @param {string|number} value
+ * @param {number} max
+ * @returns {number}
+ */
+export function clampGoal(value, max) {
+  const n = Math.trunc(Number(value))
+  if (!Number.isFinite(n) || n < 0) return 0
+  return Math.min(n, max)
+}

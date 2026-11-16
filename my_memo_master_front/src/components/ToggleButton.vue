@@ -68,12 +68,13 @@ function toggle(event) {
   transition: .4s;
 }
 
+/* --primary est un triplet RGB : sans rgb(), la déclaration est invalide et l'interrupteur activé reste invisible */
 input:checked + .slider {
-  background-color:var(--primary);
+  background-color: rgb(var(--primary));
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px var(--primary);
+  box-shadow: 0 0 1px rgb(var(--primary));
 }
 
 input:checked + .slider:before {

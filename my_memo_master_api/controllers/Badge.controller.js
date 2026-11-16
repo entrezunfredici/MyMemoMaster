@@ -1,5 +1,6 @@
 const badgeService = require('../services/Badge.service')
 const logger = require('../helpers/logger')
+const gamificationProfileService = require('../services/GamificationProfile.service')
 
 exports.findAll = async (req, res) => {
   try {
@@ -52,5 +53,57 @@ exports.summary = async (req, res) => {
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).json({ message: 'Erreur lors de la récupération du résumé des badges.' })
+  }
+}
+
+const SET_PROFILE_STATUS = { TOO_MANY_SHOWCASE: 400, BADGE_NOT_EARNED: 400 }
+
+exports.getProfile = async (req, res) => {
+  try {
+    res.status(200).json(await gamificationProfileService.getProfile(req.user.id))
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération de la vitrine.' })
+  }
+}
+
+exports.setProfile = async (req, res) => {
+  try {
+    const data = await gamificationProfileService.setProfile(req.user.id, req.body)
+    res.status(200).json({ message: 'Vitrine et titre enregistrés.', ...data })
+  } catch (error) {
+    const status = SET_PROFILE_STATUS[error?.code]
+    if (status) return res.status(status).json({ message: error.message })
+    logger.error(error?.message || error)
+    res.status(500).json({ message: "Erreur lors de l'enregistrement de la vitrine." })
+  }
+}
+
+exports.activity = async (req, res) => {
+  try {
+    const data = await gamificationProfileService.getActivity(req.user.id, req.query.weeks)
+    res.status(200).json(data)
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: "Erreur lors de la récupération du calendrier d'activité." })
+  }
+}
+
+exports.getSettings = async (req, res) => {
+  try {
+    res.status(200).json(await gamificationProfileService.getSettings(req.user.id))
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération des réglages.' })
+  }
+}
+
+exports.updateSettings = async (req, res) => {
+  try {
+    const data = await gamificationProfileService.updateSettings(req.user.id, req.body)
+    res.status(200).json({ message: 'Réglages enregistrés.', ...data })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: "Erreur lors de l'enregistrement des réglages." })
   }
 }
