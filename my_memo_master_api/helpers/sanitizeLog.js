@@ -17,7 +17,7 @@ const sanitizeLog = (value) => {
   // RAISON: c'est la forme que l'analyse CodeQL (js/log-injection) reconnaît comme nettoyage ; un traitement
   // caractère par caractère placé après lui ferait réapparaître l'alerte.
   const withoutControl = Array.from(String(value).slice(0, 200), (char) => (isControlChar(char) ? ' ' : char)).join('')
-  return withoutControl.replace(/\r?\n|\r/g, ' ')
+  return withoutControl.replace(/[\r\n]/g, '')
 }
 
 module.exports = sanitizeLog
