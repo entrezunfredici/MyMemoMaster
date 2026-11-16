@@ -155,6 +155,21 @@ describe('TeacherStudentKpi', () => {
     expect(wrapper.text()).not.toContain('Maître')
   })
 
+  it('badge obtenu avec des matières consenties : noms affichés et repris dans l\'infobulle', () => {
+    const withSubjects = {
+      ...kpi,
+      badges: [{ id: 'tenTests', unlocked: true, icon: '📚', label: '10 exercices', description: '10 séries', earnedSubjects: [{ subjectId: 1, name: 'Maths' }, { subjectId: 2, name: 'Physique' }] }]
+    }
+    const { wrapper } = mountPanel(TeacherStudentKpi, { props: { loaded: true, kpi: withSubjects } })
+    expect(wrapper.get('[data-test="badge-subjects"]').text()).toBe('Maths, Physique')
+    expect(wrapper.find('[title="10 séries (obtenu en : Maths, Physique)"]').exists()).toBe(true)
+  })
+
+  it('badge sans matières renseignées : aucune ligne de matières', () => {
+    const { wrapper } = mountPanel(TeacherStudentKpi, { props: { loaded: true, kpi } })
+    expect(wrapper.find('[data-test="badge-subjects"]').exists()).toBe(false)
+  })
+
   it('sections facultatives absentes quand les données manquent', () => {
     const sparse = { ...kpi, subjects: { list: [] }, badges: [{ id: 2, unlocked: false, label: 'Maître' }], revision: { ...kpi.revision, weeklyActivity: [] }, exercises: { ...kpi.exercises, scoreHistory: [] } }
     const { wrapper } = mountPanel(TeacherStudentKpi, { props: { loaded: true, kpi: sparse } })

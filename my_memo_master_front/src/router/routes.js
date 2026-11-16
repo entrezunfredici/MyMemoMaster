@@ -119,6 +119,15 @@ const routes = [
     }
   },
   {
+    path: '/profile/badges',
+    name: 'badges',
+    component: () => import('../pages/BadgesPage.vue'),
+    meta: {
+      title: 'Mes badges',
+      private: true
+    }
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: () => import('../pages/SettingsPage.vue'),
@@ -190,6 +199,16 @@ const routes = [
     component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
       title: 'Authentification',
+      private: false
+    }
+  },
+  {
+    // Retour de redirection du fournisseur OAuth (URI à déclarer chez Google, GitHub, Microsoft)
+    path: '/oauth/callback/:provider',
+    name: 'oauth-callback',
+    component: () => import('../pages/login/OAuthCallbackPage.vue'),
+    meta: {
+      title: 'Connexion en cours',
       private: false
     }
   },

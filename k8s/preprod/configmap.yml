@@ -58,5 +58,9 @@ data:
   VITE_FRONT_URL: "https://preprod.my-memo-master.com"
   VITE_USAGE_RULES_URL: "https://my-memo-master.com/regles-usage"
 
+  # ── OAuth (identifiants publics ; les CLIENT_SECRET sont dans le Secret) ──────
+  OAUTH_GOOGLE_CLIENT_ID: "179640285118-9t1nnogig0qqf1rd3geopb7pvhimnhgs.apps.googleusercontent.com"
+  OAUTH_GITHUB_CLIENT_ID: "Ov23liTP2ylQ5qbqCJmk"
+
   # ── PgAdmin ──────────────────────────────────────────────────────────────────
   PGADMIN_DEFAULT_EMAIL: "admin@my-memo-master.com"

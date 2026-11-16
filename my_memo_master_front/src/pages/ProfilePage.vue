@@ -1,6 +1,8 @@
 <template>
   <section class="profile">
 
+    <ProfileBadgesSummary />
+
     <!-- Informations personnelles -->
     <div class="profile__card">
       <h2 class="profile__title">Informations personnelles</h2>
@@ -192,6 +194,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { missingsElementsPassword } from '@/helpers/functions'
 import { notif } from '@/helpers/notif.js'
+import ProfileBadgesSummary from '@/components/badges/ProfileBadgesSummary.vue'
 
 const authStore = useAuthStore()
 

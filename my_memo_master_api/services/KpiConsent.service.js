@@ -1,5 +1,6 @@
 const { KpiConsent, ClassGroupUsers, User, ClassGroup, Subject } = require('../models/index')
 const KpiService = require('./Kpi.service')
+const gamificationProfileService = require('./GamificationProfile.service')
 
 class KpiConsentService {
   /**
@@ -99,7 +100,14 @@ class KpiConsentService {
     if (consents.length === 0) return 'no_consent'
 
     const hasGlobalConsent = consents.some((c) => c.subjectId === null)
-    if (hasGlobalConsent) return KpiService.getMyKpis(studentId)
+    if (hasGlobalConsent) {
+      const kpis = await KpiService.getMyKpis(studentId)
+      // CHOIX: réglage de visibilité appliqué ici, à la frontière d'accès enseignant, pour les deux modes de consentement
+      // RAISON: getMyKpis sert aussi à l'étudiant (qui voit toujours ses badges) ; seule la vue enseignant est filtrée.
+      // La branche « par matières » est filtrée par KpiService.getPersonalKpisForSubjects.
+      if (!(await gamificationProfileService.areBadgesVisibleToTeachers(studentId))) return { ...kpis, badges: [] }
+      return kpis
+    }
 
     const subjectIds = consents.map((c) => c.subjectId)
     return KpiService.getPersonalKpisForSubjects(studentId, subjectIds)

@@ -51,9 +51,14 @@ models.MindMapViewSession = require('./MindMapViewSession.model')(instance)
 models.AuditLog = require('./AuditLog.model')(instance)
 models.BackupRun = require('./BackupRun.model')(instance)
 models.ContentReport = require('./ContentReport.model')(instance)
+models.UserActivityDay = require('./UserActivityDay.model')(instance)
+models.UserBadge = require('./UserBadge.model')(instance)
+models.BadgeSubject = require('./BadgeSubject.model')(instance)
+models.UserGamificationSettings = require('./UserGamificationSettings.model')(instance)
 models.AiGenerationBatch = require('./AiGenerationBatch.model')(instance)
 models.AiGeneratedCard = require('./AiGeneratedCard.model')(instance)
 models.AiUsageLog = require('./AiUsageLog.model')(instance)
+models.UserOAuthAccount = require('./UserOAuthAccount.model')(instance)
 
 Object.keys(models).forEach((modelName) => {
   if (models[modelName].associate) {

@@ -1,4 +1,6 @@
 const { MindMapViewSession, Diagramme } = require('../models/index')
+const { emit: emitBadgeEvent } = require('../helpers/badges/badgeEvents')
+const { MIN_MINDMAP_VIEW_SECONDS } = require('./UserActivityDay.service')
 
 class MindMapViewSessionService {
   /**
@@ -9,7 +11,10 @@ class MindMapViewSessionService {
    */
   async create(data) {
     const { userId, idMindMap, durationSeconds } = data
-    return await MindMapViewSession.create({ userId, idMindMap, durationSeconds })
+    const session = await MindMapViewSession.create({ userId, idMindMap, durationSeconds })
+    // Une ouverture de moins d'une minute n'est pas une pratique (jour d'activité des badges).
+    if (durationSeconds >= MIN_MINDMAP_VIEW_SECONDS) await emitBadgeEvent('mindmap.viewed', { userId })
+    return session
   }
 
   /**
