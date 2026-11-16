@@ -12,7 +12,10 @@
 
     <!-- BADGES -->
     <section>
-      <h2 class="text-xl font-bold text-primary mb-3">Succès & Badges</h2>
+      <div class="flex items-baseline justify-between mb-3">
+        <h2 class="text-xl font-bold text-primary">Succès & Badges</h2>
+        <RouterLink :to="{ name: 'badges' }" class="underline text-primary text-sm">Voir tous mes badges</RouterLink>
+      </div>
       <div class="flex flex-wrap gap-3">
         <div
           v-for="badge in store.kpis.badges"

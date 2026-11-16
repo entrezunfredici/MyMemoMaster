@@ -35,6 +35,9 @@ import AdminAccountsPanel from '@/components/admin/AdminAccountsPanel.vue'
 import AdminAuditPanel from '@/components/admin/AdminAuditPanel.vue'
 import ReportContentButton from '@/components/classroom/ReportContentButton.vue'
 import TeacherStudentKpi from '@/components/classroom/teacher/TeacherStudentKpi.vue'
+import BadgeGrid from '@/components/badges/BadgeGrid.vue'
+import BadgeLevelHeader from '@/components/badges/BadgeLevelHeader.vue'
+import BadgeDetailModal from '@/components/badges/BadgeDetailModal.vue'
 import { CONFIRM_ACTION_KEY } from '@/composables/useConfirmAction'
 
 // Composants sans route dans leur template : pas besoin du mock vue-router.
@@ -516,6 +519,35 @@ describe('Accessibilité (axe-core) — KPI étudiant côté enseignant', () => 
   it('TeacherStudentKpi - badges avec et sans matières d\'obtention - aucune violation axe', async () => {
     wrapper = mount(TeacherStudentKpi, { props: { loaded: true, kpi }, attachTo: document.body })
     expect(wrapper.text()).toContain('Maths, Physique')
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+})
+
+describe('Badges (C-06) - rendu rempli', () => {
+  let wrapper
+  afterEach(() => wrapper?.unmount())
+
+  const badges = [
+    { code: 'streak7', category: 'regularity', rarity: 'common', icon: '🔥', label: '7 jours de suite', description: 'Pratiquer 7 jours consécutifs', earned: true, earnedAt: '2026-10-12T10:00:00Z', seenAt: null, progress: { current: 7, target: 7 } },
+    { code: 'streak30', category: 'regularity', rarity: 'rare', icon: '🏆', label: '30 jours de suite', description: 'Pratiquer 30 jours consécutifs', earned: false, progress: { current: 12, target: 30 } },
+    { code: 'tenTests', category: 'exercises', rarity: 'epic', icon: '📚', label: '10 exercices', description: "Compléter 10 séries d'exercices", earned: false, progress: { current: 4, target: 10 } },
+  ]
+
+  it('BadgeGrid - badges obtenus, en cours et nouveaux - aucune violation axe', async () => {
+    wrapper = mount(BadgeGrid, { props: { badges, newCodes: ['streak7'] }, attachTo: document.body })
+    expect(wrapper.text()).toContain('Nouveau')
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('BadgeLevelHeader - série cassée - aucune violation axe', async () => {
+    const summary = { level: { name: 'Apprenti', next: { name: 'Confirmé', min: 10 } }, earnedCount: 7, totalCount: 14, streakCurrent: 0, streakBest: 21 }
+    wrapper = mount(BadgeLevelHeader, { props: { summary }, attachTo: document.body })
+    expect(wrapper.text()).toContain('7 / 10 badges pour devenir Confirmé')
+    expect(await runAxe(wrapper.element)).toEqual([])
+  })
+
+  it('BadgeDetailModal - badge en cours - aucune violation axe', async () => {
+    wrapper = mount(BadgeDetailModal, { props: { badge: badges[1] }, attachTo: document.body })
     expect(await runAxe(wrapper.element)).toEqual([])
   })
 })

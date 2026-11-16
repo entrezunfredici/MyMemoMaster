@@ -40,6 +40,7 @@ const PAGES = [
   { path: '/calendar', label: 'Calendrier' },
   { path: '/todo', label: 'À faire' },
   { path: '/profile', label: 'Profil' },
+  { path: '/profile/badges', label: 'Mes badges' },
   { path: '/settings', label: 'Réglages' },
   { path: '/classroom', label: 'Classe' },
   { path: '/admin', label: 'Administration' },

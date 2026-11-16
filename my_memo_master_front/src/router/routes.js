@@ -119,6 +119,15 @@ const routes = [
     }
   },
   {
+    path: '/profile/badges',
+    name: 'badges',
+    component: () => import('../pages/BadgesPage.vue'),
+    meta: {
+      title: 'Mes badges',
+      private: true
+    }
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: () => import('../pages/SettingsPage.vue'),
