@@ -277,7 +277,8 @@ class OAuthService {
     const existing = await User.findOne({ where: { email } })
     if (existing) {
       if (!profile.emailVerified) {
-        logger.warn(`Connexion OAuth ${providerId} refusée — email non prouvé pour un compte existant : ${email}`)
+        const safeProviderId = String(providerId).replace(/[\r\n]/g, '')
+        logger.warn(`Connexion OAuth ${safeProviderId} refusée — email non prouvé pour un compte existant : ${email}`)
         throw new OAuthError(
           'Un compte existe déjà avec cette adresse email. Connectez-vous avec votre mot de passe.',
           409
