@@ -10,6 +10,14 @@
       <option value="autre">Autre</option>
     </select>
 
+    <fieldset v-if="otherGroups.length" class="space-y-1">
+      <legend class="text-xs font-semibold text-dark">Partager aussi dans</legend>
+      <label v-for="g in otherGroups" :key="g.id" class="flex items-center gap-2 text-sm text-dark">
+        <input type="checkbox" :value="g.id" v-model="resourceForm.otherGroupIds" />
+        {{ g.name }}
+      </label>
+    </fieldset>
+
     <!-- Zone drag & drop. RGAA 7.1 : la zone ne répond au glisser-déposer qu'à la souris ; « choisir un fichier »
          et « Retirer » sont de vrais boutons frères (plus de bouton imbriqué dans un role="button"). -->
     <div
@@ -45,8 +53,9 @@
 
 <script setup>
 // Formulaire de partage d'un document (glisser-déposer ou sélection). Extrait de pages/ClassroomEnseignantView.vue.
-import { nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { useClassGroupResourceStore } from '@/stores/classGroupResources'
+import { useAssignableGroups } from '@/composables/useAssignableGroups'
 import { formatFileSize } from '@/helpers/classroomFormat'
 
 const props = defineProps({ groupId: { type: Number, required: true } })
@@ -54,7 +63,10 @@ const props = defineProps({ groupId: { type: Number, required: true } })
 const resourceStore = useClassGroupResourceStore()
 const fileInput = ref(null)
 const browseButton = ref(null)
-const resourceForm = reactive({ title: '', type: 'cours', file: null, dragOver: false, error: '' })
+const { assignableGroups } = useAssignableGroups()
+// Autres groupes où l'utilisateur est enseignant : le document peut y être partagé en un seul envoi.
+const otherGroups = computed(() => assignableGroups.value.filter((g) => g.id !== props.groupId))
+const resourceForm = reactive({ title: '', type: 'cours', file: null, dragOver: false, error: '', otherGroupIds: [] })
 
 async function submitResource() {
   resourceForm.error = ''
@@ -63,8 +75,8 @@ async function submitResource() {
   const ok = await resourceStore.uploadAndCreate(props.groupId, resourceForm.file, {
     title: resourceForm.title.trim(),
     type: resourceForm.type,
-  })
-  if (ok) Object.assign(resourceForm, { title: '', file: null, dragOver: false, error: '' })
+  }, [...resourceForm.otherGroupIds])
+  if (ok) Object.assign(resourceForm, { title: '', file: null, dragOver: false, error: '', otherGroupIds: [] })
 }
 
 // Retirer le fichier supprime le bouton qui avait le focus : on le rend à « Parcourez » (sinon le focus

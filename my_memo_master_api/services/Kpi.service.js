@@ -2,6 +2,8 @@ const dayjs = require('dayjs')
 const { RevisionSession, TestResult, Test, Subject, LeitnerSystem, LeitnerBox, LeitnerCard, ClassGroup } = require('../models')
 const leitnerReviewSessionService = require('./LeitnerReviewSession.service')
 const mindMapViewSessionService = require('./MindMapViewSession.service')
+const badgeService = require('./Badge.service')
+const gamificationProfileService = require('./GamificationProfile.service')
 
 /**
  * Retourne le lundi de la semaine (ISO) contenant la date donnée.
@@ -71,7 +73,9 @@ class KpiService {
     const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
     const disciplineKpi = this._computeDiscipline(sessions)
     const pedagogicalKpi = this._computePedagogical(groupTestResults)
-    const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
+    // CHOIX: badges lus depuis UserBadge (obtention persistée, C-06) plutôt que recalculés ici
+    // RAISON: un badge obtenu ne se perd plus, a une date et alimente l'animation.
+    const badges = await badgeService.listForKpi(userId)
 
     return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, pedagogical: pedagogicalKpi, badges }
   }
@@ -133,7 +137,13 @@ class KpiService {
     const leitnerKpi = this._computeLeitner(leitnerSystems)
     const subjectsKpi = this._computeSubjects(privateTestResults, leitnerSystems)
     const disciplineKpi = this._computeDiscipline(sessions)
-    const badges = this._computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi })
+    // CHOIX: seuls les badges liés à une matière consentie (BadgeSubject) sont montrés
+    // RAISON: UserBadge reflète l'activité de toutes les matières ; le lien badge ↔ matières
+    // (many-to-many) décide de ce qu'un enseignant a le droit de voir.
+    // CHOIX: réglage « Montrer mes badges à mes enseignants » en plus du consentement par matière
+    // RAISON: l'étudiant garde la main sur ses badges (désactivé par défaut) ; le consentement KPI ne suffit pas.
+    const badgesShared = await gamificationProfileService.areBadgesVisibleToTeachers(userId)
+    const badges = badgesShared ? await badgeService.listForSubjects(userId, subjectIds) : []
 
     return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, badges }
   }
@@ -372,28 +382,6 @@ class KpiService {
     }))
 
     return { totalTests: groupTestResults.length, avgScore, scoreHistory, bySubject }
-  }
-
-  /**
-   * @private
-   */
-  _computeBadges({ revisionKpi, exercisesKpi, leitnerKpi, subjectsKpi }) {
-    const { streakDays, completedLast30Days } = revisionKpi
-    const { totalTests, scoreHistory } = exercisesKpi
-    const { mastery } = leitnerKpi
-    const { totalUnique } = subjectsKpi
-
-    const hasPerfect = scoreHistory.some((s) => s.percentage === 100)
-
-    return [
-      { id: 'streak7', label: '7 jours de suite', description: 'Réviser 7 jours consécutifs', icon: '🔥', unlocked: streakDays >= 7 },
-      { id: 'streak30', label: '30 jours de suite', description: 'Réviser 30 jours consécutifs', icon: '🏆', unlocked: streakDays >= 30 },
-      { id: 'perfectScore', label: 'Score parfait', description: 'Obtenir 100% à un exercice', icon: '⭐', unlocked: hasPerfect },
-      { id: 'tenTests', label: '10 exercices', description: 'Compléter 10 séries d\'exercices', icon: '📚', unlocked: totalTests >= 10 },
-      { id: 'fiveSubjects', label: 'Polyvalent', description: 'Étudier 5 matières différentes', icon: '🎯', unlocked: totalUnique >= 5 },
-      { id: 'leitnerMastery', label: 'Maîtrise Leitner', description: 'Plus de 50% des cartes en boîte 4 ou 5', icon: '🧠', unlocked: mastery >= 50 },
-      { id: 'regular', label: 'Régulier', description: '20 sessions complétées dans les 30 derniers jours', icon: '📅', unlocked: completedLast30Days >= 20 }
-    ]
   }
 }
 

@@ -4,6 +4,7 @@ const { s3Client, bucket, publicUrl } = require('../config/storage.config')
 const logger = require('../helpers/logger')
 const { isUploadKey, isUserUploadKey } = require('../helpers/storageKeys')
 const ContentReportService = require('../services/ContentReport.service')
+const ClassGroupResourceService = require('../services/ClassGroupResource.service')
 
 exports.upload = async (req, res) => {
   try {
@@ -54,7 +55,11 @@ exports.presignFile = async (req, res) => {
   }
   try {
     // Un fichier de ressource masquée par la modération n'est servi qu'à son auteur et aux rôles 1, 4 et 5.
-    if (!(await ContentReportService.canAccessFile(key, req.user.id))) {
+    // Un fichier de ressource de groupe n'est servi qu'aux membres du groupe (et rôles 1/4).
+    if (
+      !(await ClassGroupResourceService.canAccessFile(key, req.user.id)) ||
+      !(await ContentReportService.canAccessFile(key, req.user.id))
+    ) {
       return res.status(404).send({ message: 'Fichier introuvable.' })
     }
     const filename = key.split('/').pop()

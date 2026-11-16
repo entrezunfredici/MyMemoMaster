@@ -1,5 +1,6 @@
 const { LeitnerReviewSession, LeitnerSystem } = require('../models/index')
 const revisionSessionService = require('./RevisionSession.service')
+const { emit: emitBadgeEvent } = require('../helpers/badges/badgeEvents')
 
 class LeitnerReviewSessionService {
   /**
@@ -19,6 +20,8 @@ class LeitnerReviewSessionService {
     if (completed) {
       await revisionSessionService.validateMatchingSessions({ userId, idSystem })
     }
+    // Pratique réelle (cardsReviewed >= 1 garanti par le validateur) : jour d'activité + badges.
+    await emitBadgeEvent('leitner.session.completed', { userId })
     return session
   }
 

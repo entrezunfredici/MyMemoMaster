@@ -5,6 +5,7 @@ const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name'], thr
 const CLASS_GROUPS_INCLUDE = { model: ClassGroup, as: 'classGroups', attributes: ['id', 'name'], through: { attributes: [] }, required: false }
 const mistralGradingService = require('./MistralGrading.service')
 const revisionSessionService = require('./RevisionSession.service')
+const { emit: emitBadgeEvent } = require('../helpers/badges/badgeEvents')
 
 class TestService {
   /**
@@ -168,6 +169,7 @@ class TestService {
     // planifiée du jour correspondante, si elle existe (demande explicite de l'utilisateur,
     // 2026-09-04 — voir RevisionSession.service.js#validateMatchingSessions).
     await revisionSessionService.validateMatchingSessions({ userId, idTest: testId })
+    await emitBadgeEvent('exercise.submitted', { userId })
 
     return { score, total: questions.length, results, resultId: testResult.resultId }
   }

@@ -6,12 +6,16 @@ import {
   fileIcon,
   deadlineTypeLabel,
   resourceTypeLabel,
+  countResourcesByType,
+  filterResources,
   disciplineScoreClass,
   weeklyBarHeight,
   formatMinutes,
   isUrgent,
   eventTypeLabel,
   eventTypeBadgeClass,
+  badgeSubjectNames,
+  badgeTitle,
 } from '@/helpers/classroomFormat'
 
 describe('formatDate', () => {
@@ -126,5 +130,57 @@ describe('type d’événement', () => {
   it('l’examen a la pastille secondaire, tout le reste la pastille primaire', () => {
     expect(eventTypeBadgeClass('examen')).toContain('bg-secondary/10')
     for (const t of ['cours', 'autre', undefined]) expect(eventTypeBadgeClass(t)).toContain('bg-primary/10')
+  })
+})
+
+describe('bibliothèque de ressources : effectifs et filtre', () => {
+  const R = [
+    { title: 'Intégrales', type: 'cours' },
+    { title: 'DS 1', type: 'sujet' },
+    { title: 'Algèbre', type: 'cours' },
+    { title: 'Sans type' },
+  ]
+
+  it('compte par type, tous types confondus sous la clé vide', () => {
+    expect(countResourcesByType(R)).toEqual({ '': 4, cours: 2, carte_mentale: 0, sujet: 1, autre: 0 })
+    expect(countResourcesByType([])['']).toBe(0)
+  })
+
+  it('filtre par type, par recherche (titre ou type, insensible à la casse) et par les deux', () => {
+    expect(filterResources(R)).toHaveLength(4)
+    expect(filterResources(R, { type: 'cours' }).map((r) => r.title)).toEqual(['Intégrales', 'Algèbre'])
+    expect(filterResources(R, { search: 'ds' }).map((r) => r.title)).toEqual(['DS 1'])
+    expect(filterResources(R, { search: 'SUJET' })).toHaveLength(1)
+    expect(filterResources(R, { type: 'cours', search: 'alg' }).map((r) => r.title)).toEqual(['Algèbre'])
+    expect(filterResources(R, { type: 'autre' })).toEqual([])
+  })
+})
+
+describe('badgeSubjectNames', () => {
+  it('plusieurs matières -> noms séparés par des virgules', () => {
+    const badge = { earnedSubjects: [{ subjectId: 1, name: 'Maths' }, { subjectId: 2, name: 'Physique' }] }
+    expect(badgeSubjectNames(badge)).toBe('Maths, Physique')
+  })
+  it('nom manquant ignoré', () => {
+    expect(badgeSubjectNames({ earnedSubjects: [{ subjectId: 1, name: null }, { subjectId: 2, name: 'Maths' }] })).toBe('Maths')
+  })
+  it.each([[undefined], [null], [{}], [{ earnedSubjects: [] }]])('sans matière (%j) -> chaîne vide', (badge) => {
+    expect(badgeSubjectNames(badge)).toBe('')
+  })
+})
+
+describe('badgeTitle', () => {
+  it('description + matières d\'obtention', () => {
+    const badge = { description: '10 séries', earnedSubjects: [{ subjectId: 1, name: 'Maths' }] }
+    expect(badgeTitle(badge)).toBe('10 séries (obtenu en : Maths)')
+  })
+  it('sans description -> seulement les matières', () => {
+    expect(badgeTitle({ earnedSubjects: [{ subjectId: 1, name: 'Maths' }] })).toBe('Obtenu en : Maths')
+  })
+  it('sans matière -> la description seule', () => {
+    expect(badgeTitle({ description: '7 j' })).toBe('7 j')
+  })
+  it('rien du tout -> chaîne vide', () => {
+    expect(badgeTitle(undefined)).toBe('')
   })
 })

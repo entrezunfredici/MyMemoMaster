@@ -14,7 +14,10 @@ function mountPage() {
   const wrapper = mount(HomePage, {
     global: {
       plugins: [pinia],
-      stubs: { KpiAlertWidgetComponent: { template: '<div data-testid="kpi-alerts" />' } },
+      stubs: {
+        KpiAlertWidgetComponent: { template: '<div data-testid="kpi-alerts" />' },
+        ProfileBadgesSummary: { template: '<div data-testid="badges-summary" />' },
+      },
     },
   })
   return { wrapper, tour: useGuidedTourStore() }
@@ -27,6 +30,10 @@ describe('HomePage', () => {
 
   it('affiche le widget d’alertes KPI', () => {
     expect(mountPage().wrapper.find('[data-testid="kpi-alerts"]').exists()).toBe(true)
+  })
+
+  it('affiche la carte de synthèse des badges', () => {
+    expect(mountPage().wrapper.find('[data-testid="badges-summary"]').exists()).toBe(true)
   })
 
   describe('menu principal', () => {

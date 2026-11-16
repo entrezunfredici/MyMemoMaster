@@ -225,6 +225,7 @@ Règles :
 | Dates | dayjs |
 | Validation | express-validator |
 | Auth | jsonwebtoken + bcryptjs |
+| Connexion OAuth Google (API) | google-auth-library (Apache-2.0, bibliothèque officielle Google) — GitHub et Microsoft passent par `fetch` natif, sans dépendance (voir DECISIONS 2026-11-07) |
 | Email | nodemailer |
 | Cron | node-cron |
 | Queue/jobs asynchrones | bullmq + ioredis |

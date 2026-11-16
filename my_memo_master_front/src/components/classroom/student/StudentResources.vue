@@ -1,9 +1,10 @@
 <template>
   <section class="rounded-2xl border-2 border-gray bg-white p-4 shadow-sm space-y-3">
     <h2 class="text-lg font-semibold text-dark">Documents partagés</h2>
+    <ResourceTypeFilter v-if="resourceStore.resources.length" v-model="typeFilter" :resources="resourceStore.resources" />
     <div v-if="loading" class="text-sm text-dark/70">Chargement...</div>
     <div v-else-if="filteredResources.length === 0" class="text-sm text-dark/70">
-      {{ search ? 'Aucune ressource correspondante.' : 'Aucun document partagé.' }}
+      {{ search || typeFilter ? 'Aucune ressource correspondante.' : 'Aucun document partagé.' }}
     </div>
     <div v-else class="space-y-2">
       <div v-for="r in filteredResources" :key="r.id"
@@ -32,11 +33,12 @@
 
 <script setup>
 // Documents partagés avec le groupe (filtrés par la recherche). Extrait de pages/ClassroomEtudiantView.vue.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useClassGroupResourceStore } from '@/stores/classGroupResources'
 import { useStoredFile } from '@/composables/useStoredFile'
+import ResourceTypeFilter from '@/components/classroom/ResourceTypeFilter.vue'
 import ReportContentButton from '@/components/classroom/ReportContentButton.vue'
-import { fileIcon, formatFileSize, resourceTypeLabel } from '@/helpers/classroomFormat'
+import { fileIcon, filterResources, formatFileSize, resourceTypeLabel } from '@/helpers/classroomFormat'
 
 const props = defineProps({
   loading: { type: Boolean, default: false },
@@ -46,10 +48,6 @@ const props = defineProps({
 const resourceStore = useClassGroupResourceStore()
 const { downloadFile } = useStoredFile()
 
-const filteredResources = computed(() => {
-  const q = props.search.toLowerCase()
-  return resourceStore.resources.filter(
-    (r) => !q || r.title.toLowerCase().includes(q) || r.type?.toLowerCase().includes(q)
-  )
-})
+const typeFilter = ref('')
+const filteredResources = computed(() => filterResources(resourceStore.resources, { type: typeFilter.value, search: props.search }))
 </script>

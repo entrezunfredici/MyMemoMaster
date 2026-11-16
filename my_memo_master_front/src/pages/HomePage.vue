@@ -26,6 +26,9 @@
     <section class="home__alerts">
       <KpiAlertWidgetComponent />
     </section>
+    <section class="home__badges">
+      <ProfileBadgesSummary />
+    </section>
   </div>
 </template>
 
@@ -34,6 +37,7 @@ import { useRouter } from 'vue-router'
 import Button from '@/components/ButtonComponent.vue'
 import Grid from '@/components/GridComponent.vue'
 import KpiAlertWidgetComponent from '@/components/KpiAlertWidgetComponent.vue'
+import ProfileBadgesSummary from '@/components/badges/ProfileBadgesSummary.vue'
 import { useGuidedTourStore } from '@/stores/guidedTour'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
 
@@ -132,6 +136,7 @@ function goTo(path) {
   color: var(--indigo-700);
 }
 
+.home__badges,
 .home__alerts {
   max-width: 960px;
   margin: 0 auto 24px;

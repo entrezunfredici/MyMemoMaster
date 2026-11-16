@@ -165,6 +165,67 @@ describe('useClassGroupResourceStore', () => {
       expect(await store.uploadAndCreate(1, file, { title: 'X', type: 'cours' })).toBe(false)
     })
 
+    it('plusieurs groupes — un seul upload, une ressource par groupe sur la même clé', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockResolvedValueOnce({ status: 201, data: { data: RESOURCE } })
+        .mockResolvedValueOnce({ status: 201, data: { data: { ...RESOURCE, id: 2, classGroupId: 8 } } })
+
+      const store = useClassGroupResourceStore()
+      const file = new File(['content'], 'cours.pdf', { type: 'application/pdf' })
+      const result = await store.uploadAndCreate(1, file, { title: 'Cours', type: 'cours' }, [8, 1])
+
+      expect(result).toEqual(RESOURCE)
+      expect(mockPost).toHaveBeenCalledTimes(3)
+      expect(mockPost.mock.calls[1][0]).toBe('class-groups/1/resources')
+      expect(mockPost.mock.calls[2][0]).toBe('class-groups/8/resources')
+      expect(mockPost.mock.calls[2][1].fileKey).toBe(UPLOAD_RESP.key)
+      expect(store.resources).toEqual([RESOURCE]) // seule la ressource du groupe courant est listée
+      expect(mockNotify).toHaveBeenCalledWith('Ressource partagée dans 2 groupes.', 'success')
+      expect(mockDel).not.toHaveBeenCalled()
+    })
+
+    it('échec dans un groupe sur deux — avertissement, fichier conservé', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockResolvedValueOnce({ status: 201, data: { data: RESOURCE } })
+        .mockResolvedValueOnce({ status: 403, data: { message: 'Accès refusé.' } })
+
+      const store = useClassGroupResourceStore()
+      const file = new File(['content'], 'cours.pdf', { type: 'application/pdf' })
+      expect(await store.uploadAndCreate(1, file, { title: 'Cours', type: 'cours' }, [8])).toEqual(RESOURCE)
+      expect(mockNotify).toHaveBeenCalledWith('Ressource partagée dans 1 groupe(s) sur 2 : Accès refusé.', 'warning')
+      expect(mockDel).not.toHaveBeenCalled()
+    })
+
+    it('groupe courant refusé mais autre groupe accepté — non listé, fichier conservé', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockResolvedValueOnce({ status: 403, data: { message: 'Accès refusé.' } })
+        .mockResolvedValueOnce({ status: 201, data: { data: { ...RESOURCE, id: 2, classGroupId: 8 } } })
+
+      const store = useClassGroupResourceStore()
+      const file = new File(['content'], 'cours.pdf', { type: 'application/pdf' })
+      const result = await store.uploadAndCreate(1, file, { title: 'Cours', type: 'cours' }, [8])
+      expect(result.id).toBe(2)
+      expect(store.resources).toEqual([])
+      expect(mockDel).not.toHaveBeenCalled()
+    })
+
+    it('échec dans tous les groupes — fichier supprimé', async () => {
+      mockPost
+        .mockResolvedValueOnce({ status: 201, data: UPLOAD_RESP })
+        .mockResolvedValueOnce({ status: 403, data: { message: 'Accès refusé.' } })
+        .mockResolvedValueOnce({ status: 403, data: { message: 'Autre.' } })
+      mockDel.mockResolvedValueOnce({ status: 200, data: {} })
+
+      const store = useClassGroupResourceStore()
+      const file = new File(['content'], 'cours.pdf', { type: 'application/pdf' })
+      expect(await store.uploadAndCreate(1, file, { title: 'Cours', type: 'cours' }, [8])).toBe(false)
+      expect(mockNotify).toHaveBeenCalledWith('Accès refusé.', 'error')
+      expect(mockDel).toHaveBeenCalledTimes(1)
+    })
+
     it('upload refusé — rien à nettoyer', async () => {
       mockPost.mockResolvedValueOnce({ status: 500, data: { message: 'S3 error' } })
       const store = useClassGroupResourceStore()
