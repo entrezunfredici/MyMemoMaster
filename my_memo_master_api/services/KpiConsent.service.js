@@ -105,8 +105,8 @@ class KpiConsentService {
       // CHOIX: réglage de visibilité appliqué ici, à la frontière d'accès enseignant, pour les deux modes de consentement
       // RAISON: getMyKpis sert aussi à l'étudiant (qui voit toujours ses badges) ; seule la vue enseignant est filtrée.
       // La branche « par matières » est filtrée par KpiService.getPersonalKpisForSubjects.
-      if (!(await gamificationProfileService.areBadgesVisibleToTeachers(studentId))) return { ...kpis, badges: [] }
-      return kpis
+      if (!(await gamificationProfileService.areBadgesVisibleToTeachers(studentId))) return { ...kpis, badges: [], title: null }
+      return { ...kpis, title: await gamificationProfileService.getTeacherTitle(studentId) }
     }
 
     const subjectIds = consents.map((c) => c.subjectId)

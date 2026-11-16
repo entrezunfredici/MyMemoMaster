@@ -23,12 +23,18 @@ export const useBadgesStore = defineStore('badges', {
     settings: null,
     settingsPending: false,
     _settingsFetchedAt: 0,
+    // Objectif quotidien (anneau de l'accueil) et badges à fêter (modale d'obtention)
+    dailyGoal: null,
+    celebrations: [],
+    _celebrationsCheckedAt: 0,
   }),
 
   getters: {
     unseenCodes: (state) => state.badges.filter((badge) => badge.earned && !badge.seenAt).map((badge) => badge.code),
     // Mode zen : masque badges, séries et objectifs partout (profil, accueil, KPI, page des badges)
     zen: (state) => state.settings?.zenMode === true,
+    // Animation d'obtention autorisée : réglage actif et mode zen coupé (le mode zen coupe toute sollicitation)
+    celebrationsAllowed: (state) => state.settings?.animationsEnabled !== false && state.settings?.zenMode !== true,
   },
 
   actions: {
@@ -165,6 +171,72 @@ export const useBadgesStore = defineStore('badges', {
     async fetchExtras(force = false) {
       const results = await Promise.all([this.fetchProfile(), this.fetchActivity(), this.fetchSettings(force)])
       return results.every(Boolean)
+    },
+
+    /**
+     * Charge la progression de l'objectif quotidien. Un échec laisse l'anneau masqué.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async fetchDailyGoal() {
+      const gen = generation
+      try {
+        const resp = await badgesApi.dailyGoal()
+        if (gen !== generation) return false
+        if (resp?.status !== 200) return false
+        this.dailyGoal = resp.data
+        return true
+      } catch {
+        return false
+      }
+    },
+
+    /**
+     * Cherche les badges obtenus dont l'animation n'a pas été jouée. Ne fait rien (et ne marque rien comme
+     * vu) si les animations sont coupées ou en mode zen : les badges gardent alors leur pastille « Nouveau ».
+     * Appels espacés d'au moins 30 s (appelée à chaque changement de page).
+     *
+     * @param {boolean} [force=false]
+     * @returns {Promise<boolean>} true si au moins un badge est à fêter
+     */
+    async fetchCelebrations(force = false) {
+      if (!force && Date.now() - this._celebrationsCheckedAt < 30 * 1000) return this.celebrations.length > 0
+      const gen = generation
+      this._celebrationsCheckedAt = Date.now()
+      try {
+        await this.fetchSettings()
+        if (gen !== generation || !this.celebrationsAllowed) return false
+        const resp = await badgesApi.recent()
+        if (gen !== generation) return false
+        if (resp?.status !== 200 || !Array.isArray(resp.data)) return false
+        this.celebrations = resp.data
+        return this.celebrations.length > 0
+      } catch {
+        return false
+      }
+    },
+
+    /**
+     * Ferme la modale d'obtention : les badges montrés sont marqués comme vus (la pastille « Nouveau » disparaît).
+     * Si l'enregistrement échoue, ils seront simplement proposés à nouveau à la prochaine vérification.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async dismissCelebrations() {
+      const codes = this.celebrations.map((badge) => badge.code)
+      this.celebrations = []
+      if (codes.length === 0) return true
+      const gen = generation
+      try {
+        const resp = await badgesApi.markSeen(codes)
+        if (gen !== generation) return false
+        if (resp?.status !== 200) return false
+        const now = new Date().toISOString()
+        this.badges = this.badges.map((badge) => (codes.includes(badge.code) ? { ...badge, seenAt: now } : badge))
+        return true
+      } catch {
+        return false
+      }
     },
 
     /**

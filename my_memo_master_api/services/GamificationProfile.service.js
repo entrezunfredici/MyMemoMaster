@@ -1,7 +1,8 @@
 const dayjs = require('dayjs')
 const { Op, UniqueConstraintError } = require('sequelize')
-const { UserGamificationSettings, UserBadge, UserActivityDay } = require('../models/index')
+const { UserGamificationSettings, UserBadge, UserActivityDay, LeitnerReviewSession, TestResult } = require('../models/index')
 const badgeService = require('./Badge.service')
+const { computeStreaks } = require('../helpers/badges/streak')
 const { CATALOG_BY_CODE } = require('../helpers/badges/catalog')
 
 const MAX_SHOWCASE = 3
@@ -88,6 +89,22 @@ class GamificationProfileService {
   }
 
   /**
+   * Titre affichable à un enseignant : null si l'étudiant n'a pas choisi de titre ou si son badge n'est
+   * pas visible. En consentement par matières, `visibleCodes` limite le titre aux badges que
+   * l'enseignant peut déjà voir (sinon le titre révélerait une matière non consentie).
+   *
+   * @param {number} userId - l'étudiant (le réglage de partage est vérifié par l'appelant)
+   * @param {string[]|null} [visibleCodes] - codes des badges visibles ; null = tous
+   * @returns {Promise<{ code: string, label: string, icon: string }|null>}
+   */
+  async getTeacherTitle(userId, visibleCodes = null) {
+    const { titleCode } = await this.getProfile(userId)
+    const badge = titleCode ? CATALOG_BY_CODE.get(titleCode) : null
+    if (!badge || (visibleCodes && !visibleCodes.includes(titleCode))) return null
+    return { code: badge.code, label: badge.label, icon: badge.icon }
+  }
+
+  /**
    * Définit le titre et la vitrine. Une clé absente garde l'ancienne valeur.
    *
    * @param {number} userId
@@ -150,6 +167,60 @@ class GamificationProfileService {
       streakCurrent: stats.streakCurrent,
       streakBest: stats.streakBest
     }
+  }
+
+  /**
+   * Progression de l'objectif quotidien : cartes révisées et exercices terminés aujourd'hui,
+   * comparés aux objectifs de l'utilisateur (0 = pas d'objectif).
+   *
+   * @param {number} userId
+   * @param {Date} [now]
+   * @returns {Promise<{ date: string, cards: { goal: number, done: number }, exercises: { goal: number, done: number }, achieved: boolean }>}
+   */
+  async getDailyGoal(userId, now = new Date()) {
+    const start = dayjs(now).startOf('day').toDate()
+    const end = dayjs(now).endOf('day').toDate()
+    const range = { [Op.between]: [start, end] }
+    const [settings, sessions, exercises] = await Promise.all([
+      this.getSettings(userId),
+      LeitnerReviewSession.findAll({ where: { userId, completedAt: range }, attributes: ['cardsReviewed'], raw: true }),
+      TestResult.count({ where: { userId, completedAt: range } })
+    ])
+    const cards = { goal: settings.dailyGoalCards, done: sessions.reduce((sum, row) => sum + (row.cardsReviewed || 0), 0) }
+    const exercisesProgress = { goal: settings.dailyGoalExercises, done: exercises }
+    const goals = [cards, exercisesProgress].filter((entry) => entry.goal > 0)
+    return {
+      date: dayjs(now).format('YYYY-MM-DD'),
+      cards,
+      exercises: exercisesProgress,
+      achieved: goals.length > 0 && goals.every((entry) => entry.done >= entry.goal)
+    }
+  }
+
+  /**
+   * Utilisateurs dont une série d'au moins `minStreak` jours est menacée : pratique hier mais pas encore
+   * aujourd'hui, rappel activé et mode zen désactivé (le mode zen coupe toute sollicitation).
+   *
+   * @param {Date} [now]
+   * @param {number} [minStreak]
+   * @returns {Promise<Array<{ userId: number, streak: number }>>}
+   */
+  async findStreaksAtRisk(now = new Date(), minStreak = 2) {
+    const settings = await UserGamificationSettings.findAll({
+      where: { streakReminderEnabled: true, zenMode: false },
+      attributes: ['userId'],
+      raw: true
+    })
+    const today = dayjs(now).format('YYYY-MM-DD')
+    const yesterday = dayjs(now).subtract(1, 'day').format('YYYY-MM-DD')
+    const atRisk = []
+    for (const { userId } of settings) {
+      const dates = (await UserActivityDay.findAll({ where: { userId, date: { [Op.gte]: dayjs(now).subtract(400, 'day').format('YYYY-MM-DD') } }, attributes: ['date'], raw: true })).map((row) => row.date)
+      if (dates.includes(today) || !dates.includes(yesterday)) continue
+      const { current } = computeStreaks(dates, today)
+      if (current >= minStreak) atRisk.push({ userId, streak: current })
+    }
+    return atRisk
   }
 }
 

@@ -307,3 +307,42 @@ export function clampGoal(value, max) {
   if (!Number.isFinite(n) || n < 0) return 0
   return Math.min(n, max)
 }
+
+/**
+ * Noms des matières avec lesquelles un badge a été obtenu (« Maths, Physique »), vide si aucune.
+ *
+ * @param {{ earnedSubjects?: Array<{ name: string|null }> }} badge
+ * @returns {string}
+ */
+export function earnedSubjectNames(badge) {
+  return (badge?.earnedSubjects ?? [])
+    .map((subject) => subject?.name)
+    .filter(Boolean)
+    .join(', ')
+}
+
+/**
+ * Avancement de l'objectif quotidien (GET /badges/me/daily-goal).
+ * Un objectif à 0 est désactivé et ignoré. Le pourcentage cumule les deux objectifs actifs,
+ * chacun plafonné à sa cible (dépasser les cartes ne compense pas des exercices manquants).
+ *
+ * @param {{ cards?: { goal: number, done: number }, exercises?: { goal: number, done: number } }|null} goal
+ * @returns {{ active: boolean, percent: number, achieved: boolean, text: string }}
+ */
+export function dailyGoalProgress(goal) {
+  const entries = [
+    { label: 'cartes', ...(goal?.cards ?? { goal: 0, done: 0 }) },
+    { label: 'exercices', ...(goal?.exercises ?? { goal: 0, done: 0 }) },
+  ].filter((entry) => entry.goal > 0)
+  if (entries.length === 0) return { active: false, percent: 0, achieved: false, text: '' }
+
+  const target = entries.reduce((sum, entry) => sum + entry.goal, 0)
+  const done = entries.reduce((sum, entry) => sum + Math.min(entry.done, entry.goal), 0)
+  const percent = Math.round((done / target) * 100)
+  return {
+    active: true,
+    percent,
+    achieved: entries.every((entry) => entry.done >= entry.goal),
+    text: entries.map((entry) => `${entry.done} / ${entry.goal} ${entry.label}`).join(' · '),
+  }
+}

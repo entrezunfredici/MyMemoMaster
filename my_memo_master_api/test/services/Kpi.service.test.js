@@ -9,7 +9,8 @@ jest.mock('../../services/Badge.service', () => ({
 }))
 
 jest.mock('../../services/GamificationProfile.service', () => ({
-  areBadgesVisibleToTeachers: jest.fn().mockResolvedValue(true)
+  areBadgesVisibleToTeachers: jest.fn().mockResolvedValue(true),
+  getTeacherTitle: jest.fn().mockResolvedValue(null)
 }))
 
 jest.mock('../../models', () => ({
@@ -194,7 +195,25 @@ describe('KpiService', () => {
       const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
 
       expect(kpis.badges).toEqual([])
+      expect(kpis.title).toBeNull()
       expect(badgeService.listForSubjects).not.toHaveBeenCalled()
+      expect(gamificationProfileService.getTeacherTitle).not.toHaveBeenCalled()
+    })
+
+    it('getPersonalKpisForSubjects - badges partagés - titre limité aux badges visibles', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
+      badgeService.listForSubjects.mockResolvedValueOnce([{ code: 'first_exercise' }, { code: 'streak7' }])
+      gamificationProfileService.getTeacherTitle.mockClear()
+      gamificationProfileService.getTeacherTitle.mockResolvedValueOnce({ code: 'streak7', label: '7 jours de suite', icon: '🔥' })
+
+      const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
+
+      expect(gamificationProfileService.getTeacherTitle).toHaveBeenCalledWith(1, ['first_exercise', 'streak7'])
+      expect(kpis.title).toEqual({ code: 'streak7', label: '7 jours de suite', icon: '🔥' })
     })
   })
 

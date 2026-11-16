@@ -4,7 +4,7 @@ const gamificationProfileService = require('../services/GamificationProfile.serv
 
 exports.findAll = async (req, res) => {
   try {
-    const data = await badgeService.list(req.user.id)
+    const data = await badgeService.listWithSubjects(req.user.id)
     res.status(200).json(data)
   } catch (error) {
     logger.error(error?.message || error)
@@ -86,6 +86,16 @@ exports.activity = async (req, res) => {
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).json({ message: "Erreur lors de la récupération du calendrier d'activité." })
+  }
+}
+
+exports.dailyGoal = async (req, res) => {
+  try {
+    const data = await gamificationProfileService.getDailyGoal(req.user.id)
+    res.status(200).json(data)
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: "Erreur lors de la récupération de l'objectif quotidien." })
   }
 }
 

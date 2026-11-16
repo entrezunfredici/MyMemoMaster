@@ -370,7 +370,7 @@ describe('GamificationSettings', () => {
     await cards.setValue('900')
     await exercises.setValue('-4')
 
-    expect(wrapper.emitted('change')).toEqual([[{ dailyGoalCards: 500 }], [{ dailyGoalExercises: 0 }]])
+    expect(wrapper.emitted('change').map(([patch]) => patch)).toEqual([{ dailyGoalCards: 500 }, { dailyGoalExercises: 0 }])
   })
 })
 

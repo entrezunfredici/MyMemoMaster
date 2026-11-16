@@ -100,6 +100,7 @@
     </main>
     <MobileNav />
   </div>
+  <BadgeCelebration />
 </template>
 
 <script setup>
@@ -121,6 +122,7 @@ import NotificationBell from '@/components/NotificationBellComponent.vue'
 import GuidedTourBanner from '@/components/GuidedTourBannerComponent.vue'
 import OnboardingTour from '@/components/OnboardingTourComponent.vue'
 import MobileNav from '@/components/MobileNavComponent.vue'
+import BadgeCelebration from '@/components/badges/BadgeCelebration.vue'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 

@@ -144,8 +144,11 @@ class KpiService {
     // RAISON: l'étudiant garde la main sur ses badges (désactivé par défaut) ; le consentement KPI ne suffit pas.
     const badgesShared = await gamificationProfileService.areBadgesVisibleToTeachers(userId)
     const badges = badgesShared ? await badgeService.listForSubjects(userId, subjectIds) : []
+    // CHOIX: le titre n'est montré que si son badge est lui-même visible (obtenu avec une matière consentie)
+    // RAISON: un titre issu d'une matière non consentie en révélerait l'existence.
+    const title = badgesShared ? await gamificationProfileService.getTeacherTitle(userId, badges.map((badge) => badge.code)) : null
 
-    return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, badges }
+    return { revision: revisionKpi, exercises: exercisesKpi, leitner: leitnerKpi, subjects: subjectsKpi, discipline: disciplineKpi, badges, title }
   }
 
   /**
