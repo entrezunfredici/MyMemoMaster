@@ -9,7 +9,7 @@ const { mockGetShared } = vi.hoisted(() => ({ mockGetShared: vi.fn() }))
 vi.mock('@/helpers/mindmap/mindmapApi', () => ({ mindmapApi: { getShared: mockGetShared } }))
 vi.mock('vue-router', async (importOriginal) => ({
   ...(await importOriginal()),
-  useRoute: () => ({ params: { token: 'jeton-0123456789abcdefghij' } }),
+  useRoute: () => ({ params: { token: 'tokentokentokentokentoken' } }),
 }))
 
 const mountPage = () => {
@@ -34,7 +34,7 @@ describe('MindmapSharedPage', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(mockGetShared).toHaveBeenCalledWith('jeton-0123456789abcdefghij')
+    expect(mockGetShared).toHaveBeenCalledWith('tokentokentokentokentoken')
     expect(wrapper.find('[data-testid="shared-mindmap-title"]').text()).toBe('Maths')
     expect(wrapper.text()).toContain('lecture seule')
     expect(wrapper.findComponent({ name: 'MindMapBoard' }).props('readonly')).toBe(true)

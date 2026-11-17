@@ -387,14 +387,14 @@ describe('Diagramme Controller', () => {
   describe('POST /diagrammes/:id/partage', () => {
     it('200 — renvoie le jeton pour le propriétaire', async () => {
       diagrammeService.findById.mockResolvedValue({ ...mockDiagramme, userId: 1 })
-      diagrammeService.enableShare.mockResolvedValue('jeton-de-partage-0123456789')
+      diagrammeService.enableShare.mockResolvedValue('jeton-de-test')
 
       const res = await request(app)
         .post(`${BASE}/diagrammes/1/partage`)
         .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
 
       expect(res.status).toBe(200)
-      expect(res.body).toEqual({ shareToken: 'jeton-de-partage-0123456789' })
+      expect(res.body).toEqual({ shareToken: 'jeton-de-test' })
     })
 
     it('403 — non propriétaire, aucun jeton créé', async () => {

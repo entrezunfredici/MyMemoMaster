@@ -300,7 +300,7 @@ describe('MindmapsListView', () => {
   // ── Partage public ────────────────────────────────────────────────────────────
 
   it("« Partager » propose de créer le lien, puis l'affiche", async () => {
-    mockPost.mockResolvedValue({ status: 200, data: { shareToken: 'jeton-0123456789abcdefghij' } })
+    mockPost.mockResolvedValue({ status: 200, data: { shareToken: 'tokentokentokentokentoken' } })
     const wrapper = mountListView()
     await flushPromises()
 
@@ -312,20 +312,20 @@ describe('MindmapsListView', () => {
 
     expect(mockPost).toHaveBeenCalledWith('diagrammes/1/partage')
     expect(wrapper.find('[data-testid="mindmap-share-url"]').element.value).toBe(
-      `${window.location.origin}/partage/carte/jeton-0123456789abcdefghij`
+      `${window.location.origin}/partage/carte/tokentokentokentokentoken`
     )
   })
 
   it('une carte déjà partagée affiche directement son lien', async () => {
-    mockGet.mockResolvedValue({ data: [{ ...diagrams[0], shareToken: 'deja-actif-0123456789abc' }] })
+    mockGet.mockResolvedValue({ data: [{ ...diagrams[0], shareToken: 'tokentokentokentokentoken' }] })
     const wrapper = mountListView()
     await flushPromises()
     await wrapper.find('[data-testid="mindmap-share-button"]').trigger('click')
-    expect(wrapper.find('[data-testid="mindmap-share-url"]').element.value).toContain('/partage/carte/deja-actif-0123456789abc')
+    expect(wrapper.find('[data-testid="mindmap-share-url"]').element.value).toContain('/partage/carte/tokentokentokentokentoken')
   })
 
   it('« Désactiver le lien » révoque le partage', async () => {
-    mockGet.mockResolvedValue({ data: [{ ...diagrams[0], shareToken: 'deja-actif-0123456789abc' }] })
+    mockGet.mockResolvedValue({ data: [{ ...diagrams[0], shareToken: 'tokentokentokentokentoken' }] })
     mockDel.mockResolvedValue(undefined) // 204
     const wrapper = mountListView()
     await flushPromises()
