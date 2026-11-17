@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { mindmapApi } from '@/helpers/mindmap/mindmapApi'
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder'
 import MindMapBoard from '@/components/mindmap/MindMapBoard.vue'
+import { VITE_APP_NAME } from '@/config'
 
 // Page PUBLIQUE (pas de meta.private) : un visiteur sans compte ouvre le lien de partage d'une carte.
 // Lecture seule : le plateau n'expose ni édition, ni déplacement, ni création d'élément.
@@ -36,7 +37,8 @@ onBeforeUnmount(() => store.new(''))
 </script>
 
 <template>
-  <main class="shared-mindmap">
+  <!-- App.vue fournit déjà le <main> (mise en page sans menu : meta.bare) -->
+  <div class="shared-mindmap">
     <p v-if="status === 'loading'" class="shared-mindmap__message" role="status">Chargement de la carte…</p>
 
     <div v-else-if="status === 'invalid'" class="shared-mindmap__message" role="alert">
@@ -46,6 +48,9 @@ onBeforeUnmount(() => store.new(''))
 
     <template v-else>
       <header class="shared-mindmap__header">
+        <router-link to="/" class="shared-mindmap__logo">
+          <img src="/logo/logo-full.svg" :alt="VITE_APP_NAME" />
+        </router-link>
         <h1 class="text-2xl font-semibold" data-testid="shared-mindmap-title">{{ title }}</h1>
         <p class="shared-mindmap__badge">Carte partagée · lecture seule</p>
       </header>
@@ -53,7 +58,7 @@ onBeforeUnmount(() => store.new(''))
         <MindMapBoard readonly />
       </div>
     </template>
-  </main>
+  </div>
 </template>
 
 <style scoped>
@@ -77,6 +82,10 @@ onBeforeUnmount(() => store.new(''))
   gap: 8px 16px;
 }
 
+.shared-mindmap__logo img {
+  height: 44px;
+}
+
 .shared-mindmap__badge {
   font-size: 12px;
   font-weight: 600;
@@ -88,9 +97,9 @@ onBeforeUnmount(() => store.new(''))
 
 /* CHOIX: hauteur explicite (et non flex: 1) : MindMapBoard (height: 100 %) et son SVG se calent
    sur la hauteur de ce bloc ; avec flex: 1 dans un parent sans hauteur définie, le SVG retombait
-   sur sa hauteur par défaut (~150 px). 320 px = titre de la page + en-tête de la carte. */
+   sur sa hauteur par défaut (~150 px). 130 px = marges + en-tête (logo, titre) de cette page. */
 .shared-mindmap__board {
   flex: none;
-  height: max(420px, calc(100vh - 320px));
+  height: max(420px, calc(100vh - 130px));
 }
 </style>

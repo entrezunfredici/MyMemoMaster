@@ -11,9 +11,13 @@ vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal()
   return {
     ...actual,
-    useRoute: () => ({ name: 'home', meta: { title: 'Accueil' } }),
+    useRoute: () => currentRoute,
   }
 })
+
+// Route simulée, modifiable par test (accueil par défaut)
+const homeRoute = { name: 'home', meta: { title: 'Accueil' } }
+let currentRoute = homeRoute
 
 const RouterLinkStub = { template: '<a><slot /></a>' }
 
@@ -68,5 +72,23 @@ describe('App — navigation principale (RGAA 6.2)', () => {
     const labels = (roleId) => mountApp(roleId).find('aside nav').findAll('a').map((l) => l.attributes('aria-label'))
     for (const roleId of [1, 4, 5]) expect(labels(roleId)).toContain('Modération')
     for (const roleId of [2, 3, null]) expect(labels(roleId)).not.toContain('Modération')
+  })
+})
+
+describe('App — pages publiques sans mise en page (meta.bare)', () => {
+  it('la carte partagée s\'affiche sans barre latérale ni titre d\'application', () => {
+    currentRoute = { name: 'mindmap-shared', meta: { title: 'Carte partagée', bare: true } }
+    try {
+      const wrapper = mountApp()
+      expect(wrapper.find('aside').exists()).toBe(false)
+      expect(wrapper.find('header').exists()).toBe(false)
+      expect(wrapper.findAll('main')).toHaveLength(1)
+    } finally {
+      currentRoute = homeRoute
+    }
+  })
+
+  it('une page ordinaire garde la barre latérale', () => {
+    expect(mountApp().find('aside nav').exists()).toBe(true)
   })
 })
