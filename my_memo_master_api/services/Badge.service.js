@@ -268,6 +268,17 @@ class BadgeService {
   }
 
   /**
+   * Catalogue de l'utilisateur avec, pour chaque badge obtenu, les noms des matières d'obtention
+   * (`earnedSubjects`) : sert au « Obtenu avec » du détail.
+   *
+   * @param {number} userId
+   * @returns {Promise<object[]>}
+   */
+  async listWithSubjects(userId) {
+    return await this.withSubjectNames(await this.list(userId))
+  }
+
+  /**
    * Badges obtenus visibles par un enseignant qui n'a le consentement que pour certaines matières :
    * ceux obtenus avec au moins une matière consentie (matières enregistrées à l'obtention, qu'un lien
    * administrateur existe ou non). Un badge sans matière (série, régularité) n'est jamais montré ici.
