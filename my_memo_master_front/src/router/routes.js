@@ -97,7 +97,9 @@ const routes = [
     name: 'mindmap-shared',
     component: () => import('../pages/MindmapSharedPage.vue'),
     meta: {
-      title: 'Carte partagée'
+      title: 'Carte partagée',
+      // Sans la barre latérale ni l'en-tête de l'application (visiteur sans compte)
+      bare: true
     }
   },
   {
