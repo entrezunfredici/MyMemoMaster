@@ -155,6 +155,9 @@
         <div v-if="kpi.badges?.filter(b => b.unlocked).length"
           class="rounded-xl border border-gray px-3 py-2">
           <p class="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Badges débloqués</p>
+          <p v-if="kpi.title" class="text-sm font-semibold text-primary mb-1" data-test="student-title">
+            <span aria-hidden="true">{{ kpi.title.icon }}</span> {{ kpi.title.label }}
+          </p>
           <div class="flex flex-wrap gap-2">
             <span v-for="b in kpi.badges.filter(b => b.unlocked)"
               :key="b.id"

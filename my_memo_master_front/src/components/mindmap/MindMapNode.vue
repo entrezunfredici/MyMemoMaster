@@ -69,6 +69,7 @@
 
     <!-- Bouton ajout enfant -->
     <g
+      v-if="!readonly"
       class="mindmap-node__add"
       :class="{ 'mindmap-node__add--active': selected }"
       :transform="`translate(${width / 2 + 32}, 0)`"
@@ -89,9 +90,9 @@
 <script setup>
 import './node/node.css';
 import { mindmapColors, themeHex, readableTextColor } from '@/helpers/themeColors';
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
-import { provideNodeEditing } from '@/composables/useMindMapNodeEditing';
+import { provideNodeEditing, MINDMAP_READONLY_KEY } from '@/composables/useMindMapNodeEditing';
 import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
 import { hasFormulaContent, isGraphNode as isGraphItem } from '@/helpers/mindmap/mindmapItems';
 import MindMapGraph from './MindMapGraph.vue';
@@ -113,7 +114,9 @@ const props = defineProps({
 const emit = defineEmits(['node-pointerdown', 'toggle-collapse']);
 const store = useMindMapBuilderStore();
 // Champ en cours d'édition (titre, contenu ou grandeur), partagé avec les sous-composants.
-const editingField = provideNodeEditing();
+// Plateau en lecture seule (page de partage public) : ni édition, ni ajout d'enfant.
+const readonly = inject(MINDMAP_READONLY_KEY, false);
+const editingField = provideNodeEditing(readonly);
 
 const width = computed(() => props.node.style?.width || 220);
 const height = computed(() => props.node.style?.height || 120);
@@ -153,7 +156,7 @@ const addChildNode = () => {
 
 const handlePointerDown = (event) => {
   if (editingField.value) return;
-  if (event.shiftKey) {
+  if (event.shiftKey && !readonly) {
     addChildNode();
     return;
   }
@@ -165,7 +168,7 @@ const toggleCollapse = () => {
 };
 
 const createChildNode = () => {
-  if (!props.node?.id) return;
+  if (readonly || !props.node?.id) return;
   addChildNode();
 };
 </script>

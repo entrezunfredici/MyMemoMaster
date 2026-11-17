@@ -162,6 +162,22 @@ module.exports = (router) => {
 
   /**
    * @swagger
+   * /badges/me/daily-goal:
+   *   get:
+   *     summary: Progression de l'objectif quotidien (cartes révisées et exercices terminés aujourd'hui)
+   *     tags: [Badge]
+   *     responses:
+   *       200:
+   *         description: "{ date, cards: { goal, done }, exercises: { goal, done }, achieved }"
+   *       401:
+   *         description: Non authentifié
+   *       500:
+   *         description: Erreur serveur
+   */
+  router.get('/badges/me/daily-goal', authMiddleware, badge.dailyGoal)
+
+  /**
+   * @swagger
    * /badges/me/settings:
    *   get:
    *     summary: Réglages de gamification (valeurs par défaut si jamais modifiés)

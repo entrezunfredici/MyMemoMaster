@@ -1,4 +1,4 @@
-const { body } = require('express-validator')
+const { body, param } = require('express-validator')
 
 // CHOIX: max: 50 aligné sur la colonne MindMap.mmName (VARCHAR(50), voir
 // migrations/20260226151800-create-mindmap-table.js) plutôt que max: 200.
@@ -28,4 +28,12 @@ exports.update = [
     .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage('subjectId doit être un entier positif')
+]
+
+exports.shareParams = [param('id').isInt({ min: 1 }).withMessage("L'identifiant de la carte doit être un entier positif")]
+
+exports.sharedToken = [
+  param('token')
+    .matches(/^[A-Za-z0-9_-]{20,64}$/)
+    .withMessage('Lien de partage invalide')
 ]

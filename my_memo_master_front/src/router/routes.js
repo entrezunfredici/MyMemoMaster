@@ -92,6 +92,15 @@ const routes = [
     }
   },
   {
+    // Publique : ouverte par n'importe qui possédant le lien (lecture seule)
+    path: '/partage/carte/:token',
+    name: 'mindmap-shared',
+    component: () => import('../pages/MindmapSharedPage.vue'),
+    meta: {
+      title: 'Carte partagée'
+    }
+  },
+  {
     path: '/calendar',
     name: 'calendar',
     component: () => import('../pages/CalendarPage.vue'),

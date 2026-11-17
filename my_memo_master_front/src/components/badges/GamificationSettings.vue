@@ -29,7 +29,7 @@
             />
           </label>
         </div>
-        <p class="text-sm text-dark/70 mt-1">0 désactive l'objectif. L'anneau de progression sur l'accueil n'est pas encore affiché.</p>
+        <p class="text-sm text-dark/70 mt-1">0 désactive l'objectif. La progression du jour s'affiche sur l'accueil.</p>
       </fieldset>
 
       <div v-for="row in TOGGLES" :key="row.key" class="flex items-start justify-between gap-4">
@@ -55,7 +55,7 @@ const TOGGLES = [
   {
     key: 'streakReminderEnabled',
     label: 'Rappel si ma série est menacée',
-    help: "Désactivé par défaut. Ta préférence est enregistrée ; l'envoi des rappels n'est pas encore actif.",
+    help: "Désactivé par défaut. Tu reçois une notification en fin d'après-midi si tu as une série de 2 jours ou plus et que tu n'as pas encore pratiqué.",
   },
   {
     key: 'badgesVisibleToTeachers',
@@ -74,7 +74,7 @@ const TOGGLES = [
   },
 ]
 
-defineProps({
+const props = defineProps({
   settings: { type: Object, required: true },
 })
 const emit = defineEmits(['change'])
@@ -82,6 +82,12 @@ const emit = defineEmits(['change'])
 function setGoal(key, event, max) {
   const value = clampGoal(event.target.value, max)
   event.target.value = value
-  emit('change', { [key]: value })
+  // CHOIX: le parent confirme par un rappel ; en cas d'échec, le champ revient à la valeur enregistrée
+  // RAISON: sans cela, la saisie refusée restait affichée comme si elle avait été prise en compte.
+  const input = event.target
+  const previous = props.settings[key]
+  emit('change', { [key]: value }, (saved) => {
+    if (saved === false) input.value = previous
+  })
 }
 </script>

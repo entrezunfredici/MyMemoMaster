@@ -165,6 +165,17 @@ describe('TeacherStudentKpi', () => {
     expect(wrapper.find('[title="10 séries (obtenu en : Maths, Physique)"]').exists()).toBe(true)
   })
 
+  it('titre choisi par l’étudiant et partagé : affiché au-dessus des badges', () => {
+    const withTitle = { ...kpi, title: { code: 'streak7', label: '7 jours de suite', icon: '🔥' } }
+    const { wrapper } = mountPanel(TeacherStudentKpi, { props: { loaded: true, kpi: withTitle } })
+    expect(wrapper.get('[data-test="student-title"]').text()).toContain('7 jours de suite')
+  })
+
+  it('aucun titre dans la réponse : aucune ligne de titre', () => {
+    const { wrapper } = mountPanel(TeacherStudentKpi, { props: { loaded: true, kpi: { ...kpi, title: null } } })
+    expect(wrapper.find('[data-test="student-title"]').exists()).toBe(false)
+  })
+
   it('badge sans matières renseignées : aucune ligne de matières', () => {
     const { wrapper } = mountPanel(TeacherStudentKpi, { props: { loaded: true, kpi } })
     expect(wrapper.find('[data-test="badge-subjects"]').exists()).toBe(false)

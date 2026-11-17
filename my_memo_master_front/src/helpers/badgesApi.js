@@ -16,6 +16,10 @@ const badgesApi = {
   saveProfile: (data) => api.put('badges/me/profile', data),
   /** Jours d'activité des dernières semaines (calendrier). */
   activity: (weeks = 12) => api.get('badges/me/activity', { weeks }),
+  /** Progression de l'objectif quotidien : { date, cards, exercises, achieved }. */
+  dailyGoal: () => api.get('badges/me/daily-goal'),
+  /** Badges obtenus dont l'obtention n'a pas encore été vue (modale d'animation). */
+  recent: () => api.get('badges/me/recent'),
   /** Réglages de gamification (objectifs, rappel, visibilité enseignant, animations, mode zen). */
   settings: () => api.get('badges/me/settings'),
   /** Modifie une partie des réglages. */
