@@ -5,15 +5,16 @@ import MindmapsListView from '@/components/mindmap/MindmapsListView.vue'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const { mockGet, mockPut, mockDel, mockToast } = vi.hoisted(() => ({
+const { mockGet, mockPost, mockPut, mockDel, mockToast } = vi.hoisted(() => ({
   mockGet: vi.fn(),
+  mockPost: vi.fn(),
   mockPut: vi.fn(),
   mockDel: vi.fn(),
   mockToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
 vi.mock('@/helpers/api', () => ({
-  api: { get: mockGet, put: mockPut, del: mockDel },
+  api: { get: mockGet, post: mockPost, put: mockPut, del: mockDel },
 }))
 
 vi.mock('vue-toastification', () => ({ useToast: () => mockToast }))
@@ -34,6 +35,7 @@ const diagrams = [
 
 const ItemListLayoutStub = {
   template: `<div>
+    <slot name="actions" />
     <slot />
     <slot name="modals" />
     <button class="create-trigger" @click="$emit('create')">+ Nouvelle carte</button>
@@ -45,6 +47,7 @@ const ItemListLayoutStub = {
 const MenuItemStub = {
   template: `<div class="menu-item">
     <span class="item-title">{{ title }}</span>
+    <slot name="actions" />
     <slot name="stats" />
     <button class="action-btn" @click="onAction && onAction()">{{ actionLabel }}</button>
     <button class="edit-btn" @click="onEdit && onEdit()">Éditer</button>
@@ -75,7 +78,8 @@ describe('MindmapsListView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(window, 'confirm')
-    mockGet.mockResolvedValue({ data: diagrams })
+    // copie : les tests de partage modifient les cartes (jeton), sans contaminer les suivants
+    mockGet.mockResolvedValue({ data: structuredClone(diagrams) })
     mockPut.mockResolvedValue({ status: 200 })
     mockDel.mockResolvedValue({ status: 204 })
   })
@@ -232,5 +236,117 @@ describe('MindmapsListView', () => {
     await wrapper.find('.btn-modal-cancel').trigger('click')
     expect(mockDel).not.toHaveBeenCalled()
     expect(wrapper.findAll('.item-title')).toHaveLength(2)
+  })
+
+  // ── Import JSON ───────────────────────────────────────────────────────────────
+
+  const validMap = {
+    title: 'Carte importée de test',
+    subjectNodeId: 'n1',
+    nodes: { n1: { id: 'n1', label: 'Sujet', type: 'text', content: '', idCard: 12, idSystem: 3, meta: { isSubject: true } } },
+    links: [],
+  }
+
+  const pickFile = async (wrapper, content, name = 'carte.json') => {
+    const input = wrapper.find('[data-testid="mindmap-import-input"]')
+    const file = new File([content], name, { type: 'application/json' })
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    // la lecture du fichier (FileReader) est asynchrone : on attend la fin de l'import
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-testid="mindmap-import-button"]').text()).toBe('Importer un JSON')
+    )
+    await flushPromises()
+  }
+
+  it("« Importer un JSON » crée la carte via l'API et l'ajoute à la liste", async () => {
+    mockPost.mockResolvedValue({ status: 201, data: { idMindMap: 9, mmName: 'Carte importée de test', subjectId: 1 } })
+    const wrapper = mountListView()
+    await flushPromises()
+
+    await pickFile(wrapper, JSON.stringify(validMap))
+
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    const [endpoint, body] = mockPost.mock.calls[0]
+    expect(endpoint).toBe('diagrammes')
+    expect(body.mmName).toBe('Carte importée de test')
+    expect(body.subjectId).toBe(1)
+    // les liens vers les flashcards de l'auteur ne sont pas conservés
+    expect(body.mindMapJson.nodes.n1.idCard).toBeUndefined()
+    expect(wrapper.findAll('.item-title')).toHaveLength(3)
+    expect(mockToast.success).toHaveBeenCalled()
+  })
+
+  it("refuse un fichier qui n'est pas une carte, sans appeler l'API", async () => {
+    const wrapper = mountListView()
+    await flushPromises()
+
+    await pickFile(wrapper, '{"foo": 1}')
+
+    expect(mockPost).not.toHaveBeenCalled()
+    expect(mockToast.error).toHaveBeenCalledWith("Ce fichier n'est pas une carte mentale MyMemoMaster.")
+    expect(wrapper.findAll('.item-title')).toHaveLength(2)
+  })
+
+  it('signale une erreur si le serveur refuse la carte', async () => {
+    mockPost.mockResolvedValue({ status: 400, data: { message: 'x' } })
+    const wrapper = mountListView()
+    await flushPromises()
+    await pickFile(wrapper, JSON.stringify(validMap))
+    expect(mockToast.error).toHaveBeenCalledWith("Erreur lors de l'import de la carte.")
+    expect(wrapper.findAll('.item-title')).toHaveLength(2)
+  })
+
+  // ── Partage public ────────────────────────────────────────────────────────────
+
+  it("« Partager » propose de créer le lien, puis l'affiche", async () => {
+    mockPost.mockResolvedValue({ status: 200, data: { shareToken: 'jeton-0123456789abcdefghij' } })
+    const wrapper = mountListView()
+    await flushPromises()
+
+    await wrapper.findAll('[data-testid="mindmap-share-button"]')[0].trigger('click')
+    expect(wrapper.find('[data-testid="mindmap-share-url"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="mindmap-share-enable"]').trigger('click')
+    await flushPromises()
+
+    expect(mockPost).toHaveBeenCalledWith('diagrammes/1/partage')
+    expect(wrapper.find('[data-testid="mindmap-share-url"]').element.value).toBe(
+      `${window.location.origin}/partage/carte/jeton-0123456789abcdefghij`
+    )
+  })
+
+  it('une carte déjà partagée affiche directement son lien', async () => {
+    mockGet.mockResolvedValue({ data: [{ ...diagrams[0], shareToken: 'deja-actif-0123456789abc' }] })
+    const wrapper = mountListView()
+    await flushPromises()
+    await wrapper.find('[data-testid="mindmap-share-button"]').trigger('click')
+    expect(wrapper.find('[data-testid="mindmap-share-url"]').element.value).toContain('/partage/carte/deja-actif-0123456789abc')
+  })
+
+  it('« Désactiver le lien » révoque le partage', async () => {
+    mockGet.mockResolvedValue({ data: [{ ...diagrams[0], shareToken: 'deja-actif-0123456789abc' }] })
+    mockDel.mockResolvedValue(undefined) // 204
+    const wrapper = mountListView()
+    await flushPromises()
+    await wrapper.find('[data-testid="mindmap-share-button"]').trigger('click')
+
+    await wrapper.find('[data-testid="mindmap-share-disable"]').trigger('click')
+    await flushPromises()
+
+    expect(mockDel).toHaveBeenCalledWith('diagrammes/1/partage')
+    expect(wrapper.find('[data-testid="mindmap-share-url"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="mindmap-share-enable"]').exists()).toBe(true)
+  })
+
+  it("signale l'échec de création du lien", async () => {
+    mockPost.mockResolvedValue({ status: 403, data: {} })
+    const wrapper = mountListView()
+    await flushPromises()
+    await wrapper.findAll('[data-testid="mindmap-share-button"]')[0].trigger('click')
+    await wrapper.find('[data-testid="mindmap-share-enable"]').trigger('click')
+    await flushPromises()
+    expect(mockToast.error).toHaveBeenCalledWith('Impossible de créer le lien de partage.')
+    expect(wrapper.find('[data-testid="mindmap-share-url"]').exists()).toBe(false)
   })
 })

@@ -5589,3 +5589,26 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `OAuthService._linkOrCreate` refuse (403, message en français) toute création de compte quand `profile.emailVerified` est faux. Les identités déjà liées se reconnectent normalement ; le refus 409 sur un compte existant est inchangé ; Google et GitHub (email prouvé) ne changent pas.
 **Alternative écartée** : (B) e-mail de vérification avant la première session, plus long à construire (envoi, écran) ; (C) lire la revendication optionnelle Entra `xms_edov` pour considérer l'email comme prouvé quand le domaine est vérifié, impossible à tester sans tenant réel. Ces deux pistes restent possibles plus tard.
 **Conséquences** : plus aucune inscription neuve via Microsoft, qui reste utilisable pour un compte déjà lié. Les nouveaux utilisateurs Microsoft doivent s'inscrire par email et mot de passe.
+
+
+## [2026-11-17] Export JSON de carte mentale côté front uniquement
+
+**Contexte** : le bouton « Exporter » n'exportait rien, il ouvrait la modale d'enregistrement serveur ; les utilisateurs attendaient un fichier.
+**Décision** : bouton distinct « Exporter en JSON » qui sérialise `store.exportPayload()` en `Blob` téléchargé par le navigateur ; l'ancien bouton est renommé « Enregistrer sous… ».
+**Alternative écartée** : remplacer le comportement de « Exporter » (perte du chemin nom + matière à la première sauvegarde) ; route API d'export (inutile, le payload est déjà côté client).
+**Conséquences** : aucun changement d'API ni dépendance ; le format JSON suit `serializeMindMap` et n'a pas de numéro de version, à ajouter si un import est construit.
+
+
+## [2026-11-17] Partage public d'une carte mentale par jeton secret révocable
+
+**Contexte** : permettre de montrer une carte à quelqu'un sans compte. Aucun mode lecture seule n'existait dans l'éditeur, et la route d'accès aux cartes est réservée au propriétaire.
+**Décision** : colonne `MindMap.shareToken` (32 octets aléatoires, base64url, unique) ; `NULL` = privée. Création idempotente (un second clic ne casse pas le lien déjà envoyé), révocation en remettant `NULL`. Route `GET /diagrammes/partage/:token` publique qui ne renvoie que le nom et le contenu (ni auteur, ni identifiant, ni jeton), jeton validé par `validators` (400 si mal formé), réponse `no-store`. Côté front, page publique `/partage/carte/:token` qui réutilise `MindMapBoard` avec une prop `readonly` (injectée aux items) ; `store.load(..., { syncCards: false })` évite les appels authentifiés d'un visiteur anonyme (un 401 déconnecte via `api.js`).
+**Alternative écartée** : lien dérivé de l'identifiant de la carte (devinable, non révocable) ; copie figée de la carte (se désynchronise) ; page dédiée sans le plateau existant (rendu dupliqué).
+**Conséquences** : le lien donne accès à la version courante de la carte tant qu'il est actif ; révocable à tout moment, l'ancien lien est alors mort (404). Limitation de débit : celle, globale, de `apiLimiter`. Pas de journal d'accès.
+
+## [2026-11-17] Import JSON strict et sans liens de flashcards
+
+**Contexte** : `normalizeMindMap` accepte presque tout et remplace un contenu inconnu par une carte vide, ce qui masquerait un mauvais fichier ; un fichier venant d'un autre compte contient des `idCard`/`idSystem` qui ne sont pas à l'importateur.
+**Décision** : `parseMindMapJson` exige le format courant (`nodes` objet non vide + `links` tableau) ou l'ancien format (`nodeDataArray`/`linkDataArray`), plafonne le fichier à 10 Mo et le nom à 50 caractères (colonne `mmName`), puis supprime `idCard`/`idSystem` de chaque nœud. La carte est créée via l'API existante `POST /diagrammes`.
+**Alternative écartée** : route d'import dédiée côté API (la validation existante suffit, rien à gagner) ; conserver les liens de flashcards (appels API sur des systèmes que l'importateur ne possède pas).
+**Conséquences** : un import n'écrase jamais une carte, il en crée une nouvelle. Le format n'est pas versionné (à ajouter si le schéma change).

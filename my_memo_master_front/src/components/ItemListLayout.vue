@@ -15,12 +15,16 @@
         />
         <span class="absolute right-4 top-3.5 text-gray-500 pointer-events-none" aria-hidden="true">🔍</span>
       </div>
-      <button
-        @click="$emit('create')"
-        class="bg-primary hover:bg-primary/90 text-on-primary font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg whitespace-nowrap w-full sm:w-auto sm:ml-auto"
-      >
-        {{ createLabel }}
-      </button>
+      <!-- Actions complémentaires (ex. import) placées avant le bouton de création -->
+      <div class="flex flex-col sm:flex-row gap-3 sm:ml-auto">
+        <slot name="actions" />
+        <button
+          @click="$emit('create')"
+          class="bg-primary hover:bg-primary/90 text-on-primary font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg whitespace-nowrap w-full sm:w-auto"
+        >
+          {{ createLabel }}
+        </button>
+      </div>
     </div>
 
     <!-- Filtre sujet -->

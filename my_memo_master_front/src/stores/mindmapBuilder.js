@@ -51,7 +51,8 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
     ...linkActions,
     ...nodeActions,
     ...cardActions,
-    load(raw, idMindMap = null) {
+    // `syncCards: false` : vue publique (visiteur sans compte), pas d'appels API authentifiés pour les couleurs de boîte.
+    load(raw, idMindMap = null, { syncCards = true } = {}) {
       this.idMindMap = idMindMap;
       const normalized = normalizeMindMap(raw);
       const nonSubjectNodes = Object.values(normalized.nodes).filter(
@@ -63,7 +64,7 @@ export const useMindMapBuilderStore = defineStore('mindmapBuilder', {
       this.map = hasLayout ? normalized : applyRadialLayout(normalized);
       this.resetSelection();
       this.isDirty = false;
-      this.syncCardMasteries();
+      if (syncCards) this.syncCardMasteries();
     },
     new(title) {
       this.map = createBlankMindMap(title);

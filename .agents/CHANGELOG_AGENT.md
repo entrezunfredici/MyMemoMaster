@@ -13944,3 +13944,24 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Vérifié** : suites services + controllers API : 44 suites / 1 015 tests verts, ESLint propre.
 **Hypothèse** : le front affiche le message d'erreur renvoyé par l'API ; pas vérifié que l'écran d'inscription propose une alternative visible.
 **Dette** : option B (vérification par e-mail) ou C (`xms_edov`) pour rouvrir l'inscription Microsoft.
+
+
+## [2026-11-17] [ADD] Éditeur de carte — export JSON téléchargeable
+
+**Fichiers créés** : `my_memo_master_front/src/helpers/mindmap/mindmapJsonExport.js` (`buildJsonFileName`, `downloadMindMapJson`) · `test/helpers/mindmapJsonExport.test.js`.
+**Fichiers modifiés** : `components/mindmap/MindMapBuilder.vue` (nouveau bouton « Exporter en JSON » ; l'ancien « Exporter » devient « Enregistrer sous… », comportement inchangé : modale nom + matière puis enregistrement serveur) · `test/components/MindMapBuilder.test.js`.
+**Utilisable** : le bouton télécharge `<titre>.json` (payload de `store.exportPayload()`, indenté), sans appel API.
+**Vérifié** : `test/components` + helper : 75 fichiers / 1 399 tests verts, ESLint propre.
+**Hypothèse** : le format est celui de `serializeMindMap`, non versionné.
+**Dette** : pas d'import JSON (rechargement d'un fichier exporté).
+
+
+## [2026-11-17] [ADD] Cartes mentales — import JSON et lien de partage public (lecture seule)
+
+**API** — créés : `migrations/20261117000001-add-sharetoken-to-mindmap.js` (colonne `MindMap.shareToken`, STRING(64), unique, nullable). Modifiés : `models/Diagramme.model.js` · `services/Diagramme.service.js` (`enableShare` idempotent, `disableShare`, `findByShareToken` qui ne renvoie que `mmName` + `mindMapJson`) · `controllers/Diagramme.controller.js` (`enableShare`, `disableShare`, `findShared`) · `routes/Diagramme.routes.js` · `validators/Diagramme.validators.js` (`shareParams`, `sharedToken`) · tests contrôleur et service.
+Routes : `POST /diagrammes/:id/partage` (propriétaire, renvoie `{ shareToken }`) · `DELETE /diagrammes/:id/partage` (204) · `GET /diagrammes/partage/:token` (**publique**, sans authentification, `Cache-Control: no-store`).
+**Front** — créés : `helpers/mindmap/mindmapJsonImport.js` (`parseMindMapJson`, `readMindMapFile`) · `pages/MindmapSharedPage.vue` + route publique `/partage/carte/:token` · tests (`mindmapJsonImport`, `MindmapSharedPage`, `MindMapReadonly`). Modifiés : `MindmapsListView.vue` (bouton « Importer un JSON », bouton et modale « Partager » par carte) · `ItemListLayout.vue` (slot `actions`) · `MenuItemComponent.vue` (slot `actions`) · `MindMapBoard.vue` (prop `readonly`) · `MindMapNode.vue` · `composables/useMindMapNodeEditing.js` (`MINDMAP_READONLY_KEY`, `provideNodeEditing(readonly)`) · `stores/mindmapBuilder.js` (`load(raw, id, { syncCards })`) · `helpers/mindmap/mindmapApi.js` · tests existants.
+**Utilisable** : depuis la liste, importer un fichier JSON exporté crée une carte ; « Partager » crée un lien, l'affiche avec un bouton « Copier » et permet de le désactiver. Le lien ouvre la carte en lecture seule (déplacement, zoom, repli) sans compte.
+**Vérifié** : API contrôleur + service Diagramme 65 tests verts ; front composants/helpers/stores/router/composables 161 fichiers / 2 775 tests verts ; ESLint propre (API et front).
+**Hypothèses** : `history` de la carte est vide (non alimenté dans le code actuel), donc rien d'ancien n'est exposé par le lien public. Les images des cartes sont déjà servies par une route publique (`/diagrammes/image/*`), le lien public ne change donc pas leur exposition.
+**Dette** : migration non rejouée sur une vraie base (seulement les tests unitaires, modèles mockés) · pas de bouton « Partager » dans l'éditeur (liste seulement) · pas de « Copier dans mes cartes » depuis la vue publique · les identifiants `idCard`/`idSystem` des nœuds restent dans le JSON public (simples entiers, sans accès aux cartes).

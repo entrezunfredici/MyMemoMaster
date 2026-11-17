@@ -6,6 +6,7 @@ const { Subject } = require('../../models/index')
 jest.mock('../../models/index', () => ({
   Diagramme: {
     findAll: jest.fn(),
+    findOne: jest.fn(),
     findByPk: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -161,6 +162,58 @@ describe('DiagrammeService', () => {
 
       expect(Subject.findByPk).toHaveBeenCalledWith(99)
       expect(result).toBe(1)
+    })
+  })
+
+  describe('partage public', () => {
+    test("enableShare — génère un jeton aléatoire et l'enregistre", async () => {
+      const update = jest.fn()
+      Diagramme.findByPk.mockResolvedValue({ shareToken: null, update })
+
+      const token = await DiagrammeService.enableShare(1)
+
+      expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)
+      expect(update).toHaveBeenCalledWith({ shareToken: token })
+    })
+
+    test('enableShare — conserve le lien déjà actif', async () => {
+      const update = jest.fn()
+      Diagramme.findByPk.mockResolvedValue({ shareToken: 'existant', update })
+
+      expect(await DiagrammeService.enableShare(1)).toBe('existant')
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    test('enableShare / disableShare — carte introuvable', async () => {
+      Diagramme.findByPk.mockResolvedValue(null)
+      await expect(DiagrammeService.enableShare(9)).rejects.toThrow('Diagramme not found')
+      await expect(DiagrammeService.disableShare(9)).rejects.toThrow('Diagramme not found')
+    })
+
+    test('disableShare — remet le jeton à null', async () => {
+      const update = jest.fn()
+      Diagramme.findByPk.mockResolvedValue({ shareToken: 'x', update })
+      await DiagrammeService.disableShare(1)
+      expect(update).toHaveBeenCalledWith({ shareToken: null })
+    })
+
+    test('findByShareToken — ne renvoie que le nom et le contenu', async () => {
+      Diagramme.findOne.mockResolvedValue({ mmName: 'Maths', mindMapJson: '{}', userId: 5, shareToken: 'a'.repeat(43) })
+
+      const result = await DiagrammeService.findByShareToken('a'.repeat(43))
+
+      expect(result).toEqual({ mmName: 'Maths', mindMapJson: '{}' })
+      expect(Diagramme.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { shareToken: 'a'.repeat(43) }, attributes: ['mmName', 'mindMapJson'] })
+      )
+    })
+
+    test('findByShareToken — jeton inconnu, vide ou hors format : null', async () => {
+      Diagramme.findOne.mockResolvedValue(null)
+      expect(await DiagrammeService.findByShareToken('a'.repeat(43))).toBeNull()
+      expect(await DiagrammeService.findByShareToken('')).toBeNull()
+      expect(await DiagrammeService.findByShareToken(undefined)).toBeNull()
+      expect(Diagramme.findOne).toHaveBeenCalledTimes(1)
     })
   })
 })
