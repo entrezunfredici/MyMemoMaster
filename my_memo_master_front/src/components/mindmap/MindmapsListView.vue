@@ -10,6 +10,7 @@ import SubjectSelectorComponent from '@/components/SubjectSelectorComponent.vue'
 import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
 import { provideConfirmAction } from '@/composables/useConfirmAction'
 import { useTagStore } from '@/stores/tags'
+import { readMindMapFile } from '@/helpers/mindmap/mindmapJsonImport'
 
 const props = defineProps({
   subjects: { type: Array, default: () => [] },
@@ -125,6 +126,97 @@ const deleteDiagram = async (diagram) => {
   }
 }
 
+// ── Importer (fichier JSON exporté depuis l'éditeur) ────────────────────────────
+const fileInput = ref(null)
+const importing = ref(false)
+
+const openImportPicker = () => fileInput.value?.click()
+
+const onImportFile = async (event) => {
+  const input = event.target
+  const file = input.files?.[0]
+  input.value = '' // permet de réimporter le même fichier
+  if (!file) return
+  importing.value = true
+  try {
+    const { name, payload } = await readMindMapFile(file)
+    const response = await mindmapApi.createDiagram({
+      mmName: name,
+      mindMapJson: payload,
+      subjectId: selectedSubjectId.value || props.subjects[0]?.subjectId || null,
+    })
+    if (response?.data?.idMindMap) {
+      diagrams.value = [...diagrams.value, response.data]
+      toast.success(`Carte « ${name} » importée.`)
+    } else {
+      toast.error("Erreur lors de l'import de la carte.")
+    }
+  } catch (error) {
+    toast.error(error?.message || "Erreur lors de l'import de la carte.")
+  } finally {
+    importing.value = false
+  }
+}
+
+// ── Partager (lien public en lecture seule) ─────────────────────────────────────
+const showShareModal = ref(false)
+const shareDiagram = ref(null)
+const shareBusy = ref(false)
+
+const shareUrl = computed(() =>
+  shareDiagram.value?.shareToken
+    ? `${window.location.origin}/partage/carte/${shareDiagram.value.shareToken}`
+    : ''
+)
+
+const openShareModal = (diagram) => {
+  shareDiagram.value = diagram
+  showShareModal.value = true
+}
+
+const enableShare = async () => {
+  shareBusy.value = true
+  try {
+    const response = await mindmapApi.enableShare(shareDiagram.value.idMindMap)
+    if (response?.data?.shareToken) {
+      shareDiagram.value.shareToken = response.data.shareToken
+    } else {
+      toast.error('Impossible de créer le lien de partage.')
+    }
+  } catch {
+    toast.error('Impossible de créer le lien de partage.')
+  } finally {
+    shareBusy.value = false
+  }
+}
+
+const disableShare = async () => {
+  shareBusy.value = true
+  try {
+    const response = await mindmapApi.disableShare(shareDiagram.value.idMindMap)
+    // `api.del` renvoie `undefined` sur un 204 (voir deleteDiagram)
+    if (response === undefined || [200, 204].includes(response.status)) {
+      shareDiagram.value.shareToken = null
+      toast.success('Le lien de partage est désactivé.')
+    } else {
+      toast.error('Impossible de désactiver le lien de partage.')
+    }
+  } catch {
+    toast.error('Impossible de désactiver le lien de partage.')
+  } finally {
+    shareBusy.value = false
+  }
+}
+
+const copyShareUrl = async () => {
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    toast.success('Lien copié.')
+  } catch {
+    toast.warning('Copie impossible : sélectionnez le lien et copiez-le manuellement.')
+  }
+}
+
 onMounted(fetchDiagrams)
 </script>
 
@@ -143,6 +235,27 @@ onMounted(fetchDiagrams)
     empty-message="Aucune carte mentale trouvée. Créez-en une !"
     @create="openCreateModal"
   >
+    <template #actions>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".json,application/json"
+        class="hidden"
+        data-testid="mindmap-import-input"
+        aria-label="Fichier JSON de carte mentale à importer"
+        @change="onImportFile"
+      />
+      <button
+        type="button"
+        class="py-3 px-6 rounded-lg border-2 border-gray-300 font-bold text-heading bg-white hover:bg-gray-50 transition duration-200 whitespace-nowrap w-full sm:w-auto disabled:opacity-50"
+        data-testid="mindmap-import-button"
+        :disabled="importing"
+        @click="openImportPicker"
+      >
+        {{ importing ? 'Import en cours…' : 'Importer un JSON' }}
+      </button>
+    </template>
+
     <MenuItem
       v-for="diagram in filteredDiagrams"
       :key="diagram.idMindMap"
@@ -153,6 +266,18 @@ onMounted(fetchDiagrams)
       :on-edit="() => openRenameModal(diagram)"
       :on-delete="() => confirmDelete(diagram)"
     >
+      <template #actions>
+        <button
+          type="button"
+          class="hover:bg-gray-100 text-gray-600 font-bold py-1 px-2 rounded transition duration-200 border border-gray-300 hover:scale-110"
+          :aria-label="`Partager ${diagram.mmName}`"
+          :title="diagram.shareToken ? 'Carte partagée par lien' : 'Partager par lien'"
+          data-testid="mindmap-share-button"
+          @click="openShareModal(diagram)"
+        >
+          {{ diagram.shareToken ? '🔗' : '↗' }}
+        </button>
+      </template>
       <template #stats>
         <span v-if="subjectName(diagram.subjectId)" class="subject-badge">
           {{ subjectName(diagram.subjectId) }}
@@ -200,6 +325,52 @@ onMounted(fetchDiagrams)
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- Modal partager -->
+      <div v-if="showShareModal && shareDiagram" class="modal-overlay" @mousedown.self="showShareModal = false" v-dialog="() => { showShareModal = false }" role="dialog" aria-modal="true" aria-labelledby="mindmap-share-modal-title">
+        <div class="modal-panel">
+          <button aria-label="Fermer" @click="showShareModal = false" class="modal-close">&times;</button>
+          <h2 id="mindmap-share-modal-title" class="modal-title">Partager « {{ shareDiagram.mmName }} »</h2>
+
+          <template v-if="shareDiagram.shareToken">
+            <p class="mb-3 text-sm text-gray-600">
+              Toute personne qui possède ce lien peut voir la carte (lecture seule), sans compte.
+              Elle ne peut pas la modifier.
+            </p>
+            <div class="mb-4 flex gap-2">
+              <input
+                aria-label="Lien de partage"
+                data-testid="mindmap-share-url"
+                class="form-input"
+                type="text"
+                readonly
+                :value="shareUrl"
+                @focus="$event.target.select()"
+              />
+              <button type="button" class="btn-modal-submit" @click="copyShareUrl">Copier</button>
+            </div>
+            <div class="btn-row">
+              <button type="button" class="btn-modal-cancel" :disabled="shareBusy" data-testid="mindmap-share-disable" @click="disableShare">
+                Désactiver le lien
+              </button>
+              <button type="button" class="btn-modal-cancel" @click="showShareModal = false">Fermer</button>
+            </div>
+          </template>
+
+          <template v-else>
+            <p class="mb-4 text-sm text-gray-600">
+              Créez un lien public pour montrer cette carte à quelqu'un, en lecture seule et sans qu'il ait besoin de compte.
+              Vous pourrez le désactiver à tout moment.
+            </p>
+            <div class="btn-row">
+              <button type="button" class="btn-modal-submit" :disabled="shareBusy" data-testid="mindmap-share-enable" @click="enableShare">
+                Créer le lien de partage
+              </button>
+              <button type="button" class="btn-modal-cancel" @click="showShareModal = false">Annuler</button>
+            </div>
+          </template>
         </div>
       </div>
 

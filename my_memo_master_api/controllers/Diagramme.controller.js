@@ -99,6 +99,62 @@ exports.delete = async (req, res) => {
   }
 }
 
+/**
+ * Vérifie que la carte existe et appartient à l'utilisateur connecté ; répond sinon (404/403).
+ *
+ * @returns {Promise<object|null>} La carte, ou null si une réponse d'erreur a été envoyée
+ */
+const loadOwnedDiagramme = async (req, res) => {
+  const { id } = req.params
+  const diagramme = await DiagrammeService.findById(id)
+  if (!diagramme) {
+    res.status(404).json({ message: `Diagramme avec l'ID ${id} non trouvé.` })
+    return null
+  }
+  if (String(diagramme.userId) !== String(req.user.id)) {
+    res.status(403).json({ message: 'Accès refusé.' })
+    return null
+  }
+  return diagramme
+}
+
+exports.enableShare = async (req, res) => {
+  try {
+    if (!(await loadOwnedDiagramme(req, res))) return
+    const shareToken = await DiagrammeService.enableShare(req.params.id)
+    res.status(200).json({ shareToken })
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la création du lien de partage.' })
+  }
+}
+
+exports.disableShare = async (req, res) => {
+  try {
+    if (!(await loadOwnedDiagramme(req, res))) return
+    await DiagrammeService.disableShare(req.params.id)
+    res.status(204).send()
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la désactivation du lien de partage.' })
+  }
+}
+
+// Route publique (sans authentification) : le jeton fait office de secret.
+exports.findShared = async (req, res) => {
+  try {
+    const shared = await DiagrammeService.findByShareToken(req.params.token)
+    if (!shared) {
+      return res.status(404).json({ message: 'Ce lien de partage est invalide ou a été désactivé.' })
+    }
+    res.setHeader('Cache-Control', 'no-store')
+    res.status(200).json(shared)
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération de la carte partagée.' })
+  }
+}
+
 exports.uploadImage = (req, res) => {
   try {
     if (!req.file) {

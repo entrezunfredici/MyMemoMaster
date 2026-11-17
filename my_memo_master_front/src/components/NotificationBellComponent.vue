@@ -69,7 +69,9 @@
                       ? 'bg-red-100 text-red-700'
                       : reminder.entityType === 'kpi_digest'
                         ? 'bg-purple-100 text-purple-700'
-                        : 'bg-blue-100 text-blue-700'
+                        : reminder.entityType === 'streak_reminder'
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'bg-blue-100 text-blue-700'
                   ]"
                 >
                   {{ entityLabel(reminder.entityType) }}
@@ -145,6 +147,7 @@ const sentCount = computed(() =>
 function entityLabel(type) {
   if (type === 'deadline') return 'Échéance'
   if (type === 'kpi_digest') return 'Progression'
+  if (type === 'streak_reminder') return 'Série'
   return 'Révision'
 }
 

@@ -28,7 +28,10 @@ jest.mock('../../services/Diagramme.service', () => ({
   findById: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
-  resolveSubject: jest.fn()
+  resolveSubject: jest.fn(),
+  enableShare: jest.fn(),
+  disableShare: jest.fn(),
+  findByShareToken: jest.fn()
 }))
 
 process.env.AUTH_JWT_SECRET = 'test-secret'
@@ -377,6 +380,101 @@ describe('Diagramme Controller', () => {
     it('401 — pas de token', async () => {
       const res = await request(app).delete(`${BASE}/diagrammes/1`)
       expect(res.status).toBe(401)
+    })
+  })
+
+  // ── Partage public ─────────────────────────────────────────────────────────
+  describe('POST /diagrammes/:id/partage', () => {
+    it('200 — renvoie le jeton pour le propriétaire', async () => {
+      diagrammeService.findById.mockResolvedValue({ ...mockDiagramme, userId: 1 })
+      diagrammeService.enableShare.mockResolvedValue('jeton-de-test')
+
+      const res = await request(app)
+        .post(`${BASE}/diagrammes/1/partage`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ shareToken: 'jeton-de-test' })
+    })
+
+    it('403 — non propriétaire, aucun jeton créé', async () => {
+      diagrammeService.findById.mockResolvedValue({ ...mockDiagramme, userId: 2 })
+
+      const res = await request(app)
+        .post(`${BASE}/diagrammes/1/partage`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+
+      expect(res.status).toBe(403)
+      expect(diagrammeService.enableShare).not.toHaveBeenCalled()
+    })
+
+    it('404 — diagramme introuvable', async () => {
+      diagrammeService.findById.mockResolvedValue(null)
+      const res = await request(app)
+        .post(`${BASE}/diagrammes/99/partage`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+      expect(res.status).toBe(404)
+    })
+
+    it('400 — identifiant invalide', async () => {
+      const res = await request(app)
+        .post(`${BASE}/diagrammes/abc/partage`)
+        .set('Authorization', `Bearer ${makeToken()}`)
+      expect(res.status).toBe(400)
+    })
+
+    it('401 — pas de token', async () => {
+      const res = await request(app).post(`${BASE}/diagrammes/1/partage`)
+      expect(res.status).toBe(401)
+    })
+  })
+
+  describe('DELETE /diagrammes/:id/partage', () => {
+    it('204 — désactive le lien pour le propriétaire', async () => {
+      diagrammeService.findById.mockResolvedValue({ ...mockDiagramme, userId: 1 })
+      diagrammeService.disableShare.mockResolvedValue()
+
+      const res = await request(app)
+        .delete(`${BASE}/diagrammes/1/partage`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+
+      expect(res.status).toBe(204)
+      expect(diagrammeService.disableShare).toHaveBeenCalledWith('1')
+    })
+
+    it('403 — non propriétaire', async () => {
+      diagrammeService.findById.mockResolvedValue({ ...mockDiagramme, userId: 2 })
+      const res = await request(app)
+        .delete(`${BASE}/diagrammes/1/partage`)
+        .set('Authorization', `Bearer ${makeToken({ id: 1 })}`)
+      expect(res.status).toBe(403)
+      expect(diagrammeService.disableShare).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('GET /diagrammes/partage/:token (public)', () => {
+    const TOKEN = 'abcdefghijklmnopqrstuvwxyz012345'
+
+    it('200 — sans authentification, renvoie nom et contenu uniquement', async () => {
+      diagrammeService.findByShareToken.mockResolvedValue({ mmName: 'Maths', mindMapJson: { nodes: {} } })
+
+      const res = await request(app).get(`${BASE}/diagrammes/partage/${TOKEN}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ mmName: 'Maths', mindMapJson: { nodes: {} } })
+      expect(res.headers['cache-control']).toBe('no-store')
+    })
+
+    it('404 — jeton inconnu ou révoqué', async () => {
+      diagrammeService.findByShareToken.mockResolvedValue(null)
+      const res = await request(app).get(`${BASE}/diagrammes/partage/${TOKEN}`)
+      expect(res.status).toBe(404)
+    })
+
+    it("400 — jeton mal formé, la base n'est pas interrogée", async () => {
+      const res = await request(app).get(`${BASE}/diagrammes/partage/court`)
+      expect(res.status).toBe(400)
+      expect(diagrammeService.findByShareToken).not.toHaveBeenCalled()
     })
   })
 })

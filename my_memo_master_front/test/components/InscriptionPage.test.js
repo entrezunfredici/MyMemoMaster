@@ -17,6 +17,8 @@ function mountPage() {
   const pinia = createPinia()
   setActivePinia(pinia)
   register = vi.spyOn(useAuthStore(), 'register').mockResolvedValue()
+  // Les boutons OAuth chargent les fournisseurs au montage : pas d'appel réseau dans ce test
+  vi.spyOn(useAuthStore(), 'loadOAuthProviders').mockResolvedValue()
   wrapper = mount(InscriptionPage, {
     global: {
       plugins: [pinia],

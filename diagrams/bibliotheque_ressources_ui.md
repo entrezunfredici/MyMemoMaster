@@ -355,7 +355,7 @@ enseignant du même groupe (contrôle par `role = teacher` sur le groupe, pas pa
   ressource composée uniquement d'une `url` (lien externe, sans fichier). Aucun rendu dédié dans le template
   pour une ressource sans `fileKey` (`[Télécharger]`/`[Ouvrir]` ne s'affichent pas, aucune alternative "Ouvrir
   le lien").
-- **Pas de filtre par type de ressource** dans la bibliothèque (ni étudiant ni enseignant) — la liste est plate,
+- ~~**Pas de filtre par type de ressource**~~ **corrigé par C-03.05** (2026-11-01, `ResourceTypeFilter.vue`, étudiant et enseignant) — ancien constat : pas de filtre par type de ressource dans la bibliothèque (ni étudiant ni enseignant) — la liste est plate,
   sans regroupement ni filtre par `cours`/`carte_mentale`/`sujet`/`autre` malgré la maquette KPI/navigation par
   sujet du projet qui utilise ce pattern ailleurs (`ui_navigation_sujet.md`, `TagSelectorComponent`).
 - **Taille max 10 Mo affichée mais non appliquée côté API** — déjà noté dans `classroom_enseignant.md` §4.4 ;

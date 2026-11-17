@@ -1,5 +1,17 @@
 const dayjs = require('dayjs')
 const kpiService = require('../../services/Kpi.service')
+const badgeService = require('../../services/Badge.service')
+const gamificationProfileService = require('../../services/GamificationProfile.service')
+
+jest.mock('../../services/Badge.service', () => ({
+  listForKpi: jest.fn().mockResolvedValue([]),
+  listForSubjects: jest.fn().mockResolvedValue([])
+}))
+
+jest.mock('../../services/GamificationProfile.service', () => ({
+  areBadgesVisibleToTeachers: jest.fn().mockResolvedValue(true),
+  getTeacherTitle: jest.fn().mockResolvedValue(null)
+}))
 
 jest.mock('../../models', () => ({
   RevisionSession: { findAll: jest.fn() },
@@ -43,14 +55,6 @@ const box = (level, cards) => ({ level, leitnerCards: cards })
 const leitnerSystem = (boxes, subject = { subjectId: 1, name: 'Maths' }) =>
   ({ leitnerBoxes: boxes, subject })
 
-const emptyKpiInput = (overrides = {}) => ({
-  revisionKpi: { streakDays: 0, completedLast30Days: 0 },
-  exercisesKpi: { totalTests: 0, scoreHistory: [] },
-  leitnerKpi: { mastery: 0 },
-  subjectsKpi: { totalUnique: 0 },
-  ...overrides
-})
-
 describe('KpiService', () => {
   beforeEach(() => jest.clearAllMocks())
 
@@ -72,7 +76,22 @@ describe('KpiService', () => {
       expect(kpis).toHaveProperty('subjects')
       expect(kpis).toHaveProperty('discipline')
       expect(kpis).toHaveProperty('badges')
-      expect(kpis.badges).toHaveLength(7)
+      expect(kpis.badges).toEqual([])
+    })
+
+    it('lit les badges depuis le service de badges (obtention persistée)', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
+      const persisted = [{ id: 'streak7', code: 'streak7', unlocked: true }]
+      badgeService.listForKpi.mockResolvedValueOnce(persisted)
+
+      const kpis = await kpiService.getMyKpis(7)
+
+      expect(badgeService.listForKpi).toHaveBeenCalledWith(7)
+      expect(kpis.badges).toBe(persisted)
     })
 
     it('appelle chaque modèle avec le bon userId', async () => {
@@ -148,6 +167,9 @@ describe('KpiService', () => {
       const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
 
       expect(kpis.revision.totalMinutes).toBe(3)
+      // Badges de la vue filtrée : uniquement ceux liés aux matières consenties
+      expect(badgeService.listForKpi).not.toHaveBeenCalled()
+      expect(badgeService.listForSubjects).toHaveBeenCalledWith(1, [1])
       // Le filtre par matière consentie doit être répercuté sur la requête Leitner
       // (via le système rattaché) et sur la requête cartes mentales (via la carte
       // rattachée), pas seulement sur les exercices.
@@ -159,6 +181,39 @@ describe('KpiService', () => {
         where: { userId: 1 },
         include: [expect.objectContaining({ where: { subjectId: [1] } })]
       }))
+    })
+
+    it('getPersonalKpisForSubjects - badges non partagés avec les enseignants - aucun badge renvoyé', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
+      badgeService.listForSubjects.mockClear()
+      gamificationProfileService.areBadgesVisibleToTeachers.mockResolvedValueOnce(false)
+
+      const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
+
+      expect(kpis.badges).toEqual([])
+      expect(kpis.title).toBeNull()
+      expect(badgeService.listForSubjects).not.toHaveBeenCalled()
+      expect(gamificationProfileService.getTeacherTitle).not.toHaveBeenCalled()
+    })
+
+    it('getPersonalKpisForSubjects - badges partagés - titre limité aux badges visibles', async () => {
+      RevisionSession.findAll.mockResolvedValue([])
+      TestResult.findAll.mockResolvedValue([])
+      LeitnerSystem.findAll.mockResolvedValue([])
+      LeitnerReviewSession.findAll.mockResolvedValue([])
+      MindMapViewSession.findAll.mockResolvedValue([])
+      badgeService.listForSubjects.mockResolvedValueOnce([{ code: 'first_exercise' }, { code: 'streak7' }])
+      gamificationProfileService.getTeacherTitle.mockClear()
+      gamificationProfileService.getTeacherTitle.mockResolvedValueOnce({ code: 'streak7', label: '7 jours de suite', icon: '🔥' })
+
+      const kpis = await kpiService.getPersonalKpisForSubjects(1, [1])
+
+      expect(gamificationProfileService.getTeacherTitle).toHaveBeenCalledWith(1, ['first_exercise', 'streak7'])
+      expect(kpis.title).toEqual({ code: 'streak7', label: '7 jours de suite', icon: '🔥' })
     })
   })
 
@@ -502,82 +557,6 @@ describe('KpiService', () => {
       const r = kpiService._computeDiscipline(sessions)
 
       expect(r.disciplineScore).toBe(100) // 1/1 = 100%
-    })
-  })
-
-  // ─── _computeBadges ───────────────────────────────────────────────────────────
-
-  describe('_computeBadges', () => {
-    it('retourne exactement 7 badges', () => {
-      expect(kpiService._computeBadges(emptyKpiInput())).toHaveLength(7)
-    })
-
-    it('streak7 — débloqué si streakDays >= 7', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 7, completedLast30Days: 0 } }))
-      expect(badges.find((b) => b.id === 'streak7').unlocked).toBe(true)
-    })
-
-    it('streak7 — verrouillé si streakDays < 7', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput())
-      expect(badges.find((b) => b.id === 'streak7').unlocked).toBe(false)
-    })
-
-    it('streak30 — débloqué si streakDays >= 30', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 30, completedLast30Days: 0 } }))
-      expect(badges.find((b) => b.id === 'streak30').unlocked).toBe(true)
-    })
-
-    it('perfectScore — débloqué si un score à 100% dans l\'historique', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 2, scoreHistory: [{ percentage: 80 }, { percentage: 100 }] }
-      }))
-      expect(badges.find((b) => b.id === 'perfectScore').unlocked).toBe(true)
-    })
-
-    it('perfectScore — verrouillé si aucun score à 100%', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 2, scoreHistory: [{ percentage: 80 }, { percentage: 90 }] }
-      }))
-      expect(badges.find((b) => b.id === 'perfectScore').unlocked).toBe(false)
-    })
-
-    it('tenTests — débloqué si totalTests >= 10', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 10, scoreHistory: [] }
-      }))
-      expect(badges.find((b) => b.id === 'tenTests').unlocked).toBe(true)
-    })
-
-    it('tenTests — verrouillé si totalTests < 10', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({
-        exercisesKpi: { totalTests: 9, scoreHistory: [] }
-      }))
-      expect(badges.find((b) => b.id === 'tenTests').unlocked).toBe(false)
-    })
-
-    it('fiveSubjects — débloqué si totalUnique >= 5', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ subjectsKpi: { totalUnique: 5 } }))
-      expect(badges.find((b) => b.id === 'fiveSubjects').unlocked).toBe(true)
-    })
-
-    it('leitnerMastery — débloqué si mastery >= 50', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ leitnerKpi: { mastery: 50 } }))
-      expect(badges.find((b) => b.id === 'leitnerMastery').unlocked).toBe(true)
-    })
-
-    it('leitnerMastery — verrouillé si mastery < 50', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ leitnerKpi: { mastery: 49 } }))
-      expect(badges.find((b) => b.id === 'leitnerMastery').unlocked).toBe(false)
-    })
-
-    it('regular — débloqué si completedLast30Days >= 20', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 0, completedLast30Days: 20 } }))
-      expect(badges.find((b) => b.id === 'regular').unlocked).toBe(true)
-    })
-
-    it('regular — verrouillé si completedLast30Days < 20', () => {
-      const badges = kpiService._computeBadges(emptyKpiInput({ revisionKpi: { streakDays: 0, completedLast30Days: 19 } }))
-      expect(badges.find((b) => b.id === 'regular').unlocked).toBe(false)
     })
   })
 })

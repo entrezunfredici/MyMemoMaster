@@ -92,6 +92,17 @@ const routes = [
     }
   },
   {
+    // Publique : ouverte par n'importe qui possédant le lien (lecture seule)
+    path: '/partage/carte/:token',
+    name: 'mindmap-shared',
+    component: () => import('../pages/MindmapSharedPage.vue'),
+    meta: {
+      title: 'Carte partagée',
+      // Sans la barre latérale ni l'en-tête de l'application (visiteur sans compte)
+      bare: true
+    }
+  },
+  {
     path: '/calendar',
     name: 'calendar',
     component: () => import('../pages/CalendarPage.vue'),
@@ -115,6 +126,15 @@ const routes = [
     component: () => import('../pages/ProfilePage.vue'),
     meta: {
       title: 'Profile',
+      private: true
+    }
+  },
+  {
+    path: '/profile/badges',
+    name: 'badges',
+    component: () => import('../pages/BadgesPage.vue'),
+    meta: {
+      title: 'Mes badges',
       private: true
     }
   },
@@ -190,6 +210,16 @@ const routes = [
     component: () => import('../pages/login/ConnexionPage.vue'),
     meta: {
       title: 'Authentification',
+      private: false
+    }
+  },
+  {
+    // Retour de redirection du fournisseur OAuth (URI à déclarer chez Google, GitHub, Microsoft)
+    path: '/oauth/callback/:provider',
+    name: 'oauth-callback',
+    component: () => import('../pages/login/OAuthCallbackPage.vue'),
+    meta: {
+      title: 'Connexion en cours',
       private: false
     }
   },

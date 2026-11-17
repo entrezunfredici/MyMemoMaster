@@ -31,7 +31,12 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
       }
     },
 
-    async uploadAndCreate(groupId, file, metadata) {
+    /**
+     * Téléverse le fichier UNE fois puis crée une ressource par groupe (`groupId` + `otherGroupIds`),
+     * toutes sur la même clé de stockage. Le fichier n'est supprimé que si aucune création n'aboutit.
+     * @returns {Promise<object|boolean>} la ressource du groupe courant (ou la première créée), `false` si aucune
+     */
+    async uploadAndCreate(groupId, file, metadata, otherGroupIds = []) {
       this.uploading = true
       let uploadedKey = null
       try {
@@ -44,23 +49,44 @@ export const useClassGroupResourceStore = defineStore('classGroupResources', {
         }
         const { url, key, mimetype, size } = uploadResp.data
         uploadedKey = key
-        const createResp = await api.post(`class-groups/${groupId}/resources`, {
-          ...metadata,
-          url,
-          fileKey: key,
-          mimeType: mimetype,
-          originalName: file.name,
-          fileSize: size,
-        })
-        if (createResp?.status !== 201) {
+        const groupIds = [groupId, ...otherGroupIds.filter((id) => id !== groupId)]
+        const created = []
+        let firstError = null
+        for (const gid of groupIds) {
+          try {
+            const createResp = await api.post(`class-groups/${gid}/resources`, {
+              ...metadata,
+              url,
+              fileKey: key,
+              mimeType: mimetype,
+              originalName: file.name,
+              fileSize: size,
+            })
+            if (createResp?.status === 201) {
+              created.push({ groupId: gid, resource: createResp.data.data })
+            } else {
+              firstError ??= createResp?.data?.message || 'Erreur lors de la création de la ressource.'
+            }
+          } catch {
+            firstError ??= "Erreur lors de l'upload de la ressource."
+          }
+        }
+        if (!created.length) {
           await discardUploadedFile(uploadedKey)
-          notif.notify(createResp?.data?.message || 'Erreur lors de la création de la ressource.', 'error')
+          notif.notify(firstError, 'error')
           return false
         }
-        this.resources.unshift(createResp.data.data)
-        this._cache[groupId] = Date.now()
-        notif.notify('Ressource ajoutée.', 'success')
-        return createResp.data.data
+        const current = created.find((c) => c.groupId === groupId)
+        if (current) {
+          this.resources.unshift(current.resource)
+          this._cache[groupId] = Date.now()
+        }
+        if (created.length === groupIds.length) {
+          notif.notify(groupIds.length > 1 ? `Ressource partagée dans ${groupIds.length} groupes.` : 'Ressource ajoutée.', 'success')
+        } else {
+          notif.notify(`Ressource partagée dans ${created.length} groupe(s) sur ${groupIds.length} : ${firstError}`, 'warning')
+        }
+        return (current ?? created[0]).resource
       } catch {
         await discardUploadedFile(uploadedKey)
         notif.notify("Erreur lors de l'upload de la ressource.", 'error')

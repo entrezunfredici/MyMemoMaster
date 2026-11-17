@@ -14,7 +14,11 @@ function mountPage() {
   const wrapper = mount(HomePage, {
     global: {
       plugins: [pinia],
-      stubs: { KpiAlertWidgetComponent: { template: '<div data-testid="kpi-alerts" />' } },
+      stubs: {
+        KpiAlertWidgetComponent: { template: '<div data-testid="kpi-alerts" />' },
+        ProfileBadgesSummary: { template: '<div data-testid="badges-summary" />' },
+        DailyGoalRing: { template: '<div data-testid="daily-goal-ring" />' },
+      },
     },
   })
   return { wrapper, tour: useGuidedTourStore() }
@@ -27,6 +31,16 @@ describe('HomePage', () => {
 
   it('affiche le widget d’alertes KPI', () => {
     expect(mountPage().wrapper.find('[data-testid="kpi-alerts"]').exists()).toBe(true)
+  })
+
+  it('affiche l’anneau de l’objectif du jour au-dessus de la synthèse des badges', () => {
+    const html = mountPage().wrapper.find('.home__badges').html()
+    expect(html.indexOf('daily-goal-ring')).toBeGreaterThanOrEqual(0)
+    expect(html.indexOf('daily-goal-ring')).toBeLessThan(html.indexOf('badges-summary'))
+  })
+
+  it('affiche la carte de synthèse des badges', () => {
+    expect(mountPage().wrapper.find('[data-testid="badges-summary"]').exists()).toBe(true)
   })
 
   describe('menu principal', () => {

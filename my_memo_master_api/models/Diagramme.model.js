@@ -34,6 +34,13 @@ module.exports = (sequelize) => {
         onDelete: 'SET NULL',
         onUpdate: 'CASCADE'
       },
+      // Jeton du lien de partage public (lecture seule) ; null = carte non partagée.
+      // Aléatoire (32 octets, base64url) donc impossible à deviner ; révoqué en le remettant à null.
+      shareToken: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        unique: true
+      },
       subjectId: {
         type: DataTypes.INTEGER,
         allowNull: false, // Assurez-vous que cette clé étrangère ne peut pas être nulle.

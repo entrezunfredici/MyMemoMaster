@@ -10,9 +10,12 @@
 
   <div v-else class="space-y-8 pb-8">
 
-    <!-- BADGES -->
-    <section>
-      <h2 class="text-xl font-bold text-primary mb-3">Succès & Badges</h2>
+    <!-- BADGES (masqués en mode zen) -->
+    <section v-if="!badgesStore.zen">
+      <div class="flex items-baseline justify-between mb-3">
+        <h2 class="text-xl font-bold text-primary">Succès & Badges</h2>
+        <RouterLink :to="{ name: 'badges' }" class="underline text-primary text-sm">Voir tous mes badges</RouterLink>
+      </div>
       <div class="flex flex-wrap gap-3">
         <div
           v-for="badge in store.kpis.badges"
@@ -220,14 +223,19 @@ import {
   Filler
 } from 'chart.js'
 import { useKpiStore } from '@/stores/kpi'
+import { useBadgesStore } from '@/stores/badges'
 import { themeHex, themeRgba } from '@/helpers/themeColors'
 import LoaderComponent from '@/components/LoaderComponent.vue'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
 
 const store = useKpiStore()
+const badgesStore = useBadgesStore()
 
-onMounted(() => { store.fetchMyKpis() })
+onMounted(() => {
+  store.fetchMyKpis()
+  badgesStore.fetchSettings()
+})
 
 // ---- Composant inline StatCard ----
 // CHOIX: `hint` affiché en légende visible sous la valeur, pas seulement au survol

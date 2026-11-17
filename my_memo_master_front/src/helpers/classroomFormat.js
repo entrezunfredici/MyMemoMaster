@@ -43,11 +43,45 @@ export function resourceTypeLabel(type) {
   return map[type] ?? type
 }
 
+/** Types de ressource acceptés par l'API, dans l'ordre d'affichage du filtre. */
+export const RESOURCE_TYPES = ['cours', 'carte_mentale', 'sujet', 'autre']
+
+/** Nombre de ressources par type (clé `''` = toutes). */
+export function countResourcesByType(resources) {
+  const counts = { '': resources.length }
+  for (const type of RESOURCE_TYPES) counts[type] = resources.filter((r) => r.type === type).length
+  return counts
+}
+
+/** Filtre la bibliothèque par type (`''` = tous) puis par recherche sur le titre et le type. */
+export function filterResources(resources, { type = '', search = '' } = {}) {
+  const q = search.toLowerCase()
+  return resources.filter(
+    (r) => (!type || r.type === type) && (!q || r.title.toLowerCase().includes(q) || r.type?.toLowerCase().includes(q))
+  )
+}
+
 /** Couleur du score de discipline (30 jours) : bon à partir de 70, moyen à partir de 40. */
 export function disciplineScoreClass(score) {
   if (score >= 70) return 'text-green-700'
   if (score >= 40) return 'text-primary'
   return 'text-red-700'
+}
+
+/** Noms des matières avec lesquelles un badge a été obtenu (« Maths, Physique »), vide si inconnues. */
+export function badgeSubjectNames(badge) {
+  return (badge?.earnedSubjects || [])
+    .map((subject) => subject.name)
+    .filter(Boolean)
+    .join(', ')
+}
+
+/** Infobulle d'un badge : sa description, suivie des matières d'obtention quand elles sont connues. */
+export function badgeTitle(badge) {
+  const subjects = badgeSubjectNames(badge)
+  const description = badge?.description || ''
+  if (!subjects) return description
+  return description ? `${description} (obtenu en : ${subjects})` : `Obtenu en : ${subjects}`
 }
 
 /** Normalise la hauteur d'une barre d'activité hebdomadaire (max 7 séances par semaine). */

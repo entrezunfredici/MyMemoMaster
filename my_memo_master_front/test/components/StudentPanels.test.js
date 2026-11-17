@@ -331,6 +331,24 @@ describe('StudentResources', () => {
     expect(mountResources({ search: 'diapo' }).text()).not.toContain('Cours.pdf')
     expect(mountResources({ search: 'AUTRE' }).text()).toContain('Diaporama')
   })
+
+  it('filtre par type avec effectifs, combinable avec la recherche', async () => {
+    const w = mountResources()
+    const group = w.find('[role="group"]')
+    expect(group.text().replace(/\s+/g, ' ')).toContain('Tous (2) Cours (1) Carte mentale (0) Sujet (0) Autre (1)')
+    await btn(w, 'Autre (1)').trigger('click')
+    expect(w.text()).toContain('Diaporama')
+    expect(w.text()).not.toContain('Cours.pdf')
+    expect(btn(w, 'Autre (1)').attributes('aria-pressed')).toBe('true')
+    await btn(w, 'Sujet (0)').trigger('click')
+    expect(w.text()).toContain('Aucune ressource correspondante.')
+    await btn(w, 'Tous (2)').trigger('click')
+    expect(w.text()).toContain('Cours.pdf')
+  })
+
+  it('pas de filtre quand la bibliothèque est vide', () => {
+    expect(mountResources({}, []).find('[role="group"]').exists()).toBe(false)
+  })
 })
 
 describe('StudentKpiSharing', () => {

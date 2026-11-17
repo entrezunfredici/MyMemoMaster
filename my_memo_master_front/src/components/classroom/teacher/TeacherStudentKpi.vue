@@ -155,12 +155,18 @@
         <div v-if="kpi.badges?.filter(b => b.unlocked).length"
           class="rounded-xl border border-gray px-3 py-2">
           <p class="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Badges débloqués</p>
+          <p v-if="kpi.title" class="text-sm font-semibold text-primary mb-1" data-test="student-title">
+            <span aria-hidden="true">{{ kpi.title.icon }}</span> {{ kpi.title.label }}
+          </p>
           <div class="flex flex-wrap gap-2">
             <span v-for="b in kpi.badges.filter(b => b.unlocked)"
               :key="b.id"
-              class="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
-              :title="b.description">
+              class="rounded-lg bg-primary/10 px-2 py-0.5 text-xs text-primary"
+              :title="badgeTitle(b)">
               {{ b.icon }} {{ b.label }}
+              <span v-if="b.earnedSubjects?.length" class="block text-dark/70" data-test="badge-subjects">
+                {{ badgeSubjectNames(b) }}
+              </span>
             </span>
           </div>
         </div>
@@ -172,7 +178,7 @@
 <script setup>
 // KPI personnels partagés par un étudiant (S-02.07) : synthèse, révision, exercices, Leitner, matières,
 // discipline, badges. Extrait de pages/ClassroomEnseignantView.vue.
-import { disciplineScoreClass, weeklyBarHeight, formatMinutes } from '@/helpers/classroomFormat'
+import { disciplineScoreClass, weeklyBarHeight, formatMinutes, badgeSubjectNames, badgeTitle } from '@/helpers/classroomFormat'
 
 defineProps({
   // Les KPI de l'étudiant ont-ils déjà été demandés ? (sinon : « Chargement des KPI… »)

@@ -63,6 +63,8 @@
         </p>
       </div>
     </form>
+
+    <OAuthButtonsComponent v-if="!authStore.twoFactorChallenge" />
   </AuthFormLayout>
 </template>
 
@@ -70,6 +72,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import AuthFormLayout from '@/components/AuthFormLayout.vue'
+import OAuthButtonsComponent from '@/components/OAuthButtonsComponent.vue'
 
 const authStore = useAuthStore()
 const email = ref('')

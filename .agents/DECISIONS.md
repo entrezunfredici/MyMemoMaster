@@ -5414,3 +5414,213 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Décision** : `VITE_USAGE_RULES_URL` dans les ConfigMaps / values Helm, écrite dans `window.__APP_CONFIG__.USAGE_RULES_URL` par le démarrage du pod front (mécanisme déjà utilisé pour `API_URL`), lue via `src/config.js` avec repli sur `import.meta.env` puis sur l'URL officielle.
 **Alternative écartée** : variable de build (ARG Dockerfile) : imposerait un rebuild d'image par environnement.
 **Conséquences** : toute nouvelle variable runtime du front doit être ajoutée aux quatre générateurs de `config.js` (deux déploiements k8s, chart Helm, docker-compose).
+
+### [2026-11-01] C-03.03 — Clôture rétroactive : l'API ressources de groupe existante est validée, pas réécrite
+**Contexte** : le ticket C-03.03 demande de livrer l'API de partage de ressources dans un groupe. L'audit montre qu'elle existe déjà (routes, service, validators, tests) depuis C-03.01 / S-03.08, avec contrôle d'accès à deux niveaux et nettoyage S3.
+**Décision** : ne modifier aucun code ; documenter le ticket comme vérification rétroactive après exécution des 49 tests, et consigner les écarts restants comme dette plutôt que de les corriger sous un ticket dont le périmètre est déjà livré.
+**Alternative écartée** : réécrire ou étendre l'API pour « marquer » la livraison (risque de régression sans valeur utilisateur) ; ajouter un contrôle d'appartenance du `fileKey` au groupe dans ce ticket (changement de comportement hors périmètre, à décider séparément).
+**Conséquences** : C-03.03 est considéré terminé ; les points de dette (appartenance du `fileKey`, pas de changement de fichier en `update`, pas de pagination) restent à planifier si le besoin apparaît.
+
+### [2026-11-01] C-03.04 — Contrôle d'accès au fichier d'une ressource de groupe dans `presignFile`, refus en 404
+**Contexte** : la liste des ressources était filtrée par appartenance au groupe, mais l'URL signée du fichier ne l'était pas : la seule protection était le secret de la clé.
+**Décision** : `ClassGroupResourceService.canAccessFile` (membre d'un groupe portant ce `fileKey`, rôles 1/4, ou auteur du téléversement) est appelé par `presignFile` avant le contrôle de modération. Un fichier sans ressource de groupe reste accessible (fichiers personnels, cartes mentales). Le refus est un 404 identique à « fichier introuvable ».
+**Alternative écartée** : 403 explicite (révèle l'existence du fichier) ; refuser tout fichier non rattaché à une ressource (casse les uploads personnels et les images de cartes mentales servis par la même route) ; ajouter `groupId` en paramètre de la route (le front et les liens existants changeraient, et le client choisirait le groupe contre lequel on vérifie).
+**Conséquences** : tout nouveau type de contenu de groupe qui stocke un `fileKey` doit être ajouté à ce contrôle ; une requête SQL de plus par `presign`.
+
+## [2026-11-01] Filtre par type de la bibliothèque de ressources : côté client
+
+**Contexte** : C-03.05. La bibliothèque de groupe devait pouvoir être parcourue par type de ressource.
+**Décision** : filtrer côté client (`filterResources` dans `helpers/classroomFormat.js`) la liste déjà chargée, avec un composant partagé `ResourceTypeFilter.vue` pour les vues étudiant et enseignant.
+**Alternative écartée** : paramètre `type` sur `GET /class-groups/:id/resources` : l'API renvoie déjà toute la liste sans pagination, un aller-retour réseau n'apporterait rien et le cache du store (TTL 5 min) serait à segmenter.
+**Conséquences** : à refaire côté API si la liste devient paginée ; l'état du filtre est local au composant.
+
+## [2026-11-01] Partage d'un document vers plusieurs groupes : une ressource par groupe, un fichier partagé
+
+**Contexte** : C-03.06. Un enseignant doit pouvoir publier un document dans plusieurs de ses groupes en un envoi.
+**Décision** : téléverser le fichier une fois, créer une ressource par groupe avec la même `fileKey` (aucune migration), et ne supprimer le fichier S3 qu'avec la dernière ressource qui le référence (`ClassGroupResourceService.delete` et `ContentReportService._destroyContent`).
+**Alternative écartée** : (a) un téléversement par groupe : stockage et temps d'envoi multipliés ; (b) une table de liaison ressource↔groupes : migration et refonte des droits, de la modération et de la suppression, hors périmètre V2.
+**Conséquences** : le modèle reste « une ressource = un groupe », donc modération, droits et suppression restent par groupe ; la création multi-groupes côté client n'est pas atomique (voir dette dans le CHANGELOG).
+
+
+## [2026-11-03] C-06.01 — Badges persistés, pilotés par événements, fondés sur la pratique réelle
+
+**Contexte** : les 7 badges actuels sont recalculés à chaque lecture du KPI (`_computeBadges`) : sans date d'obtention, impossibles à notifier ou animer, réversibles (une série cassée « retire » le badge), et la série repose sur des créneaux planifiés cochés à la main.
+**Décision** : persister l'obtention dans une table `UserBadge` (unicité `(userId, badgeCode)`), garder le catalogue en code (`helpers/badges/catalog.js`, codes stables), attribuer par un moteur événementiel en mémoire alimenté par les services sources (best effort, jamais bloquant) plus un job quotidien pour les critères de temps ; la série et la régularité reposent sur des « jours d'activité » issus de la pratique réelle journalisée. Niveau = nombre de badges obtenus, sans points. Visibilité enseignant des badges désactivée par défaut. Détail : `diagrams/gamification_badges.md`.
+**Alternative écartée** : (a) calcul à la volée conservé : rien à notifier ni dater ; (b) points d'expérience : système de points complexe, hors périmètre, pousse au volume ; (c) table de définitions en base : migration et édition sans bénéfice en V2 ; (d) file BullMQ : volume faible, complexité inutile pour l'instant ; (e) classements : hors périmètre.
+**Conséquences** : `kpis.badges` garde sa forme mais change de source (validation requise avant implémentation) ; trois badges existants changent de critère ; chaque service source doit émettre son événement ; un rattrapage est nécessaire au déploiement ; la table devient une donnée personnelle (suppression de compte, export). Seuils non calibrés, à confirmer.
+
+## [2026-11-04] C-06 — Idées A1 à A7 (motivation quotidienne) adoptées
+
+**Contexte** : la banque d'idées de `diagrams/gamification_badges.md` §17 listait sept idées de motivation quotidienne, dont trois à arbitrer (A3, A5, A7).
+**Décision** : les sept sont retenues (objectif quotidien, série visible, gel de série, défi du jour, défis hebdomadaires, récapitulatif de la semaine, rappel de série menacée). Le gel coexiste avec le jour de grâce, reste gagné et non achetable ; le rappel reste opt-in. Rien n'est codé.
+**Alternative écartée** : ne garder que le jour de grâce (plus simple, mais moins de leviers d'habitude).
+**Conséquences** : le moteur devra gérer un état (objectif du jour, stock de gels, défis) en plus des badges ; périmètre des tickets C-06 à élargir.
+
+## [2026-11-04] C-06 — Idées B1 à B6 (progression et maîtrise) adoptées
+
+**Contexte** : la banque d'idées (§17) proposait six idées de progression. Vérification du code : B2 (carte de maîtrise) existe déjà au niveau du nœud — un nœud lié à une flashcard prend la couleur de sa boîte Leitner et un niveau de maîtrise (`PaletteCardLink.vue`, `cardActions.syncCardMasteries`, `mindmap.js`).
+**Décision** : B1 à B6 retenues, rien codé. B2 est réduite à ce qui manque : la vue agrégée (% de couverture par carte mentale ou matière).
+**Alternative écartée** : refaire B2 depuis zéro (doublon de l'existant).
+**Conséquences** : B1 (niveau par matière), B2 agrégée et B4 (jalons) partagent le même calcul de maîtrise par matière, à définir une seule fois.
+
+## [2026-11-04] C-06 — Idées C, D, E, F, G : arbitrage
+
+**Contexte** : suite de l'arbitrage de la banque d'idées (`diagrams/gamification_badges.md` §17), après A (toutes) et B (toutes).
+**Décision** : retenues : C1, C5, F1 à F6, F8, G2, G4. Second temps (bonnes idées, décisions à prendre avant : C2, C3, C4, G1, G3). Plus tard : C6, toute la famille D, toute la famille E, F7. Rien de tout cela n'est codé.
+**Alternative écartée** : tout engager d'un coup (périmètre V2 trop large) ; refuser les idées de coopération et d'enseignant (elles restent notées pour plus tard).
+**Conséquences** : le périmètre C-06 s'élargit nettement (objectif quotidien, gel, défis, quêtes, mode sprint, cartes « boss », calendrier d'activité, titre, vitrine, mode zen). G3 ajouterait une dépendance (`@capacitor/haptics`) à signaler avant tout choix.
+
+## [2026-11-04] C-06 — Noyau back-end : événements en ligne, création idempotente par contrainte d'unicité, série par la meilleure valeur
+
+**Contexte** : implémentation du noyau (jour d'activité, moteur, `UserBadge`, API, rattrapage). Les tests ont montré que `findOrCreate` échoue quand deux évaluations concurrentes s'exécutent sur SQLite (« cannot commit - no transaction is active ») et laisse l'utilisateur sans badge.
+**Décision** : (1) `create` puis capture de `UniqueConstraintError` plutôt que `findOrCreate`, l'unicité en base garantissant l'idempotence ; (2) l'émission d'événement est attendue (`await`) mais ne lève jamais (`badgeEvents.emit`), pour des tests déterministes et une réponse cohérente ; (3) l'obtention d'un badge de série est déclenchée par la **meilleure** série, pas la série courante, pour qu'un rattrapage sur l'historique ne perde pas une série passée ; (4) `kpis.badges` et `_computeBadges` ne sont pas modifiés (interface publique, validation requise) ; (5) rattrapage marqué « vu » pour éviter une rafale d'animations au déploiement.
+**Alternative écartée** : tâche non attendue (`setImmediate`) — réponse plus rapide mais état incertain en test et risque de perte à l'arrêt du processus ; transaction explicite par évaluation — inutile avec la contrainte d'unicité.
+**Conséquences** : trois actions (soumission d'exercice, session Leitner, consultation ≥ 60 s) exécutent quelques requêtes de plus ; la progression affichée d'un badge de série est la meilleure série ; deux sources de vérité des badges coexistent (`UserBadge` et `_computeBadges`) jusqu'à la bascule validée.
+
+## [2026-11-04] C-06 — `kpis.badges` fusionné avec `UserBadge` côté étudiant, pas côté vue filtrée
+
+**Contexte** : deux sources de badges coexistaient (`UserBadge`, persistée, et `Kpi.service#_computeBadges`, recalculée). L'utilisateur autorise la fusion « si pertinent ». `KpiConsent.service` appelle `getMyKpis` (consentement global) ou `getPersonalKpisForSubjects` (consentement par matière).
+**Décision** : `getMyKpis` lit `badgeService.listForKpi` (format historique `id/label/description/icon/unlocked` conservé, enrichi de `code`, `rarity`, `category`, `earnedAt`, `progress`). `getPersonalKpisForSubjects` garde `_computeBadges` : `UserBadge` reflète l'activité de toutes les matières, la lire exposerait à l'enseignant ce qui vient de matières non consenties. Un compte sans aucune donnée de gamification est rattrapé une fois, silencieusement, à la première lecture (`listForKpi`), pour que les badges d'avant le déploiement ne disparaissent pas.
+**Alternative écartée** : (a) fusion totale : fuite de données hors consentement ; (b) garder deux sources pour tous : doublon et badges incohérents entre profil et KPI ; (c) rattrapage uniquement par script : trou visible entre le déploiement et son exécution.
+**Conséquences** : le front n'a pas à changer (mêmes champs) ; la liste passe de 7 à 14 badges ; `streak7`, `streak30` et `regular` reposent désormais sur la pratique réelle ; la vue enseignant sous consentement par matière garde les 7 anciens critères tant que la visibilité enseignant n'est pas redéfinie ; `getMyKpis` (aussi appelé par le digest d'alertes) exécute quelques requêtes de plus.
+
+## [2026-11-04] C-06 — Badges liés aux matières en many-to-many (`BadgeSubject`), critère restreint, visibilité par consentement
+
+**Contexte** : la fusion de `kpis.badges` avec `UserBadge` posait un problème de confidentialité : `UserBadge` reflète l'activité de toutes les matières, alors qu'un enseignant ne doit voir que ce que l'étudiant a consenti, matière par matière (`KpiConsent`). L'utilisateur propose de lier les badges à des matières en many-to-many pour le résoudre.
+**Décision** : table `BadgeSubject (badgeCode, subjectId)` (unique sur le couple, suppression en cascade avec la matière). Un badge sans lien est global. Un badge lié ne compte que l'activité des matières liées (réponse de l'utilisateur) et un enseignant sous consentement par matières le voit s'il est lié à **au moins une** matière consentie (réponse de l'utilisateur). Seuls les badges dont le critère se mesure par matière sont liables (`scopable` dans le catalogue). Administration par `PUT /badges/:code/subjects` (rôle 1). `_computeBadges` n'est plus appelée (marquée `TODO`, ses tests étant conservés).
+**Alternative écartée** : (a) une seule matière par badge (colonne `subjectId`) : rigide, impossible de faire évoluer le rattachement ; (b) catalogue des badges en base avec clé étrangère : migration, édition et seed du catalogue sans bénéfice en V2, le lien par `badgeCode` suffit ; (c) rendre invisible tout badge sous consentement par matières : protège, mais supprime l'information ; (d) filtrer les badges par matière à l'affichage seulement : un badge global resterait obtenu grâce à de l'activité hors consentement.
+**Conséquences** : tant qu'aucun lien n'est configuré, un consentement par matières ne montre aucun badge ; les badges de série, de régularité et `fiveSubjects` ne sont pas liables ; relier un badge ne retire jamais un badge déjà obtenu ; la règle « au moins une matière » peut laisser passer un badge lié à deux matières obtenu grâce à l'une d'elles seulement.
+
+## [2026-11-04] C-06 — Visibilité enseignant par matières d'obtention, aucun lien par défaut, ancien calcul supprimé
+
+**Contexte** : la décision précédente rendait un badge visible s'il était *lié* à une matière consentie. L'utilisateur change la règle : un badge est visible par consentement s'il est *obtenu avec* la matière consentie. Il confirme aussi qu'aucun lien n'est posé par défaut et autorise la suppression de l'ancien calcul.
+**Décision** : (1) à l'obtention, `UserBadge.context.subjectIds` enregistre les matières contributrices (fonction `contributors` du catalogue, calculée sur les données déjà restreintes aux matières liées) ; (2) `listForSubjects` montre un badge obtenu s'il a au moins une matière consentie, et ne renvoie que les matières consenties ; (3) le lien `BadgeSubject` ne restreint plus que le *calcul* ; (4) aucun lien par défaut, les badges non liables restent globaux ; (5) `Kpi.service#_computeBadges`, `emptyKpiInput` et les 13 tests associés sont supprimés (autorisation explicite, AGENT.md interdisant sinon de supprimer des tests). `GET /badges` renomme `subjectIds` en `linkedSubjectIds` et ajoute `earnedSubjectIds`.
+**Alternative écartée** : (a) JSON dans `context` remplacé par une table `UserBadgeSubject` : requêtable en SQL mais inutile, le filtrage se fait en mémoire sur les badges d'un seul utilisateur ; (b) exiger que *toutes* les matières contributrices soient consenties : plus protecteur, mais un badge cumulatif devient invisible dès qu'une matière manque ; (c) garder la visibilité par lien : un badge global obtenu avec des matières non consenties restait invisible ou, mal lié, visible à tort.
+**Conséquences** : un badge global cumulatif (ex. `tenTests`) peut exprimer un total incluant des matières non consenties tout en n'en révélant que les consenties ; les badges obtenus avant cet enregistrement n'ont pas de matières et sont invisibles sous consentement par matières ; le champ `subjectIds` de `GET /badges` n'existe plus (introduit le même jour, aucun consommateur).
+
+## [2026-11-04] C-06 — Matières des anciens badges : réparation par le script de rattrapage, pas par migration SQL
+
+**Contexte** : les badges obtenus avant l'enregistrement de `context.subjectIds` n'ont pas de matières et sont invisibles pour un enseignant sous consentement par matières. L'utilisateur demande si une migration est possible.
+**Décision** : `BadgeService.repairEarnedSubjects` reconstruit les matières depuis l'activité actuelle et est appelée par `backfill` (script `npm run badges:backfill`, rejouable). Les badges sans matière (séries, régularité) reçoivent une liste vide. Aucune migration Sequelize.
+**Alternative écartée** : migration de données : possible, mais elle devrait embarquer la logique de calcul des matières (aujourd'hui dans le service et le catalogue, qui évolueront) ou la dupliquer en SQL ; une migration jouée à chaque démarrage de pod ne se rejoue pas, alors que le script est rejouable à volonté.
+**Conséquences** : les matières reconstruites sont approximatives (elles peuvent inclure une matière pratiquée après l'obtention du badge, donc un peu plus larges qu'à l'origine) ; le script doit être lancé après déploiement pour les comptes déjà dotés de badges. En pratique, la table `UserBadge` étant créée dans la même livraison, seuls des données de développement sont concernées.
+
+## [2026-11-04] C-06 — Consentement global : l'enseignant voit aussi les matières d'obtention
+
+**Contexte** : sous consentement par matières, la vue enseignant affiche les matières d'obtention de chaque badge ; sous consentement global, elles manquaient (`listForKpi` ne les chargeait pas), d'où deux affichages différents pour un même composant.
+**Décision** : `BadgeService.withSubjectNames` ajoute `earnedSubjects` (id et nom) à tous les badges, dans `listForSubjects` comme dans `listForKpi`. Un consentement global donne accès à tout : rien n'est à masquer, et l'étudiant voit lui-même ses propres matières.
+**Alternative écartée** : ne rien ajouter sous consentement global (affichage incohérent entre les deux modes) ; un champ réservé à l'enseignant (code et test en plus, sans donnée à protéger).
+**Conséquences** : une requête de plus sur `Subject` par lecture du KPI, et aucune si aucun badge n'a de matière ; `GET /kpi/my` expose `earnedSubjects`.
+
+## [2026-11-04] C-06.02 — Profil gamifié : page dédiée `/profile/badges`, carte de synthèse sur le profil
+
+**Contexte** : où placer le profil gamifié ? `ProfilePage.vue` (499 lignes) regroupe déjà informations, sécurité, double authentification, export et suppression de compte ; `KpiPage.vue` affiche des pastilles de badges.
+**Décision** : page dédiée `/profile/badges` (route `badges`), atteinte par une carte de synthèse « Mes succès » ajoutée à `ProfilePage.vue`, par le lien « Voir tous » de `KpiPage.vue` (qui garde ses pastilles) et par la notification d'obtention. Blocs : niveau et série, vitrine de 3 badges, titre, calendrier d'activité de 12 semaines, grille par catégorie, réglages de gamification. Rareté signalée par libellé et forme, jamais par la couleur seule ; jauge toujours doublée d'un texte.
+**Alternative écartée** : tout dans `ProfilePage.vue` (mélange réglages de compte et contenu motivant, dépasse la taille raisonnable d'une page) ; échelle d'intensité de couleurs sur le calendrier (comparaison à soi-même sans mesure d'intensité côté données).
+**Conséquences** : un nouveau composant par bloc dans `components/badges/` et une page courte sans appel `api.*` direct (règle du projet) ; titre, vitrine, calendrier et réglages exigent des routes et préférences qui n'existent pas (écarts E1 à E3 du document), donc ces blocs restent masquables tant que l'API n'est pas validée ; la page doit être ajoutée aux audits `e2e-a11y` (état vide et état rempli).
+
+## [2026-11-07] Connexion OAuth : flux « code » piloté par le front, `fetch` pour GitHub et Microsoft, liaison par email vérifié
+
+**Contexte** : ajouter « Se connecter avec Google / GitHub / Microsoft » (connexion et inscription). L'API émet déjà ses propres JWT + refresh token (`issueSession`) ; `User.password` est `NOT NULL` ; la 2FA par email est active par défaut et obligatoire pour les rôles 1 et 4.
+**Décision** :
+1. **Flux** : l'API construit l'URL d'autorisation et un `state` JWT signé (secret dérivé `AUTH_JWT_SECRET:oauth-state`, 10 min) ; le fournisseur redirige vers une page du front (`/oauth/callback/:provider`) qui compare le `state` à celui gardé en `sessionStorage`, puis appelle `POST /users/oauth/:provider/login`. L'API vérifie la signature du `state`, échange le code et répond comme `/users/login` (`{ token, refreshToken }`). Aucun jeton dans une URL, aucun cookie, aucune session serveur.
+2. **Bibliothèques** : `google-auth-library` pour Google (vérification de l'`id_token`) ; GitHub et Microsoft par `fetch` natif de Node 22 (GitHub n'est pas OpenID Connect, et une dépendance de plus pour deux appels HTTP n'est pas justifiée).
+3. **Schéma** : nouvelle table `UserOAuthAccount` (userId, provider, providerUserId, email), unique sur `(provider, providerUserId)`. `User` est inchangé : un compte créé par OAuth reçoit un mot de passe aléatoire de 32 octets.
+4. **Liaison à un compte existant** : uniquement si le fournisseur prouve l'email (Google `email_verified`, GitHub adresse principale vérifiée). Microsoft n'est jamais traité comme prouvé (faille « nOAuth » : l'email d'un tenant Entra ID est modifiable sans preuve) : si l'email existe déjà, réponse 409. Si le compte existant n'avait jamais vérifié son email, son mot de passe est remplacé par une valeur aléatoire avant la liaison (contre le pré-détournement : quelqu'un qui aurait inscrit l'adresse d'un tiers ne garde aucun accès).
+5. **2FA** : une connexion OAuth ne déclenche pas le code email pour un utilisateur standard (le fournisseur a déjà authentifié la personne, souvent avec sa propre MFA) ; elle le déclenche pour les rôles 1 et 4, où la 2FA reste obligatoire.
+6. `issueSession` et `sendTwoFactorCode` sortent de `User.controller.js` vers `helpers/authSession.js` pour être partagés (déplacement sans changement de comportement).
+**Alternative écartée** : `passport` et ses stratégies (sessions, middlewares et plusieurs dépendances pour un besoin couvert par trois appels HTTP) ; redirection côté API avec jeton remis dans l'URL ou un cookie (fuite dans l'historique et les journaux, ou surface CSRF) ; colonne `password` nullable (migration sur une table centrale, et tout code qui lit `password` devrait gérer `null`) ; colonnes `provider` / `providerId` sur `User` (un seul fournisseur par compte) ; imposer la 2FA email à tout le monde après OAuth (double friction sans gain de sécurité pour un compte déjà protégé chez le fournisseur).
+**Conséquences** : un fournisseur n'existe que si `OAUTH_<ID>_CLIENT_ID` et `_CLIENT_SECRET` sont définis, sinon aucun bouton n'apparaît. Les URI de redirection sont dérivées de `APP_FRONT_URL` : à déclarer chez chaque fournisseur, pour chaque environnement. Un utilisateur OAuth sans mot de passe passe par « mot de passe oublié » pour en définir un. Le rate limiting `authLimiter` couvre `POST /users/oauth/:provider/login`.
+
+## [2026-11-08] C-06 — Export des badges : informatif, sans `context`, sans réimport
+
+**Contexte** : la portabilité (`UserDataExport`) ne couvrait pas les badges ni les jours d'activité (dette notée au noyau gamification).
+**Décision** : ajouter `activity.badges` (`badgeCode`, `earnedAt`, `seenAt`) et `activity.activityDays` à l'export. `UserBadge.context` (audit interne, identifiants de matières) n'est pas exporté. Pas de réimport, `EXPORT_VERSION` reste à 1.
+**Alternative écartée** : réimporter les badges — permettrait de fabriquer un fichier pour s'attribuer des badges, alors qu'ils sont fondés sur la pratique réelle et rejouables par `badges:backfill`.
+**Conséquences** : un utilisateur qui réimporte ses données retrouve ses badges par le moteur, pas par le fichier.
+
+## [2026-11-11] C-06.05 — Affichage des badges : page dédiée, carte de synthèse partagée, blocs sans API différés
+
+**Contexte** : ticket front « Affichage badges sur profil et dashboards ». Le noyau back (C-06.01) et la maquette (C-06.02, `diagrams/profil_gamifie_ui.md`) sont livrés, mais les écarts E1 à E3 (titre et vitrine, calendrier d'activité, réglages) n'ont pas d'API, et l'API est une interface publique à ne pas modifier sans validation.
+**Décision** : page `/profile/badges` (niveau, série, grille filtrable par état et catégorie, détail), composant `ProfileBadgesSummary` réutilisé sur `ProfilePage` et `HomePage`, lien « Voir tous mes badges » dans `KpiPage` (pastilles inchangées). Un store `badges` (cache 60 s) alimente les trois écrans. La pastille « Nouveau » repose sur un instantané des codes non vus pris avant `PATCH /badges/me/seen`, appelé à l'ouverture de la page. Titre, vitrine, calendrier, réglages et mode zen ne sont pas construits. Le détail n'affiche pas « Obtenu avec » : `GET /badges` ne renvoie que `earnedSubjectIds`, sans noms.
+**Alternative écartée** : section dans `ProfilePage.vue` (page de compte déjà dense) ; créer les routes E1 à E3 dans ce ticket (modifie l'API et le modèle, hors périmètre front) ; résoudre les noms de matières côté front par le store des matières (appel supplémentaire pour une ligne secondaire).
+**Conséquences** : la carte de synthèse fait un appel `GET /badges` + `GET /badges/me/summary` par visite du profil ou de l'accueil (au plus un par minute grâce au cache). Les blocs différés se branchent sur `BadgesPage.vue` quand E1 à E3 seront validés. Le mode zen n'existe pas encore : rien ne masque ces écrans.
+
+
+## [2026-11-16] C-06 — Titre, vitrine, calendrier, réglages : une table de préférences, routes sous `/badges/me`, visibilité enseignant appliquée
+
+**Contexte** : les écarts E1 à E3 de `diagrams/profil_gamifie_ui.md` §10.2 demandaient une API et un stockage pour le titre (C1), la vitrine (C5), le calendrier d'activité (F6) et les réglages (A1, A7, G4, animations, visibilité enseignant). L'utilisateur a demandé leur réalisation, ce qui valide les nouvelles routes.
+**Décision** :
+- **Une table `UserGamificationSettings`** (une ligne par `userId`, `ON DELETE CASCADE`, créée à la première écriture ; pas de ligne = valeurs par défaut) porte titre, vitrine (JSON de codes, 3 max) et réglages. Le document de définition prévoyait `User.badgesVisibleToTeachers` ; cette colonne n'existait pas et une table dédiée évite de grossir `User`.
+- **Routes** `GET/PUT /badges/me/profile`, `GET /badges/me/activity`, `GET/PATCH /badges/me/settings`, dans le contrôleur et le service des badges existants (`GamificationProfile.service.js` pour la logique). Titre et vitrine n'acceptent que des badges **obtenus** par l'utilisateur et présents au catalogue ; le serveur est la seule autorité (400 sinon).
+- **Objectif quotidien** : deux entiers indépendants (`dailyGoalCards` 0–500, `dailyGoalExercises` 0–50), 0 = désactivé (point à valider n°7 de la maquette, tranché par défaut).
+- **Calendrier** : 12 semaines par défaut (1 à 52 acceptées), lundi → dimanche, une seule teinte (points à valider n°3). La grille est un `<table>` avec résumé textuel et cases nommées ; plein = actif, contour = inactif.
+- **Visibilité enseignant appliquée** : `Kpi.getPersonalKpisForSubjects` ne renvoie des badges que si `badgesVisibleToTeachers` est vrai (défaut faux), en plus du consentement KPI par matière. Un réglage affiché mais sans effet aurait été trompeur pour une donnée de vie privée.
+- **Mode zen** : appliqué côté front seulement (carte du profil et de l'accueil, pastilles de `KpiPage`, contenu de la page). Le moteur continue de compter et d'attribuer. En zen, les badges obtenus ne sont pas marqués « vus » : la pastille « Nouveau » attend la sortie du mode zen.
+- **La page reste utilisable sans ces API** : chaque bloc se charge à part (`fetchProfile`, `fetchActivity`, `fetchSettings`), un échec masque le bloc et affiche « Réessayer ». Le sélecteur de titre et les actions du détail n'apparaissent que si le profil est chargé.
+- **Export RGPD** : `activity.gamificationSettings` ajouté (sans `id` ni `userId`), non réimporté (comme les badges, voir DECISIONS 2026-11-04 sur l'export).
+**Alternative écartée** : colonnes sur `User` (table déjà large, jointure inutile) ; un jeu de routes par réglage (cinq appels pour un écran) ; laisser la visibilité enseignant comme simple préférence sans effet (trompeur) ; un mode zen appliqué côté API en masquant `GET /badges` (casserait la page KPI et les cartes sans bénéfice : l'utilisateur est le seul destinataire de ces données).
+**Conséquences** : changement de comportement pour les enseignants, qui ne voient plus les badges d'un étudiant tant qu'il n'a pas activé le partage. Rappel de série, anneau d'objectif et animations ont leur préférence mais pas encore leur mécanisme : les textes de la page l'indiquent. Le titre n'est pas exposé aux enseignants. Une migration (`20261116000001`) est à jouer au déploiement (automatique via l'entrypoint de l'API).
+
+## [2026-11-16] Tests front : lancer vitest depuis un chemin `C:` en majuscule sous Windows
+
+**Contexte** : depuis un shell Bash (cwd `/c/dev/...`, donc `c:` minuscule), tous les fichiers vitest échouent avec `TypeError: Cannot read properties of undefined (reading 'config')` dès l'appel à `describe`, même pour un test trivial : le chemin racine en minuscule et celui des modules en majuscule créent deux instances de `vitest`.
+**Décision** : lancer `npx vitest` depuis PowerShell dans `C:\dev\...` (lettre de lecteur en majuscule). Aucun changement de configuration.
+**Alternative écartée** : forcer la casse dans `vitest.config.js` (contourne un défaut d'environnement local, la CI Linux n'est pas concernée).
+**Conséquences** : un échec massif « no tests / reading 'config' » en local n'est pas une régression du code.
+
+
+## [2026-11-16] Sécurité de la PR #42 : identifiant de fournisseur de confiance, journaux nettoyés, exception gitleaks ciblée, cache des badges lié au compte
+
+**Contexte** : CodeQL signalait un contournement piloté par l'utilisateur (le fournisseur OAuth venait du paramètre d'URL) et deux injections dans les logs ; gitleaks signalait les identifiants clients OAuth des configmaps k8s ; la revue automatique relevait deux défauts de la gamification (visibilité enseignant, cache entre comptes).
+**Décision** :
+- `getProvider` renvoie un `id` pris dans `PROVIDER_IDS` (liste du serveur), jamais l'argument reçu ; toute valeur externe écrite dans un log passe par `helpers/sanitizeLog.js` (retours à la ligne et caractères de contrôle remplacés, 200 caractères maximum).
+- Reprendre un compte non vérifié supprime ses identités OAuth existantes avant de créer la nouvelle liaison.
+- Le réglage « Montrer mes badges à mes enseignants » est appliqué à la frontière d'accès enseignant (`KpiConsent.getStudentKpis`) pour le consentement global, comme `getPersonalKpisForSubjects` le fait pour le consentement par matières.
+- `.gitleaks.toml` : exception limitée aux clés `OAUTH_*_CLIENT_ID` dans `k8s/(prod|preprod)/configmap.yml` (chemin et clé doivent correspondre), règles par défaut conservées. Un `client_id` OAuth est public par conception ; les secrets restent dans le Secret k8s.
+- Store des badges : action `reset()` appelée par `auth.logout`, et compteur de « session » capturé par chaque requête pour ignorer une réponse arrivée après un changement de compte.
+**Alternative écartée** : réécrire l'historique git pour retirer les client_id (inutile, ils ne sont pas secrets, et coûteux sur une branche partagée) ; filtrer les badges dans `getMyKpis` (il sert aussi à l'étudiant, qui voit toujours les siens) ; clé de cache par utilisateur (laisse les données de l'ancien compte en mémoire).
+**Conséquences** : un enseignant avec consentement global ne voit plus les badges d'un étudiant qui n'a pas activé le partage. Toute nouvelle écriture de log avec une valeur externe doit utiliser `sanitizeLog`.
+
+
+## [2026-11-16] OAuth : pas de création de compte sans email prouvé par le fournisseur
+
+**Contexte** : Microsoft renvoie toujours `emailVerified: false` (l'attribut email d'un tenant Entra est modifiable par son administrateur). Le compte était pourtant créé et une session ouverte : il pouvait accepter les invitations de classe en attente destinées à l'adresse déclarée (remarque de revue Codex P1 sur la PR #42).
+**Décision** : `OAuthService._linkOrCreate` refuse (403, message en français) toute création de compte quand `profile.emailVerified` est faux. Les identités déjà liées se reconnectent normalement ; le refus 409 sur un compte existant est inchangé ; Google et GitHub (email prouvé) ne changent pas.
+**Alternative écartée** : (B) e-mail de vérification avant la première session, plus long à construire (envoi, écran) ; (C) lire la revendication optionnelle Entra `xms_edov` pour considérer l'email comme prouvé quand le domaine est vérifié, impossible à tester sans tenant réel. Ces deux pistes restent possibles plus tard.
+**Conséquences** : plus aucune inscription neuve via Microsoft, qui reste utilisable pour un compte déjà lié. Les nouveaux utilisateurs Microsoft doivent s'inscrire par email et mot de passe.
+
+
+## [2026-11-17] Export JSON de carte mentale côté front uniquement
+
+**Contexte** : le bouton « Exporter » n'exportait rien, il ouvrait la modale d'enregistrement serveur ; les utilisateurs attendaient un fichier.
+**Décision** : bouton distinct « Exporter en JSON » qui sérialise `store.exportPayload()` en `Blob` téléchargé par le navigateur ; l'ancien bouton est renommé « Enregistrer sous… ».
+**Alternative écartée** : remplacer le comportement de « Exporter » (perte du chemin nom + matière à la première sauvegarde) ; route API d'export (inutile, le payload est déjà côté client).
+**Conséquences** : aucun changement d'API ni dépendance ; le format JSON suit `serializeMindMap` et n'a pas de numéro de version, à ajouter si un import est construit.
+
+
+## [2026-11-17] Partage public d'une carte mentale par jeton secret révocable
+
+**Contexte** : permettre de montrer une carte à quelqu'un sans compte. Aucun mode lecture seule n'existait dans l'éditeur, et la route d'accès aux cartes est réservée au propriétaire.
+**Décision** : colonne `MindMap.shareToken` (32 octets aléatoires, base64url, unique) ; `NULL` = privée. Création idempotente (un second clic ne casse pas le lien déjà envoyé), révocation en remettant `NULL`. Route `GET /diagrammes/partage/:token` publique qui ne renvoie que le nom et le contenu (ni auteur, ni identifiant, ni jeton), jeton validé par `validators` (400 si mal formé), réponse `no-store`. Côté front, page publique `/partage/carte/:token` qui réutilise `MindMapBoard` avec une prop `readonly` (injectée aux items) ; `store.load(..., { syncCards: false })` évite les appels authentifiés d'un visiteur anonyme (un 401 déconnecte via `api.js`).
+**Alternative écartée** : lien dérivé de l'identifiant de la carte (devinable, non révocable) ; copie figée de la carte (se désynchronise) ; page dédiée sans le plateau existant (rendu dupliqué).
+**Conséquences** : le lien donne accès à la version courante de la carte tant qu'il est actif ; révocable à tout moment, l'ancien lien est alors mort (404). Limitation de débit : celle, globale, de `apiLimiter`. Pas de journal d'accès.
+
+## [2026-11-17] Import JSON strict et sans liens de flashcards
+
+**Contexte** : `normalizeMindMap` accepte presque tout et remplace un contenu inconnu par une carte vide, ce qui masquerait un mauvais fichier ; un fichier venant d'un autre compte contient des `idCard`/`idSystem` qui ne sont pas à l'importateur.
+**Décision** : `parseMindMapJson` exige le format courant (`nodes` objet non vide + `links` tableau) ou l'ancien format (`nodeDataArray`/`linkDataArray`), plafonne le fichier à 10 Mo et le nom à 50 caractères (colonne `mmName`), puis supprime `idCard`/`idSystem` de chaque nœud. La carte est créée via l'API existante `POST /diagrammes`.
+**Alternative écartée** : route d'import dédiée côté API (la validation existante suffit, rien à gagner) ; conserver les liens de flashcards (appels API sur des systèmes que l'importateur ne possède pas).
+**Conséquences** : un import n'écrase jamais une carte, il en crée une nouvelle. Le format n'est pas versionné (à ajouter si le schéma change).
+
+## [2026-11-16] Gamification : rappel de série, objectif quotidien, modale d'obtention, titre enseignant
+
+**Contexte** : les réglages (rappel de série, objectifs, animations) étaient enregistrés sans effet ; le titre n'était pas montré aux enseignants ; « Obtenu avec » manquait dans le détail.
+**Décision** :
+- **Rappel de série** : un cron (18h30) crée un `Reminder` `entityType: 'streak_reminder'`, `channel: 'in_app'`, affiché par la cloche existante, comme le digest KPI. Seuil : série d'au moins 2 jours, pratique hier, rien aujourd'hui, rappel activé et mode zen coupé. Un seul rappel par utilisateur et par jour (contrôle sur `reminderAt`). Aucun e-mail.
+- **Objectif quotidien** : `GET /badges/me/daily-goal` calcule la progression à la demande depuis `LeitnerReviewSession` et `TestResult` ; rien n'est stocké. L'anneau cumule les objectifs actifs, chacun plafonné à sa cible.
+- **Modale d'obtention** : le front réutilise `GET /badges/me/recent` et `PATCH /badges/me/seen`, déjà présents côté API. Elle n'est ni chargée ni marquée « vue » si les animations sont coupées ou si le mode zen est actif : les badges gardent leur pastille « Nouveau ». Vérification au chargement et à chaque changement de page, espacée de 30 s.
+- **Titre enseignant** : clé `title` ajoutée aux KPI vus par un enseignant. Avec le consentement global, le titre suit le réglage de partage des badges ; avec un consentement par matières, il n'est montré que si son badge est lui-même visible (sinon il révélerait une matière non consentie).
+- **« Obtenu avec »** : `GET /badges` ajoute `earnedSubjects` (noms), via `withSubjectNames` déjà utilisé pour les KPI. Ajout seulement, aucune clé retirée.
+**Alternative écartée** : e-mail de rappel (spam, consentement distinct, rien dans le réglage qui le promette) ; colonne de cache pour l'objectif quotidien (donnée dérivée, deux sources de vérité) ; sondage temps réel ou WebSocket pour la modale (coût disproportionné pour une annonce différée d'une page) ; montrer le titre à l'enseignant indépendamment du badge (fuite d'une matière non consentie).
+**Conséquences** : le rappel et la vérification de la modale dépendent de l'heure du serveur, pas du fuseau de l'utilisateur. Un nouveau type de `Reminder` (`streak_reminder`, 15 caractères sur 20 autorisés) est à connaître de tout code qui trie les rappels. Aucune migration.
