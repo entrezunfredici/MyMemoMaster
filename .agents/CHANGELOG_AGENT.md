@@ -13994,3 +13994,12 @@ Routes : `POST /diagrammes/:id/partage` (propriétaire, renvoie `{ shareToken }`
 **Utilisable** : un visiteur du lien voit la carte sans barre latérale, sans titre « Carte partagée » de l'application ni cloche de notifications.
 **Vérifié** : `App`, page partagée et routeur : 37 tests verts ; ESLint propre.
 **Hypothèse** : pas vérifié visuellement dans le navigateur (hauteur du plateau `100vh - 130px`).
+
+## [2026-11-18] [FIX] OAuth en production — identifiants Google et GitHub posés sur le cluster
+
+**Constat** : en prod, aucun bouton « Se connecter avec… » ne s'activait. Les `OAUTH_*_CLIENT_ID` n'étaient que dans les anciens `k8s/prod/configmap.yml` (non utilisés, le déploiement passe par Helm) et le Secret `mmm-prod-secrets` du cluster `pck-uuvuwp7` n'avait aucune clé `OAUTH_*` (18 clés).
+**Fichiers modifiés** : `helm/values-prod.yaml` (`OAUTH_GOOGLE_CLIENT_ID`, `OAUTH_GITHUB_CLIENT_ID` dans `config`).
+**Action sur le cluster** : `kubectl patch secret mmm-prod-secrets -n mymemomaster --type merge` ajoute `OAUTH_GOOGLE_CLIENT_SECRET` et `OAUTH_GITHUB_CLIENT_SECRET` (valeurs de `k8s/secrets-prod.env`, non affichées). Les 18 autres clés sont conservées (vérifié : 20 clés au total).
+**Utilisable** : après le prochain déploiement Helm de prod (la ConfigMap reçoit les ID, les pods redémarrent et lisent le Secret), les boutons Google et GitHub sont actifs.
+**Hypothèses** : les URI de redirection `https://app.my-memo-master.com/oauth/callback/google` et `/github` doivent être déclarées chez Google et GitHub (non vérifié) · Microsoft reste inactif (pas d'identifiants).
+**Dette** : `values-preprod.yaml` n'a pas non plus les ID OAuth · les pods en cours d'exécution ne voient pas encore le Secret · `k8s/prod/configmap.yml` est un reliquat à retirer.

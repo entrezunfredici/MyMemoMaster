@@ -5624,3 +5624,10 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 - **« Obtenu avec »** : `GET /badges` ajoute `earnedSubjects` (noms), via `withSubjectNames` déjà utilisé pour les KPI. Ajout seulement, aucune clé retirée.
 **Alternative écartée** : e-mail de rappel (spam, consentement distinct, rien dans le réglage qui le promette) ; colonne de cache pour l'objectif quotidien (donnée dérivée, deux sources de vérité) ; sondage temps réel ou WebSocket pour la modale (coût disproportionné pour une annonce différée d'une page) ; montrer le titre à l'enseignant indépendamment du badge (fuite d'une matière non consentie).
 **Conséquences** : le rappel et la vérification de la modale dépendent de l'heure du serveur, pas du fuseau de l'utilisateur. Un nouveau type de `Reminder` (`streak_reminder`, 15 caractères sur 20 autorisés) est à connaître de tout code qui trie les rappels. Aucune migration.
+
+## [2026-11-18] Secrets OAuth de prod : patch ciblé du Secret, pas de recréation
+
+**Contexte** : `k8s/secrets-prod.env` (local) ne contient pas toutes les clés du Secret réel (`MISTRAL_API_KEY`, `SMTP_*_USER/PASS` des providers n'y figurent pas).
+**Décision** : ajouter `OAUTH_*_CLIENT_SECRET` par `kubectl patch --type merge` ; les client ID (publics) vont dans `config` de `helm/values-prod.yaml`.
+**Alternative écartée** : `kubectl create secret --from-env-file=k8s/secrets-prod.env` (méthode du `secrets.env.example`) : elle aurait remplacé le Secret et supprimé `MISTRAL_API_KEY` et les clés SMTP.
+**Conséquences** : ne jamais recréer `mmm-prod-secrets` depuis ce fichier local sans l'avoir d'abord réconcilié avec le cluster.
