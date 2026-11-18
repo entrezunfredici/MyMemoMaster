@@ -28,4 +28,35 @@ const httpRequestsTotal = new client.Counter({
   registers: [register]
 })
 
-module.exports = { register, httpRequestDurationSeconds, httpRequestsTotal }
+// Gamification (C-06) : volumétrie des événements, badges attribués et coût de l'évaluation, qui s'exécute
+// à chaque exercice, session Leitner ou consultation de carte (voir services/Badge.service.js).
+const gamificationEventsTotal = new client.Counter({
+  name: 'gamification_events_total',
+  help: "Événements de pratique traités par le moteur de badges (label type : exercise.submitted, leitner.session.completed, mindmap.viewed)",
+  labelNames: ['type'],
+  registers: [register]
+})
+
+const badgesAwardedTotal = new client.Counter({
+  name: 'badges_awarded_total',
+  help: 'Badges attribués (label badge : code du catalogue)',
+  labelNames: ['badge'],
+  registers: [register]
+})
+
+const gamificationEvaluationDurationSeconds = new client.Histogram({
+  name: 'gamification_evaluation_duration_seconds',
+  help: "Durée d'un traitement d'événement par le moteur de badges (jour d'activité + évaluation)",
+  labelNames: ['type'],
+  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2],
+  registers: [register]
+})
+
+module.exports = {
+  register,
+  httpRequestDurationSeconds,
+  httpRequestsTotal,
+  gamificationEventsTotal,
+  badgesAwardedTotal,
+  gamificationEvaluationDurationSeconds
+}

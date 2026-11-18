@@ -351,9 +351,9 @@ Décision : les 7 idées A1 à A7 sont retenues. Précisions : A3 coexiste avec 
 | # | Idée | Statut |
 |---|---|---|
 | A1 | **Objectif quotidien** réglable (ex. 10 cartes ou 1 exercice) avec anneau de progression sur l'accueil | **Décidé** |
-| A2 | **Série visible** (flamme) dans l'en-tête avec jour de grâce | **Décidé** |
-| A3 | **Gel de série** gagné par régularité (1 par 14 jours, non achetable) | **Décidé** |
-| A4 | **Défi du jour** (« réviser une matière délaissée depuis 7 jours ») | **Décidé** |
+| A2 | **Série visible** (flamme) dans l'en-tête avec jour de grâce | **Codé (2026-11-18)** — `StreakFlame.vue` |
+| A3 | **Gel de série** gagné par régularité (1 par 14 jours, non achetable) | **Codé (2026-11-18)** — `computeStreakDetails`, stock plafonné à 2, déduit de l'historique |
+| A4 | **Défi du jour** (« réviser une matière délaissée depuis 7 jours ») | **Codé (2026-11-18)** — `GET /badges/me/daily-challenge`, carte sur l'accueil |
 | A5 | **Défis hebdomadaires** personnels (3 objectifs tirés selon l'usage) | **Décidé** |
 | A6 | **Récapitulatif de la semaine** (carte résumé : jours actifs, cartes revues, progrès) par notification | **Décidé** |
 | A7 | **Rappel bienveillant** si la série est menacée (opt-in, désactivé par défaut) | **Décidé** |
@@ -364,7 +364,7 @@ Décision : les 6 idées B1 à B6 sont retenues. B2 existe déjà au niveau du n
 
 | # | Idée | Statut |
 |---|---|---|
-| B1 | **Arbre de compétences par matière** : chaque matière a son niveau (Novice → Expert) selon cartes maîtrisées et scores | **Décidé** |
+| B1 | **Arbre de compétences par matière** : chaque matière a son niveau (Novice → Expert) selon cartes maîtrisées et scores | **Codé (2026-11-18)** — `GET /badges/me/subject-levels`, section « Mes matières » ; sans arbre graphique : liste de niveaux avec jauges |
 | B2 | **Carte de maîtrise** : visualiser la couverture d'une matière (cartes mentales « colorées » selon la maîtrise Leitner) | **Décidé** |
 | B3 | **Boîte Leitner animée** : la carte « monte » visuellement d'une boîte avec effet de célébration | **Décidé** |
 | B4 | **Jalons de matière** (« 100 % des cartes du chapitre en boîte 3 ») | **Décidé** |
@@ -408,7 +408,7 @@ Décision : les 6 idées B1 à B6 sont retenues. B2 existe déjà au niveau du n
 | F1 | **Quêtes** à étapes (« Maîtriser le chapitre 3 » = créer 10 cartes, les réviser 3 jours, réussir 1 exercice) | **Décidé** |
 | F2 | **Parcours guidé d'intégration** transformé en quête avec récompenses | **Décidé** |
 | F3 | **Mode sprint** : 5 minutes de cartes à rythme soutenu | **Décidé** |
-| F4 | **Bonus de première session du jour** (message d'encouragement, pas de points) | **Décidé** |
+| F4 | **Bonus de première session du jour** (message d'encouragement, pas de points) | **Codé (2026-11-18)** — `GET /badges/me/session-feedback`, `SessionEncouragement.vue` |
 | F5 | **Feedback ludique sur la qualité des cartes générées par IA** (« carte validée ») | **Décidé** |
 | F6 | **Calendrier d'activité** (grille façon contributions GitHub) sur le profil | **Décidé** |
 | F7 | **Mini-jeux de révision** (association, texte à trous, vrai/faux chronométré) à partir des cartes | **Plus tard** |
@@ -419,7 +419,7 @@ Décision : les 6 idées B1 à B6 sont retenues. B2 existe déjà au niveau du n
 | # | Idée | Statut |
 |---|---|---|
 | G1 | **Sons** discrets (désactivés par défaut) à la bonne réponse et à l'obtention | **Second temps** (bonne idée, décisions à prendre avant) |
-| G2 | **Messages d'encouragement** variés en fin de session | **Décidé** |
+| G2 | **Messages d'encouragement** variés en fin de session | **Codé (2026-11-18)** — `helpers/gamificationMessages.js`, écrans de fin des cartes et des exercices |
 | G3 | **Haptique** sur mobile (Capacitor déjà présent) | **Second temps** (bonne idée, décisions à prendre avant) |
 | G4 | **Mode « zen »** désactivant toute gamification | **Décidé** |
 
@@ -444,6 +444,10 @@ Garde-fou commun : toute idée comparant des élèves entre eux, introduisant un
 **Pas encore codé** : front (profil, animation), visibilité enseignant (`PATCH /users/me/badge-visibility`), badges du catalogue hors lot 1 (`progress`, `retry`, `comeback`, `box5`, `cleanSweep`, exploration/création, groupes, secrets), job quotidien (inutile tant qu'aucun badge ne dépend de l'absence d'activité), export des badges dans `UserDataExport`, objectif quotidien, gel de série et autres idées A à G décidées.
 
 **Écarts avec la définition** : (1) la meilleure série (et non la série courante) déclenche l'obtention, pour qu'un rattrapage n'efface pas une série passée ; la progression affichée est donc la meilleure série ; (2) les sessions Leitner partielles comptent comme pratique (leur `cardsReviewed` est ≥ 1 et correspond à des cartes réellement corrigées) ; (3) l'émission est attendue (`await`) mais ne lève jamais : quelques requêtes de plus sur la réponse des trois actions.
+
+---
+
+**Mise à jour 2026-11-18** : codés A1 (objectif quotidien), A2 (flamme de série), A3 (gel de série), A4 (défi du jour), B1 (niveau par matière), A7 (rappel de série, à 18 h locale), C1, C5, F4, F6, G2, G4 ; jour d'activité, objectif et rappel calculés dans le fuseau de l'utilisateur (`UserGamificationSettings.timezone`) ; interface d'administration des liens badge ↔ matières (`/admin`, onglet « Badges »). Restent : A5, A6, B2 à B6, F1 à F3, F5, F8, badges du §6 hors lot 1.
 
 ---
 

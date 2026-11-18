@@ -23,7 +23,9 @@ module.exports = (instance) => {
       streakReminderEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       badgesVisibleToTeachers: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       animationsEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
-      zenMode: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
+      zenMode: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      // Fuseau IANA envoyé par le navigateur ; null = fuseau du serveur
+      timezone: { type: DataTypes.STRING(64), allowNull: true }
     },
     { tableName: 'UserGamificationSettings', timestamps: false }
   )

@@ -173,6 +173,31 @@ describe('api.js — couche API front', () => {
       expect(result).toBeUndefined()
     })
 
+    it('post - route de pratique réussie - annonce « pratique enregistrée » (temps réel des badges)', async () => {
+      const listener = vi.fn()
+      window.addEventListener('mmm:practice-logged', listener)
+      mockPost.mockResolvedValue({ data: { score: 2 }, status: 200 })
+
+      await api.post('tests/7/submit', { answers: [] })
+      await api.post('leitner-review-sessions', {})
+
+      expect(listener).toHaveBeenCalledTimes(2)
+      window.removeEventListener('mmm:practice-logged', listener)
+    })
+
+    it('post - route de pratique en erreur, ou autre route - aucune annonce', async () => {
+      const listener = vi.fn()
+      window.addEventListener('mmm:practice-logged', listener)
+
+      mockPost.mockResolvedValue({ data: { message: 'invalide' }, status: 400 })
+      await api.post('tests/7/submit', {})
+      mockPost.mockResolvedValue({ data: { id: 1 }, status: 201 })
+      await api.post('users/register', {})
+
+      expect(listener).not.toHaveBeenCalled()
+      window.removeEventListener('mmm:practice-logged', listener)
+    })
+
     it('post - statut 401 - appelle logout et retourne undefined', async () => {
       mockPost.mockResolvedValue({ data: {}, status: 401 })
       const result = await api.post('users/1', {})

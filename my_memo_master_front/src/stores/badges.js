@@ -9,6 +9,15 @@ const TTL = 60 * 1000
 // ne doit jamais remplir le store du nouveau compte avec les données de l'ancien.
 let generation = 0
 
+// Fuseau IANA du navigateur (« Europe/Paris »), ou null s'il n'est pas disponible.
+function browserTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null
+  } catch {
+    return null
+  }
+}
+
 export const useBadgesStore = defineStore('badges', {
   state: () => ({
     badges: [],
@@ -27,6 +36,16 @@ export const useBadgesStore = defineStore('badges', {
     dailyGoal: null,
     celebrations: [],
     _celebrationsCheckedAt: 0,
+    // Série affichée dans l'en-tête (flamme) : { current, best, practicedToday, freezes }
+    streak: null,
+    _streakFetchedAt: 0,
+    // Défi du jour (A4) : null tant que non chargé
+    dailyChallenge: null,
+    // Niveau par matière (B1) : null tant que non chargé ; chargé à part, la page fonctionne sans
+    subjectLevels: null,
+    subjectLevelsError: false,
+    // Fuseau du navigateur déjà enregistré pour ce compte (évite de le renvoyer à chaque page)
+    _timezoneSynced: null,
   }),
 
   getters: {
@@ -192,6 +211,130 @@ export const useBadgesStore = defineStore('badges', {
     },
 
     /**
+     * Charge la série en cours (flamme de l'en-tête). Cache court ; un échec laisse la flamme masquée.
+     *
+     * @param {boolean} [force=false]
+     * @returns {Promise<boolean>}
+     */
+    async fetchStreak(force = false) {
+      if (!force && this._streakFetchedAt && Date.now() - this._streakFetchedAt < TTL) return true
+      const gen = generation
+      try {
+        const resp = await badgesApi.summary()
+        if (gen !== generation) return false
+        if (resp?.status !== 200) return false
+        this.streak = {
+          current: resp.data.streakCurrent ?? 0,
+          best: resp.data.streakBest ?? 0,
+          practicedToday: Boolean(resp.data.practicedToday),
+          freezes: resp.data.freezes?.available ?? 0,
+        }
+        this._streakFetchedAt = Date.now()
+        return true
+      } catch {
+        return false
+      }
+    },
+
+    /**
+     * Charge le défi du jour (matière délaissée à réviser). Un échec laisse le défi masqué.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async fetchDailyChallenge() {
+      const gen = generation
+      try {
+        const resp = await badgesApi.dailyChallenge()
+        if (gen !== generation) return false
+        if (resp?.status !== 200 || typeof resp.data !== 'object' || resp.data === null) return false
+        this.dailyChallenge = resp.data
+        return true
+      } catch {
+        return false
+      }
+    },
+
+    /**
+     * Charge le niveau de l'utilisateur dans chaque matière (cartes maîtrisées et exercices).
+     * Un échec est signalé par `subjectLevelsError` ; le reste de la page n'en dépend pas.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async fetchSubjectLevels() {
+      const gen = generation
+      this.subjectLevelsError = false
+      try {
+        const resp = await badgesApi.subjectLevels()
+        if (gen !== generation) return false
+        if (resp?.status !== 200 || !Array.isArray(resp.data)) {
+          this.subjectLevelsError = true
+          return false
+        }
+        this.subjectLevels = resp.data
+        return true
+      } catch {
+        if (gen === generation) this.subjectLevelsError = true
+        return false
+      }
+    },
+
+    /**
+     * Envoie le fuseau horaire du navigateur à l'API (une fois par compte et par fuseau) : le « jour »
+     * de la série, l'objectif quotidien et le rappel se calculent dans ce fuseau. Silencieux : aucun toast.
+     *
+     * @returns {Promise<boolean>} true si le fuseau est enregistré
+     */
+    async syncTimezone() {
+      const zone = browserTimeZone()
+      if (!zone || this._timezoneSynced === zone) return false
+      const gen = generation
+      await this.fetchSettings()
+      if (gen !== generation || !this.settings) return false
+      if (this.settings.timezone === zone) {
+        this._timezoneSynced = zone
+        return true
+      }
+      const saved = await this.updateSettings({ timezone: zone }, { silent: true })
+      if (saved && gen === generation) this._timezoneSynced = zone
+      return saved
+    },
+
+    /**
+     * Bilan de fin de session (première pratique du jour, série) pour le message d'encouragement.
+     * Aucune donnée n'est gardée dans le store : le bilan ne vaut que pour la session qui vient de finir.
+     *
+     * @returns {Promise<object|null>} null en mode zen, ou si l'API échoue
+     */
+    async fetchSessionFeedback() {
+      const gen = generation
+      try {
+        await this.fetchSettings()
+        if (gen !== generation || this.zen) return null
+        const resp = await badgesApi.sessionFeedback()
+        if (gen !== generation || resp?.status !== 200) return null
+        return resp.data
+      } catch {
+        return null
+      }
+    },
+
+    /**
+     * Une pratique vient d'être enregistrée (l'API a déjà évalué les badges) : rafraîchit la série, l'objectif
+     * quotidien et cherche les badges à fêter sans attendre le prochain changement de page.
+     *
+     * @returns {Promise<void>}
+     */
+    async refreshAfterPractice() {
+      this._fetchedAt = 0 // la page des badges doit se recharger : progression et badges ont changé
+      await Promise.all([
+        this.fetchStreak(true),
+        this.dailyGoal ? this.fetchDailyGoal() : Promise.resolve(),
+        this.dailyChallenge ? this.fetchDailyChallenge() : Promise.resolve(),
+        this.fetchCelebrations(true),
+      ])
+    },
+
+    /**
      * Cherche les badges obtenus dont l'animation n'a pas été jouée. Ne fait rien (et ne marque rien comme
      * vu) si les animations sont coupées ou en mode zen : les badges gardent alors leur pastille « Nouveau ».
      * Appels espacés d'au moins 30 s (appelée à chaque changement de page).
@@ -267,24 +410,25 @@ export const useBadgesStore = defineStore('badges', {
      * Modifie une partie des réglages (enregistrés à l'action, avec confirmation par toast).
      *
      * @param {object} patch - ex. { zenMode: true }
+     * @param {{ silent?: boolean }} [options] - silent : aucun toast (réglage posé par l'application, pas par l'utilisateur)
      * @returns {Promise<boolean>}
      */
-    async updateSettings(patch) {
+    async updateSettings(patch, { silent = false } = {}) {
       const gen = generation
       try {
         const resp = await badgesApi.updateSettings(patch)
         if (gen !== generation) return false
         if (resp?.status !== 200) {
-          notif.notify(resp?.data?.message || "Erreur lors de l'enregistrement du réglage.", 'error')
+          if (!silent) notif.notify(resp?.data?.message || "Erreur lors de l'enregistrement du réglage.", 'error')
           return false
         }
         // La réponse mêle `message` et les réglages : on ne garde que les réglages
         this.settings = Object.fromEntries(Object.entries(resp.data).filter(([key]) => key !== 'message'))
         this._settingsFetchedAt = Date.now()
-        notif.notify('Réglage enregistré.', 'success')
+        if (!silent) notif.notify('Réglage enregistré.', 'success')
         return true
       } catch {
-        notif.notify("Erreur lors de l'enregistrement du réglage.", 'error')
+        if (!silent) notif.notify("Erreur lors de l'enregistrement du réglage.", 'error')
         return false
       }
     },

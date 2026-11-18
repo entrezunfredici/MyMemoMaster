@@ -1,26 +1,38 @@
-const dayjs = require('dayjs')
 const { Op, UniqueConstraintError } = require('sequelize')
-const { UserActivityDay, TestResult, LeitnerReviewSession, MindMapViewSession } = require('../models/index')
+const { UserActivityDay, UserGamificationSettings, TestResult, LeitnerReviewSession, MindMapViewSession } = require('../models/index')
+const { dayString, isValidZone } = require('../helpers/badges/zone')
 
 // Durée minimale d'une consultation de carte mentale pour compter comme pratique
 // (diagrams/gamification_badges.md §5) : en dessous, l'ouverture est accidentelle.
 const MIN_MINDMAP_VIEW_SECONDS = 60
 
-const toDay = (date) => dayjs(date).format('YYYY-MM-DD')
-
 class UserActivityDayService {
   /**
+   * Fuseau IANA de l'utilisateur (réglage de gamification), ou null pour le fuseau du serveur.
+   *
+   * @param {number} userId
+   * @returns {Promise<string|null>}
+   */
+  async getZone(userId) {
+    const row = await UserGamificationSettings.findOne({ where: { userId }, attributes: ['timezone'], raw: true })
+    return isValidZone(row?.timezone) ? row.timezone : null
+  }
+
+  /**
    * Enregistre un jour d'activité (idempotent : un seul enregistrement par jour et par utilisateur).
+   * Le jour est celui de l'utilisateur, dans son fuseau.
    *
    * @param {number} userId
    * @param {Date|string} [at] - instant de la pratique (défaut : maintenant)
+   * @param {string|null} [zone] - fuseau déjà connu ; lu en base s'il est omis
    * @returns {Promise<boolean>} true si le jour vient d'être créé
    */
-  async record(userId, at = new Date()) {
+  async record(userId, at = new Date(), zone) {
+    const day = dayString(at, zone === undefined ? await this.getZone(userId) : zone)
     // CHOIX: create + capture de l'erreur d'unicité plutôt que findOrCreate
     // RAISON: findOrCreate ouvre une transaction ; deux appels concurrents la font échouer sur SQLite (dev/tests).
     try {
-      await UserActivityDay.create({ userId, date: toDay(at) })
+      await UserActivityDay.create({ userId, date: day })
       return true
     } catch (error) {
       if (error instanceof UniqueConstraintError) return false
@@ -57,10 +69,11 @@ class UserActivityDayService {
         raw: true
       })
     ])
+    const zone = await this.getZone(userId)
     const days = new Set([
-      ...results.map((r) => toDay(r.completedAt)),
-      ...leitner.map((r) => toDay(r.completedAt)),
-      ...views.map((r) => toDay(r.viewedAt))
+      ...results.map((r) => dayString(r.completedAt, zone)),
+      ...leitner.map((r) => dayString(r.completedAt, zone)),
+      ...views.map((r) => dayString(r.viewedAt, zone))
     ])
     const existing = new Set(await this.findDates(userId))
     const missing = [...days].filter((day) => !existing.has(day))

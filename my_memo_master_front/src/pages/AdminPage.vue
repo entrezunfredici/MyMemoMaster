@@ -16,6 +16,7 @@
     <AdminRolesPanel v-if="activeSection === 'roles'" />
     <AdminAccountsPanel v-else-if="activeSection === 'accounts'" />
     <AdminBackupsPanel v-else-if="activeSection === 'backups'" />
+    <AdminBadgesPanel v-else-if="activeSection === 'badges'" />
     <AdminAuditPanel v-else />
 
     <ConfirmActionModal :modal="confirmModal" @cancel="closeConfirmModal" @confirm="runConfirmedAction" />
@@ -23,7 +24,8 @@
 </template>
 
 <script setup>
-// Administration plateforme (rôle 1 uniquement — garde du routeur) : rôles, comptes, journal d'audit global, sauvegardes.
+// Administration plateforme (rôle 1 uniquement — garde du routeur) : rôles, comptes, journal d'audit global, sauvegardes,
+// liens badges ↔ matières.
 import { ref } from 'vue'
 import { provideConfirmAction } from '@/composables/useConfirmAction'
 import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
@@ -31,12 +33,14 @@ import AdminRolesPanel from '@/components/admin/AdminRolesPanel.vue'
 import AdminAccountsPanel from '@/components/admin/AdminAccountsPanel.vue'
 import AdminAuditPanel from '@/components/admin/AdminAuditPanel.vue'
 import AdminBackupsPanel from '@/components/admin/AdminBackupsPanel.vue'
+import AdminBadgesPanel from '@/components/admin/AdminBadgesPanel.vue'
 
 const sections = [
   { key: 'roles', label: 'Rôles' },
   { key: 'accounts', label: 'Comptes' },
   { key: 'audit', label: 'Journal d’audit' },
   { key: 'backups', label: 'Sauvegardes' },
+  { key: 'badges', label: 'Badges' },
 ]
 const activeSection = ref('roles')
 

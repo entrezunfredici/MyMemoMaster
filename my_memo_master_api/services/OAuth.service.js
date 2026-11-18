@@ -44,6 +44,35 @@ const requireProvider = (providerId) => {
 const googleClient = (provider) =>
   new OAuth2Client(provider.clientId, provider.clientSecret, redirectUri(provider.id))
 
+// Identifiant du tenant réservé aux comptes Microsoft personnels (MSA)
+const MICROSOFT_CONSUMER_TENANT_ID = '9188040d-6c67-4c5b-b112-36a304b66dad'
+
+/**
+ * Indique si l'email transmis par Microsoft est prouvé, d'après l'`id_token` renvoyé par l'échange du code.
+ * Le jeton vient directement de l'endpoint de jeton du fournisseur (TLS, échange du code avec notre secret) :
+ * sa signature n'a pas à être revérifiée (OpenID Connect Core §3.1.3.7), on ne lit que ses revendications.
+ *
+ * Preuve acceptée :
+ * - compte personnel (`tid` réservé) : l'adresse est prouvée par Microsoft ;
+ * - compte Entra ID : revendication optionnelle `xms_edov` (domaine de l'email vérifié par son propriétaire), à
+ *   activer sur l'`id_token` dans l'app registration, et à condition que l'email du jeton soit celui utilisé.
+ *
+ * @param {string|undefined} idToken - `id_token` renvoyé par l'échange du code
+ * @param {string|null} email - Email retenu pour le compte
+ * @returns {boolean} false si le jeton est absent ou illisible, ou si rien ne prouve l'adresse
+ */
+const isMicrosoftEmailVerified = (idToken, email) => {
+  if (typeof idToken !== 'string') return false
+  const claims = jwt.decode(idToken)
+  if (!claims || typeof claims !== 'object') return false
+  if (typeof claims.tid === 'string' && claims.tid.toLowerCase() === MICROSOFT_CONSUMER_TENANT_ID) return true
+
+  const domainVerified = claims.xms_edov === true || claims.xms_edov === 1 || claims.xms_edov === '1'
+  const sameEmail =
+    typeof claims.email === 'string' && Boolean(email) && claims.email.trim().toLowerCase() === email.trim().toLowerCase()
+  return domainVerified && sameEmail
+}
+
 /**
  * Requête HTTP JSON vers un fournisseur, avec délai maximal ; toute réponse non 2xx lève une erreur.
  *
@@ -209,13 +238,13 @@ class OAuthService {
     const profile = await fetchJson('https://graph.microsoft.com/oidc/userinfo', {
       headers: { Authorization: `Bearer ${token.access_token}` }
     })
-    // CHOIX: l'email Microsoft n'est jamais considéré comme vérifié (emailVerified: false)
+    // CHOIX: l'email Microsoft n'est vérifié que pour un compte personnel ou avec la revendication `xms_edov`
     // RAISON: sur un tenant Entra ID, l'attribut email est modifiable par l'administrateur du tenant sans preuve
-    // de possession (faille « nOAuth ») : il ne doit pas permettre de reprendre un compte existant.
+    // de possession (faille « nOAuth ») : sans preuve, il ne doit ni reprendre un compte existant ni en créer un.
     return {
       providerUserId: String(profile.sub),
       email: profile.email || null,
-      emailVerified: false,
+      emailVerified: isMicrosoftEmailVerified(token.id_token, profile.email || null),
       name: profile.name || null
     }
   }
@@ -291,7 +320,7 @@ class OAuthService {
       return existing
     }
 
-    // CHOIX: pas de création de compte sans email prouvé par le fournisseur (Microsoft aujourd'hui)
+    // CHOIX: pas de création de compte sans email prouvé par le fournisseur (Microsoft sans compte personnel ni `xms_edov`)
     // RAISON: sinon un tenant Entra déclarant l'adresse d'un tiers obtiendrait une session et pourrait
     // consommer les invitations de classe destinées à cette adresse.
     if (!profile.emailVerified) {

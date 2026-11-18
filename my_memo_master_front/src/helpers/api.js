@@ -12,6 +12,7 @@ import {
 } from '@/config';
 import { useAuthStore } from '@/stores/auth'
 import { notif } from '@/helpers/notif'
+import { announcePractice, isPracticeEndpoint } from '@/helpers/practiceEvents'
 
 const SECURITY_MODES = {
   PUBLIC: 'public',
@@ -387,6 +388,7 @@ async function post(endpoint, data = {}, config = {}) {
     const response = await axiosApi.post(endpoint, data, config)
     if (response?.status === 204) return undefined
     if (handleSpecialStatus(response?.status)) return undefined
+    if (response?.status >= 200 && response?.status < 300 && isPracticeEndpoint(endpoint)) announcePractice()
     return toResponse(response)
   } catch (error) {
     // Voir le choix documenté dans get() ci-dessus — plus de redirection globale.

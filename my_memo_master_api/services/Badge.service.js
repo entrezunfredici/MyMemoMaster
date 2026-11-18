@@ -1,5 +1,5 @@
 const dayjs = require('dayjs')
-const { UniqueConstraintError } = require('sequelize')
+const { UniqueConstraintError, fn, col } = require('sequelize')
 const {
   UserBadge,
   UserActivityDay,
@@ -15,7 +15,9 @@ const {
   LeitnerReviewSession
 } = require('../models/index')
 const userActivityDayService = require('./UserActivityDay.service')
-const { computeStreaks } = require('../helpers/badges/streak')
+const { gamificationEventsTotal, badgesAwardedTotal, gamificationEvaluationDurationSeconds } = require('../helpers/metrics')
+const { dayString } = require('../helpers/badges/zone')
+const { computeStreakDetails, FREEZE_EVERY_DAYS, MAX_FREEZES } = require('../helpers/badges/streak')
 const { CATALOG, CATALOG_BY_CODE, ACTIVITY_EVENTS, levelFor } = require('../helpers/badges/catalog')
 
 // Plancher de cartes pour qu'un taux de maîtrise ait un sens (50 % de 2 cartes ne prouve rien).
@@ -24,8 +26,16 @@ const MIN_CARDS_FOR_MASTERY = 20
 const MIN_QUESTIONS_FOR_PERFECT = 3
 // Seuil du badge leitnerMastery (catalog.js) : sert à savoir quels systèmes y ont contribué.
 const MASTERY_TARGET_PERCENT = 50
+// Taille maximale de la mémoire des comptes déjà rattrapés (évite une croissance non bornée du processus).
+const MAX_LAZY_BACKFILLED = 10000
 
 class BadgeService {
+  constructor() {
+    // Comptes déjà rattrapés par `listForKpi` dans ce processus : un compte sans aucune pratique ne
+    // doit pas refaire le rattrapage (3 requêtes) à chaque lecture.
+    this._lazyBackfilled = new Set()
+  }
+
   /**
    * Réagit à un événement métier : enregistre le jour d'activité si l'événement est une pratique
    * réelle, puis attribue les badges concernés dont le critère est atteint.
@@ -38,8 +48,15 @@ class BadgeService {
   async handle(type, payload, now = new Date()) {
     const { userId } = payload
     if (!userId) return []
-    if (ACTIVITY_EVENTS.includes(type)) await userActivityDayService.record(userId, now)
-    return await this.evaluate(userId, { eventType: type, now })
+    const stopTimer = gamificationEvaluationDurationSeconds.startTimer({ type })
+    try {
+      if (ACTIVITY_EVENTS.includes(type)) await userActivityDayService.record(userId, now)
+      const awarded = await this.evaluate(userId, { eventType: type, now })
+      gamificationEventsTotal.inc({ type })
+      return awarded
+    } finally {
+      stopTimer()
+    }
   }
 
   /**
@@ -65,6 +82,7 @@ class BadgeService {
       try {
         await UserBadge.create({ userId, badgeCode: badge.code, earnedAt: now, seenAt: markSeen ? now : null, context: { value, subjectIds } })
         awarded.push(badge.code)
+        badgesAwardedTotal.inc({ badge: badge.code })
       } catch (error) {
         // Obtenu entre-temps par une évaluation concurrente : rien à faire (idempotence)
         if (!(error instanceof UniqueConstraintError)) throw error
@@ -104,8 +122,9 @@ class BadgeService {
    * @returns {Promise<object>}
    */
   async loadRaw(userId) {
-    const [dates, testResults, leitnerSessions, systems] = await Promise.all([
+    const [dates, zone, testResults, leitnerSessions, rawSystems] = await Promise.all([
       userActivityDayService.findDates(userId),
+      userActivityDayService.getZone(userId),
       TestResult.findAll({
         where: { userId },
         include: [
@@ -129,12 +148,33 @@ class BadgeService {
       LeitnerSystem.findAll({
         where: { idUser: userId },
         include: [
-          { model: LeitnerBox, as: 'leitnerBoxes', include: [{ model: LeitnerCard, as: 'leitnerCards', attributes: ['idCard'] }] },
+          { model: LeitnerBox, as: 'leitnerBoxes', attributes: ['idBox', 'level'] },
           { model: Subject, as: 'subject', attributes: ['subjectId'] }
         ]
       })
     ])
-    return { dates, testResults, leitnerSessions, systems }
+    const systems = await this.withCardCounts(rawSystems)
+    return { dates, zone, testResults, leitnerSessions, systems }
+  }
+
+  /**
+   * Remplace la liste des cartes de chaque boîte par leur nombre (`cardCount`) : seul ce total sert au
+   * calcul de maîtrise, et charger chaque carte à chaque événement de pratique était le poste le plus coûteux.
+   *
+   * @param {import('sequelize').Model[]} systems - systèmes Leitner avec leurs boîtes (sans les cartes)
+   * @returns {Promise<object[]>} objets simples dont les boîtes portent `cardCount`
+   */
+  async withCardCounts(systems) {
+    const plain = systems.map((system) => (typeof system.get === 'function' ? system.get({ plain: true }) : system))
+    const boxIds = plain.flatMap((system) => (system.leitnerBoxes || []).map((box) => box.idBox))
+    const rows = boxIds.length
+      ? await LeitnerCard.findAll({ where: { idBox: boxIds }, attributes: ['idBox', [fn('COUNT', col('idCard')), 'cardCount']], group: ['idBox'], raw: true })
+      : []
+    const countByBox = new Map(rows.map((row) => [row.idBox, Number(row.cardCount)]))
+    return plain.map((system) => ({
+      ...system,
+      leitnerBoxes: (system.leitnerBoxes || []).map((box) => ({ ...box, cardCount: countByBox.get(box.idBox) || 0 }))
+    }))
   }
 
   /**
@@ -148,13 +188,13 @@ class BadgeService {
    * @returns {object} statistiques
    */
   computeStats(raw, now = new Date(), subjectIds = null) {
-    const today = dayjs(now).format('YYYY-MM-DD')
+    const today = dayString(now, raw.zone)
     const inScope = (subjectId) => !subjectIds || subjectIds.includes(subjectId)
     const testResults = raw.testResults.filter((r) => inScope(r.test?.subjectId))
     const leitnerSessions = raw.leitnerSessions.filter((s) => inScope(s.system?.subjectId))
     const systems = raw.systems.filter((s) => inScope(s.subject?.subjectId))
 
-    const { current, best } = computeStreaks(raw.dates, today)
+    const streak = computeStreakDetails(raw.dates, today)
     const windowStart = dayjs(today).subtract(29, 'day').format('YYYY-MM-DD')
 
     const privateResults = testResults.filter((r) => !r.test?.classGroups?.length)
@@ -168,7 +208,7 @@ class BadgeService {
       let total = 0
       let advanced = 0
       for (const box of system.leitnerBoxes || []) {
-        const count = (box.leitnerCards || []).length
+        const count = box.cardCount ?? (box.leitnerCards || []).length
         total += count
         if (box.level >= 4) advanced += count
       }
@@ -190,8 +230,13 @@ class BadgeService {
       ),
       subjectsLeitnerSessions: uniqueSubjects(leitnerSessions, (s) => s.system?.subjectId),
       subjectsMastered: uniqueSubjects(masteredSystems, (s) => s.subject?.subjectId),
-      streakCurrent: current,
-      streakBest: best,
+      streakCurrent: streak.current,
+      streakBest: streak.best,
+      freezesAvailable: streak.freezesAvailable,
+      freezeProgress: streak.freezeProgress,
+      lastFreezeEarnedOn: streak.lastFreezeEarnedOn,
+      lastFreezeUsedOn: streak.lastFreezeUsedOn,
+      practicedToday: raw.dates.includes(today),
       activeDaysLast30: raw.dates.filter((d) => d >= windowStart && d <= today).length,
       exerciseCount: testResults.length,
       privateExerciseCount: privateResults.length,
@@ -354,8 +399,12 @@ class BadgeService {
    * @returns {Promise<object[]>}
    */
   async listForKpi(userId) {
-    const [badgeCount, dayCount] = await Promise.all([UserBadge.count({ where: { userId } }), UserActivityDay.count({ where: { userId } })])
-    if (badgeCount === 0 && dayCount === 0) await this.backfill(userId)
+    if (!this._lazyBackfilled.has(userId)) {
+      const [badgeCount, dayCount] = await Promise.all([UserBadge.count({ where: { userId } }), UserActivityDay.count({ where: { userId } })])
+      if (badgeCount === 0 && dayCount === 0) await this.backfill(userId)
+      if (this._lazyBackfilled.size >= MAX_LAZY_BACKFILLED) this._lazyBackfilled.clear()
+      this._lazyBackfilled.add(userId)
+    }
     const badges = await this.list(userId)
     // Avec un consentement global, l'enseignant voit les mêmes badges que l'étudiant, matières comprises
     return await this.withSubjectNames(badges.map((badge) => ({ id: badge.code, ...badge, unlocked: badge.earned })))
@@ -411,7 +460,9 @@ class BadgeService {
       earnedCount,
       totalCount: CATALOG.length,
       streakCurrent: stats.streakCurrent,
-      streakBest: stats.streakBest
+      streakBest: stats.streakBest,
+      practicedToday: stats.practicedToday,
+      freezes: { available: stats.freezesAvailable, max: MAX_FREEZES, progress: stats.freezeProgress, every: FREEZE_EVERY_DAYS }
     }
   }
 

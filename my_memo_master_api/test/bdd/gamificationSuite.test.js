@@ -114,7 +114,7 @@ describe('Suite gamification — objectif quotidien, rappel de série, obtenu av
 
       const atRisk = await gamificationProfileService.findStreaksAtRisk()
 
-      expect(atRisk).toContainEqual({ userId: user.userId, streak: 3 })
+      expect(atRisk).toContainEqual({ userId: user.userId, streak: 3, zone: null })
     })
 
     it('findStreaksAtRisk - a déjà pratiqué aujourd’hui - non menacée', async () => {
@@ -160,8 +160,10 @@ describe('Suite gamification — objectif quotidien, rappel de série, obtenu av
       await setSettings(user, { streakReminderEnabled: true })
       await practiceDays(user, 1, 2, 3, 4)
 
-      const first = await streakReminderService.runDailyReminders()
-      const second = await streakReminderService.runDailyReminders()
+      // Heure fixée à 18 h locale : le rappel ne part qu'à cette heure-là (sinon le test dépendrait de l'horloge)
+      const at18 = dayjs().hour(18).minute(30).second(0).toDate()
+      const first = await streakReminderService.runDailyReminders(at18)
+      const second = await streakReminderService.runDailyReminders(at18)
 
       const reminders = await Reminder.findAll({ where: { userId: user.userId, entityType: 'streak_reminder' } })
       expect(reminders).toHaveLength(1)
@@ -169,6 +171,228 @@ describe('Suite gamification — objectif quotidien, rappel de série, obtenu av
       expect(reminders[0].message).toContain('4 jours')
       expect(first.created).toBeGreaterThanOrEqual(1)
       expect(second.skipped).toBeGreaterThanOrEqual(1)
+    })
+
+    it('runDailyReminders - hors de 18 h locale - aucun rappel', async () => {
+      const user = await createUser()
+      await setSettings(user, { streakReminderEnabled: true })
+      await practiceDays(user, 1, 2, 3)
+
+      const result = await streakReminderService.runDailyReminders(dayjs().hour(11).minute(30).toDate())
+
+      expect(result.created).toBe(0)
+      expect(await Reminder.count({ where: { userId: user.userId, entityType: 'streak_reminder' } })).toBe(0)
+    })
+
+    it('findStreaksAtRisk - heure locale : chacun est rappelé à 18 h dans SON fuseau', async () => {
+      const paris = await createUser()
+      await setSettings(paris, { streakReminderEnabled: true, timezone: 'Europe/Paris' })
+      const tokyo = await createUser()
+      await setSettings(tokyo, { streakReminderEnabled: true, timezone: 'Asia/Tokyo' })
+      const instant = new Date('2026-06-10T16:30:00Z') // 18 h 30 le 10 à Paris (UTC+2), 01 h 30 le 11 à Tokyo
+      await UserActivityDay.bulkCreate([
+        ...['2026-06-07', '2026-06-08', '2026-06-09'].map((date) => ({ userId: paris.userId, date })),
+        ...['2026-06-08', '2026-06-09', '2026-06-10'].map((date) => ({ userId: tokyo.userId, date }))
+      ])
+
+      const ids = (await gamificationProfileService.findStreaksAtRisk(instant, 2, 18)).map((e) => e.userId)
+
+      expect(ids).toContain(paris.userId)
+      expect(ids).not.toContain(tokyo.userId) // à Tokyo il est 01 h 30 : pas l'heure du rappel
+    })
+
+    it('findStreaksAtRisk - le « jour » est celui du fuseau : à Tokyo, le 10 est « hier » quand il est 01 h 30 le 11', async () => {
+      const tokyo = await createUser()
+      await setSettings(tokyo, { streakReminderEnabled: true, timezone: 'Asia/Tokyo' })
+      const instant = new Date('2026-06-10T16:30:00Z')
+      await UserActivityDay.bulkCreate(['2026-06-08', '2026-06-09', '2026-06-10'].map((date) => ({ userId: tokyo.userId, date })))
+
+      const atRisk = await gamificationProfileService.findStreaksAtRisk(instant, 2)
+
+      expect(atRisk).toContainEqual({ userId: tokyo.userId, streak: 3, zone: 'Asia/Tokyo' })
+    })
+  })
+
+  describe('Fuseau horaire de l’utilisateur', () => {
+    const instant = new Date('2026-11-18T03:00:00Z') // 16 h le 18 à Auckland, 19 h le 17 à Los Angeles
+    const activityDayService = require('../../services/UserActivityDay.service')
+
+    it('record - jour d’activité calculé dans le fuseau de l’utilisateur', async () => {
+      const auckland = await createUser()
+      await setSettings(auckland, { timezone: 'Pacific/Auckland' })
+      const losAngeles = await createUser()
+      await setSettings(losAngeles, { timezone: 'America/Los_Angeles' })
+
+      await activityDayService.record(auckland.userId, instant)
+      await activityDayService.record(losAngeles.userId, instant)
+
+      expect(await activityDayService.findDates(auckland.userId)).toEqual(['2026-11-18'])
+      expect(await activityDayService.findDates(losAngeles.userId)).toEqual(['2026-11-17'])
+    })
+
+    it('record - fuseau absent ou inconnu - repli sur le fuseau du serveur, sans erreur', async () => {
+      const none = await createUser()
+      const unknown = await createUser()
+      await UserGamificationSettings.create({ userId: unknown.userId, timezone: 'Nulle/Part' })
+
+      await activityDayService.record(none.userId, instant)
+      await activityDayService.record(unknown.userId, instant)
+
+      const expected = dayjs(instant).format('YYYY-MM-DD')
+      expect(await activityDayService.findDates(none.userId)).toEqual([expected])
+      expect(await activityDayService.findDates(unknown.userId)).toEqual([expected])
+    })
+
+    it('getDailyGoal - « aujourd’hui » suit le fuseau de l’utilisateur', async () => {
+      const user = await createUser()
+      await setSettings(user, { dailyGoalExercises: 1, timezone: 'America/Los_Angeles' })
+      const subject = await Subject.create({ name: `Fuseau ${user.userId}` })
+      const test = await Test.create({ name: 'Fuseau', userId: user.userId, subjectId: subject.subjectId })
+      // « Maintenant » = 02 h le 18 à Los Angeles (10 h UTC). Son jour local va du 18 à 08 h UTC au 19 à 08 h UTC.
+      await TestResult.create({ userId: user.userId, testId: test.testId, score: 1, total: 1, completedAt: new Date('2026-11-18T07:00:00Z') }) // 23 h le 17 : veille locale
+      await TestResult.create({ userId: user.userId, testId: test.testId, score: 1, total: 1, completedAt: new Date('2026-11-18T09:00:00Z') }) // 01 h le 18 : du jour
+
+      const goal = await gamificationProfileService.getDailyGoal(user.userId, new Date('2026-11-18T10:00:00Z'))
+
+      expect(goal.date).toBe('2026-11-18')
+      expect(goal.exercises.done).toBe(1)
+      expect(goal.achieved).toBe(true)
+    })
+
+    it('PATCH settings - fuseau valide enregistré, fuseau inconnu refusé (400)', async () => {
+      const user = await createUser()
+
+      const ok = await request(app).patch(`${BASE}/badges/me/settings`).set(auth(user)).send({ timezone: 'Europe/Paris' })
+      const bad = await request(app).patch(`${BASE}/badges/me/settings`).set(auth(user)).send({ timezone: 'Mars/Olympus' })
+
+      expect(ok.status).toBe(200)
+      expect(ok.body.timezone).toBe('Europe/Paris')
+      expect(bad.status).toBe(400)
+      expect((await gamificationProfileService.getSettings(user.userId)).timezone).toBe('Europe/Paris')
+    })
+  })
+
+  describe('GET /badges/me/session-feedback — bonus de première session', () => {
+    const makeTest = async (user) => {
+      const subject = await Subject.create({ name: `Bilan ${user.userId}` })
+      return Test.create({ name: 'Bilan', userId: user.userId, subjectId: subject.subjectId })
+    }
+    const result = (user, test) => TestResult.create({ userId: user.userId, testId: test.testId, score: 1, total: 1, completedAt: new Date() })
+
+    it('session-feedback - première pratique du jour - firstOfDay vrai', async () => {
+      const user = await createUser()
+      await result(user, await makeTest(user))
+
+      const res = await request(app).get(`${BASE}/badges/me/session-feedback`).set(auth(user))
+
+      expect(res.status).toBe(200)
+      expect(res.body).toMatchObject({ firstOfDay: true, practicesToday: 1, streakExtended: false, dailyGoalAchieved: false })
+    })
+
+    it('session-feedback - deuxième pratique du jour - firstOfDay faux', async () => {
+      const user = await createUser()
+      const test = await makeTest(user)
+      await result(user, test)
+      await result(user, test)
+
+      const res = await request(app).get(`${BASE}/badges/me/session-feedback`).set(auth(user))
+
+      expect(res.body).toMatchObject({ firstOfDay: false, practicesToday: 2, streakExtended: false })
+    })
+
+    it('session-feedback - première pratique après une série en cours - série prolongée', async () => {
+      const user = await createUser()
+      await practiceDays(user, 0, 1, 2)
+      await result(user, await makeTest(user))
+
+      const res = await request(app).get(`${BASE}/badges/me/session-feedback`).set(auth(user))
+
+      expect(res.body).toMatchObject({ firstOfDay: true, streakCurrent: 3, streakExtended: true })
+    })
+
+    it('session-feedback - aucune pratique - rien à fêter', async () => {
+      const user = await createUser()
+
+      const res = await request(app).get(`${BASE}/badges/me/session-feedback`).set(auth(user))
+
+      expect(res.body).toMatchObject({ firstOfDay: false, practicesToday: 0, streakCurrent: 0 })
+    })
+
+    it('session-feedback - sans jeton - 401', async () => {
+      expect((await request(app).get(`${BASE}/badges/me/session-feedback`)).status).toBe(401)
+    })
+  })
+
+  describe('GET /badges/me/summary — practicedToday', () => {
+    it('summary - jour d’activité aujourd’hui - practicedToday vrai, sinon faux', async () => {
+      const active = await createUser()
+      await practiceDays(active, 0, 1)
+      const idle = await createUser()
+      await practiceDays(idle, 1)
+
+      const a = await request(app).get(`${BASE}/badges/me/summary`).set(auth(active))
+      const i = await request(app).get(`${BASE}/badges/me/summary`).set(auth(idle))
+
+      expect(a.body.practicedToday).toBe(true)
+      expect(i.body.practicedToday).toBe(false)
+      expect(i.body.streakCurrent).toBe(1)
+    })
+  })
+
+  describe('Gel de série (A3)', () => {
+    const offsets = (from, to) => Array.from({ length: from - to + 1 }, (_, i) => from - i) // from → to (décroissant)
+    const subjectTest = async (user) => {
+      const subject = await Subject.create({ name: `Gel ${user.userId}` })
+      return Test.create({ name: 'Gel', userId: user.userId, subjectId: subject.subjectId })
+    }
+
+    it('summary - 14 jours de série - un gel en réserve, cycle remis à zéro', async () => {
+      const user = await createUser()
+      await practiceDays(user, ...offsets(13, 0))
+
+      const res = await request(app).get(`${BASE}/badges/me/summary`).set(auth(user))
+
+      expect(res.body.streakCurrent).toBe(14)
+      expect(res.body.freezes).toEqual({ available: 1, max: 2, progress: 0, every: 14 })
+    })
+
+    it('summary - 5 jours de série - aucun gel, progression 5/14', async () => {
+      const user = await createUser()
+      await practiceDays(user, ...offsets(4, 0))
+
+      const res = await request(app).get(`${BASE}/badges/me/summary`).set(auth(user))
+
+      expect(res.body.freezes).toEqual({ available: 0, max: 2, progress: 5, every: 14 })
+    })
+
+    it('session-feedback - le 14ᵉ jour de série - gel gagné aujourd’hui', async () => {
+      const user = await createUser()
+      await practiceDays(user, ...offsets(13, 0))
+      await TestResult.create({ userId: user.userId, testId: (await subjectTest(user)).testId, score: 1, total: 1, completedAt: new Date() })
+
+      const res = await request(app).get(`${BASE}/badges/me/session-feedback`).set(auth(user))
+
+      expect(res.body).toMatchObject({ freezeEarned: true, freezeUsed: false, freezesAvailable: 1 })
+    })
+
+    it('session-feedback - reprise après deux jours manqués - le gel a protégé la série', async () => {
+      const user = await createUser()
+      // 14 jours de pratique, puis deux jours manqués (hier et avant-hier), reprise aujourd'hui
+      await practiceDays(user, ...offsets(16, 3), 0)
+      await TestResult.create({ userId: user.userId, testId: (await subjectTest(user)).testId, score: 1, total: 1, completedAt: new Date() })
+
+      const res = await request(app).get(`${BASE}/badges/me/session-feedback`).set(auth(user))
+
+      expect(res.body).toMatchObject({ freezeUsed: true, freezesAvailable: 0, streakCurrent: 15 })
+    })
+
+    it('session-feedback - série ordinaire - ni gel gagné ni gel utilisé', async () => {
+      const user = await createUser()
+      await practiceDays(user, 2, 1, 0)
+
+      const res = await request(app).get(`${BASE}/badges/me/session-feedback`).set(auth(user))
+
+      expect(res.body).toMatchObject({ freezeEarned: false, freezeUsed: false, freezesAvailable: 0 })
     })
   })
 

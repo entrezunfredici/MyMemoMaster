@@ -75,7 +75,10 @@
       <header class="mt-20 lg:mt-16 xl:mt-12 mb-3 flex items-start justify-between pr-4">
         <h1 class="text-primary text-[3rem] lg:text-[4rem] xl:text-[4rem] neue-haas-grotesk-b font-bold">{{
           route.meta.title }}</h1>
-        <NotificationBell class="mt-3" data-tour="notifications" />
+        <div class="mt-3 flex items-center gap-3">
+          <StreakFlame />
+          <NotificationBell data-tour="notifications" />
+        </div>
       </header>
       <GuidedTourBanner />
       <OnboardingTour />
@@ -89,7 +92,10 @@
     <header class="m-4 flex items-center justify-between">
       <h1 class="text-primary text-[2rem] neue-haas-grotesk-b font-bold">{{
         route.meta.title }}</h1>
-      <NotificationBell data-tour="notifications" />
+      <div class="flex items-center gap-2">
+        <StreakFlame />
+        <NotificationBell data-tour="notifications" />
+      </div>
     </header>
     <div class="m-4 mb-0">
       <GuidedTourBanner />
@@ -123,6 +129,7 @@ import GuidedTourBanner from '@/components/GuidedTourBannerComponent.vue'
 import OnboardingTour from '@/components/OnboardingTourComponent.vue'
 import MobileNav from '@/components/MobileNavComponent.vue'
 import BadgeCelebration from '@/components/badges/BadgeCelebration.vue'
+import StreakFlame from '@/components/badges/StreakFlame.vue'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { notif } from '@/helpers/notif.js'
 

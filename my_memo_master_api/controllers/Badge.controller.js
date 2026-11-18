@@ -1,6 +1,8 @@
 const badgeService = require('../services/Badge.service')
 const logger = require('../helpers/logger')
 const gamificationProfileService = require('../services/GamificationProfile.service')
+const subjectLevelService = require('../services/SubjectLevel.service')
+const dailyChallengeService = require('../services/DailyChallenge.service')
 
 exports.findAll = async (req, res) => {
   try {
@@ -96,6 +98,33 @@ exports.dailyGoal = async (req, res) => {
   } catch (error) {
     logger.error(error?.message || error)
     res.status(500).json({ message: "Erreur lors de la récupération de l'objectif quotidien." })
+  }
+}
+
+exports.sessionFeedback = async (req, res) => {
+  try {
+    res.status(200).json(await gamificationProfileService.getSessionFeedback(req.user.id))
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération du bilan de la session.' })
+  }
+}
+
+exports.dailyChallenge = async (req, res) => {
+  try {
+    res.status(200).json(await dailyChallengeService.get(req.user.id))
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération du défi du jour.' })
+  }
+}
+
+exports.subjectLevels = async (req, res) => {
+  try {
+    res.status(200).json(await subjectLevelService.list(req.user.id))
+  } catch (error) {
+    logger.error(error?.message || error)
+    res.status(500).json({ message: 'Erreur lors de la récupération des niveaux par matière.' })
   }
 }
 

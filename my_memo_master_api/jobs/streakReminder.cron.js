@@ -3,15 +3,18 @@ const logger = require('../helpers/logger')
 
 let streakReminderCron = null
 
+// Toutes les heures, à la minute 30 : le service ne rappelle que les utilisateurs pour qui il est 18 h
+// dans leur fuseau (voir REMINDER_LOCAL_HOUR) ; un seul rappel par utilisateur et par jour.
+const SCHEDULE = '30 * * * *'
+
 /**
- * Lance le cron quotidien des rappels de série menacée.
- * S'exécute à 18h30 tous les jours (après le digest KPI de 18h00).
+ * Lance le cron des rappels de série menacée (passage horaire, un rappel par utilisateur et par jour).
  * Idempotent : un seul cron tourne par processus.
  */
 function startStreakReminderCron() {
   if (streakReminderCron) return
 
-  streakReminderCron = cron.schedule('30 18 * * *', async () => {
+  streakReminderCron = cron.schedule(SCHEDULE, async () => {
     logger.info('[streak-reminder-cron] Démarrage des rappels de série')
     try {
       // Chargement différé pour éviter les problèmes de DB non initialisée
@@ -22,7 +25,7 @@ function startStreakReminderCron() {
     }
   })
 
-  logger.info('[streak-reminder-cron] Démarré — exécution quotidienne à 18h30')
+  logger.info('[streak-reminder-cron] Démarré — passage horaire, rappel à 18 h locale de chaque utilisateur')
 }
 
 function stopStreakReminderCron() {
@@ -32,4 +35,4 @@ function stopStreakReminderCron() {
   }
 }
 
-module.exports = { startStreakReminderCron, stopStreakReminderCron }
+module.exports = { startStreakReminderCron, stopStreakReminderCron, SCHEDULE }

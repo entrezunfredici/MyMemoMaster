@@ -444,7 +444,7 @@ describe('AdminPage', () => {
     const { wrapper } = mountPage()
     const pressed = () => wrapper.findAll('[role="group"] button').map((b) => [b.text(), b.attributes('aria-pressed')])
     expect(wrapper.find('#admin-roles-title').exists()).toBe(true)
-    expect(pressed()).toEqual([['Rôles', 'true'], ['Comptes', 'false'], ['Journal d’audit', 'false'], ['Sauvegardes', 'false']])
+    expect(pressed()).toEqual([['Rôles', 'true'], ['Comptes', 'false'], ['Journal d’audit', 'false'], ['Sauvegardes', 'false'], ['Badges', 'false']])
     await btn(wrapper, 'Comptes').trigger('click')
     expect(wrapper.find('#admin-accounts-title').exists()).toBe(true)
     expect(wrapper.find('#admin-roles-title').exists()).toBe(false)

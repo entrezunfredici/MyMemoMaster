@@ -186,15 +186,68 @@ describe('OAuth.service', () => {
       await expect(oauthService.fetchProfile('github', 'code')).rejects.toMatchObject({ status: 502 })
     })
 
-    test('fetchProfile - microsoft - email jamais considéré comme vérifié', async () => {
+    const msIdToken = (claims) => jwt.sign(claims, 'peu-importe')
+    const MS_CONSUMER_TID = '9188040d-6c67-4c5b-b112-36a304b66dad'
+
+    test('fetchProfile - microsoft tenant Entra - email non vérifié', async () => {
       global.fetch
-        .mockResolvedValueOnce(jsonResponse({ access_token: 'ms' }))
+        .mockResolvedValueOnce(jsonResponse({ access_token: 'ms', id_token: msIdToken({ tid: 'tenant-corp' }) }))
         .mockResolvedValueOnce(jsonResponse({ sub: 'abc', email: 'a@corp.fr', name: 'Alice' }))
       await expect(oauthService.fetchProfile('microsoft', 'code')).resolves.toMatchObject({
         providerUserId: 'abc',
         email: 'a@corp.fr',
         emailVerified: false
       })
+    })
+
+    test('fetchProfile - microsoft compte personnel - email vérifié', async () => {
+      global.fetch
+        .mockResolvedValueOnce(jsonResponse({ access_token: 'ms', id_token: msIdToken({ tid: MS_CONSUMER_TID }) }))
+        .mockResolvedValueOnce(jsonResponse({ sub: 'abc', email: 'a@outlook.fr', name: 'Alice' }))
+      await expect(oauthService.fetchProfile('microsoft', 'code')).resolves.toMatchObject({
+        providerUserId: 'abc',
+        email: 'a@outlook.fr',
+        emailVerified: true
+      })
+    })
+
+    test('fetchProfile - microsoft Entra avec xms_edov et même email - email vérifié', async () => {
+      global.fetch
+        .mockResolvedValueOnce(
+          jsonResponse({ access_token: 'ms', id_token: msIdToken({ tid: 'tenant-corp', email: 'A@Corp.fr', xms_edov: 1 }) })
+        )
+        .mockResolvedValueOnce(jsonResponse({ sub: 'abc', email: 'a@corp.fr', name: 'Alice' }))
+      await expect(oauthService.fetchProfile('microsoft', 'code')).resolves.toMatchObject({ emailVerified: true })
+    })
+
+    test('fetchProfile - microsoft Entra avec xms_edov faux - email non vérifié', async () => {
+      global.fetch
+        .mockResolvedValueOnce(
+          jsonResponse({ access_token: 'ms', id_token: msIdToken({ tid: 'tenant-corp', email: 'a@corp.fr', xms_edov: 0 }) })
+        )
+        .mockResolvedValueOnce(jsonResponse({ sub: 'abc', email: 'a@corp.fr' }))
+      await expect(oauthService.fetchProfile('microsoft', 'code')).resolves.toMatchObject({ emailVerified: false })
+    })
+
+    test('fetchProfile - microsoft Entra avec xms_edov mais email différent - email non vérifié', async () => {
+      global.fetch
+        .mockResolvedValueOnce(
+          jsonResponse({ access_token: 'ms', id_token: msIdToken({ tid: 'tenant-corp', email: 'a@corp.fr', xms_edov: 1 }) })
+        )
+        .mockResolvedValueOnce(jsonResponse({ sub: 'abc', email: 'victime@autre.fr' }))
+      await expect(oauthService.fetchProfile('microsoft', 'code')).resolves.toMatchObject({ emailVerified: false })
+    })
+
+    test('fetchProfile - microsoft sans id_token ou id_token illisible - email non vérifié', async () => {
+      global.fetch
+        .mockResolvedValueOnce(jsonResponse({ access_token: 'ms' }))
+        .mockResolvedValueOnce(jsonResponse({ sub: 'abc', email: 'a@outlook.fr' }))
+      await expect(oauthService.fetchProfile('microsoft', 'code')).resolves.toMatchObject({ emailVerified: false })
+
+      global.fetch
+        .mockResolvedValueOnce(jsonResponse({ access_token: 'ms', id_token: 'pas-un-jwt' }))
+        .mockResolvedValueOnce(jsonResponse({ sub: 'abc', email: 'a@outlook.fr' }))
+      await expect(oauthService.fetchProfile('microsoft', 'code')).resolves.toMatchObject({ emailVerified: false })
     })
   })
 

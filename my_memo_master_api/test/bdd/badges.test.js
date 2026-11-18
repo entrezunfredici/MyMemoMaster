@@ -79,6 +79,49 @@ describe('Badges — noyau de gamification', () => {
       expect(await UserActivityDay.count({ where: { userId: user.userId } })).toBe(1)
     })
 
+    it('handle - métriques Prometheus - événements, badges attribués et durée sont comptés', async () => {
+      const { register } = require('../../helpers/metrics')
+      const user = await createUser()
+      const subject = await createSubject('Maths')
+      await createResult(user.userId, subject, { score: 2, total: 4 })
+
+      await emit('exercise.submitted', { userId: user.userId })
+
+      const events = await register.getSingleMetric('gamification_events_total').get()
+      const awarded = await register.getSingleMetric('badges_awarded_total').get()
+      const duration = await register.getSingleMetric('gamification_evaluation_duration_seconds').get()
+      expect(events.values.find((v) => v.labels.type === 'exercise.submitted').value).toBeGreaterThanOrEqual(1)
+      expect(awarded.values.find((v) => v.labels.badge === 'firstExercise').value).toBeGreaterThanOrEqual(1)
+      expect(duration.values.some((v) => v.labels.type === 'exercise.submitted')).toBe(true)
+    })
+
+    it('listForKpi - compte sans aucune pratique - le rattrapage n’est tenté qu’une fois par processus', async () => {
+      const user = await createUser()
+      const spy = jest.spyOn(badgeService, 'backfill')
+
+      await badgeService.listForKpi(user.userId)
+      await badgeService.listForKpi(user.userId)
+      await badgeService.listForKpi(user.userId)
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      spy.mockRestore()
+    })
+
+    it('loadRaw - boîtes Leitner - nombre de cartes par boîte sans charger les cartes', async () => {
+      const user = await createUser()
+      const system = await LeitnerSystem.create({ name: 'Sys', idUser: user.userId })
+      const box = await LeitnerBox.create({ level: 4, intervall: 10, color: 111111, idSystem: system.idSystem })
+      const question = await Question.create({ statement: 'Q', questionPosition: 1, type: 'text' })
+      await LeitnerCard.create({ idBox: box.idBox, idQuestion: question.idQuestion })
+      await LeitnerCard.create({ idBox: box.idBox, idQuestion: question.idQuestion })
+
+      const raw = await badgeService.loadRaw(user.userId)
+
+      expect(raw.systems).toHaveLength(1)
+      expect(raw.systems[0].leitnerBoxes[0]).toMatchObject({ level: 4, cardCount: 2 })
+      expect(raw.systems[0].leitnerBoxes[0].leitnerCards).toBeUndefined()
+    })
+
     it('handle - même événement rejoué - aucun doublon (idempotence)', async () => {
       const user = await createUser()
       const subject = await createSubject('Maths')

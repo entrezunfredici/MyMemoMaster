@@ -1,4 +1,5 @@
 const { body, param, query } = require('express-validator')
+const { isValidZone } = require('../helpers/badges/zone')
 
 const MAX_CODES_PER_REQUEST = 50
 
@@ -49,5 +50,9 @@ exports.updateSettings = [
   body('streakReminderEnabled').optional().isBoolean({ strict: true }).withMessage('streakReminderEnabled doit être un booléen.'),
   body('badgesVisibleToTeachers').optional().isBoolean({ strict: true }).withMessage('badgesVisibleToTeachers doit être un booléen.'),
   body('animationsEnabled').optional().isBoolean({ strict: true }).withMessage('animationsEnabled doit être un booléen.'),
-  body('zenMode').optional().isBoolean({ strict: true }).withMessage('zenMode doit être un booléen.')
+  body('zenMode').optional().isBoolean({ strict: true }).withMessage('zenMode doit être un booléen.'),
+  body('timezone')
+    .optional({ nullable: true })
+    .custom((value) => isValidZone(value))
+    .withMessage('Le fuseau horaire est invalide (ex. Europe/Paris).')
 ]

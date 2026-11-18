@@ -1,7 +1,9 @@
-const dayjs = require('dayjs')
 const { Op, UniqueConstraintError } = require('sequelize')
-const { UserGamificationSettings, UserBadge, UserActivityDay, LeitnerReviewSession, TestResult } = require('../models/index')
+const { UserGamificationSettings, UserBadge, UserActivityDay, LeitnerReviewSession, TestResult, MindMapViewSession } = require('../models/index')
 const badgeService = require('./Badge.service')
+const userActivityDayService = require('./UserActivityDay.service')
+const dailyChallengeService = require('./DailyChallenge.service')
+const { inZone, dayString, dayBounds, isValidZone } = require('../helpers/badges/zone')
 const { computeStreaks } = require('../helpers/badges/streak')
 const { CATALOG_BY_CODE } = require('../helpers/badges/catalog')
 
@@ -15,7 +17,8 @@ const DEFAULT_SETTINGS = Object.freeze({
   streakReminderEnabled: false,
   badgesVisibleToTeachers: false,
   animationsEnabled: true,
-  zenMode: false
+  zenMode: false,
+  timezone: null
 })
 const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS)
 
@@ -61,6 +64,8 @@ class GamificationProfileService {
    */
   async updateSettings(userId, changes) {
     const patch = Object.fromEntries(SETTING_KEYS.filter((key) => changes[key] !== undefined).map((key) => [key, changes[key]]))
+    // Un fuseau inconnu est ignoré plutôt que stocké (le validateur de route le refuse déjà en amont)
+    if (patch.timezone !== undefined && patch.timezone !== null && !isValidZone(patch.timezone)) delete patch.timezone
     const row = await this.ensureRow(userId)
     if (Object.keys(patch).length > 0) await row.update(patch)
     return this.getSettings(userId)
@@ -144,7 +149,8 @@ class GamificationProfileService {
    * @returns {Promise<object>} { from, to, today, weeks, activeDates, activeDaysLast30, streakCurrent, streakBest }
    */
   async getActivity(userId, weeks = DEFAULT_WEEKS, now = new Date()) {
-    const today = dayjs(now)
+    const zone = await userActivityDayService.getZone(userId)
+    const today = inZone(now, zone)
     const mondayOffset = (today.day() + 6) % 7
     const from = today.subtract(mondayOffset + (weeks - 1) * 7, 'day').format('YYYY-MM-DD')
     const todayStr = today.format('YYYY-MM-DD')
@@ -178,11 +184,11 @@ class GamificationProfileService {
    * @returns {Promise<{ date: string, cards: { goal: number, done: number }, exercises: { goal: number, done: number }, achieved: boolean }>}
    */
   async getDailyGoal(userId, now = new Date()) {
-    const start = dayjs(now).startOf('day').toDate()
-    const end = dayjs(now).endOf('day').toDate()
+    const settings = await this.getSettings(userId)
+    const zone = isValidZone(settings.timezone) ? settings.timezone : null
+    const { start, end } = dayBounds(now, zone)
     const range = { [Op.between]: [start, end] }
-    const [settings, sessions, exercises] = await Promise.all([
-      this.getSettings(userId),
+    const [sessions, exercises] = await Promise.all([
       LeitnerReviewSession.findAll({ where: { userId, completedAt: range }, attributes: ['cardsReviewed'], raw: true }),
       TestResult.count({ where: { userId, completedAt: range } })
     ])
@@ -190,7 +196,7 @@ class GamificationProfileService {
     const exercisesProgress = { goal: settings.dailyGoalExercises, done: exercises }
     const goals = [cards, exercisesProgress].filter((entry) => entry.goal > 0)
     return {
-      date: dayjs(now).format('YYYY-MM-DD'),
+      date: dayString(now, zone),
       cards,
       exercises: exercisesProgress,
       achieved: goals.length > 0 && goals.every((entry) => entry.done >= entry.goal)
@@ -199,28 +205,76 @@ class GamificationProfileService {
 
   /**
    * Utilisateurs dont une série d'au moins `minStreak` jours est menacée : pratique hier mais pas encore
-   * aujourd'hui, rappel activé et mode zen désactivé (le mode zen coupe toute sollicitation).
+   * aujourd'hui (jours comptés dans le fuseau de chaque utilisateur), rappel activé et mode zen désactivé
+   * (le mode zen coupe toute sollicitation).
    *
    * @param {Date} [now]
    * @param {number} [minStreak]
-   * @returns {Promise<Array<{ userId: number, streak: number }>>}
+   * @param {number|null} [localHour] - si fourni, ne retient que les utilisateurs dont il est actuellement
+   *   cette heure locale (0-23) : le cron tourne toutes les heures et chacun est rappelé à sa propre heure
+   * @returns {Promise<Array<{ userId: number, streak: number, zone: string|null }>>}
    */
-  async findStreaksAtRisk(now = new Date(), minStreak = 2) {
+  async findStreaksAtRisk(now = new Date(), minStreak = 2, localHour = null) {
     const settings = await UserGamificationSettings.findAll({
       where: { streakReminderEnabled: true, zenMode: false },
-      attributes: ['userId'],
+      attributes: ['userId', 'timezone'],
       raw: true
     })
-    const today = dayjs(now).format('YYYY-MM-DD')
-    const yesterday = dayjs(now).subtract(1, 'day').format('YYYY-MM-DD')
     const atRisk = []
-    for (const { userId } of settings) {
-      const dates = (await UserActivityDay.findAll({ where: { userId, date: { [Op.gte]: dayjs(now).subtract(400, 'day').format('YYYY-MM-DD') } }, attributes: ['date'], raw: true })).map((row) => row.date)
+    for (const { userId, timezone } of settings) {
+      const zone = isValidZone(timezone) ? timezone : null
+      const local = inZone(now, zone)
+      if (localHour !== null && local.hour() !== localHour) continue
+      const today = local.format('YYYY-MM-DD')
+      const yesterday = local.subtract(1, 'day').format('YYYY-MM-DD')
+      const since = local.subtract(400, 'day').format('YYYY-MM-DD')
+      const dates = (await UserActivityDay.findAll({ where: { userId, date: { [Op.gte]: since } }, attributes: ['date'], raw: true })).map((row) => row.date)
       if (dates.includes(today) || !dates.includes(yesterday)) continue
       const { current } = computeStreaks(dates, today)
-      if (current >= minStreak) atRisk.push({ userId, streak: current })
+      if (current >= minStreak) atRisk.push({ userId, streak: current, zone })
     }
     return atRisk
+  }
+
+  /**
+   * Faits utiles au message de fin de session : est-ce la première pratique de la journée (bonus de
+   * première session, sans points), et où en est la série. Les messages eux-mêmes sont composés côté
+   * front. À appeler une fois la session enregistrée.
+   *
+   * @param {number} userId
+   * @param {Date} [now]
+   * @returns {Promise<{ date: string, firstOfDay: boolean, practicesToday: number, streakCurrent: number, streakBest: number, streakExtended: boolean, dailyGoalAchieved: boolean, freezeUsed: boolean, freezeEarned: boolean, freezesAvailable: number, challengeDone: boolean, challengeSubject: string|null }>}
+   */
+  async getSessionFeedback(userId, now = new Date()) {
+    const zone = await userActivityDayService.getZone(userId)
+    const { start, end } = dayBounds(now, zone)
+    const range = { [Op.between]: [start, end] }
+    const [leitner, exercises, views, stats, goal, challenge] = await Promise.all([
+      LeitnerReviewSession.count({ where: { userId, completedAt: range } }),
+      TestResult.count({ where: { userId, completedAt: range } }),
+      MindMapViewSession.count({ where: { userId, viewedAt: range, durationSeconds: { [Op.gte]: userActivityDayService.MIN_MINDMAP_VIEW_SECONDS } } }),
+      badgeService.loadStats(userId, now),
+      this.getDailyGoal(userId, now),
+      dailyChallengeService.get(userId, now)
+    ])
+    const practicesToday = leitner + exercises + views
+    const firstOfDay = practicesToday === 1
+    return {
+      date: dayString(now, zone),
+      firstOfDay,
+      practicesToday,
+      streakCurrent: stats.streakCurrent,
+      streakBest: stats.streakBest,
+      streakExtended: firstOfDay && stats.streakCurrent >= 2,
+      dailyGoalAchieved: goal.achieved,
+      // Gel de série (A3) : un gel vient de couvrir un trou avant la pratique d'aujourd'hui / vient d'être gagné
+      freezeUsed: stats.lastFreezeUsedOn === dayString(now, zone),
+      freezeEarned: stats.lastFreezeEarnedOn === dayString(now, zone),
+      freezesAvailable: stats.freezesAvailable,
+      // Défi du jour (A4) relevé par CETTE session : la première pratique du jour dans la matière du défi
+      challengeDone: challenge.done && challenge.practicesToday === 1,
+      challengeSubject: challenge.done && challenge.practicesToday === 1 ? challenge.subject?.name ?? null : null
+    }
   }
 }
 

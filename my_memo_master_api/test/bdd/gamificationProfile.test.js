@@ -224,7 +224,8 @@ describe('Profil gamifié — titre, vitrine, calendrier, réglages', () => {
         streakReminderEnabled: false,
         badgesVisibleToTeachers: false,
         animationsEnabled: true,
-        zenMode: false
+        zenMode: false,
+        timezone: null
       })
       expect(await UserGamificationSettings.count({ where: { userId: user.userId } })).toBe(0)
     })

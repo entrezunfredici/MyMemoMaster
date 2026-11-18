@@ -9,6 +9,12 @@
       <p class="text-lg mt-2">{{ Math.round((correctCount / questions.length) * 100) }}%</p>
     </div>
   </div>
+  <!-- Les résultats ne s'affichent qu'une fois l'exercice enregistré par l'API : le bilan du jour est alors fiable -->
+  <SessionEncouragement
+    class="mb-8 block"
+    :ready="shown"
+    :score-percent="questions.length ? Math.round((correctCount / questions.length) * 100) : null"
+  />
   <div v-if="shown" class="space-y-6">
 
     <!-- Détail par question -->
@@ -83,6 +89,7 @@
 // Écran de résultats : score annoncé aux lecteurs d'écran, détail de chaque question, bouton « Recommencer ».
 // Extrait de pages/ExerciseDetailPage.vue.
 import FormulaText from '@/components/FormulaTextComponent.vue'
+import SessionEncouragement from '@/components/badges/SessionEncouragement.vue'
 import { formatCorrectAnswer, formatPoints, formatUserAnswer, partialPoints, resultTone } from '@/helpers/exerciseQuiz'
 
 defineProps({

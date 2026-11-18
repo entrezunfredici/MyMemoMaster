@@ -39,6 +39,8 @@
 
         <BadgeShowcase v-if="store.profileLoaded" :badges="store.badges" :codes="store.profile.showcaseCodes" @save="store.saveProfile({ showcaseCodes: $event })" />
 
+        <SubjectLevels />
+
         <section v-if="upcoming.length && store.summary.earnedCount === 0" aria-labelledby="next-badges-title">
           <h2 id="next-badges-title" class="text-xl font-bold text-primary mb-2">Prochains badges</h2>
           <ul class="flex flex-wrap gap-2 list-none p-0">
@@ -83,6 +85,7 @@ import BadgeShowcase from '@/components/badges/BadgeShowcase.vue'
 import BadgeGrid from '@/components/badges/BadgeGrid.vue'
 import BadgeDetailModal from '@/components/badges/BadgeDetailModal.vue'
 import ActivityCalendar from '@/components/badges/ActivityCalendar.vue'
+import SubjectLevels from '@/components/badges/SubjectLevels.vue'
 import GamificationSettings from '@/components/badges/GamificationSettings.vue'
 import { useBadgesStore } from '@/stores/badges'
 import { MAX_SHOWCASE, nextBadges, toggleShowcaseCode } from '@/helpers/badges'

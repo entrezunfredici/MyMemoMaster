@@ -28,6 +28,7 @@
     </section>
     <section class="home__badges">
       <DailyGoalRing class="mb-4" />
+      <DailyChallenge class="mb-4" />
       <ProfileBadgesSummary />
     </section>
   </div>
@@ -40,6 +41,7 @@ import Grid from '@/components/GridComponent.vue'
 import KpiAlertWidgetComponent from '@/components/KpiAlertWidgetComponent.vue'
 import ProfileBadgesSummary from '@/components/badges/ProfileBadgesSummary.vue'
 import DailyGoalRing from '@/components/badges/DailyGoalRing.vue'
+import DailyChallenge from '@/components/badges/DailyChallenge.vue'
 import { useGuidedTourStore } from '@/stores/guidedTour'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
 

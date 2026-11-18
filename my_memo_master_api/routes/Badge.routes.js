@@ -48,7 +48,7 @@ module.exports = (router) => {
    * @swagger
    * /badges/me/summary:
    *   get:
-   *     summary: Résumé du profil gamifié (niveau, badges obtenus, séries)
+   *     summary: Résumé du profil gamifié (niveau, badges obtenus, séries, gels de série)
    *     tags: [Badge]
    *     responses:
    *       200:
@@ -178,6 +178,57 @@ module.exports = (router) => {
 
   /**
    * @swagger
+   * /badges/me/session-feedback:
+   *   get:
+   *     summary: Bilan de fin de session (première pratique du jour, série) pour le message d'encouragement
+   *     description: À appeler une fois la session enregistrée. Jours comptés dans le fuseau de l'utilisateur.
+   *     tags: [Badge]
+   *     responses:
+   *       200:
+   *         description: "{ date, firstOfDay, practicesToday, streakCurrent, streakBest, streakExtended, dailyGoalAchieved }"
+   *       401:
+   *         description: Non authentifié
+   *       500:
+   *         description: Erreur serveur
+   */
+  router.get('/badges/me/session-feedback', authMiddleware, badge.sessionFeedback)
+
+  /**
+   * @swagger
+   * /badges/me/subject-levels:
+   *   get:
+   *     summary: Niveau de l'utilisateur dans chaque matière où il a une activité (Novice, Initié, Confirmé, Expert)
+   *     description: Calculé depuis les cartes maîtrisées (boîtes 4 et 5) et les exercices personnels terminés. Seuils lisibles, aucun point.
+   *     tags: [Badge]
+   *     responses:
+   *       200:
+   *         description: "[{ subjectId, name, rank, level: { code, label, icon }, next: { label, mode, cards, exercises, averagePercent }|null, stats: { masteredCards, totalCards, exercises, averagePercent } }]"
+   *       401:
+   *         description: Non authentifié
+   *       500:
+   *         description: Erreur serveur
+   */
+  router.get('/badges/me/subject-levels', authMiddleware, badge.subjectLevels)
+
+  /**
+   * @swagger
+   * /badges/me/daily-challenge:
+   *   get:
+   *     summary: Défi du jour — réviser la matière la plus délaissée (aucune pratique depuis 7 jours)
+   *     description: Dérivé de l'historique, stable toute la journée (jour dans le fuseau de l'utilisateur), rien n'est stocké.
+   *     tags: [Badge]
+   *     responses:
+   *       200:
+   *         description: "{ date, available, subject: { subjectId, name }|null, daysSince: number|null, done, practicesToday }"
+   *       401:
+   *         description: Non authentifié
+   *       500:
+   *         description: Erreur serveur
+   */
+  router.get('/badges/me/daily-challenge', authMiddleware, badge.dailyChallenge)
+
+  /**
+   * @swagger
    * /badges/me/settings:
    *   get:
    *     summary: Réglages de gamification (valeurs par défaut si jamais modifiés)
@@ -215,6 +266,10 @@ module.exports = (router) => {
    *                 type: boolean
    *               zenMode:
    *                 type: boolean
+   *               timezone:
+   *                 type: string
+   *                 nullable: true
+   *                 description: Fuseau IANA du navigateur (ex. Europe/Paris) ; null = fuseau du serveur
    *     responses:
    *       200:
    *         description: Réglages enregistrés

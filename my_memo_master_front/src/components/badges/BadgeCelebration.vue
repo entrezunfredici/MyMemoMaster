@@ -36,12 +36,13 @@
 <script setup>
 // Modale d'obtention d'un badge, montée une fois dans App.vue. Elle ne s'ouvre que si l'utilisateur est
 // connecté, que les animations sont activées et que le mode zen est coupé (voir `celebrationsAllowed`).
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { dialogDirective as vDialog } from '@/directives/dialog'
 import { useAuthStore } from '@/stores/auth'
 import { useBadgesStore } from '@/stores/badges'
 import { rarityMeta } from '@/helpers/badges'
+import { PRACTICE_EVENT } from '@/helpers/practiceEvents'
 
 const store = useBadgesStore()
 const authStore = useAuthStore()
@@ -54,7 +55,16 @@ const hasNext = computed(() => index.value < total.value - 1)
 const rarity = computed(() => rarityMeta(current.value?.rarity))
 
 function check() {
-  if (authStore.authenticated) store.fetchCelebrations()
+  if (!authStore.authenticated) return
+  store.fetchCelebrations()
+  // Une fois par compte : le jour de la série, l'objectif quotidien et le rappel suivent le fuseau du navigateur
+  store.syncTimezone()
+}
+
+// Pratique enregistrée (exercice corrigé, session Leitner, carte consultée) : l'API a déjà attribué les
+// badges, on les cherche tout de suite au lieu d'attendre le prochain changement de page.
+function onPractice() {
+  if (authStore.authenticated) store.refreshAfterPractice()
 }
 
 function advance() {
@@ -67,7 +77,11 @@ function close() {
   store.dismissCelebrations()
 }
 
-onMounted(check)
+onMounted(() => {
+  check()
+  window.addEventListener(PRACTICE_EVENT, onPractice)
+})
+onBeforeUnmount(() => window.removeEventListener(PRACTICE_EVENT, onPractice))
 // Vérification à chaque changement de page : un badge gagné pendant une session s'affiche à la page suivante
 watch(() => route.fullPath, check)
 watch(() => authStore.authenticated, check)

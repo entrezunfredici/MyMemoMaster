@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   profile: vi.fn(),
   saveProfile: vi.fn(),
   activity: vi.fn(),
+  subjectLevels: vi.fn(),
   settings: vi.fn(),
   updateSettings: vi.fn(),
   notify: vi.fn(),
@@ -61,6 +62,7 @@ beforeEach(() => {
   api.markSeen.mockResolvedValue(ok({ updated: 1 }))
   api.profile.mockResolvedValue(ok({ titleCode: null, showcaseCodes: [] }))
   api.activity.mockResolvedValue(ok(ACTIVITY))
+  api.subjectLevels.mockResolvedValue(ok([]))
   api.settings.mockResolvedValue(ok(SETTINGS))
   api.saveProfile.mockImplementation(async (data) => ok({ message: 'ok', titleCode: data.titleCode ?? null, showcaseCodes: data.showcaseCodes ?? [] }))
   api.updateSettings.mockImplementation(async (patch) => ok({ message: 'ok', ...SETTINGS, ...patch }))
@@ -404,6 +406,18 @@ describe('BadgesPage — blocs profil, activité, réglages, mode zen', () => {
 
     expect(wrapper.text()).toContain('Ma vitrine')
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('niveaux par matière - bloc affiché sur la page, absent en mode zen', async () => {
+    api.subjectLevels.mockResolvedValue(ok([{ subjectId: 1, name: 'Maths', rank: 1, level: { code: 'initiate', label: 'Initié', icon: '📘' }, stats: { masteredCards: 10, totalCards: 12, exercises: 0, averagePercent: 0 }, next: null }]))
+    const wrapper = mountWith(BadgesPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="subject-level-1"]').text()).toContain('Initié')
+
+    useBadgesStore().settings = { ...SETTINGS, zenMode: true }
+    await flushPromises()
+    expect(wrapper.find('[data-testid="subject-levels"]').exists()).toBe(false)
   })
 
   it('titre choisi dans la liste - enregistré', async () => {

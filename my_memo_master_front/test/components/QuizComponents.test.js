@@ -119,8 +119,20 @@ describe('QuizResults', () => {
     { correct: false, points: 0 },
     { correct: true, points: 1, degraded: true, degradedMessage: 'Correction simplifiée.' },
   ]
+  // SessionEncouragement (message de fin de session) a ses propres tests : ici on vérifie seulement ce qu'on lui passe
   const mountResults = (props = {}) =>
-    mount(QuizResults, { props: { questions, states, results, correctCount: 1.6, shown: true, ...props }, global: { stubs } })
+    mount(QuizResults, {
+      props: { questions, states, results, correctCount: 1.6, shown: true, ...props },
+      global: { stubs: { ...stubs, SessionEncouragement: true } },
+    })
+
+  it('message de fin de session - prêt quand les résultats sont affichés, avec le score en pourcentage', () => {
+    const shown = mountResults().findComponent({ name: 'SessionEncouragement' })
+    expect(shown.props()).toEqual({ ready: true, scorePercent: 53 })
+
+    const hidden = mountResults({ shown: false }).findComponent({ name: 'SessionEncouragement' })
+    expect(hidden.props('ready')).toBe(false)
+  })
 
   it('la zone aria-live est toujours montée, même sans résultats (RGAA 13.x)', () => {
     const w = mountResults({ shown: false })

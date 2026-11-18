@@ -29,6 +29,10 @@
     </div>
     <p v-if="message" class="text-sm text-dark/70 mt-2">{{ message }}</p>
     <p class="text-sm text-dark/70 mt-2">Un jour de grâce protège ta série : 1 jour manqué par semaine ne la casse pas.</p>
+    <p v-if="freeze.visible" class="text-sm text-dark/70 mt-1" data-testid="freeze-summary">
+      <span aria-hidden="true">❄️</span> {{ freeze.text }}
+      Un gel couvre un jour manqué de plus ; il se gagne tous les 14 jours de série et ne s'achète pas.
+    </p>
   </div>
 </template>
 
@@ -36,6 +40,7 @@
 import { computed } from 'vue'
 import BadgeProgress from '@/components/badges/BadgeProgress.vue'
 import { levelProgress, streakMessage } from '@/helpers/badges'
+import { freezeSummary } from '@/helpers/gamificationMessages'
 
 const props = defineProps({
   summary: { type: Object, required: true },
@@ -51,6 +56,7 @@ const showTitle = computed(() => props.profileAvailable && props.earnedBadges.le
 const level = computed(() => levelProgress(props.summary))
 const nextMin = computed(() => props.summary.level?.next?.min ?? 0)
 const message = computed(() => streakMessage(props.summary))
+const freeze = computed(() => freezeSummary(props.summary.freezes))
 
 function plural(n) {
   return `${n} jour${n > 1 ? 's' : ''}`

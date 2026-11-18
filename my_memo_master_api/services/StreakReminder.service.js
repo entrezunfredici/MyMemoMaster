@@ -1,11 +1,16 @@
-const dayjs = require('dayjs')
 const { Op } = require('sequelize')
 const { Reminder } = require('../models/index')
 const gamificationProfileService = require('./GamificationProfile.service')
+const { dayBounds } = require('../helpers/badges/zone')
 const logger = require('../helpers/logger')
 
 // Valeur de `Reminder.entityType` (colonne de 20 caractères) : reconnue par la cloche de notifications du front
 const ENTITY_TYPE = 'streak_reminder'
+
+// Heure locale (de chaque utilisateur) à laquelle le rappel est envoyé : en fin de journée, assez tôt
+// pour qu'une courte révision reste possible. Le cron passe toutes les heures et ne rappelle que les
+// utilisateurs pour qui il est cette heure-là.
+const REMINDER_LOCAL_HOUR = 18
 
 class StreakReminderService {
   /**
@@ -20,20 +25,21 @@ class StreakReminderService {
 
   /**
    * Crée un rappel dans la cloche pour chaque utilisateur dont la série est menacée.
-   * Idempotent sur la journée : un seul rappel par utilisateur et par jour, même si le cron est relancé.
+   * Chaque utilisateur est rappelé à 18 h dans son fuseau (fuseau du serveur s'il n'en a pas envoyé).
+   * Idempotent sur la journée de l'utilisateur : un seul rappel par jour, même si le cron est relancé.
    * Aucun e-mail : le réglage « rappel de série » ne promet qu'une notification dans l'application.
    *
    * @param {Date} [now]
    * @returns {Promise<{ created: number, skipped: number }>}
    */
   async runDailyReminders(now = new Date()) {
-    const atRisk = await gamificationProfileService.findStreaksAtRisk(now)
-    const startOfDay = dayjs(now).startOf('day').toDate()
+    const atRisk = await gamificationProfileService.findStreaksAtRisk(now, undefined, REMINDER_LOCAL_HOUR)
     let created = 0
     let skipped = 0
 
-    for (const { userId, streak } of atRisk) {
+    for (const { userId, streak, zone } of atRisk) {
       try {
+        const { start: startOfDay } = dayBounds(now, zone)
         const already = await Reminder.count({ where: { userId, entityType: ENTITY_TYPE, reminderAt: { [Op.gte]: startOfDay } } })
         if (already > 0) {
           skipped++
@@ -62,3 +68,4 @@ class StreakReminderService {
 
 module.exports = new StreakReminderService()
 module.exports.ENTITY_TYPE = ENTITY_TYPE
+module.exports.REMINDER_LOCAL_HOUR = REMINDER_LOCAL_HOUR

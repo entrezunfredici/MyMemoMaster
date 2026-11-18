@@ -456,6 +456,42 @@ describe('FlashcardsSessionPage', () => {
     expect(reviewSessionStore.logSession.mock.calls[0][2]).toBeGreaterThanOrEqual(0)
   })
 
+  it('fin de session — le message d\'encouragement n\'est prêt qu\'une fois la session ENREGISTRÉE', async () => {
+    const wrapper = mountSession([mockCard])
+    await flushPromises()
+    const cardStore = useLeitnerCardStore()
+    cardStore.submitResponse.mockImplementation(async () => {
+      cardStore.lastCorrection = { success: true, score: 0.9, correction: 'Paris', explanation: '', decision_zone: 'high' }
+      return true
+    })
+    // L'enregistrement de la session reste en attente : le bilan du jour ne doit pas encore être demandé
+    let finishLogging
+    useLeitnerReviewSessionStore().logSession.mockImplementation(() => new Promise((resolve) => { finishLogging = resolve }))
+
+    await wrapper.find('textarea').setValue('Paris')
+    await wrapper.findAll('button').find(b => b.text() === 'Valider')?.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'Continuer')?.trigger('click')
+    await flushPromises()
+
+    const encouragement = () => wrapper.findComponent({ name: 'SessionEncouragement' })
+    expect(wrapper.text()).toContain('Session terminée')
+    expect(encouragement().props('ready')).toBe(false)
+    expect(encouragement().props('scorePercent')).toBe(90)
+
+    finishLogging()
+    await flushPromises()
+
+    expect(encouragement().props('ready')).toBe(true)
+  })
+
+  it('sortie anticipée — aucun message d\'encouragement (session non terminée)', async () => {
+    const wrapper = mountSession([mockCard])
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'SessionEncouragement' }).exists()).toBe(false)
+  })
+
   // ── Quitter la session ────────────────────────────────────────────────────
 
   it('« Retour » ouvre la modale commune (jamais window.confirm) ; rien ne part avant la réponse', async () => {

@@ -18,6 +18,14 @@ const badgesApi = {
   activity: (weeks = 12) => api.get('badges/me/activity', { weeks }),
   /** Progression de l'objectif quotidien : { date, cards, exercises, achieved }. */
   dailyGoal: () => api.get('badges/me/daily-goal'),
+  /** Bilan de fin de session : { date, firstOfDay, practicesToday, streakCurrent, streakBest, streakExtended, dailyGoalAchieved }. */
+  sessionFeedback: () => api.get('badges/me/session-feedback'),
+  /** Défi du jour : { date, available, subject, daysSince, done, practicesToday }. */
+  dailyChallenge: () => api.get('badges/me/daily-challenge'),
+  /** Niveau (Novice à Expert) dans chaque matière où l'utilisateur a une activité. */
+  subjectLevels: () => api.get('badges/me/subject-levels'),
+  /** Administration : remplace les matières liées à un badge restreignable (liste vide = badge global). */
+  setSubjects: (code, subjectIds) => api.put(`badges/${encodeURIComponent(code)}/subjects`, { subjectIds }),
   /** Badges obtenus dont l'obtention n'a pas encore été vue (modale d'animation). */
   recent: () => api.get('badges/me/recent'),
   /** Réglages de gamification (objectifs, rappel, visibilité enseignant, animations, mode zen). */

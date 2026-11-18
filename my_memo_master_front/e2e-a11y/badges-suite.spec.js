@@ -34,6 +34,22 @@ const RECENT = [
   { code: 'perfectScore', label: 'Score parfait', icon: '⭐', rarity: 'epic', description: 'Obtenir 100 % sur une série' },
 ]
 
+const SUBJECT_LEVELS = [
+  {
+    subjectId: 1, name: 'Mathématiques', rank: 2, level: { code: 'confirmed', label: 'Confirmé', icon: '🎯' },
+    stats: { masteredCards: 60, totalCards: 80, exercises: 6, averagePercent: 70 },
+    next: { code: 'expert', label: 'Expert', icon: '🏅', mode: 'both', cards: { current: 60, target: 150 }, exercises: { current: 6, target: 10 }, averagePercent: { current: 70, target: 80 } },
+  },
+  {
+    subjectId: 2, name: 'Physique', rank: 1, level: { code: 'initiate', label: 'Initié', icon: '📘' },
+    stats: { masteredCards: 0, totalCards: 0, exercises: 2, averagePercent: 63 },
+    next: { code: 'confirmed', label: 'Confirmé', icon: '🎯', mode: 'both', cards: { current: 0, target: 50 }, exercises: { current: 2, target: 5 }, averagePercent: { current: 63, target: 65 } },
+  },
+  { subjectId: 3, name: 'Histoire', rank: 3, level: { code: 'expert', label: 'Expert', icon: '🏅' }, stats: { masteredCards: 200, totalCards: 210, exercises: 12, averagePercent: 90 }, next: null },
+]
+
+const CHALLENGE = { date: '2026-11-18', available: true, subject: { subjectId: 1, name: 'Mathématiques' }, daysSince: 12, done: false, practicesToday: 0 }
+
 const day = (offset) => {
   const d = new Date()
   d.setDate(d.getDate() - offset)
@@ -64,6 +80,8 @@ async function open(page, baseURL, path, { recent = [] } = {}) {
     if (apiPath === 'badges/me/profile') return json({ titleCode: null, showcaseCodes: [] })
     if (apiPath === 'badges/me/activity') return json(activity())
     if (apiPath === 'badges/me/settings') return json(SETTINGS)
+    if (apiPath === 'badges/me/subject-levels') return json(SUBJECT_LEVELS)
+    if (apiPath === 'badges/me/daily-challenge') return json(CHALLENGE)
     return json({ data: [] })
   })
   await page.goto(path)
@@ -119,7 +137,36 @@ test.describe('ordinateur', () => {
   })
 })
 
+test.describe('défi du jour (A4)', () => {
+  test('Accueil, défi à relever - liens d action nommés - WCAG 2.1 A/AA - aucune violation', async ({ page, baseURL }) => {
+    await open(page, baseURL, '/')
+    const challenge = page.getByTestId('daily-challenge')
+    await expect(challenge).toBeVisible()
+    await expect(challenge).toContainText('Mathématiques')
+    await expect(challenge.getByRole('link', { name: 'Réviser mes cartes' })).toBeVisible()
+    expect(await audit(page)).toEqual([])
+  })
+})
+
+test.describe('niveau par matière (B1)', () => {
+  test('Mes badges, « Mes matières » - niveaux et jauges nommées - WCAG 2.1 A/AA - aucune violation', async ({ page, baseURL }) => {
+    await open(page, baseURL, '/profile/badges')
+    await expect(page.getByRole('heading', { name: 'Mes matières' })).toBeVisible()
+    await expect(page.getByTestId('subject-level-1')).toContainText('Confirmé')
+    await expect(page.getByTestId('subject-level-3')).toContainText('Niveau maximal atteint')
+    await expect(page.getByRole('progressbar', { name: 'Physique — Cartes maîtrisées pour Confirmé' })).toBeVisible()
+    expect(await audit(page)).toEqual([])
+  })
+})
+
 test.describe('téléphone (Pixel 5)', () => {
+  test('Accueil mobile avec défi du jour - aucune violation, pas de défilement horizontal', async ({ page, baseURL }) => {
+    await open(page, baseURL, '/')
+    await expect(page.getByTestId('daily-challenge')).toBeVisible()
+    expect(await hasHorizontalScroll(page)).toBe(false)
+    expect(await audit(page)).toEqual([])
+  })
+
   // CHOIX: seules les caractéristiques d'écran et le user-agent (qui déclenche la disposition mobile de l'application)
   // RAISON: `defaultBrowserType` du profil d'appareil est refusé par Playwright dans un groupe de tests.
   const { userAgent, viewport, deviceScaleFactor, isMobile, hasTouch } = devices['Pixel 5']
@@ -147,6 +194,13 @@ test.describe('téléphone (Pixel 5)', () => {
     await open(page, baseURL, '/profile/badges')
     await expect(page.getByRole('heading', { name: 'Mon activité' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Réglages de gamification' })).toBeVisible()
+    expect(await hasHorizontalScroll(page)).toBe(false)
+    expect(await audit(page)).toEqual([])
+  })
+
+  test('Mes badges mobile, « Mes matières » - aucune violation, pas de défilement horizontal', async ({ page, baseURL }) => {
+    await open(page, baseURL, '/profile/badges')
+    await expect(page.getByRole('heading', { name: 'Mes matières' })).toBeVisible()
     expect(await hasHorizontalScroll(page)).toBe(false)
     expect(await audit(page)).toEqual([])
   })

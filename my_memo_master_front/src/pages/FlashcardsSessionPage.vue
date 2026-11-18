@@ -133,6 +133,8 @@
             Score moyen : <strong>{{ averageScorePercent }}%</strong> ·
             {{ cardStore.dueCards.length - errors.length }} réussie(s), {{ errors.length }} à revoir
           </p>
+          <!-- Monté une fois la session enregistrée : le bilan du jour (première session, série) est alors fiable -->
+          <SessionEncouragement class="mb-6 block" :ready="sessionSaved" :score-percent="averageScorePercent" />
           <Button :callback="() => router.push('/flashcards')">Retour aux systèmes</Button>
         </div>
 
@@ -184,6 +186,7 @@ import { useLeitnerBoxStore } from '@/stores/leitnerBoxes'
 import { useLeitnerReviewSessionStore } from '@/stores/leitnerReviewSessions'
 import { shuffledIndices } from '@/helpers/shuffle'
 import ConfirmActionModal from '@/components/ConfirmActionModal.vue'
+import SessionEncouragement from '@/components/badges/SessionEncouragement.vue'
 import { provideConfirmAction } from '@/composables/useConfirmAction'
 
 const router = useRouter()
@@ -235,6 +238,8 @@ const startedAt = ref(null)
 // sur logSessionProgress ci-dessous.
 const reviewedCount = ref(0)
 let sessionLogged = false
+// Vrai une fois la session terminée ENREGISTRÉE côté API (le message de fin s'appuie sur le bilan du jour)
+const sessionSaved = ref(false)
 
 onMounted(async () => {
   await Promise.all([
@@ -318,11 +323,12 @@ const handleValidation = async () => {
 // terme valide en plus automatiquement une séance planifiée correspondante
 // (voir RevisionSession.service.js#validateMatchingSessions) — une sortie
 // anticipée reste journalisée pour le temps, mais ne valide rien.
-const logSessionProgress = (completed) => {
+const logSessionProgress = async (completed) => {
   if (sessionLogged || !startedAt.value || reviewedCount.value < 1) return
   sessionLogged = true
   const durationSeconds = Math.round((Date.now() - startedAt.value) / 1000)
-  reviewSessionStore.logSession(systemId, reviewedCount.value, durationSeconds, completed)
+  await reviewSessionStore.logSession(systemId, reviewedCount.value, durationSeconds, completed)
+  if (completed) sessionSaved.value = true
 }
 
 const nextStep = () => {
