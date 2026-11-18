@@ -13757,6 +13757,14 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Vérifié** : test de la page (4/4), ESLint propre. Manifestes non appliqués ni rendus (`helm template`, `kubectl`) : à vérifier au prochain déploiement.
 **Dette** : `.env.ci` et le `Dockerfile` (ARG de build) n'exposent pas la variable : inutile grâce au repli par défaut.
 
+## [2026-11-01] [IMP] Nouveau bundle Android (versionCode 2 / versionName 1.1)
+
+**Contexte** : rebuild du bundle pour embarquer les nouvelles fonctionnalités du front dans l'app mobile. Aucun code applicatif modifié.
+**Fichiers modifiés** : `my_memo_master_front/android/app/build.gradle` (`versionCode` 1 -> 2, `versionName` "1.0" -> "1.1") ; `android/app/src/main/assets/` régénéré par `cap sync`.
+**Utilisable** : `my_memo_master_front/android/app/build/outputs/bundle/release/app-release.aab` (≈ 17,5 Mo, signé, 2026-11-01 23:00), produit via la procédure du 2026-10-30. À importer dans la Play Console (nouvelle release).
+**Hypothèses** : le `.aab` de `versionCode` 1 est déjà ou sera remplacé ; `versionCode` doit être incrémenté à chaque nouvel envoi.
+**Dette** : bundle non testé sur appareil ; le back de prod doit exposer les endpoints des nouvelles fonctionnalités (déploiement API séparé).
+
 ## [2026-11-01] DOC — C-03.03 : API partage ressources dans groupe (Partage de ressources pédagogiques)
 
 **Feature list ID** : C-03 | **ID source planning** : C-03.03 | **Version** : V2 | **User stories** : US-17
@@ -13946,6 +13954,26 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Dette** : option B (vérification par e-mail) ou C (`xms_edov`) pour rouvrir l'inscription Microsoft.
 
 
+## [2026-11-17] [ADD] Éditeur de carte — export JSON téléchargeable
+
+**Fichiers créés** : `my_memo_master_front/src/helpers/mindmap/mindmapJsonExport.js` (`buildJsonFileName`, `downloadMindMapJson`) · `test/helpers/mindmapJsonExport.test.js`.
+**Fichiers modifiés** : `components/mindmap/MindMapBuilder.vue` (nouveau bouton « Exporter en JSON » ; l'ancien « Exporter » devient « Enregistrer sous… », comportement inchangé : modale nom + matière puis enregistrement serveur) · `test/components/MindMapBuilder.test.js`.
+**Utilisable** : le bouton télécharge `<titre>.json` (payload de `store.exportPayload()`, indenté), sans appel API.
+**Vérifié** : `test/components` + helper : 75 fichiers / 1 399 tests verts, ESLint propre.
+**Hypothèse** : le format est celui de `serializeMindMap`, non versionné.
+**Dette** : pas d'import JSON (rechargement d'un fichier exporté).
+
+
+## [2026-11-17] [ADD] Cartes mentales — import JSON et lien de partage public (lecture seule)
+
+**API** — créés : `migrations/20261117000001-add-sharetoken-to-mindmap.js` (colonne `MindMap.shareToken`, STRING(64), unique, nullable). Modifiés : `models/Diagramme.model.js` · `services/Diagramme.service.js` (`enableShare` idempotent, `disableShare`, `findByShareToken` qui ne renvoie que `mmName` + `mindMapJson`) · `controllers/Diagramme.controller.js` (`enableShare`, `disableShare`, `findShared`) · `routes/Diagramme.routes.js` · `validators/Diagramme.validators.js` (`shareParams`, `sharedToken`) · tests contrôleur et service.
+Routes : `POST /diagrammes/:id/partage` (propriétaire, renvoie `{ shareToken }`) · `DELETE /diagrammes/:id/partage` (204) · `GET /diagrammes/partage/:token` (**publique**, sans authentification, `Cache-Control: no-store`).
+**Front** — créés : `helpers/mindmap/mindmapJsonImport.js` (`parseMindMapJson`, `readMindMapFile`) · `pages/MindmapSharedPage.vue` + route publique `/partage/carte/:token` · tests (`mindmapJsonImport`, `MindmapSharedPage`, `MindMapReadonly`). Modifiés : `MindmapsListView.vue` (bouton « Importer un JSON », bouton et modale « Partager » par carte) · `ItemListLayout.vue` (slot `actions`) · `MenuItemComponent.vue` (slot `actions`) · `MindMapBoard.vue` (prop `readonly`) · `MindMapNode.vue` · `composables/useMindMapNodeEditing.js` (`MINDMAP_READONLY_KEY`, `provideNodeEditing(readonly)`) · `stores/mindmapBuilder.js` (`load(raw, id, { syncCards })`) · `helpers/mindmap/mindmapApi.js` · tests existants.
+**Utilisable** : depuis la liste, importer un fichier JSON exporté crée une carte ; « Partager » crée un lien, l'affiche avec un bouton « Copier » et permet de le désactiver. Le lien ouvre la carte en lecture seule (déplacement, zoom, repli) sans compte.
+**Vérifié** : API contrôleur + service Diagramme 65 tests verts ; front composants/helpers/stores/router/composables 161 fichiers / 2 775 tests verts ; ESLint propre (API et front).
+**Hypothèses** : `history` de la carte est vide (non alimenté dans le code actuel), donc rien d'ancien n'est exposé par le lien public. Les images des cartes sont déjà servies par une route publique (`/diagrammes/image/*`), le lien public ne change donc pas leur exposition.
+**Dette** : migration non rejouée sur une vraie base (seulement les tests unitaires, modèles mockés) · pas de bouton « Partager » dans l'éditeur (liste seulement) · pas de « Copier dans mes cartes » depuis la vue publique · les identifiants `idCard`/`idSystem` des nœuds restent dans le JSON public (simples entiers, sans accès aux cartes).
+
 ## [2026-11-16] [ADD] Gamification — suite : objectif quotidien, rappel de série, modale d'obtention, « Obtenu avec », titre enseignant
 
 **Contexte** : les entrées précédentes laissaient en dette les fonctions dont les réglages existaient déjà (rappel de série, objectif quotidien, animations) ainsi que le titre côté enseignant, « Obtenu avec » et l'audit mobile.
@@ -13958,3 +13986,20 @@ Sans `keystore.properties`, Gradle produit un bundle **non signé** que la conso
 **Vérifié** : API 141 suites / 2 884 tests verts, ESLint propre ; front 164 fichiers / 2 837 tests verts, ESLint propre, `audit:colors`, `audit:tailwind`, `audit:a11y` à 0 ; Playwright `badges-suite.spec.js` 7 / 7 (WCAG 2.1 A/AA contraste inclus, interface mobile Pixel 5, aucun défilement horizontal). L'audit a trouvé un défaut corrigé : le passage « Suivant » → « Super ! » remplaçait le bouton focalisé, le focus tombait sur la page et Échap ne fermait plus la modale ; un seul bouton au libellé changeant.
 **Hypothèses** : (1) « série menacée » = au moins 2 jours de série, pratique hier, rien aujourd'hui (seuil `minStreak`) ; (2) le rappel est une notification dans l'application seulement, sans e-mail : le réglage ne promettait que cela ; (3) l'objectif quotidien compte les cartes de `LeitnerReviewSession` terminées et les `TestResult` du jour (fuseau du serveur) ; (4) le pourcentage de l'anneau cumule les deux objectifs actifs, chacun plafonné à sa cible.
 **Non vérifié / dette** : (1) le cron n'a tourné qu'en test (`runDailyReminders` appelé à la main) ; son horaire est celui du serveur ; (2) le rappel ne tient pas compte du fuseau de l'utilisateur ; (3) la modale vérifie au changement de page, pas en temps réel : un badge gagné s'annonce à la page suivante ; (4) pas de test avec un lecteur d'écran réel ; (5) l'inscription OAuth Microsoft reste fermée (voir DECISIONS 2026-11-16) ; (6) le « message d'encouragement » du mode zen n'existe pas, il n'y a donc rien à masquer.
+
+
+## [2026-11-17] [IMP] Page de partage d'une carte — mise en page publique sans menu
+
+**Fichiers modifiés** : `my_memo_master_front/src/App.vue` (une route à `meta.bare` utilise la mise en page « sans menu » déjà employée par la connexion) · `src/router/routes.js` (`/partage/carte/:token` : `bare: true`) · `src/pages/MindmapSharedPage.vue` (logo vers l'accueil, racine `div` au lieu de `main` pour éviter deux repères `main`, hauteur du plateau recalculée) · `test/App.test.js` (route simulée modifiable ; 2 tests).
+**Utilisable** : un visiteur du lien voit la carte sans barre latérale, sans titre « Carte partagée » de l'application ni cloche de notifications.
+**Vérifié** : `App`, page partagée et routeur : 37 tests verts ; ESLint propre.
+**Hypothèse** : pas vérifié visuellement dans le navigateur (hauteur du plateau `100vh - 130px`).
+
+## [2026-11-18] [FIX] OAuth en production — identifiants Google et GitHub posés sur le cluster
+
+**Constat** : en prod, aucun bouton « Se connecter avec… » ne s'activait. Les `OAUTH_*_CLIENT_ID` n'étaient que dans les anciens `k8s/prod/configmap.yml` (non utilisés, le déploiement passe par Helm) et le Secret `mmm-prod-secrets` du cluster `pck-uuvuwp7` n'avait aucune clé `OAUTH_*` (18 clés).
+**Fichiers modifiés** : `helm/values-prod.yaml` (`OAUTH_GOOGLE_CLIENT_ID`, `OAUTH_GITHUB_CLIENT_ID` dans `config`).
+**Action sur le cluster** : `kubectl patch secret mmm-prod-secrets -n mymemomaster --type merge` ajoute `OAUTH_GOOGLE_CLIENT_SECRET` et `OAUTH_GITHUB_CLIENT_SECRET` (valeurs de `k8s/secrets-prod.env`, non affichées). Les 18 autres clés sont conservées (vérifié : 20 clés au total).
+**Utilisable** : après le prochain déploiement Helm de prod (la ConfigMap reçoit les ID, les pods redémarrent et lisent le Secret), les boutons Google et GitHub sont actifs.
+**Hypothèses** : les URI de redirection `https://app.my-memo-master.com/oauth/callback/google` et `/github` doivent être déclarées chez Google et GitHub (non vérifié) · Microsoft reste inactif (pas d'identifiants).
+**Dette** : `values-preprod.yaml` n'a pas non plus les ID OAuth · les pods en cours d'exécution ne voient pas encore le Secret · `k8s/prod/configmap.yml` est un reliquat à retirer.

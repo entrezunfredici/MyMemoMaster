@@ -34,6 +34,12 @@ config:
   S3_BUCKET: default
   S3_KEY_PREFIX: prod/
   S3_PUBLIC_URL: https://s3.swiss-backup04.infomaniak.com
+  # Connexion OAuth : identifiants publics. Les OAUTH_*_CLIENT_SECRET sont dans le Secret
+  # mmm-prod-secrets (jamais ici). Un fournisseur n'est actif que si ID ET secret sont définis.
+  # URI de redirection à déclarer chez chaque fournisseur :
+  #   https://app.my-memo-master.com/oauth/callback/<google|github>
+  OAUTH_GOOGLE_CLIENT_ID: "179640285118-9t1nnogig0qqf1rd3geopb7pvhimnhgs.apps.googleusercontent.com"
+  OAUTH_GITHUB_CLIENT_ID: "Ov23liTP2ylQ5qbqCJmk"
 
 domain:
   api: api.my-memo-master.com

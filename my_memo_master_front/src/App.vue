@@ -1,6 +1,6 @@
 <template>
-  <!-- NO LAYOUT -->
-  <div v-if="route?.name?.includes?.('auth') || route?.name === 'register' || route?.name === 'forgot-password' || route?.name === 'reset-password'">
+  <!-- NO LAYOUT (connexion, inscription… et pages publiques à meta.bare : lien de partage d'une carte) -->
+  <div v-if="route?.name?.includes?.('auth') || route?.name === 'register' || route?.name === 'forgot-password' || route?.name === 'reset-password' || route?.meta?.bare">
     <main>
       <RouterView />
     </main>

@@ -24,7 +24,14 @@
       </button>
       <div class="mindmap-builder__actions" :class="{ 'is-open': actionsOpen }" role="group" aria-label="Actions">
         <button class="secondary" @click="runAction(handleNew)" :disabled="loading">Nouveau</button>
-        <button class="secondary" @click="runAction(handleExport)" :disabled="loading">Exporter</button>
+        <button class="secondary" @click="runAction(handleExport)" :disabled="loading">Enregistrer sous…</button>
+        <button
+          class="secondary"
+          data-testid="builder-export-json"
+          title="Télécharger la carte au format JSON"
+          @click="runAction(handleExportJson)"
+          :disabled="loading"
+        >Exporter en JSON</button>
         <button class="primary" @click="runAction(handleSave)" :disabled="loading">Sauvegarder</button>
       </div>
     </header>
@@ -62,6 +69,7 @@ import { Bars3Icon } from '@heroicons/vue/24/outline';
 import MindMapBoard from './MindMapBoard.vue';
 import MindMapPalette from './MindMapPalette.vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
+import { downloadMindMapJson } from '@/helpers/mindmap/mindmapJsonExport';
 
 const props = defineProps({
   mapPayload: {
@@ -121,6 +129,10 @@ const handleSave = () => {
 
 const handleExport = () => {
   emit('export', store.exportPayload());
+};
+
+const handleExportJson = () => {
+  downloadMindMapJson(store.exportPayload());
 };
 
 const handleNew = () => {

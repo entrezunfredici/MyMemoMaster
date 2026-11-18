@@ -5591,6 +5591,28 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 **Conséquences** : plus aucune inscription neuve via Microsoft, qui reste utilisable pour un compte déjà lié. Les nouveaux utilisateurs Microsoft doivent s'inscrire par email et mot de passe.
 
 
+## [2026-11-17] Export JSON de carte mentale côté front uniquement
+
+**Contexte** : le bouton « Exporter » n'exportait rien, il ouvrait la modale d'enregistrement serveur ; les utilisateurs attendaient un fichier.
+**Décision** : bouton distinct « Exporter en JSON » qui sérialise `store.exportPayload()` en `Blob` téléchargé par le navigateur ; l'ancien bouton est renommé « Enregistrer sous… ».
+**Alternative écartée** : remplacer le comportement de « Exporter » (perte du chemin nom + matière à la première sauvegarde) ; route API d'export (inutile, le payload est déjà côté client).
+**Conséquences** : aucun changement d'API ni dépendance ; le format JSON suit `serializeMindMap` et n'a pas de numéro de version, à ajouter si un import est construit.
+
+
+## [2026-11-17] Partage public d'une carte mentale par jeton secret révocable
+
+**Contexte** : permettre de montrer une carte à quelqu'un sans compte. Aucun mode lecture seule n'existait dans l'éditeur, et la route d'accès aux cartes est réservée au propriétaire.
+**Décision** : colonne `MindMap.shareToken` (32 octets aléatoires, base64url, unique) ; `NULL` = privée. Création idempotente (un second clic ne casse pas le lien déjà envoyé), révocation en remettant `NULL`. Route `GET /diagrammes/partage/:token` publique qui ne renvoie que le nom et le contenu (ni auteur, ni identifiant, ni jeton), jeton validé par `validators` (400 si mal formé), réponse `no-store`. Côté front, page publique `/partage/carte/:token` qui réutilise `MindMapBoard` avec une prop `readonly` (injectée aux items) ; `store.load(..., { syncCards: false })` évite les appels authentifiés d'un visiteur anonyme (un 401 déconnecte via `api.js`).
+**Alternative écartée** : lien dérivé de l'identifiant de la carte (devinable, non révocable) ; copie figée de la carte (se désynchronise) ; page dédiée sans le plateau existant (rendu dupliqué).
+**Conséquences** : le lien donne accès à la version courante de la carte tant qu'il est actif ; révocable à tout moment, l'ancien lien est alors mort (404). Limitation de débit : celle, globale, de `apiLimiter`. Pas de journal d'accès.
+
+## [2026-11-17] Import JSON strict et sans liens de flashcards
+
+**Contexte** : `normalizeMindMap` accepte presque tout et remplace un contenu inconnu par une carte vide, ce qui masquerait un mauvais fichier ; un fichier venant d'un autre compte contient des `idCard`/`idSystem` qui ne sont pas à l'importateur.
+**Décision** : `parseMindMapJson` exige le format courant (`nodes` objet non vide + `links` tableau) ou l'ancien format (`nodeDataArray`/`linkDataArray`), plafonne le fichier à 10 Mo et le nom à 50 caractères (colonne `mmName`), puis supprime `idCard`/`idSystem` de chaque nœud. La carte est créée via l'API existante `POST /diagrammes`.
+**Alternative écartée** : route d'import dédiée côté API (la validation existante suffit, rien à gagner) ; conserver les liens de flashcards (appels API sur des systèmes que l'importateur ne possède pas).
+**Conséquences** : un import n'écrase jamais une carte, il en crée une nouvelle. Le format n'est pas versionné (à ajouter si le schéma change).
+
 ## [2026-11-16] Gamification : rappel de série, objectif quotidien, modale d'obtention, titre enseignant
 
 **Contexte** : les réglages (rappel de série, objectifs, animations) étaient enregistrés sans effet ; le titre n'était pas montré aux enseignants ; « Obtenu avec » manquait dans le détail.
@@ -5602,3 +5624,10 @@ comportement documenté du path-style S3, à confirmer par l'utilisateur au proc
 - **« Obtenu avec »** : `GET /badges` ajoute `earnedSubjects` (noms), via `withSubjectNames` déjà utilisé pour les KPI. Ajout seulement, aucune clé retirée.
 **Alternative écartée** : e-mail de rappel (spam, consentement distinct, rien dans le réglage qui le promette) ; colonne de cache pour l'objectif quotidien (donnée dérivée, deux sources de vérité) ; sondage temps réel ou WebSocket pour la modale (coût disproportionné pour une annonce différée d'une page) ; montrer le titre à l'enseignant indépendamment du badge (fuite d'une matière non consentie).
 **Conséquences** : le rappel et la vérification de la modale dépendent de l'heure du serveur, pas du fuseau de l'utilisateur. Un nouveau type de `Reminder` (`streak_reminder`, 15 caractères sur 20 autorisés) est à connaître de tout code qui trie les rappels. Aucune migration.
+
+## [2026-11-18] Secrets OAuth de prod : patch ciblé du Secret, pas de recréation
+
+**Contexte** : `k8s/secrets-prod.env` (local) ne contient pas toutes les clés du Secret réel (`MISTRAL_API_KEY`, `SMTP_*_USER/PASS` des providers n'y figurent pas).
+**Décision** : ajouter `OAUTH_*_CLIENT_SECRET` par `kubectl patch --type merge` ; les client ID (publics) vont dans `config` de `helm/values-prod.yaml`.
+**Alternative écartée** : `kubectl create secret --from-env-file=k8s/secrets-prod.env` (méthode du `secrets.env.example`) : elle aurait remplacé le Secret et supprimé `MISTRAL_API_KEY` et les clés SMTP.
+**Conséquences** : ne jamais recréer `mmm-prod-secrets` depuis ce fichier local sans l'avoir d'abord réconcilié avec le cluster.

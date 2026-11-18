@@ -58,13 +58,20 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { useMindMapBuilderStore } from '@/stores/mindmapBuilder';
+import { MINDMAP_READONLY_KEY } from '@/composables/useMindMapNodeEditing';
 import { getNodeLabel } from '@/helpers/mindmap/mindmapCreation';
 import MindMapNode from './MindMapNode.vue';
 import MindMapLink from './MindMapLink.vue';
 import { computeLinkGeometry, getBranchTypeLabel, getOutgoingLinks, layoutLinkLabels, linkLabelText, linkLabelWidth } from '@/helpers/mindmap/mindmapLinks';
 import MindMapZone from './MindMapZone.vue';
+
+const props = defineProps({
+  // Lecture seule (page de partage public) : on peut se déplacer, zoomer et replier, pas modifier la carte.
+  readonly: { type: Boolean, default: false },
+});
+provide(MINDMAP_READONLY_KEY, props.readonly);
 
 const store = useMindMapBuilderStore();
 
@@ -212,7 +219,7 @@ const toBoardCoords = (event) => {
 };
 
 const onNodePointerDown = ({ event, node }) => {
-  if (store.tool === 'link') {
+  if (!props.readonly && store.tool === 'link') {
     if (!store.pendingLinkSource) {
       store.setPendingLinkSource(node.id);
     } else {
@@ -223,6 +230,7 @@ const onNodePointerDown = ({ event, node }) => {
 
   const additive = event.ctrlKey || event.metaKey;
   store.selectNode(node.id, additive);
+  if (props.readonly) return;
   pendingDragNodeId.value = node.id;
   pendingDragPointerId.value = event.pointerId;
   pendingDragStart.value = { x: event.clientX, y: event.clientY };
@@ -238,12 +246,14 @@ const ZONE_MIN_SIZE = { width: 120, height: 80 };
 const resizingZone = ref(null);
 
 const onZoneResizeStart = ({ event, zone }) => {
+  if (props.readonly) return;
   const { x = 0, y = 0, width = 320, height = 240 } = zone.layout || {};
   resizingZone.value = { id: zone.id, left: x - width / 2, top: y - height / 2 };
   svgRef.value?.setPointerCapture?.(event.pointerId);
 };
 
 const onZonePointerDown = ({ event, zone }) => {
+  if (props.readonly) return;
   draggingZoneId.value = zone.id;
   const coords = toBoardCoords(event);
   zoneDragOffset.value = {
@@ -261,7 +271,7 @@ const onBackgroundPointerDown = (event) => {
   const isPrimaryButton = event.button === 0;
   const clickedSvgBackground = event.target === svgRef.value;
 
-  if (event.shiftKey && isPrimaryButton && clickedSvgBackground) {
+  if (!props.readonly && event.shiftKey && isPrimaryButton && clickedSvgBackground) {
     if (!store.map.subjectNodeId) return;
     const coords = toBoardCoords(event);
     const type = store.nodeType || 'text';

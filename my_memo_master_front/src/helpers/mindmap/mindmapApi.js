@@ -11,6 +11,12 @@ const mindmapApi = {
   createDiagram: (body) => api.post('diagrammes', body),
   updateDiagram: (id, body) => api.put(`/diagrammes/${id}`, body),
   deleteDiagram: (id) => api.del(`diagrammes/${id}`),
+
+  // ── Partage public (lecture seule) ──
+  enableShare: (id) => api.post(`diagrammes/${id}/partage`),
+  disableShare: (id) => api.del(`diagrammes/${id}/partage`),
+  getShared: (token) => api.get(`diagrammes/partage/${encodeURIComponent(token)}`),
+
   uploadImage: (formData) =>
     api.post('diagrammes/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 

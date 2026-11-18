@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const { Diagramme, Subject, Tag } = require('../models/index')
 
 const TAG_INCLUDE = { model: Tag, as: 'tags', attributes: ['tagId', 'name', 'color'], through: { attributes: [] } }
@@ -40,6 +41,54 @@ class DiagrammeService {
       throw new Error('Diagramme not found')
     }
     return await diagramme.destroy()
+  }
+
+  /**
+   * Active le partage public d'une carte. Idempotent : un lien déjà actif est conservé
+   * (sinon un second clic casserait le lien déjà envoyé).
+   *
+   * @param {number|string} id - Identifiant de la carte
+   * @returns {Promise<string>} Jeton de partage
+   */
+  async enableShare(id) {
+    const diagramme = await Diagramme.findByPk(id)
+    if (!diagramme) {
+      throw new Error('Diagramme not found')
+    }
+    if (diagramme.shareToken) return diagramme.shareToken
+    const shareToken = crypto.randomBytes(32).toString('base64url')
+    await diagramme.update({ shareToken })
+    return shareToken
+  }
+
+  /**
+   * Révoque le lien de partage : l'ancien lien ne donne plus accès à la carte.
+   *
+   * @param {number|string} id - Identifiant de la carte
+   * @returns {Promise<void>}
+   */
+  async disableShare(id) {
+    const diagramme = await Diagramme.findByPk(id)
+    if (!diagramme) {
+      throw new Error('Diagramme not found')
+    }
+    await diagramme.update({ shareToken: null })
+  }
+
+  /**
+   * Retrouve une carte à partir de son jeton public. Ne renvoie que le nom et le contenu :
+   * ni l'auteur, ni l'identifiant, ni le jeton.
+   *
+   * @param {string} token - Jeton de partage
+   * @returns {Promise<{mmName: string, mindMapJson: object|string}|null>}
+   */
+  async findByShareToken(token) {
+    if (typeof token !== 'string' || token.length < 20 || token.length > 64) return null
+    const diagramme = await Diagramme.findOne({
+      where: { shareToken: token },
+      attributes: ['mmName', 'mindMapJson']
+    })
+    return diagramme ? { mmName: diagramme.mmName, mindMapJson: diagramme.mindMapJson } : null
   }
 
   /**

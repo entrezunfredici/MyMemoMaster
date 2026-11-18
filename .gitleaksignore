@@ -1,0 +1,10 @@
+# Faux positifs gitleaks : jetons de partage FACTICES dans des tests (aucun secret réel).
+# CHOIX: empreintes exactes (commit:fichier:règle:ligne) plutôt qu'une exception de chemin ou de règle.
+# RAISON: ces valeurs sont déjà dans l'historique publié (commit 5d847a7) et gitleaks scanne tout
+# l'historique ; ignorer uniquement ces cinq occurrences laisse la règle generic-api-key active partout
+# ailleurs. Les tests ont ensuite été réécrits avec des valeurs à faible entropie.
+5d847a7a3f1fa1e1964ce3dbe2cc98a84d06087b:my_memo_master_api/test/controllers/Diagramme.controller.test.js:generic-api-key:397
+5d847a7a3f1fa1e1964ce3dbe2cc98a84d06087b:my_memo_master_front/test/components/MindmapSharedPage.test.js:generic-api-key:12
+5d847a7a3f1fa1e1964ce3dbe2cc98a84d06087b:my_memo_master_front/test/components/MindmapsListView.test.js:generic-api-key:303
+5d847a7a3f1fa1e1964ce3dbe2cc98a84d06087b:my_memo_master_front/test/components/MindmapsListView.test.js:generic-api-key:320
+5d847a7a3f1fa1e1964ce3dbe2cc98a84d06087b:my_memo_master_front/test/components/MindmapsListView.test.js:generic-api-key:328

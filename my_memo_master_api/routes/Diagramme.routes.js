@@ -63,6 +63,30 @@ router.get('/image/*', diagramme.getImage)
 
 /**
  * @swagger
+ * /diagrammes/partage/{token}:
+ *   get:
+ *     summary: Récupère une carte mentale partagée publiquement (sans authentification)
+ *     tags:
+ *       - diagrammes
+ *     parameters:
+ *       - name: token
+ *         in: path
+ *         required: true
+ *         description: Jeton du lien de partage
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Nom et contenu de la carte (lecture seule)
+ *       404:
+ *         description: Lien invalide ou désactivé
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.get('/partage/:token', diagrammeValidators.sharedToken, validate, diagramme.findShared)
+
+/**
+ * @swagger
  * /diagrammes/{id}:
  *   get:
  *     summary: Récupère un diagramme par son ID
@@ -192,6 +216,47 @@ router.put('/:id', authMiddleware, diagrammeValidators.update, validate, diagram
  *         description: Erreur interne du serveur
  */
 router.delete('/:id', authMiddleware, diagramme.delete)
+
+/**
+ * @swagger
+ * /diagrammes/{id}/partage:
+ *   post:
+ *     summary: Active (ou récupère) le lien de partage public de la carte
+ *     tags:
+ *       - diagrammes
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Jeton de partage
+ *       403:
+ *         description: La carte n'appartient pas à l'utilisateur
+ *       404:
+ *         description: Diagramme non trouvé
+ *   delete:
+ *     summary: Désactive le lien de partage public de la carte
+ *     tags:
+ *       - diagrammes
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       204:
+ *         description: Lien désactivé
+ *       403:
+ *         description: La carte n'appartient pas à l'utilisateur
+ *       404:
+ *         description: Diagramme non trouvé
+ */
+router.post('/:id/partage', authMiddleware, diagrammeValidators.shareParams, validate, diagramme.enableShare)
+router.delete('/:id/partage', authMiddleware, diagrammeValidators.shareParams, validate, diagramme.disableShare)
 
 /**
  * @swagger
