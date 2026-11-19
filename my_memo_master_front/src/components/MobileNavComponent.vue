@@ -50,6 +50,16 @@
         <component :is="item.icon" class="size-7" />
         <span>{{ item.label }}</span>
       </router-link>
+      <button
+        v-if="badgesStore.zen"
+        type="button"
+        class="mobile-sheet__item"
+        data-testid="zen-disable"
+        @click="disableZen"
+      >
+        <SparklesIcon class="size-7" />
+        <span>Désactiver le mode zen</span>
+      </button>
     </div>
   </Teleport>
 </template>
@@ -57,7 +67,8 @@
 <script setup>
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import { Bars3Icon, HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon, ShieldExclamationIcon } from '@heroicons/vue/24/outline'
+import { Bars3Icon, HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon, ShieldExclamationIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { useBadgesStore } from '@/stores/badges'
 import ExercisesIcon from '@/icons/ExercisesIcon.vue'
 import FlashardIcon from '@/icons/FlashardIcon.vue'
 import MindmapIcon from '@/icons/MindmapIcon.vue'
@@ -70,6 +81,12 @@ import { useRole } from '@/composables/useRole'
 const route = useRoute()
 const { isAdminPlateforme, canModerate } = useRole()
 const isOpen = ref(false)
+const badgesStore = useBadgesStore()
+
+const disableZen = async () => {
+  await badgesStore.updateSettings({ zenMode: false })
+  isOpen.value = false
+}
 
 // `match` : sous-chaîne du nom de route qui marque l'entrée comme active ('' = égalité stricte sur `name`)
 const primaryItems = [

@@ -520,12 +520,20 @@ describe('ProfileBadgesSummary — vitrine, titre, mode zen', () => {
     expect(wrapper.find('[data-testid="badge-title"]').exists()).toBe(false)
   })
 
-  it('mode zen - la carte n\'est pas affichée', async () => {
+  it('mode zen - la carte des succès est remplacée par un bouton pour quitter le mode', async () => {
     api.settings.mockResolvedValue(ok({ ...SETTINGS, zenMode: true }))
     const wrapper = mountWith(ProfileBadgesSummary)
     await flushPromises()
 
-    expect(wrapper.find('section').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Mes succès')
+    expect(wrapper.text()).not.toContain('Voir tous mes badges')
+
+    await wrapper.find('[data-testid="zen-disable"]').trigger('click')
+    await flushPromises()
+
+    expect(api.updateSettings).toHaveBeenCalledWith({ zenMode: false })
+    expect(wrapper.text()).toContain('Mes succès')
+    expect(wrapper.find('[data-testid="zen-disable"]').exists()).toBe(false)
   })
 
   it('API des réglages en erreur - la carte reste affichée', async () => {

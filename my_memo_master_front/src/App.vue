@@ -59,6 +59,11 @@
           </router-link>
         </div>
         <div class="flex flex-col items-center gap-3 justify-center">
+          <button v-if="badgesStore.zen" type="button" aria-label="Désactiver le mode zen"
+            title="Mode zen actif : cliquer pour le désactiver et retrouver les badges"
+            data-testid="zen-disable" class="text-primary bg-light p-3 rounded-lg" @click="disableZen">
+            <SparklesIcon class="size-8" />
+          </button>
           <router-link to="/profile" aria-label="Profil"
             :class="[route?.name && route.name.includes('profile') ? 'text-light bg-primary' : 'text-primary bg-light', 'p-3 rounded-lg']">
             <ProfileIcon class="size-8" />
@@ -119,7 +124,8 @@ import SettingsIcon from '@/icons/SettingsIcon.vue'
 // import CreditsIcon from '@/icons/CommunityIcon.vue'
 import ClassroomIcon from '@/icons/ClassroomIcon.vue'
 import KpiIcon from '@/icons/KpiIcon.vue'
-import { HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon, ShieldExclamationIcon } from '@heroicons/vue/24/outline'
+import { HomeIcon, CalendarIcon, CheckCircleIcon, ShieldCheckIcon, ShieldExclamationIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { useBadgesStore } from '@/stores/badges'
 import { useRole } from '@/composables/useRole'
 import { useRoute } from 'vue-router'
 import { VITE_APP_NAME } from '@/config';
@@ -135,6 +141,10 @@ import { notif } from '@/helpers/notif.js'
 
 const route = useRoute()
 const { isAdminPlateforme, canModerate } = useRole()
+const badgesStore = useBadgesStore()
+
+// Sortie du mode zen depuis le menu principal (sinon plus aucun accès aux badges une fois zen activé)
+const disableZen = () => badgesStore.updateSettings({ zenMode: false })
 
 const konamiSequence = [
   'ArrowUp',

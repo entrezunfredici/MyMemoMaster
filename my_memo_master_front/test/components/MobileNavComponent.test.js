@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
+import { useBadgesStore } from '@/stores/badges'
 import MobileNav from '@/components/MobileNavComponent.vue'
 
 const routeState = ref({ name: 'home', fullPath: '/' })
@@ -15,16 +17,19 @@ vi.mock('@/composables/useRole', () => ({ useRole: () => ({ isAdminPlateforme: i
 
 const RouterLinkStub = { props: ['to'], template: '<a :href="to"><slot /></a>' }
 
+let pinia
 const mountNav = () =>
   mount(MobileNav, {
     attachTo: document.body,
-    global: { stubs: { RouterLink: RouterLinkStub } },
+    global: { plugins: [pinia], stubs: { RouterLink: RouterLinkStub } },
   })
 
 const sheet = () => document.body.querySelector('[data-testid="mobile-nav-sheet"]')
 
 describe('MobileNav — barre du bas', () => {
   beforeEach(() => {
+    pinia = createPinia()
+    setActivePinia(pinia)
     routeState.value = { name: 'home', fullPath: '/' }
     isAdmin.value = false
     canModerate.value = false
@@ -129,6 +134,22 @@ describe('MobileNav — barre du bas', () => {
     const active = wrapper.findAll('a.mobile-nav__tab--active')
     expect(active).toHaveLength(1)
     expect(active[0].attributes('aria-label')).toBe('Cartes mentales')
+    wrapper.unmount()
+  })
+
+  it("le bouton « Désactiver le mode zen » n'apparaît qu'en mode zen et coupe le mode", async () => {
+    const store = useBadgesStore()
+    const spy = vi.spyOn(store, 'updateSettings').mockResolvedValue(true)
+    const wrapper = mountNav()
+    await wrapper.find('[data-testid="mobile-nav-more"]').trigger('click')
+    expect(sheet().querySelector('[data-testid="zen-disable"]')).toBeNull()
+    store.settings = { zenMode: true }
+    await wrapper.vm.$nextTick()
+    const btn = sheet().querySelector('[data-testid="zen-disable"]')
+    expect(btn).not.toBeNull()
+    btn.click()
+    await wrapper.vm.$nextTick()
+    expect(spy).toHaveBeenCalledWith({ zenMode: false })
     wrapper.unmount()
   })
 })

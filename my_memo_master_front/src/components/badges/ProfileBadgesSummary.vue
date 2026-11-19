@@ -35,6 +35,19 @@
       <RouterLink :to="{ name: 'badges' }" class="inline-block mt-3 underline text-primary">Voir tous mes badges</RouterLink>
     </template>
   </section>
+  <!-- Mode zen : le résumé est masqué, on propose de quitter le mode à la place -->
+  <section v-else-if="store.zen" class="bg-white border-2 border-gray-100 rounded-xl p-4" aria-labelledby="zen-summary-title">
+    <h2 id="zen-summary-title" class="text-xl font-bold text-primary mb-2">Mode zen activé</h2>
+    <p class="text-sm text-dark/70">Badges, séries et objectifs sont masqués. Rien n'est perdu : tout reste compté.</p>
+    <button
+      type="button"
+      class="mt-3 px-4 py-2 rounded-lg border-2 border-primary bg-primary text-on-primary font-semibold"
+      data-testid="zen-disable"
+      @click="store.updateSettings({ zenMode: false })"
+    >
+      Désactiver le mode zen
+    </button>
+  </section>
 </template>
 
 <script setup>

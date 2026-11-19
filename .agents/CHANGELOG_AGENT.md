@@ -14077,3 +14077,14 @@ Routes : `POST /diagrammes/:id/partage` (propriétaire, renvoie `{ shareToken }`
 **Hypothèses** : (1) « délaissée » = aucune pratique (session Leitner ou exercice personnel) depuis 7 jours calendaires locaux ; (2) une consultation de carte mentale ne compte pas comme pratique d'une matière ; (3) une matière jamais pratiquée mais avec des cartes est candidate, après les matières déjà pratiquées ; (4) relever le défi = n'importe quelle pratique du jour dans la matière.
 **Non vérifié / dette** : (1) pas de réglage pour désactiver le défi seul ; (2) pas de suivi de « défis relevés » ni de badge associé ; (3) le calcul lit tout l'historique de l'utilisateur à chaque appel ; (4) le lien « Réviser mes cartes » mène à la liste des systèmes, pas directement au système de la matière du défi ; (5) tests BDD sur SQLite uniquement ; (6) pas de test avec un lecteur d'écran réel.
 **Reste à faire sur C-06** : A5, A6, B2 à B6, F1 à F3, F5, F8, badges du §6 hors lot 1.
+
+
+## [2026-11-19] [FIX] Mode zen : sortie depuis le menu principal
+
+**Contexte** : en mode zen, KPI/profil/accueil masquent tout accès aux badges ; l'utilisateur ne pouvait plus désactiver le mode (réglage sur `/profile/badges`).
+**Front — fichiers modifiés** : `src/App.vue` (bouton `SparklesIcon` « Désactiver le mode zen » dans la nav desktop, visible seulement si `badgesStore.zen`) · `src/components/MobileNavComponent.vue` (même bouton dans la feuille « Plus »).
+**Utilisable** : en mode zen, un bouton du menu principal (desktop et mobile) appelle `updateSettings({ zenMode: false })` ; les badges redeviennent accessibles.
+**Hypothèses** : le bouton s'appuie sur `store.zen`, alimenté par `fetchSettings` (appelé par `StreakFlame` dans l'en-tête).
+**Dette** : aucun test ajouté (ni composant, ni Playwright) ; non vérifié visuellement.
+
+**Complément (même jour)** : `components/badges/ProfileBadgesSummary.vue` affiche, en mode zen, une carte « Mode zen activé » avec le bouton « Désactiver le mode zen » à la place de « Mes succès ». Tests : `BadgesProfile.test.js` (test zen remplacé), `MobileNavComponent.test.js` (+1, Pinia fourni). Non fait : test du bouton desktop de `App.vue`, Playwright.
