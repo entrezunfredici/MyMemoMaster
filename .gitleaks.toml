@@ -4,15 +4,15 @@ title = "MyMemoMaster — configuration gitleaks"
 [extend]
 useDefault = true
 
-# CHOIX: exception limitée aux identifiants CLIENT OAuth des configmaps k8s (chemin ET clé doivent correspondre)
+# CHOIX: exception limitée aux identifiants CLIENT OAuth des configmaps k8s et values Helm (chemin ET clé doivent correspondre)
 # RAISON: un client_id OAuth est public par conception (il apparaît dans l'URL d'autorisation visible du
 # navigateur) ; les CLIENT_SECRET restent dans le Secret k8s et ne sont jamais dans le dépôt.
 # Toute autre valeur de ces fichiers, ou ce même motif ailleurs, reste contrôlée.
 [[allowlists]]
-description = "Identifiants clients OAuth publics des configmaps k8s (les secrets sont dans le Secret)"
+description = "Identifiants clients OAuth publics des configmaps k8s et values Helm (les secrets sont dans le Secret)"
 condition = "AND"
 targetRules = ["generic-api-key"]
-paths = ['''k8s/(prod|preprod)/configmap\.yml''']
+paths = ['''k8s/(prod|preprod)/configmap\.yml''', '''helm/values[^/]*\.yaml''']
 # Par défaut les regex sont comparées à la valeur du secret seule ; ici la clé se trouve sur la ligne
 regexTarget = "line"
 regexes = ['''OAUTH_(GITHUB|GOOGLE|MICROSOFT)_CLIENT_ID''']

@@ -14088,3 +14088,10 @@ Routes : `POST /diagrammes/:id/partage` (propriétaire, renvoie `{ shareToken }`
 **Dette** : aucun test ajouté (ni composant, ni Playwright) ; non vérifié visuellement.
 
 **Complément (même jour)** : `components/badges/ProfileBadgesSummary.vue` affiche, en mode zen, une carte « Mode zen activé » avec le bouton « Désactiver le mode zen » à la place de « Mes succès ». Tests : `BadgesProfile.test.js` (test zen remplacé), `MobileNavComponent.test.js` (+1, Pinia fourni). Non fait : test du bouton desktop de `App.vue`, Playwright.
+
+
+## [2026-11-20] [IMP] OAuth Microsoft : configuration preprod et prod
+
+**Fichiers modifiés** : `k8s/preprod/configmap.yml` · `k8s/prod/configmap.yml` · `helm/values-prod.yaml` (`OAUTH_MICROSOFT_CLIENT_ID`, `OAUTH_MICROSOFT_TENANT`, repris du `.env`) ; `k8s/secrets-preprod.env` · `k8s/secrets-prod.env` (`OAUTH_MICROSOFT_CLIENT_SECRET`, fichiers ignorés par git).
+**Hypothèses** : le secret n'est jamais dans un ConfigMap (versionné), même logique que Google et GitHub.
+**Dette** : à appliquer sur le cluster (`kubectl apply` des ConfigMap, mise à jour du Secret, redémarrage de l'API) ; l'URI `<APP_FRONT_URL>/oauth/callback/microsoft` doit être déclarée chez Microsoft pour preprod ET prod. Rien de tout cela n'a été vérifié.

@@ -60,6 +60,8 @@ data:
   # ── OAuth (identifiants publics ; les CLIENT_SECRET sont dans le Secret) ──────
   OAUTH_GOOGLE_CLIENT_ID: "179640285118-9t1nnogig0qqf1rd3geopb7pvhimnhgs.apps.googleusercontent.com"
   OAUTH_GITHUB_CLIENT_ID: "Ov23liTP2ylQ5qbqCJmk"
+  OAUTH_MICROSOFT_CLIENT_ID: "61ff60aa-ae6d-4149-ad82-4ce320c99ee5"
+  OAUTH_MICROSOFT_TENANT: "common"
 
   # ── PgAdmin ──────────────────────────────────────────────────────────────────
   PGADMIN_DEFAULT_EMAIL: "admin@my-memo-master.com"

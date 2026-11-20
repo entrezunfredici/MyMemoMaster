@@ -37,9 +37,11 @@ config:
   # Connexion OAuth : identifiants publics. Les OAUTH_*_CLIENT_SECRET sont dans le Secret
   # mmm-prod-secrets (jamais ici). Un fournisseur n'est actif que si ID ET secret sont définis.
   # URI de redirection à déclarer chez chaque fournisseur :
-  #   https://app.my-memo-master.com/oauth/callback/<google|github>
+  #   https://app.my-memo-master.com/oauth/callback/<google|github|microsoft>
   OAUTH_GOOGLE_CLIENT_ID: "179640285118-9t1nnogig0qqf1rd3geopb7pvhimnhgs.apps.googleusercontent.com"
   OAUTH_GITHUB_CLIENT_ID: "Ov23liTP2ylQ5qbqCJmk"
+  OAUTH_MICROSOFT_CLIENT_ID: "61ff60aa-ae6d-4149-ad82-4ce320c99ee5"
+  OAUTH_MICROSOFT_TENANT: "common"
 
 domain:
   api: api.my-memo-master.com
