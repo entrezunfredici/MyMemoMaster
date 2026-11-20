@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
-    "@capacitor/cli": "^8.5.3",
+    "@capacitor/cli": "^8.6.2",
     "@pinia/testing": "^0.1.7",
     "@playwright/test": "^1.62.1",
     "@rushstack/eslint-patch": "^1.8.0",
