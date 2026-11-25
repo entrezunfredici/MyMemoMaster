@@ -14095,3 +14095,10 @@ Routes : `POST /diagrammes/:id/partage` (propriétaire, renvoie `{ shareToken }`
 **Fichiers modifiés** : `k8s/preprod/configmap.yml` · `k8s/prod/configmap.yml` · `helm/values-prod.yaml` (`OAUTH_MICROSOFT_CLIENT_ID`, `OAUTH_MICROSOFT_TENANT`, repris du `.env`) ; `k8s/secrets-preprod.env` · `k8s/secrets-prod.env` (`OAUTH_MICROSOFT_CLIENT_SECRET`, fichiers ignorés par git).
 **Hypothèses** : le secret n'est jamais dans un ConfigMap (versionné), même logique que Google et GitHub.
 **Dette** : à appliquer sur le cluster (`kubectl apply` des ConfigMap, mise à jour du Secret, redémarrage de l'API) ; l'URI `<APP_FRONT_URL>/oauth/callback/microsoft` doit être déclarée chez Microsoft pour preprod ET prod. Rien de tout cela n'a été vérifié.
+
+## 2026-11-25 — Activation manuelle de la connexion Microsoft en prod
+
+- Cluster (aucun code modifié) : `OAUTH_MICROSOFT_CLIENT_ID` et `OAUTH_MICROSOFT_TENANT` ajoutés par `kubectl patch` à la ConfigMap `mmm-prod-config` (valeurs de `helm/values-prod.yaml`), puis redémarrage de `mmm-prod-api`. Le secret était déjà présent.
+- Utilisable : `/api/v1/users/oauth/providers` renvoie Google, GitHub et Microsoft. Connexion complète avec un compte Microsoft non testée.
+- Cause : CI en échec sur `f2a7c78` (E2E, HTTP 502 à la création d'un groupe), donc CD prod ignoré.
+- Dette : corriger ou relancer cette CI ; kubeconfig valide = `pck-uuvuwp7` (le kubeconfig par défaut pointe sur `pck-dkoyol2`, injoignable).
